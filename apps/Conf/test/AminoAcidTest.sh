@@ -21,7 +21,7 @@ cat > cgen.in << EOF
 &end
 
 &conformer
-  rotation_samples 600,
+  rotation_samples 60,
 &end
 EOF
 

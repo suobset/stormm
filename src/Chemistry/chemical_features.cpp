@@ -33,7 +33,8 @@ using testing::Approx;
 using topology::colorConnectivity;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
-  
+
+
 //-------------------------------------------------------------------------------------------------
 BondedNode::BondedNode() :
     previous_atom_index{-1}, previous_node_index{-1}, atom_index{-1}, layer_index{-1},
@@ -156,6 +157,87 @@ void BondedNode::setRingCompletion(const int branch_index) {
 //-------------------------------------------------------------------------------------------------
 void BondedNode::wipeRingCompletion() {
   rings_completed = 0U;
+}
+
+//-------------------------------------------------------------------------------------------------
+Isomerization::Isomerization(const ConformationEdit motion_in, const int root_atom_in,
+                             const int pivot_atom_in, const AtomGraph* ag_pointer_in) :
+    motion{motion_in}, root_atom{root_atom_in}, pivot_atom{pivot_atom_in},
+    ag_pointer{ag_pointer_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+Isomerization::Isomerization(const ConformationEdit motion_in, const int root_atom_in,
+                             const AtomGraph* ag_pointer_in) :
+    motion{motion_in}, root_atom{root_atom_in}, pivot_atom{-1}, ag_pointer{ag_pointer_in}
+{
+  // Check that the ConformationEdit needs no pivot atom
+  switch (motion) {
+  case ConformationEdit::BOND_ROTATION:
+  case ConformationEdit::CIS_TRANS_FLIP:
+    rtErr("Bond rotations or cis-trans flips must specify a pivot atom as well as a root atom.",
+          "Isomerization");
+  case ConformationEdit::CHIRAL_INVERSION:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+Isomerization& Isomerization::operator=(const Isomerization &other) {
+
+  // Guard against self-assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Copy each element
+  motion = other.motion;
+  root_atom = other.root_atom;
+  pivot_atom = other.pivot_atom;
+  ag_pointer = other.ag_pointer;
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+Isomerization& Isomerization::operator=(Isomerization &&other) {
+
+  // Guard against self-assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Copy each element
+  motion = other.motion;
+  root_atom = other.root_atom;
+  pivot_atom = other.pivot_atom;
+  ag_pointer = other.ag_pointer;
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+ConformationEdit Isomerization::getMotion() const {
+  return motion;
+}
+
+//-------------------------------------------------------------------------------------------------
+int Isomerization::getRootAtom() const {
+  return root_atom;
+}
+
+//-------------------------------------------------------------------------------------------------
+int Isomerization::getPivotAtom() const {
+  return pivot_atom;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& Isomerization::getMovingAtoms() const {
+  switch (motion) {
+  case ConformationEdit::BOND_ROTATION:
+  case ConformationEdit::CIS_TRANS_FLIP:
+  case ConformationEdit::CHIRAL_INVERSION:
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

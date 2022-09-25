@@ -16,6 +16,7 @@
 namespace stormm {
 namespace structure {
 
+using chemistry::ChemicalFeatures;
 using chemistry::ChiralInversionProtocol;
 using chemistry::RotatorGroup;
 using data_types::isSignedIntegralScalarType;
@@ -30,7 +31,7 @@ using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
-  
+
 /// \brief Rotate a molecule such that selected internal coordinates achieve particular values.
 ///        The internal coordinates must define a rotatable bond (bonds in rings are prohibited
 ///        from rotation under this procedure).  This operation takes place only on the CPU.  The
@@ -39,7 +40,7 @@ using trajectory::PhaseSpaceWriter;
 ///
 /// Overloaded:
 ///   - Take the X, Y, and Z particle coordinates directly, in a templated function that will
-///     handle the fixed-precision conversions internally if ndeed
+///     handle the fixed-precision conversions internally if needed
 ///   - Take a CoordinateFrame, PhaseSpace, PhaseSpaceSynthesis, or CoordinateSeries object, or
 ///     any of their writeable abstracts, for the coordinates
 ///

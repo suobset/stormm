@@ -52,7 +52,12 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
                              MapRotatableGroups::YES);
   }
   tm->assignTime(2);
-  
+
+  // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
+  std::vector<PhaseSpace> ps_list; 
+  std::vector<AtomGraph*> ag_list;
+  int conf_counter = 0;
+
   // Loop over all systems, grouping those with the same topology into a coherent group of
   // proto-conformers for coarse-grained sampling of rotatable bonds and chiral centers.
   const int nbond_rotations = conf_input.getRotationSampleCount();
@@ -93,7 +98,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     int nproto_conf;
     SamplingStrategy strat;
     if (ln_choices < log(conf_input.getSystemTrialCount())) {
-      nproto_conf = exp(ln_choices) + 0.99;
+      nproto_conf = ceil(exp(ln_choices));
       strat = SamplingStrategy::FULL;
     }
     else if (ln_choices < log(static_cast<double>(conf_input.getSystemTrialCount()) * 32.0)) {
@@ -125,50 +130,38 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     const std::vector<RotatorGroup> invertible_groups = chemfe_list[i].getChiralInversionGroups();
     CoordinateSeriesWriter<float> cseries_w = cseries.data();
     for (int j = 0; j < ncases; j++) {
-      for (int k = 0; k < nrot_bond; k++) {
-        for (int m = 0; m < nbond_rotations; m++) {
-          const double rval = static_cast<double>(m) * stormm::symbols::twopi /
-                              static_cast<double>(nbond_rotations);
-          rotateAboutBond(cseries_w, fc, rotatable_groups[k].root_atom,
-                          rotatable_groups[k].pivot_atom, rotatable_groups[k].rotatable_atoms,
-                          rval);
-          fc++;
+      switch (strat) {
+      case SamplingStrategy::FULL:
+        for (int k = 0; k < nrot_bond; k++) {
+          for (int m = 0; m < nbond_rotations; m++) {
+            const double rval = static_cast<double>(m) * stormm::symbols::twopi /
+                                static_cast<double>(nbond_rotations);
+            rotateAboutBond(cseries_w, fc, rotatable_groups[k].root_atom,
+                            rotatable_groups[k].pivot_atom, rotatable_groups[k].rotatable_atoms,
+                            rval);
+            fc++;
+          }
+        }
+        break;
+      case SamplingStrategy::LIMITED:
+      case SamplingStrategy::SPARSE:
+        for (int k = 0; k < nrot_bond; k++) {
         }
       }
     }
-
-    // CHECK
-#if 0
-    ChemicalDetailsKit cdk = sc.getTopologyPointer(i)->getChemicalDetailsKit();
-    for (int j = 0; j < ncases * bond_rotation_reps * nchiral_reps; j++) {
-      for (int k = 0; k < j; k++) {
-        const double this_rmsd = rmsd<float, float>(cseries_w, j, k, cdk, RmsdMethod::ALIGN_MASS,
-                                                    0, cdk.natom);
-        //printf("  %9.4lf", this_rmsd);
-      }
-      //printf("\n");
-    }
-#endif
-    // END CHECK
   }
   
-  // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
-  std::vector<PhaseSpace> ps_list; 
-  std::vector<AtomGraph*> ag_list;
-#if 0
-  int conf_counter = 0;
   for (int i = 0; i < nsys; i++) {
-    const int top_idx = sc.getTopologyIndex(i);
+    const int top_idx = sc.getSystemTopologyIndex(i);
     const int nrot_bond = std::min(chemfe_list[top_idx].getRotatableBondCount(),
                                    conf_input.getRotatableBondLimit());
-    const int ncopy = pow(nrot_bond, conf_input.getRotationSampleCount());
+    const int ncopy = nrot_bond * conf_input.getRotationSampleCount());
     for (int j = 0; j < ncopy; j++) {
       ag_list[conf_counter] = const_cast<AtomGraph*>(sc.getTopologyPointer(i));
       ps_list.push_back(PhaseSpace(sc.getCoordinateReference(i)));
       conf_counter++;
     }
   }
-#endif
   return PhaseSpaceSynthesis(ps_list, ag_list);
 }
 
