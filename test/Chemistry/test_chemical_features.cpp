@@ -247,13 +247,14 @@ int main(const int argc, const char* argv[]) {
   for (size_t i = 0; i < nsys; i++) {
     const int nrotor = sys_chem[i].getRotatableBondCount();
     if (nrotor > 0) {
-      const std::vector<RotatorGroup> all_rotors = sys_chem[i].getRotatableBondGroups();
+      const std::vector<IsomerPlan> all_rotors = sys_chem[i].getRotatableBondGroups();
       std::vector<int> rotor_ids;
       for (int j = 0; j < nrotor; j++) {
-        rotor_ids.push_back(all_rotors[j].root_atom);
-        rotor_ids.push_back(all_rotors[j].pivot_atom);
-        for (size_t k = 0; k < all_rotors[j].rotatable_atoms.size(); k++) {
-          rotor_ids.push_back(all_rotors[j].rotatable_atoms[k]);
+        rotor_ids.push_back(all_rotors[j].getRootAtom());
+        rotor_ids.push_back(all_rotors[j].getPivotAtom());
+        const int nr_atom = all_rotors[j].getMovingAtomCount();
+        for (int k = 0; k < nr_atom; k++) {
+          rotor_ids.push_back(all_rotors[j].getMovingAtom(k));
         }
       }
       snapshot(ro_name, polyNumericVector(rotor_ids), std::string("rotators_") + std::to_string(i),
@@ -265,13 +266,14 @@ int main(const int argc, const char* argv[]) {
     }
     const int nchiral = sys_chem[i].getChiralCenterCount();
     if (nchiral > 0) {
-      const std::vector<RotatorGroup> all_invertors = sys_chem[i].getChiralInversionGroups();
+      const std::vector<IsomerPlan> all_invertors = sys_chem[i].getChiralInversionGroups();
       std::vector<int> invertor_ids;
       for (int j = 0; j < nchiral; j++) {
-        invertor_ids.push_back(all_invertors[j].root_atom);
-        invertor_ids.push_back(all_invertors[j].pivot_atom);
-        for (size_t k = 0; k < all_invertors[j].rotatable_atoms.size(); k++) {
-          invertor_ids.push_back(all_invertors[j].rotatable_atoms[k]);
+        invertor_ids.push_back(all_invertors[j].getRootAtom());
+        invertor_ids.push_back(all_invertors[j].getPivotAtom());
+        const int nr_atom = all_invertors[j].getMovingAtomCount();
+        for (size_t k = 0; k < nr_atom; k++) {
+          invertor_ids.push_back(all_invertors[j].getMovingAtom(k));
         }
       }
       snapshot(ro_name, polyNumericVector(invertor_ids), std::string("invertors_") +

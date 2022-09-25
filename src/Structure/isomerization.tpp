@@ -128,7 +128,7 @@ template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups,
+                      const std::vector<IsomerPlan> &inversion_groups,
                       const Tcalc globalpos_scale_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
@@ -139,21 +139,21 @@ void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int center
   case ChiralInversionProtocol::ROTATE:
     {
       // Unpack the appropriate inversion group
-      const int root_a = inversion_groups[center_idx].root_atom;
-      const int root_b = inversion_groups[center_idx].pivot_atom;
+      const int root_idx = inversion_groups[center_idx].getRootAtom();
+      const int pivt_idx = inversion_groups[center_idx].getPivotAtom();
       const int ccen   = chiral_centers[center_idx];
 
-      // Find the bisector of the root_a : chiral_center : root_b angle.  Shift the root_b atom to
-      // lie along the line of the bisector, rotate the moving atoms 180 degrees about this "bond,"
-      // then replace the root_b atom.
-      const Tcoord orig_bx = xcrd[root_b];
-      const Tcoord orig_by = ycrd[root_b];
-      const Tcoord orig_bz = zcrd[root_b];
+      // Find the bisector of the root_idx : chiral_center : pivt_idx angle.  Shift the pivt_idx
+      // atom to lie along the line of the bisector, rotate the moving atoms 180 degrees about
+      // this "bond," then replace the pivt_idx atom.
+      const Tcoord orig_bx = xcrd[pivt_idx];
+      const Tcoord orig_by = ycrd[pivt_idx];
+      const Tcoord orig_bz = zcrd[pivt_idx];
       Tcalc dax, day, daz, dbx, dby, dbz, ccenx, cceny, ccenz, invra, invrb;
       if (tcoord_is_sgnint) {
-        dax = static_cast<Tcalc>(xcrd[root_a] - xcrd[ccen]) * inv_globalpos_scale_factor;
-        day = static_cast<Tcalc>(ycrd[root_a] - ycrd[ccen]) * inv_globalpos_scale_factor;
-        daz = static_cast<Tcalc>(zcrd[root_a] - zcrd[ccen]) * inv_globalpos_scale_factor;
+        dax = static_cast<Tcalc>(xcrd[root_idx] - xcrd[ccen]) * inv_globalpos_scale_factor;
+        day = static_cast<Tcalc>(ycrd[root_idx] - ycrd[ccen]) * inv_globalpos_scale_factor;
+        daz = static_cast<Tcalc>(zcrd[root_idx] - zcrd[ccen]) * inv_globalpos_scale_factor;
         dbx = static_cast<Tcalc>(orig_bx - xcrd[ccen]) * inv_globalpos_scale_factor;
         dby = static_cast<Tcalc>(orig_by - ycrd[ccen]) * inv_globalpos_scale_factor;
         dbz = static_cast<Tcalc>(orig_bz - zcrd[ccen]) * inv_globalpos_scale_factor;
@@ -167,9 +167,9 @@ void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int center
         // of the coordinates.  It is possible, and even common in MD programs, to store
         // coordinates in a higher degree of precision than the calculation.  It would be faster,
         // otherwise, to set ccen(x,y,z) at the front and re-use the values in computing da or db.
-        dax = xcrd[root_a] - xcrd[ccen];
-        day = ycrd[root_a] - ycrd[ccen];
-        daz = zcrd[root_a] - zcrd[ccen];
+        dax = xcrd[root_idx] - xcrd[ccen];
+        day = ycrd[root_idx] - ycrd[ccen];
+        daz = zcrd[root_idx] - zcrd[ccen];
         dbx = orig_bx - xcrd[ccen];
         dby = orig_by - ycrd[ccen];
         dbz = orig_bz - zcrd[ccen];
@@ -195,29 +195,30 @@ void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int center
       const Tcalc midpoint_y = 0.5 * (dby + day);
       const Tcalc midpoint_z = 0.5 * (dbz + daz);
       if (tcoord_is_sgnint) {
-        xcrd[root_b] = llround(midpoint_x * globalpos_scale_factor);
-        ycrd[root_b] = llround(midpoint_y * globalpos_scale_factor);
-        zcrd[root_b] = llround(midpoint_z * globalpos_scale_factor);
+        xcrd[pivt_idx] = llround(midpoint_x * globalpos_scale_factor);
+        ycrd[pivt_idx] = llround(midpoint_y * globalpos_scale_factor);
+        zcrd[pivt_idx] = llround(midpoint_z * globalpos_scale_factor);
       }
       else {
-        xcrd[root_b] = midpoint_x;
-        ycrd[root_b] = midpoint_y;
-        zcrd[root_b] = midpoint_z;
+        xcrd[pivt_idx] = midpoint_x;
+        ycrd[pivt_idx] = midpoint_y;
+        zcrd[pivt_idx] = midpoint_z;
       }
-      rotateAboutBond(xcrd, ycrd, zcrd, root_b, chiral_centers[center_idx],
-                      inversion_groups[center_idx].rotatable_atoms,
+      rotateAboutBond(xcrd, ycrd, zcrd, pivt_idx, chiral_centers[center_idx],
+                      inversion_groups[center_idx].getMovingAtoms(),
                       static_cast<Tcalc>(symbols::pi), globalpos_scale_factor);
-      xcrd[root_b] = orig_bx;
-      ycrd[root_b] = orig_by;
-      zcrd[root_b] = orig_bz;
+      xcrd[pivt_idx] = orig_bx;
+      ycrd[pivt_idx] = orig_by;
+      zcrd[pivt_idx] = orig_bz;
     }
     break;
   case ChiralInversionProtocol::REFLECT:
     {
       // Find the molecule home of the present center and flip those atoms only.
-      const int natom = inversion_groups[center_idx].rotatable_atoms.size();
+      const int natom = inversion_groups[center_idx].getMovingAtomCount();
+      const int* moving_atoms = inversion_groups[center_idx].getMovingAtoms().data();
       for (int i = 0; i < natom; i++) {
-        const int atom_idx = inversion_groups[center_idx].rotatable_atoms[i];
+        const int atom_idx = moving_atoms[i];
         xcrd[atom_idx] = -xcrd[atom_idx];
       }
 
@@ -244,7 +245,7 @@ template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeries<Tcoord> *cs, const int frame_index,
                       const int center_idx, const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups) {
+                      const std::vector<IsomerPlan> &inversion_groups) {
   flipChiralCenter<Tcoord, Tcalc>(cs->data(), frame_index, center_idx, chiral_centers,
                                   chiral_protocols, inversion_groups);
 }
@@ -254,7 +255,7 @@ template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, const int frame_index,
                       const int center_idx, const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups) {
+                      const std::vector<IsomerPlan> &inversion_groups) {
   const size_t fidx_zu  = static_cast<size_t>(frame_index);
   const size_t natom_zu = roundUp<size_t>(csw.natom, warp_size_zu);
   flipChiralCenter<Tcoord, Tcalc>(&csw.xcrd[fidx_zu * natom_zu], &csw.ycrd[fidx_zu * natom_zu],

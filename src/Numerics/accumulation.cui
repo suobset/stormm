@@ -229,12 +229,14 @@ size_t splitFPToReal(double* result, const size_t pos, const size_t iter, const 
 ///   - Accept four values corresponding to the parts of each pair and return the type implied by
 ///     the differentiated function name
 ///
-/// \param a    The first of the two value pairs
-/// \param b    The second of the two value pairs
-/// \param a_x  The lower bits of the first value pair
-/// \param a_y  The upper bits of the first value pair
-/// \param b_x  The lower_bits of the second value pair
-/// \param b_y  The upper_bits of the second value pair
+/// \param a      The first of the two value pairs
+/// \param b      The second of the two value pairs
+/// \param a_x    The lower bits of the first value pair
+/// \param a_y    The upper bits of the first value pair
+/// \param b_x    The lower_bits of the second value pair
+/// \param b_y    The upper_bits of the second value pair
+/// \param breal  Real-valued form of the second number (this will be converted to the appropriate
+///               split fixed-precision type before adding)
 /// \{
 __device__ __forceinline__ int95_t splitFPSum(const int95_t a, const int95_t b) {
   int95_t result = { a.x + b.x, a.y + b.y };

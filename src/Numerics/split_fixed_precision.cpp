@@ -395,6 +395,11 @@ float int63ToFloat(const int2 ival) {
 }
 
 //-------------------------------------------------------------------------------------------------
+double int95ToDouble(const int95_t ival) {
+  return (static_cast<double>(ival.y) * max_llint_accumulation) + static_cast<double>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
 double int95ToDouble(const llint primary, const int overflow) {
   return (static_cast<double>(overflow) * max_llint_accumulation) + static_cast<double>(primary);
 }
@@ -467,11 +472,6 @@ void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<do
 }
 
 //-------------------------------------------------------------------------------------------------
-double int95ToDouble(const int95_t ival) {
-  return (static_cast<double>(ival.y) * max_llint_accumulation) + static_cast<double>(ival.x);
-}
-
-//-------------------------------------------------------------------------------------------------
 void splitAccumulation(const float fval, int *primary, int *overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
@@ -507,6 +507,80 @@ void splitAccumulation(const double dval, llint *primary, int *overflow) {
   if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
     *overflow += (1 - (2 * (ival < 0LL))) * 2;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t splitFPSum(const int95_t a, const int95_t b) {
+  int95_t result = { a.x + b.x, a.y + b.y };
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 splitFPSum(const int2 a, const int2 b) {
+  int2 result = { a.x + b.x, a.y + b.y };
+  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t splitFPSum(const int95_t a, const double breal) {
+  const int95_t b = doubleToInt95(breal);
+  int95_t result = { a.x + b.x, a.y + b.y };
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 splitFPSum(const int2 a, const float breal) {
+  const int2 b = floatToInt63(breal);
+  int2 result = { a.x + b.x, a.y + b.y };
+  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t splitFPSum(const int95_t a, const llint b_x, const int b_y) {
+  int95_t result = { a.x + b_x, a.y + b_y };
+  result.y += (1 - (2 * (b_x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0LL) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 splitFPSum(const int2 a, const int b_x, const int b_y) {
+  int2 result = { a.x + b_x, a.y + b_y };
+  result.y += (1 - (2 * (b_x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t int95Sum(const llint a_x, const int a_y, const llint b_x, const int b_y) {
+  int95_t result = { a_x + b_x, a_y + b_y };
+  result.y += (1 - (2 * (b_x < 0LL))) * ((a_x ^ result.x) < 0 && (a_x ^ b_x) >= 0LL) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 int63Sum(const int a_x, const int a_y, const int b_x, const int b_y) {
+  int2 result = { a_x + b_x, a_y + b_y };
+  result.y += (1 - (2 * (b_x < 0))) * ((a_x ^ result.x) < 0 && (a_x ^ b_x) >= 0) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t int95Sum(const llint a_x, const int a_y, const double breal) {
+  const int95_t b = doubleToInt95(breal);
+  int95_t result = { a_x + b.x, a_y + b.y };
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a_x ^ result.x) < 0 && (a_x ^ b.x) >= 0LL) * 2;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 int63Sum(const int a_x, const int a_y, const float breal) {
+  const int2 b = floatToInt63(breal);
+  int2 result = { a_x + b.x, a_y + b.y };
+  result.y += (1 - (2 * (b.x < 0))) * ((a_x ^ result.x) < 0 && (a_x ^ b.x) >= 0) * 2;
+  return result;
 }
 
 } // namespace numerics

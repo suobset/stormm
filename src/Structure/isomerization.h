@@ -18,7 +18,7 @@ namespace structure {
 
 using chemistry::ChemicalFeatures;
 using chemistry::ChiralInversionProtocol;
-using chemistry::RotatorGroup;
+using chemistry::IsomerPlan;
 using data_types::isSignedIntegralScalarType;
 using math::roundUp;
 using synthesis::PhaseSpaceSynthesis;
@@ -138,48 +138,48 @@ template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups,
+                      const std::vector<IsomerPlan> &inversion_groups,
                       Tcalc globalpos_scale_factor = 1.0);
 
 void flipChiralCenter(CoordinateFrame *cf, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 void flipChiralCenter(CoordinateFrameWriter cfw, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 void flipChiralCenter(PhaseSpace *ps, int center_idx, const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 void flipChiralCenter(PhaseSpaceWriter psw, int center_idx, const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeries<Tcoord> *cs, int frame_index, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 
 template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<IsomerPlan> &inversion_groups);
 /// \}
   
 } // namespace structure

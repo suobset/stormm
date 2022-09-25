@@ -24,15 +24,6 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 
-/// \brief An unguarded struct for delivering information about a rotatable group of atoms.
-struct RotatorGroup {
-  int root_atom;                     ///< The root atom helping to define the rotatable bond axis
-  int pivot_atom;                    ///< Pivot atom completing the rotatable bond axis (more
-                                     ///<   proximal to atoms that will turn than the root atom)
-  std::vector<int> rotatable_atoms;  ///< List of all atoms that turn as a consequence of twisting
-                                     ///<   about the rotatable bond axis
-};
-
 /// \brief The maximum number of nodes permitted in the tree searches of fused ring systems
 constexpr int max_fused_ring_tree_size = 33554432;
   
@@ -146,26 +137,32 @@ enum class ConformationEdit {
 
 /// \brief A shorthand form of a conformational degree of freedom, which could be a rotable bond,
 ///        cis-trans invertible bond, or chiral center.
-class Isomerization {
+class IsomerPlan {
 public:
 
   /// \brief The constructor takes all applicable arguments.  Different overloads check the value
   ///        of the ConformationEdit parameter to determine whether they have all of the necessary
   ///        information.
+  ///
+  /// Overloaded:
+  ///   - Accept a list of moving atoms
+  ///   - Leave the field blank to be filled later
   /// \{
-  Isomerization(ConformationEdit motion_in, int root_atom_in, int pivot_atom_in,
-                const AtomGraph* ag_pointer_in);
-  Isomerization(ConformationEdit motion_in, int root_atom_in, const AtomGraph* ag_pointer_in);
+  IsomerPlan(ConformationEdit motion_in, int root_atom_in, int pivot_atom_in,
+             const std::vector<int> &moving_atoms_in, const AtomGraph* ag_pointer_in);
+
+  IsomerPlan(ConformationEdit motion_in, int root_atom_in, int pivot_atom_in,
+             const AtomGraph* ag_pointer_in);
   /// \}
 
   /// \brief The default copy and move constructors will suffice, but the copy and move assignment
   ///        operators will need to be written out using return statements based on newly created
   ///        objects.
   /// \{
-  Isomerization(const Isomerization &original) = default;
-  Isomerization(Isomerization &&original) = default;
-  Isomerization& operator=(const Isomerization &other);
-  Isomerization& operator=(Isomerization &&other);
+  IsomerPlan(const IsomerPlan &original) = default;
+  IsomerPlan(IsomerPlan &&original) = default;
+  IsomerPlan& operator=(const IsomerPlan &other);
+  IsomerPlan& operator=(IsomerPlan &&other);
   /// \}
 
   /// \brief Get the isomerizing motion.
@@ -176,22 +173,38 @@ public:
 
   /// \brief Get the pivot atom for the motion.
   int getPivotAtom() const;
+  
+  /// \brief Get the number of moving atoms.
+  int getMovingAtomCount() const;
 
+  /// \brief Get the index of an individual moving atom from within this plan.
+  ///
+  // \param index  Index of the atom of interest within the plan (the topological index of the
+  ///              atom will be returned)
+  int getMovingAtom(const size_t index) const;
+  
   /// \brief Get a const reference to the stored list of atoms that move as a consequence of the
   ///        isomerization.
   const std::vector<int>& getMovingAtoms() const;
 
+  /// \brief Add atoms to the moving atoms list.
+  ///
+  /// \param new_atom_idx  The list of new atoms
+  void addMovingAtoms(const std::vector<int> &new_atom_idx);
+
+  /// \brief Erase the list of moving atoms to start over.  This will resize the vector to zero.
+  void eraseMovingAtoms();
+  
 private:
-  ConformationEdit motion;  ///< The motion to make that will change the conformation (this
-                            ///<   includes bond rotations as well as true isomerizations)
-  int root_atom;            ///< The root of the rotatable bond, or the center for chirality
-  int pivot_atom;           ///< End of the rotatable bond (unused if motion is CHIRAL_INVERSION)
-
-  /// List of all atoms that turn as a consequence of twisting about the rotatable bond axis
-  std::vector<int> r_atoms;
-
-  /// Pointer to the AtomGraph object to which this isomerization applies
-  const AtomGraph* ag_pointer;
+  ConformationEdit motion;        ///< The motion to make that will change the conformation (this
+                                  ///<   includes bond rotations as well as true isomerizations)
+  int root_atom;                  ///< The root of the rotatable bond, or the center for chirality
+  int pivot_atom;                 ///< The end of the rotatable bond (unused if motion is set to
+                                  ///<   CHIRAL_INVERSION)
+  std::vector<int> moving_atoms;  ///< List of all atoms that turn as a consequence of twisting
+                                  ///<   about the rotatable bond axis
+  const AtomGraph* ag_pointer;    ///< Pointer to the AtomGraph object to which this isomerization
+                                  ///<   applies
 };
 
 /// \brief An object to store information about chemical motifs: participation in rings, planarity,
@@ -366,17 +379,17 @@ public:
   ///                   atoms.
   /// \param mol_index  The molecule of interest (the system may have multiple molecules).
   /// \{
-  std::vector<RotatorGroup> getRotatableBondGroups() const;
-  std::vector<RotatorGroup> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
+  std::vector<IsomerPlan> getRotatableBondGroups() const;
+  std::vector<IsomerPlan> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
   /// \}
 
   /// \brief Get the moving atom groups and bond endpoints involved in cis-trans isomerization.
   ///        This function clones the simple form of getRotatableBondGroups but the reliance on
   ///        so many different arrays and counters makes it fruitless to abstract.
-  std::vector<RotatorGroup> getCisTransIsomerizationGroups() const;
+  std::vector<IsomerPlan> getCisTransIsomerizationGroups() const;
   
   /// \brief Get the group of atoms that can invert a chiral center by a C2 symmetry rotation.
-  ///        This re-uses the RotatorGroup struct, this time casting the root and pivot atoms as
+  ///        This re-uses the IsomerPlan struct, this time casting the root and pivot atoms as
   ///        the origins of the heaviest and second-heaviest branches, respectively, which will
   ///        again not move even as the rest of the atoms rotate.
   ///
@@ -388,7 +401,7 @@ public:
   /// \param cutoff     The maximum number of dependents for a chiral center 
   /// \param mol_index  The molecule for which to obtain chiral center inversion groups
   ///                   system may contain more than one molecule)
-  std::vector<RotatorGroup> getChiralInversionGroups() const;
+  std::vector<IsomerPlan> getChiralInversionGroups() const;
   
   /// \brief Get the means for inverting one or more chiral centers.
   ///

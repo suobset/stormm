@@ -235,6 +235,8 @@ double int63ToDouble(int2 ival);
 
 float int63ToFloat(int2 ival);
 
+double int95ToDouble(const int95_t ival);
+  
 double int95ToDouble(llint primary, int overflow);
 
 void int95ToDouble(double* result, const llint* primary, const int* overflow, size_t n_values,
@@ -262,8 +264,6 @@ void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<do
                    const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
                    const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
                    double descale = 1.0);
-
-double int95ToDouble(int95_t ival);
 /// \}
 
 /// \brief Accumulate floating point numbers into fixed-precision representations with two
@@ -284,7 +284,56 @@ void splitAccumulation(const float fval, int *primary, int *overflow);
 void splitAccumulation(const double fval, llint *primary, int *overflow);
 /// \}
 
+/// \brief Accumulate two split fixed-precision integers.
+///
+/// Overloaded:
+///   - Accumulate int95_t with its various components
+///   - Accumulate int63_t (int2) with its various components
+///
+/// \param a      The first of the two value pairs
+/// \param b      The second of the two value pairs
+/// \param a_x    The lower bits of the first value pair
+/// \param a_y    The upper bits of the first value pair
+/// \param b_x    The lower_bits of the second value pair
+/// \param b_y    The upper_bits of the second value pair
+/// \param breal  Real-valued form of the second number (this will be converted to the appropriate
+///               split fixed-precision type before adding)
+/// \{
+int95_t splitFPSum(const int95_t a, const int95_t b);
+
+int2 splitFPSum(const int2 a, const int2 b);
+
+int95_t splitFPSum(const int95_t a, double breal);
+
+int2 splitFPSum(const int2 a, float breal);
+
+int95_t splitFPSum(const int95_t a, llint b_x, int b_y);
+
+int2 splitFPSum(const int2 a, int b_x, int b_y);
+
+int95_t int95Sum(llint a_x, int a_y, llint b_x, int b_y);
+
+int2 int63Sum(int a_x, int a_y, int b_x, int b_y);
+
+int95_t int95Sum(llint a_x, int a_y, double breal);
+
+int2 int63Sum(int a_x, int a_y, float breal);
+/// \}
+
 } // namespace numerics
+} // namespace stormm
+
+// Make basic arithmetic functions native to the stormm namespace
+namespace stormm {
+  using numerics::floatToInt63;
+  using numerics::doubleToInt95;
+  using numerics::int63ToDouble;
+  using numerics::int63ToFloat;
+  using numerics::int95ToDouble;
+  using numerics::splitAccumulation;
+  using numerics::splitFPSum;
+  using numerics::int95Sum;
+  using numerics::int63Sum;
 } // namespace stormm
 
 #endif

@@ -22,7 +22,7 @@
 
 using stormm::chemistry::ChemicalFeatures;
 using stormm::chemistry::MapRotatableGroups;
-using stormm::chemistry::RotatorGroup;
+using stormm::chemistry::IsomerPlan;
 using stormm::constants::tiny;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
@@ -75,7 +75,7 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   
   // Rotate about various bonds.  This will generate all sorts of clashes, but bond and angle
   // energies should be unaffected.
-  const std::vector<RotatorGroup> rt_grp = chemfe.getRotatableBondGroups();
+  const std::vector<IsomerPlan> rt_grp = chemfe.getRotatableBondGroups();
   const int nrt = rt_grp.size();
   PhaseSpace rotation_copy(ps);
   PhaseSpaceWriter psw = rotation_copy.data();
@@ -84,8 +84,8 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   std::vector<double> repos_dev(nrt), ubond_dev(nrt), uangl_dev(nrt);
   int rcpos = 0;
   for (int i = 0; i < nrt; i++) {
-    rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
-                    rt_grp[i].rotatable_atoms, 2.0 * stormm::symbols::pi / 3.0);
+    rotateAboutBond(&rotation_copy, rt_grp[i].getRootAtom(), rt_grp[i].getPivotAtom(),
+                    rt_grp[i].getMovingAtoms(), 2.0 * stormm::symbols::pi / 3.0);
 
     // Record the positions of atoms in the first molecule
     for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
@@ -104,8 +104,8 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
     uangl_dev[i] = fabs(new_angl_e - orig_angl_e);
 
     // Reverse the rotation
-    rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
-                    rt_grp[i].rotatable_atoms, -2.0 * stormm::symbols::pi / 3.0);
+    rotateAboutBond(&rotation_copy, rt_grp[i].getRootAtom(), rt_grp[i].getPivotAtom(),
+                    rt_grp[i].getMovingAtoms(), -2.0 * stormm::symbols::pi / 3.0);
 
     // Check that the molecule was returned to its original state
     repos_dev[i] = rmsd(ps, rotation_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
@@ -155,7 +155,7 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
                          const std::string &snp_var_name = std::string(""),
                          const PrintSituation expectation = PrintSituation::APPEND) {
   ScoreCard sc(1);
-  const std::vector<RotatorGroup> inv_grp = chemfe.getChiralInversionGroups();
+  const std::vector<IsomerPlan> inv_grp = chemfe.getChiralInversionGroups();
   const std::vector<ChiralInversionProtocol> protocols = chemfe.getChiralInversionMethods();
   const std::vector<int> centers = chemfe.getChiralCenters();
   const int nchiral = protocols.size();

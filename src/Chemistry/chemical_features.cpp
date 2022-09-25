@@ -160,30 +160,21 @@ void BondedNode::wipeRingCompletion() {
 }
 
 //-------------------------------------------------------------------------------------------------
-Isomerization::Isomerization(const ConformationEdit motion_in, const int root_atom_in,
-                             const int pivot_atom_in, const AtomGraph* ag_pointer_in) :
+IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
+                       const int pivot_atom_in, const std::vector<int> &moving_atoms_in,
+                       const AtomGraph* ag_pointer_in) :
     motion{motion_in}, root_atom{root_atom_in}, pivot_atom{pivot_atom_in},
-    ag_pointer{ag_pointer_in}
+    moving_atoms{moving_atoms_in}, ag_pointer{ag_pointer_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-Isomerization::Isomerization(const ConformationEdit motion_in, const int root_atom_in,
-                             const AtomGraph* ag_pointer_in) :
-    motion{motion_in}, root_atom{root_atom_in}, pivot_atom{-1}, ag_pointer{ag_pointer_in}
-{
-  // Check that the ConformationEdit needs no pivot atom
-  switch (motion) {
-  case ConformationEdit::BOND_ROTATION:
-  case ConformationEdit::CIS_TRANS_FLIP:
-    rtErr("Bond rotations or cis-trans flips must specify a pivot atom as well as a root atom.",
-          "Isomerization");
-  case ConformationEdit::CHIRAL_INVERSION:
-    break;
-  }
-}
+IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
+                       const int pivot_atom_in, const AtomGraph* ag_pointer_in) :
+    IsomerPlan(motion_in, root_atom_in, pivot_atom_in, {}, ag_pointer_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
-Isomerization& Isomerization::operator=(const Isomerization &other) {
+IsomerPlan& IsomerPlan::operator=(const IsomerPlan &other) {
 
   // Guard against self-assignment
   if (this == &other) {
@@ -194,12 +185,13 @@ Isomerization& Isomerization::operator=(const Isomerization &other) {
   motion = other.motion;
   root_atom = other.root_atom;
   pivot_atom = other.pivot_atom;
+  moving_atoms = other.moving_atoms;
   ag_pointer = other.ag_pointer;
   return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
-Isomerization& Isomerization::operator=(Isomerization &&other) {
+IsomerPlan& IsomerPlan::operator=(IsomerPlan &&other) {
 
   // Guard against self-assignment
   if (this == &other) {
@@ -210,34 +202,53 @@ Isomerization& Isomerization::operator=(Isomerization &&other) {
   motion = other.motion;
   root_atom = other.root_atom;
   pivot_atom = other.pivot_atom;
+  moving_atoms = std::move(other.moving_atoms);
   ag_pointer = other.ag_pointer;
   return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
-ConformationEdit Isomerization::getMotion() const {
+ConformationEdit IsomerPlan::getMotion() const {
   return motion;
 }
 
 //-------------------------------------------------------------------------------------------------
-int Isomerization::getRootAtom() const {
+int IsomerPlan::getRootAtom() const {
   return root_atom;
 }
 
 //-------------------------------------------------------------------------------------------------
-int Isomerization::getPivotAtom() const {
+int IsomerPlan::getPivotAtom() const {
   return pivot_atom;
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<int>& Isomerization::getMovingAtoms() const {
-  switch (motion) {
-  case ConformationEdit::BOND_ROTATION:
-  case ConformationEdit::CIS_TRANS_FLIP:
-  case ConformationEdit::CHIRAL_INVERSION:
-    break;
+int IsomerPlan::getMovingAtomCount() const {
+  return moving_atoms.size();
+}
+
+//-------------------------------------------------------------------------------------------------
+int IsomerPlan::getMovingAtom(const size_t index) const {
+  if (index > moving_atoms.size()) {
+    rtErr("Index " + std::to_string(index) + " is invalid for a plan containing " +
+          std::to_string(moving_atoms.size()) + " moving atoms.", "IsomerPlan", "getMovingAtom");
   }
-  __builtin_unreachable();
+  return moving_atoms[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& IsomerPlan::getMovingAtoms() const {
+  return moving_atoms;
+}
+
+//-------------------------------------------------------------------------------------------------
+void IsomerPlan::addMovingAtoms(const std::vector<int> &new_atom_idx) {
+  moving_atoms.insert(moving_atoms.end(), new_atom_idx.begin(), new_atom_idx.end());
+}
+
+//-------------------------------------------------------------------------------------------------
+void IsomerPlan::eraseMovingAtoms() {
+  moving_atoms.resize(0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2547,26 +2558,27 @@ std::vector<double> ChemicalFeatures::getBondOrders() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<RotatorGroup> ChemicalFeatures::getRotatableBondGroups() const {
-  std::vector<RotatorGroup> result(rotatable_bond_count);
+std::vector<IsomerPlan> ChemicalFeatures::getRotatableBondGroups() const {
+  std::vector<IsomerPlan> result;
+  result.reserve(rotatable_bond_count);
   const int* rg_ptr = rotatable_groups.data();
   for (int i = 0; i < rotatable_bond_count; i++) {
     const int llim = rotatable_group_bounds.readHost(i);
     const int hlim = rotatable_group_bounds.readHost(i + 1);
-    result[i].root_atom  = rg_ptr[llim];
-    result[i].pivot_atom = rg_ptr[llim + 1];
-    result[i].rotatable_atoms.resize(hlim - llim - 2);
+    std::vector<int> moving_atom_idx(hlim - llim - 2);
     int k = 0;
     for (int j = llim + 2; j < hlim; j++) {
-      result[i].rotatable_atoms[k] = rg_ptr[j];
+      moving_atom_idx[k] = rg_ptr[j];
       k++;
     }
+    result.emplace_back(ConformationEdit::BOND_ROTATION, rg_ptr[llim], rg_ptr[llim + 1],
+                        moving_atom_idx, ag_pointer);
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<RotatorGroup>
+std::vector<IsomerPlan>
 ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) const {
 
   // Collect all rotatable groups on a particular molecule larger than a stated cutoff size.
@@ -2577,76 +2589,76 @@ ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) 
     rtErr("Molecule index " + std::to_string(mol_index) + " is invalid for a system with " +
           std::to_string(cdk.nmol) + " molecules.", "ChemicalFeatures", "getRotatableBondGroups");
   }
-  int nrg = 0;
+  int n_rgroup = 0;
   for (int i = 0; i < rotatable_bond_count; i++) {
     const int llim = rotatable_group_bounds.readHost(i);
     const int hlim = rotatable_group_bounds.readHost(i + 1);
-    nrg += (cdk.mol_home[llim + 1] == mol_index && hlim - llim - 2 >= cutoff);
+    n_rgroup += (cdk.mol_home[llim + 1] == mol_index && hlim - llim - 2 >= cutoff);
   }
-  std::vector<RotatorGroup> result;
-  result.reserve(nrg);
+  std::vector<IsomerPlan> result;
+  result.reserve(n_rgroup);
   const int* rg_ptr = rotatable_groups.data();
-  nrg = 0;
+  n_rgroup = 0;
   for (int i = 0; i < rotatable_bond_count; i++) {
     const int llim = rotatable_group_bounds.readHost(i);
     const int hlim = rotatable_group_bounds.readHost(i + 1);
     if (cdk.mol_home[llim + 1] == mol_index && hlim - llim - 2 >= cutoff) {
-      RotatorGroup tg;
-      tg.root_atom = rg_ptr[llim];
-      tg.pivot_atom = rg_ptr[llim + 1];
+      std::vector<int> moving_atom_idx(hlim - llim - 2);
       int k = 0;
-      tg.rotatable_atoms.resize(hlim - llim - 2);
       for (int j = llim + 2; j < hlim; j++) {
-        tg.rotatable_atoms[k] = rg_ptr[j];
+        moving_atom_idx[k] = rg_ptr[j];
         k++;
       }
-      result.push_back(tg);
-      nrg++;
+      result.emplace_back(ConformationEdit::BOND_ROTATION, rg_ptr[llim], rg_ptr[llim + 1],
+                          moving_atom_idx, ag_pointer);
+      n_rgroup++;
     }
   }
   std::sort(result.begin(), result.end(),
-            [](RotatorGroup a, RotatorGroup b) {
-              return a.rotatable_atoms.size() > b.rotatable_atoms.size();
+            [](IsomerPlan a, IsomerPlan b) {
+              return a.getMovingAtomCount() > b.getMovingAtomCount();
             });
   
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<RotatorGroup> ChemicalFeatures::getCisTransIsomerizationGroups() const {
-  std::vector<RotatorGroup> result(cis_trans_bond_count);
+std::vector<IsomerPlan> ChemicalFeatures::getCisTransIsomerizationGroups() const {
+  std::vector<IsomerPlan> result;
+  result.reserve(cis_trans_bond_count);
   const int* rg_ptr = cis_trans_groups.data();
   for (int i = 0; i < cis_trans_bond_count; i++) {
     const int llim = cis_trans_group_bounds.readHost(i);
     const int hlim = cis_trans_group_bounds.readHost(i + 1);
-    result[i].root_atom  = rg_ptr[llim];
-    result[i].pivot_atom = rg_ptr[llim + 1];
-    result[i].rotatable_atoms.resize(hlim - llim - 2);
+    std::vector<int> moving_atom_idx(hlim - llim - 2);
     int k = 0;
     for (int j = llim + 2; j < hlim; j++) {
-      result[i].rotatable_atoms[k] = rg_ptr[j];
+      moving_atom_idx[k] = rg_ptr[j];
       k++;
     }
+    result.emplace_back(ConformationEdit::CIS_TRANS_FLIP, rg_ptr[llim], rg_ptr[llim + 1],
+                        moving_atom_idx, ag_pointer);    
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<RotatorGroup> ChemicalFeatures::getChiralInversionGroups() const {
-  std::vector<RotatorGroup> result(chiral_center_count);
+std::vector<IsomerPlan> ChemicalFeatures::getChiralInversionGroups() const {
+  std::vector<IsomerPlan> result;
+  result.reserve(chiral_center_count);
   const int* groups_ptr   = invertible_groups.data();
   const int* bounds_ptr   = invertible_group_bounds.data();
   const int* anchor_a_ptr = anchor_a_branches.data();
   const int* anchor_b_ptr = anchor_b_branches.data();
   for (int i = 0; i < chiral_center_count; i++) {
-    result[i].root_atom  = anchor_a_ptr[i];
-    result[i].pivot_atom = anchor_b_ptr[i];
-    result[i].rotatable_atoms.resize(bounds_ptr[i + 1] - bounds_ptr[i]);
+    std::vector<int> moving_atom_idx(bounds_ptr[i + 1] - bounds_ptr[i]);
     int k = 0;
     for (int j = bounds_ptr[i]; j < bounds_ptr[i + 1]; j++) {
-      result[i].rotatable_atoms[k] = groups_ptr[j];
+      moving_atom_idx[k] = groups_ptr[j];
       k++;
     }
+    result.emplace_back(ConformationEdit::CHIRAL_INVERSION, anchor_a_ptr[i], anchor_b_ptr[i],
+                        moving_atom_idx, ag_pointer);
   }
   return result;
 }
