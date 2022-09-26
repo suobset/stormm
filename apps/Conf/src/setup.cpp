@@ -16,8 +16,9 @@ namespace setup {
 
 using stormm::chemistry::ChemicalFeatures;
 using stormm::chemistry::ChiralInversionProtocol;
+using stormm::chemistry::ConformationEdit;
 using stormm::chemistry::MapRotatableGroups;
-using stormm::chemistry::RotatorGroup;
+using stormm::chemistry::IsomerPlan;
 using stormm::constants::warp_size_int;
 using stormm::math::roundUp;
 using stormm::namelist::ConformerControls;
@@ -109,6 +110,37 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       nproto_conf = conf_input.getSystemTrialCount();
       strat = SamplingStrategy::SPARSE;
     }
+
+    // Create a list of ways to change the conformation
+    const std::vector<IsomerPlan> rotatable_groups  = chemfe_list[i].getRotatableBondGroups();
+    const std::vector<IsomerPlan> cis_trans_groups  =
+      chemfe_list[i].getCisTransIsomerizationGroups();
+    const std::vector<IsomerPlan> invertible_groups = chemfe_list[i].getChiralInversionGroups();
+    std::vector<IsomerPlan> permutations;
+    const int n_permutations = nrot_bond + nctx_bond + nchiral;
+    permutations.reserve(n_permutations);
+    std::vector<int> permutation_states;
+    permutation_states.reserve(n_permutations);
+    for (int j = 0; j < nrot_bond; j++) {
+      permutations.emplace_back(rotatable_groups[j]);
+      permutation_states.push_back(nbond_rotations);
+    }
+    for (int j = 0; j < nctx_bond; j++) {
+      permutations.emplace_back(cis_trans_groups[j]);
+      permutation_states.push_back(2);
+    }
+    for (int j = 0; j < nchiral; j++) {
+      permutations.emplace_back(invertible_groups[j]);
+      switch (chiral_protocols[j]) {
+      case ChiralInversionProtocol::ROTATE:
+      case ChiralInversionProtocol::REFLECT:
+        permutation_states.push_back(2);
+        break;
+      case ChiralInversionProtocol::DO_NOT_INVERT:
+        permutation_states.push_back(1);
+        break;
+      }
+    }
     
     // Create a series to hold the conformers resulting from the coarse-grained search.
     CoordinateSeries<float> cseries(sc.getTopologyPointer(i)->getAtomCount(), nproto_conf);
@@ -126,19 +158,22 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     // Compute the RMSD matrix and determine a set of diverse conformations.  Cull the results
     // to eliminate ring stabs or severe clashes between tertiary or quaternary atoms.
     fc = 0;
-    const std::vector<RotatorGroup> rotatable_groups  = chemfe_list[i].getRotatableBondGroups();
-    const std::vector<RotatorGroup> invertible_groups = chemfe_list[i].getChiralInversionGroups();
     CoordinateSeriesWriter<float> cseries_w = cseries.data();
     for (int j = 0; j < ncases; j++) {
       switch (strat) {
       case SamplingStrategy::FULL:
-        for (int k = 0; k < nrot_bond; k++) {
-          for (int m = 0; m < nbond_rotations; m++) {
+        {
+          std::vector<int> permutation_counters(n_permutations, 0);
+          const int last_perm = n_permutations - 1;
+          while (permutation_counters[last_perm] < permutation_states[last_perm]) {
+            
+            for (int k = 0; k < nrot_bond; k++) {
+              for (int m = 0; m < nbond_rotations; m++) {
             const double rval = static_cast<double>(m) * stormm::symbols::twopi /
                                 static_cast<double>(nbond_rotations);
-            rotateAboutBond(cseries_w, fc, rotatable_groups[k].root_atom,
-                            rotatable_groups[k].pivot_atom, rotatable_groups[k].rotatable_atoms,
-                            rval);
+            rotateAboutBond(cseries_w, fc, rotatable_groups[k].getRootAtom(),
+                            rotatable_groups[k].getPivotAtom(),
+                            rotatable_groups[k].getMovingAtoms(), rval);
             fc++;
           }
         }
@@ -155,7 +190,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     const int top_idx = sc.getSystemTopologyIndex(i);
     const int nrot_bond = std::min(chemfe_list[top_idx].getRotatableBondCount(),
                                    conf_input.getRotatableBondLimit());
-    const int ncopy = nrot_bond * conf_input.getRotationSampleCount());
+    const int ncopy = nrot_bond * conf_input.getRotationSampleCount();
     for (int j = 0; j < ncopy; j++) {
       ag_list[conf_counter] = const_cast<AtomGraph*>(sc.getTopologyPointer(i));
       ps_list.push_back(PhaseSpace(sc.getCoordinateReference(i)));

@@ -31,6 +31,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Math/rounding.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
 		   $(SRCDIR)/Math/statistics.cpp \
+		   $(SRCDIR)/Math/tickcounter.cpp \
 		   $(SRCDIR)/Math/vector_ops.cpp \
 		   $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
@@ -152,6 +153,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Math/sorting.h \
 	             $(SRCDIR)/Math/statistics.h \
 	             $(SRCDIR)/Math/summation.h \
+	             $(SRCDIR)/Math/tickcounter.h \
 	             $(SRCDIR)/Math/vector_ops.h \
 		     $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
@@ -307,6 +309,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/rounding.o \
 	          $(SRCDIR)/Math/series_ops.o \
 	          $(SRCDIR)/Math/statistics.o \
+	          $(SRCDIR)/Math/tickcounter.o \
 	          $(SRCDIR)/Math/vector_ops.o \
 	          $(SRCDIR)/MolecularMechanics/line_minimization.o \
 	          $(SRCDIR)/MolecularMechanics/minimization.o \

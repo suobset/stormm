@@ -9,6 +9,7 @@
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
+#include "../../src/Math/tickcounter.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
@@ -39,6 +40,14 @@ using namespace stormm::testing;
 //-------------------------------------------------------------------------------------------------
 // Produce a series of random numbers from a generator based on an initial state and some
 // directions about how to cycle the generator after each sample.
+//
+// Arguments:
+//   xrs:         Random number generator (the templating revolves around this type and its state)
+//   init_state:  Initial state of the first generator
+//   gen_idx:     Generator index
+//   ngen:        Number of random generators
+//   depth:       Depth of the pre-computed random numbers cache
+//   maxcyc:      Number of cycles to run the generator through after each sample is taken
 //-------------------------------------------------------------------------------------------------
 template <typename Tgen, typename Tstate>
 std::vector<double> generateExpectedSeries(Tgen *xrs, const Tstate init_state, const int gen_idx,
@@ -79,6 +88,47 @@ std::vector<double> generateExpectedSeries(Tgen *xrs, const Tstate init_state, c
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test a TickCounter object to ensure that its incrementation is valid for a variety of series
+// lengths.
+//-------------------------------------------------------------------------------------------------
+void testDialCounter(TickCounter *dials, const int ncyc) {
+  const int ndials = dials->getStateCount();
+  const std::vector<int>& dial_settings = dials->getSettings();
+  const std::vector<int>& dial_limits = dials->getStateLimits();
+  for (int i = 0; i < ncyc; i++) {
+    dials->advance();
+  }
+  int nperm = 1;
+  for (int i = 0; i < ndials; i++) {
+    nperm *= dial_limits[i];
+  }
+  std::vector<int> expected_settings(ndials);
+  int balance = (ncyc % nperm);
+  int tick_value = nperm / dial_limits[ndials - 1];
+  for (int i = ndials - 1; i >= 0; i--) {
+    expected_settings[i] = (balance / tick_value);
+    balance -= expected_settings[i] * tick_value;
+    if (i > 0) {
+      tick_value /= dial_limits[i - 1];
+    }
+  }
+  check(dial_settings, RelationalOperator::EQUAL, expected_settings, "A TickCounter with " +
+        std::to_string(ndials) + " variables did not increment as expected.");
+  const std::vector<int> inc_result = dials->getSettings();
+  dials->reset();
+  dials->advance(ncyc);
+  check(dial_settings, RelationalOperator::EQUAL, expected_settings, "A TickCounter with " +
+        std::to_string(ndials) + " variables did not jump as expected.");
+  for (int i = 0; i < 50; i++) {
+    dials->reverse();
+  }
+  dials->reverse(ncyc / 7);
+  dials->advance((ncyc / 7) + 50);
+  check(dial_settings, RelationalOperator::EQUAL, expected_settings, "A TickCounter with " +
+        std::to_string(ndials) + " variables did not jump as expected.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -97,6 +147,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 4
   section("Lightweight matrix math from the hand-coded routines");
+
+  // Section 5
+  section("Test the TickCounter object");
   
   // Check vector processing capabilities
   section(1);
@@ -647,6 +700,18 @@ int main(const int argc, const char* argv[]) {
   check(d_path, RelationalOperator::EQUAL, d_expect, "A random number sequence obtained from "
         "generator " + std::to_string(sample_d) + " of a Xoroshiro128+ generator series did not "
         "meet expectations.");
+
+  // Create a tick counter with a series of dials with different lengths.
+  TickCounter dials({ 2, 2, 3, 5, 7, 4, 1, 2 });
+  testDialCounter(&dials, 5000);
+  dials.reset();
+  testDialCounter(&dials, 2134);
+  dials.reset();
+  testDialCounter(&dials,  187);
+  CHECK_THROWS(TickCounter test_dials({ 2, 0, 7}), "A TickCounter object was created with zero "
+               "increments possible in one of the variables.");
+  CHECK_THROWS(TickCounter test_dials({ 9, 5, -7}), "A TickCounter object was created with "
+               "negative increments in one of the variables.");
   
   // Print results
   printTestSummary(oe.getVerbosity());
