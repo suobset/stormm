@@ -141,6 +141,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
         break;
       }
     }
+    TickCounter ptrack(permutation_states);
     
     // Create a series to hold the conformers resulting from the coarse-grained search.
     CoordinateSeries<float> cseries(sc.getTopologyPointer(i)->getAtomCount(), nproto_conf);
@@ -160,9 +161,12 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     fc = 0;
     CoordinateSeriesWriter<float> cseries_w = cseries.data();
     for (int j = 0; j < ncases; j++) {
+      ptrack.reset();
       switch (strat) {
       case SamplingStrategy::FULL:
         {
+          for (int k = 0; k <  {
+          }
           std::vector<int> permutation_counters(n_permutations, 0);
           const int last_perm = n_permutations - 1;
           while (permutation_counters[last_perm] < permutation_states[last_perm]) {

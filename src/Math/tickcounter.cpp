@@ -1,5 +1,6 @@
+#include "copyright.h"
 #include "Reporting/error_format.h"
-#include "series_ops.h"
+#include "multiplication.h"
 #include "tickcounter.h"
 
 namespace stormm {
@@ -37,6 +38,7 @@ TickCounter::TickCounter(const std::vector<int> &state_limits_in,
   for (int i = 0; i < state_count; i++) {
     settings[i] = settings_in[i];
   }
+  validateSettings();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -158,12 +160,33 @@ void TickCounter::set(const std::vector<int> &new_state) {
   for (int i = 0; i < state_count; i++) {
     settings[i] = new_state[i];
   }
+  validateSettings();
+}
+
+//-------------------------------------------------------------------------------------------------
+void TickCounter::set(const int new_state, const int var_index) {
+  if (var_index >= state_count || var_index < 0) {
+    rtErr("Variable index " + std::to_string(var_index) + " is invalid for " +
+          std::to_string(state_count) + " overall counters.", "TickCounter", "set");
+  }
+  settings[var_index] = new_state;
 }
 
 //-------------------------------------------------------------------------------------------------
 void TickCounter::reset() {
   for (int i = 0; i < state_count; i++) {
     settings[i] = 0;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void TickCounter::validateSettings() const {
+  for (int i = 0; i < state_count; i++) {
+    if (settings[i] >= state_limits[i] || settings[i] < 0) {
+      rtErr("Counter variable " + std::to_string(i) + " has a maximum of " +
+            std::to_string(state_limits[i]) + " possible values.  A setting of " +
+            std::to_string(settings[i]) + " is invalid.", "TickCounter", "validateSettings");
+    }
   }
 }
 

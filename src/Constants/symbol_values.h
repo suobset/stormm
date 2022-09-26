@@ -18,6 +18,10 @@ constexpr float twopi_f = 6.283185482025146484375f;
 constexpr float inverse_pi_f = 0.3183098733425140380859375f;
 constexpr float inverse_twopi_f = 0.15915493667125701904296875f;
 
+/// \brief The base of the natural logarithm, e.
+constexpr double evalue = 2.718281828459045090795598298427648842334747314453125;
+constexpr float evalue_f = evalue;
+  
 /// The tetrahedral bond angle, in radians to twenty decimal places
 constexpr double tetrahedral_angle = 1.91063323624901859610;
 
@@ -63,6 +67,20 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \}
 
 } // namespace constants
+} // namespace stormm
+
+// Put common symbols in the stormm namespace
+namespace stormm {
+using symbols::pi;
+using symbols::twopi;
+using symbols::inverse_pi;
+using symbols::inverse_twopi;
+using symbols::pi_f;
+using symbols::twopi_f;
+using symbols::inverse_pi_f;
+using symbols::inverse_twopi_f;
+using symbols::evalue;
+using symbols::evalue_f;
 } // namespace stormm
 
 #endif

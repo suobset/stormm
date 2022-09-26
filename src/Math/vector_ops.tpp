@@ -4,9 +4,6 @@
 namespace stormm {
 namespace math {
 
-using parse::NumberFormat;
-using parse::realToString;
-
 //-------------------------------------------------------------------------------------------------
 template <typename T> void vectorComparisonCheck(const std::vector<T> &va,
                                                  const std::vector<T> &vb, const char* caller) {
@@ -1196,6 +1193,6 @@ std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx
   }
   return result;
 }
-  
+
 } // namespace math
 } // namespace stormm

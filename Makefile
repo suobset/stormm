@@ -143,6 +143,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/ForceField/forcefield_enumerators.h \
 		     $(SRCDIR)/Math/matrix.h \
 		     $(SRCDIR)/Math/matrix_ops.h \
+		     $(SRCDIR)/Math/multiplication.h \
 	             $(SRCDIR)/Math/reduction.h \
 	             $(SRCDIR)/Math/reduction_abstracts.h \
 	             $(SRCDIR)/Math/reduction_bridge.h \
@@ -252,6 +253,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/DataTypes/stormm_vector_types.tpp \
 		   $(SRCDIR)/Math/matrix.tpp \
 		   $(SRCDIR)/Math/matrix_ops.tpp \
+		   $(SRCDIR)/Math/multiplication.tpp \
 		   $(SRCDIR)/Math/reduction.tpp \
 		   $(SRCDIR)/Math/reduction_abstracts.tpp \
 		   $(SRCDIR)/Math/rounding.tpp \

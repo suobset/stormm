@@ -31,6 +31,8 @@ using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
 using data_types::ValueWithCounter;
+using parse::NumberFormat;
+using parse::realToString;
 using testing::Approx;
   
 /// \brief Check that two vectors of the same data type are compatible for various arithmetic
@@ -650,7 +652,7 @@ int readBitFromMask(const std::vector<ushort> &va, const size_t pos);
 /// \param tidx  Vector of indices into va, from which to construct the result
 template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx);
-  
+
 } // namespace math
 } // namespace stormm
 

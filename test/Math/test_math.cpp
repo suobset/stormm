@@ -712,7 +712,11 @@ int main(const int argc, const char* argv[]) {
                "increments possible in one of the variables.");
   CHECK_THROWS(TickCounter test_dials({ 9, 5, -7}), "A TickCounter object was created with "
                "negative increments in one of the variables.");
-  
+  CHECK_THROWS(dials.set({ 0, 0, 1, 1, 5, 3, 0}), "A TickCounter allowed a misaligned vector "
+               "to be used in setting its state.");
+  CHECK_THROWS(dials.set({ 0, 0, -1, 1, 5, 3, 0, 0}), "A TickCounter allowed a negative number to "
+               "enter its state settings.");
+
   // Print results
   printTestSummary(oe.getVerbosity());
 

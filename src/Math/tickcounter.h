@@ -49,7 +49,18 @@ public:
   void reverse(int steps = 1);
 
   /// \brief Set the object's state to an arbitrary series of values.
+  ///
+  /// Overloaded:
+  ///   - Set all variables
+  ///   - Set a specific variable
+  ///
+  /// \param new_state  The value or values to set
+  /// \param var_index  Index of a particular coutner variable to set
+  /// \{
   void set(const std::vector<int> &new_state);
+
+  void set(int new_state, int var_index);
+  /// \}
   
   /// \brief Reset all states of the counter to zero.
   void reset();
@@ -59,6 +70,10 @@ private:
   double log_permutations;
   std::vector<int> settings;
   std::vector<int> state_limits;
+
+  /// \brief Validate the settings to ensure that they are within the stated limits and above zero
+  ///        in all counter variables.
+  void validateSettings() const;
 };
 
 } // namespace math

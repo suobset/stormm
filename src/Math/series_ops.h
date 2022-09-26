@@ -88,23 +88,6 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
                                                           const int reduced_length = 0);
 /// \}
 
-/// \brief Compute the (natural) logarithm of a product series.
-///
-/// Overloaded:
-///   - Operate on a C-style array of trusted length
-///   - Operate on a std::vector of original values
-///   - Operate on a Hybrid object of original values
-///
-/// \param values  The array of values for which to take the product
-/// \param length  Trusted length of the array values (if a C-style array is used)
-/// \{
-template <typename T> double logProduct(const T* values, const size_t length);
-
-template <typename T> double logProduct(const std::vector<T> &values);
-
-template <typename T> double logProduct(const Hybrid<T> &values);
-/// \}
-
 } // namespace math
 } // namespace stormm
 
