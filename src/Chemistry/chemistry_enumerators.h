@@ -42,7 +42,12 @@ enum class RotatorCriterion {
   GROUP_SIZE      ///< Size of the group of rotating atoms (excludes the pivot and root atoms at
                   ///<   the ends of the rotatable bond)
 };
-  
+
+/// \brief Enumerate the methods for isomerization.
+enum class ConformationEdit {
+  BOND_ROTATION, CIS_TRANS_FLIP, CHIRAL_INVERSION
+};
+
 } // namespace chemistry
 } // namespace stormm
 

@@ -15,6 +15,7 @@ namespace stormm {
 namespace math {
 
 using card::Hybrid;
+using data_types::getStormmScalarTypeName;
 using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
@@ -52,9 +53,10 @@ template <typename T> double logProduct(const Hybrid<T> &values);
 /// \param va      The array of numbers
 /// \param length  Trusted length of va (if va is a C-style array)
 /// \{
-template <typename T> T seriesProduct(const T* va, const size_t length);
-template <typename T> T seriesProduct(const std::vector<T> &va);
-template <typename T> T seriesProduct(const Hybrid<T> &va);
+template <typename Tprod, typename Tbase> Tprod seriesProduct(const Tbase* va,
+                                                              const size_t length);
+template <typename Tprod, typename Tbase> Tprod seriesProduct(const std::vector<Tbase> &va);
+template <typename Tprod, typename Tbase> Tprod seriesProduct(const Hybrid<Tbase> &va);
 /// \}
 
 } // namespace math
