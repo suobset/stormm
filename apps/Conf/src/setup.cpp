@@ -129,7 +129,12 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       fc += conformations_per_case;
       cseries.resize(fc, sc.getCoordinateReference(top_cases[j]));
     }
-        
+
+    // Get the vectors of chiral centers and inversion plans for all centers in this molecule
+    const std::vector<int> chiral_centers = chemfe_list[i].getChiralCenters();
+    const std::vector<ChiralInversionPlan> chiral_center_plans =
+      chemfe_list[i].getChiralInversionMethods();
+    
     // Manipulate this coordinate series using bond rotations as well as chiral inversions.
     // Compute the RMSD matrix and determine a set of diverse conformations.  Cull the results
     // to eliminate ring stabs or severe clashes between tertiary or quaternary atoms.
@@ -152,13 +157,14 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
                                 isomerizers[m].getPivotAtom(), isomerizers[m].getMovingAtoms(),
                                 rval);
               }
-              break;
+              break;s
             case CHIRAL_INVERSION:
               {
                 switch (isomerizers[m].getChiralPlan()) {
                 case ChiralInversionProtocol::ROTATE:
-                  break;
                 case ChiralInversionProtocol::REFLECT:
+                  flipChiralCenter(cseries_w, fc, isomerizers[m].getRootAtom(),
+                                   chiral_centers, chiral_center_plans, invertible_groups);
                   break;
                 case ChiralInversionProtocol::DO_NOT_INVERT:
                   break;
@@ -179,6 +185,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
         break;
       }
     }
+    ps_list.push_back(
   }
   
   for (int i = 0; i < nsys; i++) {
