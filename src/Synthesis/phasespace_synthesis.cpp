@@ -1120,6 +1120,11 @@ int PhaseSpaceSynthesis::getForceAccumulationBits() const {
   return force_scale_bits;
 }
 
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int index) const {
+  return topologies[index];
+}
+
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {

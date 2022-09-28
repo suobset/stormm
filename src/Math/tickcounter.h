@@ -56,6 +56,23 @@ public:
 
   /// \brief Reverse the counter by a specified number of steps.
   void reverse(int steps = 1);
+  
+  /// \brief Randomize some or all variables of the object.
+  ///
+  /// Overloaded:
+  ///   - Randomize all counter variables
+  ///   - Randomize selected counter variables
+  ///
+  /// \param xrs        The random number generator (the type of this argument is the basis of the
+  ///                   templating)
+  /// \param apply_rng  A vector containing entries for all counter variables and marked TRUE to
+  ///                   cause the variable to be randomly reassigned, or a vector containing a
+  ///                   limited number of counter indices
+  /// \{
+  template<typename T> void randomize(T *xrs);
+  template<typename T> void randomize(T *xrs, const std::vector<bool> &apply_rng);
+  template<typename T> void randomize(T *xrs, const std::vector<int> &apply_rng);
+  /// \}
 
   /// \brief Set the object's state to an arbitrary series of values.
   ///
@@ -87,5 +104,7 @@ private:
 
 } // namespace math
 } // namespace stormm
+
+#include "tickcounter.tpp"
 
 #endif

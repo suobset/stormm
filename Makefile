@@ -259,6 +259,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Math/rounding.tpp \
 		   $(SRCDIR)/Math/series_ops.tpp \
 		   $(SRCDIR)/Math/summation.tpp \
+		   $(SRCDIR)/Math/tickcounter.tpp \
 		   $(SRCDIR)/Math/vector_ops.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \

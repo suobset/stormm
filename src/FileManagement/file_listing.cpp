@@ -157,6 +157,23 @@ std::string getBaseName(const std::string &path) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string substituteNameExtension(const std::string &path, const std::string &new_ext) {
+  bool dot_sought = true;
+  int pos = path.size() - 1;
+  while (dot_sought && pos) {
+    dot_sought = (dot_sought && (path[pos] != '.'));
+    pos -= dot_sought;
+  }
+  if (dot_sought) {
+    return path + '.' + new_ext;
+  }
+  else {
+    return path.substr(0, pos) + '.' + new_ext;
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::vector<std::string> separatePath(const std::string &path) {
 
   // Detect a leading slash to see if the regular expression contains an absolute path

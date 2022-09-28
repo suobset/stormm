@@ -458,6 +458,11 @@ public:
 
   /// \brief Get the force accumulation bit count
   int getForceAccumulationBits() const;
+
+  /// \brief Get the topology pointer for a particular system within the synthesis.
+  ///
+  /// \param index  Index of the system of interest within the synthesis
+  const AtomGraph* getSystemTopologyPointer(int index) const;
   
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
   ///

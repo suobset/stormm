@@ -63,7 +63,7 @@ const std::vector<int>& TickCounter::getStateLimits() const {
 
 //-------------------------------------------------------------------------------------------------
 llint TickCounter::getExactPermutationCount() const {
-  if (getLogPermutationCount() >= static_cast<double>(sizeof(llint) - 1LLU) * log(2.0)) {
+  if (getLogPermutationCount() >= static_cast<double>((sizeof(llint) * 8LLU) - 1LLU) * log(2.0)) {
     rtErr("There are too many permutations to represent as a long long integer.", "TickCounter",
           "getExactPermutationCount");
   }

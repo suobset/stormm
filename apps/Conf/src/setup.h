@@ -2,6 +2,7 @@
 #ifndef CONFORMER_SETUP_H
 #define CONFORMER_SETUP_H
 
+#include "../../../src/Random/random.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/UnitTesting/stopwatch.h"
@@ -11,6 +12,7 @@ namespace conf_app {
 namespace setup {
 
 using stormm::namelist::UserSettings;
+using stormm::random::Xoshiro256ppGenerator;
 using stormm::synthesis::PhaseSpaceSynthesis;
 using stormm::synthesis::SystemCache;
 using stormm::testing::StopWatch;
@@ -31,13 +33,15 @@ enum class SamplingStrategy {
 ///        details and then enumerating the rotatable bonds, cis-trans isomers, and chiral centers
 ///        which it could sample.
 ///
-/// \param ui  User input settings, obtained from the input deck
-/// \param sc  Cache of topologies and initial structures.  The list of topologies will not be
-///            expanded by this procedure, but the list of structures will undergo a radical
-///            expansion.
-/// \param tm  Timer to record the wall time spent on various setup procedures
+/// \param ui   User input settings, obtained from the input deck
+/// \param sc   Cache of topologies and initial structures.  The list of topologies will not be
+///             expanded by this procedure, but the list of structures will undergo a radical
+///             expansion.
+/// \param xrs  Random number generator (the master generator will guide the CPU-based,
+///             coarse-grained conformer selection)
+/// \param tm   Timer to record the wall time spent on various setup procedures
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
-                                     StopWatch *tm);
+                                     Xoshiro256ppGenerator *xrs, StopWatch *tm);
 
 } // namespace setup
 } // namespace conf_app
