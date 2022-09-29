@@ -11,6 +11,7 @@
 #include "Math/sorting.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
+#include "atomgraph.h"
 #include "atomgraph_abstracts.h"
 #include "topology_limits.h"
 
@@ -85,6 +86,22 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
 /// \param atom_list  Topological indices for the atoms of interest
 /// \param cdk        Chemical details abstract for the topology of interest
 std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetailsKit &cdk);
+
+/// \brief Determine whether two atoms are bonded, based on non-bonded 1:2 exclusions.
+///
+/// Overloaded:
+///   - Pass the topology's non-bonded abstract
+///   - Pass the topology itself, as a const pointer or as a const reference
+///
+/// \param ag      Topology for the molecule of interest
+/// \param nbk     Non-bonded abstract from ag
+/// \param atom_i  Test atom I for bonding to atom J
+/// \param atom_j  Test atom J for bonding to atom I
+/// \{
+bool isBonded(const NonbondedKit<double> &nbk, int atom_i, int atom_j);
+bool isBonded(const AtomGraph &ag, int atom_i, int atom_j);
+bool isBonded(const AtomGraph *ag, int atom_i, int atom_j);
+/// \}
 
 } // namespace topology
 } // namespace stormm

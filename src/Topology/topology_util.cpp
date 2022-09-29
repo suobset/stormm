@@ -31,6 +31,28 @@ std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetai
   }
   return result;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+bool isBonded(const NonbondedKit<double> &nbk, const int atom_i, const int atom_j) {
+  const int hlim = nbk.nb12_bounds[atom_i + 1];
+  bool result = false;
+  for (int i = nbk.nb12_bounds[atom_i]; i < hlim; i++) {
+    result = (result || (atom_j == nbk.nb12x[i]));
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool isBonded(const AtomGraph &ag, const int atom_i, const int atom_j) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  return isBonded(nbk, atom_i, atom_j);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool isBonded(const AtomGraph *ag, const int atom_i, const int atom_j) {
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  return isBonded(nbk, atom_i, atom_j);
+}
+
 } // namespace topology
 } // namespace stormm
