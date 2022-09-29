@@ -119,7 +119,8 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/UnitTesting/vector_report.cpp
 
 # STORMM C++ header files
-STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
+STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
+		     $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Accelerator/gpu_details.h \
 		     $(SRCDIR)/Accelerator/kernel_manager.h \
 		     $(SRCDIR)/Chemistry/atommask.h \
