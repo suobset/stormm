@@ -235,6 +235,15 @@ public:
   CoordinateFrame exportFrame(int frame_index,
                               HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Prepare a PhaseSpace object based on one frame of the series, accomplishing any data
+  ///        conversions needed to put the coordinates back into the familiar double-precision
+  ///        format.
+  ///
+  /// \param frame_index  The frame to extract
+  /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
+  PhaseSpace exportPhaseSpace(int frame_index,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
   /// \brief Export the contents of this coordinate series to a trajectory file.
   ///
   /// \param file_name     Name of the file to write

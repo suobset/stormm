@@ -259,6 +259,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Math/rounding.tpp \
 		   $(SRCDIR)/Math/series_ops.tpp \
 		   $(SRCDIR)/Math/summation.tpp \
+		   $(SRCDIR)/Math/tickcounter.tpp \
 		   $(SRCDIR)/Math/vector_ops.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
@@ -283,7 +284,9 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Topology/atomgraph.tpp \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		   $(SRCDIR)/Topology/topology_util.tpp \
+		   $(SRCDIR)/Trajectory/coordinateframe.tpp \
 		   $(SRCDIR)/Trajectory/coordinate_series.tpp \
+		   $(SRCDIR)/Trajectory/phasespace.tpp \
 		   $(SRCDIR)/Trajectory/thermostat.tpp \
 		   $(SRCDIR)/UnitTesting/approx.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp

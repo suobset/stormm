@@ -6,6 +6,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix.h"
 #include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/multiplication.h"
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
@@ -17,6 +18,7 @@
 #include "../../src/UnitTesting/file_snapshot.h"
 
 using stormm::double3;
+using stormm::llint;
 using stormm::ulint;
 using stormm::ullint;
 using stormm::ullint2;
@@ -254,6 +256,27 @@ int main(const int argc, const char* argv[]) {
   check(locateValue(Approx(3.75).margin(0.06), d_searchable_des, DataOrder::DESCENDING),
         RelationalOperator::EQUAL, 3, "Binary search in descending order with an approximate "
         "target value that should hit its mark from below fails.");
+  const std::vector<double> productize_this = { 1.5, 1.8, 2.9, 3.1, -2.0 };
+  check(seriesProduct<double>(productize_this), RelationalOperator::EQUAL,
+        Approx(1.5 * 1.8 * 2.9 * 3.1 * -2.0).margin(tiny), "The product of a short series of "
+        "real numbers was not computed properly.");
+  const std::vector<double> poly_product = tileVector(productize_this, 6);
+  check(seriesProduct<double>(poly_product), RelationalOperator::EQUAL,
+        Approx(13089429228.941328).margin(1.0e-4), "The product of a long series of real "
+        "numbers was not computed correctly.");
+  const std::vector<double> poly_product_ii = tileVector(productize_this, 400.0);
+  CHECK_THROWS(seriesProduct<double>(poly_product_ii), "The product of a very long series of "
+               "numbers was computed, despite the fact that this would break the double-precision "
+               "format.");
+  const std::vector<int> iproductize_this = { 2, 1, 3, -3, 4, -5, 1, 7 };
+  check(seriesProduct<int>(iproductize_this), RelationalOperator::EQUAL, 2520, "The product of a "
+        "short series of integers was not computed correctly.");
+  const std::vector<int> ipoly_product = tileVector(iproductize_this, 3);
+  check(seriesProduct<llint>(ipoly_product), RelationalOperator::EQUAL, 16003008000LL,
+        "The product of a triple-length series of integers was not computed correctly.");
+  CHECK_THROWS(seriesProduct<int>(ipoly_product), "The product of a triple-length series of "
+               "integers was computed, despite the fact that it would overflow the integer "
+               "format.");
   
   // Verify that the internal random number generation is consistent with expectations.  Create
   // three generators, the first two initialized in the same way (which thus should track one

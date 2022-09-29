@@ -168,6 +168,31 @@ public:
                      int frame_number = 0);
   /// \}
 
+  /// \brief Fill the object from information in three arrays.
+  ///
+  /// Overloaded:
+  ///   - Fill from three C-style arrays
+  ///   - Fill from three Standard Template Library vector objects
+  ///
+  /// \param xcrd        Cartesian X coordinates of positions, velocities, or forces
+  /// \param ycrd        Cartesian Y coordinates of positions, velocities, or forces
+  /// \param zcrd        Cartesian Z coordinates of positions, velocities, or forces
+  /// \param kind        Type of coordinates coming in: fill the positions, velocities, or forces
+  /// \param cycle_in    The point in the coordinate cycle to fill
+  /// \param scale_bits  The number of bits after the decimal, applicable to fixed-precision
+  ///                    representations of xcrd, ycrd, and zcrd (the box dimensions are always
+  ///                    given as a double-precision array, in units of Angstroms)
+  /// \param box_dims    Box dimensions, from which the tranformation matrices will be derived
+  /// \{
+  template <typename T>
+  void fill(const T* xcrd, const T* ycrd, const T* zcrd, int scale_bits = 0,
+            const double* box_dims = nullptr);
+
+  template <typename T>
+  void fill(const std::vector<T> &xcrd, const std::vector<T> &ycrd, const std::vector<T> &zcrd,
+            int scale_bits = 0, const std::vector<double> &box_dims = {});
+  /// \}
+
   /// \brief Get the file name that originated this coordinate set
   std::string getFileName() const;
 
@@ -331,6 +356,8 @@ std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const in
 
 } // namespace trajectory
 } // namespace stormm
+
+#include "coordinateframe.tpp"
 
 #endif
 

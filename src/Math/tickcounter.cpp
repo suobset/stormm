@@ -62,6 +62,25 @@ const std::vector<int>& TickCounter::getStateLimits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+llint TickCounter::getExactPermutationCount() const {
+  if (getLogPermutationCount() >= static_cast<double>((sizeof(llint) * 8LLU) - 1LLU) * log(2.0)) {
+    rtErr("There are too many permutations to represent as a long long integer.", "TickCounter",
+          "getExactPermutationCount");
+  }
+  return seriesProduct<llint>(state_limits);
+}
+
+//-------------------------------------------------------------------------------------------------
+double TickCounter::getApproximatePermutationCount() const {
+  return seriesProduct<double>(state_limits);
+}
+
+//-------------------------------------------------------------------------------------------------
+double TickCounter::getLogPermutationCount() const {
+  return logProduct(state_limits);
+}
+
+//-------------------------------------------------------------------------------------------------
 void TickCounter::advance(const int steps) {
   if (steps == 1) {
     int wheel = 0;

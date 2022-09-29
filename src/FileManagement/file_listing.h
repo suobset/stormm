@@ -77,6 +77,14 @@ std::string getNormPath(const std::string &path);
 /// \param path  The path from which to extract a base name
 std::string getBaseName(const std::string &path);
 
+/// \brief Substitute the extension of a file by chopping off anything past a final '.' character,
+///        then adding the supplied extension.  If no such '.' character exists, the extension will
+///        be added to the name provided.
+///
+/// \param path     Path to the file of interest
+/// \param new_ext  The new extension to apply to the file
+std::string substituteNameExtension(const std::string &path, const std::string &new_ext);
+
 /// \brief Extract the various directory levels in a given path
 ///
 /// \param path  The path to analyze

@@ -648,11 +648,21 @@ int readBitFromMask(const std::vector<ushort> &va, const size_t pos);
 /// \brief Construct a vector based on an existing vector of any object type and an ordered list
 ///        of indices.  The original vector is limited to INT_MAX unique entries.
 ///
+/// Overloaded:
+///   - Tile a vector by replicating it a certain number of times
+///   - Pluck particular values from a vector, arrange them into a new vector, and replicate that
+///     a certain number of times
+///
 /// \param va    The original vector of objects
 /// \param tidx  Vector of indices into va, from which to construct the result
-template <typename T>
-std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx);
+/// \param nrep  The number of replicas to concatenate into the result
+/// \{
+template <typename T> std::vector<T> tileVector(const std::vector<T> &va, size_t nrep = 1);
 
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx, size_t nrep = 1);
+/// \}
+  
 } // namespace math
 } // namespace stormm
 

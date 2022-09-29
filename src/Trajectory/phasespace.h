@@ -5,6 +5,7 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Math/matrix_ops.h"
 #include "Topology/atomgraph.h"
 #include "trajectory_enumerators.h"
 #include "write_frame.h"
@@ -15,6 +16,7 @@ namespace trajectory {
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::CartesianDimension;
+using math::computeBoxTransform;
 using topology::AtomGraph;
 using topology::UnitCellType;
 
@@ -192,7 +194,7 @@ public:
   /// \param other     Another way to say original, in a different semantic context
   PhaseSpace& operator=(PhaseSpace &&other);
 
-  /// \brief Fill the object from information some coordinate, restart, or trajectory file.
+  /// \brief Fill the object from information in some coordinate, restart, or trajectory file.
   ///
   /// \param file_name     Name of the file from which to obtain coordinates
   /// \param file_kind     The type of coordinate-containing input file
@@ -201,6 +203,35 @@ public:
   void buildFromFile(const std::string &file_name_in,
                      const CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                      int frame_number = 0);
+
+  /// \brief Fill the object from information in three arrays.
+  ///
+  /// Overloaded:
+  ///   - Fill from three C-style arrays
+  ///   - Fill from three Standard Template Library vector objects
+  ///
+  /// \param xcrd        Cartesian X coordinates of positions, velocities, or forces
+  /// \param ycrd        Cartesian Y coordinates of positions, velocities, or forces
+  /// \param zcrd        Cartesian Z coordinates of positions, velocities, or forces
+  /// \param kind        Type of coordinates coming in: fill the positions, velocities, or forces
+  /// \param cycle_in    The point in the coordinate cycle to fill
+  /// \param scale_bits  The number of bits after the decimal, applicable to fixed-precision
+  ///                    representations of xcrd, ycrd, and zcrd (the box dimensions are always
+  ///                    given as a double-precision array, in units of Angstroms)
+  /// \param box_dims    Box dimensions, from which the tranformation matrices will be derived
+  /// \{
+  template <typename T>
+  void fill(const T* xcrd, const T* ycrd, const T* zcrd,
+            TrajectoryKind kind = TrajectoryKind::POSITIONS,
+            CoordinateCycle cycle_in = CoordinateCycle::PRESENT, int scale_bits = 0,
+            const double* box_dims = nullptr);
+
+  template <typename T>
+  void fill(const std::vector<T> &xcrd, const std::vector<T> &ycrd, const std::vector<T> &zcrd,
+            TrajectoryKind kind = TrajectoryKind::POSITIONS,
+            CoordinateCycle cycle_in = CoordinateCycle::PRESENT, int scale_bits = 0,
+            const std::vector<double> &box_dims = {});
+  /// \}
 
   /// \brief Get the name of the file associated with this object.
   std::string getFileName() const;
@@ -548,5 +579,7 @@ std::vector<double> interlaceXYZ(const double* xptr, const double* yptr, const d
   
 } // namespace trajectory
 } // namespace stormm
+
+#include "phasespace.tpp"
 
 #endif

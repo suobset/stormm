@@ -130,11 +130,6 @@ private:
                              ///<   completed by following the nth branch
 };
   
-/// \brief Enumerate the methods for isomerization.
-enum class ConformationEdit {
-  BOND_ROTATION, CIS_TRANS_FLIP, CHIRAL_INVERSION
-};
-
 /// \brief A shorthand form of a conformational degree of freedom, which could be a rotable bond,
 ///        cis-trans invertible bond, or chiral center.
 class IsomerPlan {
@@ -147,9 +142,18 @@ public:
   /// Overloaded:
   ///   - Accept a list of moving atoms
   ///   - Leave the field blank to be filled later
+  ///   - Specify the chiral inversion protocol (used only in the case of motion_in being
+  ///     CHIRAL_INVERSION)
   /// \{
+  IsomerPlan(ConformationEdit motion_in, ChiralInversionProtocol chiral_plan_in, int root_atom_in,
+             int pivot_atom_in, const std::vector<int> &moving_atoms_in,
+             const AtomGraph* ag_pointer_in);
+
   IsomerPlan(ConformationEdit motion_in, int root_atom_in, int pivot_atom_in,
              const std::vector<int> &moving_atoms_in, const AtomGraph* ag_pointer_in);
+
+  IsomerPlan(ConformationEdit motion_in, ChiralInversionProtocol chiral_plan_in, int root_atom_in,
+             int pivot_atom_in, const AtomGraph* ag_pointer_in);
 
   IsomerPlan(ConformationEdit motion_in, int root_atom_in, int pivot_atom_in,
              const AtomGraph* ag_pointer_in);
@@ -167,6 +171,9 @@ public:
 
   /// \brief Get the isomerizing motion.
   ConformationEdit getMotion() const;
+
+  /// \brief Get the plan for inverting a chiral center.
+  ChiralInversionProtocol getChiralPlan() const;
 
   /// \brief Get the root atom for the motion.
   int getRootAtom() const;
@@ -196,15 +203,18 @@ public:
   void eraseMovingAtoms();
   
 private:
-  ConformationEdit motion;        ///< The motion to make that will change the conformation (this
-                                  ///<   includes bond rotations as well as true isomerizations)
-  int root_atom;                  ///< The root of the rotatable bond, or the center for chirality
-  int pivot_atom;                 ///< The end of the rotatable bond (unused if motion is set to
-                                  ///<   CHIRAL_INVERSION)
-  std::vector<int> moving_atoms;  ///< List of all atoms that turn as a consequence of twisting
-                                  ///<   about the rotatable bond axis
-  const AtomGraph* ag_pointer;    ///< Pointer to the AtomGraph object to which this isomerization
-                                  ///<   applies
+  ConformationEdit motion;              ///< The motion to make that will change the conformation
+                                        ///<   (this includes bond rotations as well as true
+                                        ///<   isomerizations)
+  ChiralInversionProtocol chiral_plan;  ///< Plan for inverting a chiral center, if that is the
+                                        ///<   motion involved in this isomer plan
+  int root_atom;                        ///< Root of the rotatable bond, chiral center atom
+  int pivot_atom;                       ///< The end atom of the rotatable bond (unused if motion
+                                        ///<   is set to CHIRAL_INVERSION)
+  std::vector<int> moving_atoms;        ///< List of all atoms that turn as a consequence of
+                                        ///<   twisting about the rotatable bond axis
+  const AtomGraph* ag_pointer;          ///< Pointer to the AtomGraph object to which this
+                                        ///<   isomerization applies
 };
 
 /// \brief An object to store information about chemical motifs: participation in rings, planarity,

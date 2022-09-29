@@ -133,7 +133,6 @@ void rotateAboutBond(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int at
 ///                                originated in a PhaseSpaceSynthesis or CoordinateSeries using
 ///                                an integer representation
 /// \{
-
 template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int center_idx,
                       const std::vector<int> &chiral_centers,

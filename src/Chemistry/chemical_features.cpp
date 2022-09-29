@@ -160,17 +160,34 @@ void BondedNode::wipeRingCompletion() {
 }
 
 //-------------------------------------------------------------------------------------------------
+IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
+                       const ChiralInversionProtocol chiral_plan_in, const int root_atom_in,
+                       const int pivot_atom_in, const std::vector<int> &moving_atoms_in,
+                       const AtomGraph* ag_pointer_in) :
+    motion{motion_in}, chiral_plan{chiral_plan_in}, root_atom{root_atom_in},
+    pivot_atom{pivot_atom_in}, moving_atoms{moving_atoms_in}, ag_pointer{ag_pointer_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
                        const int pivot_atom_in, const std::vector<int> &moving_atoms_in,
                        const AtomGraph* ag_pointer_in) :
-    motion{motion_in}, root_atom{root_atom_in}, pivot_atom{pivot_atom_in},
-    moving_atoms{moving_atoms_in}, ag_pointer{ag_pointer_in}
+    IsomerPlan(motion_in, ChiralInversionProtocol::DO_NOT_INVERT, root_atom_in, pivot_atom_in,
+               moving_atoms_in, ag_pointer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
+                       const ChiralInversionProtocol chiral_plan_in, const int root_atom_in,
+                       const int pivot_atom_in, const AtomGraph* ag_pointer_in) :
+    IsomerPlan(motion_in, chiral_plan_in, root_atom_in, pivot_atom_in, {}, ag_pointer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
 IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
                        const int pivot_atom_in, const AtomGraph* ag_pointer_in) :
-    IsomerPlan(motion_in, root_atom_in, pivot_atom_in, {}, ag_pointer_in)
+    IsomerPlan(motion_in, ChiralInversionProtocol::DO_NOT_INVERT, root_atom_in, pivot_atom_in, {},
+               ag_pointer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -210,6 +227,11 @@ IsomerPlan& IsomerPlan::operator=(IsomerPlan &&other) {
 //-------------------------------------------------------------------------------------------------
 ConformationEdit IsomerPlan::getMotion() const {
   return motion;
+}
+
+//-------------------------------------------------------------------------------------------------
+ChiralInversionProtocol IsomerPlan::getChiralPlan() const {
+  return chiral_plan;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2657,8 +2679,9 @@ std::vector<IsomerPlan> ChemicalFeatures::getChiralInversionGroups() const {
       moving_atom_idx[k] = groups_ptr[j];
       k++;
     }
-    result.emplace_back(ConformationEdit::CHIRAL_INVERSION, anchor_a_ptr[i], anchor_b_ptr[i],
-                        moving_atom_idx, ag_pointer);
+    result.emplace_back(ConformationEdit::CHIRAL_INVERSION,
+                        static_cast<ChiralInversionProtocol>(chiral_inversion_methods.readHost(i)),
+                        anchor_a_ptr[i], anchor_b_ptr[i], moving_atom_idx, ag_pointer);
   }
   return result;
 }

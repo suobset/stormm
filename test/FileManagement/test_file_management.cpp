@@ -32,6 +32,9 @@ int main(const int argc, const char* argv[]) {
   // Section 5
   section("Directory destruction");
 
+  // Section 6
+  section("File name manipulation");
+  
   // Test the directory and regular expression search features
   section(1);
   const std::string base_dir = oe.getStormmSourcePath() + osc + "test" + osc + "FileManagement";
@@ -189,6 +192,19 @@ int main(const int argc, const char* argv[]) {
         new_folder + " was not removed after creating a deep nested folder within it and "
         "scrambling the tree of subdirectories.", tmpdir_priority);
 
+  // Test file name mechanics
+  section(6);
+  const std::string jungle = oe.getStormmHomePath() + osc + "its" + osc + "a" + osc + "jungle" +
+                             osc + "out" + osc + "there.book";
+  check(getBaseName(jungle), RelationalOperator::EQUAL, std::string("there.book"), "The base "
+        "name of a file path is not returned correctly.");
+  const std::string sea_creature = substituteNameExtension("sea.turtle", "snake");
+  check(sea_creature, RelationalOperator::EQUAL, std::string("sea.snake"), "Substitution of a "
+        "file name extension does not work as expected.");
+  const std::string island = substituteNameExtension("bikini", "atoll");
+  check(island, RelationalOperator::EQUAL, std::string("bikini.atoll"), "Substitution of a "
+        "file name extension does not work as expected when no extension is initially present.");
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

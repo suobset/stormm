@@ -406,76 +406,24 @@ template <typename T>
 CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
                                                  const HybridTargetLevel tier) const {
   CoordinateFrame result(atom_count, unit_cell);
-  CoordinateFrameWriter resultw = result.data();
-  const size_t natom_zu = atom_count;
   const size_t fidx_zu  = static_cast<size_t>(frame_index); 
   const size_t frame_offset = roundUp<size_t>(atom_count, warp_size_zu) * fidx_zu;
-  const size_t xfrm_offset  = roundUp<size_t>(9, warp_size_zu) * fidx_zu;
   const size_t bdim_offset  = roundUp<size_t>(6, warp_size_zu) * fidx_zu;
   switch (tier) {
   case HybridTargetLevel::HOST:
-    {
-      const T* xptr = x_coordinates.data();
-      const T* yptr = y_coordinates.data();
-      const T* zptr = z_coordinates.data();
-      const double* umat_ptr = box_space_transforms.data();
-      const double* invu_ptr = inverse_transforms.data();
-      const double* bdim_ptr = box_dimensions.data();
-      if (globalpos_scale_bits == 0) {
-        for (size_t i = 0; i < natom_zu; i++) {
-          resultw.xcrd[i] = xptr[frame_offset + i];
-          resultw.ycrd[i] = yptr[frame_offset + i];
-          resultw.zcrd[i] = zptr[frame_offset + i];
-        }
-      }
-      else {
-        const double conv_factor = inverse_globalpos_scale;
-        for (size_t i = 0; i < natom_zu; i++) {
-          resultw.xcrd[i] = static_cast<double>(xptr[frame_offset + i]) * conv_factor;
-          resultw.ycrd[i] = static_cast<double>(yptr[frame_offset + i]) * conv_factor;
-          resultw.zcrd[i] = static_cast<double>(zptr[frame_offset + i]) * conv_factor;
-        }
-      }
-      for (size_t i = 0; i < 9LLU; i++) {
-        resultw.umat[i] = umat_ptr[xfrm_offset + i];
-        resultw.invu[i] = invu_ptr[xfrm_offset + i];
-      }
-      for (size_t i = 0; i < 6LLU; i++) {
-        resultw.boxdim[i] = bdim_ptr[bdim_offset + i];
-      }
-    }
+    result.fill(&x_coordinates.data()[frame_offset], &y_coordinates.data()[frame_offset],
+                &z_coordinates.data()[frame_offset], globalpos_scale_bits,
+                &box_dimensions.data()[bdim_offset]);
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
+      const size_t natom_zu = atom_count;
       const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
       const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);
       const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
-      const std::vector<double> tmp_umat = box_space_transforms.readDevice(xfrm_offset, 9);
-      const std::vector<double> tmp_invu = inverse_transforms.readDevice(xfrm_offset, 9);
       const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
-      if (globalpos_scale_bits == 0) {
-        for (size_t i = 0; i < natom_zu; i++) {
-          resultw.xcrd[i] = tmp_xcrd[i];
-          resultw.ycrd[i] = tmp_ycrd[i];
-          resultw.zcrd[i] = tmp_zcrd[i];
-        }
-      }
-      else {
-        const double conv_factor = inverse_globalpos_scale;
-        for (size_t i = 0; i < natom_zu; i++) {
-          resultw.xcrd[i] = static_cast<double>(tmp_xcrd[i]) * conv_factor;
-          resultw.ycrd[i] = static_cast<double>(tmp_ycrd[i]) * conv_factor;
-          resultw.zcrd[i] = static_cast<double>(tmp_zcrd[i]) * conv_factor;
-        }
-      }
-      for (size_t i = 0; i < 9LLU; i++) {
-        resultw.umat[i] = tmp_umat[i];
-        resultw.invu[i] = tmp_invu[i];
-      }
-      for (size_t i = 0; i < 6LLU; i++) {
-        resultw.boxdim[i] = tmp_bdim[i];
-      }
+      result.fill(tmp_xcrd, tmp_ycrd, tmp_zcrd, globalpos_scale_bits, tmp_bdim);
     }
     break;
 #endif
@@ -484,6 +432,38 @@ CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
   // Set the frame number based on the position in the series
   result.setFrameNumber(frame_index);
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+PhaseSpace CoordinateSeries<T>::exportPhaseSpace(const int frame_index,
+                                                 const HybridTargetLevel tier) const {
+  PhaseSpace result(atom_count, unit_cell);
+  const size_t fidx_zu  = static_cast<size_t>(frame_index);
+  const size_t frame_offset = roundUp<size_t>(atom_count, warp_size_zu) * fidx_zu;
+  const size_t bdim_offset  = roundUp<size_t>(6, warp_size_zu) * fidx_zu;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    result.fill(&x_coordinates.data()[frame_offset], &y_coordinates.data()[frame_offset],
+                &z_coordinates.data()[frame_offset], TrajectoryKind::POSITIONS,
+                CoordinateCycle::PRESENT, globalpos_scale_bits,
+                &box_dimensions.data()[bdim_offset]);
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const size_t natom_zu = atom_count;
+      const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
+      result.fill(tmp_xcrd, tmp_ycrd, tmp_zcrd,	TrajectoryKind::POSITIONS,
+                  CoordinateCycle::PRESENT, globalpos_scale_bits, tmp_bdim);
+    }
+    break;
+#endif
+  }
+  return result;  
 }
 
 //-------------------------------------------------------------------------------------------------

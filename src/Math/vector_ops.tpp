@@ -1183,13 +1183,29 @@ findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx) {
+template <typename T> std::vector<T> tileVector(const std::vector<T> &va, const size_t nrep) {
   std::vector<T> result;
-  const size_t ntiles = tidx.size();
-  result.reserve(ntiles);
-  for (size_t i = 0; i < ntiles; i++) {
-    result.emplace_back(va[tidx[i]]);
+  const size_t n_va = va.size();
+  result.reserve(n_va * nrep);
+  for (size_t pos = 0LLU; pos < nrep; pos++) {	
+    for (size_t i = 0LLU; i < n_va; i++) {
+      result.emplace_back(va[i]);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx,
+                          const size_t nrep) {
+  std::vector<T> result;
+  const size_t n_tidx = tidx.size();
+  result.reserve(n_tidx * nrep);
+  for (size_t pos = 0LLU; pos < nrep; pos++) {
+    for (size_t i = 0LLU; i < n_tidx; i++) {
+      result.emplace_back(va[tidx[i]]);
+    }
   }
   return result;
 }
