@@ -81,7 +81,7 @@ public:
   ///   - Set a specific variable
   ///
   /// \param new_state  The value or values to set
-  /// \param var_index  Index of a particular coutner variable to set
+  /// \param var_index  Index of a particular counter variable to set
   /// \{
   void set(const std::vector<int> &new_state);
 

@@ -2222,8 +2222,8 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
   std::vector<double> tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel, tmp_yvel, tmp_zvel;
   const PsSynthesisReader tpsr = this->data(cycle_position);
   for (size_t i = 0; i < nframe; i++) {
-    const int fr_start = atom_starts.readHost(i);
-    const int fr_end   = fr_start + atom_counts.readHost(i);
+    const int fr_start = atom_starts.readHost(system_indices[i]);
+    const int fr_end   = fr_start + atom_counts.readHost(system_indices[i]);
     const int frame_atom_count = fr_end - fr_start;
 
     // Transfer the particle positions.  Resize the holding arrays at each frame: if the frames

@@ -7,8 +7,6 @@
 #include "../../../src/Math/tickcounter.h"
 #include "../../../src/Structure/isomerization.h"
 #include "../../../src/Structure/rmsd.h"
-#include "../../../src/Topology/atomgraph.h"
-#include "../../../src/Topology/atomgraph_abstracts.h"
 #include "../../../src/Topology/topology_util.h"
 #include "../../../src/Trajectory/coordinate_series.h"
 #include "setup.h"
@@ -17,10 +15,8 @@ namespace conf_app {
 namespace setup {
 
 using stormm::chemistry::ChemicalFeatures;
-using stormm::chemistry::ChiralInversionProtocol;
 using stormm::chemistry::ConformationEdit;
 using stormm::chemistry::MapRotatableGroups;
-using stormm::chemistry::IsomerPlan;
 using stormm::constants::warp_size_int;
 using stormm::math::roundUp;
 using stormm::math::TickCounter;
@@ -29,15 +25,52 @@ using stormm::structure::rmsd;
 using stormm::structure::RmsdMethod;
 using stormm::structure::rotateAboutBond;
 using stormm::structure::flipChiralCenter;
-using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::isBonded;
-using stormm::topology::NonbondedKit;
 using stormm::trajectory::PhaseSpace;
 using stormm::trajectory::CoordinateFrame;
 using stormm::trajectory::CoordinateFrameReader;
 using stormm::trajectory::CoordinateSeries;
 using stormm::trajectory::CoordinateSeriesWriter;
+
+//-------------------------------------------------------------------------------------------------
+bool permutationsAreLinked(const std::vector<IsomerPlan> &isomerizers, const int permi,
+                           const int permj, const NonbondedKit<double> &nbk) {
+  const int root_i = isomerizers[permi].getRootAtom();
+  const int pivt_i = isomerizers[permi].getPivotAtom();
+  const int root_j = isomerizers[permj].getRootAtom();
+  const int pivt_j = isomerizers[permj].getPivotAtom();
+  switch (isomerizers[permi].getMotion()) {
+  case ConformationEdit::BOND_ROTATION:
+  case ConformationEdit::CIS_TRANS_FLIP:
+
+    // If two isomerizations share atoms or have their root and pivot atoms bonded to one
+    // another, consider them coupled and add the product of the number of possible states for
+    // each to the running sum.
+    switch (isomerizers[permj].getMotion()) {
+    case ConformationEdit::BOND_ROTATION:
+    case ConformationEdit::CIS_TRANS_FLIP:
+      return (root_i == root_j || root_i == pivt_j || pivt_i == root_j || pivt_i == pivt_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j) ||
+              isBonded(nbk, pivt_i, root_j) || isBonded(nbk, pivt_i, pivt_j));
+    case ConformationEdit::CHIRAL_INVERSION:
+      return (root_i == root_j || pivt_i == root_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j));
+    }
+    break;
+  case ConformationEdit::CHIRAL_INVERSION:
+    switch (isomerizers[permj].getMotion()) {
+    case ConformationEdit::BOND_ROTATION:
+    case ConformationEdit::CIS_TRANS_FLIP:
+      return (root_i == root_j || root_i == pivt_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j));
+    case ConformationEdit::CHIRAL_INVERSION:
+      return (root_i == root_j || isBonded(nbk, root_i, root_j));
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
   
 //-------------------------------------------------------------------------------------------------
 double computeLocalPermutations(const std::vector<int> &limits,
@@ -45,67 +78,57 @@ double computeLocalPermutations(const std::vector<int> &limits,
   double result = 0.0;
   const int n_var = limits.size();
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  std::vector<double> log_limits(n_var);
   for (int i = 0; i < n_var; i++) {
-    log_limits[i] = log(static_cast<double>(limits[i]));
+    result += limits[i];
+    for (int j = i + 1; j < n_var; j++) {
+      if (permutationsAreLinked(isomerizers, i, j, nbk)) {
+        result += limits[i] * limits[j];
+      }
+    }
   }
-  for (int i = 0; i < n_var; i++) {
-    result += log_limits[i];
-    const int root_i = isomerizers[i].getRootAtom();
-    const int pivt_i = isomerizers[i].getPivotAtom();
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void forgeConformation(CoordinateSeries<double> *cseries, const int fc,
+                       const std::vector<IsomerPlan> &isomerizers, const TickCounter &ptrack,
+                       const std::vector<int> &chiral_centers,
+                       const std::vector<ChiralInversionProtocol> &chiral_center_plans,
+                       const std::vector<int> &chiral_variable_indices,
+                       const std::vector<IsomerPlan> &invertible_groups) {
+  const int n_variables = ptrack.getStateCount();
+  CoordinateSeriesWriter<double> cseries_w   = cseries->data();
+  const std::vector<int>& permutation_watch  = ptrack.getSettings();
+  const std::vector<int>& permutation_limits = ptrack.getStateLimits();
+  for (int i = 0; i < n_variables; i++) {
     switch (isomerizers[i].getMotion()) {
     case ConformationEdit::BOND_ROTATION:
     case ConformationEdit::CIS_TRANS_FLIP:
-      for (int j = i + 1; j < n_var; j++) {
-        const int root_j = isomerizers[j].getRootAtom();
-        const int pivt_j = isomerizers[j].getPivotAtom();
-
-        // If two isomerizations share atoms or have their root and pivot atoms bonded to one
-        // another, consider them coupled and add the product of the number of possible states for
-        // each to the running sum.
-        switch (isomerizers[j].getMotion()) {
-        case ConformationEdit::BOND_ROTATION:
-        case ConformationEdit::CIS_TRANS_FLIP:
-          if (root_i == root_j || root_i == pivt_j || pivt_i == root_j || pivt_i == pivt_j ||
-              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j) ||
-              isBonded(nbk, pivt_i, root_j) || isBonded(nbk, pivt_i, pivt_j)) {
-            result += log_limits[i] + log_limits[j];
-          }
-          break;
-        case ConformationEdit::CHIRAL_INVERSION:
-          if (root_i == root_j || pivt_i == root_j ||
-              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j)) {
-            result += log_limits[i] + log_limits[j];
-          }
-          break;
-        }
+      if (permutation_watch[i] > 0) {
+        const double rval = static_cast<double>(permutation_watch[i]) /
+                            static_cast<double>(permutation_limits[i]) * stormm::symbols::twopi;
+        rotateAboutBond<double, double>(cseries_w, fc, isomerizers[i].getRootAtom(),
+                                        isomerizers[i].getPivotAtom(),
+                                        isomerizers[i].getMovingAtoms(), rval);
       }
       break;
     case ConformationEdit::CHIRAL_INVERSION:
-      for (int j = i + 1; j < n_var; j++) {
-        const int root_j = isomerizers[j].getRootAtom();
-        const int pivt_j = isomerizers[j].getPivotAtom();
-        switch (isomerizers[j].getMotion()) {
-        case ConformationEdit::BOND_ROTATION:
-        case ConformationEdit::CIS_TRANS_FLIP:
-          if (root_i == root_j || root_i == pivt_j ||
-              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j)) {
-            result += log_limits[i] + log_limits[j];
-          }
+      if (permutation_watch[i] == 1) {
+        switch (isomerizers[i].getChiralPlan()) {
+        case ChiralInversionProtocol::ROTATE:
+        case ChiralInversionProtocol::REFLECT:
+          flipChiralCenter<double, double>(cseries_w, fc, chiral_variable_indices[i],
+                                           chiral_centers, chiral_center_plans, invertible_groups);
           break;
-        case ConformationEdit::CHIRAL_INVERSION:
-          if (root_i == root_j || isBonded(nbk, root_i, root_j)) {
-            result += log_limits[i] + log_limits[j];
-          }
+        case ChiralInversionProtocol::DO_NOT_INVERT:
           break;
         }
       }
       break;
     }
   }
-  return result;
 }
-  
+
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
                                      Xoshiro256ppGenerator *xrs, StopWatch *tm) {
@@ -138,6 +161,9 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   int nneighborhood = 0;
   for (int i = 0; i < ntop; i++) {
 
+    // Obtain the topology poitner for possible use later
+    const AtomGraph *iag_ptr = sc.getTopologyPointer(i);
+    
     // Create a list of ways to change the conformation
     const std::vector<IsomerPlan> rotatable_groups  = chemfe_list[i].getRotatableBondGroups();
     const std::vector<IsomerPlan> cis_trans_groups  =
@@ -172,20 +198,26 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       }
     }
     TickCounter ptrack(permutation_states);
-
+    
     // This reference, while const, will allow the program to see into the permutation tracking
     // TickCounter object as the state updates with each iteration.
-    const std::vector<int>& permutation_watch  = ptrack.getSettings();
     const std::vector<int> permutation_limits = ptrack.getStateLimits();
     const double ln_choices = ptrack.getLogPermutationCount();
     SamplingStrategy strat;
     int conformations_per_case;
+
+    // CHECK
+    printf("There would be %.0lf local permutations out of %.0lf in all.\n",
+           computeLocalPermutations(permutation_limits, isomerizers, iag_ptr),
+           ptrack.getApproximatePermutationCount());
+    // END CHECK
+    
     if (ln_choices < log(conf_input.getSystemTrialCount())) {
       conformations_per_case = ptrack.getExactPermutationCount();
       strat = SamplingStrategy::FULL;
     }
-    else if (computeLocalPermutations(permutation_limits, isomerizers, sc.getTopologyPointer(i)) <
-             log(static_cast<double>(conf_input.getSystemTrialCount()))) {
+    else if (computeLocalPermutations(permutation_limits, isomerizers, iag_ptr) <
+             static_cast<double>(conf_input.getSystemTrialCount())) {
       conformations_per_case = conf_input.getSystemTrialCount();
       strat = SamplingStrategy::LIMITED;
     }
@@ -230,93 +262,77 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     // to eliminate ring stabs or severe clashes between tertiary or quaternary atoms.
     fc = 0;
     CoordinateSeriesWriter<double> cseries_w = cseries.data();
-    for (int j = 0; j < ncases; j++) {
-      ptrack.reset();
-      switch (strat) {
-      case SamplingStrategy::FULL:
+    switch (strat) {
+    case SamplingStrategy::FULL:
+      for (int j = 0; j < ncases; j++) {
+        ptrack.reset();
         for (int k = 0; k < conformations_per_case; k++) {
-          for (int m = 0; m < n_variables; m++) {
-            switch (isomerizers[m].getMotion()) {
-            case ConformationEdit::BOND_ROTATION:
-            case ConformationEdit::CIS_TRANS_FLIP:
-              if (permutation_watch[m] > 0) {
-                const double rval = static_cast<double>(permutation_watch[m]) /
-                                    static_cast<double>(permutation_limits[m]) *
-                                    stormm::symbols::twopi;
-                rotateAboutBond<double, double>(cseries_w, fc, isomerizers[m].getRootAtom(),
-                                                isomerizers[m].getPivotAtom(),
-                                                isomerizers[m].getMovingAtoms(), rval);
-              }
-              break;
-            case ConformationEdit::CHIRAL_INVERSION:
-              if (permutation_watch[m] == 1) {
-                switch (isomerizers[m].getChiralPlan()) {
-                case ChiralInversionProtocol::ROTATE:
-                case ChiralInversionProtocol::REFLECT:
-                  flipChiralCenter<double, double>(cseries_w, fc, chiral_variable_indices[m],
-                                                   chiral_centers, chiral_center_plans,
-                                                   invertible_groups);
-                  break;
-                case ChiralInversionProtocol::DO_NOT_INVERT:
-                  break;
-                }
-              }
-              break;
-            }
-          }
+          forgeConformation(&cseries, fc, isomerizers, ptrack, chiral_centers, chiral_center_plans,
+                            chiral_variable_indices, invertible_groups);
           fc++;
           ptrack.advance();
         }
         break;
-      case SamplingStrategy::LIMITED:
-      case SamplingStrategy::SPARSE:
-        {
-          // In limited sampling, coupled isomerizing variables will be explored in concert.  In
-          // sparse sampling, each variable will be explored in at least one case, provided that
-          // there are enough samples of the various permutations to fill.  In either case, the
-          // rest of the available samples will be filled with randomized permutations.
-          if (strat == SamplingStrategy::LIMITED) {
-            
-          }
-          else {
-            
-          }
-          for (int k = 0; k < conformations_per_case; k++) {
-            for (int m = 0; m < n_variables; m++) {
-              switch (isomerizers[m].getMotion()) {
-              case ConformationEdit::BOND_ROTATION:
-              case ConformationEdit::CIS_TRANS_FLIP:
-                if (permutation_watch[m] > 0) {
-                  const double rval = static_cast<double>(permutation_watch[m]) /
-                                      static_cast<double>(permutation_limits[m]) *
-                                      stormm::symbols::twopi;
-                  rotateAboutBond<double, double>(cseries_w, fc, isomerizers[m].getRootAtom(),
-                                                  isomerizers[m].getPivotAtom(),
-                                                  isomerizers[m].getMovingAtoms(), rval);
-                }
-                break;
-              case ConformationEdit::CHIRAL_INVERSION:
-                if (permutation_watch[m] == 1) {
-                  switch (isomerizers[m].getChiralPlan()) {
-                  case ChiralInversionProtocol::ROTATE:
-                  case ChiralInversionProtocol::REFLECT:
-                    flipChiralCenter<double, double>(cseries_w, fc, chiral_variable_indices[m],
-                                                     chiral_centers, chiral_center_plans,
-                                                     invertible_groups);
-                    break;
-                  case ChiralInversionProtocol::DO_NOT_INVERT:
-                    break;
+      }
+      break;
+    case SamplingStrategy::LIMITED:
+      {
+        // In limited sampling, coupled isomerizing variables will be explored in concert.  In
+        // sparse sampling, each variable will be explored in at least one case, provided that
+        // there are enough samples of the various permutations to fill.
+        const NonbondedKit<double> nbk = iag_ptr->getDoublePrecisionNonbondedKit();
+        const int conf_goal = ncases * conformations_per_case;
+        while (fc < conf_goal) {
+          int k = 0;
+          while (k < n_variables && fc < conf_goal) {
+            int m = k + 1;
+            while (m < n_variables && fc < conf_goal) {
+              if (permutationsAreLinked(isomerizers, k, m, nbk)) {
+                int pos_k = 0;
+                while (pos_k < permutation_limits[k] && fc < conf_goal) {
+                  int pos_m = 0;
+                  while (pos_m < permutation_limits[m] && fc < conf_goal) {
+                    ptrack.randomize(xrs);
+                    ptrack.set(pos_k, k);
+                    ptrack.set(pos_m, m);
+                    forgeConformation(&cseries, fc, isomerizers, ptrack, chiral_centers,
+                                      chiral_center_plans, chiral_variable_indices,
+                                      invertible_groups);
+                    fc++;
+                    pos_m++;
                   }
+                  pos_k++;
                 }
-                break;
               }
+              m++;
             }
-            fc++;
-            ptrack.randomize(xrs);
+            k++;
           }
         }
-        break;
       }
+      break;
+    case SamplingStrategy::SPARSE:
+      {
+        const NonbondedKit<double> nbk = iag_ptr->getDoublePrecisionNonbondedKit();
+        const int conf_goal = ncases * conformations_per_case;
+        while (fc < conf_goal) {
+          int k = 0;
+          while (k < n_variables && fc < conf_goal) {
+            int m = 0;
+            while (m < permutation_limits[k] && fc < conf_goal) {
+              ptrack.randomize(xrs);
+              ptrack.set(m, k);
+              forgeConformation(&cseries, fc, isomerizers, ptrack, chiral_centers,
+                                chiral_center_plans, chiral_variable_indices,
+                                invertible_groups);
+              fc++;
+              m++;
+            }
+            k++;
+          }
+        }
+      }
+      break;
     }
     for (int j = 0; j < ncases * conformations_per_case; j++) {
       ps_list.push_back(cseries.exportPhaseSpace(j));

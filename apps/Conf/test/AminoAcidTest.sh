@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "&files" > cgen.in
-for SYS in gly_lys ; do
+for SYS in gly_lys gly_gly trp ; do
   echo "  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/${SYS}.top" >> cgen.in
   echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd }" >> cgen.in
 done
@@ -18,4 +18,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn
+${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn

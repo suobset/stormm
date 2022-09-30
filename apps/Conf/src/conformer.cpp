@@ -55,7 +55,7 @@ int main(int argc, const char* argv[]) {
     const AtomGraph* iag_ptr = conformer_population.getSystemTopologyPointer(i);
     std::vector<int> like_confs(1, i);
     for (int j = i + 1; j < nconf; j++) {
-      const AtomGraph* jag_ptr = conformer_population.getSystemTopologyPointer(i);
+      const AtomGraph* jag_ptr = conformer_population.getSystemTopologyPointer(j);
       if (iag_ptr == jag_ptr) {
         like_confs.push_back(j);
         is_printed[j] = true;
@@ -64,7 +64,19 @@ int main(int argc, const char* argv[]) {
     is_printed[i] = true;
     const std::string fname = substituteNameExtension("bloom_" +
                                                       getBaseName(iag_ptr->getFileName()), "crd");
-    printf("Print file %s\n", fname.c_str());
+    printf("Print trajectory %s with %4zu frames\n", fname.c_str(), like_confs.size());
+    int k = 0;
+    for (size_t j = 0; j < like_confs.size(); j++) {
+      printf("  %4d", like_confs[j]);
+      k++;
+      if (k == 16) {
+        printf("\n");
+        k = 0;
+      }
+    }
+    if (k > 0) {
+      printf("\n");
+    }
     conformer_population.printTrajectory(like_confs, fname, 0.0, CoordinateFileKind::AMBER_CRD,
                                          PrintSituation::OVERWRITE);
   }
@@ -73,10 +85,6 @@ int main(int argc, const char* argv[]) {
   // Collate the topologies in preparation to operate on the new coordinate population
   
   master_timer.printResults();
-  
-  // CHECK
-  printf("Back in main.\n");
-  // END CHECK
-  
+
   return 0;
 }
