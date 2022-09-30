@@ -330,7 +330,7 @@ PhaseSpace& PhaseSpace::operator=(PhaseSpace &&other) {
 void PhaseSpace::buildFromFile(const std::string &file_name_in, const CoordinateFileKind file_kind,
                                const int frame_number) {
   file_name = file_name_in;
-
+  
   // Try to detect the file format if it is not already specified.  If it remains UNKNOWN, that
   // will ultimately lead to an error.
   CoordinateFileKind actual_kind = file_kind;

@@ -64,19 +64,6 @@ int main(int argc, const char* argv[]) {
     is_printed[i] = true;
     const std::string fname = substituteNameExtension("bloom_" +
                                                       getBaseName(iag_ptr->getFileName()), "crd");
-    printf("Print trajectory %s with %4zu frames\n", fname.c_str(), like_confs.size());
-    int k = 0;
-    for (size_t j = 0; j < like_confs.size(); j++) {
-      printf("  %4d", like_confs[j]);
-      k++;
-      if (k == 16) {
-        printf("\n");
-        k = 0;
-      }
-    }
-    if (k > 0) {
-      printf("\n");
-    }
     conformer_population.printTrajectory(like_confs, fname, 0.0, CoordinateFileKind::AMBER_CRD,
                                          PrintSituation::OVERWRITE);
   }

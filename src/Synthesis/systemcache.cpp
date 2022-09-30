@@ -936,7 +936,7 @@ std::vector<int> SystemCache::getTopologicalCases(const int topology_index) cons
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemTrajectoryName(const int system_index) const {
-  if (system_index >= static_cast<int>(system_trajectory_names.size())) {
+  if (system_index < 0 || system_index >= static_cast<int>(system_trajectory_names.size())) {
     rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
           std::to_string(system_trajectory_names.size()) + ".", "SystemCache",
           "getTrajectoryFileName");
@@ -946,12 +946,22 @@ std::string SystemCache::getSystemTrajectoryName(const int system_index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemCheckpointName(const int system_index) const {
-  if (system_index >= static_cast<int>(system_checkpoint_names.size())) {
+  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_names.size())) {
     rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
           std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
           "getCheckpointFileName");
   }
   return system_checkpoint_names[system_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string SystemCache::getSystemLabel(const int system_index) const {
+  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_names.size())) {
+    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
+          std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
+          "getSystemLabel");
+  }
+  return system_labels[system_index];
 }
 
 } // namespace synthesis

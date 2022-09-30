@@ -56,13 +56,19 @@ public:
 
   BoundedRestraint getRestraint(const AtomGraph *ag) const;
   /// \}  
+
 private:
   ExceptionResponse policy;  ///< Protocol to follow in the event of bad input data
   bool restraint_is_valid;   ///< Indicator that the restraints passes various quality checks
+  std::string system;        ///< A system label that can be matched to various entries based on
+                             ///<   the -sys keyword in &files namelist input
+  std::string ensemble;      ///< Indicates a collection of restraints to apply throughout any
+                             ///<   specified systems.  This will supercede any atom indices or
+                             ///<   masks specified in the same &restraint namelist.
   std::string mask_i;        ///< Atom I (first atom) mask
   std::string mask_j;        ///< Atom J (second atom) mask
   std::string mask_k;        ///< Atom K (third atom) mask
-  std::string mask_l;        ///< Atom L (fourth atom) maskk
+  std::string mask_l;        ///< Atom L (fourth atom) mask
   int atom_i;                ///< Atom I topological index
   int atom_j;                ///< Atom J topological index
   int atom_k;                ///< Atom K topological index

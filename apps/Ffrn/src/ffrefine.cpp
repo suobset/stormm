@@ -1,4 +1,5 @@
 #include <vector>
+#include "../../../src/Constants/behavior.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/MolecularMechanics/minimization.h"
 #include "../../../src/Namelists/nml_minimize.h"
@@ -10,6 +11,7 @@
 #include "../../../src/UnitTesting/stopwatch.h"
 #include "../../../src/UnitTesting/unit_test.h"
 
+using stormm::constants::getEnumerationName;
 using stormm::chemistry::MapRotatableGroups;
 using stormm::energy::ScoreCard;
 using stormm::mm::minimize;
@@ -46,8 +48,9 @@ int main(int argc, const char* argv[]) {
     all_mme.reserve(system_count);
     for (int i = 0; i < system_count; i++) {
       PhaseSpace *ps = sc.getCoordinatePointer(i);
-
+      
       // CHECK
+      printf("Label %2d = %s\n", i, sc.getSystemLabel(i).c_str());
       RestraintApparatus ra(sc.getSystemTopologyPointer(i));
       // END CHECK
     

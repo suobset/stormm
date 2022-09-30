@@ -13,7 +13,8 @@ using structure::ImagingMethod;
   
 //-------------------------------------------------------------------------------------------------
 RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
-    policy{policy_in}, mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
+    policy{policy_in}, restraint_is_valid{true}, system{std::string("ALL")}, ensemble{},
+    mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
     mask_l{std::string("")}, atom_i{-1}, atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0},
     initiation_step{0}, maturation_step{0}, initial_k2{0.0}, initial_k3{0.0}, initial_r1{0.0},
     initial_r2{0.0}, initial_r3{0.0}, initial_r4{0.0}, mature_k2{0.0}, mature_k3{0.0},
@@ -24,10 +25,44 @@ RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
 //-------------------------------------------------------------------------------------------------
 RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
                                      const ExceptionResponse policy_in) :
-    RestraintControls()
+    RestraintControls(policy_in)
 {
   const int starting_line = *start_line + 1;
   NamelistEmulator t_nml = restraintInput(tf, start_line, policy);
+
+  // Take in an associated label to indicate systems to which this restraint condition applies
+  if (t_nml.getKeywordStatus("system") != InputStatus::MISSING) {
+    system = t_nml.getStringValue("system");
+  }
+
+  // Look for a general directive for a group of restraints that apply througout a system
+  if (t_nml.getKeywordStatus("ensemble") != InputStatus::MISSING) {
+    ensemble = t_nml.getStringValue("ensemble");
+    if (t_nml.getKeywordStatus("mask1") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("mask2") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("mask3") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("mask4") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("iat1") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("iat2") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("iat3") != InputStatus::MISSING ||
+        t_nml.getKeywordStatus("iat4") != InputStatus::MISSING) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Ensemble restraints apply throughout the system and are incompatible with "
+              " particular atoms, as indicated in a &restraint namelist beginning on line " +
+              std::to_string(starting_line) + " of " + tf.getFileName() + ".",
+              "RestraintControls");
+      case ExceptionResponse::WARN:
+        rtWarn("Ensemble restraints apply throughout the system, but particular atoms were also "
+               "indicated in a &restraint namelist beginning on line " +
+               std::to_string(starting_line) + " of " + tf.getFileName() + ".  The atom "
+               "specifications will be ignored.", "RestraintControls");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+  }
 
   // Take in atom selections
   if (t_nml.getKeywordStatus("mask1") != InputStatus::MISSING) {
@@ -551,6 +586,9 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                 "of the &files namelist, or use one of the reserved values 'all' or "
                 "'all_possible' (both case-insensitive) to apply the restraint to all systems, or "
                 "all systems meeting the atom requirements.");
+  t_nml.addHelp("ensemble", "Indicate not a single restraint but a collection of restraints "
+                "applied throughout the molecular system.  This keyword will supercede any atom "
+                "indices or masks specified in the same &restraint namelist.");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

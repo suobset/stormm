@@ -2,12 +2,23 @@
 
 cat > minimize.in << EOF
 &files
-  -sys { -p ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide.top
-         -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf }
+  -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
+         -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
+         -label sulfonamide }
 &end
 
 &ffrefine
-  rotation_samples 600,
+  
+&end
+
+&minimize
+  ncyc 50,  maxcyc 1000,
+&end
+
+&restraint
+  label sulfonamide
+  mask1 @O1, mask2 @S1, mask3 @C2, mask4 @C3
+  
 &end
 EOF
 

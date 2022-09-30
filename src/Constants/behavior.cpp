@@ -9,6 +9,35 @@ namespace constants {
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
+ExceptionResponse translateExceptionResponse(const std::string &policy) {
+  if (strcmpCased(policy, std::string("die")) || strcmpCased(policy, std::string("abort"))) {
+    return ExceptionResponse::DIE;
+  }
+  else if (strcmpCased(policy, std::string("warn")) || strcmpCased(policy, std::string("alert")) ||
+           strcmpCased(policy, std::string("advise"))) {
+    return ExceptionResponse::WARN;
+  }
+  else if (strcmpCased(policy, std::string("none")) ||
+           strcmpCased(policy, std::string("silent"))) {
+    return ExceptionResponse::SILENT;
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ExceptionResponse policy) {
+  switch (policy) {
+  case ExceptionResponse::DIE:
+    return std::string("DIE");
+  case ExceptionResponse::WARN:
+    return std::string("WARN");
+  case ExceptionResponse::SILENT:
+    return std::string("SILENT");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 PrecisionModel translatePrecisionModel(const std::string &choice, const ExceptionResponse policy) {
   if (strcmpCased(choice, std::string("single"))) {
     return PrecisionModel::SINGLE;

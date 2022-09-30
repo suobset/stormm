@@ -35,6 +35,17 @@ enum class CartesianDimension {
   X, Y, Z
 };
 
+/// \brief Convert a string object, possibly supplied by the user, into an ExceptionResponse
+///        enumeration to indicate the program's intended behavior.
+///
+/// \param policy  Human-readable indication of the exception response behavior
+ExceptionResponse translateExceptionResponse(const std::string &policy);
+  
+/// \brief Translate the exception response behavior into a human-readable string.
+///
+/// \param choice  The named exception response behavior
+std::string getEnumerationName(ExceptionResponse policy);
+  
 /// \brief Translate a string into a known precision level enumeration.
 ///
 /// \param choice  The named precision model (will be checked for validity)

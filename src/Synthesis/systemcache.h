@@ -296,7 +296,12 @@ public:
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemCheckpointName(int system_index) const;
-  
+
+  /// \brief Get the label associated with a particular system in the cache.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  std::string getSystemLabel(int system_index) const;
+
 private:
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.

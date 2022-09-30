@@ -133,6 +133,9 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
       return CoordinateFileKind::UNKNOWN;
     }
   }
+  else {
+    return CoordinateFileKind::UNKNOWN;
+  }
   __builtin_unreachable();
 }
 
