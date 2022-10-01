@@ -332,6 +332,8 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
       unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
+  case CoordinateFileKind::SDF:
+    break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
@@ -376,6 +378,8 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
       // Interpret the box transformation, updating the unit cell type based on the file
       unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
+    break;
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -500,6 +504,8 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
     writeFrame(&foutp, file_name, kind, atom_count, x_coordinates.data(), y_coordinates.data(),
                z_coordinates.data(), nullptr, nullptr, nullptr, unit_cell, box_dimensions.data());
     break;
+  case CoordinateFileKind::SDF:
+    break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
@@ -605,6 +611,8 @@ std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const Coordin
       }
     }
     break;
+  case CoordinateFileKind::SDF:
+    break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
@@ -693,6 +701,8 @@ std::vector<CoordinateFrame> getAllFrames(const TextFile &tf, const int atom_cou
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
     frame_numbers.resize(1, 0);
+    break;
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:

@@ -88,7 +88,8 @@ bool verifyNumberFormat(const char* a, NumberFormat cform, int read_begin = 0, i
 /// Overloaded:
 ///   - Inspect a C-style array of characters
 ///   - Inspect a Standard Template Library string object
-///   - Inspect a TextFile object with a line number, starting position, and length
+///   - Inspect a TextFile object, or its abstract, with a line number, starting position, and
+///     length
 ///
 /// \param line       The line data as a std::string object, a C-style array of characters, or the
 ///                   number of the line in a TextFile object
@@ -102,6 +103,8 @@ bool verifyContents(const char* line, int start_pos, int length,
 bool verifyContents(const std::string &line, int start_pos, int length,
                     NumberFormat fmt = NumberFormat::CHAR4);
 bool verifyContents(const TextFile &tf, int line, int start_pos, int length,
+                    NumberFormat fmt = NumberFormat::CHAR4);
+bool verifyContents(const TextFileReader &tfr, int line, int start_pos, int length,
                     NumberFormat fmt = NumberFormat::CHAR4);
 /// \}
 

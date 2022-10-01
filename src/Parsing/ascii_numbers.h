@@ -65,7 +65,7 @@ std::vector<PolyNumeric> readNumberSeries(const TextFile &tf, const int start_li
 
 /// \brief Extract an integer number from a character string.  This is not intended for the
 ///        highest-performance applications and should be used in contexts where only a few such
-///        integers must be read in specailized formats.
+///        integers must be read in specialized formats.
 ///
 /// Overloaded:
 ///   - Accept a C-style character string

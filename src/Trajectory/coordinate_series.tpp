@@ -504,6 +504,8 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
                  nullptr, nullptr, nullptr, cfr.unit_cell, cfr.boxdim);
     }
     break;
+  case CoordinateFileKind::SDF:
+    break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
@@ -794,6 +796,8 @@ void CoordinateSeries<T>::importFromFile(const std::string &file_name,
         }
       }
     }
+    break;
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:

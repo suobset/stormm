@@ -22,6 +22,7 @@ PrintSituation adjustTrajectoryOpeningProtocol(const PrintSituation expectation,
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
   case CoordinateFileKind::AMBER_NETCDF_RST:
+  case CoordinateFileKind::SDF:
     switch (expectation) {
     case PrintSituation::OPEN_NEW:
     case PrintSituation::OVERWRITE:
@@ -59,6 +60,7 @@ void initializeTrajectory(std::ofstream *foutp, const CoordinateFileKind output_
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
+  case CoordinateFileKind::SDF:
   case CoordinateFileKind::UNKNOWN:
     break;
   }
@@ -80,6 +82,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::SDF:
     pn_allcrd.resize(3 * natom);
     for (int i = 0; i < natom; i++) {
       pn_allcrd[3*i    ].d = x_crd[i];
@@ -98,6 +101,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
     pn_allvel.resize(3 * natom);
@@ -112,6 +116,8 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
     // The case of an unknown format is handled in the switch above
     break;
   }
+
+  // Print the coordinates
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
     printNumberSeries(foutp, pn_allcrd, 10, 8, 3, NumberFormat::STANDARD_REAL, "writeFrame",
@@ -130,6 +136,8 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
     printNumberSeries(foutp, pn_allvel, 6, 12, 7, NumberFormat::STANDARD_REAL, "writeFrame",
                       "Write a frame to an Amber-format input coordinates file, " + filename +
                       ".");
+    break;
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -172,6 +180,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
       break;
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_NETCDF_RST:
+    case CoordinateFileKind::SDF:
     case CoordinateFileKind::UNKNOWN:
       break;
     }

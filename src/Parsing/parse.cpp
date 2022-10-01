@@ -178,6 +178,21 @@ bool verifyContents(const TextFile &tf, const int line, const int start_pos, con
 }
 
 //-------------------------------------------------------------------------------------------------
+bool verifyContents(const TextFileReader &tfr, const int line, const int start_pos,
+                    const int length, const NumberFormat fmt) {
+  if (line >= tfr.line_count) {
+    return false;
+  }
+  if (start_pos >= tfr.line_lengths[line] || start_pos + length >= tfr.line_lengths[line]) {
+    return false;
+  }
+  else {
+    return verifyNumberFormat(&tfr.text[tfr.line_limits[line]], fmt, start_pos, length);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 char uppercase(const char tc) {
   return tc - (tc >= 97 && tc <= 122) * 32;
 }

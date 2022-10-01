@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include "copyright.h"
+#include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
@@ -11,6 +12,7 @@ namespace stormm {
 namespace trajectory {
 
 using parse::NumberFormat;
+using parse::readIntegerValue;
 using parse::separateText;
 using parse::strncmpCased;
 using parse::TextFileReader;
@@ -30,6 +32,8 @@ std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
     return std::string("Amber NetCDF binary trajectory");
   case CoordinateFileKind::AMBER_NETCDF_RST:
     return std::string("Amber NetCDF binary restart");
+  case CoordinateFileKind::SDF:
+    return std::string("MDL MOL / SDF");
   case CoordinateFileKind::UNKNOWN:
     return std::string("Unknown coordinate file format");
   }
@@ -42,6 +46,7 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::SDF:
     return DataFormat::ASCII;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -71,6 +76,9 @@ CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
   else if (strncmpCased(name_in, "AMBER_NETCDF_RST")) {
     return CoordinateFileKind::AMBER_NETCDF_RST;
   }
+  else if (strncmpCased(name_in, "SDF") || strncmpCased(name_in, "MDL_MOL")) {
+    return CoordinateFileKind::SDF;
+  }
   else if (strncmpCased(name_in, "UNKNOWN")) {
     return CoordinateFileKind::UNKNOWN;
   }
@@ -87,12 +95,12 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
   }
   const std::vector<std::string> line_two = separateText(&tfr.text[tfr.line_limits[1]],
                                                          tfr.line_limits[2] - tfr.line_limits[1]);
-  if (line_two.size() == 0) {
-    return CoordinateFileKind::UNKNOWN;
-  }
   if (line_two.size() == 2 && verifyNumberFormat(line_two[0].c_str(), NumberFormat::INTEGER) &&
+      stoi(line_two[0]) > 0 &&
       (verifyNumberFormat(line_two[1].c_str(), NumberFormat::SCIENTIFIC) ||
        verifyNumberFormat(line_two[1].c_str(), NumberFormat::STANDARD_REAL))) {
+
+    // Check the third line to confirm
     if (tfr.line_limits[3] - tfr.line_limits[2] >= 36 &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2], 12) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2] + 12, 12) &&
@@ -103,40 +111,47 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
       // head of the file.
       return CoordinateFileKind::AMBER_ASCII_RST;
     }
-    else {
-      return CoordinateFileKind::UNKNOWN;
-    }
   }
   else if (line_two.size() == 1 &&
-           verifyNumberFormat(line_two[0].c_str(), NumberFormat::INTEGER)) {
+           verifyNumberFormat(line_two[0].c_str(), NumberFormat::INTEGER) &&
+           stoi(line_two[0]) > 0) {
+
+    // Check the third line to confirm
     if (tfr.line_limits[3] - tfr.line_limits[2] >= 36 &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2], 12) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2] + 12, 12) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2] + 24, 12)) {
       return CoordinateFileKind::AMBER_INPCRD;
     }
-    else {
-      return CoordinateFileKind::UNKNOWN;
+  }
+  else if (tfr.line_limits[2] - tfr.line_limits[1] >= 24 &&
+           verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1], 8) &&
+           verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1] + 8, 8) &&
+           verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1] + 16, 8)) {
+    return CoordinateFileKind::AMBER_CRD;
+  }
+
+  // If the fourth line looks like an MDL MOL-format counts line, return that result
+  if (tfr.line_count > 4 &&
+      verifyContents(tfr, 3, 0, 3, NumberFormat::INTEGER) &&
+      verifyContents(tfr, 3, 3, 6, NumberFormat::INTEGER) &&
+      readIntegerValue(&tfr.text[tfr.line_limits[3]], 0, 3) >= 0) {
+
+    // Check the first atom line
+    if (verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 0) &&
+        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 10) &&
+        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 20)) {
+
+      // CHECK
+      printf("A SDF file was identified.\n");
+      // END CHECK
+      
+      return CoordinateFileKind::SDF;
     }
   }
-  else if (line_two.size() >= 3 &&
-           verifyNumberFormat(line_two[0].c_str(), NumberFormat::STANDARD_REAL) &&
-           verifyNumberFormat(line_two[1].c_str(), NumberFormat::STANDARD_REAL) &&
-           verifyNumberFormat(line_two[2].c_str(), NumberFormat::STANDARD_REAL)) {
-    if (tfr.line_limits[2] - tfr.line_limits[1] >= 24 &&
-        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1], 8) &&
-        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1] + 8, 8) &&
-        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1] + 16, 8)) {
-      return CoordinateFileKind::AMBER_CRD;
-    }
-    else {
-      return CoordinateFileKind::UNKNOWN;
-    }
-  }
-  else {
-    return CoordinateFileKind::UNKNOWN;
-  }
-  __builtin_unreachable();
+
+  // If the file type has not yet been ascertained, return UNKNOWN
+  return CoordinateFileKind::UNKNOWN;
 }
 
 //-------------------------------------------------------------------------------------------------

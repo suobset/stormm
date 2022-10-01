@@ -24,6 +24,7 @@ enum class CoordinateFileKind {
                      ///<   restart file with no velocities is an INPUT_COORDINATES file)
   AMBER_NETCDF,      ///< The binary Amber NetCDF trajectory format
   AMBER_NETCDF_RST,  ///< The binary Amber NetCDF restart format
+  SDF,               ///< The trajectory is an MDL MOL file, or a collection of them
   UNKNOWN            ///< The coordinate file kind is not (yet) understood
 };
 
