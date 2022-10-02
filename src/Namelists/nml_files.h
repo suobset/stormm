@@ -26,9 +26,9 @@ constexpr char default_filecon_trajectory_name[] = "md.crd";
 constexpr char default_filecon_checkpoint_name[] = "md.rst";
 constexpr char default_filecon_warnings_name[] = "warn.out";
 constexpr char default_filecon_errors_name[] = "err.out";
-constexpr char default_filecon_inpcrd_type[] = "UNKNOWN";
-constexpr char default_filecon_outcrd_type[] = "AMBER_CRD";
-constexpr char default_filecon_chkcrd_type[] = "AMBER_ASCII_RST";
+constexpr CoordinateFileKind default_filecon_inpcrd_type = CoordinateFileKind::UNKNOWN;
+constexpr CoordinateFileKind default_filecon_outcrd_type = CoordinateFileKind::AMBER_CRD;
+constexpr CoordinateFileKind default_filecon_chkcrd_type = CoordinateFileKind::AMBER_ASCII_RST;
 /// \}
 
 /// \brief Object to encapsulate a system, a coupled set of coordinates and a single topology.
@@ -422,6 +422,9 @@ private:
   int system_count;           ///< The number of system keyword specifications
   bool all_free_frames;       ///< Flag to have all free coordinate files' frames read (if true),
                               ///<   or just the first (if false, default)
+
+  /// Format of the coordinate output files
+  CoordinateFileKind coordinate_input_format;
   
   /// Format of the coordinate output files
   CoordinateFileKind coordinate_output_format;
@@ -472,16 +475,23 @@ private:
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place
 ///        of a great deal of command line input in the Amber pmemd and sander programs.
 ///
-/// \param tf                Input text file to scan immediately after the namelist is created
-/// \param start_line        Line at which to begin scanning the input file for the namelist (this
-///                          will wrap back to the beginning of the file in search of a unique
-///                          &files namelist)
-/// \param policy            Reaction to exceptions encountered during namelist reading
-/// \param sys_keyword_reqs  Requirements for the subkeys of the -sys keyword (constructed based on
-///                          input to the FilesControls object that calls this function)
-NamelistEmulator filesInput(const TextFile &tf, int *start_line,
-                            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
-                            ExceptionResponse policy = ExceptionResponse::DIE);
+/// \param tf                 Input text file to scan immediately after the namelist is created
+/// \param start_line         Line at which to begin scanning the input file for the namelist
+///                           (this will wrap back to the beginning of the file in search of a
+///                           unique &files namelist)
+/// \param sys_keyword_reqs   Requirements for the subkeys of the -sys keyword (constructed based
+///                           on input to the FilesControls object that calls this function)
+/// \param policy             Reaction to exceptions encountered during namelist reading
+/// \param crd_input_format   The default type for input coordinate files describing each system
+/// \param crd_output_format  The default type for trajectory files written based on each system
+/// \param crd_chkpt_format   The default type for restart files written based on each system
+NamelistEmulator
+filesInput(const TextFile &tf, int *start_line,
+           const std::vector<SubkeyRequirement> &sys_keyword_reqs,
+           ExceptionResponse policy = ExceptionResponse::DIE,
+           CoordinateFileKind crd_input_format = default_filecon_inpcrd_type,
+           CoordinateFileKind crd_output_format = default_filecon_outcrd_type,
+           CoordinateFileKind crd_checkpoint_format = default_filecon_chkcrd_type);
 
 } // namespace namelist
 } // namespace stormm

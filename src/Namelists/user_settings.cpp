@@ -8,6 +8,7 @@
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "user_settings.h"
 
 namespace stormm {
@@ -24,10 +25,12 @@ using parse::NumberFormat;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
 using parse::WrapTextSearch;
-
+using trajectory::translateCoordinateFileKind;
+  
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
-    policy{ExceptionResponse::DIE}, has_minimize_nml{false}, has_solvent_nml{false},
+    policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
+    has_minimize_nml{false}, has_solvent_nml{false},
     has_random_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
     has_ffmorph_nml{false}, 
     input_file{std::string(default_conformer_input_file)},
@@ -46,6 +49,9 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   bool cli_igseed   = false;
   bool cli_report   = false;
   bool cli_confname = false;
+  CoordinateFileKind c_kind = default_filecon_inpcrd_type;
+  CoordinateFileKind x_kind = default_filecon_outcrd_type;
+  CoordinateFileKind r_kind = default_filecon_chkcrd_type;
   for (int i = 1; i < argc; i++) {
     if (i < argc - 1 && strcmp(argv[i], "-i") == 0) {
       input_file = std::string(argv[i + 1]);
@@ -75,9 +81,21 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
       cli_report = true;
       i++;
     }
-    else if (i < argc - 1 && strcmp(argv[i], "-xname") == 0) {
+    else if (i < argc - 1 && strcmp(argv[i], "-x") == 0) {
       cval_traj_file_name = std::string(argv[i + 1]);
       cli_confname = true;
+      i++;
+    }
+    else if (i < argc - 1 && strcmp(argv[i], "-c_kind") == 0) {
+      c_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
+      i++;
+    }
+    else if (i < argc - 1 && strcmp(argv[i], "-x_kind") == 0) {
+      x_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
+      i++;
+    }
+    else if (i < argc - 1 && strcmp(argv[i], "-r_kind") == 0) {
+      r_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
       i++;
     }
     else if (strcmp(argv[i], "-warn") == 0) {
@@ -85,6 +103,9 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     }
     else if (strcmp(argv[i], "-silent") == 0) {
       policy = ExceptionResponse::SILENT;
+    }
+    else if (strcmp(argv[i], "-O") == 0) {
+      print_policy = PrintSituation::OVERWRITE;
     }
     else {
       rtErr("Command line argument " + std::string(argv[i]) + " was not recognized.",
@@ -102,8 +123,24 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   }
   TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable",
                   "UserSettings");
+  std::vector<std::string> alternatives = {
+    "coordinate_input_format",      getCoordinateFileKindName(c_kind),
+    "coordinate_output_format",     getCoordinateFileKindName(x_kind),
+    "coordinate_checkpoint_format", getCoordinateFileKindName(r_kind)
+  };
+  std::vector<std::string> sys_reqs = { "-pe", "-ce" };
   int start_line = 0;
-  file_io_input = FilesControls(inp_tf, &start_line, policy);
+  switch (prog_set) {
+  case AppName::CONFORMER:
+    file_io_input = FilesControls(inp_tf, &start_line, policy);
+    break;
+  case AppName::DYNAMICS:
+    file_io_input = FilesControls(inp_tf, &start_line, policy);
+    break;
+  case AppName::FFREFINE:
+    file_io_input = FilesControls(inp_tf, &start_line, policy);
+    break;
+  }
   start_line = 0;
   line_min_input = MinimizeControls(inp_tf, &start_line, &has_minimize_nml, policy);
   start_line = 0;

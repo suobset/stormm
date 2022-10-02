@@ -11,20 +11,16 @@
 #include "../../../src/UnitTesting/stopwatch.h"
 #include "../../../src/UnitTesting/unit_test.h"
 
-using stormm::constants::getEnumerationName;
-using stormm::chemistry::MapRotatableGroups;
-using stormm::energy::ScoreCard;
-using stormm::mm::minimize;
-using stormm::namelist::AppName;
-using stormm::namelist::MinimizeControls;
-using stormm::namelist::UserSettings;
-using stormm::restraints::RestraintApparatus;
-using stormm::synthesis::PhaseSpaceSynthesis;
-using stormm::synthesis::SystemCache;
-using stormm::testing::StopWatch;
-using stormm::topology::UnitCellType;
-using stormm::trajectory::PhaseSpace;
-using stormm::restraints::RestraintApparatus;
+using namespace stormm::constants;
+using namespace stormm::chemistry;
+using namespace stormm::energy;
+using namespace stormm::mm;
+using namespace stormm::namelist;
+using namespace stormm::restraints;
+using namespace stormm::synthesis;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
@@ -51,9 +47,14 @@ int main(int argc, const char* argv[]) {
       
       // CHECK
       printf("Label %2d = %s\n", i, sc.getSystemLabel(i).c_str());
+      PhaseSpaceWriter psw = ps->data();
+      for (int i = 0; i < psw.natom; i++) {
+        printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
+      }
+      printf("\n");
       RestraintApparatus ra(sc.getSystemTopologyPointer(i));
       // END CHECK
-    
+#if 0
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
@@ -63,9 +64,14 @@ int main(int argc, const char* argv[]) {
       case UnitCellType::TRICLINIC:
         break;
       }
+#endif
     }
   }
 
+  // CHECK
+  printf("Point A\n");
+  // END CHECK
+  
   // Print restart files from energy minimization
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {

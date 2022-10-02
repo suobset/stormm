@@ -4,6 +4,7 @@
 #include "FileManagement/file_listing.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
+#include "MoleculeFormat/molecule_file_io.h"
 #include "amber_ascii.h"
 #include "coordinateframe.h"
 #include "trajectory_enumerators.h"
@@ -17,6 +18,7 @@ using diskutil::getDrivePathType;
 using math::extractBoxDimensions;
 using math::roundUp;
 using parse::TextFileReader;
+using structure::extractSdfCoordinates;
 
 //-------------------------------------------------------------------------------------------------
 CoordinateFrameWriter::CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in,
@@ -380,6 +382,22 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
     }
     break;
   case CoordinateFileKind::SDF:
+    {
+      const std::vector<double3> mdl_crd = extractSdfCoordinates(tf, frame_number);
+
+      // The SDF format is assumed to encode no box information
+      unit_cell = UnitCellType::NONE;
+      double* box_ptr = box_dimensions.data();
+      double* umat_ptr = box_space_transform.data();
+      double* invu_ptr = inverse_transform.data();
+      for (int i = 0; i < 3; i++) {
+        box_ptr[i] = 0.0;
+      }
+      for (int i = 0; i < 9; i++) {
+        umat_ptr[i] = static_cast<double>((i & 0x3) == 0);
+        invu_ptr[i] = static_cast<double>((i & 0x3) == 0);
+      }
+    }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -494,7 +512,7 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
   const bool fi_exists = (getDrivePathType(file_name) == DrivePathType::FILE);
   std::ofstream foutp;
   foutp = openOutputFile(file_name, aexp, "Open an output file for writing CoordinateFrame "
-                         "contents.", style);
+                         "contents", style);
   if (fi_exists == false) {
     initializeTrajectory(&foutp, kind, atom_count);
   }

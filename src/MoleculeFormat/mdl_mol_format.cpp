@@ -108,26 +108,12 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
                      const CaseSensitivity capitalization, const ExceptionResponse policy):
   MdlMolObj()
 {
-  // Default line end of -1 indicates reading to the end of the file
-  int line_end = (line_end_in < 0) ? tf.getLineCount() : line_end_in;
-
-  // Identify the end of the formatting ("M  END")
   const TextFileReader tfr = tf.data();
-  int next_delim_loc = line_start;
-  bool found = false;
-  while (found == false && next_delim_loc < line_end) {
-    const char* lptr = &tfr.text[tfr.line_limits[next_delim_loc]];
-    if (tfr.line_limits[next_delim_loc + 1] - tfr.line_limits[next_delim_loc] >= 6 &&
-        lptr[0] == 'M' && lptr[1] == ' ' && lptr[2] == ' ' && lptr[3] == 'E' && lptr[4] == 'N' &&
-        lptr[5] == 'D') {
-      found = true;
-    }
-    else {
-      next_delim_loc++;
-    }
-  }
-  line_end = next_delim_loc;
 
+  // Default line end of -1 indicates reading to the end of the file.  Otherwise, identify the
+  // end of the formatting ("M  END").
+  const int line_end = getMdlFormatEnd(tfr, line_start, line_end_in);
+                       
   // The range of data now extends from line_start to line_end.  Sift through that information
   // for a V2000 or V3000 specification.  This should be found on the fourth line.
   int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
@@ -333,7 +319,7 @@ std::vector<double> MdlMolObj::getCoordinates(const CartesianDimension dim) cons
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace MdlMolObj::exportPhaseSpace() {
+PhaseSpace MdlMolObj::exportPhaseSpace() const {
   PhaseSpace result(atom_count);
   PhaseSpaceWriter rw = result.data();
   for (int i = 0; i < atom_count; i++) {
@@ -345,7 +331,7 @@ PhaseSpace MdlMolObj::exportPhaseSpace() {
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFrame MdlMolObj::exportCoordinateFrame() {
+CoordinateFrame MdlMolObj::exportCoordinateFrame() const {
   CoordinateFrame result(atom_count);
   CoordinateFrameWriter rw = result.data();
   for (int i = 0; i < atom_count; i++) {
@@ -595,20 +581,48 @@ std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 }
 
 //-------------------------------------------------------------------------------------------------
-int findMolObjVersion(const char* text, const int nchar) {
-  for (int i = 0; i < nchar; i++) {
-    if (text[i] == 'V' || text[i] == 'v') {
-      if (i < nchar - 4 && text[i + 2] == '0' && text[i + 3] == '0' && text[i + 4] == '0') {
-        if (text[i + 1] == '2') {
-          return 2000;
-        }
-        else if (text[i + 1] == '3') {
-          return 3000;
-        }
-      }
-    }
+std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf, const int low_frame_limit,
+                                             const int high_frame_limit,
+                                             const CaseSensitivity capitalization,
+                                             const ExceptionResponse policy) {
+  std::vector<MdlMolObj> result;
+
+  // Find the limits for different MDL MOL entries
+  const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
+  const int nsection = mol_entry_limits.size();
+  int actual_low_limit, actual_high_limit;
+  if (low_frame_limit >= nsection) {
+    rtErr("An SD file with " + std::to_string(nsection) + " frames cannot be read starting at "
+          "frame index " + std::to_string(low_frame_limit) + ".", "readStructureDataFile");
   }
-  return 2000;
+  else if (low_frame_limit < 0 || high_frame_limit < 0 || high_frame_limit >= nsection) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The frame range " + std::to_string(low_frame_limit) + " to " +
+            std::to_string(high_frame_limit) + " is invalid for a file with " +
+            std::to_string(nsection) + " frames.", "readStructureDataFile");
+    case ExceptionResponse::WARN:
+      rtWarn("The frame range " + std::to_string(low_frame_limit) + " to " +
+             std::to_string(high_frame_limit) + " is invalid for a file with " +
+             std::to_string(nsection) + " frames.  Only the valid range will be taken",
+             "readStructureDataFile");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    actual_low_limit = std::max(0, low_frame_limit);
+    actual_high_limit = (high_frame_limit < low_frame_limit || high_frame_limit >= nsection) ?
+                        nsection - 1 : high_frame_limit;
+  }
+  else {
+    actual_low_limit = low_frame_limit;
+    actual_high_limit = (high_frame_limit < low_frame_limit) ? nsection - 1: high_frame_limit;
+  }
+  result.reserve(actual_high_limit - actual_low_limit + 1);
+  for (int i = actual_low_limit; i <= actual_high_limit; i++) {
+    result.emplace_back(tf, mol_entry_limits[i].x, mol_entry_limits[i].y, capitalization, policy);
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -618,38 +632,17 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
   std::vector<MdlMolObj> result;
 
   // Find the limits for different MDL MOL entries
-  const TextFileReader tfr = tf.data();
-  int nsection = 0;
-  int last_delimiter_line = -1;
-  std::vector<int2> mol_entry_limits;
-  for (int i = 0; i < tfr.line_count; i++) {
-    if (tfr.line_lengths[i] >= 4 && tfr.text[tfr.line_limits[i]] == '$' &&
-        tfr.text[tfr.line_limits[i] + 1] == '$' && tfr.text[tfr.line_limits[i] + 2] == '$' &&
-        tfr.text[tfr.line_limits[i] + 3] == '$') {
-
-      // A MOL entry must have at least four lines, so any text preceding a $$$$ marker must be at
-      // least four lines long to count as a valid entry worth parsing
-      if ((last_delimiter_line >=  0 && i - last_delimiter_line >= 4) ||
-          (last_delimiter_line == -1 && i >= 4)) {
-        mol_entry_limits.push_back({ last_delimiter_line + 1, i });
-        nsection++;
-      }
-      last_delimiter_line = i;
-    }
-  }
-  if (tfr.line_count - last_delimiter_line >= 4) {
-    mol_entry_limits.push_back({ last_delimiter_line, tfr.line_count });
-  }
+  const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
 
   // Parse each MDL MOL entry
+  const int nsection = mol_entry_limits.size();
   result.reserve(nsection);
   for (int i = 0; i < nsection; i++) {
     result.emplace_back(tf, mol_entry_limits[i].x, mol_entry_limits[i].y, capitalization, policy);
   }
-
   return result;
 }
-                                             
+
 //-------------------------------------------------------------------------------------------------
 std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
                                              const CaseSensitivity capitalization,

@@ -124,6 +124,9 @@ void getAmberInputCoordinates(const TextFile &tf, double* x_coordinates, double*
     const int nchar = tfr.line_limits[box_line + 1] - tfr.line_limits[box_line];
     if (nchar < 6 * 12 ||
         separateText(&tfr.text[tfr.line_limits[box_line]], nchar).size() < 6LLU) {
+      for (int i = 0; i < 6; i++) {
+        box_dimensions[i] = 0.0;
+      }
       for (int i = 0; i < 9; i++) {
         box_space_transform[i] = static_cast<double>((i & 0x3) == 0);
         inverse_transform[i]   = static_cast<double>((i & 0x3) == 0);

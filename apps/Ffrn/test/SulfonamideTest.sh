@@ -1,10 +1,10 @@
 #!/bin/bash
 
-cat > minimize.in << EOF
+cat > ffld.in << EOF
 &files
   -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
          -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
-         -label sulfonamide }
+         -label sulfonamide frame_end -1 }
 &end
 
 &ffrefine
@@ -22,4 +22,4 @@ cat > minimize.in << EOF
 &end
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/ffrefine.stormm -i minimize.in -warn
+valgrind ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn

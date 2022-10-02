@@ -12,6 +12,7 @@
 #include "Parsing/parse.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
+#include "molecule_file_io.h"
 
 namespace stormm {
 namespace structure {
@@ -222,11 +223,11 @@ public:
 
   /// \brief Export the coordinates as a PhaseSpace object suitable for basic molecular mechanics
   ///        force computations.
-  PhaseSpace exportPhaseSpace();
+  PhaseSpace exportPhaseSpace() const ;
 
   /// \brief Export the coordinates as a stripped-down CoordinateFrame object suitable for
   ///        molecular mechanics energy computations.
-  CoordinateFrame exportCoordinateFrame();
+  CoordinateFrame exportCoordinateFrame() const;
 
   /// \brief Get the atomic symbol for a particular atom.
   ///
@@ -367,13 +368,6 @@ private:
 std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 				  const std::vector<MolObjBond> &rhs);
 
-/// \brief Find the version stamp in an MDL MOL file (or a part of an SD file, .sdf).  Assume the
-///        legacy V2000 if no version is found.
-///
-/// \param text   Text to search, probably from the fourth line of the MOL file or SD entry
-/// \param nchar  The number of characters on the line
-int findMolObjVersion(const char* text, const int nchar);
-
 /// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.
 ///        Return the results as a Standard Template Library vector of MDL MOL objects.
 ///
@@ -388,16 +382,17 @@ int findMolObjVersion(const char* text, const int nchar);
 /// \param policy          Course of action to take if errors are encountered when inferring
 ///                        atomic elements
 /// \{
-std::vector<MdlMolObj>
-readStructureDataFile(const std::string &file_name,
-                      const CaseSensitivity capitalization = CaseSensitivity::YES,
-                      const ExceptionResponse policy = ExceptionResponse::WARN);
+std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf, int low_frame_limit,
+                                             int high_frame_limit,
+                                             CaseSensitivity capitalization = CaseSensitivity::YES,
+                                             ExceptionResponse policy = ExceptionResponse::WARN);
+std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
+                                             CaseSensitivity capitalization = CaseSensitivity::YES,
+                                             ExceptionResponse policy = ExceptionResponse::WARN);
 
-std::vector<MdlMolObj>
-readStructureDataFile(const TextFile &tf,
-                      const CaseSensitivity capitalization = CaseSensitivity::YES,
-                      const ExceptionResponse policy = ExceptionResponse::WARN);
-
+std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
+                                             CaseSensitivity capitalization = CaseSensitivity::YES,
+                                             ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
   
 } // namespace structure

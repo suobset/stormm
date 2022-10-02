@@ -4,6 +4,7 @@
 
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "FileManagement/file_util.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
@@ -21,6 +22,7 @@ namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
+using diskutil::PrintSituation;
 using namelist::DynamicsControls;
 using namelist::FFMorphControls;
 using namelist::FilesControls;
@@ -33,9 +35,15 @@ using topology::ImplicitSolventModel;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFileKind;
 
-/// \brief Default input settings for conformer.stormm
+/// \brief Default settings for general file output
+/// \{
+constexpr PrintSituation default_file_writing_directive = PrintSituation::OPEN_NEW;
+/// \}
+  
+/// \brief Default input settings for various STORMM app input files
 /// \{
 constexpr char default_conformer_input_file[] = "cgen.in";
+constexpr char default_ffrefine_input_file[] = "ffld.in";
 /// \}
 
 /// \brief Enumerate the various apps using STORMM libraries, and which use this UserSettings
@@ -88,13 +96,16 @@ struct UserSettings {
 
 private:
 
-  ExceptionResponse policy;   /// Action in the event of bad input
-  bool has_minimize_nml;      /// Indicate the presence of a &minimize namelist in the input file
-  bool has_solvent_nml;       /// Indicate the presence of a &solvent namelist in the input file
-  bool has_random_nml;        /// Indicate the presence of a &random namelist in the input file
-  bool has_conformer_nml;     /// Indicate the presence of a &conformer namelist in the input file
-  bool has_dynamics_nml;      /// Indicate the presence of a &dynamics namelist in the input file
-  bool has_ffmorph_nml;       /// Indicate the presence of an &ffmorph namelist in the input file
+  ExceptionResponse policy;     ///< Action in the event of bad input
+  PrintSituation print_policy;  ///< Policy to take with regard to general output files
+  bool has_minimize_nml;        ///< Indicate presence of a &minimize namelist in the input file
+  bool has_solvent_nml;         ///< Indicate presence of a &solvent namelist in the input file
+  bool has_random_nml;          ///< Indicate presence of a &random namelist in the input file
+  bool has_conformer_nml;       ///< Indicate presence of a &conformer namelist in the input file
+  bool has_dynamics_nml;        ///< Indicate presence of a &dynamics namelist in the input file
+  bool has_ffmorph_nml;         ///< Indicate presence of an &ffmorph namelist in the input file
+
+  /// Overwriting 
   
   /// Name of the original input file
   std::string input_file;

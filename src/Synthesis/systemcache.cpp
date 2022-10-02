@@ -5,24 +5,27 @@
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
+#include "MoleculeFormat/mdl_mol_format.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 
 namespace stormm {
 namespace synthesis {
 
-using stormm::diskutil::getBaseName;
-using stormm::diskutil::splitPath;
-using stormm::energy::evaluateBondTerms;
-using stormm::energy::evaluateAngleTerms;
-using stormm::energy::ScoreCard;
-using stormm::math::prefixSumInPlace;
-using stormm::math::PrefixSumType;
-using stormm::namelist::MoleculeSystem;
-using stormm::parse::findStringInVector;
-using stormm::topology::UnitCellType;
-using stormm::topology::ValenceKit;
-using stormm::trajectory::detectCoordinateFileKind;
+using diskutil::getBaseName;
+using diskutil::splitPath;
+using energy::evaluateBondTerms;
+using energy::evaluateAngleTerms;
+using energy::ScoreCard;
+using math::prefixSumInPlace;
+using math::PrefixSumType;
+using namelist::MoleculeSystem;
+using parse::findStringInVector;
+using structure::MdlMolObj;
+using structure::readStructureDataFile;
+using topology::UnitCellType;
+using topology::ValenceKit;
+using trajectory::detectCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
@@ -85,6 +88,17 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       break;
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_NETCDF_RST:
+      break;
+    case CoordinateFileKind::SDF:
+      {
+        const std::vector<MdlMolObj> all_frames = readStructureDataFile(crd_name);
+        const size_t n_entries = all_frames.size();
+        for (size_t i = 0; i < n_entries; i++) {
+          tmp_coordinates_cache.push_back(all_frames[i].exportCoordinateFrame());
+          tmp_coordinates_frame_count.push_back(1);
+          tmp_coordinates_kind.push_back(kind);
+        }
+      }
       break;
     case CoordinateFileKind::UNKNOWN:
       switch (policy) {
@@ -261,7 +275,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
                                       restart_base + trajectory_middle + restart_ext, syslabel, 0,
                                       tmp_coordinates_frame_count[icrdj], 1,
                                       tmp_coordinates_kind[icrdj],
-                                      fcon.getOutputCoordinateFormat(), 
+                                      fcon.getOutputCoordinateFormat(),
                                       fcon.getCheckpointFormat()));
       n_paired_systems++;
 
@@ -449,13 +463,65 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       topology_ok = true;
     }
     if (topology_ok) {
-      bool coordinates_ok = false;
-      try {
+      switch (detectCoordinateFileKind(sysvec[i].getInputCoordinateFileName(), "SystemCache")) {
+      case CoordinateFileKind::AMBER_CRD:
+        break;
+      case CoordinateFileKind::AMBER_INPCRD:
+      case CoordinateFileKind::AMBER_ASCII_RST:
         coordinates_cache.push_back(PhaseSpace(sysvec[i].getInputCoordinateFileName(),
                                                sysvec[i].getInputCoordinateFileKind()));
-        coordinates_ok = true;
-      }
-      catch (std::runtime_error) {
+        topology_indices.push_back(top_idx);
+        system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+        system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
+        system_labels.push_back(sysvec[i].getLabel());
+        break;
+      case CoordinateFileKind::AMBER_NETCDF:
+      case CoordinateFileKind::AMBER_NETCDF_RST:
+        break;
+      case CoordinateFileKind::SDF:
+        {
+          // If the user has specified the frame range [ 0, -1 ), take that as a special case
+          // indicating that "all frames" shall be read and produce no warning or error.
+          // Otherwise, check the specified range against the file's actual contents.
+          const int fr_init  = sysvec[i].getStartingFrame();
+          const int fr_final = sysvec[i].getFinalFrame();
+          const std::vector<MdlMolObj> frame_selection = (fr_init == 0 && fr_final == -1) ?
+            readStructureDataFile(sysvec[i].getInputCoordinateFileName()) :
+            readStructureDataFile(sysvec[i].getInputCoordinateFileName(), fr_init, fr_final);
+          const int jlim = frame_selection.size();
+          for (int j = 0; j < jlim; j++) {
+
+            // Apply a simple check to help ensure that the data in the SDF applies to the stated
+            // topology.  SD files can contain different molecules, but if it passes this test
+            // then there is good reason to trust the user.
+            const int top_atom_count = topology_cache[top_idx].getAtomCount();
+            if (frame_selection[j].getAtomCount() != top_atom_count) {
+              const std::string base_err("The atom count in frame " + std::to_string(j) +
+                                         " of SD file " +
+                                         getBaseName(sysvec[i].getInputCoordinateFileName()) +
+                                         " (" + std::to_string(frame_selection[j].getAtomCount()) +
+                                         ") does not agree with the atom count in topology " +
+                                         getBaseName(sysvec[i].getTopologyFileName()) + " (" +
+                                         std::to_string(top_atom_count) + ").");
+              switch (policy) {
+              case ExceptionResponse::DIE:
+                rtErr(base_err, "SystemCache");
+              case ExceptionResponse::WARN:
+                rtErr(base_err + "  This frame will be skipped.", "SystemCache");
+                break;
+              case ExceptionResponse::SILENT:
+                break;
+              }
+            }
+            coordinates_cache.push_back(frame_selection[j].exportPhaseSpace());
+            topology_indices.push_back(top_idx);
+            system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+            system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
+            system_labels.push_back(sysvec[i].getLabel());
+          }
+        }
+        break;
+      case CoordinateFileKind::UNKNOWN:
         switch (policy) {
         case ExceptionResponse::DIE:
           rtErr("The format of coordinate file " + sysvec[i].getTopologyFileName() +
@@ -469,12 +535,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
         case ExceptionResponse::SILENT:
           break;
         }
-      }
-      if (coordinates_ok) {
-        topology_indices.push_back(top_idx);
-        system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
-        system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
-        system_labels.push_back(sysvec[i].getLabel());
+        break;
       }
     }
   }

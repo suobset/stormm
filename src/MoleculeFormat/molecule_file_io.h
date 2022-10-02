@@ -1,0 +1,64 @@
+// -*-c++-*-
+#ifndef STORMM_MOLECULE_FILE_IO
+#define STORMM_MOLECULE_FILE_IO
+
+#include "copyright.h"
+#include "DataTypes/stormm_vector_types.h"
+#include "Parsing/textfile.h"
+
+namespace stormm {
+namespace structure {
+
+using parse::TextFile;
+using parse::TextFileReader;
+
+/// \brief Find the end of the MDL MOL entry formatting within a specified range.  If the
+///        end of formatting takes it default value of -1, the search will continue until the end
+///        of the TextFile object.
+///
+/// Overloaded:
+///   - Accept a TextFile object
+///   - Accept the abstract of a TextFile object
+///
+/// \param tfr          Abstract of the text
+/// \param tf           Text of the MDL MOL file (or SD file), read into RAM
+/// \param line_start   The point at which to assume the MDL MOL format entry begins
+/// \param line_end_in  The limit at which to stop searching for the MDL MOL format end
+/// \{
+int getMdlFormatEnd(const TextFileReader &tfr, int line_start, int line_end_in);
+
+int getMdlFormatEnd(const TextFile &tf, int line_start, int line_end_in);
+/// \}
+  
+/// \brief Find the version stamp in an MDL MOL file (or a part of an SD file, .sdf).  Assume the
+///        legacy V2000 if no version is found.
+///
+/// \param text   Text to search, probably from the fourth line of the MOL file or SD entry
+/// \param nchar  The number of characters on the line
+int findMolObjVersion(const char* text, const int nchar);
+
+/// \brief Find the limits for different MDL MOL entries within an SD file.
+///
+/// \param tf  The SD file, read into RAM
+std::vector<int2> findSdfMolEntryLimits(const TextFile &tf);
+
+/// \brief Extract the vector of molecular coordiantes from an SDF file.
+///
+/// Overloaded:
+///   - Accept the line numbers defining the limits of the frame
+///   - Accept the frame number to extract
+///
+/// \param tf             The text file to parse, read from disk into RAM
+/// \param line_start_in  First line at which to begin parsing an MDL MOL entry
+/// \param line_end_in    Last line at which to seek data from an MDL MOL entry
+/// \param frame_number   The frame number to parse
+/// \{
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, int line_start_in, int line_end_in);
+
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, int frame_number = 0);
+/// \}
+
+} // namespace structure
+} // namespace stormm
+
+#endif

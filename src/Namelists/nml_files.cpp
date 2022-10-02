@@ -192,8 +192,9 @@ FilesControls::FilesControls(const ExceptionResponse policy_in) :
     policy{policy_in}, structure_count{0}, free_topology_count{0}, free_coordinate_count{0},
     system_count{0},
     all_free_frames{default_filecon_read_all_free},
-    coordinate_output_format{translateCoordinateFileKind(default_filecon_outcrd_type)},
-    coordinate_checkpoint_format{translateCoordinateFileKind(default_filecon_chkcrd_type)},
+    coordinate_input_format{default_filecon_inpcrd_type},
+    coordinate_output_format{default_filecon_outcrd_type},
+    coordinate_checkpoint_format{default_filecon_chkcrd_type},
     topology_file_names{}, coordinate_file_names{}, systems{},
     report_file{std::string(default_filecon_report_name)},
     coordinate_output_name{std::string(default_filecon_trajectory_name)},
@@ -214,7 +215,11 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
   const int n_alt = alternatives.size();
   for (int i = 0; i < n_alt; i++) {
     if (i < n_alt - 1) {
-      if (alternatives[i] == std::string("coordinate_output_format")) {
+      if (alternatives[i] == std::string("coordinate_input_format")) {
+        coordinate_input_format = translateCoordinateFileKind(alternatives[i + 1]);
+        i++;
+      }
+      else if (alternatives[i] == std::string("coordinate_output_format")) {
         coordinate_output_format = translateCoordinateFileKind(alternatives[i + 1]);
         i++;
       }
@@ -282,7 +287,9 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt,
     short_opt
   };
-  NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy);
+  NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy,
+                                      coordinate_input_format, coordinate_output_format,
+                                      coordinate_checkpoint_format);
   const InputStatus stt_missing = InputStatus::MISSING;
   const int nsys = t_nml.getKeywordEntries("-sys");
   for (int i = 0; i < nsys; i++) {
@@ -369,7 +376,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
           break;
         }
       }
-    }  
+    }
     if (complete) {
       if (strcmpCased(sys_label, "all", CaseSensitivity::NO) ||
           strcmpCased(sys_label, "all_possible", CaseSensitivity::NO) ||
@@ -653,7 +660,10 @@ void FilesControls::setWarningFileName(const std::string &file_name) {
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                             const std::vector<SubkeyRequirement> &sys_keyword_reqs,
-                            const ExceptionResponse policy) {
+                            const ExceptionResponse policy,
+                            const CoordinateFileKind crd_input_format,
+                            const CoordinateFileKind crd_output_format,
+                            const CoordinateFileKind crd_chkpt_format) {
   NamelistEmulator t_nml("files", CaseSensitivity::AUTOMATIC, policy, "Collects file names for "
                          "STORMM programs, offloading work that would otherwise require "
                          "command-line arguments.");
@@ -691,9 +701,9 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                                      NamelistType::STRING },
                                    { std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string(""), "0", "0", "1",
-                                     std::string(default_filecon_inpcrd_type),
-                                     std::string(default_filecon_outcrd_type),
-                                     std::string(default_filecon_chkcrd_type) },
+                                     getCoordinateFileKindName(crd_input_format),
+                                     getCoordinateFileKindName(crd_output_format),
+                                     getCoordinateFileKindName(crd_chkpt_format) },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sys_help,
                                    sys_keys_help, sys_keyword_reqs));
   t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING,

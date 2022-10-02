@@ -130,22 +130,16 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
            verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[1] + 16, 8)) {
     return CoordinateFileKind::AMBER_CRD;
   }
-
+  
   // If the fourth line looks like an MDL MOL-format counts line, return that result
   if (tfr.line_count > 4 &&
       verifyContents(tfr, 3, 0, 3, NumberFormat::INTEGER) &&
-      verifyContents(tfr, 3, 3, 6, NumberFormat::INTEGER) &&
+      verifyContents(tfr, 3, 3, 3, NumberFormat::INTEGER) &&
       readIntegerValue(&tfr.text[tfr.line_limits[3]], 0, 3) >= 0) {
-
     // Check the first atom line
-    if (verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 0) &&
-        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 10) &&
-        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 20)) {
-
-      // CHECK
-      printf("A SDF file was identified.\n");
-      // END CHECK
-      
+    if (verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 10) &&
+        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4] + 10, 10) &&
+        verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4] + 20, 10)) {
       return CoordinateFileKind::SDF;
     }
   }

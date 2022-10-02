@@ -382,6 +382,11 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
       unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
+  case CoordinateFileKind::SDF:
+    {
+      
+    }
+    break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -903,7 +908,7 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   // Begin writing the file
   const bool fi_exists = (getDrivePathType(file_name) == DrivePathType::FILE);
   std::ofstream foutp;
-  foutp = openOutputFile(file_name, aexp, "Open an output file for writing PhaseSpace contents.",
+  foutp = openOutputFile(file_name, aexp, "Open an output file for writing PhaseSpace contents",
                          style);
   if (fi_exists == false) {
     initializeTrajectory(&foutp, output_kind, atom_count, current_time);
@@ -926,6 +931,8 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
                getCoordinatePointer(CartesianDimension::Y, TrajectoryKind::VELOCITIES),
                getCoordinatePointer(CartesianDimension::Z, TrajectoryKind::VELOCITIES),
                unit_cell, box_dimensions.data());
+    break;
+  case CoordinateFileKind::SDF:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
