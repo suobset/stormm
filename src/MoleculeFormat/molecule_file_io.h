@@ -3,12 +3,14 @@
 #define STORMM_MOLECULE_FILE_IO
 
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/textfile.h"
 
 namespace stormm {
 namespace structure {
 
+using constants::ExceptionResponse;
 using parse::TextFile;
 using parse::TextFileReader;
 
@@ -48,14 +50,17 @@ std::vector<int2> findSdfMolEntryLimits(const TextFile &tf);
 ///   - Accept the line numbers defining the limits of the frame
 ///   - Accept the frame number to extract
 ///
-/// \param tf             The text file to parse, read from disk into RAM
-/// \param line_start_in  First line at which to begin parsing an MDL MOL entry
-/// \param line_end_in    Last line at which to seek data from an MDL MOL entry
-/// \param frame_number   The frame number to parse
+/// \param tf            The text file to parse, read from disk into RAM
+/// \param line_start    First line at which to begin parsing an MDL MOL entry
+/// \param line_end_in   Last line at which to seek data from an MDL MOL entry
+/// \param frame_number  The frame number to parse
+/// \param policy        Action to take if errors are encountered
 /// \{
-std::vector<double3> extractSdfCoordinates(const TextFile &tf, int line_start_in, int line_end_in);
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, int line_start, int line_end_in,
+                                           ExceptionResponse policy = ExceptionResponse::WARN);
 
-std::vector<double3> extractSdfCoordinates(const TextFile &tf, int frame_number = 0);
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, int frame_number = 0,
+                                           ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
 
 } // namespace structure

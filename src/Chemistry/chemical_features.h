@@ -217,6 +217,105 @@ private:
                                         ///<   isomerization applies
 };
 
+/// \brief Abstract of the chemical features object: this is about as complex as an object with a
+///        single abstract should get.
+struct ChemicalFeaturesReader {
+
+  /// \brief The constructor takes a straight list of critical constants and pointers.
+  ChemicalFeaturesReader(int atom_count_in, int planar_atom_count_in, int ring_count_in,
+                         int fused_ring_count_in, int twistable_ring_count_in,
+                         int conjugated_group_count_in, int aromatic_group_count_in,
+                         int polar_hydrogen_count_in, int hbond_donor_count_in,
+                         int hbond_acceptor_count_in, int chiral_center_count_in,
+                         int rotatable_bond_count_in, int cis_trans_bond_count_in,
+                         int double_bond_count_in, int triple_bond_count_in,
+                         int max_ring_size_in, double temperature_in,
+                         bool rotating_groups_mapped_in, const int* planar_centers_in,
+                         const int* ring_atoms_in, const int* ring_atom_bounds_in,
+                         const int* aromatic_pi_electrons_in, const int* aromatic_groups_in,
+                         const int* aromatic_group_bounds_in, const int* polar_hydrogens_in,
+                         const int* hydrogen_bond_donors_in, const int* hydrogen_bond_acceptors_in,
+                         const int* chiral_centers_in, const int* chiral_inversion_methods_in,
+                         const int* rotatable_groups_in, const int* rotatable_group_bounds_in,
+                         const int* cis_trans_groups_in, const int* cis_trans_group_bounds_in,
+                         const int* invertible_groups_in, const int* invertible_group_bounds_in,
+                         const int4* chiral_arm_atoms_in, const double* formal_charges_in,
+                         const double* bond_orders_in, const double* free_electrons_in,
+                         const ullint* ring_inclusion_in, const AtomGraph *ag_pointer_in);
+
+  /// \brief The default copy and move constructors are acceptable, but assignment operators are
+  ///        implicitly deleted due to the presence of const elements.
+  ///
+  /// \param original  The original object to copy or move
+  /// \{
+  ChemicalFeaturesReader(const ChemicalFeaturesReader &original) = default;
+  ChemicalFeaturesReader(ChemicalFeaturesReader &&original) = default;
+  /// \}
+
+  // Counts of atoms and features (see the parent object for more detailed information)
+  const int atom_count;               ///< Total number of atoms in the system
+  const int planar_atom_count;        ///< Number of atoms with enforced planarity
+  const int ring_count;               ///< Number of rings
+  const int fused_ring_count;         ///< Number of fused rings
+  const int twistable_ring_count;     ///< Number of twistable (i.e. boat-chair) rings
+  const int conjugated_group_count;   ///< Number of separate conjugated pi-systems
+  const int aromatic_group_count;     ///< Number of distinct aromatic groups
+  const int polar_hydrogen_count;     ///< Number of polar hydrogens
+  const int hbond_donor_count;        ///< Number of hydrogen bond donors
+  const int hbond_acceptor_count;     ///< Number of hydrogen bond acceptors
+  const int chiral_center_count;      ///< Number of chiral centers
+  const int rotatable_bond_count;     ///< Number of rotatable single bonds
+  const int cis_trans_bond_count;     ///< Number of cis-trans flippable bonds
+  const int double_bond_count;        ///< Number of double bonds
+  const int triple_bond_count;        ///< Number of triple bonds
+  const int max_ring_size;            ///< The maximum ring size found
+  const double temperature;           ///< Temperature at which resonance structures were computed
+  const bool rotating_groups_mapped;  ///< Indicate whether the rotatable groups of the system
+                                      ///<   (as well as chiral inversion groups) have been mapped
+
+  // Lists of atom indices and atom properties (see the parent object for detailed descriptions)
+  const int* planar_centers;            ///< Topological indices of atoms with enforced planarity
+  const int* ring_atoms;                ///< Lists of topological indices for atoms involved in
+                                        ///<   rings, arranged back-to-back
+  const int* ring_atom_bounds;          ///< Bounds array for ring_atoms
+  const int* aromatic_pi_electrons;     ///< Numbers of pi electrons in each aromatic group (not
+                                        ///<   a per-atom quantity, and not associated with limits
+                                        ///<   in the aromatic_group_bounds array)
+  const int* aromatic_groups;           ///< Lists of atoms involved in distinct aromatic groups,
+                                        ///<   arranged back-to-back
+  const int* aromatic_group_bounds;     ///< Bounds array for aromatic_groups
+  const int* polar_hydrogens;           ///< List of topological indices for polar hydrogen atoms
+  const int* hydrogen_bond_donors;      ///< List of topological indices for H-bond donors
+                                        ///<   (atoms bearin gpolar hydrogens)
+  const int* hydrogen_bond_acceptors;   ///< List of topological indices for H-bond acceptors
+  const int* chiral_centers;            ///< List of topological indices for chiral centers
+  const int* chiral_inversion_methods;  ///< Integer translations of the ChiralInversionProtocol
+                                        ///<   data types instructing 
+  const int* rotatable_groups;          ///< Lists of atoms that move when rotating about single
+                                        ///<   bonds, arranged back-to-back
+  const int* rotatable_group_bounds;    ///< Bounds array for rotatable groups
+  const int* cis_trans_groups;          ///< Lists of atoms that move when creating cis-trans
+                                        ///<  isomers, arranged back-to-back
+  const int* cis_trans_group_bounds;    ///< Bounds array for cis_trans_groups
+  const int* invertible_groups;         ///< Lists of atoms that move based on inversion of a
+                                        ///<   particular chiral center (various groups are
+                                        ///<   arranged back-to-back in this array)
+  const int* invertible_group_bounds;   ///< Bounds array for invertible_groups
+  const int4* chiral_arm_atoms;         ///< Topological indices of the base atoms for all four
+                                        ///<   arms around each chiral center (the y and z members
+                                        ///<   are identical to entries in the anchor_a_branches
+                                        ///<   and anchor_b_branches arrays)
+  const double* formal_charges;         ///< Formal charges of each atom (real numbers taken from
+                                        ///<   the resonance structure, often between 0.0 and 1.0)
+  const double* bond_orders;            ///< The order of each bond (real numbers which frequently
+                                        ///<   fall between 1.0 and 2.0)
+  const double* free_electrons;         ///< Free electron content of each atom
+  const ullint* ring_inclusion;         ///< Bitmask indicating the various sizes of rings that
+                                        ///<  each atom is found in
+  const AtomGraph *ag_pointer;          ///< Pointer to the associated topology (only useable in
+                                        ///<   the HOST version of the abstract)
+};
+  
 /// \brief An object to store information about chemical motifs: participation in rings, planarity,
 ///        chirality, aromaticity, conjugation, planarity, and bonds with different rotatability.
 class ChemicalFeatures {
@@ -429,6 +528,11 @@ public:
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;
 
+  /// \brief Get the abstract.
+  ///
+  /// \param tier  Extract pointers to data on either the CPU host or GPU device
+  ChemicalFeaturesReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
   /// \brief Find the chiral orientations of the system's chiral centers.  This function will be
   ///        called once by the constructor but can be called additional times if the coordinates
   ///        of the system change.  It will update the object's internal array of chiral centers,

@@ -8,6 +8,7 @@
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_files.h"
+#include "Namelists/nml_restraint.h"
 #include "Potential/forward_exclusionmask.h"
 #include "Potential/static_exclusionmask.h"
 #include "Restraints/restraint_apparatus.h"
@@ -26,6 +27,7 @@ using constants::ExceptionResponse;
 using energy::ForwardExclusionMask;
 using energy::StaticExclusionMask;
 using namelist::FilesControls;
+using namelist::RestraintControls;
 using restraints::RestraintApparatus;
 using testing::StopWatch;
 using topology::AtomGraph;
@@ -52,6 +54,12 @@ public:
   /// \param policy         Response to bad user input, i.e. files of the wrong type
   /// \{
   SystemCache();
+
+  SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
+              ExceptionResponse policy = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              StopWatch *timer_in = nullptr);
+
   SystemCache(const FilesControls &fcon, ExceptionResponse policy = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               StopWatch *timer_in = nullptr);
@@ -302,7 +310,21 @@ public:
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemLabel(int system_index) const;
 
+  /// \brief Get the coordinate file type associated with a particular system's trajectory.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  CoordinateFileKind getSystemTrajectoryKind(const int system_index) const;
+
+  /// \brief Get the coordinate file type associated with a particular system's checkpoint file.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  CoordinateFileKind getSystemCheckpointKind(const int system_index) const;
+
 private:
+
+  /// An official record of the total number of systems in the cache
+  int system_count;
+
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.
   std::vector<AtomGraph> topology_cache;
@@ -349,6 +371,12 @@ private:
 
   /// Labels applied to each system (whether from user input or auto-generated)
   std::vector<std::string> system_labels;
+
+  /// File types for the various output trajectory files
+  std::vector<CoordinateFileKind> system_trajectory_kinds;
+
+  /// File types for the various output checkpoint files
+  std::vector<CoordinateFileKind> system_checkpoint_kinds;
 };
   
 } // namespace synthesis

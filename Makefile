@@ -76,6 +76,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		   $(SRCDIR)/Restraints/restraint_builder.cpp \
+		   $(SRCDIR)/Restraints/restraint_enumerators.cpp \
 		   $(SRCDIR)/Structure/global_manipulation.cpp \
 		   $(SRCDIR)/Structure/isomerization.cpp \
 		   $(SRCDIR)/Structure/local_arrangement.cpp \
@@ -204,6 +205,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 	             $(SRCDIR)/Restraints/bounded_restraint.h \
 	             $(SRCDIR)/Restraints/restraint_apparatus.h \
 	             $(SRCDIR)/Restraints/restraint_builder.h \
+	             $(SRCDIR)/Restraints/restraint_enumerators.h \
 	             $(SRCDIR)/Restraints/restraint_util.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
@@ -362,6 +364,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/Restraints/bounded_restraint.o \
 	          $(SRCDIR)/Restraints/restraint_apparatus.o \
 	          $(SRCDIR)/Restraints/restraint_builder.o \
+	          $(SRCDIR)/Restraints/restraint_enumerators.o \
 		  $(SRCDIR)/Structure/global_manipulation.o \
 		  $(SRCDIR)/Structure/isomerization.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \
@@ -511,8 +514,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O3
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \

@@ -12,14 +12,15 @@ cat > ffld.in << EOF
 &end
 
 &minimize
-  ncyc 50,  maxcyc 1000,
+  ncyc 50,  maxcyc 500,
 &end
 
 &restraint
-  label sulfonamide
-  mask1 @O1, mask2 @S1, mask3 @C2, mask4 @C3
-  
+  system sulfonamide
+  ensemble heavy_dihedrals
+  mask '@O1,S1,C2,C3'
+  penalty 50.0, fbhw 0.0,
 &end
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn
+${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn

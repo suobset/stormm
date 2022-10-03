@@ -206,6 +206,14 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
       const int atom_j = vk.dihe_asgn_atoms[(3 * j) + 1];
       const int atom_k = i;
       const int atom_l = vk.dihe_asgn_atoms[(3 * j) + 2];
+
+      // Apply a restraint only if all four atoms are within the mask.
+      if (holding_mask[atom_i] == false || holding_mask[atom_j] == false ||
+          holding_mask[atom_k] == false || holding_mask[atom_l] == false) {
+        continue;
+      }
+      
+      // Do not apply a restraint to dihedrals with hydrogens in them
       if (cdk.z_numbers[atom_i] <= 1 || cdk.z_numbers[atom_j] <= 1 || cdk.z_numbers[atom_k] <= 1 ||
           cdk.z_numbers[atom_l] <= 1) {
         continue;
@@ -224,6 +232,11 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
           }
         }
       }
+
+      // CHECK
+      printf("Restrain atoms %4d - %4d - %4d - %4d\n", atom_i, atom_j, atom_k, atom_l);
+      // END CHECK
+      
       const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr);
       const double r1 = current_value - flat_bottom_half_width - harmonic_width;
       const double r2 = current_value - flat_bottom_half_width;

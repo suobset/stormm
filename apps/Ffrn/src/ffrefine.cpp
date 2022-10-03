@@ -32,8 +32,8 @@ int main(int argc, const char* argv[]) {
   UserSettings ui(argc, argv, AppName::FFREFINE);
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
-  SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::YES,
-                 &timer);
+  SystemCache sc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
+                 ui.getExceptionBehavior(), MapRotatableGroups::YES, &timer);
 
   // Perform minimizations as requested.
   const int system_count = sc.getSystemCount();
@@ -46,7 +46,10 @@ int main(int argc, const char* argv[]) {
       PhaseSpace *ps = sc.getCoordinatePointer(i);
       
       // CHECK
-      printf("Label %2d = %s\n", i, sc.getSystemLabel(i).c_str());
+      const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
+      const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
+      printf("Label %2d = %s (%s)\n", i, sc.getSystemLabel(i).c_str(),
+             getImplicitSolventModelName(i_ism).c_str());
       PhaseSpaceWriter psw = ps->data();
       for (int i = 0; i < psw.natom; i++) {
         printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
@@ -54,7 +57,7 @@ int main(int argc, const char* argv[]) {
       printf("\n");
       RestraintApparatus ra(sc.getSystemTopologyPointer(i));
       // END CHECK
-#if 0
+
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
@@ -64,19 +67,15 @@ int main(int argc, const char* argv[]) {
       case UnitCellType::TRICLINIC:
         break;
       }
-#endif
     }
   }
-
-  // CHECK
-  printf("Point A\n");
-  // END CHECK
   
   // Print restart files from energy minimization
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
       const PhaseSpace ps = sc.getCoordinateReference(i);
-      ps.exportToFile(sc.getSystemCheckpointName(i));
+      ps.exportToFile(sc.getSystemCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
+                      sc.getSystemTrajectoryKind(i), ui.getPrintingPolicy());
     }
   }
 

@@ -116,9 +116,9 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
                        
   // The range of data now extends from line_start to line_end.  Sift through that information
   // for a V2000 or V3000 specification.  This should be found on the fourth line.
-  int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
-                                  tfr.line_limits[line_start + 4] -
-                                  tfr.line_limits[line_start + 3]);
+  const int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
+                                        tfr.line_limits[line_start + 4] -
+                                        tfr.line_limits[line_start + 3]);
   
   // Begin by reading the molecule name (title), generating software details, and any general
   // comment (always three and only three distinct lines, even if left blank).

@@ -32,10 +32,10 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
     has_minimize_nml{false}, has_solvent_nml{false},
     has_random_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
-    has_ffmorph_nml{false}, 
+    has_ffmorph_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{}, dyna_input{},
-    ffmod_input{}
+    ffmod_input{}, rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -153,7 +153,17 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
   start_line = 0;
   ffmod_input = FFMorphControls(inp_tf, &start_line, &has_ffmorph_nml, policy);
-
+  start_line = 0;
+  while (start_line < inp_tf.getLineCount()) {
+    bool restraint_nml_found = false;
+    RestraintControls tmp_rstr_input = RestraintControls(inp_tf, &start_line, &restraint_nml_found,
+                                                         policy);
+    if (restraint_nml_found) {
+      restraint_nml_count += 1;
+      rstr_inputs.push_back(tmp_rstr_input);
+    }
+  }
+  
   // Check the validity of input namelists
   switch (prog_set) {
   case AppName::CONFORMER:
@@ -238,6 +248,26 @@ RandomControls UserSettings::getRandomNamelistInfo() const {
 //-------------------------------------------------------------------------------------------------
 ConformerControls UserSettings::getConformerNamelistInfo() const {
   return conf_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<RestraintControls>& UserSettings::getRestraintNamelistInfo() const {
+  return rstr_inputs;
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintControls UserSettings::getRestraintNamelistInfo(const int index) const {
+  if (index < 0 || index >= restraint_nml_count) {
+    rtErr("The input contained " + std::to_string(restraint_nml_count) + " &restraint namelists.  "
+          "Index " + std::to_string(index) + " is invalid.", "UserSettings",
+          "getRestraintNamelistInfo");
+  }
+  return rstr_inputs[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+PrintSituation UserSettings::getPrintingPolicy() const {
+  return print_policy;
 }
 
 } // namespace namelist

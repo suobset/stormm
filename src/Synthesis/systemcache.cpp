@@ -29,14 +29,15 @@ using trajectory::detectCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
-    topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
+    system_count{0}, topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
     static_masks_cache{}, forward_masks_cache{}, topology_indices{}, example_indices{},
     topology_cases{}, topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{},
-    system_labels{}
+    system_labels{}, system_trajectory_kinds{}, system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
+SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
+                         const ExceptionResponse policy,
                          const MapRotatableGroups map_chemfe_rotators, StopWatch *timer_in) :
     SystemCache()
 {
@@ -474,6 +475,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
         system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
         system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
         system_labels.push_back(sysvec[i].getLabel());
+        system_count += 1;
         break;
       case CoordinateFileKind::AMBER_NETCDF:
       case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -518,6 +520,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
             system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
             system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
             system_labels.push_back(sysvec[i].getLabel());
+            system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
+            system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
+            system_count += 1;
           }
         }
         break;
@@ -622,11 +627,34 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       forward_masks_cache.emplace_back(nullptr);
     }
   }
+
+  // Use the chemical features objects to make restraint apparatuses associated with the various
+  // labels found in &restraint namelists.
+  const int nrst_nml = rstcon.size();
+
+  // CHECK
+  printf("Detected %d &restraint namelists in the input.\n", nrst_nml);
+  // END CHECK
+  
+  int nrst_labels = 0;
+  std::vector<std::string> tmp_rst_labels;
+  for (int i = 0; i < nrst_nml; i++) {
+
+    // CHECK
+    printf("Apply to %s\n", rstcon[i].getSystemLabel().c_str());
+    // END CHECK
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
+SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
+                         const MapRotatableGroups map_chemfe_rotators, StopWatch *timer_in) :
+    SystemCache(fcon, {}, policy, map_chemfe_rotators, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
 int SystemCache::getSystemCount() const {
-  return coordinates_cache.size();
+  return system_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1017,13 +1045,30 @@ std::string SystemCache::getSystemCheckpointName(const int system_index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemLabel(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_names.size())) {
+  if (system_index < 0 || system_index >= static_cast<int>(system_labels.size())) {
     rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
-          "getSystemLabel");
+          std::to_string(system_labels.size()) + ".", "SystemCache", "getSystemLabel");
   }
   return system_labels[system_index];
 }
 
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind SystemCache::getSystemTrajectoryKind(const int system_index) const {
+  if (system_index < 0 || system_index >= static_cast<int>(system_trajectory_kinds.size())) {
+    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
+          std::to_string(system_trajectory_kinds.size()) + ".", "SystemCache",
+          "getSystemTrajectoryKind");
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) const {
+  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_kinds.size())) {
+    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
+          std::to_string(system_checkpoint_kinds.size()) + ".", "SystemCache",
+          "getSystemCheckpointKind");
+  }
+}
+  
 } // namespace synthesis
 } // namespace stormm

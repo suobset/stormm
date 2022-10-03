@@ -10,6 +10,7 @@
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_random.h"
+#include "Namelists/nml_restraint.h"
 #include "Namelists/nml_solvent.h"
 #include "Parsing/textfile.h"
 #include "Topology/atomgraph.h"
@@ -28,6 +29,7 @@ using namelist::FFMorphControls;
 using namelist::FilesControls;
 using namelist::MinimizeControls;
 using namelist::RandomControls;
+using namelist::RestraintControls;
 using namelist::SolventControls;
 using parse::TextFile;
 using topology::AtomGraph;
@@ -94,18 +96,26 @@ struct UserSettings {
   /// \brief Get the block of information associated with the &conformer namelist.
   ConformerControls getConformerNamelistInfo() const;
 
+  /// \brief Get a const reference to the vector of &restraint namelist objects.
+  const std::vector<RestraintControls>& getRestraintNamelistInfo() const;
+
+  /// \brief Get one block of information associated with a particular &restraint namelist.
+  RestraintControls getRestraintNamelistInfo(int index) const;
+    
+  /// \brief Produce the file overwriting policy.
+  PrintSituation getPrintingPolicy() const;
+
 private:
 
   ExceptionResponse policy;     ///< Action in the event of bad input
   PrintSituation print_policy;  ///< Policy to take with regard to general output files
-  bool has_minimize_nml;        ///< Indicate presence of a &minimize namelist in the input file
-  bool has_solvent_nml;         ///< Indicate presence of a &solvent namelist in the input file
-  bool has_random_nml;          ///< Indicate presence of a &random namelist in the input file
-  bool has_conformer_nml;       ///< Indicate presence of a &conformer namelist in the input file
-  bool has_dynamics_nml;        ///< Indicate presence of a &dynamics namelist in the input file
-  bool has_ffmorph_nml;         ///< Indicate presence of an &ffmorph namelist in the input file
-
-  /// Overwriting 
+  bool has_minimize_nml;        ///< Indicate the presence of a &minimize namelist in the input
+  bool has_solvent_nml;         ///< Indicate the presence of a &solvent namelist in the input
+  bool has_random_nml;          ///< Indicate the presence of a &random namelist in the input
+  bool has_conformer_nml;       ///< Indicate the presence of a &conformer namelist in the input
+  bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
+  bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
+  int restraint_nml_count;      ///< Number of &restraint namelists found in the input
   
   /// Name of the original input file
   std::string input_file;
@@ -118,6 +128,9 @@ private:
   ConformerControls conf_input;     ///< Conformer generation instructions
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions
+
+  /// There can be many restraint controls sections in the input.  This vector holds them all.
+  std::vector<RestraintControls> rstr_inputs;
 };
 
 } // namespace namelist

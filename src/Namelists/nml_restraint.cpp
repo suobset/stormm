@@ -1,6 +1,8 @@
 #include <cmath>
 #include "copyright.h"
+#include "Chemistry/atommask.h"
 #include "Constants/symbol_values.h"
+#include "Restraints/restraint_builder.h"
 #include "Structure/local_arrangement.h"
 #include "namelist_element.h"
 #include "nml_restraint.h"
@@ -8,27 +10,35 @@
 namespace stormm {
 namespace namelist {
 
+using chemistry::AtomMask;
+using chemistry::MaskInputMode;
+using restraints::applyHoldingRestraints;
+using restraints::applyHydrogenBondPreventors;
+using restraints::applyPositionalRestraints;
+using restraints::translateRestraintEnsemble;
 using structure::imageValue;
 using structure::ImagingMethod;
-  
-//-------------------------------------------------------------------------------------------------
-RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
-    policy{policy_in}, restraint_is_valid{true}, system{std::string("ALL")}, ensemble{},
-    mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
-    mask_l{std::string("")}, atom_i{-1}, atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0},
-    initiation_step{0}, maturation_step{0}, initial_k2{0.0}, initial_k3{0.0}, initial_r1{0.0},
-    initial_r2{0.0}, initial_r3{0.0}, initial_r4{0.0}, mature_k2{0.0}, mature_k3{0.0},
-    mature_r1{0.0}, mature_r2{0.0}, mature_r3{0.0}, mature_r4{0.0}, initial_crd{0.0, 0.0, 0.0},
-    mature_crd{0.0, 0.0, 0.0}
-{}
 
 //-------------------------------------------------------------------------------------------------
-RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
+RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
+    policy{policy_in}, restraint_is_valid{true}, system{std::string("ALL")},
+    domain{RestraintEnsemble::SPECIFIC_ATOMS}, mask_i{std::string("")}, mask_j{std::string("")},
+    mask_k{std::string("")}, mask_l{std::string("")},
+    ensemble_mask{std::string(default_heavy_atom_mask)}, atom_i{-1}, atom_j{-1}, atom_k{-1},
+    atom_l{-1}, order{0}, initiation_step{0}, maturation_step{0}, initial_k2{0.0}, initial_k3{0.0},
+    initial_r1{0.0}, initial_r2{0.0}, initial_r3{0.0}, initial_r4{0.0}, mature_k2{0.0},
+    mature_k3{0.0}, mature_r1{0.0}, mature_r2{0.0}, mature_r3{0.0}, mature_r4{0.0},
+    initial_crd{0.0, 0.0, 0.0}, mature_crd{0.0, 0.0, 0.0}, penalty{0.0},
+    flat_bottom_half_width{0.0}
+{}
+  
+//-------------------------------------------------------------------------------------------------
+RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *found_nml,
                                      const ExceptionResponse policy_in) :
     RestraintControls(policy_in)
 {
+  NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy);
   const int starting_line = *start_line + 1;
-  NamelistEmulator t_nml = restraintInput(tf, start_line, policy);
 
   // Take in an associated label to indicate systems to which this restraint condition applies
   if (t_nml.getKeywordStatus("system") != InputStatus::MISSING) {
@@ -37,7 +47,7 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
 
   // Look for a general directive for a group of restraints that apply througout a system
   if (t_nml.getKeywordStatus("ensemble") != InputStatus::MISSING) {
-    ensemble = t_nml.getStringValue("ensemble");
+    domain = translateRestraintEnsemble(t_nml.getStringValue("ensemble"));
     if (t_nml.getKeywordStatus("mask1") != InputStatus::MISSING ||
         t_nml.getKeywordStatus("mask2") != InputStatus::MISSING ||
         t_nml.getKeywordStatus("mask3") != InputStatus::MISSING ||
@@ -49,12 +59,12 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
       switch (policy) {
       case ExceptionResponse::DIE:
         rtErr("Ensemble restraints apply throughout the system and are incompatible with "
-              " particular atoms, as indicated in a &restraint namelist beginning on line " +
+              " particular atoms, as indicated in a &restraint namelist terminating on line " +
               std::to_string(starting_line) + " of " + tf.getFileName() + ".",
               "RestraintControls");
       case ExceptionResponse::WARN:
         rtWarn("Ensemble restraints apply throughout the system, but particular atoms were also "
-               "indicated in a &restraint namelist beginning on line " +
+               "indicated in a &restraint namelist terminating on line " +
                std::to_string(starting_line) + " of " + tf.getFileName() + ".  The atom "
                "specifications will be ignored.", "RestraintControls");
         break;
@@ -77,6 +87,9 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
   if (t_nml.getKeywordStatus("mask4") != InputStatus::MISSING) {
     mask_l = t_nml.getStringValue("mask4");
   }
+  if (t_nml.getKeywordStatus("mask") == InputStatus::USER_SPECIFIED) {
+    ensemble_mask = t_nml.getStringValue("mask");
+  }
   if (t_nml.getKeywordStatus("iat1") != InputStatus::MISSING) {
     atom_i = t_nml.getIntValue("iat1");
   }
@@ -89,17 +102,18 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
   if (t_nml.getKeywordStatus("iat4") != InputStatus::MISSING) {
     atom_l = t_nml.getIntValue("iat4");
   }
-
+  
   // Check the validity of the atom selections
-  if (mask_i.size() == 0LLU && atom_i < 0) {
+  if (mask_i.size() == 0LLU && atom_i < 0 &&
+      t_nml.getKeywordStatus("ensemble") == InputStatus::MISSING) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("A restraint must have at least a valid first atom, but no such atom was specified "
-            "for the &restraint namelist beginning on line " + std::to_string(starting_line) +
+            "for the &restraint namelist terminating on line " + std::to_string(starting_line) +
             "of " + tf.getFileName() + ".", "RestraintControls", "validateRestraint");
     case ExceptionResponse::WARN:
       rtWarn("A restraint must have at least a valid first atom, but no such atom was specified.  "
-             "This may create problems downstream, or the restraint input beginning on line " +
+             "This may create problems downstream, or the restraint input terminating on line " +
              std::to_string(starting_line) + " of " + tf.getFileName() + " will be ignored.",
              "RestraintControls", "validateRestraint");
       restraint_is_valid = false;
@@ -126,11 +140,11 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
   // Get time-dependencies
   bool nstep1_found = false;
   bool nstep2_found = false;
-  if (t_nml.getKeywordStatus("nstep1") != InputStatus::MISSING) {
+  if (t_nml.getKeywordStatus("nstep1") == InputStatus::USER_SPECIFIED) {
     nstep1_found = true;
     initiation_step = t_nml.getIntValue("nstep1");
   }
-  if (t_nml.getKeywordStatus("nstep2") != InputStatus::MISSING) {
+  if (t_nml.getKeywordStatus("nstep2") == InputStatus::USER_SPECIFIED) {
     nstep2_found = true;
     maturation_step = t_nml.getIntValue("nstep2");
   }
@@ -242,10 +256,10 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
   if (nstep1_found == false && time_dependent_parameters_found) {
     switch (policy) {
     case ExceptionResponse::DIE:
-      rtErr("Time-dependent parameters were found in a &restraint namelist beginning on line " +
+      rtErr("Time-dependent parameters were found in a &restraint namelist terminating on line " +
             std::to_string(starting_line) + " of " + tf.getFileName() + ".", "RestraintControls");
     case ExceptionResponse::WARN:
-      rtWarn("Time-dependent parameters were found in a &restraint namelist beginning on line " +
+      rtWarn("Time-dependent parameters were found in a &restraint namelist terminating on line " +
              std::to_string(starting_line) + " of " + tf.getFileName() + ".  The restraint will "
              "be made static based on its initial values.", "RestraintControls");
       break;
@@ -253,6 +267,8 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
       break;
     }
   }
+  checkFinalRestraintSettings(nstep1_found, r2a_found, r3a_found, k2a_found, k3a_found,
+                              starting_line, tf.getFileName());
   if (order == 1) {
     if (x0_found == false || y0_found == false || z0_found == false) {
       switch (policy) {
@@ -271,28 +287,19 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
         break;
       }
     }
-    if (nstep1_found && (x0a_found == false || y0a_found == false || z0a_found == false)) {
-      switch (policy) {
-      case ExceptionResponse::DIE:
-        rtErr("A time-dependent positional restraint specified at line " +
-              std::to_string(starting_line) + " of " + tf.getFileName() + " must have a final "
-              "x0a, y0a, and z0a for the target position.", "RestraintControls");
-      case ExceptionResponse::WARN:
-        rtWarn("A time-dependent positional restraint specified at line " +
-               std::to_string(starting_line) + " of " + tf.getFileName() + " must have a final "
-               "x0a, y0a, and z0a for the target position.  The restraint will be ignored.",
-               "RestraintControls");
-        restraint_is_valid = false;
-        break;
-      case ExceptionResponse::SILENT:
-        restraint_is_valid = false;
-        break;
+    if (nstep1_found) {
+      if (x0a_found == false) {
+        mature_crd.x = initial_crd.x;
+      }
+      if (y0a_found == false) {
+        mature_crd.y = initial_crd.y;
+      }
+      if (z0a_found == false) {
+        mature_crd.z = initial_crd.z;
       }
     }
   }
   if (order == 2) {
-    checkFinalRestraintSettings(nstep1_found, r2a_found, r3a_found, k2a_found, k3a_found,
-                                starting_line, tf.getFileName());
     if (r1_found == false) {
       initial_r1 = initial_r2 - 1000.0;
     }
@@ -309,8 +316,6 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
     }
   }
   if (order == 3) {
-    checkFinalRestraintSettings(nstep1_found, r2a_found, r3a_found, k2a_found, k3a_found,
-                                starting_line, tf.getFileName());
     initial_r2 = fabs(imageValue(initial_r2, symbols::twopi, ImagingMethod::MINIMUM_IMAGE));
     initial_r3 = fabs(imageValue(initial_r3, symbols::twopi, ImagingMethod::MINIMUM_IMAGE));
     mature_r2  = fabs(imageValue(mature_r2, symbols::twopi, ImagingMethod::MINIMUM_IMAGE));
@@ -331,8 +336,6 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
     }
   }
   if (order == 4) {
-    checkFinalRestraintSettings(nstep1_found, r2a_found, r3a_found, k2a_found, k3a_found,
-                                starting_line, tf.getFileName());
     initial_r2 = imageValue(initial_r2, symbols::twopi, ImagingMethod::PRIMARY_UNIT_CELL);
     initial_r3 = imageValue(initial_r3, symbols::twopi, ImagingMethod::PRIMARY_UNIT_CELL);
     mature_r2  = imageValue(mature_r2, symbols::twopi, ImagingMethod::PRIMARY_UNIT_CELL);
@@ -352,6 +355,14 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
       }
     }
   }
+
+  // Take in parameters for ensembles of restraints, built based on the existing structure.
+  if (t_nml.getKeywordStatus("penalty") != InputStatus::MISSING) {
+    penalty = t_nml.getRealValue("penalty");
+  }
+  if (t_nml.getKeywordStatus("fbhw") != InputStatus::MISSING) {
+    flat_bottom_half_width = t_nml.getRealValue("fbhw");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -362,8 +373,7 @@ RestraintAnchoring RestraintControls::getAtomSpecification() const {
   const int mixed_order = (atom_i >= 0 || mask_i.size() >= 0LLU) +
                           (atom_j >= 0 || mask_j.size() >= 0LLU) +
                           (atom_k >= 0 || mask_k.size() >= 0LLU) +
-                          (atom_l >= 0 || mask_l.size() >= 0LLU);
-    
+                          (atom_l >= 0 || mask_l.size() >= 0LLU);    
   if (indexed_order == order) {
     return RestraintAnchoring::INDICES;
   }
@@ -448,50 +458,78 @@ void RestraintControls::checkFinalRestraintSettings(const bool nstep1_found, con
 }
 
 //-------------------------------------------------------------------------------------------------
-BoundedRestraint RestraintControls::getRestraint(const AtomGraph *ag,
-                                                 const ChemicalFeatures *chemfe,
-                                                 const CoordinateFrameReader &cfr) const {
-  switch (getAtomSpecification()) {
-  case RestraintAnchoring::INDICES:
-    return BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, initiation_step,
-                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
-                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
-                            mature_r3, mature_r4, initial_crd, mature_crd);
-  case RestraintAnchoring::ATOMMASK:
-    return BoundedRestraint(mask_i, mask_j, mask_k, mask_l, ag, chemfe, cfr, initiation_step,
-                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
-                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
-                            mature_r3, mature_r4, initial_crd, mature_crd);
-  case RestraintAnchoring::MIXED:
-  case RestraintAnchoring::UNKNOWN:
-    rtErr("The restraint atom encoding could not be determined.", "RestraintControls",
-          "getRestraint");
+std::string RestraintControls::getSystemLabel() const {
+  return system;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                const CoordinateFrameReader &cfr) const {
+  std::vector<BoundedRestraint> result;
+  switch (domain) {
+  case RestraintEnsemble::SPECIFIC_ATOMS:
+    result.reserve(1);
+    switch (getAtomSpecification()) {
+    case RestraintAnchoring::INDICES:
+      result.emplace_back(atom_i, atom_j, atom_k, atom_l, ag, initiation_step, maturation_step,
+                          initial_k2, initial_k3, initial_r1, initial_r2, initial_r3, initial_r4,
+                          mature_k2, mature_k3, mature_r1, mature_r2, mature_r3, mature_r4,
+                          initial_crd, mature_crd);
+    case RestraintAnchoring::ATOMMASK:
+      result.emplace_back(mask_i, mask_j, mask_k, mask_l, ag, chemfe, cfr, initiation_step,
+                          maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
+                          initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
+                          mature_r3, mature_r4, initial_crd, mature_crd);
+    case RestraintAnchoring::MIXED:
+    case RestraintAnchoring::UNKNOWN:
+
+      // This situation should never be reached, as consisten restraint anchoring is enforced in
+      // the constructor.
+      rtErr("The restraint atom encoding could not be determined.", "RestraintControls",
+            "getRestraint");
+    }
+    break;
+  case RestraintEnsemble::PREVENT_HBONDS:
+    return applyHydrogenBondPreventors(ag, *chemfe, penalty, flat_bottom_half_width);
+    break;
+  case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
+    {
+      const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
+                            "Atom selection for heavy-atom dihedral angle preservation");
+      return applyHoldingRestraints(ag, cfr, cordon, penalty, flat_bottom_half_width, 1000.0);
+    }
+    break;
+  case RestraintEnsemble::PRESERVE_POSITIONS:
+    {
+      const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
+                            "Atom selection for heavy-atom dihedral angle preservation");
+      return applyPositionalRestraints(ag, cfr, cordon, initial_k3, initial_r3, initial_r4,
+                                       initial_k2, initial_r2, initial_r1);
+    }
+    break;
+  case RestraintEnsemble::PRESERVE_DISTANCES:
+    break;
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-BoundedRestraint RestraintControls::getRestraint(const AtomGraph *ag) const {
-  switch (getAtomSpecification()) {
-  case RestraintAnchoring::INDICES:
-    return BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, initiation_step,
-                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
-                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
-                            mature_r3, mature_r4, initial_crd, mature_crd);
-  case RestraintAnchoring::ATOMMASK:
-    rtErr("A restraint cannot be specified with atom masks unless its chemical features and "
-          "coordinates are also provided.  An alternative overload of getRestraint() must be "
-          "called instead.", "RestraintControls", "getRestraint");
-  case RestraintAnchoring::MIXED:
-  case RestraintAnchoring::UNKNOWN:
-    rtErr("The restraint atom encoding could not be determined.", "RestraintControls",
-          "getRestraint");
-  }
-  __builtin_unreachable();
+std::vector<BoundedRestraint>
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                const CoordinateFrame &cf) const {
+  return getRestraint(ag, chemfe, cf.data());
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
+std::vector<BoundedRestraint>
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                const PhaseSpace &ps) const {
+  return getRestraint(ag, chemfe, CoordinateFrameReader(ps));
+}
+
+//-------------------------------------------------------------------------------------------------
+NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, policy,
                          "Replicates the Amber NMR restraint namelist within STORMM.");
@@ -517,13 +555,18 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
   t_nml.addKeyword(NamelistElement("mask2", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("mask3", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("mask4", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("mask", NamelistType::STRING,
+                                   std::string(default_heavy_atom_mask)));
   t_nml.addKeyword(NamelistElement("rx0", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("ry0", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("rz0", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("rx0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("ry0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("rz0a", NamelistType::REAL, "MISSING"));
+  t_nml.addKeyword(NamelistElement("penalty", NamelistType::REAL, "MISSING"));
+  t_nml.addKeyword(NamelistElement("fbhw", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("system", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("ensemble", NamelistType::STRING, "MISSING"));
   t_nml.addHelp("iat1", "The first atom in the restraint (this or mask_i is required)");
   t_nml.addHelp("iat2", "The second atom in the restraint (this or mask_j is required)");
   t_nml.addHelp("iat3", "The third atom in the restraint (optional, will convert a distance "
@@ -572,6 +615,8 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
   t_nml.addHelp("mask4", "Ambmask string evaluating to the fourth atom in the restraint (may be "
                 "given in place of iatm4, and either will convert a distance restraint into an "
                 "angle bending restraint)");
+  t_nml.addHelp("mask", "Ambmask string evaluating to the general mask to which an ensemble "
+                "of restraints should apply.  Default is all heavy atoms (\"@/2-200\")");
   t_nml.addHelp("rx0", "Cartesian X coordinate of the anchor point for a positional restraint.");
   t_nml.addHelp("ry0", "Cartesian Y coordinate of the anchor point for a positional restraint.");
   t_nml.addHelp("rz0", "Cartesian Z coordinate of the anchor point for a positional restraint.");
@@ -581,6 +626,12 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                 "positional restraint, given appropriate nstep values.");
   t_nml.addHelp("rz0a", "Final value of the Cartesian Z coordinate of the anchor point for a "
                 "positional restraint, given appropriate nstep values.");
+  t_nml.addHelp("penalty", "General value of the harmonic restraint penalty to impose when "
+                "creating an ensemble of restraints.  The units are kcal/mol-A^2 for positional "
+                "or distance restraint ensembles, and kcal/mol-rad^2 for angle and dihedral "
+                "restraint ensembles.");
+  t_nml.addHelp("fbhw", "General value of the permissive, flat-bottom well to incorporate into a "
+                "restraint ensemble.");
   t_nml.addHelp("system", "The system to which this restraint shall apply.  The value of this "
                 "keyword should match one of the labels given to a system with the -sys keyword "
                 "of the &files namelist, or use one of the reserved values 'all' or "
@@ -592,8 +643,8 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
-
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
+                             found);
   return t_nml;
 }
 

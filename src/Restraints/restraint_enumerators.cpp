@@ -16,7 +16,7 @@ RestraintEnsemble translateRestraintEnsemble(const std::string &rst_group) {
       strcmpCased(rst_group, "hbonds", CaseSensitivity::NO) ||
       strcmpCased(rst_group, "h-bonds", CaseSensitivity::NO) ||
       strcmpCased(rst_group, "prevent_hbonds", CaseSensitivity::NO) ||
-      strcmpCased(rst_group, "prevent_hydrogen_bonds", CaseSensitivity::NO)) {
+      strcmpCased(rst_group, "prevent_hydrogen_bonds", CaseSensitivity::NO) ||
       strcmpCased(rst_group, "preventhydrogenbonds", CaseSensitivity::NO)) {
     return RestraintEnsemble::PREVENT_HBONDS;
   }
@@ -28,7 +28,7 @@ RestraintEnsemble translateRestraintEnsemble(const std::string &rst_group) {
            strcmpCased(rst_group, "preserveheavydihedrals", CaseSensitivity::NO) ||
            strcmpCased(rst_group, "hold_heavy_dihedrals", CaseSensitivity::NO) ||
            strcmpCased(rst_group, "holdheavydihedrals", CaseSensitivity::NO)) {
-    return RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS
+    return RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS;
   }
   else if (strcmpCased(rst_group, "heavy_distances", CaseSensitivity::NO) ||
            strcmpCased(rst_group, "heavydistances", CaseSensitivity::NO) ||
@@ -37,6 +37,9 @@ RestraintEnsemble translateRestraintEnsemble(const std::string &rst_group) {
            strcmpCased(rst_group, "hold_heavy_distances", CaseSensitivity::NO) ||
            strcmpCased(rst_group, "holdheavydistances", CaseSensitivity::NO)) {
     return RestraintEnsemble::PRESERVE_DISTANCES;
+  }
+  else if (strcmpCased(rst_group, "positions")) {
+    return RestraintEnsemble::PRESERVE_POSITIONS;
   }
   else {
     rtErr("Unknown restraint ensemble code \"" + rst_group + "\".", "translateRestraintEnsemble");

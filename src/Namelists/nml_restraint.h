@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef STORMM_NML_RST_H
-#define STORMM_NML_RST_H
+#ifndef STORMM_NML_RESTRAINT_H
+#define STORMM_NML_RESTRAINT_H
 
 #include "copyright.h"
 #include "input.h"
@@ -9,16 +9,27 @@
 #include "Chemistry/chemical_features.h"
 #include "Parsing/textfile.h"
 #include "Restraints/bounded_restraint.h"
+#include "Restraints/restraint_enumerators.h"
 #include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/phasespace.h"
 
 namespace stormm {
 namespace namelist {
 
 using chemistry::ChemicalFeatures;
 using restraints::BoundedRestraint;
+using restraints::RestraintEnsemble;
 using topology::AtomGraph;
+using topology::NonbondedKit;
+using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
-  
+using trajectory::PhaseSpace;
+
+/// \brief Default expressions for the restraint namelist
+constexpr char default_heavy_atom_mask[] = "@/2-200";
+
 /// \brief Object to encapsulate and dispense restraint information collected from a single
 ///        &restraint namelist.
 class RestraintControls {
@@ -32,66 +43,86 @@ public:
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
   RestraintControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
-  RestraintControls(const TextFile &tf, int *start_line,
+  RestraintControls(const TextFile &tf, int *start_line, bool *found_nml,
                     ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
+  /// \brief Get the system label, to indicate which system(s) this restraint applies to
+  std::string getSystemLabel() const;
+  
   /// \brief Get the restraint specified by this namelist.  There are no other getter functions
   ///        for individual details, nor setters to manually edit the result.  Restraints can be
   ///        built by many means, namelists being only one, and editing should be done on the
   ///        more tractable BoundedRestraint form.
   ///
   /// Overloaded:
-  ///   - Produce a restraint based on atom index specifications
-  ///   - Produce a restraint based on atom masks (probably from user input)
+  ///   - Accept a CoordinateFrame object, or its abstract, for the coordinates
+  ///   - Accept a PhaseSpace object, or its abstract, for the coordinates
   ///
   /// \param ag      The system topology (needed to check the atom indexing--this member function
   ///                can only be called once the topology to which the restraint shall apply has
   ///                been constructed, which may be well after user input has been transcribed)
-  /// \param chemfe  Chemical features of the system (needed to evaluate atom masks)
-  /// \param cfr     Coordinates of the system (needed to evaluate atom masks)
+  /// \param chemfe  Chemical features of the system (needed to evaluate atom masks, but in many
+  ///                cases is a placeholder)
+  /// \param cfr     Coordinates of the system
+  /// \param cf      Coordinates of the system
+  /// \param ps      Coordinates of the system
   /// \{
-  BoundedRestraint getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
-                                const CoordinateFrameReader &cfr) const;
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                             const CoordinateFrameReader &cf) const;
 
-  BoundedRestraint getRestraint(const AtomGraph *ag) const;
-  /// \}  
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                             const CoordinateFrame &cf) const;
+
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                             const PhaseSpace &ps) const;
+  /// \}
 
 private:
-  ExceptionResponse policy;  ///< Protocol to follow in the event of bad input data
-  bool restraint_is_valid;   ///< Indicator that the restraints passes various quality checks
-  std::string system;        ///< A system label that can be matched to various entries based on
-                             ///<   the -sys keyword in &files namelist input
-  std::string ensemble;      ///< Indicates a collection of restraints to apply throughout any
-                             ///<   specified systems.  This will supercede any atom indices or
-                             ///<   masks specified in the same &restraint namelist.
-  std::string mask_i;        ///< Atom I (first atom) mask
-  std::string mask_j;        ///< Atom J (second atom) mask
-  std::string mask_k;        ///< Atom K (third atom) mask
-  std::string mask_l;        ///< Atom L (fourth atom) mask
-  int atom_i;                ///< Atom I topological index
-  int atom_j;                ///< Atom J topological index
-  int atom_k;                ///< Atom K topological index
-  int atom_l;                ///< Atom L topological index
-  int order;                 ///< Order of the restraint: 0 = no restraint, 1 = positional
-                             ///<   restraint, 2 = distance restraint, 3 = angle restraint,
-                             ///<   4 = dihedral restraint
-  int initiation_step;       ///< Step at which restraint application begins
-  int maturation_step;       ///< Step at which restraint application becomes mature
-  double initial_k2;         ///< Initial (or static) left-hand stiffness constant
-  double initial_k3;         ///< Initial (or static) right-hand stiffness constant
-  double initial_r1;         ///< Initial (or static) leftmost harmonic boundary of k2's support
-  double initial_r2;         ///< Initial (or static) rightmost harmonic boundary of k2's support
-  double initial_r3;         ///< Initial (or static) leftmost harmonic boundary of k3's support
-  double initial_r4;         ///< Initial (or static) rightmost harmonic boundary of k3's support
-  double mature_k2;          ///< Long-term value of k2, but only if k2 is not static
-  double mature_k3;          ///< Long-term value of k3, but only if k3 is not static
-  double mature_r1;          ///< Long term value of r1, but only if r1 is not static
-  double mature_r2;          ///< Long-term value of r2, but only if r2 is not static
-  double mature_r3;          ///< Long-term value of r3, but only if r3 is not static
-  double mature_r4;          ///< Long-term value of r4, but only if r4 is not static
-  double3 initial_crd;       ///< Initial (or static) Cartesian tether for a positional restraint
-  double3 mature_crd;        ///< Long-term Cartesian tether for a positional restraint
+
+  // General information about the status of the restraint
+  ExceptionResponse policy;   ///< Protocol to follow in the event of bad input data
+  bool restraint_is_valid;    ///< Indicator that the restraints passes various quality checks
+  std::string system;         ///< A system label that can be matched to various entries based on
+                              ///<   the -sys keyword in &files namelist input
+  RestraintEnsemble domain;   ///< Indicates a collection of restraints to apply throughout any
+                              ///<   specified systems.  This will supercede any atom indices or
+                              ///<   masks specified in the same &restraint namelist.
+
+  // Parameters for a typical Amber flat-bottom well NMR restraint applied to specific atoms
+  std::string mask_i;         ///< Atom I (first atom) mask
+  std::string mask_j;         ///< Atom J (second atom) mask
+  std::string mask_k;         ///< Atom K (third atom) mask
+  std::string mask_l;         ///< Atom L (fourth atom) mask
+  std::string ensemble_mask;  ///< Ensemble restraints mask for selecting a subset of all atoms
+                              ///<   (not just a specific atom)
+  int atom_i;                 ///< Atom I topological index
+  int atom_j;                 ///< Atom J topological index
+  int atom_k;                 ///< Atom K topological index
+  int atom_l;                 ///< Atom L topological index
+  int order;                  ///< Order of the restraint: 0 = no restraint, 1 = positional
+                              ///<   restraint, 2 = distance restraint, 3 = angle restraint,
+                              ///<   4 = dihedral restraint
+  int initiation_step;        ///< Step at which restraint application begins
+  int maturation_step;        ///< Step at which restraint application becomes mature
+  double initial_k2;          ///< Initial (or static) left-hand stiffness constant
+  double initial_k3;          ///< Initial (or static) right-hand stiffness constant
+  double initial_r1;          ///< Initial (or static) leftmost harmonic boundary of k2's support
+  double initial_r2;          ///< Initial (or static) rightmost harmonic boundary of k2's support
+  double initial_r3;          ///< Initial (or static) leftmost harmonic boundary of k3's support
+  double initial_r4;          ///< Initial (or static) rightmost harmonic boundary of k3's support
+  double mature_k2;           ///< Long-term value of k2, but only if k2 is not static
+  double mature_k3;           ///< Long-term value of k3, but only if k3 is not static
+  double mature_r1;           ///< Long term value of r1, but only if r1 is not static
+  double mature_r2;           ///< Long-term value of r2, but only if r2 is not static
+  double mature_r3;           ///< Long-term value of r3, but only if r3 is not static
+  double mature_r4;           ///< Long-term value of r4, but only if r4 is not static
+  double3 initial_crd;        ///< Initial (or static) Cartesian tether for a positional restraint
+  double3 mature_crd;         ///< Long-term Cartesian tether for a positional restraint
+
+  // Parameters for ensembles of restraints
+  double penalty;                 ///< General penalty to apply
+  double flat_bottom_half_width;  ///< Permissive flat-bottom well half width
 
   /// \brief Get a verdict on whether this object specifies atoms by masks or by indices.
   RestraintAnchoring getAtomSpecification() const;
@@ -127,8 +158,9 @@ private:
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
 ///                    function will not wrap back to the beginning of the TextFile object, as the
 ///                    &rst namelist is often intended to be repeatable)
+/// \param found       Indicate that the namelist was found
 /// \param policy      Reaction to exceptions encountered during namelist reading
-NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
+NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
                                 ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist

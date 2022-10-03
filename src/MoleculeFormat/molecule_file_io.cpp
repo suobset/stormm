@@ -1,8 +1,12 @@
 #include "copyright.h"
+#include "Parsing/ascii_numbers.h"
 #include "molecule_file_io.h"
 
 namespace stormm {
 namespace structure {
+
+using parse::readIntegerValue;
+using parse::readRealValue;
 
 //-------------------------------------------------------------------------------------------------
 int getMdlFormatEnd(const TextFileReader &tfr, const int line_start, const int line_end_in) {
@@ -80,15 +84,52 @@ std::vector<int2> findSdfMolEntryLimits(const TextFile &tf) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int line_start_in,
-                                           const int line_end_in) {
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int line_start,
+                                           const int line_end_in, const ExceptionResponse policy) {
   std::vector<double3> result;
+
+  // Check that there is sufficient information to read the SDF
+  const TextFileReader tfr = tf.data();
+  const int line_end = getMdlFormatEnd(tfr, line_start, line_end_in);
+  if (line_end - line_start <= 4) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("There is not enough information in " + tf.getFileName() + " to contain atoms in MDL "
+            "MOL format.", "extractSdfCoordinates");
+    case ExceptionResponse::WARN:
+      rtWarn("There is not enough information in " + tf.getFileName() + " to contain atoms in MDL "
+            "MOL format.  An empty array will be returned.", "extractSdfCoordinates");
+      break;    
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return result;
+  }
+
+  // Get the version
+  const int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
+                                        tfr.line_limits[line_start + 4] -
+                                        tfr.line_limits[line_start + 3]);
+  
+  // Read the number of atoms from the counts line, then read coordinates for each atom
+  if (version == 2000) {
+    const int atom_count = readIntegerValue(&tfr.text[tfr.line_limits[line_start + 3]], 0, 3);
+    int iatm = 0;
+    const int ilim = line_start + 4 + atom_count;
+    result.reserve(atom_count);
+    for (int i = line_start + 4; i < ilim; i++) {
+      const char* atom_line_ptr = &tfr.text[tfr.line_limits[i]];
+      result[iatm] = { readRealValue(atom_line_ptr,  0, 10), readRealValue(atom_line_ptr, 10, 10),
+                       readRealValue(atom_line_ptr, 20, 10) };
+    }
+  }
 
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int frame_number) {
+std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int frame_number,
+                                           const ExceptionResponse policy) {
   const std::vector<int2> limits = findSdfMolEntryLimits(tf);
   if (frame_number < 0 || frame_number >= static_cast<int>(limits.size())) {
     rtErr("The requested frame index (" + std::to_string(frame_number) + ") does not exist in an "

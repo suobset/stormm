@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef STORMM_NML_RST_H
-#define STORMM_NML_RST_H
+#ifndef STORMM_NML_FILES_H
+#define STORMM_NML_FILES_H
 
 #include <string>
 #include <vector>
