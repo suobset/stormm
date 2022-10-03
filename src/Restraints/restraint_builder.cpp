@@ -159,12 +159,86 @@ applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_
   const int nmasked = masked_atoms.size();
   std::vector<BoundedRestraint> result;
   result.reserve(nmasked);
-  for (size_t i = 0; i < nmasked; i++) {
+  for (int i = 0; i < nmasked; i++) {
     const int atom_i = masked_atoms[i];
     const double3 target = { ref_cfr.xcrd[atom_i], ref_cfr.ycrd[atom_i], ref_cfr.zcrd[atom_i] };
     result.emplace_back(atom_i, ag, proximity_penalty, displacement_penalty, proximity_plateau,
                         proximity_onset, displacement_onset, displacement_plateau, target);
   }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const AtomMask &mask, const double penalty,
+                        const double flat_bottom_half_width, const double cutoff) {
+  restraintTopologyChecks(ag, ref_cfr, mask);
+  return applyDistanceRestraints(ag, ref_cfr,  mask.getMaskedAtomList(), penalty,
+                                 flat_bottom_half_width, cutoff);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const std::string &mask, const double penalty,
+                        const double flat_bottom_half_width, const double cutoff) {
+  ChemicalFeatures chemfe(ag, ref_cfr);
+  return applyDistanceRestraints(ag, ref_cfr, AtomMask(mask, ag, &chemfe, ref_cfr), penalty,
+                                 flat_bottom_half_width, cutoff);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const std::vector<int> &masked_atoms, const double penalty,
+                        const double flat_bottom_half_width, const double cutoff) {
+  const int nmasked = masked_atoms.size();
+  std::vector<BoundedRestraint> result;
+  int nrstr = 0;
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  for (int i = 0; i < nmasked; i++) {
+    const int atom_i = masked_atoms[i];
+    for (int j = i + 1; j < nmasked; j++) {
+      const int atom_j = masked_atoms[j];
+
+      // Check that the two atoms are not part of the same 1:2 or 1:3 bond exclusions, to prevent
+      // adding constraints to atoms already joined by very high-frequency terms.
+      bool bonded_partners = false;
+      for (int k = nbk.nb12_bounds[atom_i]; k < nbk.nb12_bounds[atom_i + 1]; k++) {
+        bonded_partners = (bonded_partners || nbk.nb12x[k] == atom_j);
+      }
+      if (bonded_partners) {
+        continue;
+      }
+      else {
+        for (int k = nbk.nb13_bounds[atom_i]; k < nbk.nb13_bounds[atom_i + 1]; k++) {
+          bonded_partners = (bonded_partners || nbk.nb13x[k] == atom_j);
+        }
+      }
+      if (bonded_partners) {
+        continue;
+      }
+
+      // Check that the two atoms are within the cutoff of one another.  In this manner, a distance
+      // restraint ensemble ensures that relatively close arrangements are maintained but
+      // interactions over longer distances can vary somewhat.
+      double dx = ref_cfr.xcrd[atom_j] - ref_cfr.xcrd[atom_i];
+      double dy = ref_cfr.ycrd[atom_j] - ref_cfr.ycrd[atom_i];
+      double dz = ref_cfr.zcrd[atom_j] - ref_cfr.zcrd[atom_i];
+      imageCoordinates(&dx, &dy, &dz, ref_cfr.umat, ref_cfr.invu, ref_cfr.unit_cell,
+                       ImagingMethod::MINIMUM_IMAGE);
+      const double target = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      if (target < cutoff) {
+        const double r1 = 0.0;
+        const double r2 = std::max(0.0, target - flat_bottom_half_width);
+        const double r3 = target + flat_bottom_half_width;
+        const double r4 = target + flat_bottom_half_width + 1000.0;
+        result.emplace_back(atom_i, atom_j, ag, penalty, penalty, r1, r2, r3, r4);
+      }
+    }
+  }
+  result.shrink_to_fit();
   return result;
 }
 
@@ -212,7 +286,7 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
           holding_mask[atom_k] == false || holding_mask[atom_l] == false) {
         continue;
       }
-      
+
       // Do not apply a restraint to dihedrals with hydrogens in them
       if (cdk.z_numbers[atom_i] <= 1 || cdk.z_numbers[atom_j] <= 1 || cdk.z_numbers[atom_k] <= 1 ||
           cdk.z_numbers[atom_l] <= 1) {
@@ -232,18 +306,12 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
           }
         }
       }
-
-      // CHECK
-      printf("Restrain atoms %4d - %4d - %4d - %4d\n", atom_i, atom_j, atom_k, atom_l);
-      // END CHECK
-      
       const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr);
       const double r1 = current_value - flat_bottom_half_width - harmonic_width;
       const double r2 = current_value - flat_bottom_half_width;
       const double r3 = current_value + flat_bottom_half_width;
       const double r4 = current_value + flat_bottom_half_width + harmonic_width;
-      result.push_back(BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, penalty, penalty,
-                                        r1, r2, r3, r4));
+      result.emplace_back(atom_i, atom_j, atom_k, atom_l, ag, penalty, penalty, r1, r2, r3, r4);
     }
   }
   return result;

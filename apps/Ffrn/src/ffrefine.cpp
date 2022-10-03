@@ -44,20 +44,7 @@ int main(int argc, const char* argv[]) {
     all_mme.reserve(system_count);
     for (int i = 0; i < system_count; i++) {
       PhaseSpace *ps = sc.getCoordinatePointer(i);
-      
-      // CHECK
-      const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
-      const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
-      printf("Label %2d = %s (%s)\n", i, sc.getSystemLabel(i).c_str(),
-             getImplicitSolventModelName(i_ism).c_str());
-      PhaseSpaceWriter psw = ps->data();
-      for (int i = 0; i < psw.natom; i++) {
-        printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
-      }
-      printf("\n");
       RestraintApparatus ra(sc.getSystemTopologyPointer(i));
-      // END CHECK
-
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
@@ -67,6 +54,21 @@ int main(int argc, const char* argv[]) {
       case UnitCellType::TRICLINIC:
         break;
       }
+      
+      // CHECK
+      const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
+      const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
+      if (i >= 0) {
+        printf("Label %2d = %s (%s)\n", i, sc.getSystemLabel(i).c_str(),
+               getImplicitSolventModelName(i_ism).c_str());
+        PhaseSpaceWriter psw = ps->data();
+        for (int i = 0; i < psw.natom; i++) {
+          printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
+        }
+        printf("\n");
+      }
+      // END CHECK
+
     }
   }
   
@@ -75,7 +77,7 @@ int main(int argc, const char* argv[]) {
     for (int i = 0; i < system_count; i++) {
       const PhaseSpace ps = sc.getCoordinateReference(i);
       ps.exportToFile(sc.getSystemCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
-                      sc.getSystemTrajectoryKind(i), ui.getPrintingPolicy());
+                      sc.getSystemCheckpointKind(i), ui.getPrintingPolicy());
     }
   }
 

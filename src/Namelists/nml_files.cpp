@@ -245,7 +245,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
       }
     }
   }
-
+  
   // Get the systems requirements in order
   bool top_name_required = false;
   bool crd_name_required = false;
@@ -338,16 +338,18 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     if (complete == false) {
       continue;
     }
-    CoordinateFileKind c_kind, x_kind, r_kind;
-    if (crd_name.size() > 0LLU) {
-      c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "c_kind", i));
-    }
-    if (trj_name.size() > 0LLU) {
-      x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "x_kind", i));
-    }
-    if (rst_name.size() > 0LLU) {
-      r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "r_kind", i));
-    }
+    const CoordinateFileKind c_kind =
+      (t_nml.getKeywordStatus("-sys", "c_kind", i) == InputStatus::MISSING) ?
+      coordinate_input_format :
+      translateCoordinateFileKind(t_nml.getStringValue("-sys", "c_kind", i));
+    const CoordinateFileKind x_kind =
+      (t_nml.getKeywordStatus("-sys", "x_kind", i) == InputStatus::MISSING) ?
+      coordinate_input_format :
+      translateCoordinateFileKind(t_nml.getStringValue("-sys", "x_kind", i));
+    const CoordinateFileKind r_kind =
+      (t_nml.getKeywordStatus("-sys", "r_kind", i) == InputStatus::MISSING) ?
+      coordinate_input_format :
+      translateCoordinateFileKind(t_nml.getStringValue("-sys", "r_kind", i));
     
     // Check for the existence of critical files
     const std::vector<std::string> sys_components = { "-p", "-c", "-x", "-r" };

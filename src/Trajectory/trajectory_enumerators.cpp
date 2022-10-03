@@ -14,13 +14,13 @@ namespace trajectory {
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::separateText;
-using parse::strncmpCased;
+using parse::strcmpCased;
 using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
 
 //-------------------------------------------------------------------------------------------------
-std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
+std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind) {
   switch (cfkind) {
   case CoordinateFileKind::AMBER_CRD:
     return std::string("Amber ascii trajectory");
@@ -36,6 +36,27 @@ std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
     return std::string("MDL MOL / SDF");
   case CoordinateFileKind::UNKNOWN:
     return std::string("Unknown coordinate file format");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
+  switch (cfkind) {
+  case CoordinateFileKind::AMBER_CRD:
+    return std::string("AMBER_CRD");
+  case CoordinateFileKind::AMBER_INPCRD:
+    return std::string("AMBER_INPCRD");
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    return std::string("AMBER_ASCII_RST");
+  case CoordinateFileKind::AMBER_NETCDF:
+    return std::string("AMBER_NETCDF");
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    return std::string("AMBER_NETCDF_RST");
+  case CoordinateFileKind::SDF:
+    return std::string("SDF");
+  case CoordinateFileKind::UNKNOWN:
+    return std::string("UNKNOWN");
   }
   __builtin_unreachable();
 }
@@ -61,26 +82,30 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   
 //-------------------------------------------------------------------------------------------------
 CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
-  if (strncmpCased(name_in, "AMBER_CRD")) {
+  if (strcmpCased(name_in, "AMBER_CRD")) {
     return CoordinateFileKind::AMBER_CRD;
   }
-  else if (strncmpCased(name_in, "AMBER_INPCRD")) {
+  else if (strcmpCased(name_in, "AMBER_INPCRD")) {
     return CoordinateFileKind::AMBER_INPCRD;
   }
-  else if (strncmpCased(name_in, "AMBER_ASCII_RST")) {
+  else if (strcmpCased(name_in, "AMBER_ASCII_RST")) {
     return CoordinateFileKind::AMBER_ASCII_RST;
   }
-  else if (strncmpCased(name_in, "AMBER_NETCDF")) {
+  else if (strcmpCased(name_in, "AMBER_NETCDF")) {
     return CoordinateFileKind::AMBER_NETCDF;
   }
-  else if (strncmpCased(name_in, "AMBER_NETCDF_RST")) {
+  else if (strcmpCased(name_in, "AMBER_NETCDF_RST")) {
     return CoordinateFileKind::AMBER_NETCDF_RST;
   }
-  else if (strncmpCased(name_in, "SDF") || strncmpCased(name_in, "MDL_MOL")) {
+  else if (strcmpCased(name_in, "SDF") || strcmpCased(name_in, "MDL_MOL")) {
     return CoordinateFileKind::SDF;
   }
-  else if (strncmpCased(name_in, "UNKNOWN")) {
+  else if (strcmpCased(name_in, "UNKNOWN")) {
     return CoordinateFileKind::UNKNOWN;
+  }
+  else {
+    rtErr("Unrecognized coordinate file enumeration " + name_in + ".",
+          "translateCoordinateFileKind");
   }
   __builtin_unreachable();
 }

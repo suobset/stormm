@@ -170,6 +170,46 @@ applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_
 
 /// \}
 
+/// \brief Apply restraints to inter-atomic distances such that the participating atoms are not
+///        involved in a topological bond or bond angle exclusion (separated by at least three
+///        bonds) but also within some cutoff of one another.  This permits a user to restrain the
+///        structural geometry at a middle length scale, while allowing local arrangments to relax
+///        and some degree of long-ranged motion.
+///
+/// Overloaded:
+///   - Provide an atom mask to indicate the atoms to restrain
+///   - Provide a string that makes an atom mask to indicate the atoms to restrain
+///   - Provide a list of atom indices to restrain
+///
+/// \param ag                      Pointer to the topology for the system of interest
+/// \param cfr                     Coordinates of the system in its current state
+/// \param mask                    Mask of atoms to be held in place, relative to one another
+/// \param masked_atoms            List of masked atom indices, based on the original topology
+/// \param penalty                 The stiffness of the harmonic penalty to apply.  This is
+///                                identical for distance, angle, and dihedral restraints.
+/// \param flat_bottom_half_width  The flat bottom of the restraint well extends this amount in
+///                                either direction from the current, observed value of the
+///                                distance, angle, or dihedral coordinate, in the appropriate
+///                                unit system.
+/// \param cutoff                  The maximum displacement of any two atoms in the original
+///                                structure, beyond which no restraints shall be created.
+/// \{
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const AtomMask &mask, double penalty, double flat_bottom_half_width,
+                        double cutoff);
+
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const std::string &mask, double penalty, double flat_bottom_half_width,
+                        double cutoff);
+
+std::vector<BoundedRestraint>
+applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                        const std::vector<int> &masked_atoms, double penalty,
+                        double flat_bottom_half_width, double cutoff);
+/// \}
+  
 /// \brief Build restraints needed to maintain elements of the conformation not intended to change
 ///        their shape.  This will be accomplished by distance, angle, and dihedral restraints
 ///        between heavy atoms not intended to move.  
@@ -177,10 +217,12 @@ applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_
 /// Overloaded:
 ///   - Provide an atom mask to indicate the atoms to restrain
 ///   - Provide a string that makes an atom mask to indicate the atoms to restrain
+///   - Provide a list of atom indices to restrain
 ///
 /// \param ag                      Pointer to the topology for the system of interest
 /// \param cfr                     Coordinates of the system in its current state
 /// \param mask                    Mask of atoms to be held in place, relative to one another
+/// \param masked_atoms            List of masked atom indices, based on the original topology
 /// \param penalty                 The stiffness of the harmonic penalty to apply.  This is
 ///                                identical for distance, angle, and dihedral restraints.
 /// \param flat_bottom_half_width  The flat bottom of the restraint well extends this amount in

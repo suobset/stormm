@@ -631,18 +631,11 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   // Use the chemical features objects to make restraint apparatuses associated with the various
   // labels found in &restraint namelists.
   const int nrst_nml = rstcon.size();
-
-  // CHECK
-  printf("Detected %d &restraint namelists in the input.\n", nrst_nml);
-  // END CHECK
   
   int nrst_labels = 0;
   std::vector<std::string> tmp_rst_labels;
   for (int i = 0; i < nrst_nml; i++) {
 
-    // CHECK
-    printf("Apply to %s\n", rstcon[i].getSystemLabel().c_str());
-    // END CHECK
   }
 }
 
@@ -1059,6 +1052,7 @@ CoordinateFileKind SystemCache::getSystemTrajectoryKind(const int system_index) 
           std::to_string(system_trajectory_kinds.size()) + ".", "SystemCache",
           "getSystemTrajectoryKind");
   }
+  return system_trajectory_kinds[system_index];
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -1068,6 +1062,7 @@ CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) 
           std::to_string(system_checkpoint_kinds.size()) + ".", "SystemCache",
           "getSystemCheckpointKind");
   }
+  return system_checkpoint_kinds[system_index];
 }
   
 } // namespace synthesis

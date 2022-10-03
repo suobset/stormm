@@ -129,18 +129,16 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     "coordinate_checkpoint_format", getCoordinateFileKindName(r_kind)
   };
   std::vector<std::string> sys_reqs = { "-pe", "-ce" };
-  int start_line = 0;
   switch (prog_set) {
   case AppName::CONFORMER:
-    file_io_input = FilesControls(inp_tf, &start_line, policy);
     break;
   case AppName::DYNAMICS:
-    file_io_input = FilesControls(inp_tf, &start_line, policy);
     break;
   case AppName::FFREFINE:
-    file_io_input = FilesControls(inp_tf, &start_line, policy);
     break;
   }
+  int start_line = 0;
+  file_io_input = FilesControls(inp_tf, &start_line, policy, alternatives, sys_reqs);
   start_line = 0;
   line_min_input = MinimizeControls(inp_tf, &start_line, &has_minimize_nml, policy);
   start_line = 0;

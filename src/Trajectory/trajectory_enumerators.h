@@ -64,6 +64,11 @@ enum class CoordinateCycle {
   PRESENT,  ///< Set the typical positions arrays (x_coordinates...) as current
   FUTURE    ///< Set the future positions arrays (x_future_coordinates...) as current
 };
+
+/// \brief Produce a description of the coordinate file kind.
+///
+/// \param cfkind  The enumerator instance of interest
+std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind);
   
 /// \brief Translate the CoordinateFileKind enumeration.
 ///

@@ -12,6 +12,7 @@ namespace namelist {
 
 using chemistry::AtomMask;
 using chemistry::MaskInputMode;
+using restraints::applyDistanceRestraints;
 using restraints::applyHoldingRestraints;
 using restraints::applyHydrogenBondPreventors;
 using restraints::applyPositionalRestraints;
@@ -28,8 +29,10 @@ RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
     atom_l{-1}, order{0}, initiation_step{0}, maturation_step{0}, initial_k2{0.0}, initial_k3{0.0},
     initial_r1{0.0}, initial_r2{0.0}, initial_r3{0.0}, initial_r4{0.0}, mature_k2{0.0},
     mature_k3{0.0}, mature_r1{0.0}, mature_r2{0.0}, mature_r3{0.0}, mature_r4{0.0},
-    initial_crd{0.0, 0.0, 0.0}, mature_crd{0.0, 0.0, 0.0}, penalty{0.0},
-    flat_bottom_half_width{0.0}
+    initial_crd{0.0, 0.0, 0.0}, mature_crd{0.0, 0.0, 0.0},
+    penalty{default_restraint_ensemble_penalty},
+    flat_bottom_half_width{default_restraint_ensemble_half_width},
+    cutoff{default_restraint_ensemble_distance_cutoff}
 {}
   
 //-------------------------------------------------------------------------------------------------
@@ -357,12 +360,9 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *
   }
 
   // Take in parameters for ensembles of restraints, built based on the existing structure.
-  if (t_nml.getKeywordStatus("penalty") != InputStatus::MISSING) {
-    penalty = t_nml.getRealValue("penalty");
-  }
-  if (t_nml.getKeywordStatus("fbhw") != InputStatus::MISSING) {
-    flat_bottom_half_width = t_nml.getRealValue("fbhw");
-  }
+  penalty = t_nml.getRealValue("penalty");
+  flat_bottom_half_width = t_nml.getRealValue("fbhw");
+  cutoff = t_nml.getRealValue("cutoff");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -503,12 +503,17 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
   case RestraintEnsemble::PRESERVE_POSITIONS:
     {
       const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
-                            "Atom selection for heavy-atom dihedral angle preservation");
-      return applyPositionalRestraints(ag, cfr, cordon, initial_k3, initial_r3, initial_r4,
-                                       initial_k2, initial_r2, initial_r1);
+                            "Atom selection for dihedral angle preservation");
+      return applyPositionalRestraints(ag, cfr, cordon, penalty, flat_bottom_half_width,
+                                       flat_bottom_half_width + 1000.0, penalty, 0.0, 0.0);
     }
     break;
   case RestraintEnsemble::PRESERVE_DISTANCES:
+    {
+      const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
+                            "Atom selection for mid-ranged distance preservation");
+      return applyDistanceRestraints(ag, cfr, cordon, penalty, flat_bottom_half_width, cutoff);
+    }
     break;
   }
   __builtin_unreachable();
@@ -563,8 +568,12 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addKeyword(NamelistElement("rx0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("ry0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("rz0a", NamelistType::REAL, "MISSING"));
-  t_nml.addKeyword(NamelistElement("penalty", NamelistType::REAL, "MISSING"));
-  t_nml.addKeyword(NamelistElement("fbhw", NamelistType::REAL, "MISSING"));
+  t_nml.addKeyword(NamelistElement("penalty", NamelistType::REAL,
+                                   std::to_string(default_restraint_ensemble_penalty)));
+  t_nml.addKeyword(NamelistElement("fbhw", NamelistType::REAL,
+                                   std::to_string(default_restraint_ensemble_half_width)));
+  t_nml.addKeyword(NamelistElement("cutoff", NamelistType::REAL,
+                                   std::to_string(default_restraint_ensemble_distance_cutoff)));
   t_nml.addKeyword(NamelistElement("system", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("ensemble", NamelistType::STRING, "MISSING"));
   t_nml.addHelp("iat1", "The first atom in the restraint (this or mask_i is required)");

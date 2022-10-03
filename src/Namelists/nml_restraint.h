@@ -28,7 +28,12 @@ using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 
 /// \brief Default expressions for the restraint namelist
+/// \{
 constexpr char default_heavy_atom_mask[] = "@/2-200";
+constexpr double default_restraint_ensemble_penalty = 1.0;
+constexpr double default_restraint_ensemble_half_width = 0.0;
+constexpr double default_restraint_ensemble_distance_cutoff = 6.0;
+/// \}
 
 /// \brief Object to encapsulate and dispense restraint information collected from a single
 ///        &restraint namelist.
@@ -77,7 +82,7 @@ public:
   std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
                                              const PhaseSpace &ps) const;
   /// \}
-
+  
 private:
 
   // General information about the status of the restraint
@@ -123,6 +128,8 @@ private:
   // Parameters for ensembles of restraints
   double penalty;                 ///< General penalty to apply
   double flat_bottom_half_width;  ///< Permissive flat-bottom well half width
+  double cutoff;                  ///< Distance-based cutoff for applying distance ensemble
+                                  ///<   restraints
 
   /// \brief Get a verdict on whether this object specifies atoms by masks or by indices.
   RestraintAnchoring getAtomSpecification() const;
