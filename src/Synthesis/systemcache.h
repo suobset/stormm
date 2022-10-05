@@ -350,6 +350,11 @@ private:
   /// when composing the synthesis objects.
   std::vector<int> topology_indices;
 
+  /// The vector of all restraint indices guiding each simulation.  Like topology_indices, this
+  /// list may contain multiple systems pointing to the same restraint apparatus, especially if
+  /// some systems are subject to no restraints.
+  std::vector<int> restraint_indices;
+  
   /// Each topology describes one or more systems in the cache.  This array will store the index
   /// of a coordinate set which serves as an example of each topology.
   std::vector<int> example_indices;

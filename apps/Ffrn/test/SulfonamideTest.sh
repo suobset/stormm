@@ -16,11 +16,17 @@ cat > ffld.in << EOF
 &end
 
 &restraint
-  system sulfonamide
-  ensemble heavy_dihedrals
-  mask '@O1,S1,C2,C3'
+  system sulfonamide,
+  ensemble heavy_dihedrals,
+  mask '@O1,S1,C2,C3',
   penalty 50.0, fbhw 0.0,
 &end
+
+%&restraint
+%  system sulfonamide
+%  ensemble heavy_dihedrals
+%  penalty 20.0, fbhw 0.1,
+%&end
 EOF
 
 ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn

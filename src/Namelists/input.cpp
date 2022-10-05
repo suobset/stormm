@@ -234,6 +234,12 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
   // If wrapping is requested, there is one more opportunity to find a namelist.
   switch (wrap) {
   case WrapTextSearch::NO:
+    {
+      // Return an empty container to indicate that no namelist could be pulled
+      *end_line = tf.getLineCount();
+      std::vector<std::string> blank;
+      return blank;
+    }
     break;
   case WrapTextSearch::YES:
     {
@@ -243,12 +249,9 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
       *end_line = start_line;
       return pullNamelist(tf, nml, 0, WrapTextSearch::NO, end_line);
     }
+    break;
   }
-
-  // Return an empty container to indicate that no namelist could be pulled
-  *end_line = -1;
-  std::vector<std::string> blank;
-  return blank;
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

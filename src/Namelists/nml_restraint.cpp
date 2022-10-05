@@ -21,7 +21,8 @@ using structure::imageValue;
 using structure::ImagingMethod;
 
 //-------------------------------------------------------------------------------------------------
-RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
+RestraintControls::RestraintControls(const ExceptionResponse policy_in,
+                                     const WrapTextSearch wrap) :
     policy{policy_in}, restraint_is_valid{true}, system{std::string("ALL")},
     domain{RestraintEnsemble::SPECIFIC_ATOMS}, mask_i{std::string("")}, mask_j{std::string("")},
     mask_k{std::string("")}, mask_l{std::string("")},
@@ -37,11 +38,15 @@ RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
   
 //-------------------------------------------------------------------------------------------------
 RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *found_nml,
-                                     const ExceptionResponse policy_in) :
+                                     const ExceptionResponse policy_in,
+                                     const WrapTextSearch wrap) :
     RestraintControls(policy_in)
 {
-  NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy, wrap);
   const int starting_line = *start_line + 1;
+  if (*found_nml == false) {
+    return;
+  }
 
   // Take in an associated label to indicate systems to which this restraint condition applies
   if (t_nml.getKeywordStatus("system") != InputStatus::MISSING) {
@@ -458,6 +463,19 @@ void RestraintControls::checkFinalRestraintSettings(const bool nstep1_found, con
 }
 
 //-------------------------------------------------------------------------------------------------
+int RestraintControls::getOrder() const {
+  switch (domain) {
+  case RestraintEnsemble::SPECIFIC_ATOMS:
+    return order;
+  case RestraintEnsemble::PREVENT_HBONDS:
+  case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
+  case RestraintEnsemble::PRESERVE_POSITIONS:
+  case RestraintEnsemble::PRESERVE_DISTANCES:
+    return 0;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string RestraintControls::getSystemLabel() const {
   return system;
 }
@@ -492,7 +510,6 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
     break;
   case RestraintEnsemble::PREVENT_HBONDS:
     return applyHydrogenBondPreventors(ag, *chemfe, penalty, flat_bottom_half_width);
-    break;
   case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
     {
       const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
@@ -535,7 +552,7 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
-                                const ExceptionResponse policy) {
+                                const ExceptionResponse policy, WrapTextSearch wrap) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, policy,
                          "Replicates the Amber NMR restraint namelist within STORMM.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "MISSING"));
@@ -649,11 +666,11 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addHelp("ensemble", "Indicate not a single restraint but a collection of restraints "
                 "applied throughout the molecular system.  This keyword will supercede any atom "
                 "indices or masks specified in the same &restraint namelist.");
-  
+
   // Search the input file, read the namelist if it can be found, and update the current line
-  // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
-                             found);
+  // for subsequent calls to this function or other namelists.  
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
+  
   return t_nml;
 }
 

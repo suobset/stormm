@@ -30,9 +30,10 @@ using trajectory::detectCoordinateFileKind;
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
     system_count{0}, topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
-    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, example_indices{},
-    topology_cases{}, topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{},
-    system_labels{}, system_trajectory_kinds{}, system_checkpoint_kinds{}
+    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, restraint_indices{},
+    example_indices{}, topology_cases{}, topology_case_bounds{}, system_trajectory_names{},
+    system_checkpoint_names{}, system_labels{}, system_trajectory_kinds{},
+    system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -630,12 +631,65 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 
   // Use the chemical features objects to make restraint apparatuses associated with the various
   // labels found in &restraint namelists.
-  const int nrst_nml = rstcon.size();
-  
   int nrst_labels = 0;
-  std::vector<std::string> tmp_rst_labels;
+  const int nrst_nml = rstcon.size();
+  std::vector<std::string> rst_group_labels;
+  std::vector<std::vector<int>> rst_group_namelists;
+  std::vector<bool> rst_label_group_assigned(nrst_nml, false);
+  std::vector<std::string> all_nml_labels(nrst_nml);
   for (int i = 0; i < nrst_nml; i++) {
+    all_nml_labels[i] = rstcon[i].getSystemLabel();
+  }
+  for (int i = 0; i < nrst_nml; i++) {
+    if (rst_label_group_assigned[i]) {
+      continue;
+    }
+    rst_label_group_assigned[i] = true;
+    const std::string ilabel = rstcon[i].getSystemLabel();
+    rst_group_labels.push_back(ilabel);
+    std::vector<int> tmp_rst_list(1, i);
+    for (int j = i + 1; j < nrst_nml; j++) {
+      if (ilabel == all_nml_labels[j]) {
+        tmp_rst_list.push_back(j);
+        rst_label_group_assigned[j] = true;
+      }
+    }
+    rst_group_namelists.push_back(tmp_rst_list);
+  }
+  const int nrst_groups = rst_group_labels.size();
+  
+  // Loop over all systems and apply restraints as stated in the labeled groups
+  std::vector<int> blank_ra(topology_cache.size(), -1);
+  restraint_indices.resize(system_count);
+  for (int i = 0; i < system_count; i++) {
+    RestraintApparatus ra(&topology_cache[topology_indices[i]]);
+    const AtomGraph *iag_ptr = &topology_cache[topology_indices[i]];
+    const ChemicalFeatures *ichemfe_ptr = &features_cache[topology_indices[i]];
+    const CoordinateFrameReader cfr(coordinates_cache[i]);
+    for (int j = 0; j < nrst_groups; j++) {
+      if (rst_group_labels[j] != system_labels[i]) {
+        continue;
+      }
+      const int nrst_applicable = rst_group_namelists[j].size();
+      for (int k = 0; k < nrst_applicable; k++) {
+        ra.addRestraints(rstcon[rst_group_namelists[j][k]].getRestraint(iag_ptr, ichemfe_ptr,
+                                                                        cfr));
+      }
+    }
 
+    // If there are no restraints, log this apparatus as a new case only if it is the first such
+    // blank apparatus for the system topology at hand.
+    if (ra.getTotalRestraintCount() == 0) {
+      if (blank_ra[topology_indices[i]] < 0) {
+        restraints_cache.push_back(ra);
+        blank_ra[topology_indices[i]] = static_cast<int>(restraints_cache.size()) - 1;
+      }
+      restraint_indices[i] = blank_ra[topology_indices[i]];
+    }
+    else {
+      restraints_cache.push_back(ra);
+      restraint_indices[i] = static_cast<int>(restraints_cache.size()) - 1;
+    }
   }
 }
 
@@ -881,37 +935,41 @@ ChemicalFeatures& SystemCache::getFeaturesReference(const int index) {
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus* SystemCache::getRestraintPointer(const int index) const {
   if (index >= static_cast<int>(restraints_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
+    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
+          "system " + std::to_string(index) + ", is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
   }
-  return &restraints_cache[index];
+  return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus* SystemCache::getRestraintPointer(const int index) {
   if (index >= static_cast<int>(restraints_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
+    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
+          "system " + std::to_string(index) + ", is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
   }
-  return &restraints_cache[index];
+  return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus& SystemCache::getRestraintReference(const int index) const {
   if (index >= static_cast<int>(restraints_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
+          "system " + std::to_string(index) + ", is invalid for an array of length " +
           std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
   }
-  return restraints_cache[index];
+  return restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus& SystemCache::getRestraintReference(const int index) {
   if (index >= static_cast<int>(restraints_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
+          "system " + std::to_string(index) + ", is invalid for an array of length " +
           std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
   }
-  return restraints_cache[index];
+  return restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------

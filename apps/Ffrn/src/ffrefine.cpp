@@ -44,7 +44,7 @@ int main(int argc, const char* argv[]) {
     all_mme.reserve(system_count);
     for (int i = 0; i < system_count; i++) {
       PhaseSpace *ps = sc.getCoordinatePointer(i);
-      RestraintApparatus ra(sc.getSystemTopologyPointer(i));
+      const RestraintApparatus& ra = sc.getRestraintReference(i);
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
@@ -56,6 +56,36 @@ int main(int argc, const char* argv[]) {
       }
       
       // CHECK
+      printf("Energy progression in system %2d\n", i);
+      printf("STEP    BOND    ANGLE   DIHEDRAL IMPROPER  ELEC 1-4  VDW 1-4    ELEC     VDW   "
+             "  RESTRAINT    TOTAL  \n");
+      printf("----  -------- -------- -------- --------  -------- --------  -------- --------"
+             "  ---------  ---------\n");
+      const std::vector<double> bond_nrg = all_mme[i].reportEnergyHistory(StateVariable::BOND, 0);
+      const std::vector<double> angl_nrg = all_mme[i].reportEnergyHistory(StateVariable::ANGLE, 0);
+      const std::vector<double> dihe_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::PROPER_DIHEDRAL, 0);
+      const std::vector<double> impr_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::IMPROPER_DIHEDRAL, 0);
+      const std::vector<double> qq14_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::ELECTROSTATIC_ONE_FOUR, 0);
+      const std::vector<double> lj14_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::VDW_ONE_FOUR, 0);
+      const std::vector<double> qqnb_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::ELECTROSTATIC, 0);
+      const std::vector<double> ljnb_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::VDW, 0);
+      const std::vector<double> rstr_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::RESTRAINT, 0);
+      all_mme[i].computePotentialEnergy();      
+      const std::vector<double> totl_nrg =
+        all_mme[i].reportEnergyHistory(StateVariable::POTENTIAL_ENERGY, 0);        
+      for (int j = 0; j < all_mme[i].getSampleSize(); j += 50) {
+        printf("%4d  %8.4lf %8.4lf %8.4lf %8.4lf  %8.4lf %8.4lf  %8.4lf %8.4lf  %9.4lf  %9.4lf\n",
+               j, bond_nrg[j], angl_nrg[j], dihe_nrg[j], impr_nrg[j], qq14_nrg[j], lj14_nrg[j],
+               qqnb_nrg[j], ljnb_nrg[j], rstr_nrg[j], totl_nrg[j]);
+      }
+#if 0
       const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
       const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
       if (i >= 0) {
@@ -67,8 +97,8 @@ int main(int argc, const char* argv[]) {
         }
         printf("\n");
       }
+#endif
       // END CHECK
-
     }
   }
   

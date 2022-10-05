@@ -19,6 +19,7 @@ namespace stormm {
 namespace namelist {
 
 using chemistry::ChemicalFeatures;
+using parse::WrapTextSearch;
 using restraints::BoundedRestraint;
 using restraints::RestraintEnsemble;
 using topology::AtomGraph;
@@ -47,14 +48,20 @@ public:
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
-  RestraintControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  RestraintControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   RestraintControls(const TextFile &tf, int *start_line, bool *found_nml,
-                    ExceptionResponse policy_in = ExceptionResponse::DIE);
+                    ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief Get the order of the restraint.  If the object describes a collection (ensemble) of
+  ///        restraints, the order will be returned as zero.
+  int getOrder() const;
+  
   /// \brief Get the system label, to indicate which system(s) this restraint applies to
   std::string getSystemLabel() const;
-  
+
   /// \brief Get the restraint specified by this namelist.  There are no other getter functions
   ///        for individual details, nor setters to manually edit the result.  Restraints can be
   ///        built by many means, namelists being only one, and editing should be done on the
@@ -168,7 +175,8 @@ private:
 /// \param found       Indicate that the namelist was found
 /// \param policy      Reaction to exceptions encountered during namelist reading
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
-                                ExceptionResponse policy = ExceptionResponse::DIE);
+                                ExceptionResponse policy = ExceptionResponse::DIE,
+                                WrapTextSearch wrap = WrapTextSearch::NO);
 
 } // namespace namelist
 } // namespace stormm
