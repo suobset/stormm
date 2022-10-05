@@ -15,6 +15,7 @@
 #  endif
 #endif
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -25,6 +26,7 @@
 namespace stormm {
 namespace card {
 
+using constants::ExceptionResponse;
 using constants::mega;
 using errors::rtErr;
 using math::roundUp;
@@ -447,7 +449,9 @@ public:
   ///
   /// \param target  Pointer to the new Hybrid object to point into.  This is a pointer because
   ///                otherwise it would have to be a non-const reference.
-  void swapTarget(Hybrid<T> *new_target);
+  /// \param policy  Indicate different actions to take if the Hybrid object does not yet point to
+  ///                any target.
+  void swapTarget(Hybrid<T> *new_target, ExceptionResponse policy = ExceptionResponse::SILENT);
   
   /// \brief Get a pointer to a Hybrid object at a specific location.  This is the way to get
   ///        const Hybrid POINTER-kind objects to const ARRAY-kind Hybrid objects.  This function
