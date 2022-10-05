@@ -10,7 +10,7 @@ using parse::stringToChar4;
 using parse::char4ToString;
 
 //-------------------------------------------------------------------------------------------------
-FFMorphControls::FFMorphControls(const ExceptionResponse policy_in) :
+FFMorphControls::FFMorphControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in},
     harmonic_bonds{}, harmonic_angles{}, cosine_dihedrals{}, urey_bradley_angles{},
     charmm_impropers{}, cmap_surfaces{}, attn14_scalings{}, charge_properties{},
@@ -19,10 +19,10 @@ FFMorphControls::FFMorphControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 FFMorphControls::FFMorphControls(const TextFile &tf, int *start_line, bool *found_nml,
-                                 const ExceptionResponse policy_in) :
+                                 const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     FFMorphControls(policy_in)
 {
-  NamelistEmulator t_nml = ffmorphInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = ffmorphInput(tf, start_line, found_nml, policy, wrap);
 
   // Load each kind of parameter edit
   const int nbond    = t_nml.getKeywordEntries("bond");
@@ -425,7 +425,7 @@ ForceFieldElement FFMorphControls::getModelEdit(const ParameterKind kind, const 
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
-                              const ExceptionResponse policy) {
+                              const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("ffmorph", CaseSensitivity::AUTOMATIC, policy, "Permits user control of "
                          "specific parameters within the topologies at hand.  The control extends "
                          "as far as changing individual parameters' values, but not the atoms to "
@@ -666,8 +666,7 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
-                             found);
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   return t_nml;
 }
   

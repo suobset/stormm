@@ -13,6 +13,7 @@
 namespace stormm {
 namespace namelist {
 
+using parse::WrapTextSearch;
 using trajectory::CoordinateFileKind;
 
 /// \brief Default file names and extensions.  The default input file name varies according to the
@@ -234,10 +235,15 @@ public:
   ///                          subkey is bogus and should trigger an exception consistent with
   ///                          the stated policy (policy_in).  Default requirements are a topology
   ///                          and input coordinates, both of which must exist.
+  /// \param wrap              Indicate that the search for a &files namelist should carry on
+  ///                          from the beginning of an input file if no such namelist is found
+  ///                          starting from the original starting point
   /// \{
-  FilesControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  FilesControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                WrapTextSearch wrap = WrapTextSearch::NO);
   FilesControls(const TextFile &tf, int *start_line,
                 ExceptionResponse policy_in = ExceptionResponse::DIE,
+                WrapTextSearch wrap = WrapTextSearch::NO,
                 const std::vector<std::string> &alternatives = {},
                 const std::vector<std::string> &sys_requirements = {"-pe", "-ce"});
   /// \}
@@ -482,6 +488,9 @@ private:
 /// \param sys_keyword_reqs   Requirements for the subkeys of the -sys keyword (constructed based
 ///                           on input to the FilesControls object that calls this function)
 /// \param policy             Reaction to exceptions encountered during namelist reading
+/// \param wrap               Indicate that the search for a &files namelist should carry on
+///                           from the beginning of an input file if no such namelist is found
+///                           starting from the original starting point
 /// \param crd_input_format   The default type for input coordinate files describing each system
 /// \param crd_output_format  The default type for trajectory files written based on each system
 /// \param crd_chkpt_format   The default type for restart files written based on each system
@@ -489,6 +498,7 @@ NamelistEmulator
 filesInput(const TextFile &tf, int *start_line,
            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
            ExceptionResponse policy = ExceptionResponse::DIE,
+           WrapTextSearch wrap = WrapTextSearch::NO,
            CoordinateFileKind crd_input_format = default_filecon_inpcrd_type,
            CoordinateFileKind crd_output_format = default_filecon_outcrd_type,
            CoordinateFileKind crd_checkpoint_format = default_filecon_chkcrd_type);

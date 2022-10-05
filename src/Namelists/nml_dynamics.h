@@ -10,6 +10,8 @@
 namespace stormm {
 namespace namelist {
 
+using parse::WrapTextSearch;
+  
 /// \brief Default number of molecular dynamics cycles
 constexpr int default_dynamics_nstlim = 100;
 
@@ -40,10 +42,15 @@ public:
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \param found_nml   Indicator that the namelist was found in the input file
   /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for a &dynamics namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
-  DynamicsControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  DynamicsControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                   WrapTextSearch wrap = WrapTextSearch::NO);
   DynamicsControls(const TextFile &tf, int *start_line, bool *found_nml,
-                   ExceptionResponse policy_in = ExceptionResponse::DIE);
+                   ExceptionResponse policy_in = ExceptionResponse::DIE,
+                   WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the total number of dynamics steps
@@ -101,8 +108,12 @@ private:
 ///                    &rst namelist is intended to be repeatable)
 /// \param found       Indicator that the namelist was present in the input file
 /// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for an &dynamics namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
-                               ExceptionResponse policy = ExceptionResponse::DIE);
+                               ExceptionResponse policy = ExceptionResponse::DIE,
+                               WrapTextSearch wrap = WrapTextSearch::NO);
 
 } // namespace namelist
 } // namespace stormm

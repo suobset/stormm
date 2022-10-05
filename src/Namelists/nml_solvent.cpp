@@ -14,7 +14,7 @@ using topology::translateAtomicRadiusSet;
 using topology::translateImplicitSolventModel;
   
 //-------------------------------------------------------------------------------------------------
-SolventControls::SolventControls(const ExceptionResponse policy_in) :
+SolventControls::SolventControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in},
     gb_style{translateImplicitSolventModel(default_solvent_igb)},
     born_radii_cutoff{default_solvent_rgbmax},
@@ -26,10 +26,10 @@ SolventControls::SolventControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 SolventControls::SolventControls(const TextFile &tf, int *start_line, bool *found_nml,
-                                 const ExceptionResponse policy_in) :
+                                 const ExceptionResponse policy_in, const WrapTextSearch wrap) :
   SolventControls(policy_in)
 {
-  NamelistEmulator t_nml = solventInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = solventInput(tf, start_line, found_nml, policy, wrap);
   gb_style            = translateImplicitSolventModel(t_nml.getIntValue("igb"));
   born_radii_cutoff   = t_nml.getRealValue("rgbmax");
   internal_dielectric = t_nml.getRealValue("intdiel");
@@ -208,7 +208,7 @@ void SolventControls::validateSaltConcentration() {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
-                              const ExceptionResponse policy) {
+                              const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("solvent", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to define the solvent model of a molecular mechanical system.  This is "
                          "not the same as the explicit water model in use, and generally refers "
@@ -243,8 +243,7 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
-                             found);
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   
   return t_nml;
 }

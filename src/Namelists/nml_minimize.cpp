@@ -14,7 +14,7 @@ using parse::realToString;
 using parse::strcmpCased;
   
 //-------------------------------------------------------------------------------------------------
-MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
+MinimizeControls::MinimizeControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in},
     total_cycles{default_minimize_maxcyc},
     steepest_descent_cycles{default_minimize_ncyc},
@@ -28,10 +28,10 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *found_nml,
-                                   const ExceptionResponse policy_in) :
+                                   const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     MinimizeControls(policy_in)
 {
-  NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy, wrap);
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   print_frequency = t_nml.getIntValue("ntpr");
@@ -316,7 +316,7 @@ void MinimizeControls::validateConvergenceTarget() {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
-                               const ExceptionResponse policy) {
+                               const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("minimize", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to carry out energy minimization of a molecular system guided by an "
                          "energy surface based on a force field.");
@@ -355,8 +355,7 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
-                             found);
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
 
   return t_nml;
 }

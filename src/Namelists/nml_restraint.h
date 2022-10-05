@@ -44,9 +44,12 @@ public:
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for a &restraint namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
   RestraintControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
                     WrapTextSearch wrap = WrapTextSearch::NO);
@@ -174,6 +177,9 @@ private:
 ///                    &rst namelist is often intended to be repeatable)
 /// \param found       Indicate that the namelist was found
 /// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for a &restraint namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
                                 ExceptionResponse policy = ExceptionResponse::DIE,
                                 WrapTextSearch wrap = WrapTextSearch::NO);

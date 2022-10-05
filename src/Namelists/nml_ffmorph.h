@@ -15,7 +15,8 @@ namespace namelist {
 
 using modeling::ForceFieldElement;
 using modeling::ParameterKind;
-  
+using parse::WrapTextSearch;
+
 /// \brief Object to encapsulate force field morphing operations.  Take information from an input
 ///        file or a series of setters and validate each piece of data as it appears with private
 ///        member functions.
@@ -29,10 +30,15 @@ public:
   /// \param start_line  Line of the input file to begin searching for the &ffmorph namelist
   /// \param found_nml   Indicator of whether namelist input was found
   /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for an &ffmorph namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
-  FFMorphControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  FFMorphControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                  WrapTextSearch wrap = WrapTextSearch::NO);
   FFMorphControls(const TextFile &tf, int *start_line, bool *found_nml,
-                  ExceptionResponse policy_in = ExceptionResponse::DIE);
+                  ExceptionResponse policy_in = ExceptionResponse::DIE,
+                  WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the number of edits for a particular force field term.
@@ -90,14 +96,17 @@ private:
 /// \brief Produce a namelist for translating user input into lists of ForceFieldElement objects,
 ///        which can then be applied to topologies to experiment with new parameter settings.
 ///
-/// \param tf                Input text file to scan immediately after the namelist is created
-/// \param start_line        Line at which to begin scanning the input file for the namelist (this
-///                          will wrap back to the beginning of the file in search of a unique
-///                          &files namelist)
-/// \param found             Indicator that the namelist was detected in the input file (returned)
-/// \param policy            Reaction to exceptions encountered during namelist reading
+/// \param tf          Input text file to scan immediately after the namelist is created
+/// \param start_line  Line at which to begin scanning the input file for the namelist (this
+///                    will wrap back to the beginning of the file in search of a unique
+///                    &files namelist)
+/// \param found       Indicator that the namelist was detected in the input file (returned)
+/// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for an &ffmorph namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
-                              const ExceptionResponse policy);
+                              ExceptionResponse policy, WrapTextSearch wrap = WrapTextSearch::NO);
   
 } // namespace namelist
 } // namespace stormm

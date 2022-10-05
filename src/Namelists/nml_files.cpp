@@ -17,7 +17,6 @@ using diskutil::SearchStyle;
 using parse::findStringInVector;
 using parse::strcmpCased;
 using parse::strncmpCased;
-using parse::WrapTextSearch;
 using trajectory::translateCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
@@ -188,7 +187,8 @@ bool MoleculeSystem::validateInputCoordinateFile() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-FilesControls::FilesControls(const ExceptionResponse policy_in) :
+FilesControls::FilesControls(const ExceptionResponse policy_in,
+                             const WrapTextSearch wrap) :
     policy{policy_in}, structure_count{0}, free_topology_count{0}, free_coordinate_count{0},
     system_count{0},
     all_free_frames{default_filecon_read_all_free},
@@ -203,7 +203,7 @@ FilesControls::FilesControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 FilesControls::FilesControls(const TextFile &tf, int *start_line,
-                             const ExceptionResponse policy_in,
+                             const ExceptionResponse policy_in, const WrapTextSearch wrap,
                              const std::vector<std::string> &alternatives,
                              const std::vector<std::string> &sys_requirements) :
     FilesControls(policy_in)
@@ -287,7 +287,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt,
     short_opt
   };
-  NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy,
+  NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy, wrap,
                                       coordinate_input_format, coordinate_output_format,
                                       coordinate_checkpoint_format);
   const InputStatus stt_missing = InputStatus::MISSING;
@@ -662,7 +662,7 @@ void FilesControls::setWarningFileName(const std::string &file_name) {
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                             const std::vector<SubkeyRequirement> &sys_keyword_reqs,
-                            const ExceptionResponse policy,
+                            const ExceptionResponse policy, const WrapTextSearch wrap,
                             const CoordinateFileKind crd_input_format,
                             const CoordinateFileKind crd_output_format,
                             const CoordinateFileKind crd_chkpt_format) {
@@ -743,7 +743,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
   
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());
   
   return t_nml;
 }

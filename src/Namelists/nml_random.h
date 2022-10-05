@@ -10,6 +10,8 @@
 namespace stormm {
 namespace namelist {
 
+using parse::WrapTextSearch;
+
 /// \brief Default values for molecular dynamics
 /// \{
 constexpr int default_random_seed    = 30965871;
@@ -37,10 +39,15 @@ public:
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \param found_nml   Indication that the namelist was found (passed back to calling function)
   /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for a &random namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
-  RandomControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  RandomControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                 WrapTextSearch wrap = WrapTextSearch::NO);
   RandomControls(const TextFile &tf, int *start_line, bool *found_nml,
-                 ExceptionResponse policy_in = ExceptionResponse::DIE);
+                 ExceptionResponse policy_in = ExceptionResponse::DIE,
+                 WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the random seed supplied (and possibly, as corrected) from user input.
@@ -114,8 +121,12 @@ private:
 ///                    necessary, to find a &random namelist)
 /// \param found       Indication that the namelist was found (passed back to calling function)
 /// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for a &random namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
-                             ExceptionResponse policy = ExceptionResponse::DIE);
+                             ExceptionResponse policy = ExceptionResponse::DIE,
+                             WrapTextSearch wrap = WrapTextSearch::NO);
 
 /// \brief 
 ///

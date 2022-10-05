@@ -11,7 +11,7 @@ namespace namelist {
 using data_types::uint;
 
 //-------------------------------------------------------------------------------------------------
-RandomControls::RandomControls(const ExceptionResponse policy_in) :
+RandomControls::RandomControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in},
     igseed{default_random_seed},
     stream_count{default_random_streams},
@@ -21,10 +21,10 @@ RandomControls::RandomControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 RandomControls::RandomControls(const TextFile &tf, int *start_line, bool *found_nml,
-                               const ExceptionResponse policy_in) :
+                               const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     RandomControls(policy_in)
 {
-  NamelistEmulator t_nml = randomInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = randomInput(tf, start_line, found_nml, policy, wrap);
   igseed = t_nml.getIntValue("igseed");
   stream_count = t_nml.getIntValue("igstreams");
   production_stride = t_nml.getIntValue("igstride");
@@ -168,7 +168,7 @@ void RandomControls::validateProductionStride() {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
-                             const ExceptionResponse policy) {
+                             const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("random", CaseSensitivity::AUTOMATIC, policy, "Namelist containing "
                          "parameters for the random number generator and its updates throughout "
                          "a simulation.");
@@ -205,8 +205,7 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
-                             found);
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   return t_nml;
 }
 

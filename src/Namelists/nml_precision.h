@@ -13,6 +13,7 @@ namespace stormm {
 namespace namelist {
 
 using constants::PrecisionModel;
+using parse::WrapTextSearch;
 using numerics::default_charge_mesh_scale_bits;
 using numerics::default_energy_scale_bits;
 using numerics::default_force_scale_bits;
@@ -46,9 +47,11 @@ public:
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
-  PrecisionControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  PrecisionControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   PrecisionControls(const TextFile &tf, int *start_line,
-                    ExceptionResponse policy_in = ExceptionResponse::DIE);
+                    ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the global position fixed-precision bits.
@@ -170,8 +173,12 @@ private:
 ///                    function will wrap back to the beginning of the TextFile object, if needed,
 ///                    to find a &minimize namelist) 
 /// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for a &precision namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
-                                ExceptionResponse policy = ExceptionResponse::DIE);
+                                ExceptionResponse policy = ExceptionResponse::DIE,
+                                WrapTextSearch wrap = WrapTextSearch::NO);
 
 } // namespace namelist
 } // namespace stormm

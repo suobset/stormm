@@ -14,6 +14,7 @@ namespace namelist {
 using constants::ExceptionResponse;
 using namelist::NamelistEmulator;
 using parse::TextFile;
+using parse::WrapTextSearch;
 
 /// \brief Default input settings for the &conformer namelist
 /// \{
@@ -39,10 +40,15 @@ struct ConformerControls {
   /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param wrap        Indicate that the search for a &conformer namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
-  ConformerControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  ConformerControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   ConformerControls(const TextFile &tf, int *start_line, bool *found_nml,
-                    ExceptionResponse policy_in = ExceptionResponse::DIE);
+                    ExceptionResponse policy_in = ExceptionResponse::DIE,
+                    WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the common atom mask string.
@@ -146,8 +152,12 @@ private:
 /// \param start_line  Line of the input file at which to begin the scan
 /// \param found       Indicator that the namelist was found in the input file
 /// \param policy      Response to bad inputs
+/// \param wrap        Indicate that the search for a &conformer namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
-                                ExceptionResponse policy);
+                                ExceptionResponse policy = ExceptionResponse::DIE,
+                                WrapTextSearch wrap = WrapTextSearch::NO);
   
 } // namespace namelist
 } // namespace stormm

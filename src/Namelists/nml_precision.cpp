@@ -21,7 +21,8 @@ using parse::NumberFormat;
 using parse::realToString;
   
 //-------------------------------------------------------------------------------------------------
-PrecisionControls::PrecisionControls(const ExceptionResponse policy_in) :
+PrecisionControls::PrecisionControls(const ExceptionResponse policy_in,
+                                     const WrapTextSearch wrap) :
     policy{policy_in},
     globalpos_scale_bits{default_globalpos_scale_bits},
     localpos_scale_bits{default_localpos_scale_bits},
@@ -39,10 +40,11 @@ PrecisionControls::PrecisionControls(const ExceptionResponse policy_in) :
 
 //-------------------------------------------------------------------------------------------------
 PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line,
-                                     const ExceptionResponse policy_in) :
+                                     const ExceptionResponse policy_in,
+                                     const WrapTextSearch wrap) :
     PrecisionControls(policy_in)
 {
-  NamelistEmulator t_nml = precisionInput(tf, start_line, policy);
+  NamelistEmulator t_nml = precisionInput(tf, start_line, policy, wrap);
   globalpos_scale_bits = t_nml.getIntValue("globalpos_bits");
   localpos_scale_bits = t_nml.getIntValue("localpos_bits");
   velocity_scale_bits = t_nml.getIntValue("velocity_bits");
@@ -187,7 +189,7 @@ void PrecisionControls::validateBondConstraintTol() {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
-                               const ExceptionResponse policy) {
+                                const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("precision", CaseSensitivity::AUTOMATIC, policy, "Wraps directives for "
                          "tuning the precision model and accumulation of molecular mechanics "
                          "calculations.");
@@ -240,7 +242,7 @@ NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());
 
   return t_nml;
 }

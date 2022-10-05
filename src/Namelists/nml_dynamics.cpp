@@ -11,19 +11,19 @@ using parse::realToString;
 using parse::NumberFormat;
   
 //-------------------------------------------------------------------------------------------------
-DynamicsControls::DynamicsControls(const ExceptionResponse policy_in) :
-  policy{policy_in},
-  nstlim{default_dynamics_nstlim},
-  time_step{default_dynamics_time_step},
-  rattle_tolerance{default_rattle_tolerance}
+DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
+    policy{policy_in},
+    nstlim{default_dynamics_nstlim},
+    time_step{default_dynamics_time_step},
+    rattle_tolerance{default_rattle_tolerance}
 {}
 
 //-------------------------------------------------------------------------------------------------
 DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *found_nml,
-                                   const ExceptionResponse policy_in) :
+                                   const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     DynamicsControls(policy_in)
 {
-  NamelistEmulator t_nml = dynamicsInput(tf, start_line, found_nml, policy);
+  NamelistEmulator t_nml = dynamicsInput(tf, start_line, found_nml, policy, wrap);
   nstlim = t_nml.getIntValue("nstlim");
 
   // Validate input
@@ -110,7 +110,7 @@ void DynamicsControls::validateRattleTolerance() const {
   
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
-                               const ExceptionResponse policy) {
+                               const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("dynamics", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to propagate dynamics of a molecular system.");
   t_nml.addKeyword(NamelistElement("nstlim", NamelistType::INTEGER,
@@ -123,7 +123,7 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   // instance of this namelist twice or skipping instances of it in the search for some other
   // namelist.  An alternative is to keep an independent counter to track progress through the
   // input file in search for &rst namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::NO, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());
 
   return t_nml;
 }

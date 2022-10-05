@@ -106,6 +106,9 @@ int main(const int argc, const char* argv[]) {
   // Section 5
   section("Test the &ffmorph namelist");
 
+  // Section 6
+  section("Test the &restraint namelist");
+  
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any STORMM app
   section(1);
@@ -257,6 +260,11 @@ int main(const int argc, const char* argv[]) {
                   "keyword entry with too few atom types was accepted");
   testBadNamelist("ffmorph", "dihedral { -ti CG -tk CV -tj OS -tl CN -tl H1 -n 2 -amp 0.97 }",
                   "A dihedral keyword entry with repeated atom types was accepted");
+
+  // The restraint namelist can build individual restraints as well as ensembles of them
+  section(6);
+  start_line = 0;
+  
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

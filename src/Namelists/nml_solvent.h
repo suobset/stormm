@@ -13,6 +13,7 @@ namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
+using parse::WrapTextSearch;
 using topology::ImplicitSolventModel;
 using topology::AtomicRadiusSet;
 
@@ -40,10 +41,15 @@ public:
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \param found_nml   Indication that the namelist was found
   /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for a &solvent namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
-  SolventControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  SolventControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
+                  WrapTextSearch wrap = WrapTextSearch::NO);
   SolventControls(const TextFile &tf, int *start_line, bool *found_nml,
-                  ExceptionResponse policy_in = ExceptionResponse::DIE);
+                  ExceptionResponse policy_in = ExceptionResponse::DIE,
+                  WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
   /// \brief Get the type of implicit solvent (some flavor of Generalized Born)
@@ -154,8 +160,12 @@ private:
 ///                    to find an &solvent namelist)
 /// \param found       Indication that the namelist was found (passed back to the calling function)
 /// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param wrap        Indicate that the search for a &solvent namelist should carry on from the
+///                    beginning of an input file if no such namelist is found starting from the
+///                    original starting point
 NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
-                              ExceptionResponse policy = ExceptionResponse::DIE);
+                              ExceptionResponse policy = ExceptionResponse::DIE,
+                              WrapTextSearch wrap = WrapTextSearch::NO);
 
 } // namespace namelist
 } // namespace stormm
