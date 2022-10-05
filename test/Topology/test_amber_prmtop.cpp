@@ -431,6 +431,8 @@ void showAnswer(const std::vector<AtomGraph*> &topols, const CharInfoCode method
 }
 
 //-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // The temporary directory will not be needed.  Results will be compared against snapshots.
@@ -662,7 +664,22 @@ int main(const int argc, const char* argv[]) {
   }
   check(dryness_check, "Water models were identified in a Standard Template Library vector of dry "
         "topologies created by the push_back() method.", top_check);
-
+  bool blank_topology_vector_growth_success;
+  try {
+    std::vector<AtomGraph> agvn;
+    for (int i = 0; i < 16; i++) {
+      agvn.emplace_back();
+    }
+    blank_topology_vector_growth_success = true;
+  }
+  catch (std::runtime_error) {
+    blank_topology_vector_growth_success = false;
+  }
+  check(blank_topology_vector_growth_success, "A Standard Template Library vector of blank "
+        "AtomGraph objects does not grow properly.  Most likely, one of the constructors or "
+        "assignment operators is having trouble with some POINTER-kind Hybrid object not yet "
+        "pointing to anything as there is no content.");
+  
   // Test the move assignment operator by erasing elements from a list of topologies.
   std::vector<AtomGraph> clones = dry_topologies_pb;
   clones.erase(clones.begin() + 1);

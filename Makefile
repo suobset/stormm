@@ -117,7 +117,9 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/UnitTesting/checklist.cpp \
 		   $(SRCDIR)/UnitTesting/file_snapshot.cpp \
 		   $(SRCDIR)/UnitTesting/test_environment.cpp \
+		   $(SRCDIR)/UnitTesting/test_system_manager.cpp \
 		   $(SRCDIR)/UnitTesting/unit_test.cpp \
+		   $(SRCDIR)/UnitTesting/unit_test_enumerators.cpp \
 		   $(SRCDIR)/UnitTesting/vector_report.cpp
 
 # STORMM C++ header files
@@ -247,6 +249,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/UnitTesting/checklist.h \
 		     $(SRCDIR)/UnitTesting/file_snapshot.h \
 		     $(SRCDIR)/UnitTesting/test_environment.h \
+		     $(SRCDIR)/UnitTesting/test_system_manager.h \
 		     $(SRCDIR)/UnitTesting/unit_test.h \
 		     $(SRCDIR)/UnitTesting/unit_test_enumerators.h \
 		     $(SRCDIR)/UnitTesting/vector_report.h
@@ -405,7 +408,9 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/UnitTesting/checklist.o \
 		  $(SRCDIR)/UnitTesting/file_snapshot.o \
 		  $(SRCDIR)/UnitTesting/test_environment.o \
+		  $(SRCDIR)/UnitTesting/test_system_manager.o \
 		  $(SRCDIR)/UnitTesting/unit_test.o \
+		  $(SRCDIR)/UnitTesting/unit_test_enumerators.o \
 		  $(SRCDIR)/UnitTesting/vector_report.o
 
 # STORMM CUDA source files

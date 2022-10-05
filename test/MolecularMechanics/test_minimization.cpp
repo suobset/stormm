@@ -106,6 +106,8 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
 }
 
 //-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization

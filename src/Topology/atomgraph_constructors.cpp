@@ -712,6 +712,12 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::rebasePointers() {
 
+  // If there are no atoms and the various Hybrid objects do not currently point to anything,
+  // there is no rebasing to do.
+  if (atom_count == 0 && descriptors.getTargetSerialNumber() < 0) {
+    return;    
+  }
+  
   // Repair counts of atoms, residues, and other parts of the system
   descriptors.swapTarget(&int_data);
   residue_limits.swapTarget(&int_data);
@@ -1908,7 +1914,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
-    
+  
   // Guard against self assignment
   if (this == &other) {
     return *this;

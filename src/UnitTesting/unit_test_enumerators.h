@@ -66,6 +66,11 @@ enum class TmpdirStatus {
   REQUIRED
 };
 
+/// \brief Get a string corresponding to a particular test priority enumeration.
+///
+/// \param x  The enumeration to translate
+std::string getEnumerationName(TestPriority x);
+
 } // namespace testing
 } // namespace stormm
 
