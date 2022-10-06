@@ -6,8 +6,8 @@ add_library(static_mask_synthesis static_mask_synthesis.cpp)
 add_library(systemcache systemcache.cpp)
 add_library(valence_workunit valence_workunit.cpp)
 
-install(TARGETS atomgraph_synthesis implicit_solvent nonbonded_workunit phasespace_synthesis
-        static_mask_synthesis systemcache valence_workunit DESTINATION lib)
+install(TARGETS atomgraph_synthesis implicit_solvent_workspace nonbonded_workunit
+        phasespace_synthesis static_mask_synthesis systemcache valence_workunit DESTINATION lib)
 install(FILES atomgraph_synthesis.h atomgraph_synthesis.tpp implicit_solvent_workspace.h
         implicit_solvent_workspace.tpp nonbonded_workunit.h nonbonded_workunit.tpp
         phasespace_synthesis.h static_mask_synthesis.h synthesis_abstracts.h

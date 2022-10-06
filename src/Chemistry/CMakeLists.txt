@@ -1,6 +1,8 @@
 add_library(atommask atommask.cpp)
-add_library(chirality chirality.cpp)
+add_library(chemical_features chemical_features.cpp)
+add_library(indigo indigo.cpp)
 add_library(znumber znumber.cpp)
 
-install(TARGETS atommask chirality znumber DESTINATION lib)
-install(FILES atommask.h chirality.h znumber.h DESTINATION include)
+install(TARGETS atommask chemical_features indigo znumber DESTINATION lib)
+install(FILES atommask.h chemistry_enumerators.h chemical_features.h indigo.h periodic_table.h
+        znumber.h DESTINATION include)

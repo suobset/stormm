@@ -20,3 +20,6 @@ add_subdirectory(Synthesis)
 add_subdirectory(Topology)
 add_subdirectory(Trajectory)
 add_subdirectory(UnitTesting)
+
+# Add the copyright.h file
+install(FILES copyright.h DESTINATION include)
