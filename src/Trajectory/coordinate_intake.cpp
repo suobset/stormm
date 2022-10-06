@@ -63,6 +63,7 @@ std::vector<PhaseSpace> loadPhaseSpace(const std::vector<std::string> &file_name
       case ExceptionResponse::SILENT:
         break;
       }
+      result.emplace_back();
       if (files_found != nullptr) {
         *files_found = false;
       }

@@ -63,6 +63,7 @@ std::vector<AtomGraph> loadTopology(const std::vector<std::string> &file_names,
       case ExceptionResponse::SILENT:
         break;
       }
+      result.emplace_back();
       if (files_found != nullptr) {
         *files_found = false;
       }

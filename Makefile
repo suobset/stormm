@@ -551,8 +551,8 @@ $(LIBDIR)/libstormm.so : $(STORMM_CPP_OBJS)
 $(LIBDIR)/libstormm_cuda.so : CPP_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 $(LIBDIR)/libstormm_cuda.so : CPP_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 $(LIBDIR)/libstormm_cuda.so : CPP_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 \
-					-L${CUDA_HOME}/lib64/stubs -lcurand -lcublas -lcusolver \
-					-lcudart -lcudadevrt -lnvidia-ml
+					  -L${CUDA_HOME}/lib64/stubs -lcurand -lcublas -lcusolver \
+					  -lcudart -lcudadevrt -lnvidia-ml
 $(LIBDIR)/libstormm_cuda.so : $(STORMM_CPP_OBJS) $(STORMM_CUDA_OBJS)
 	@echo "[STORMM]  Building CUDA library..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) -shared -o $@ $(STORMM_CUDA_OBJS) \
@@ -820,13 +820,6 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 	  $(APPDIR)/Ffrn/src/ffrefine.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 install : $(LIBDIR)/libstormm.so
-	@export STORMM_HOME=`pwd`
-	@export STORMM_SOURCE=`pwd`
-	@(if [[ ":$LD_LIBRARY_PATH:" == *":${STORMM_HOME}/lib:"* ]]; then \
-	    echo "${LD_LIBRARY_PATH} was found to include ${STORMM_HOME}/lib" \
-	  else \
-	    export LD_LIBRARY_PATH=${STORMM_HOME}/lib:${LD_LIBRARY_PATH} \
-	  fi)
 
 clean :
 	@echo "[STORMM]  Cleaning CPU libraries"
