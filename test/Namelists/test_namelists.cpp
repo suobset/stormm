@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -15,8 +16,10 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using stormm::chemistry::ChemicalFeatures;
 using stormm::constants::ExceptionResponse;
 using stormm::constants::tiny;
 using stormm::diskutil::osSeparator;
@@ -85,6 +88,8 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+// main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
@@ -263,8 +268,15 @@ int main(const int argc, const char* argv[]) {
 
   // The restraint namelist can build individual restraints as well as ensembles of them
   section(6);
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  TestSystemManager tsm(base_top_name, "top",
+                        { "stereo_L1_vs", "symmetry_L1_vs", "drug_example_vs_iso",
+                          "bromobenzene_vs_iso", "med_1", "med_2", "med_3", "med_4", "med_5" },
+                        base_crd_name, "inpcrd",
+                        { "stereo_L1_vs", "symmetry_L1_vs", "drug_example_vs_iso",
+                          "bromobenzene_vs_iso", "med_1", "med_2", "med_3", "med_4", "med_5" });
   start_line = 0;
-  
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

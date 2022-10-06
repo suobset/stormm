@@ -295,6 +295,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 }
 
 //-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available

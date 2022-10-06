@@ -902,7 +902,7 @@ void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void Hybrid<T>::swapTarget(Hybrid<T> *new_target) {
+void Hybrid<T>::swapTarget(Hybrid<T> *new_target, const ExceptionResponse policy) {
   if (kind != HybridKind::POINTER) {
     rtErr("The non-POINTER kind Hybrid object " + std::string(label.name) + " cannot be set to "
           "target any other Hybrid object.", "Hybrid", "swapTarget");
@@ -912,8 +912,22 @@ void Hybrid<T>::swapTarget(Hybrid<T> *new_target) {
           std::string(label.name) + " must be ARRAY-kind.", "Hybrid", "swapTarget");
   }
   if (target_serial_number < 0) {
-    rtErr("Hybrid object " + std::string(label.name) + " does not currently point to an array.",
-          "Hybrid", "swapTarget");
+
+    // Is there is no current target, then no swapping can occur.  This may or may not lead to
+    // errors later in the program.  A range of responses is offered, with a SILENT policy of
+    // returning immediately being the default.
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Hybrid object " + std::string(label.name) + " does not currently point to an array.",
+            "Hybrid", "swapTarget");
+    case ExceptionResponse::WARN:
+      rtWarn("Hybrid object " + std::string(label.name) + " does not currently point to an "
+             "array.  No target swap will occur.", "Hybrid", "swapTarget");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return;
   }
   setPointer(new_target, pointer_index, length);
 }

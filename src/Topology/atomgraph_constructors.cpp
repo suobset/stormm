@@ -1908,7 +1908,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
-    
+  
   // Guard against self assignment
   if (this == &other) {
     return *this;

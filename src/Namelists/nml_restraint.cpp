@@ -473,6 +473,7 @@ int RestraintControls::getOrder() const {
   case RestraintEnsemble::PRESERVE_DISTANCES:
     return 0;
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

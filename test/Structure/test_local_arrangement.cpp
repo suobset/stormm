@@ -414,6 +414,8 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPr
 }
 
 //-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
