@@ -815,6 +815,13 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 	  $(APPDIR)/Ffrn/src/ffrefine.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 install : $(LIBDIR)/libstormm.so
+	@export STORMM_HOME=`pwd`
+	@export STORMM_SOURCE=`pwd`
+	@(if [[ ":$LD_LIBRARY_PATH:" == *":${STORMM_HOME}/lib:"* ]]; then \
+	    echo "${LD_LIBRARY_PATH} was found to include ${STORMM_HOME}/lib" \
+	  else \
+	    export LD_LIBRARY_PATH=${STORMM_HOME}/lib:${LD_LIBRARY_PATH} \
+	  fi)
 
 clean :
 	@echo "[STORMM]  Cleaning CPU libraries"
