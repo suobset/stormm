@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(behavior behavior.cpp)
 add_library(generalized_born generalized_born.cpp)
 

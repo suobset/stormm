@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(approx approx.cpp)
 add_library(checklist checklist.cpp)
 add_library(file_snapshot file_snapshot.cpp)

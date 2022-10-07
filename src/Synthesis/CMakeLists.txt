@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(atomgraph_synthesis atomgraph_synthesis.cpp)
 add_library(implicit_solvent_workspace implicit_solvent_workspace.cpp)
 add_library(nonbonded_workunit nonbonded_workunit.cpp)

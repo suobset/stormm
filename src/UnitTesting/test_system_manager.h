@@ -11,7 +11,6 @@
 #include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
-#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 
 namespace stormm {
@@ -20,7 +19,6 @@ namespace testing {
 using constants::ExceptionResponse;
 using topology::AtomGraph;
 using trajectory::CoordinateFrame;
-using trajectory::CoordinateSeries;
 using trajectory::PhaseSpace;
   
 /// \brief Provide the means to read a series of topology and coordinate files, then organize them
@@ -86,6 +84,24 @@ public:
   /// \brief Get the planned course of action for subsequent tests in the event that a file is
   ///        non-existent, or for any reason unreadable.
   TestPriority getTestingStatus() const;
+
+  /// \brief Get a copy of the coordinates for one system as a PhaseSpace object.
+  ///
+  /// \param index  The system of interest
+  PhaseSpace exportPhaseSpace(int index) const;
+  
+  /// \brief Get a copy of the coordinates for one system as a CoordinateFrame object.
+  ///
+  /// \param index  The system of interest
+  CoordinateFrame exportCoordinateFrame(int index) const;
+
+  /// \brief Get a const reference to the coordinates for one system.
+  ///
+  /// \param index  The system of interest
+  const PhaseSpace& viewCoordinates(int index) const;
+
+  /// \brief Get a const reference to the topology for one system.
+  const AtomGraph& viewTopology(int index) const;
   
 private:
   int system_count;              ///< The number of systems managed by this object

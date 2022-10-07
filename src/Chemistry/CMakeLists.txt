@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(atommask atommask.cpp)
 add_library(chemical_features chemical_features.cpp)
 add_library(indigo indigo.cpp)

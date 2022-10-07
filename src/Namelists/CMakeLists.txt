@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(input input.cpp)
 add_library(namelist_element namelist_element.cpp)
 add_library(namelist_emulator namelist_emulator.cpp)

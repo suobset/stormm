@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(amber_ascii amber_ascii.cpp)
 add_library(barostat barostat.cpp)
 add_library(coordinateframe coordinateframe.cpp)

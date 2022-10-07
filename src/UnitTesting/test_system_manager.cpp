@@ -206,5 +206,29 @@ TestPriority TestSystemManager::getTestingStatus() const {
   return (fault_found) ? fault_response : all_go_response;
 }
 
+//-------------------------------------------------------------------------------------------------
+PhaseSpace TestSystemManager::exportPhaseSpace(const int index) const {
+  checkIndexing(index, "exportPhaseSpace");
+  return all_coordinates[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrame TestSystemManager::exportCoordinateFrame(const int index) const {
+  checkIndexing(index, "exportCoordinateFrame");
+  return CoordinateFrame(all_coordinates[index]);
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpace& TestSystemManager::viewCoordinates(const int index) const {
+  checkIndexing(index, "viewCoordinates");
+  return all_coordinates[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph& TestSystemManager::viewTopology(const int index) const {
+  checkIndexing(index, "viewTopology");
+  return all_topologies[index];
+}
+
 } // namespace testing
 } // namespace stormm

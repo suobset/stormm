@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(ascii_numbers ascii_numbers.cpp)
 add_library(citation citation.cpp)
 add_library(parse parse.cpp)

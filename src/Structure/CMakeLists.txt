@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(global_manipulation global_manipulation.cpp)
 add_library(isomerization isomerization.cpp)
 add_library(local_arrangement local_arrangement.cpp)

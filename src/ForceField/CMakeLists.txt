@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(forcefield_element forcefield_element.cpp)
 add_library(forcefield_enumerators  forcefield_enumerators.cpp)
 

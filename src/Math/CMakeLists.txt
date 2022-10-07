@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(matrix_ops matrix_ops.cpp)
 add_library(reduction reduction.cpp)
 add_library(reduction_abstracts reduction_abstracts.cpp)

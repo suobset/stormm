@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(amber_prmtop_util amber_prmtop_util.cpp)
 add_library(atomgraph atomgraph_constructors.cpp atomgraph_detailers.cpp atomgraph_getters.cpp
             atomgraph_miscellaneous.cpp)

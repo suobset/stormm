@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(bounded_restraint bounded_restraint.cpp)
 add_library(restraint_apparatus restraint_apparatus.cpp)
 add_library(restraint_builder restraint_builder.cpp)

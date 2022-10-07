@@ -1,3 +1,5 @@
+include_directories(../)
+
 add_library(random random.cpp)
 
 install(TARGETS random DESTINATION lib)
