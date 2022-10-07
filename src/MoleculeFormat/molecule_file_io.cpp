@@ -9,7 +9,7 @@ using parse::readIntegerValue;
 using parse::readRealValue;
 
 //-------------------------------------------------------------------------------------------------
-int getMdlFormatEnd(const TextFileReader &tfr, const int line_start, const int line_end_in) {
+int getMdlMolSectionEnd(const TextFileReader &tfr, const int line_start, const int line_end_in) {
   const int line_end = (line_end_in < 0) ? tfr.line_count : line_end_in;
   int result = line_start;
   bool found = false;
@@ -28,25 +28,30 @@ int getMdlFormatEnd(const TextFileReader &tfr, const int line_start, const int l
 }
 
 //-------------------------------------------------------------------------------------------------
-int getMdlFormatEnd(const TextFile &tf, const int line_start, const int line_end_in) {
-  return getMdlFormatEnd(tf.data(), line_start, line_end_in);
+int getMdlMolSectionEnd(const TextFile &tf, const int line_start, const int line_end_in) {
+  return getMdlMolSectionEnd(tf.data(), line_start, line_end_in);
 }
 
 //-------------------------------------------------------------------------------------------------
-int findMolObjVersion(const char* text, const int nchar) {
+MdlMolVersion findMolObjVersion(const char* text, const int nchar) {
   for (int i = 0; i < nchar; i++) {
     if (text[i] == 'V' || text[i] == 'v') {
       if (i < nchar - 4 && text[i + 2] == '0' && text[i + 3] == '0' && text[i + 4] == '0') {
         if (text[i + 1] == '2') {
-          return 2000;
+          return MdlMolVersion::V2000;
         }
         else if (text[i + 1] == '3') {
-          return 3000;
+          return MdlMolVersion::V3000;
         }
       }
     }
   }
-  return 2000;
+  return MdlMolVersion::UNKNOWN;
+}
+
+//-------------------------------------------------------------------------------------------------
+MdlMolVersion findMolObjVersion(const TextFile &tf, const int line_number) {
+  return findMolObjVersion(tf.getLinePointer(line_number), tf.getLineLength(line_number));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -90,7 +95,7 @@ std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int line_st
 
   // Check that there is sufficient information to read the SDF
   const TextFileReader tfr = tf.data();
-  const int line_end = getMdlFormatEnd(tfr, line_start, line_end_in);
+  const int line_end = getMdlMolSectionEnd(tfr, line_start, line_end_in);
   if (line_end - line_start <= 4) {
     switch (policy) {
     case ExceptionResponse::DIE:
@@ -107,21 +112,29 @@ std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int line_st
   }
 
   // Get the version
-  const int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
-                                        tfr.line_limits[line_start + 4] -
-                                        tfr.line_limits[line_start + 3]);
+  const MdlMolVersion version_no = findMolObjVersion(tf, line_start + 3);
   
   // Read the number of atoms from the counts line, then read coordinates for each atom
-  if (version == 2000) {
-    const int atom_count = readIntegerValue(&tfr.text[tfr.line_limits[line_start + 3]], 0, 3);
-    int iatm = 0;
-    const int ilim = line_start + 4 + atom_count;
-    result.reserve(atom_count);
-    for (int i = line_start + 4; i < ilim; i++) {
-      const char* atom_line_ptr = &tfr.text[tfr.line_limits[i]];
-      result[iatm] = { readRealValue(atom_line_ptr,  0, 10), readRealValue(atom_line_ptr, 10, 10),
-                       readRealValue(atom_line_ptr, 20, 10) };
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      const int atom_count = readIntegerValue(&tfr.text[tfr.line_limits[line_start + 3]], 0, 3);
+      int iatm = 0;
+      const int ilim = line_start + 4 + atom_count;
+      result.reserve(atom_count);
+      for (int i = line_start + 4; i < ilim; i++) {
+        const char* atom_line_ptr = &tfr.text[tfr.line_limits[i]];
+        result[iatm] = { readRealValue(atom_line_ptr,  0, 10),
+                         readRealValue(atom_line_ptr, 10, 10),
+                         readRealValue(atom_line_ptr, 20, 10) };
+      }
     }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    rtErr("No valid MDL MOL version was detected.  Parsing in " + tf.getFileName() + " cannot "
+          "proceed.");
   }
 
   return result;

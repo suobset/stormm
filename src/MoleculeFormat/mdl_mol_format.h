@@ -13,6 +13,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "molecule_file_io.h"
+#include "molecule_format_enumerators.h"
 
 namespace stormm {
 namespace structure {
@@ -24,44 +25,6 @@ using constants::ExceptionResponse;
 using parse::TextFile;
 using trajectory::CoordinateFrame;
 using trajectory::PhaseSpace;
-  
-/// \brief A molecule's chirality
-enum class MolObjChirality {
-  ACHIRAL = 0, CHIRAL = 1
-};
-
-/// \brief Enumerate possible bond orders, including aromatics or variable bonds
-enum class MolObjBondOrder {
-  SINGLE = 1, DOUBLE = 2, TRIPLE = 3, AROMATIC = 4, SINGLE_OR_DOUBLE = 5,
-  SINGLE_OR_AROMATIC = 6, DOUBLE_OR_AROMATIC = 7, ANY = 8
-};
-
-/// \brief Enumerate possible stereochemistries arising from a bond
-enum class MolObjBondStereo {
-  NOT_STEREO = 0, UP = 1, CIS_OR_TRANS = 3, EITHER = 4, DOWN = 6
-};
-
-/// \brief Enumerate different steroe parity settings for an atom
-enum class MolObjAtomStereo {
-  NOT_STEREO = 0, ODD = 1, EVEN = 2, UNMARKED = 3
-};
-
-/// \brief Enumerate states in which a bond participates in a ring system or just a chain
-enum class MolObjRingState {
-  EITHER = 0, RING = 1, CHAIN = 2
-};
-
-/// \brief Enumerate ways in which a _bond_ can participate in reactions
-enum class MolObjReactionCenter {
-  NON_CENTER = -1, UNMARKED = 0, CENTER = 1, UNREACTIVE = 2, BOND_MADE_OR_BROKEN = 4,
-  CENTER_WITH_FORMATION = 5, BOND_ORDER_CHANGE = 8, CENTER_WITH_ORDER_CHANGE = 9,
-  BOND_FORMATION_AND_ORDER_CHANGE = 12, CENTER_WITH_FORMATION_AND_ORDER_CHANGE = 13
-};
-
-/// \brief Enumerate the outcomes for stereochemistry during a reaction
-enum class StereoRetention {
-  NOT_APPLIED = 0, INVERTED = 1, RETAINED = 2
-};
 
 /// \brief Default settings for the MDL MOL object atom initializations
 /// \{
@@ -96,11 +59,17 @@ public:
   ///   - Construct a blank object with -1 atom indices to indicate its invalid nature
   ///   - Construct an object with just the atom indices
   ///   - Construct a complete object with all details pre-loaded
+  ///   - Construct the object based on text input of trusted bounds
+  ///
+  /// \param tf           Text of the original .sdf or .mol file, read into RAM
+  /// \param line_number  Number of the line on which to read the data
+  /// \param title        The title of the structure, if known, for error tracing purposes
   /// \{
   MolObjBond();
   MolObjBond(int i_atom_in, int j_atom_in);
   MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjBondStereo stereo_in,
              MolObjRingState ring_state_in, MolObjReactionCenter reactivity_in);
+  MolObjBond(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
   /// \brief The default copy and move constructors as well as assignment operators are adequate.
@@ -157,10 +126,74 @@ private:
   MolObjBondStereo stereo;          ///< Indicator of the bond stereochemistry
   MolObjRingState ring_state;       ///< Indicator of whether the atom is part of a ring
   MolObjReactionCenter reactivity;  ///< Indicator of a bond as a center of reactivity
+
+  /// \brief Interpret a code for the order of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the bond order
+  /// \param title    Title of the parent structure, for error tracing purposes
+  MolObjBondOrder interpretBondOrder(int code_in, const std::string &title);
+
+  /// \brief Interpret a code for the stereochemistry of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the bond stereochemistry
+  /// \param title    Title of the parent structure, for error tracing purposes
+  MolObjBondStereo interpretBondStereochemistry(int code_in, const std::string &title);
+  
+  /// \brief Interpret a code for the ring status of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the ring status
+  /// \param title    Title of the parent structure, for error tracing purposes
+  MolObjRingState interpretRingState(int code_in, const std::string &title);
+
+  /// \brief Interpret a code for the reactive potential of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the reactive potential
+  /// \param title    Title of the parent structure, for error tracing purposes
+  MolObjReactionCenter interpretBondReactivePotential(int code_in, const std::string &title);
 };
 
+/// \brief An atom list entry (this object can be assembled either from one of the deprecated
+///        V2000 format lines after the bonds block, or from one of the "M  ALS" properties)
+class MolObjAtomList {
+public:
+
+  /// \brief The constructor can take all member variables (and all come with default values to
+  ///        let this form of the constructor serve as the blank object constructor), or a pointer
+  ///        to the line of a text file from which the information shall come.
+  ///
+  /// \param tf           Text of the original .sdf or .mol file, read into RAM
+  /// \param line_number  Number of the line on which to read the data
+  /// \param title        The title of the structure, if known, for error tracing purposes
+  /// \{
+  MolObjAtomList(const std::vector<int> &atomic_numbers_in = {}, bool exclusions_in = false,
+                 int atom_attachment_in = 0);
+  MolObjAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
+  /// \}
+
+private:
+  int entry_count;                  ///< The number of atomic elements (identified by Z-numbers)
+                                    ///<   in this list
+  std::vector<int> atomic_numbers;  ///< Atomic (Z-) numbers of atoms that are to be excluded or
+                                    ///<   included by processing this list
+  bool exclusions;                  ///< Indicate whether this list covers atomic numbers which
+                                    ///<   are to be excluded (TRUE) or included (FALSE)
+  int atom_attachment;              ///< Attachment point of the list, an index of an atom in the
+                                    ///<   molecule itself
+};
+
+/// \brief An SText group from an MDL MOL (.mol) or SDF file.  This information is used only by
+///        old ISIS / Desktop programs and is otherwise deprecated.
+class MolObjSTextGroup {
+public:
+private:
+};
+  
 /// \brief A molecular or atomic property read from an MDL .mol or SDF file
-struct MolObjProperty {
+class MolObjProperty {
+public:
+  
+private:
+  char4 code;
   
 };
 
@@ -248,9 +281,11 @@ public:
 private:
 
   // Items describing quantities of information (most of them from the counts line)
+  MdlMolVersion version_no;   ///< The format in which this entry was read (does not necessarily
+                              ///<   dictate the version in which it will be written)
   int atom_count;             ///< The number of atoms in the molecule
   int bond_count;             ///< Number of bonds of all types between atoms in the system
-  int list_count;             ///< The number of atom lists
+  int list_count;             ///< The number of atom (element) lists
   int stext_entry_count;      ///< The number of S-text entries
   int properties_count;       ///< The number of additional properties (the default, and expected,
                               ///<   value is 999)
@@ -284,12 +319,18 @@ private:
   std::vector<bool> exact_change_enforced;  ///< Flags to indicate that the changes on an atom
                                             ///<   must be exactly as described in the reaction
   
-  ///< Indication of whether stereochemistry is inverted or retained in a chemical reaction
+  /// Indication of whether stereochemistry is inverted or retained in a chemical reaction
   std::vector<StereoRetention> orientation_stability;
 
   /// Bonds between atoms
   std::vector<MolObjBond> bonds;
 
+  /// Lists of atomic elements to be used in arbitrary operations
+  std::vector<MolObjAtomList> element_lists;
+
+  /// Stext entries (these are deprecated and used by ISIS / Desktop applications only)
+  std::vector<MolObjSTextGroup> stext_entries;
+  
   /// Properties
   std::vector<MolObjProperty> properties;
 
@@ -342,26 +383,6 @@ private:
   ///
   /// \param code_in  A numeric code to be translated into inversion or retention options
   StereoRetention interpretStereoStability(int code_in);
-
-  /// \brief Interpret a code for the order of a bond in the structure.
-  ///
-  /// \param code_in  A numeric code to be translated into the bond order
-  MolObjBondOrder interpretBondOrder(int code_in);
-
-  /// \brief Interpret a code for the stereochemistry of a bond in the structure.
-  ///
-  /// \param code_in  A numeric code to be translated into the bond stereochemistry
-  MolObjBondStereo interpretBondStereochemistry(int code_in);
-  
-  /// \brief Interpret a code for the ring status of a bond in the structure.
-  ///
-  /// \param code_in  A numeric code to be translated into the ring status
-  MolObjRingState interpretRingState(int code_in);
-
-  /// \brief Interpret a code for the reactive potential of a bond in the structure.
-  ///
-  /// \param code_in  A numeric code to be translated into the reactive potential
-  MolObjReactionCenter interpretBondReactivePotential(int code_in);
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.

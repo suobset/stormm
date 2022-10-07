@@ -1,12 +1,15 @@
 #include "copyright.h"
+#include "FileManagement/file_listing.h"
 #include "mdl_mol_format.h"
 
 namespace stormm {
 namespace structure {
 
+using diskutil::getBaseName;
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::readRealValue;
+using parse::strncmpCased;
 using parse::TextFileReader;
 using parse::verifyContents;
 using trajectory::CoordinateFrameWriter;
@@ -32,6 +35,128 @@ MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in, const MolObjBon
     i_atom{i_atom_in}, j_atom{j_atom_in}, order{order_in}, stereo{stereo_in},
     ring_state{ring_state_in}, reactivity{reactivity_in}
 {}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBond::MolObjBond(const TextFile &tf, const int line_number, const std::string &title) :
+    MolObjBond()
+{
+  const char* bond_line_ptr = tf.getLinePointer(line_number);
+  if (tf.getLineLength(line_number) < 6) {
+    rtErr("Line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) +
+          " cannot contain MDL MOL bond information due to its length being only " +
+          std::to_string(tf.getLineLength(line_number)));
+  }
+  i_atom = readIntegerValue(bond_line_ptr, 0, 3);
+  j_atom = readIntegerValue(bond_line_ptr, 3, 3);
+  order = (verifyContents(tf, line_number, 6, 3)) ?
+          interpretBondOrder(readIntegerValue(bond_line_ptr, 6, 3), title) :
+          default_mdl_bond_order;
+  stereo = (verifyContents(tf, line_number, 9, 3)) ?
+           interpretBondStereochemistry(readIntegerValue(bond_line_ptr, 9, 3), title) :
+           default_mdl_bond_stereochemistry;
+  ring_state = (verifyContents(tf, line_number, 12, 3)) ?
+               interpretRingState(readIntegerValue(bond_line_ptr, 12, 3), title) :
+               default_mdl_ring_status;
+  reactivity = (verifyContents(tf, line_number, 15, 3)) ?
+               interpretBondReactivePotential(readIntegerValue(bond_line_ptr, 15, 3), title) :
+               default_mdl_bond_reactivity;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBondOrder MolObjBond::interpretBondOrder(const int code_in, const std::string &title) {
+  switch (code_in) {
+  case 1:
+    return MolObjBondOrder::SINGLE;
+  case 2:
+    return MolObjBondOrder::DOUBLE;
+  case 3:
+    return MolObjBondOrder::TRIPLE;
+  case 4:
+    return MolObjBondOrder::AROMATIC;
+  case 5:
+    return MolObjBondOrder::SINGLE_OR_DOUBLE;
+  case 6:
+    return MolObjBondOrder::SINGLE_OR_AROMATIC;
+  case 7:
+    return MolObjBondOrder::DOUBLE_OR_AROMATIC;
+  case 8:
+    return MolObjBondOrder::ANY;
+  default:
+    rtErr("An invalid bond order code " + std::to_string(code_in) + " was specified in an MDL MOL "
+          "entry titled \"" + title + "\".", "MdlMolObj", "interpretBondOrder");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBondStereo MolObjBond::interpretBondStereochemistry(const int code_in,
+                                                          const std::string &title) {
+  switch (code_in) {
+  case 0:
+    return MolObjBondStereo::NOT_STEREO;
+  case 1:
+    return MolObjBondStereo::UP;
+  case 3:
+    return MolObjBondStereo::CIS_OR_TRANS;
+  case 4:
+    return MolObjBondStereo::EITHER;
+  case 6:
+    return MolObjBondStereo::DOWN;
+  default:
+    rtErr("An invalid bond stereochemistry code " + std::to_string(code_in) + " was specified in "
+          "an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
+          "interpretBondStereoChemistry");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjRingState MolObjBond::interpretRingState(const int code_in, const std::string &title) {
+  switch (code_in) {
+  case 0:
+    return MolObjRingState::EITHER;
+  case 1:
+    return MolObjRingState::RING;
+  case 2:
+    return MolObjRingState::CHAIN;
+  default:
+    rtErr("An invalid bond ring status code " + std::to_string(code_in) + " was specified in an "
+          "MDL MOL entry titled \"" + title + "\".", "MdlMolObj", "interpretRingState");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjReactionCenter MolObjBond::interpretBondReactivePotential(const int code_in,
+                                                                const std::string &title) {
+  switch (code_in) {
+  case -1:
+    return MolObjReactionCenter::NON_CENTER;
+  case 0:
+    return MolObjReactionCenter::UNMARKED;
+  case 1:
+    return MolObjReactionCenter::CENTER;
+  case 2:
+    return MolObjReactionCenter::UNREACTIVE;
+  case 4:
+    return MolObjReactionCenter::BOND_MADE_OR_BROKEN;
+  case 5:
+    return MolObjReactionCenter::CENTER_WITH_FORMATION;
+  case 8:
+    return MolObjReactionCenter::BOND_ORDER_CHANGE;
+  case 9:
+    return MolObjReactionCenter::CENTER_WITH_ORDER_CHANGE;
+  case 12:
+    return MolObjReactionCenter::BOND_FORMATION_AND_ORDER_CHANGE;
+  case 13:
+    return MolObjReactionCenter::CENTER_WITH_FORMATION_AND_ORDER_CHANGE;
+  default:
+    rtErr("An invalid bond reactive potential code " + std::to_string(code_in) + " was specified "
+          "in an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
+          "interpretBondReactivePotential");
+  }
+  __builtin_unreachable();
+}
 
 //-------------------------------------------------------------------------------------------------
 int MolObjBond::getFirstAtom() const {
@@ -94,13 +219,46 @@ void MolObjBond::setReactivity(const MolObjReactionCenter potential_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
+MolObjAtomList::MolObjAtomList(const std::vector<int> &atomic_numbers_in, bool const exclusions_in,
+                               const int atom_attachment_in) :
+  entry_count{static_cast<int>(atomic_numbers_in.size())},
+  atomic_numbers{atomic_numbers_in},
+  exclusions{exclusions_in},
+  atom_attachment{atom_attachment_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
+                               const std::string &title) :
+    MolObjAtomList()
+{
+  // Determine whether this originates in an atom list entry or a property of the MDL section
+  const char* line_ptr = tf.getLinePointer(line_number);
+  if (tf.getLineLength(line_number) < 6) {
+    rtErr("Line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) +
+          " cannot contain MDL MOL atom list information due to its length being only " +
+          std::to_string(tf.getLineLength(line_number)));
+  }
+  if (strncmpCased(line_ptr, std::string("M  ALS"))) {
+
+    // The entry originates as a property.  This would invalidate any preceding atom list entries
+    // of the deprecated format, but such a contingency has already been taken care of in the
+    // parent MdlMolObj reader.
+    
+  }
+  else {
+    
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
-    atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0}, constraint_count{0},
-    chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, coordinates{}, atomic_symbols{},
-    atomic_numbers{}, formal_charges{}, isotopic_shifts{}, parities{}, implicit_hydrogens{},
-    stereo_considerations{}, valence_connections{}, atom_atom_mapping_count{},
-    orientation_stability{}, bonds{}, properties{}, title{""}, software_details{""},
-    general_comment{""}
+    version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
+    constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, coordinates{},
+    atomic_symbols{}, atomic_numbers{}, formal_charges{}, isotopic_shifts{}, parities{},
+    implicit_hydrogens{}, stereo_considerations{}, valence_connections{},
+    atom_atom_mapping_count{}, orientation_stability{}, bonds{}, element_lists{}, stext_entries{},
+    properties{}, title{""}, software_details{""}, general_comment{""}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -112,61 +270,73 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
 
   // Default line end of -1 indicates reading to the end of the file.  Otherwise, identify the
   // end of the formatting ("M  END").
-  const int line_end = getMdlFormatEnd(tfr, line_start, line_end_in);
+  const int mdl_section_end = getMdlMolSectionEnd(tfr, line_start, line_end_in);
                        
-  // The range of data now extends from line_start to line_end.  Sift through that information
-  // for a V2000 or V3000 specification.  This should be found on the fourth line.
-  const int version = findMolObjVersion(&tfr.text[tfr.line_limits[line_start + 3]],
-                                        tfr.line_limits[line_start + 4] -
-                                        tfr.line_limits[line_start + 3]);
+  // The range of data now extends from line_start to mdl_section_end.  Sift through that
+  // information for a V2000 or V3000 specification.  This should be found on the fourth line.
+  version_no = findMolObjVersion(tf, line_start + 3);
   
   // Begin by reading the molecule name (title), generating software details, and any general
   // comment (always three and only three distinct lines, even if left blank).
-  title            = tf.extractString(line_start);
-  software_details = tf.extractString(line_start + 1);
-  general_comment  = tf.extractString(line_start + 2);
+  if (line_start + 2 < tfr.line_count) {
+    title            = tf.extractString(line_start);
+    software_details = tf.extractString(line_start + 1);
+    general_comment  = tf.extractString(line_start + 2);
+  }
 
   // Read the counts line
-  if (version == 2000) {
-    const int counts_line_idx = line_start + 3;
-    const char* counts_line_ptr = &tfr.text[tfr.line_limits[line_start + 3]];
-    atom_count   = readIntegerValue(counts_line_ptr, 0, 3);
-    bond_count   = readIntegerValue(counts_line_ptr, 3, 3);
-    if (verifyContents(tf, counts_line_idx, 6, 3, NumberFormat::INTEGER)) {
-      list_count   = readIntegerValue(counts_line_ptr, 6, 3);
-    }
-    if (verifyContents(tf, counts_line_idx, 12, 3, NumberFormat::INTEGER)) {
-      const int chir_num = readIntegerValue(counts_line_ptr, 12, 3);
-      if (chir_num == 0) {
-        chirality = MolObjChirality::ACHIRAL;
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      const int counts_line_idx = line_start + 3;
+      const char* counts_line_ptr = &tfr.text[tfr.line_limits[line_start + 3]];
+      atom_count   = readIntegerValue(counts_line_ptr, 0, 3);
+      bond_count   = readIntegerValue(counts_line_ptr, 3, 3);
+      if (verifyContents(tf, counts_line_idx, 6, 3, NumberFormat::INTEGER)) {
+        list_count   = readIntegerValue(counts_line_ptr, 6, 3);
       }
-      else if (chir_num == 1) {
-        chirality = MolObjChirality::CHIRAL;
+      if (verifyContents(tf, counts_line_idx, 12, 3, NumberFormat::INTEGER)) {
+        const int chir_num = readIntegerValue(counts_line_ptr, 12, 3);
+        if (chir_num == 0) {
+          chirality = MolObjChirality::ACHIRAL;
+        }
+        else if (chir_num == 1) {
+          chirality = MolObjChirality::CHIRAL;
+        }
+        else {
+          rtErr("Invalid chirality setting detected at line " + std::to_string(counts_line_idx) +
+                " in .sdf or MDL MOL file " + tf.getFileName() + ".", "MdlMolObj");
+        }
       }
-      else {
-        rtErr("Invalid chirality setting detected at line " + std::to_string(counts_line_idx) +
-              " in .sdf or MDL MOL file " + tf.getFileName() + ".", "MdlMolObj");
+      if (verifyContents(tf, counts_line_idx, 15, 3, NumberFormat::INTEGER)) {
+        stext_entry_count = readIntegerValue(counts_line_ptr, 15, 3);
       }
-    }
-    if (verifyContents(tf, counts_line_idx, 15, 3, NumberFormat::INTEGER)) {
-      stext_entry_count = readIntegerValue(counts_line_ptr, 15, 3);
-    }
-    if (verifyContents(tf, counts_line_idx, 30, 3, NumberFormat::INTEGER)) {
-      properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
-    }
+      if (verifyContents(tf, counts_line_idx, 30, 3, NumberFormat::INTEGER)) {
+        properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
+      }
     
-    // Validation
-    if (atom_count > 255) {
-      rtErr("A V2000 MOL format entry cannot contain more than 255 atoms.", "MdlMolObj");
+      // Validation
+      if (atom_count > 255) {
+        rtErr("A V2000 MOL format entry cannot contain more than 255 atoms.", "MdlMolObj");
+      }
     }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
 
-    // Allocate space for information to be read
-    allocate();
+    // This case would be unprocessable.
+    rtErr("No valid MDL MOL version was detected.  Parsing in " + tf.getFileName() + " cannot "
+          "proceed.");
   }
+
+  // Allocate space for information to be read
+  allocate();
     
   // Read the atoms block
-  if (version == 2000) {
-    int iatm = 0;
+  int iatm = 0;
+  switch (version_no) {
+  case MdlMolVersion::V2000:
     for (int i = line_start + 4; i < line_start + 4 + atom_count; i++) {
       const char* atom_line_ptr = &tfr.text[tfr.line_limits[i]];
       coordinates[iatm] = { readRealValue(atom_line_ptr,  0, 10),
@@ -228,30 +398,81 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       }
       iatm++;
     }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    break;
   }
 
   // Read the bonds block
-  if (version == 2000) {
-    const int bond_line_start = line_start + 4 + atom_count;
-    for (int pos = 0; pos < bond_count; pos++) {
-      const char* bond_line_ptr = &tfr.text[tfr.line_limits[bond_line_start + pos]];
-      const MolObjBondOrder bnd_order = (verifyContents(tf, bond_line_start + pos, 6, 3)) ?
-                                        interpretBondOrder(readIntegerValue(bond_line_ptr, 6, 3)) :
-                                        default_mdl_bond_order;
-      const MolObjBondStereo bnd_stereo = (verifyContents(tf, bond_line_start + pos, 9, 3)) ?
-        interpretBondStereochemistry(readIntegerValue(bond_line_ptr, 9, 3)) :
-        default_mdl_bond_stereochemistry;
-      const MolObjRingState ring_status = (verifyContents(tf, bond_line_start + pos, 12, 3)) ?
-        interpretRingState(readIntegerValue(bond_line_ptr, 12, 3)) :
-        default_mdl_ring_status;
-      const MolObjReactionCenter reax_potential = (verifyContents(tf, bond_line_start + pos,
-                                                                  15, 3)) ?
-        interpretBondReactivePotential(readIntegerValue(bond_line_ptr, 15, 3)) :
-        default_mdl_bond_reactivity;
-      bonds[pos] = MolObjBond(readIntegerValue(bond_line_ptr, 0, 3),
-                              readIntegerValue(bond_line_ptr, 3, 3), bnd_order, bnd_stereo,
-                              ring_status, reax_potential);
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      const int bond_line_start = line_start + 4 + atom_count;
+      for (int pos = 0; pos < bond_count; pos++) {
+        bonds.emplace_back(tf, bond_line_start + pos, title);
+      }
     }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    break;
+  }
+
+  // Read the atom lists (this information is superceded by the presence of "M  ALS" properties)
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      // Scan for atom lists imbedded in properties
+      const std::string als_tag("M  ALS");
+      for (int pos = line_start; pos < mdl_section_end; pos++) {
+        if (tfr.line_lengths[pos] >= 6 && strncmpCased(tf.getLinePointer(pos), als_tag)) {
+          element_lists.emplace_back(tf, pos, title);
+        }
+      }
+      if (element_lists.size() == 0LLU) {
+        const int alst_line_start = line_start + 4 + atom_count + bond_count;
+        for (int pos = 0; pos < list_count; pos++) {
+          element_lists.emplace_back(tf, alst_line_start + pos, title);          
+        }
+      }
+    }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    break;
+  }
+
+  // Read the stext entries
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      const int stxt_line_start = line_start + 4 + atom_count + bond_count + list_count;
+      for (int pos = 0; pos < stext_entry_count; pos += 2) {
+      }
+    }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    break;
+  }
+
+  // Read various properties
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    {
+      const int prop_line_start = line_start + 4 + atom_count + bond_count + list_count +
+                                  (2 * stext_entry_count);
+    }
+    break;
+  case MdlMolVersion::V3000:
+    break;
+  case MdlMolVersion::UNKNOWN:
+    break;
   }
 
   // Make some basic inferences
@@ -265,8 +486,6 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     
   }
   
-  // Read various properties
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -364,6 +583,9 @@ const std::vector<int>& MdlMolObj::getAtomicNumbers() const {
 
 //-------------------------------------------------------------------------------------------------
 void MdlMolObj::allocate() {
+
+  // Atom property fields are resized and then set as part of a loop in the parent MdlMolObj
+  // constructor.
   coordinates.resize(atom_count);
   atomic_symbols.resize(atom_count, default_mdl_atomic_symbol);
   atomic_numbers.resize(atom_count, default_mdl_atomic_number);
@@ -377,8 +599,13 @@ void MdlMolObj::allocate() {
   atom_atom_mapping_count.resize(atom_count, default_mdl_map_count);
   exact_change_enforced.resize(atom_count, default_mdl_exact_change);
   orientation_stability.resize(atom_count, default_mdl_stereo_retention);
-  bonds.resize(bond_count);
-  properties.resize(properties_count);
+
+  // Other arrays are reserved and built with emplace_back().  The MDL MOL properties array is
+  // not reserved to any specific length, however, as the number of properties is not known from
+  // the counts line, where it is set to 999 by default.
+  bonds.reserve(bond_count);
+  element_lists.reserve(list_count);
+  stext_entries.reserve(stext_entry_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -474,100 +701,6 @@ StereoRetention MdlMolObj::interpretStereoStability(const int code_in) {
   default:
     rtErr("A stereochemistry retention code of " + std::to_string(code_in) + " is invalid in MDL "
           "MOL entry \"" + title + "\".", "MdlMolObj", "interpretStereoStability");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjBondOrder MdlMolObj::interpretBondOrder(const int code_in) {
-  switch (code_in) {
-  case 1:
-    return MolObjBondOrder::SINGLE;
-  case 2:
-    return MolObjBondOrder::DOUBLE;
-  case 3:
-    return MolObjBondOrder::TRIPLE;
-  case 4:
-    return MolObjBondOrder::AROMATIC;
-  case 5:
-    return MolObjBondOrder::SINGLE_OR_DOUBLE;
-  case 6:
-    return MolObjBondOrder::SINGLE_OR_AROMATIC;
-  case 7:
-    return MolObjBondOrder::DOUBLE_OR_AROMATIC;
-  case 8:
-    return MolObjBondOrder::ANY;
-  default:
-    rtErr("An invalid bond order code " + std::to_string(code_in) + " was specified in an MDL MOL "
-          "entry titled \"" + title + "\".", "MdlMolObj", "interpretBondOrder");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjBondStereo MdlMolObj::interpretBondStereochemistry(const int code_in) {
-  switch (code_in) {
-  case 0:
-    return MolObjBondStereo::NOT_STEREO;
-  case 1:
-    return MolObjBondStereo::UP;
-  case 3:
-    return MolObjBondStereo::CIS_OR_TRANS;
-  case 4:
-    return MolObjBondStereo::EITHER;
-  case 6:
-    return MolObjBondStereo::DOWN;
-  default:
-    rtErr("An invalid bond stereochemistry code " + std::to_string(code_in) + " was specified in "
-          "an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
-          "interpretBondStereoChemistry");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjRingState MdlMolObj::interpretRingState(const int code_in) {
-  switch (code_in) {
-  case 0:
-    return MolObjRingState::EITHER;
-  case 1:
-    return MolObjRingState::RING;
-  case 2:
-    return MolObjRingState::CHAIN;
-  default:
-    rtErr("An invalid bond ring status code " + std::to_string(code_in) + " was specified in an "
-          "MDL MOL entry titled \"" + title + "\".", "MdlMolObj", "interpretRingState");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjReactionCenter MdlMolObj::interpretBondReactivePotential(const int code_in) {
-  switch (code_in) {
-  case -1:
-    return MolObjReactionCenter::NON_CENTER;
-  case 0:
-    return MolObjReactionCenter::UNMARKED;
-  case 1:
-    return MolObjReactionCenter::CENTER;
-  case 2:
-    return MolObjReactionCenter::UNREACTIVE;
-  case 4:
-    return MolObjReactionCenter::BOND_MADE_OR_BROKEN;
-  case 5:
-    return MolObjReactionCenter::CENTER_WITH_FORMATION;
-  case 8:
-    return MolObjReactionCenter::BOND_ORDER_CHANGE;
-  case 9:
-    return MolObjReactionCenter::CENTER_WITH_ORDER_CHANGE;
-  case 12:
-    return MolObjReactionCenter::BOND_FORMATION_AND_ORDER_CHANGE;
-  case 13:
-    return MolObjReactionCenter::CENTER_WITH_FORMATION_AND_ORDER_CHANGE;
-  default:
-    rtErr("An invalid bond reactive potential code " + std::to_string(code_in) + " was specified "
-          "in an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
-          "interpretBondReactivePotential");
   }
   __builtin_unreachable();
 }

@@ -167,6 +167,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
 		     $(SRCDIR)/MoleculeFormat/mdl_mol_format.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
+		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \

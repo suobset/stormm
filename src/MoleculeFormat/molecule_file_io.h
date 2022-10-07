@@ -6,6 +6,7 @@
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/textfile.h"
+#include "molecule_format_enumerators.h"
 
 namespace stormm {
 namespace structure {
@@ -25,19 +26,29 @@ using parse::TextFileReader;
 /// \param tfr          Abstract of the text
 /// \param tf           Text of the MDL MOL file (or SD file), read into RAM
 /// \param line_start   The point at which to assume the MDL MOL format entry begins
-/// \param line_end_in  The limit at which to stop searching for the MDL MOL format end
+/// \param line_end_in  The limit at which to stop searching for the MDL MOL format end.  Defaults
+///                     to -1 to indicate "end of file."
 /// \{
-int getMdlFormatEnd(const TextFileReader &tfr, int line_start, int line_end_in);
+int getMdlMolSectionEnd(const TextFileReader &tfr, int line_start, int line_end_in = -1);
 
-int getMdlFormatEnd(const TextFile &tf, int line_start, int line_end_in);
+int getMdlMolSectionEnd(const TextFile &tf, int line_start, int line_end_in = -1);
 /// \}
   
 /// \brief Find the version stamp in an MDL MOL file (or a part of an SD file, .sdf).  Assume the
 ///        legacy V2000 if no version is found.
 ///
+/// Overloaded:
+///   - Accept a pointer to a single line
+///   - Accept the original TextFile object (safest method, as it implies a bounds check on the
+///     line of interest)
+///
 /// \param text   Text to search, probably from the fourth line of the MOL file or SD entry
 /// \param nchar  The number of characters on the line
-int findMolObjVersion(const char* text, const int nchar);
+/// \{
+MdlMolVersion findMolObjVersion(const char* text, const int nchar);
+  
+MdlMolVersion findMolObjVersion(const TextFile &tf, const int line_number);
+/// \}
 
 /// \brief Find the limits for different MDL MOL entries within an SD file.
 ///

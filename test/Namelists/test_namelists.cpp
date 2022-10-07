@@ -6,6 +6,8 @@
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/ForceField/forcefield_enumerators.h"
+#include "../../src/Math/vector_ops.h"
+#include "../../src/Math/statistics.h"
 #include "../../src/Namelists/input.h"
 #include "../../src/Namelists/nml_ffmorph.h"
 #include "../../src/Namelists/nml_files.h"
@@ -14,6 +16,9 @@
 #include "../../src/Namelists/nml_restraint.h"
 #include "../../src/Namelists/nml_solvent.h"
 #include "../../src/Parsing/parse.h"
+#include "../../src/Potential/energy_enumerators.h"
+#include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
@@ -26,12 +31,19 @@ using stormm::constants::tiny;
 using stormm::diskutil::osSeparator;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
+using stormm::energy::EvaluateForce;
+using stormm::energy::evaluateRestraints;
+using stormm::energy::ScoreCard;
 using stormm::errors::rtWarn;
+using stormm::math::mean;
+using stormm::math::variance;
+using stormm::math::VarianceMethod;
 using stormm::modeling::ForceFieldElement;
 using stormm::modeling::ParameterKind;
 using stormm::parse::separateText;
 using stormm::parse::strcmpCased;
 using stormm::parse::TextOrigin;
+using stormm::restraints::RestraintApparatus;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
 using stormm::topology::ImplicitSolventModel;
@@ -283,16 +295,42 @@ int main(const int argc, const char* argv[]) {
   start_line = 0;
   RestraintControls rst_ctrl_a(nml_tf, &start_line, nullptr);
   std::vector<int> rst_count(tsm.getSystemCount(), 0);
+  std::vector<RestraintApparatus> ra_vec;
+  std::vector<double> ra_mean_kvals(tsm.getSystemCount()), ra_std_kvals(tsm.getSystemCount());
+  ra_vec.reserve(tsm.getSystemCount());
   for (int i = 0; i < tsm.getSystemCount(); i++) {
     const CoordinateFrame cf_i = tsm.exportCoordinateFrame(i);
     const ChemicalFeatures chemfe_i(tsm.getTopologyPointer(i), cf_i);
     const std::vector<BoundedRestraint> r_i = rst_ctrl_a.getRestraint(tsm.getTopologyPointer(i),
                                                                       &chemfe_i, cf_i);
     rst_count[i] = r_i.size();
+    ra_vec.emplace_back(r_i, tsm.getTopologyPointer(i));
+    std::vector<double>k_vals(r_i.size());
+    for (size_t j = 0; j < r_i.size(); j++) {
+      k_vals[j] = r_i[j].getStiffness().x;
+    }
+    ra_mean_kvals[i] = mean(k_vals);
+    ra_std_kvals[i] = variance(k_vals, VarianceMethod::STANDARD_DEVIATION);
   }
   const std::vector<int> rst_count_ans = { 88, 36, 36, 8, 47, 124, 51, 90, 81 };
   check(rst_count, RelationalOperator::EQUAL, rst_count_ans, "The number of heavy-atom dihedral "
         "restraints found in each system do not meet expectations.", tsm.getTestingStatus());
+  check(ra_mean_kvals, RelationalOperator::EQUAL, std::vector<double>(9, 50.0), "The restraint "
+        "stiffnesses were not applied correctly.", tsm.getTestingStatus());
+  check(ra_std_kvals, RelationalOperator::EQUAL, std::vector<double>(9, 0.0), "The restraint "
+        "stiffnesses were not applied correctly.  All stiffnesses should be identical.",
+        tsm.getTestingStatus());
+  std::vector<double> rstr_e(tsm.getSystemCount());
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    ScoreCard sc(1, 1, 32);
+    PhaseSpace ps_i = tsm.exportPhaseSpace(i);
+    evaluateRestraints(ra_vec[i], &ps_i, &sc, EvaluateForce::YES);
+    rstr_e[i] = sc.reportTotalEnergy();
+  }
+  check(rstr_e, RelationalOperator::EQUAL, std::vector<double>(9, 0.0), "Holding restraints "
+        "applied to a variety of systems show non-zero initial energies.  This indicates that the "
+        "restraint targets, and possibly other aspects of the restraints, do not match the "
+        "structures to which they were assigned.", tsm.getTestingStatus());
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
