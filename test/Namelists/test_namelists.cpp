@@ -11,6 +11,7 @@
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_minimize.h"
 #include "../../src/Namelists/nml_random.h"
+#include "../../src/Namelists/nml_restraint.h"
 #include "../../src/Namelists/nml_solvent.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Reporting/error_format.h"
@@ -276,8 +277,22 @@ int main(const int argc, const char* argv[]) {
                         base_crd_name, "inpcrd",
                         { "stereo_L1_vs", "symmetry_L1_vs", "drug_example_vs_iso",
                           "bromobenzene_vs_iso", "med_1", "med_2", "med_3", "med_4", "med_5" });
-  
+  const std::string rst_nml_a("&restraint\n  ensemble heavy_dihedrals\n  penalty 50.0, fbhw 0.0\n"
+                              "&end");
+  const TextFile nml_tf(rst_nml_a, TextOrigin::RAM);
   start_line = 0;
+  RestraintControls rst_ctrl_a(nml_tf, &start_line, nullptr);
+  std::vector<int> rst_count(tsm.getSystemCount(), 0);
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    const CoordinateFrame cf_i = tsm.exportCoordinateFrame(i);
+    const ChemicalFeatures chemfe_i(tsm.getTopologyPointer(i), cf_i);
+    const std::vector<BoundedRestraint> r_i = rst_ctrl_a.getRestraint(tsm.getTopologyPointer(i),
+                                                                      &chemfe_i, cf_i);
+    rst_count[i] = r_i.size();
+  }
+  const std::vector<int> rst_count_ans = { 88, 36, 36, 8, 47, 124, 51, 90, 81 };
+  check(rst_count, RelationalOperator::EQUAL, rst_count_ans, "The number of heavy-atom dihedral "
+        "restraints found in each system do not meet expectations.", tsm.getTestingStatus());
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -170,6 +170,11 @@ void TestSystemManager::checkIndexing(const int index, const char* caller) const
 }
 
 //-------------------------------------------------------------------------------------------------
+int TestSystemManager::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string TestSystemManager::getTopologyBasePath() const {
   return topology_base;
 }
@@ -225,9 +230,29 @@ const PhaseSpace& TestSystemManager::viewCoordinates(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph& TestSystemManager::viewTopology(const int index) const {
+const AtomGraph& TestSystemManager::getTopologyReference(const int index) const {
   checkIndexing(index, "viewTopology");
   return all_topologies[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph>& TestSystemManager::getTopologyReference() const {
+  return all_topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* TestSystemManager::getTopologyPointer(const int index) const {
+  checkIndexing(index, "viewTopology");
+  return &all_topologies[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() {
+  std::vector<AtomGraph*> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = &all_topologies[i];
+  }
+  return result;
 }
 
 } // namespace testing

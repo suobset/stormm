@@ -63,6 +63,9 @@ public:
                     TestPriority all_go_response_in = TestPriority::CRITICAL);
   /// \}
 
+  /// \brief Get the number of systems in the object.
+  int getSystemCount() const;
+  
   /// \brief Return the base path for topologies
   std::string getTopologyBasePath() const;
   
@@ -100,8 +103,29 @@ public:
   /// \param index  The system of interest
   const PhaseSpace& viewCoordinates(int index) const;
 
-  /// \brief Get a const reference to the topology for one system.
-  const AtomGraph& viewTopology(int index) const;
+  /// \brief Get a const reference to the topology for one or more systems.
+  ///
+  /// Overloaded:
+  ///   - Get a reference to a single topology
+  ///   - Get a reference to the vector of all topologies in order
+  ///
+  /// \param index  The system of interest
+  /// \{
+  const AtomGraph& getTopologyReference(int index) const;
+  const std::vector<AtomGraph>& getTopologyReference() const;
+  /// \}
+  
+  /// \brief Get a pointer to one or more topologies
+  ///
+  /// Overloaded:
+  ///   - Get a pointer to a single topology
+  ///   - Get a const vector of pointers to all topologies in order
+  ///
+  /// \param index  Identifier of a specific topology of interest
+  /// \{
+  const AtomGraph* getTopologyPointer(int index) const;
+  const std::vector<AtomGraph*> getTopologyPointer();
+  /// \}
   
 private:
   int system_count;              ///< The number of systems managed by this object

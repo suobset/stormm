@@ -44,7 +44,7 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *
 {
   NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy, wrap);
   const int starting_line = *start_line + 1;
-  if (*found_nml == false) {
+  if (found_nml != nullptr && *found_nml == false) {
     return;
   }
 
