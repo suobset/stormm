@@ -167,6 +167,7 @@ public:
   /// \{
   MolObjAtomList(const std::vector<int> &atomic_numbers_in = {}, bool exclusions_in = false,
                  int atom_attachment_in = 0);
+
   MolObjAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
@@ -191,12 +192,78 @@ private:
 /// \brief A molecular or atomic property read from an MDL .mol or SDF file
 class MolObjProperty {
 public:
+
+  /// \brief The constructor takes all member variable inputs, or the original text and a line
+  ///        number within it.
+  ///
+  /// \param tf            Text of the original .sdf or .mol file, read into RAM
+  /// \param line_number   Number of the line on which to read the data
+  /// \param line_advance  The line advancement position, which will account for data lines in
+  ///                      some properties
+  /// \param title         The title of the structure, if known, for error tracing purposes
+  /// \{
+  MolObjProperty(const char4 code_in = { ' ', ' ', ' ', ' ' }, int substrate_in = -1,
+                 int entry_count_in = 0, int entry_depth_in = 0,
+                 const std::vector<MolObjPropField> &entry_detail_in = {},
+                 const std::vector<int> &int_data_in = {},
+                 const std::vector<double> &real_data_in = {},
+                 const std::vector<std::string> &str_data_in = {});
+
+  MolObjProperty(const TextFile &tf, int line_number, int *line_advance,
+                 const std::string &title = std::string(""));
+  /// \}
   
 private:
-  char4 code;
-  
+  char4 code;                                ///< A three-letter code indicating what the property
+                                             ///<   is.  The "w" member stores the first letter on
+                                             ///<   the line, which is usually but not always 'M'.
+  MolObjPropertyKind kind;                   ///< The type of property
+  int substrate;                             ///< One atom or S-group that is central to all
+                                             ///<   entries, relevant to some properties 
+  int entry_count;                           ///< Number of entries (some properties have maximum
+                                             ///<   numbers of entries hard-wired into the format,
+                                             ///<   and thus into the constructor)
+  int entry_depth;                           ///< The number of fields in each entry
+  std::vector<MolObjPropField> entry_detail; ///< Nature of each field in each entry.  The most
+                                             ///<   important classifications are INTEGER and
+                                             ///<   CHAR4, although some properties contain longer
+                                             ///<   strings.
+                                             ///<   real numbers in the 3-character column format.
+  std::vector<int> int_data;                 ///< Data for all entries, ordered for entries A, B,
+                                             ///<   and C with depth 3: { A1, A2, A3, B1, B2, B3,
+                                             ///<   C1, C2, C3 }
+  std::vector<double> real_data;             ///< Real-valued information for the property.  If a
+                                             ///<   component of an entry is REAL, the
+                                             ///<   corresponding value in int_data will refer to
+                                             ///<   the index of data_str at which to find the
+                                             ///<   information.
+  std::vector<std::string> str_data;         ///< String data for all entries, covering the
+                                             ///<   STRING enumerations of the MolObjPropField
+                                             ///<   entry details.  If a component of an entry is a
+                                             ///<   STRING, the corresponding value in int_data
+                                             ///<   will refer to the index of data_str at which to
+                                             ///<   find the information.
+
+  /// \brief Extract the number of entries for the property.  Returns FALSE if there is no error
+  ///        encountered, TRUE if there is a problem.
+  ///
+  /// \param line_ptr   The line containing the property text
+  /// \param start_pos  The starting position at which to reach the property (default 6)
+  /// \param length     The expected length of the entry count (default 3)
+  bool readEntryCount(const char* line_ptr, int start_pos = 6, int length = 3);
+
+  /// \brief Extract the index of the substrate atom or group for the property.  Returns FALSE if
+  ///        there is no error encountered, TRUE if there is a problem.
+  ///
+  /// \param line_ptr   The line containing the property text
+  /// \param start_pos  The starting position at which to reach the property (default 7)
+  /// \param length     The expected length of the entry count (default 3)
+  bool readSubstrateIndex(const char* line_ptr, int start_pos = 7, int length = 3);
 };
 
+/// \brief A molecular three-dimensional feature.  This special class of MOL object properies has
+///        its own data lines.
+  
 /// \brief A molecule read from an MDL .mol file, or one of many read from a concatenated SDF file.
 ///        Many of the enumerators above are translated according to member functions of this
 ///        object based on the documentation in the ctfileformats.pdf file in this library's

@@ -234,23 +234,453 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
 {
   // Determine whether this originates in an atom list entry or a property of the MDL section
   const char* line_ptr = tf.getLinePointer(line_number);
-  if (tf.getLineLength(line_number) < 6) {
+  const int lnlength = tf.getLineLength(line_number);
+  if (lnlength < 6) {
     rtErr("Line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) +
           " cannot contain MDL MOL atom list information due to its length being only " +
-          std::to_string(tf.getLineLength(line_number)));
+          std::to_string(lnlength) + ".");
   }
   if (strncmpCased(line_ptr, std::string("M  ALS"))) {
 
     // The entry originates as a property.  This would invalidate any preceding atom list entries
     // of the deprecated format, but such a contingency has already been taken care of in the
     // parent MdlMolObj reader.
-    
+    if (lnlength < 15) {
+      rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + " to read a property-based MDL MOL atom list.", "MolObjAtomList");
+    }
+    if (verifyContents(line_ptr, 7, 3, NumberFormat::INTEGER)) {
+      atom_attachment = readIntegerValue(line_ptr, 7, 3);
+    }
+    if (verifyContents(line_ptr, 10, 3, NumberFormat::INTEGER)) {
+      entry_count = readIntegerValue(line_ptr, 10, 3);
+    }
+    if (entry_count < 0 || entry_count > 16) {
+      rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
+            "line " + std::to_string(line_number) + " of " + tf.getFileName() + ".",
+            "MolObjAtomList");
+    }
+    switch (line_ptr[14]) {
+    case 'T':
+      exclusions = true;
+      break;
+    case 'F':
+      exclusions = false;
+      break;
+    default:
+      rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + ", " + line_ptr[14] + ", is invalid.", "MolObjAtomList");
+    }
+    if (lnlength < 16 + (4 * entry_count)) {
+      rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + " to read an atom list with " + std::to_string(entry_count) +
+            "items.", "MolObjAtomList");      
+    }
+    std::vector<char4> tmp_symbols;
+    for (int i = 0; i < entry_count; i++) {
+      tmp_symbols[i].x = line_ptr[16 + (4 * i)];
+      tmp_symbols[i].y = line_ptr[17 + (4 * i)];
+      tmp_symbols[i].z = line_ptr[18 + (4 * i)];
+      tmp_symbols[i].w = line_ptr[19 + (4 * i)];
+    }
+    atomic_numbers = symbolToZNumber(tmp_symbols, CaseSensitivity::YES, ExceptionResponse::DIE);
   }
   else {
-    
+    if (lnlength < 10) {
+      rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + " to read one of the (deprecated) MDL MOL atom list entries.",
+            "MolObjAtomList");
+    }
+
+    // Read the deprecated atom list entry format
+    if (verifyContents(line_ptr, 0, 3, NumberFormat::INTEGER)) {
+      atom_attachment = readIntegerValue(line_ptr, 0, 3);
+    }
+    switch (line_ptr[4]) {
+    case 'T':
+      exclusions = true;
+      break;
+    case 'F':
+      exclusions = false;
+      break;
+    default:
+      rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + ", " + line_ptr[4] + ", is invalid.", "MolObjAtomList");
+    }
+    if (verifyContents(line_ptr, 5, 5, NumberFormat::INTEGER)) {
+      entry_count = readIntegerValue(line_ptr, 5, 5);
+    }
+    if (entry_count < 0 || entry_count > 5) {
+      rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
+            "line " + std::to_string(line_number) + " of " + tf.getFileName() + ".",
+            "MolObjAtomList");
+    }
+    if (lnlength < 10 + (4 * entry_count)) {
+      rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
+            tf.getFileName() + " to read an atom list with " + std::to_string(entry_count) +
+            "items.", "MolObjAtomList");
+    }
+    atomic_numbers.resize(entry_count);
+    for (int i = 0; i < entry_count; i++) {
+      if (verifyContents(line_ptr, 11 + (4 * i), 3, NumberFormat::INTEGER)) {
+        atomic_numbers[i] = readIntegerValue(line_ptr, 11 + (4 * i), 3);
+      }
+      else {
+        rtErr("An invalid entry was found on line " + std::to_string(line_number) + " of " +
+              tf.getFileName() + ": " + tf.extractString(line_number, 11 + (4 * i), 3) + ".  The "
+              "entries of one of the (deprecated) MDL MOL format atom lists must be integers "
+              "corresponding to atomic numbers.  Use IUPAC element symbols in the new format, "
+              "placed on MOL property lines beginning \"M  ALS\".", "MolObjAtomList");
+      }
+    }
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+MolObjProperty::MolObjProperty(const char4 code_in, const int substrate_in,
+                               const int entry_count_in, const int entry_depth_in,
+                               const std::vector<MolObjPropField> &entry_detail_in,
+                               const std::vector<int> &int_data_in,
+                               const std::vector<double> &real_data_in,
+                               const std::vector<std::string> &str_data_in) :
+    code{code_in}, substrate{substrate_in}, entry_count{entry_count_in},
+    entry_depth{entry_depth_in}, entry_detail{entry_detail_in}, int_data{int_data_in},
+    real_data{real_data_in}, str_data{str_data_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *line_advance,
+                               const std::string &title) :
+    MolObjProperty()
+{
+  const char* line_ptr = tf.getLinePointer(line_number);
+  const int lnlength = tf.getLineLength(line_number);
+  if (lnlength < 6) {
+    rtErr("Line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) +
+          " cannot contain MDL MOL property information due to its length being only " +
+          std::to_string(lnlength) + ".");
+  }
+
+  // Read the initial letter and three-letter code,
+  code.w = line_ptr[0];
+  code.x = line_ptr[3];
+  code.x = line_ptr[4];
+  code.x = line_ptr[5];
+  kind = translateMolObjPropertyKind(code);
+
+  // Interpret the code according to known options, starting with the maximum number of entries.
+  int max_entries = 10000;
+  switch (kind) {
+  case MolObjPropertyKind::ATOM_ALIAS:
+  case MolObjPropertyKind::ATOM_VALUE:
+  case MolObjPropertyKind::GROUP_ABBREVIATION:
+  case MolObjPropertyKind::ATOM_LIST:
+  case MolObjPropertyKind::SGROUP_SUBSCRIPT:
+  case MolObjPropertyKind::SGROUP_BOND_VECTOR:
+  case MolObjPropertyKind::SGROUP_FIELD:
+  case MolObjPropertyKind::SGROUP_DISPLAY:
+  case MolObjPropertyKind::SGROUP_DATA:
+  case MolObjPropertyKind::SPATIAL_FEATURE:
+  case MolObjPropertyKind::PHANTOM_ATOM:
+  case MolObjPropertyKind::SGROUP_CLASS:
+  case MolObjPropertyKind::LARGE_REGNO:
+    break;
+  case MolObjPropertyKind::SGROUP_EXPANSION:
+  case MolObjPropertyKind::SGROUP_ATOM_LIST:
+  case MolObjPropertyKind::SGROUP_BOND_LIST:
+  case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
+    max_entries = 15;
+    break;
+  case MolObjPropertyKind::CHARGE:
+  case MolObjPropertyKind::RADICAL:
+  case MolObjPropertyKind::ISOTOPE:
+  case MolObjPropertyKind::RING_BOND_COUNT:
+  case MolObjPropertyKind::SUBSTITUTION_COUNT:
+  case MolObjPropertyKind::UNSATURATED_COUNT:
+  case MolObjPropertyKind::RGROUP_LABEL_LOCATION:
+  case MolObjPropertyKind::SGROUP_TYPE:
+  case MolObjPropertyKind::SGROUP_SUBTYPE:
+  case MolObjPropertyKind::SGROUP_LABELS:
+  case MolObjPropertyKind::SGROUP_CONNECTIVITY:
+  case MolObjPropertyKind::SGROUP_HIERARCHY:
+  case MolObjPropertyKind::SGROUP_COMP_NUMBER:
+  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
+    max_entries = 8;
+    break;
+  case MolObjPropertyKind::SGROUP_CORRESPONENCE:
+  case MolObjPropertyKind::SGROUP_ATTACH_POINT:
+    max_entries = 6;
+    break;
+  case MolObjPropertyKind::LINK_ATOM:
+  case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
+    max_entries = 4;
+    break;
+  case MolObjPropertyKind::ATTACHMENT_POINT:
+  case MolObjPropertyKind::ATTACHMENT_ORDER:
+    max_entries = 2;
+    break;
+  case MolObjPropertyKind::RGROUP_LOGIC:
+    max_entries = 1;
+    break;
+  case MolObjPropertyKind::SKIP:
+    break;
+  }
+
+  // Determine the layout and allocate the necessary space for each property.  Set the line
+  // advancement, if appropriate.
+  int tmp_advance = 0;
+  bool entry_count_unrecognized = false;
+  bool substrate_unrecognized = false;
+  switch (kind) {
+  case MolObjPropertyKind::ATOM_ALIAS:
+  case MolObjPropertyKind::ATOM_VALUE:
+    entry_count = 1;
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::GROUP_ABBREVIATION:
+    entry_count = 1;
+    entry_depth = 2;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
+    tmp_advance = 1;
+    break;
+  case MolObjPropertyKind::CHARGE:
+  case MolObjPropertyKind::RADICAL:
+  case MolObjPropertyKind::ISOTOPE:
+  case MolObjPropertyKind::RING_BOND_COUNT:
+  case MolObjPropertyKind::SUBSTITUTION_COUNT:
+  case MolObjPropertyKind::UNSATURATED_COUNT:
+  case MolObjPropertyKind::ATTACHMENT_POINT:
+  case MolObjPropertyKind::RGROUP_LABEL_LOCATION:
+  case MolObjPropertyKind::SGROUP_TYPE:
+  case MolObjPropertyKind::SGROUP_SUBTYPE:
+  case MolObjPropertyKind::SGROUP_LABELS:
+  case MolObjPropertyKind::SGROUP_CONNECTIVITY:
+  case MolObjPropertyKind::SGROUP_HIERARCHY:
+  case MolObjPropertyKind::SGROUP_COMP_NUMBER:
+    entry_count_unrecognized = readEntryCount(line_ptr);
+    entry_depth = 2;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::LINK_ATOM:
+  case MolObjPropertyKind::RGROUP_LOGIC:
+    entry_count_unrecognized = readEntryCount(line_ptr);
+    entry_depth = 4;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::ATOM_LIST:
+    break;
+  case MolObjPropertyKind::ATTACHMENT_ORDER:
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_depth = 4;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::SGROUP_EXPANSION:
+    if (strncmpCased("EXP", tf.extractString(line_number, 7, 3), CaseSensitivity::YES) == false) {
+      rtErr("A malformed S-Group expansion entry was encountered on line " +
+            std::to_string(line_number) + " of file " + tf.getFileName() + ".", "MolObjProperty");
+    }
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::SGROUP_ATOM_LIST:
+  case MolObjPropertyKind::SGROUP_BOND_LIST:
+  case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::SGROUP_SUBSCRIPT:
+    entry_count = 1;
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::STRING };
+    break;
+  case MolObjPropertyKind::SGROUP_CORRESPONENCE:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 3;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 4;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER };    
+    break;
+  case MolObjPropertyKind::SGROUP_BOND_VECTOR:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count = 1;
+    entry_depth = 3;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER };    
+    break;
+  case MolObjPropertyKind::SGROUP_FIELD:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count = 1;
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::STRING };
+    break;
+  case MolObjPropertyKind::SGROUP_DISPLAY:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count = 1;
+    entry_depth = 7;
+    entry_detail = { MolObjPropField::REAL, MolObjPropField::REAL, MolObjPropField::INTEGER,
+                     MolObjPropField::CHAR4, MolObjPropField::CHAR4, MolObjPropField::CHAR4,
+                     MolObjPropField::INTEGER };
+
+    // Each "M  SDD" entry will be followed by zero or more "M  SCD" entries and a final "M  SED"
+    // entry.  Scan ahead to determine the number of subsequent lines to skip.
+    tmp_advance = line_number + 1;
+    while (tmp_advance < tf.getLineCount() && tf.getLineLength(tmp_advance) >= 6 &&
+           strncmpCased(tf.extractString(tmp_advance, 0, 6), "M  SCD")) {
+      tmp_advance++;
+    }
+    if (strncmpCased(tf.extractString(tmp_advance, 0, 6), "M  SED")) {
+      tmp_advance++;
+    }
+    else {
+      rtErr("An MDL MOL property S-group display (\"M  SDD\") entry beginning on line " +
+            std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + " must "
+            "be followed by S-group data line (optional \"M  SCD\" lines, and a terminating "
+            "\"M  SED\" line).", "MolObjProperty");
+    }
+    tmp_advance -= line_number;
+    break;
+  case MolObjPropertyKind::SGROUP_DATA:
+
+    // The S-group data will be read as part of the parent S-group display entry.
+    break;
+  case MolObjPropertyKind::SPATIAL_FEATURE:
+    break;
+  case MolObjPropertyKind::PHANTOM_ATOM:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count = 1;
+    entry_depth = 5;
+    entry_detail = { MolObjPropField::REAL, MolObjPropField::REAL, MolObjPropField::REAL,
+                     MolObjPropField::CHAR4, MolObjPropField::STRING };
+    break;
+  case MolObjPropertyKind::SGROUP_ATTACH_POINT:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 5;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::CHAR4 };
+    break;
+  case MolObjPropertyKind::SGROUP_CLASS:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count = 1;
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::STRING };
+    break;
+  case MolObjPropertyKind::LARGE_REGNO:
+    entry_count = 1;
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
+    break;
+  case MolObjPropertyKind::SKIP:
+    entry_count = 0;
+    entry_depth = 0;
+    if (verifyContents(line_ptr, 6, 3, NumberFormat::INTEGER)) {
+      tmp_advance = readIntegerValue(line_ptr, 6, 3);
+    }
+    else {
+      rtErr("The S  SKP property cannot skip " + tf.extractString(line_number, 6, 3) + " lines.",
+            "MolObjProperty");
+    }
+    break;
+  }
+  *line_advance = line_number + tmp_advance;
+  if (*line_advance >= tf.getLineCount()) {
+    rtErr("The advancement due to property " + std::to_string(code.w) + "  " + code.x + code.y +
+          code.z + " overruns the length of file " + tf.getFileName() + ".", "MolObjProperty");
+  }
   
+  // Read the line for each type of property.  Advance the auxiliary counter line_advance if there
+  // are additional data lines associated with the property, to avoid later trying to read such
+  // information as new properties.
+  switch (kind) {
+  case MolObjPropertyKind::ATOM_ALIAS:
+    entry_count = 1;
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    break;
+  case MolObjPropertyKind::ATOM_VALUE:
+  case MolObjPropertyKind::GROUP_ABBREVIATION:
+  case MolObjPropertyKind::CHARGE:
+  case MolObjPropertyKind::RADICAL:
+  case MolObjPropertyKind::ISOTOPE:
+  case MolObjPropertyKind::RING_BOND_COUNT:
+  case MolObjPropertyKind::SUBSTITUTION_COUNT:
+  case MolObjPropertyKind::UNSATURATED_COUNT:
+  case MolObjPropertyKind::LINK_ATOM:
+  case MolObjPropertyKind::ATOM_LIST:
+  case MolObjPropertyKind::ATTACHMENT_POINT:
+  case MolObjPropertyKind::ATTACHMENT_ORDER:
+  case MolObjPropertyKind::RGROUP_LABEL_LOCATION:
+  case MolObjPropertyKind::RGROUP_LOGIC:
+  case MolObjPropertyKind::SGROUP_TYPE:
+  case MolObjPropertyKind::SGROUP_SUBTYPE:
+  case MolObjPropertyKind::SGROUP_LABELS:
+  case MolObjPropertyKind::SGROUP_CONNECTIVITY:
+  case MolObjPropertyKind::SGROUP_EXPANSION:
+  case MolObjPropertyKind::SGROUP_ATOM_LIST:
+  case MolObjPropertyKind::SGROUP_BOND_LIST:
+  case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
+  case MolObjPropertyKind::SGROUP_SUBSCRIPT:
+  case MolObjPropertyKind::SGROUP_CORRESPONENCE:
+  case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
+  case MolObjPropertyKind::SGROUP_BOND_VECTOR:
+  case MolObjPropertyKind::SGROUP_FIELD:
+  case MolObjPropertyKind::SGROUP_DISPLAY:
+  case MolObjPropertyKind::SGROUP_DATA:
+  case MolObjPropertyKind::SGROUP_HIERARCHY:
+  case MolObjPropertyKind::SGROUP_COMP_NUMBER:
+  case MolObjPropertyKind::SPATIAL_FEATURE:
+  case MolObjPropertyKind::PHANTOM_ATOM:
+  case MolObjPropertyKind::SGROUP_ATTACH_POINT:
+  case MolObjPropertyKind::SGROUP_CLASS:
+  case MolObjPropertyKind::LARGE_REGNO:
+  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
+    break;
+  case MolObjPropertyKind::SKIP:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, const int length) {
+  if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
+    entry_count = readIntegerValue(line_ptr, start_pos, length);
+    return false;
+  }
+  else {
+    return true;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_pos,
+                                        const int length) {
+  if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
+    entry_count = readIntegerValue(line_ptr, start_pos, length);
+    return false;
+  }
+  else {
+    return true;
+  }
+  __builtin_unreachable();
+}
+
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},

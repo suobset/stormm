@@ -113,6 +113,17 @@ std::vector<int> symbolToZNumber(const std::vector<char4> &atomic_symbols,
   const size_t nsymb = atomic_symbols.size();
   std::vector<char2> abridged_symbols(nsymb);
   for (size_t i = 0LLU; i < nsymb; i++) {
+
+    // Remove leading white space
+    char4 asymb_tmp = atomic_symbols[i];
+    int nws = 0;
+    while (asymb_tmp.x == ' ' && nws < 3) {
+      asymb_tmp.x = asymb_tmp.y;
+      asymb_tmp.y = asymb_tmp.z;
+      asymb_tmp.z = asymb_tmp.w;
+      asymb_tmp.w = ' ';
+      nws++;
+    }
     abridged_symbols[i].x = atomic_symbols[i].x;
     abridged_symbols[i].y = atomic_symbols[i].y;
   }

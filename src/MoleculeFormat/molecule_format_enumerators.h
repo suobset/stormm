@@ -3,6 +3,7 @@
 #define STORMM_MOLECULE_FORMAT_ENUMERATORS_H
 
 #include "copyright.h"
+#include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {
 namespace structure {
@@ -49,6 +50,59 @@ enum class MolObjReactionCenter {
 enum class StereoRetention {
   NOT_APPLIED = 0, INVERTED = 1, RETAINED = 2
 };
+
+/// \brief Enumerate types of data that could be found in the fields on an MDL MOL format property.
+enum class MolObjPropField {
+  INTEGER, CHAR4, REAL, STRING
+};
+
+/// \brief Enumerate the types of data that property fields could contain
+enum class MolObjPropertyKind {
+  ATOM_ALIAS,
+  ATOM_VALUE,
+  GROUP_ABBREVIATION,
+  CHARGE,
+  RADICAL,
+  ISOTOPE,
+  RING_BOND_COUNT,
+  SUBSTITUTION_COUNT,
+  UNSATURATED_COUNT,
+  LINK_ATOM,
+  ATOM_LIST,
+  ATTACHMENT_POINT,
+  ATTACHMENT_ORDER,
+  RGROUP_LABEL_LOCATION,
+  RGROUP_LOGIC,
+  SGROUP_TYPE,
+  SGROUP_SUBTYPE,
+  SGROUP_LABELS,
+  SGROUP_CONNECTIVITY,
+  SGROUP_EXPANSION,
+  SGROUP_ATOM_LIST,
+  SGROUP_BOND_LIST,
+  MG_PARENT_ATOM_LIST,
+  SGROUP_SUBSCRIPT,
+  SGROUP_CORRESPONENCE,
+  SGROUP_DISPLAY_INFO,
+  SGROUP_BOND_VECTOR,
+  SGROUP_FIELD,
+  SGROUP_DISPLAY,
+  SGROUP_DATA,
+  SGROUP_HIERARCHY,
+  SGROUP_COMP_NUMBER,
+  SPATIAL_FEATURE,
+  PHANTOM_ATOM,
+  SGROUP_ATTACH_POINT,
+  SGROUP_CLASS,
+  LARGE_REGNO,
+  SGROUP_BRACKET_STYLE,
+  SKIP
+};
+
+/// \brief Translate a four-character tuple into one of the known MDL MOL format properties.
+///
+/// \param input  The code to translate
+MolObjPropertyKind translateMolObjPropertyKind(char4 input);
   
 } // namespace structure
 } // namespace stormm

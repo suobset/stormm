@@ -39,6 +39,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdl_mol_format.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
+		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 	           $(SRCDIR)/Namelists/input.cpp \
 	           $(SRCDIR)/Namelists/namelist_element.cpp \
 	           $(SRCDIR)/Namelists/namelist_emulator.cpp \
@@ -331,6 +332,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
 	          $(SRCDIR)/MoleculeFormat/mdl_mol_format.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
+	          $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 		  $(SRCDIR)/Namelists/input.o \
 	          $(SRCDIR)/Namelists/namelist_element.o \
 	          $(SRCDIR)/Namelists/namelist_emulator.o \
