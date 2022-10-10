@@ -30,10 +30,11 @@ using trajectory::PhaseSpace;
 /// \{
 constexpr char4 default_mdl_atomic_symbol = { ' ', ' ', ' ', ' ' };
 constexpr int default_mdl_atomic_number = -1;
-constexpr double default_mdl_formal_charge = 0.0;
-constexpr bool default_mdl_doublet_radical_state = false;
+constexpr int default_mdl_formal_charge = 0;
+constexpr RadicalState default_mdl_radical_state = RadicalState::NONE;
 constexpr int default_mdl_isotopic_shift = 0;
 constexpr MolObjAtomStereo default_mdl_stereo_parity = MolObjAtomStereo::NOT_STEREO;
+constexpr HydrogenAssignment default_hydrogenation = HydrogenAssignment::DO_NOT_HYDROGENATE;
 constexpr int default_mdl_implicit_hydrogen = 0;
 constexpr int default_mdl_valence_connections = 0;
 constexpr int default_mdl_map_count = 0;
@@ -205,6 +206,7 @@ public:
   MolObjProperty(const char4 code_in = { ' ', ' ', ' ', ' ' }, int substrate_in = -1,
                  int entry_count_in = 0, int entry_depth_in = 0,
                  const std::vector<MolObjPropField> &entry_detail_in = {},
+                 const std::vector<MolObjIndexKind> &entry_adjustment_in = {},
                  const std::vector<int> &int_data_in = {},
                  const std::vector<double> &real_data_in = {},
                  const std::vector<std::string> &str_data_in = {},
@@ -213,23 +215,49 @@ public:
   MolObjProperty(const TextFile &tf, int line_number, int *line_advance,
                  const std::string &title = std::string(""));
   /// \}
-  
+
+  /// \brief Get the property code.  This will indicate whether to obliterate certain types of
+  ///        information from the atom block of the V2000 MDL MOL format entry.
+  char4 getCode() const;
+
+  /// \brief Get the substrate atom or S-group.  The nature of the property will indicate which
+  ///        type of substrate this is.
+  int getSubstrate() const;
+
+  /// \brief Get the number of entries for this property.
+  int getEntryCount() const;
+
+  /// \brief Get a value from the property for a specific entry.  Inputs to these functions
+  ///        will be checked by checkAttributeValidity().
+  ///
+  /// \param entry_index      The index of the entry to access
+  /// \param attribute_index  The index of the attribute to retrieve
+  /// \{
+  int getIntegerValue(int entry_index, int attribute_index) const;
+  double getRealValue(int entry_index, int attribute_index) const;
+  char4 getChar4Value(int entry_index, int attribute_index) const;
+  std::string getStringValue(int entry_index, int attribute_index) const;
+  /// \}
+
 private:
-  char4 code;                                ///< A three-letter code indicating what the property
-                                             ///<   is.  The "w" member stores the first letter on
-                                             ///<   the line, which is usually but not always 'M'.
-  MolObjPropertyKind kind;                   ///< The type of property
-  int substrate;                             ///< One atom or S-group that is central to all
-                                             ///<   entries, relevant to some properties 
-  int entry_count;                           ///< Number of entries (some properties have maximum
-                                             ///<   numbers of entries hard-wired into the format,
-                                             ///<   and thus into the constructor)
-  int entry_depth;                           ///< The number of fields in each entry
-  std::vector<MolObjPropField> entry_detail; ///< Nature of each field in each entry.  The most
-                                             ///<   important classifications are INTEGER and
-                                             ///<   CHAR4, although some properties contain longer
-                                             ///<   strings.
-                                             ///<   real numbers in the 3-character column format.
+  char4 code;               ///< A three-letter code indicating what the property is.  The "w"
+                            ///<   member stores the first letter on the line, which is usually
+                            ///<   but not always 'M'.
+  MolObjPropertyKind kind;  ///< The type of property
+  int substrate;            ///< One atom or S-group that is central to all entries, relevant to
+                            ///<   some properties 
+  int entry_count;          ///< Number of entries (some properties have maximum numbers of entries
+                            ///<   hard-wired into the format, and thus into the constructor)
+  int entry_depth;          ///< The number of fields in each entry
+
+  /// Nature of each field in each entry.  The most important classifications are INTEGER and
+  ///   CHAR4, although some properties contain longer strings or real numbers.
+  std::vector<MolObjPropField> entry_detail;
+
+  /// Indications of adjustments that must be made to convert from the MDL MOL format conventions
+  /// into C / C++ array indexing.
+  std::vector<MolObjIndexKind> entry_adjustment;
+
   std::vector<int> int_data;                 ///< Data for all entries, ordered for entries A, B,
                                              ///<   and C with depth 3: { A1, A2, A3, B1, B2, B3,
                                              ///<   C1, C2, C3 }
@@ -276,6 +304,16 @@ private:
   ///                     the nth data element is given in the nth position of limits.
   void parseEntries(const TextFile &tf, int line_number, int start_pos,
                     const std::vector<int> &limits);
+
+  /// \brief Check the validity of an attribute request.  Getting information from properties can
+  ///        be a tedious and error-prone process.  These guardrails will help developers find
+  ///        information safely.
+  ///
+  /// \param entry_index      The index of the entry to access (receives a bounds check)
+  /// \param attribute_index  The index of the attribute to retrieve (receives a bounds check)
+  /// \param expectation      The expected nature of the attribute (checked for sanity)
+  void checkAttributeValidity(int entry_index, int attribute_index,
+                              MolObjPropField expectation) const;
 };
 
 /// \brief A molecular three-dimensional feature.  This special class of MOL object properies has
@@ -362,6 +400,17 @@ public:
   /// \brief Get a const reference to the vector of all atomic numbers in the system.
   const std::vector<int>& getAtomicNumbers() const;
 
+  /// \brief Get the formal charge on a particular atom.
+  ///
+  /// \param index  Index number of the atom of interest
+  int getFormalCharge(int index) const;
+
+  /// \brief Get a const reference to the vector of all formal charges.
+  const std::vector<int>& getFormalCharges() const;
+  
+  /// \brief Get the number of properties found in the MDL MOL entry
+  int getPropertiesCount() const;
+  
 private:
 
   // Items describing quantities of information (most of them from the counts line)
@@ -382,9 +431,9 @@ private:
   std::vector<double3> coordinates;         ///< Cartesian coordinates of all atoms
   std::vector<char4> atomic_symbols;        ///< Symbols for all atoms
   std::vector<int> atomic_numbers;          ///< Atomic numbers for all atoms
-  std::vector<double> formal_charges;       ///< Formal charges for all atoms
-  std::vector<bool> doublet_radicals;       ///< Indications that any atom contains a radical in
-                                            ///<   doublet excitation state
+  std::vector<int> formal_charges;          ///< Formal charges for all atoms
+  std::vector<RadicalState> radicals;       ///< Indications that any atom contains a radical in
+                                            ///<   singlet, doublet, or triplet excitation state
   std::vector<int> isotopic_shifts;         ///< Isotope numbers shifting each atoms nuclear mass
                                             ///<   (~1 Dalton from the most common isotopic mass)
   std::vector<MolObjAtomStereo> parities;   ///< Stereochemical parity of each atom
@@ -402,7 +451,12 @@ private:
                                             ///<   chemical reaction
   std::vector<bool> exact_change_enforced;  ///< Flags to indicate that the changes on an atom
                                             ///<   must be exactly as described in the reaction
-  
+
+  /// The assigned method of adding implicit hydrogens: add at least the number defined in the
+  /// field (up to the amount needed to satisfy the anticipated valence shell electron content),
+  /// add the number needed to satisfy the valence shell, or do not add hydrogens. 
+  std::vector<HydrogenAssignment> hydrogenation_protocol;
+
   /// Indication of whether stereochemistry is inverted or retained in a chemical reaction
   std::vector<StereoRetention> orientation_stability;
 
@@ -433,9 +487,10 @@ private:
   /// \brief Interpret the formal charge of an atom based on an integer code.  A doublet radical
   ///        can also emerge from this analysis.
   ///
-  /// \param charge_in           The charge code to interpret
-  /// \param is_doublet_radical  Flag to indicate code 4, no net charge but a double radical
-  double interpretFormalCharge(int charge_in, bool *is_doublet_radical);
+  /// \param charge_in   The charge code to interpret
+  /// \param atom_index  Index of the atom to which the charge applies (the radical state may also
+  ///                    be set by this function)
+  void interpretFormalCharge(int charge_in, int atom_index);
 
   /// \brief Interpret the stereochemical parity of an atom based on an integral numeric code.
   ///
@@ -446,10 +501,12 @@ private:
   ///        hydrogens are implied to be present around an atom center, in addition to any hydrogen
   ///        atoms explicitly placed in the structure.
   ///
-  /// \param nh_in  The number of hydrogens that are to be inferred around the atom's structure.
-  ///               This number is decremented by one, meaning that 1 implies no implicit hydrogen
-  ///               content.
-  int interpretImplicitHydrogenContent(int nh_in);
+  /// \param nh_in       The number of hydrogens that are to be inferred around the atom's
+  ///                    structure.  This number is decremented by one, meaning that 1 implies no
+  ///                    implicit hydrogen content.
+  /// \param atom_index  Atom to which the hydrogen content applies.  This is provided in order to
+  ///                    set both the actual number and the action fields for the atom.
+  void interpretImplicitHydrogenContent(int nh_in, int atom_index);
 
   /// \brief Interpret a boolean value from an integer.
   ///
@@ -467,6 +524,14 @@ private:
   ///
   /// \param code_in  A numeric code to be translated into inversion or retention options
   StereoRetention interpretStereoStability(int code_in);
+
+  /// \brief Scan properties (of a V2000-format molecule) and update information that may have been
+  ///        read from the atoms block.
+  void updateV2kAtomAttributes();
+  
+  /// \brief Add hydrogens to fill out valence shells based on the stated bond orders, formal
+  ///        charges, and elements of the molecule.
+  void hydrogenate();
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.

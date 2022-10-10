@@ -28,10 +28,12 @@ int main(const int argc, const char* argv[]) {
 
   // Open an MDL MOL file with a single entry in V2000 format
   const std::string base_name = oe.getStormmSourcePath() + osc + "test" + osc + "MoleculeFormat";
-  const std::string mdl_name = base_name + osc + "sulfonamide.mol";
-  const std::string sdf_name = base_name + osc + "sulfonamide_rots.sdf";
+  const std::string mdl_name      = base_name + osc + "sulfonamide.mol";
+  const std::string sdf_name      = base_name + osc + "sulfonamide_rots.sdf";
+  const std::string chemaxon_name = base_name + osc + "sdf_chemaxon.sdf";
   const bool files_ready = (getDrivePathType(mdl_name) == DrivePathType::FILE &&
-                            getDrivePathType(sdf_name) == DrivePathType::FILE);
+                            getDrivePathType(sdf_name) == DrivePathType::FILE &&
+                            getDrivePathType(chemaxon_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_ready) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (files_ready == false) {
     rtWarn("Files for MDL MOL format molecules were not found.  Check the STORMM source path, "
@@ -61,7 +63,17 @@ int main(const int argc, const char* argv[]) {
   check(sulf_rtm[2].getCoordinates(CartesianDimension::X), RelationalOperator::EQUAL,
         Approx(sulf_rtm_c_xcrds).margin(verytiny), "Coordinates for an MDL MOL entry within an "
         "SD file were not taken up as expected.  The X coordinate values do not match.", do_tests);
-  
+
+  // Read an SD file with V2000 MDL MOL entries containing some properties
+  std::vector<MdlMolObj> chemaxon_mols = readStructureDataFile(chemaxon_name);
+  check(chemaxon_mols[1].getPropertiesCount(), RelationalOperator::EQUAL, 1, "An incorrect number "
+        "of properties were found in the second V2000 MDL MOL entry of " + chemaxon_name + ".",
+        do_tests);
+  const std::vector<int> fc_result = { chemaxon_mols[1].getFormalCharge(22),
+                                       chemaxon_mols[1].getFormalCharge(22) };
+  check(fc_result, RelationalOperator::EQUAL, std::vector<int>(2, 1), "Formal charges were not "
+        "properly interpreted from an MDL MOL V2000 format property.", do_tests);
+
   // Print results
   printTestSummary(oe.getVerbosity());
 

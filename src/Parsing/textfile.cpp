@@ -215,7 +215,7 @@ int TextFile::checkAvailableLength(const int line_number, const int start_pos,
           "TextFile", "checkAvailableLength");
   }
   const int available_chars = line_limits[line_number + 1] - line_limits[line_number];
-  if (start_pos > available_chars || start_pos + string_length >= available_chars) {
+  if (start_pos > available_chars || start_pos + string_length > available_chars) {
     rtErr("Line " + std::to_string(line_number) + " of text file " + orig_file + " has " +
           std::to_string(available_chars) + " characters (requested starting position " +
           std::to_string(start_pos) + ", length " + std::to_string(string_length) + ").",

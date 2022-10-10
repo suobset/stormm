@@ -12,6 +12,7 @@ using parse::readRealValue;
 using parse::strncmpCased;
 using parse::TextFileReader;
 using parse::verifyContents;
+using parse::operator==;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpaceWriter;
   
@@ -46,8 +47,10 @@ MolObjBond::MolObjBond(const TextFile &tf, const int line_number, const std::str
           " cannot contain MDL MOL bond information due to its length being only " +
           std::to_string(tf.getLineLength(line_number)));
   }
-  i_atom = readIntegerValue(bond_line_ptr, 0, 3);
-  j_atom = readIntegerValue(bond_line_ptr, 3, 3);
+
+  // Subtract 1 from the atom indexing given in the MDL MOL format, which starts at 1.
+  i_atom = readIntegerValue(bond_line_ptr, 0, 3) - 1;
+  j_atom = readIntegerValue(bond_line_ptr, 3, 3) - 1;
   order = (verifyContents(tf, line_number, 6, 3)) ?
           interpretBondOrder(readIntegerValue(bond_line_ptr, 6, 3), title) :
           default_mdl_bond_order;
@@ -340,6 +343,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
 MolObjProperty::MolObjProperty(const char4 code_in, const int substrate_in,
                                const int entry_count_in, const int entry_depth_in,
                                const std::vector<MolObjPropField> &entry_detail_in,
+                               const std::vector<MolObjIndexKind> &entry_adjustment_in,
                                const std::vector<int> &int_data_in,
                                const std::vector<double> &real_data_in,
                                const std::vector<std::string> &str_data_in,
@@ -365,8 +369,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   // Read the initial letter and three-letter code,
   code.w = line_ptr[0];
   code.x = line_ptr[3];
-  code.x = line_ptr[4];
-  code.x = line_ptr[5];
+  code.y = line_ptr[4];
+  code.z = line_ptr[5];
   kind = translateMolObjPropertyKind(code);
 
   // Interpret the code according to known options, starting with the maximum number of entries.
@@ -437,17 +441,19 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   switch (kind) {
   case MolObjPropertyKind::ATOM_ALIAS:
   case MolObjPropertyKind::ATOM_VALUE:
+    substrate_unrecognized = readSubstrateIndex(line_ptr, 3);
     entry_count = 1;
-    entry_depth = 1;
-    entry_detail = { MolObjPropField::INTEGER };
+    entry_depth = 0;
     tmp_advance = 1;
     entry_read_start_pos = 3;
     entry_data_bounds = { 0, 3 };
     break;
   case MolObjPropertyKind::GROUP_ABBREVIATION:
+    substrate_unrecognized = readSubstrateIndex(line_ptr, 3);
     entry_count = 1;
-    entry_depth = 2;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
+    entry_depth = 1;
+    entry_detail = { MolObjPropField::INTEGER };
+    entry_adjustment = { MolObjIndexKind::ATOM };
     tmp_advance = 1;
     entry_read_start_pos = 3;
     entry_data_bounds = { 0, 3, 6 };
@@ -470,16 +476,17 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr);
     entry_depth = 2;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
-    entry_read_start_pos = 10;
+    entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER };
+    entry_read_start_pos = 9;
     entry_data_bounds = { 0, 4, 8 };
     break;
   case MolObjPropertyKind::LINK_ATOM:
   case MolObjPropertyKind::RGROUP_LOGIC:
     entry_count_unrecognized = readEntryCount(line_ptr);
     entry_depth = 4;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
-                     MolObjPropField::INTEGER };
-    entry_read_start_pos = 10;
+    entry_detail = std::vector<MolObjPropField>(4, MolObjPropField::INTEGER);
+    entry_adjustment = std::vector<MolObjIndexKind>(4, MolObjIndexKind::OTHER);
+    entry_read_start_pos = 9;
     entry_data_bounds = { 0, 4, 8, 12, 16 };
     break;
   case MolObjPropertyKind::ATOM_LIST:
@@ -488,9 +495,10 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_depth = 4;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
-                     MolObjPropField::INTEGER };
-    entry_read_start_pos = 14;
+    entry_detail = std::vector<MolObjPropField>(4, MolObjPropField::INTEGER);
+    entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER, MolObjIndexKind::ATOM,
+                         MolObjIndexKind::OTHER };
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4, 8, 12, 16 };
     break;
   case MolObjPropertyKind::SGROUP_EXPANSION:
@@ -501,7 +509,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
-    entry_read_start_pos = 14;
+    entry_adjustment = { MolObjIndexKind::BOND };
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4 };
     break;
   case MolObjPropertyKind::SGROUP_ATOM_LIST:
@@ -511,7 +520,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
-    entry_read_start_pos = 14;
+    entry_adjustment = { MolObjIndexKind::ATOM };
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4 };
     break;
   case MolObjPropertyKind::SGROUP_SUBSCRIPT:
@@ -519,34 +529,35 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_depth = 1;
     entry_detail = { MolObjPropField::STRING };
-    entry_read_start_pos = 11;
+    entry_adjustment = { MolObjIndexKind::OTHER };
+    entry_read_start_pos = 10;
     entry_data_bounds = { 0, tf.getLineLength(line_number) - 11 };
     break;
   case MolObjPropertyKind::SGROUP_CORRESPONENCE:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 3;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
-                     MolObjPropField::INTEGER };
-    entry_read_start_pos = 14;
+    entry_detail = std::vector<MolObjPropField>(3, MolObjPropField::INTEGER);
+    entry_adjustment = std::vector<MolObjIndexKind>(3, MolObjIndexKind::BOND);
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4, 8, 12 };
     break;
   case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 4;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
-                     MolObjPropField::INTEGER };    
-    entry_read_start_pos = 14;
+    entry_detail = std::vector<MolObjPropField>(4, MolObjPropField::INTEGER);
+    entry_adjustment = std::vector<MolObjIndexKind>(4, MolObjIndexKind::BOND);
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 3, 6, 9, 12 };
     break;
   case MolObjPropertyKind::SGROUP_BOND_VECTOR:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count = 1;
     entry_depth = 3;
-    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
-                     MolObjPropField::INTEGER };    
-    entry_read_start_pos = 11;
+    entry_detail = std::vector<MolObjPropField>(3, MolObjPropField::INTEGER);
+    entry_adjustment = { MolObjIndexKind::BOND, MolObjIndexKind::OTHER, MolObjIndexKind::OTHER };
+    entry_read_start_pos = 10;
     entry_data_bounds = { 0, 4, 7, 10 };
     break;
   case MolObjPropertyKind::SGROUP_FIELD:
@@ -555,7 +566,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 1;
     entry_detail = { MolObjPropField::STRING, MolObjPropField::CHAR4, MolObjPropField::STRING,
                      MolObjPropField::CHAR4, MolObjPropField::STRING };
-    entry_read_start_pos = 11;
+    entry_adjustment = std::vector<MolObjIndexKind>(5, MolObjIndexKind::OTHER);
+    entry_read_start_pos = 10;
     entry_data_bounds = { 0, 30, 32, 52, 54, tf.getLineLength(line_number) - 65 };
     break;
   case MolObjPropertyKind::SGROUP_DISPLAY:
@@ -567,7 +579,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
                      MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER, MolObjPropField::CHAR4, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };
-    entry_read_start_pos = 11;
+    entry_adjustment = std::vector<MolObjIndexKind>(13, MolObjIndexKind::OTHER);
+    entry_read_start_pos = 10;
     entry_data_bounds = { 0, 10, 20, 24, 25, 26, 27, 29, 33, 36, 39, 41, 43, 45 };
 
     // Each "M  SDD" entry will be followed by zero or more "M  SCD" entries and a final "M  SED"
@@ -600,7 +613,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 5;
     entry_detail = { MolObjPropField::REAL, MolObjPropField::REAL, MolObjPropField::REAL,
                      MolObjPropField::CHAR4, MolObjPropField::STRING };
-    entry_read_start_pos = 10;
+    entry_adjustment = std::vector<MolObjIndexKind>(5, MolObjIndexKind::OTHER);
+    entry_read_start_pos = 9;
     entry_data_bounds = { 0, 10, 20, 31, 35, tf.getLineLength(line_number) - 45 }; 
     break;
   case MolObjPropertyKind::SGROUP_ATTACH_POINT:
@@ -608,7 +622,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 5;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::CHAR4 };
-    entry_read_start_pos = 14;
+    entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::ATOM, MolObjIndexKind::OTHER };
+    entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4, 8, 10 };
     break;
   case MolObjPropertyKind::SGROUP_CLASS:
@@ -616,14 +631,16 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count = 1;
     entry_depth = 1;
     entry_detail = { MolObjPropField::STRING };
-    entry_read_start_pos = 11;
+    entry_adjustment = { MolObjIndexKind::OTHER };
+    entry_read_start_pos = 10;
     entry_data_bounds = { 0, tf.getLineLength(line_number) - 11 };
     break;
   case MolObjPropertyKind::LARGE_REGNO:
     entry_count = 1;
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
-    entry_read_start_pos = 7;
+    entry_adjustment = { MolObjIndexKind::OTHER };
+    entry_read_start_pos = 6;
     entry_data_bounds = { 0, tf.getLineLength(line_number) - 7 };
     break;
   case MolObjPropertyKind::SKIP:
@@ -716,6 +733,50 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
 }
 
 //-------------------------------------------------------------------------------------------------
+char4 MolObjProperty::getCode() const {
+  return code;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjProperty::getSubstrate() const {
+  return substrate;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjProperty::getEntryCount() const {
+  return entry_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjProperty::getIntegerValue(const int entry_index, const int attribute_index) const {
+  checkAttributeValidity(entry_index, attribute_index, MolObjPropField::INTEGER);
+  return int_data[(entry_depth * entry_index) + attribute_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolObjProperty::getRealValue(const int entry_index, const int attribute_index) const {
+  checkAttributeValidity(entry_index, attribute_index, MolObjPropField::REAL);
+  return real_data[int_data[(entry_depth * entry_index) + attribute_index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 MolObjProperty::getChar4Value(const int entry_index, const int attribute_index) const {
+  checkAttributeValidity(entry_index, attribute_index, MolObjPropField::CHAR4);
+  const uint ui_result = int_data[(entry_depth * entry_index) + attribute_index];
+  return { static_cast<char>(ui_result & 0xff),
+           static_cast<char>((ui_result >>  8) & 0xff),
+           static_cast<char>((ui_result >> 16) & 0xff),
+           static_cast<char>((ui_result >> 24) & 0xff) };
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MolObjProperty::getStringValue(const int entry_index,
+                                           const int attribute_index) const {
+  checkAttributeValidity(entry_index, attribute_index, MolObjPropField::STRING);
+  return str_data[int_data[(entry_depth * entry_index) + attribute_index]];
+}
+
+//-------------------------------------------------------------------------------------------------
 bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, const int length) {
   if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
     entry_count = readIntegerValue(line_ptr, start_pos, length);
@@ -731,7 +792,7 @@ bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, c
 bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_pos,
                                         const int length) {
   if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
-    entry_count = readIntegerValue(line_ptr, start_pos, length);
+    substrate = readIntegerValue(line_ptr, start_pos, length) - 1;
     return false;
   }
   else {
@@ -743,7 +804,7 @@ bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_po
 //-------------------------------------------------------------------------------------------------
 void MolObjProperty::parseEntries(const TextFile &tf, const int line_number, const int start_pos,
                                   const std::vector<int> &limits) {
-
+  
   // There are integers for every piece of information: char4 data gets converted to a bit-packed
   // integer, pieces of string and double-precision data log integers for their index in the
   // corresponding string or double-precision lists.
@@ -762,7 +823,7 @@ void MolObjProperty::parseEntries(const TextFile &tf, const int line_number, con
   n_string = 0;
   for (int i = 0; i < entry_count; i++) {
     for (int j = 0; j < entry_depth; j++) {
-      const int llim = (i * limits[entry_depth]) + limits[j];
+      const int llim = start_pos + (i * limits[entry_depth]) + limits[j];
       int slen = limits[j + 1] - limits[j];
       slen = (entry_detail[i] == MolObjPropField::CHAR4) ? std::min(slen, 4) : slen; 
       if (llim + slen > lnlength) {
@@ -776,11 +837,19 @@ void MolObjProperty::parseEntries(const TextFile &tf, const int line_number, con
       case MolObjPropField::INTEGER:
         if (verifyContents(line_ptr, llim, slen, NumberFormat::INTEGER)) {
           int_data[(i * entry_depth) + j] = readIntegerValue(line_ptr, llim, slen);
+          switch (entry_adjustment[j]) {
+          case MolObjIndexKind::ATOM:
+          case MolObjIndexKind::BOND:
+            int_data[(i * entry_depth) + j] -= 1;
+            break;
+          case MolObjIndexKind::OTHER:
+            break;
+          }
         }
         else {
           rtErr("Failed to parse an integer from characters " + std::to_string(llim) + " - " +
                 std::to_string(llim + slen - 1) + " of line " + std::to_string(line_number) +
-                "( a \"" + tf.extractString(line_number, 0, 6) + "\" property) of file " +
+                "(an \"" + tf.extractString(line_number, 0, 6) + "\" property) of file " +
                 getBaseName(tf.getFileName()) + ".", "MolObjProperty", "parseEntries");
         }
         break;
@@ -813,8 +882,28 @@ void MolObjProperty::parseEntries(const TextFile &tf, const int line_number, con
     }
   }
 }
-                           
 
+//-------------------------------------------------------------------------------------------------
+void MolObjProperty::checkAttributeValidity(const int entry_index, const int attribute_index,
+                                            const MolObjPropField expectation) const {
+  if (entry_index < 0 || entry_index >= entry_count) {
+    rtErr("Entry " + std::to_string(entry_index) + " does not exist for an \"" + code.w + "  " +
+          code.x + code.y + code.z + "\" property with " + std::to_string(entry_count) +
+          " entries.", "MolObjProperty", "checkAttributeValidity");
+  }
+  if (attribute_index < 0 || attribute_index >= entry_depth) {
+    rtErr("Attribute index " + std::to_string(attribute_index) + " is invalid for an \"" +
+          code.w + "  " + code.x + code.y + code.z + "\" property.", "MolObjProperty",
+          "checkAttributeValidity");
+  }
+  if (entry_detail[attribute_index] != expectation) {
+    rtErr("Attribute " + std::to_string(attribute_index) + " is of type " +
+          getEnumerationName(entry_detail[attribute_index]).c_str() + ", not " +
+          getEnumerationName(expectation).c_str() + ".", "MolObjProperty",
+          "checkAttributeValidity");
+  }
+}
+ 
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
@@ -878,10 +967,31 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       if (verifyContents(tf, counts_line_idx, 30, 3, NumberFormat::INTEGER)) {
         properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
       }
-    
-      // Validation
-      if (atom_count > 255) {
-        rtErr("A V2000 MOL format entry cannot contain more than 255 atoms.", "MdlMolObj");
+
+      // Validation of the atom counts line
+      if (atom_count <= 0 || bond_count < 0) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("A V2000 MOL format entry in file " + getBaseName(tf.getFileName()) + " at line " +
+                std::to_string(line_start) + " contains invalid numbers of atoms (" +
+                std::to_string(atom_count) + ") and/or bonds (" + std::to_string(bond_count) +
+                ").", "MdlMolObj");
+        case ExceptionResponse::WARN:
+          rtWarn("A V2000 MOL format entry in file " + getBaseName(tf.getFileName()) + " at " +
+                 "line " + std::to_string(line_start) + " contains invalid numbers of atoms (" +
+                 std::to_string(atom_count) + ") and/or bonds (" + std::to_string(bond_count) +
+                 ").  This will become a blank entry", "MdlMolObj");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+        atom_count = 0;
+        bond_count = 0;
+        list_count = 0;
+        chirality = MolObjChirality::ACHIRAL;
+        stext_entry_count = 0;
+        properties_count = 0;
+        return;
       }
     }
     break;
@@ -921,17 +1031,13 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       // Standard Template Library vector<bool> works differently from other vectors.  Set its
       // contents in a different manner.
       if (verifyContents(tf, i, 36, 3, NumberFormat::INTEGER)) {
-        bool dblt_flag;
-        formal_charges[iatm] = interpretFormalCharge(readIntegerValue(atom_line_ptr, 36, 3),
-                                                     &dblt_flag);
-        doublet_radicals[iatm] = dblt_flag;
+        interpretFormalCharge(readIntegerValue(atom_line_ptr, 36, 3), iatm);
       }
       if (verifyContents(tf, i, 39, 3, NumberFormat::INTEGER)) {
         parities[iatm] = interpretStereoParity(readIntegerValue(atom_line_ptr, 39, 3));
       }
       if (verifyContents(tf, i, 42, 3, NumberFormat::INTEGER)) {
-        implicit_hydrogens[iatm] =
-          interpretImplicitHydrogenContent(readIntegerValue(atom_line_ptr, 42, 3));
+        interpretImplicitHydrogenContent(readIntegerValue(atom_line_ptr, 42, 3), iatm);
       }
       if (verifyContents(tf, i, 45, 3, NumberFormat::INTEGER)) {
         stereo_considerations[iatm] =
@@ -1031,6 +1137,13 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     {
       const int prop_line_start = line_start + 4 + atom_count + bond_count + list_count +
                                   (2 * stext_entry_count);
+      for (int pos = prop_line_start; pos < mdl_section_end; pos++) {
+        int adv_pos;
+        properties.emplace_back(tf, pos, &adv_pos, title);
+      }
+      
+      // Update the properties count
+      properties_count = properties.size();
     }
     break;
   case MdlMolVersion::V3000:
@@ -1039,7 +1152,13 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     break;
   }
 
-  // Make some basic inferences
+  // Update the atom attributes based on properties data.  This provides V3000 functionality and
+  // backwards compatibility for the V2000 format.
+  updateV2kAtomAttributes();
+  
+  // Make some basic inferences.  The version number is irrelevant by now: all information has been
+  // converted into version-agnostic internal representations and the version number is kept only
+  // as a footnote for reference when re-printing the file later.
   const std::vector<int> tmp_znum = symbolToZNumber(atomic_symbols, capitalization, policy);
   int nvs = 0;
   for (int i = 0; i < atom_count; i++) {
@@ -1049,7 +1168,9 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   if (nvs > 0) {
     
   }
-  
+
+  // Add implicit hydrogens.  This may re-allocate the data arrays and extend the bonding patterns.
+  hydrogenate();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1146,6 +1267,21 @@ const std::vector<int>& MdlMolObj::getAtomicNumbers() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int MdlMolObj::getFormalCharge(const int index) const {
+  return formal_charges[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& MdlMolObj::getFormalCharges() const {
+  return formal_charges;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getPropertiesCount() const {
+  return properties_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMolObj::allocate() {
 
   // Atom property fields are resized and then set as part of a loop in the parent MdlMolObj
@@ -1154,7 +1290,7 @@ void MdlMolObj::allocate() {
   atomic_symbols.resize(atom_count, default_mdl_atomic_symbol);
   atomic_numbers.resize(atom_count, default_mdl_atomic_number);
   formal_charges.resize(atom_count, default_mdl_formal_charge);
-  doublet_radicals.resize(atom_count, default_mdl_doublet_radical_state);
+  radicals.resize(atom_count, default_mdl_radical_state);
   isotopic_shifts.resize(atom_count, default_mdl_isotopic_shift);
   parities.resize(atom_count, default_mdl_stereo_parity);
   implicit_hydrogens.resize(atom_count, default_mdl_implicit_hydrogen);
@@ -1162,6 +1298,7 @@ void MdlMolObj::allocate() {
   valence_connections.resize(atom_count, default_mdl_valence_connections);
   atom_atom_mapping_count.resize(atom_count, default_mdl_map_count);
   exact_change_enforced.resize(atom_count, default_mdl_exact_change);
+  hydrogenation_protocol.resize(atom_count, default_hydrogenation);
   orientation_stability.resize(atom_count, default_mdl_stereo_retention);
 
   // Other arrays are reserved and built with emplace_back().  The MDL MOL properties array is
@@ -1173,31 +1310,36 @@ void MdlMolObj::allocate() {
 }
 
 //-------------------------------------------------------------------------------------------------
-double MdlMolObj::interpretFormalCharge(const int charge_in, bool *is_doublet_radical) {
-  *is_doublet_radical = false;
+void MdlMolObj::interpretFormalCharge(const int charge_in, const int atom_index) {
   switch (charge_in) {
   case 0:
-    return 0.0;
+    formal_charges[atom_index] = 0;
+    break;
   case 1:
-    return 3.0;
+    formal_charges[atom_index] = 3;
+    break;
   case 2:
-    return 2.0;
+    formal_charges[atom_index] = 2;
+    break;
   case 3:
-    return 1.0;
+    formal_charges[atom_index] = 1;
+    break;
   case 4:
-    *is_doublet_radical = true;
-    return 0.0;
+    radicals[atom_index] = RadicalState::DOUBLET;
+    break;
   case 5:
-    return -1.0;
+    formal_charges[atom_index] = -1;
+    break;
   case 6:
-    return -2.0;
+    formal_charges[atom_index] = -2;
+    break;
   case 7:
-    return -3.0;
+    formal_charges[atom_index] = -3;
+    break;
   default:
     rtErr("A formal charge code of " + std::to_string(charge_in) + " is invalid for an MDL MOL "
           "entry.  Title of entry: \"" + title + "\".", "MdlMolObj", "interpretFormalCharge");    
   }
-  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1219,13 +1361,26 @@ MolObjAtomStereo MdlMolObj::interpretStereoParity(const int setting_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::interpretImplicitHydrogenContent(const int nh_in) {
-  if (nh_in >= 5 || nh_in < 0) {
+void MdlMolObj::interpretImplicitHydrogenContent(const int nh_in, const int atom_index) {
+  if (nh_in > 5 || nh_in < 0) {
     rtErr("An implicit hydrogen content of " + std::to_string(nh_in) + " would imply " +
           std::to_string(nh_in - 1) + " hydrogens can be inferred around an atom in MDL MOL "
           "entry \"" + title + "\".", "MdlMolObj", "interpretImplicitHydrogenContent");
   }
-  return std::max(nh_in - 1, 0);
+  if (nh_in > 0) {
+    implicit_hydrogens[atom_index] = nh_in - 1;
+    hydrogenation_protocol[atom_index] = (nh_in == 1) ? HydrogenAssignment::DO_NOT_HYDROGENATE :
+                                                        HydrogenAssignment::VALENCE_SHELL;
+  }
+  else {
+
+    // An implicit hydrogen indicator of 0 does not correspond to H0, H1, H2, H3, or H4, but it is
+    // very common.  This final possibility implies "free hydrogen content." While the actual
+    // number of hydrogens will read 0, the flag will be set to apply as many as are needed to
+    // fill the valence shell given the bonding considerations.
+    implicit_hydrogens[atom_index] = 0;
+    hydrogenation_protocol[atom_index] = HydrogenAssignment::VALENCE_SHELL;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1267,6 +1422,79 @@ StereoRetention MdlMolObj::interpretStereoStability(const int code_in) {
           "MOL entry \"" + title + "\".", "MdlMolObj", "interpretStereoStability");
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::updateV2kAtomAttributes() {
+
+  // Return immediately if the version is not V2000
+  switch (version_no) {
+  case MdlMolVersion::V2000:
+    break;
+  case MdlMolVersion::V3000:
+  case MdlMolVersion::UNKNOWN:
+    return;
+  }
+  
+  // Scan all properties for items that would invalidate atom-block information.  Wipe the
+  // relevant arrays.
+  for (int i = 0; i < properties_count; i++) {
+    if (properties[i].getCode() == char4({ 'C', 'H', 'G', 'M' })) {
+      for (int j = 0; j < atom_count; j++) {
+        formal_charges[j] = 0;
+      }
+    }
+    if (properties[i].getCode() == char4({ 'R', 'A', 'D', 'M' })) {
+      for (int j = 0; j < atom_count; j++) {
+        formal_charges[j] = 0;
+        radicals[j] = RadicalState::NONE;
+      }
+    }
+    if (properties[i].getCode() == char4({ 'I', 'S', 'O', 'M' })) {
+      for (int j = 0; j < atom_count; j++) {
+        isotopic_shifts[j] = 0;
+      }
+    }
+  }
+
+  // Scan the properties again and add details to the atoms.
+  for (int i = 0; i < properties_count; i++) {
+    const int n_entry = properties[i].getEntryCount();
+    if (properties[i].getCode() == char4({ 'C', 'H', 'G', 'M' })) {
+      for (int j = 0; j < n_entry; j++) {
+        formal_charges[properties[i].getIntegerValue(j, 0)] = properties[i].getIntegerValue(j, 1);
+      }
+    }
+    if (properties[i].getCode() == char4({ 'R', 'A', 'D', 'M' })) {
+      for (int j = 0; j < n_entry; j++) {
+        const int atom_idx = properties[i].getIntegerValue(j, 0);
+        switch (properties[i].getIntegerValue(j, 1)) {
+        case 0:
+          radicals[atom_idx] = RadicalState::NONE;
+          break;
+        case 1:
+          radicals[atom_idx] = RadicalState::SINGLET;
+          break;
+        case 2:
+          radicals[atom_idx] = RadicalState::DOUBLET;
+          break;
+        case 3:
+          radicals[atom_idx] = RadicalState::TRIPLET;
+          break;
+        }
+      }
+    }
+    if (properties[i].getCode() == char4({ 'I', 'S', 'O', 'M' })) {
+      for (int j = 0; j < n_entry; j++) {
+        isotopic_shifts[properties[i].getIntegerValue(j, 0)] = properties[i].getIntegerValue(j, 1);
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::hydrogenate() {
+
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -13,11 +13,36 @@ enum class MdlMolVersion {
   V2000, V3000, UNKNOWN
 };
 
+/// \brief Enumerate the types of indices that may be encountered.  The chief purpose of this is
+///        to signal that certain indices such as atoms should have 1 subtracted from their values
+///        in the original MDL MOL format, to shift into C-array indexing from the original format
+///        which is likely based on Fortran.
+enum class MolObjIndexKind {
+  ATOM,  ///< Subtract 1 from the index found in the file.  Add 1 to the stored index when writing
+         ///<   results to a new file.
+  BOND,  ///< Subtract or add 1 to read / write this index, like ATOM
+  OTHER  ///< No shift in the index is needed
+};
+  
+/// \brief Enumerate the possible radical states for an MDL MOL entry
+enum class RadicalState {
+  NONE, SINGLET, DOUBLET, TRIPLET
+};
+  
 /// \brief A molecule's chirality
 enum class MolObjChirality {
   ACHIRAL = 0, CHIRAL = 1
 };
 
+/// \brief Different ways to go about adding hydrogens to a minimal representation of a molecule
+enum class HydrogenAssignment {
+  VALENCE_SHELL,      ///< Add at least the number of hydrogens given in a secondary array, until
+                      ///<   the anticipated valence shell electron content is satisfied.  The
+                      ///<   anticipated content is eight electrons for C, N, O, and F, 10 for P,
+                      ///<   and 8 or 12 for S depending on the hybridization.
+  DO_NOT_HYDROGENATE  ///< Do not attempt to add hydrogens to the atom.
+};
+  
 /// \brief Enumerate possible bond orders, including aromatics or variable bonds
 enum class MolObjBondOrder {
   SINGLE = 1, DOUBLE = 2, TRIPLE = 3, AROMATIC = 4, SINGLE_OR_DOUBLE = 5,
@@ -103,6 +128,11 @@ enum class MolObjPropertyKind {
 ///
 /// \param input  The code to translate
 MolObjPropertyKind translateMolObjPropertyKind(char4 input);
+
+/// \brief Get a string corresponding to the name of the MolObjPropField enumeration.
+///
+/// \param input  The enumeration to translate
+std::string getEnumerationName(MolObjPropField input);
   
 } // namespace structure
 } // namespace stormm
