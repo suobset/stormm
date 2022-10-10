@@ -342,10 +342,11 @@ MolObjProperty::MolObjProperty(const char4 code_in, const int substrate_in,
                                const std::vector<MolObjPropField> &entry_detail_in,
                                const std::vector<int> &int_data_in,
                                const std::vector<double> &real_data_in,
-                               const std::vector<std::string> &str_data_in) :
+                               const std::vector<std::string> &str_data_in,
+                               const std::vector<std::string> &data_lines_in) :
     code{code_in}, substrate{substrate_in}, entry_count{entry_count_in},
     entry_depth{entry_depth_in}, entry_detail{entry_detail_in}, int_data{int_data_in},
-    real_data{real_data_in}, str_data{str_data_in}
+    real_data{real_data_in}, str_data{str_data_in}, data_lines{data_lines_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -431,18 +432,25 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   int tmp_advance = 0;
   bool entry_count_unrecognized = false;
   bool substrate_unrecognized = false;
+  int entry_read_start_pos;
+  std::vector<int> entry_data_bounds;
   switch (kind) {
   case MolObjPropertyKind::ATOM_ALIAS:
   case MolObjPropertyKind::ATOM_VALUE:
     entry_count = 1;
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
+    tmp_advance = 1;
+    entry_read_start_pos = 3;
+    entry_data_bounds = { 0, 3 };
     break;
   case MolObjPropertyKind::GROUP_ABBREVIATION:
     entry_count = 1;
     entry_depth = 2;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
     tmp_advance = 1;
+    entry_read_start_pos = 3;
+    entry_data_bounds = { 0, 3, 6 };
     break;
   case MolObjPropertyKind::CHARGE:
   case MolObjPropertyKind::RADICAL:
@@ -458,9 +466,12 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_CONNECTIVITY:
   case MolObjPropertyKind::SGROUP_HIERARCHY:
   case MolObjPropertyKind::SGROUP_COMP_NUMBER:
+  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
     entry_count_unrecognized = readEntryCount(line_ptr);
     entry_depth = 2;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
+    entry_read_start_pos = 10;
+    entry_data_bounds = { 0, 4, 8 };
     break;
   case MolObjPropertyKind::LINK_ATOM:
   case MolObjPropertyKind::RGROUP_LOGIC:
@@ -468,6 +479,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 4;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };
+    entry_read_start_pos = 10;
+    entry_data_bounds = { 0, 4, 8, 12, 16 };
     break;
   case MolObjPropertyKind::ATOM_LIST:
     break;
@@ -477,6 +490,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 4;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 4, 8, 12, 16 };
     break;
   case MolObjPropertyKind::SGROUP_EXPANSION:
     if (strncmpCased("EXP", tf.extractString(line_number, 7, 3), CaseSensitivity::YES) == false) {
@@ -486,6 +501,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 4 };
     break;
   case MolObjPropertyKind::SGROUP_ATOM_LIST:
   case MolObjPropertyKind::SGROUP_BOND_LIST:
@@ -494,12 +511,16 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 4 };
     break;
   case MolObjPropertyKind::SGROUP_SUBSCRIPT:
     entry_count = 1;
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_depth = 1;
     entry_detail = { MolObjPropField::STRING };
+    entry_read_start_pos = 11;
+    entry_data_bounds = { 0, tf.getLineLength(line_number) - 11 };
     break;
   case MolObjPropertyKind::SGROUP_CORRESPONENCE:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
@@ -507,6 +528,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 3;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 4, 8, 12 };
     break;
   case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
@@ -514,6 +537,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 4;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };    
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 3, 6, 9, 12 };
     break;
   case MolObjPropertyKind::SGROUP_BOND_VECTOR:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
@@ -521,20 +546,29 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 3;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };    
+    entry_read_start_pos = 11;
+    entry_data_bounds = { 0, 4, 7, 10 };
     break;
   case MolObjPropertyKind::SGROUP_FIELD:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count = 1;
     entry_depth = 1;
-    entry_detail = { MolObjPropField::STRING };
+    entry_detail = { MolObjPropField::STRING, MolObjPropField::CHAR4, MolObjPropField::STRING,
+                     MolObjPropField::CHAR4, MolObjPropField::STRING };
+    entry_read_start_pos = 11;
+    entry_data_bounds = { 0, 30, 32, 52, 54, tf.getLineLength(line_number) - 65 };
     break;
   case MolObjPropertyKind::SGROUP_DISPLAY:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count = 1;
-    entry_depth = 7;
+    entry_depth = 13;
     entry_detail = { MolObjPropField::REAL, MolObjPropField::REAL, MolObjPropField::INTEGER,
                      MolObjPropField::CHAR4, MolObjPropField::CHAR4, MolObjPropField::CHAR4,
+                     MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::INTEGER,
+                     MolObjPropField::INTEGER, MolObjPropField::CHAR4, MolObjPropField::INTEGER,
                      MolObjPropField::INTEGER };
+    entry_read_start_pos = 11;
+    entry_data_bounds = { 0, 10, 20, 24, 25, 26, 27, 29, 33, 36, 39, 41, 43, 45 };
 
     // Each "M  SDD" entry will be followed by zero or more "M  SCD" entries and a final "M  SED"
     // entry.  Scan ahead to determine the number of subsequent lines to skip.
@@ -566,25 +600,31 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_depth = 5;
     entry_detail = { MolObjPropField::REAL, MolObjPropField::REAL, MolObjPropField::REAL,
                      MolObjPropField::CHAR4, MolObjPropField::STRING };
+    entry_read_start_pos = 10;
+    entry_data_bounds = { 0, 10, 20, 31, 35, tf.getLineLength(line_number) - 45 }; 
     break;
   case MolObjPropertyKind::SGROUP_ATTACH_POINT:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 5;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::CHAR4 };
+    entry_read_start_pos = 14;
+    entry_data_bounds = { 0, 4, 8, 10 };
     break;
   case MolObjPropertyKind::SGROUP_CLASS:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count = 1;
     entry_depth = 1;
     entry_detail = { MolObjPropField::STRING };
+    entry_read_start_pos = 11;
+    entry_data_bounds = { 0, tf.getLineLength(line_number) - 11 };
     break;
   case MolObjPropertyKind::LARGE_REGNO:
     entry_count = 1;
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
-    break;
-  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
+    entry_read_start_pos = 7;
+    entry_data_bounds = { 0, tf.getLineLength(line_number) - 7 };
     break;
   case MolObjPropertyKind::SKIP:
     entry_count = 0;
@@ -603,21 +643,42 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     rtErr("The advancement due to property " + std::to_string(code.w) + "  " + code.x + code.y +
           code.z + " overruns the length of file " + tf.getFileName() + ".", "MolObjProperty");
   }
+  if (entry_count_unrecognized) {
+    rtErr("The entry count on line " + std::to_string(line_number) + " of file " +
+          getBaseName(tf.getFileName()) + " was not recognizable as an integer for property \"" +
+          tf.extractString(line_number, 0, 6) + "\".", "MolObjProperty");
+  }
+  if (substrate_unrecognized) {
+    rtErr("The substrate index on line " + std::to_string(line_number) + " of file " +
+          getBaseName(tf.getFileName()) + " was not recognizable as an integer for property \"" +
+          tf.extractString(line_number, 0, 6) + "\".", "MolObjProperty");
+  }
+  if (entry_count < 0 || entry_count > max_entries) {
+    rtErr("Property \"" + tf.extractString(line_number, 0, 6) + "\" on line " +
+          std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + " has an "
+          "invalid number of entries (" + std::to_string(entry_count) + ") (max " +
+          std::to_string(max_entries) + ").", "MolObjProperty");
+  }
   
   // Read the line for each type of property.  Advance the auxiliary counter line_advance if there
   // are additional data lines associated with the property, to avoid later trying to read such
   // information as new properties.
   switch (kind) {
   case MolObjPropertyKind::ATOM_ALIAS:
-    entry_count = 1;
-    entry_depth = 1;
-    entry_detail = { MolObjPropField::INTEGER };
-    break;
   case MolObjPropertyKind::ATOM_VALUE:
   case MolObjPropertyKind::GROUP_ABBREVIATION:
+    data_lines.push_back(tf.extractString(tmp_advance, 0, tf.getLineLength(line_number)));
+    break;
+  case MolObjPropertyKind::SGROUP_DISPLAY:
+    for (int i = line_number + 1; i < tmp_advance; i++) {
+      data_lines.push_back(tf.extractString(i, 12, std::min(tf.getLineLength(i) - 12, 69)));
+    }
+    break;
   case MolObjPropertyKind::CHARGE:
   case MolObjPropertyKind::RADICAL:
   case MolObjPropertyKind::ISOTOPE:
+    parseEntry(line_ptr, entry_read_start_pos, entry_data_bounds);
+    break;
   case MolObjPropertyKind::RING_BOND_COUNT:
   case MolObjPropertyKind::SUBSTITUTION_COUNT:
   case MolObjPropertyKind::UNSATURATED_COUNT:
@@ -640,7 +701,6 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
   case MolObjPropertyKind::SGROUP_BOND_VECTOR:
   case MolObjPropertyKind::SGROUP_FIELD:
-  case MolObjPropertyKind::SGROUP_DISPLAY:
   case MolObjPropertyKind::SGROUP_DATA:
   case MolObjPropertyKind::SGROUP_HIERARCHY:
   case MolObjPropertyKind::SGROUP_COMP_NUMBER:
@@ -650,7 +710,6 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_CLASS:
   case MolObjPropertyKind::LARGE_REGNO:
   case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
-    break;
   case MolObjPropertyKind::SKIP:
     break;
   }
@@ -680,6 +739,40 @@ bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_po
   }
   __builtin_unreachable();
 }
+
+//-------------------------------------------------------------------------------------------------
+void MolObjProperty::parseEntry(const char* line_ptr, const int start_pos,
+                                const std::vector<int> &limits) {
+
+  // There are integers for every piece of information: char4 data gets converted to a bit-packed
+  // integer, pieces of string and double-precision data log integers for their index in the
+  // corresponding string or double-precision lists.
+  int_data.resize(entry_depth * entry_count);
+  int n_real   = 0;
+  int n_string = 0;
+  for (int i = 0; i < entry_depth; i++) {
+    n_real   += (entry_detail[i] == MolObjPropField::REAL);
+    n_string += (entry_detail[i] == MolObjPropField::STRING);
+  }
+  real_data.reserve(n_real * entry_count);
+  str_data.reserve(n_string * entry_count);
+  for (int i = 0; i < entry_count; i++) {
+    for (int j = 0; j < entry_depth; j++) {
+      switch (entry_detail[i]) {
+      case MolObjPropField::INTEGER:
+        
+        break;
+      case MolObjPropField::CHAR4:
+        break;
+      case MolObjPropField::REAL:
+        break;
+      case MolObjPropField::STRING:
+        break;
+      }
+    }
+  }
+}
+                           
 
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():

@@ -39,7 +39,9 @@ MolObjPropertyKind translateMolObjPropertyKind(char4 input) {
   else if (input == char4({ 'M', 'S', 'B', 'V' })) return MolObjPropertyKind::SGROUP_BOND_VECTOR;
   else if (input == char4({ 'M', 'S', 'D', 'T' })) return MolObjPropertyKind::SGROUP_FIELD;
   else if (input == char4({ 'M', 'S', 'D', 'D' })) return MolObjPropertyKind::SGROUP_DISPLAY;
-  else if (input == char4({ 'M', 'S', 'C', 'D' })) return MolObjPropertyKind::SGROUP_DATA;
+  else if (input == char4({ 'M', 'S', 'C', 'D' }) || input == char4({ 'M', 'S', 'E', 'D' })) {
+    return MolObjPropertyKind::SGROUP_DATA;
+  }
   else if (input == char4({ 'M', 'S', 'P', 'L' })) return MolObjPropertyKind::SGROUP_HIERARCHY;
   else if (input == char4({ 'M', 'S', 'N', 'C' })) return MolObjPropertyKind::SGROUP_COMP_NUMBER;
   else if (input == char4({ 'M', '$', '3', 'D' })) return MolObjPropertyKind::SPATIAL_FEATURE;

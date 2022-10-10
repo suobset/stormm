@@ -207,7 +207,8 @@ public:
                  const std::vector<MolObjPropField> &entry_detail_in = {},
                  const std::vector<int> &int_data_in = {},
                  const std::vector<double> &real_data_in = {},
-                 const std::vector<std::string> &str_data_in = {});
+                 const std::vector<std::string> &str_data_in = {},
+                 const std::vector<std::string> &data_lines_in = {});
 
   MolObjProperty(const TextFile &tf, int line_number, int *line_advance,
                  const std::string &title = std::string(""));
@@ -243,12 +244,14 @@ private:
                                              ///<   STRING, the corresponding value in int_data
                                              ///<   will refer to the index of data_str at which to
                                              ///<   find the information.
+  std::vector<std::string> data_lines;       ///< Lines of data, stored one line per string, that
+                                             ///<   complement the property
 
   /// \brief Extract the number of entries for the property.  Returns FALSE if there is no error
   ///        encountered, TRUE if there is a problem.
   ///
   /// \param line_ptr   The line containing the property text
-  /// \param start_pos  The starting position at which to reach the property (default 6)
+  /// \param start_pos  The starting position at which to read the value (default 6)
   /// \param length     The expected length of the entry count (default 3)
   bool readEntryCount(const char* line_ptr, int start_pos = 6, int length = 3);
 
@@ -256,9 +259,21 @@ private:
   ///        there is no error encountered, TRUE if there is a problem.
   ///
   /// \param line_ptr   The line containing the property text
-  /// \param start_pos  The starting position at which to reach the property (default 7)
+  /// \param start_pos  The starting position at which to read the value (default 7)
   /// \param length     The expected length of the entry count (default 3)
   bool readSubstrateIndex(const char* line_ptr, int start_pos = 7, int length = 3);
+
+  /// \brief Parse the list of entries for the property, fillin gout the arrays of integer, real,
+  ///        and string data in the process.
+  ///
+  /// \param line_ptr   The line containing the property text
+  /// \param start_pos  Starting position for data pertaining to the first entry
+  /// \param limits     Bounds array for reading each entry.  Formatting present in entry_detail
+  ///                   will impose some limits on what is read (white space can be implied by
+  ///                   using a char4 to read between limits 5 characters apart, for example), but
+  ///                   the critical feature is that the character of the line at which to begin
+  ///                   reading the nth data element is given in the nth position of limits.
+  void parseEntry(const char* line_ptr, int start_pos, const std::vector<int> &limits);
 };
 
 /// \brief A molecular three-dimensional feature.  This special class of MOL object properies has
