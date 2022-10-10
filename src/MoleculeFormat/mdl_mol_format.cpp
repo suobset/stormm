@@ -677,7 +677,7 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::CHARGE:
   case MolObjPropertyKind::RADICAL:
   case MolObjPropertyKind::ISOTOPE:
-    parseEntry(line_ptr, entry_read_start_pos, entry_data_bounds);
+    parseEntries(tf, line_number, entry_read_start_pos, entry_data_bounds);
     break;
   case MolObjPropertyKind::RING_BOND_COUNT:
   case MolObjPropertyKind::SUBSTITUTION_COUNT:
@@ -741,8 +741,8 @@ bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_po
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjProperty::parseEntry(const char* line_ptr, const int start_pos,
-                                const std::vector<int> &limits) {
+void MolObjProperty::parseEntries(const TextFile &tf, const int line_number, const int start_pos,
+                                  const std::vector<int> &limits) {
 
   // There are integers for every piece of information: char4 data gets converted to a bit-packed
   // integer, pieces of string and double-precision data log integers for their index in the
@@ -756,17 +756,58 @@ void MolObjProperty::parseEntry(const char* line_ptr, const int start_pos,
   }
   real_data.reserve(n_real * entry_count);
   str_data.reserve(n_string * entry_count);
+  const char* line_ptr = tf.getLinePointer(line_number);
+  const int lnlength = tf.getLineLength(line_number);
+  n_real = 0;
+  n_string = 0;
   for (int i = 0; i < entry_count; i++) {
     for (int j = 0; j < entry_depth; j++) {
+      const int llim = (i * limits[entry_depth]) + limits[j];
+      int slen = limits[j + 1] - limits[j];
+      slen = (entry_detail[i] == MolObjPropField::CHAR4) ? std::min(slen, 4) : slen; 
+      if (llim + slen > lnlength) {
+        rtErr("Reading entry " + std::to_string(i) + " field " + std::to_string(j) +
+              " of property \"" + tf.extractString(line_number, 0, 6) + "\" at line " +
+              std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) +
+              "would overrun the line length (" + std::to_string(lnlength) + ").",
+              "MolObjProperty", "parseEntries");
+      }
       switch (entry_detail[i]) {
       case MolObjPropField::INTEGER:
-        
+        if (verifyContents(line_ptr, llim, slen, NumberFormat::INTEGER)) {
+          int_data[(i * entry_depth) + j] = readIntegerValue(line_ptr, llim, slen);
+        }
+        else {
+          rtErr("Failed to parse an integer from characters " + std::to_string(llim) + " - " +
+                std::to_string(llim + slen - 1) + " of line " + std::to_string(line_number) +
+                "( a \"" + tf.extractString(line_number, 0, 6) + "\" property) of file " +
+                getBaseName(tf.getFileName()) + ".", "MolObjProperty", "parseEntries");
+        }
         break;
       case MolObjPropField::CHAR4:
+        if (verifyContents(line_ptr, llim, slen, NumberFormat::CHAR4)) {
+          char4 result;
+          result.x = (slen > 0) ? line_ptr[llim    ] : ' ';
+          result.y = (slen > 1) ? line_ptr[llim + 1] : ' ';
+          result.z = (slen > 2) ? line_ptr[llim + 2] : ' ';
+          result.w = (slen > 3) ? line_ptr[llim + 3] : ' ';
+          uint uiresult = ((static_cast<uint>(result.w) << 24) |
+                           (static_cast<uint>(result.z) << 16) |
+                           (static_cast<uint>(result.y) <<  8) |
+                           (static_cast<uint>(result.x)));
+          int_data[(i * entry_depth) + j] = uiresult;
+        }
         break;
       case MolObjPropField::REAL:
+        if (verifyContents(line_ptr, llim, slen, NumberFormat::STANDARD_REAL) ||
+            verifyContents(line_ptr, llim, slen, NumberFormat::SCIENTIFIC)) {
+          int_data[(i * entry_depth) + j] = n_real;
+          real_data.push_back(readRealValue(line_ptr, llim, slen));
+        }
         break;
       case MolObjPropField::STRING:
+        int_data[(i * entry_depth) + j] = n_string;
+        str_data.push_back(tf.extractString(line_number, llim, slen));
         break;
       }
     }
