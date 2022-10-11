@@ -239,6 +239,60 @@ public:
   std::string getStringValue(int entry_index, int attribute_index) const;
   /// \}
 
+  /// \brief Define the property code.
+  ///
+  /// Overloaded:
+  ///   - Provide the first letter and the final three
+  ///   - Provide all four letters as a pre-made char tuple
+  ///
+  /// \param x        The first letter of the three-letter tuple in the property code
+  /// \param y        The second letter of the three-letter tuple defining the property code
+  /// \param z        The last letter of the three-letter tuple defining the property code
+  /// \param major    The first letter that will appear on the line if the property is written to
+  ///                 a file
+  /// \param code_in  A pre-made code to apply, ordered 3-4-5-0 in terms of the indices that each
+  ///                 character would occupy on a property line of an MDL MOL format entry
+  /// \{
+  void setCode(char x, char y, char z, char major = 'M');
+
+  void setCode(char4 code_in);
+  /// \}
+
+  /// \brief Define the substrate to be used, whether an atom or an S-group.
+  ///
+  /// \param index  Atom or S-group index of the substrate.  This should be provided for the
+  ///               C / C++ array element, not the file format (+1 will be added if and when the
+  ///               information is committed to a file).
+  void setSubstrate(int index);
+
+  /// \brief Define the entry format for the property.  If applied to an existing MolObjProperty
+  ///        with nonzero depth, this will create an error.
+  ///
+  /// \param entry_detail_in  List of data types of the entry elements
+  /// \param entry_adjustment_in  List of index adjustments for each element of the entry.  Atom
+  ///        and bond elements will have their indices adjusted by -1, but only if the information
+  ///        is read from a file--programmatic input is still expected to occur in the C / C++
+  ///        array numbering.
+  void setEntryFormat(const std::vector<MolObjPropField> &entry_detail_in,
+                      const std::vector <MolObjIndexKind> &entry_adjustment_in);
+
+  /// \brief Add an entry to the MDL MOL V2000 format property.  The layout must match that
+  ///        established in the detail array.  Adjustments will not be applied to the indexing for
+  ///        input originating within the program.  Other methods will adjust the indexing of
+  ///        atoms, bonds, and S-groups named in auxiliary user input when making properties out
+  ///        of such information.
+  ///
+  /// \brief int_data_in     All integer data, given in the order that INTEGER MolObjPropField
+  ///                        types appear in the detail array.  No char4, real or string data
+  ///                        indices are included in this array.
+  /// \param char4_data_in   List of char4 data elements, given back-to-back in the order that
+  ///                        CHAR4 MolObjPropField types appear in the detail array.
+  /// \param real_data_in    List of real data, ordered as the other arrays in this input.
+  /// \param string_data_in  List of string data, ordered as the other arrays in this input.
+  void addEntry(const std::vector <int> &int_data_in, const std::vector <char4> &char4_data_in,
+                const std::vector<double> &real_data_in,
+                const std::vector<std::string> &str_data_in);
+  
 private:
   char4 code;               ///< A three-letter code indicating what the property is.  The "w"
                             ///<   member stores the first letter on the line, which is usually
@@ -314,6 +368,66 @@ private:
   /// \param expectation      The expected nature of the attribute (checked for sanity)
   void checkAttributeValidity(int entry_index, int attribute_index,
                               MolObjPropField expectation) const;
+};
+
+/// \brief Store a data item from within an SD file.  Data items begin with a line of the form
+///        "> <ITEM_NAME>" (additional specifications are possible), end with a single blank line,
+///        and can contain customized format information.  The information will be read as a series
+///        of raw strings, one per line and each representing a whole line.  Once read, member
+///        functions of the class can extract specific integer, real, char4, or string coded data
+///        from within the item.
+class MolObjDataItem {
+public:
+
+  /// \brief The constructor takes the original text file and the number of the first line of the
+  ///        data item, or the information pertinent to the header line and a series of strings
+  ///        that will form the body of data in the item.  Any information submitted as part of a
+  ///        string such as an atom or bond index, which could then go to an output file, must be
+  ///        in the Fortran array indexing (starting at 1).  Integer information read from the
+  ///        data body can be adjusted to meet internal array indexing.
+  ///
+  /// \param tf                  The original text of the SD file, committed to RAM
+  /// \param line_number         Line of the file at which to begin reading the data item
+  /// \param item_name_in        Name of the data item (an item_name of "ABCD" will appear as
+  ///                            "<ABCD>" on the data item's first line)
+  /// \param external_regno_in   An identification number for the compound referencing an external
+  ///                            database.  An external identification number of "PD-3647" will be
+  ///                            represented as "(PD-3647)" on the data item's header line.
+  /// \param maccs_ii_number_in  An integer representing the corresponding field in a MACCS-II
+  ///                            database.  A field number such as "6519" will be represented as
+  ///                            "DT6519" in the data item header line.
+  /// \param header_info         A bit-packed unsigned integer containing, in its low to high bits,
+  ///                            whether to display the internal identification number (based on
+  ///                            the order in the SD file), the external identification number,
+  ///                            the item name, the field number, and finally a "FROM ARCHIVES"
+  ///                            declaration.
+  /// \{
+  MolObjDataItem(const TextFile &tf, int line_number);
+
+  MolObjDataItem(const std::string &item_name_in, const std::string &external_regno,
+                 int maccs_ii_number_in, uint header_info);
+  /// \}
+
+  /// \brief Match this data item with a series of identification tags.
+  ///
+  /// \param item_name_comp  Item name for comparison
+  /// \param ext_regno_comp  External registry number for comparison
+  /// \param maccs_ii_no_comp  MACCS-II database field number for comparison (omit leading "DT")
+  bool match(const std::string &item_name_comp = mdl_data_item_name_any,
+             const std::string &ext_regno_comp = mdl_external_registry_any,
+             int maccs_ii_no_comp = -1);
+
+private:
+  std::string item_name;  ///< Name of the data item (optional, but an effective means of
+                          ///<   distiction)
+  int external_regno;     ///< External registry number
+  int maccs_ii_number;    ///< MACCS-II database field number
+  bool use_internal_id;   ///< Flag to have the header line use the SD file's internal structure
+                          ///<   numbering in the data item header line
+  bool note_archives;     ///< Flag to have the header line note "FROM ARCHIVES"
+
+  /// Data lines from the item, one per array element
+  std::vector<std::string>> body;
 };
 
 /// \brief A molecular three-dimensional feature.  This special class of MOL object properies has
