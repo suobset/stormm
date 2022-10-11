@@ -427,16 +427,16 @@ public:
   /// \}
   
 private:
-  std::string item_name;     ///< Name of the data item (optional, but an effective means of
-                             ///<   distiction)
-  int external_regno;        ///< External registry number
-  int maccs_ii_number;       ///< MACCS-II database field number
-  bool use_internal_id;      ///< Flag to have the header line use the SD file's internal structure
-                             ///<   numbering in the data item header line
-  bool use_external_regno;   ///< Flag to have the header line use the external registry number
-  bool use_item_name;        ///< Flag to use the name of the item in the header between < > marks
-  bool use_maccs_ii_number;  ///< Flag to use the MACCS-II field number in the header after "DT"
-  bool note_archives;        ///< Flag to have the header line note "FROM ARCHIVES"
+  std::string item_name;       ///< Name of the data item (optional, but an effective means of
+                               ///<   distiction)
+  std::string external_regno;  ///< External registry number
+  int maccs_ii_number;         ///< MACCS-II database field number
+  bool use_internal_id;        ///< Flag to have the header line use the SD file's internal
+                               ///<   structure numbering in the data item header line
+  bool use_external_regno;     ///< Flag to have the header line use the external registry number
+  bool use_item_name;          ///< Flag to use the item name in the header between < > marks
+  bool use_maccs_ii_number;    ///< Flag to use the MACCS-II field number in the header after "DT"
+  bool note_archives;          ///< Flag to have the header line note "FROM ARCHIVES"
 
   /// Data lines from the item, one per array element
   std::vector<std::string> body;

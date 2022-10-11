@@ -966,6 +966,32 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number)
 {}
 
 //-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
+                                   const std::string &ext_regno_comp, const int maccs_ii_no_comp) {
+  return ((use_item_name && item_name_comp == item_name) &&
+          (use_external_regno && ext_regno_comp == external_regno) &&
+          (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::matchItemName(const std::string &item_name_comp, const int maccs_ii_no_comp) {
+  return ((use_item_name && item_name_comp == item_name) &&
+          (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::matchRegistryNumber(const std::string &ext_regno_comp,
+                                         const int maccs_ii_no_comp) {
+  return ((use_external_regno && ext_regno_comp == external_regno) &&
+          (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::matchMaccsField(const int maccs_ii_no_comp) {
+  return (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number);
+}
+
+//-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
     constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, coordinates{},
