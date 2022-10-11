@@ -33,6 +33,29 @@ int getMdlMolSectionEnd(const TextFile &tf, const int line_start, const int line
 }
 
 //-------------------------------------------------------------------------------------------------
+int getCompoundSectionEnd(const TextFileReader &tfr, const int line_start, const int line_end_in) {
+  const int line_end = (line_end_in < 0) ? tfr.line_count : line_end_in;
+  int result = line_start;
+  bool found = false;
+  while (found == false && result < line_end) {
+    const char* lptr = &tfr.text[tfr.line_limits[result]];
+    if (tfr.line_limits[result + 1] - tfr.line_limits[result] >= 6 &&
+        lptr[0] == '$' && lptr[1] == '$' && lptr[2] == '$' && lptr[3] == '$') {
+      found = true;
+    }
+    else {
+      result++;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int getCompoundSectionEnd(const TextFile &tf, const int line_start, const int line_end_in) {
+  return getCompoundSectionEnd(tf.data(), line_start, line_end_in);
+}
+
+//-------------------------------------------------------------------------------------------------
 MdlMolVersion findMolObjVersion(const char* text, const int nchar) {
   for (int i = 0; i < nchar; i++) {
     if (text[i] == 'V' || text[i] == 'v') {

@@ -9,6 +9,8 @@ using diskutil::getBaseName;
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::readRealValue;
+using parse::separateText;
+using parse::stringToChar4;
 using parse::strncmpCased;
 using parse::TextFileReader;
 using parse::verifyContents;
@@ -250,7 +252,8 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     // parent MdlMolObj reader.
     if (lnlength < 15) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + " to read a property-based MDL MOL atom list.", "MolObjAtomList");
+            getBaseName(tf.getFileName()) + " to read a property-based MDL MOL atom list.",
+            "MolObjAtomList");
     }
     if (verifyContents(line_ptr, 7, 3, NumberFormat::INTEGER)) {
       atom_attachment = readIntegerValue(line_ptr, 7, 3);
@@ -260,7 +263,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     }
     if (entry_count < 0 || entry_count > 16) {
       rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
-            "line " + std::to_string(line_number) + " of " + tf.getFileName() + ".",
+            "line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) + ".",
             "MolObjAtomList");
     }
     switch (line_ptr[14]) {
@@ -272,12 +275,13 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
       break;
     default:
       rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + ", " + line_ptr[14] + ", is invalid.", "MolObjAtomList");
+            getBaseName(tf.getFileName()) + ", " + line_ptr[14] + ", is invalid.",
+            "MolObjAtomList");
     }
     if (lnlength < 16 + (4 * entry_count)) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + " to read an atom list with " + std::to_string(entry_count) +
-            "items.", "MolObjAtomList");      
+            getBaseName(tf.getFileName()) + " to read an atom list with " +
+            std::to_string(entry_count) + "items.", "MolObjAtomList");      
     }
     std::vector<char4> tmp_symbols;
     for (int i = 0; i < entry_count; i++) {
@@ -291,8 +295,8 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
   else {
     if (lnlength < 10) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + " to read one of the (deprecated) MDL MOL atom list entries.",
-            "MolObjAtomList");
+            getBaseName(tf.getFileName()) + " to read one of the (deprecated) MDL MOL atom list "
+            "entries.", "MolObjAtomList");
     }
 
     // Read the deprecated atom list entry format
@@ -308,20 +312,21 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
       break;
     default:
       rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + ", " + line_ptr[4] + ", is invalid.", "MolObjAtomList");
+            getBaseName(tf.getFileName()) + ", " + line_ptr[4] + ", is invalid.",
+            "MolObjAtomList");
     }
     if (verifyContents(line_ptr, 5, 5, NumberFormat::INTEGER)) {
       entry_count = readIntegerValue(line_ptr, 5, 5);
     }
     if (entry_count < 0 || entry_count > 5) {
       rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
-            "line " + std::to_string(line_number) + " of " + tf.getFileName() + ".",
+            "line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) + ".",
             "MolObjAtomList");
     }
     if (lnlength < 10 + (4 * entry_count)) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
-            tf.getFileName() + " to read an atom list with " + std::to_string(entry_count) +
-            "items.", "MolObjAtomList");
+            getBaseName(tf.getFileName()) + " to read an atom list with " +
+            std::to_string(entry_count) + "items.", "MolObjAtomList");
     }
     atomic_numbers.resize(entry_count);
     for (int i = 0; i < entry_count; i++) {
@@ -330,10 +335,11 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
       }
       else {
         rtErr("An invalid entry was found on line " + std::to_string(line_number) + " of " +
-              tf.getFileName() + ": " + tf.extractString(line_number, 11 + (4 * i), 3) + ".  The "
-              "entries of one of the (deprecated) MDL MOL format atom lists must be integers "
-              "corresponding to atomic numbers.  Use IUPAC element symbols in the new format, "
-              "placed on MOL property lines beginning \"M  ALS\".", "MolObjAtomList");
+              getBaseName(tf.getFileName()) + ": " +
+              tf.extractString(line_number, 11 + (4 * i), 3) + ".  The entries of one of the "
+              "(deprecated) MDL MOL format atom lists must be integers corresponding to atomic "
+              "numbers.  Use IUPAC element symbols in the new format, placed on MOL property "
+              "lines beginning \"M  ALS\".", "MolObjAtomList");
       }
     }
   }
@@ -504,7 +510,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_EXPANSION:
     if (strncmpCased("EXP", tf.extractString(line_number, 7, 3), CaseSensitivity::YES) == false) {
       rtErr("A malformed S-Group expansion entry was encountered on line " +
-            std::to_string(line_number) + " of file " + tf.getFileName() + ".", "MolObjProperty");
+            std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + ".",
+            "MolObjProperty");
     }
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
@@ -658,7 +665,8 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   *line_advance = line_number + tmp_advance;
   if (*line_advance >= tf.getLineCount()) {
     rtErr("The advancement due to property " + std::to_string(code.w) + "  " + code.x + code.y +
-          code.z + " overruns the length of file " + tf.getFileName() + ".", "MolObjProperty");
+          code.z + " overruns the length of file " + getBaseName(tf.getFileName()) + ".",
+          "MolObjProperty");
   }
   if (entry_count_unrecognized) {
     rtErr("The entry count on line " + std::to_string(line_number) + " of file " +
@@ -950,20 +958,313 @@ void MolObjProperty::checkAttributeValidity(const int entry_index, const int att
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataItem(const std::string &item_name_in, const std::string &external_regno_in,
-               const int maccs_ii_number_in, const uint header_info,
-               const std::vector<std::string> &body_in) :
-    item_name{item_name_in}, external_regno{external_regno_in},
-    maccs_ii_number{maccs_ii_number_in}, use_internal_id{((header_info & 0x1) == 1U)},
-    use_external_id{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
+MolObjDataItem::MolObjDataItem(const std::string &item_name_in,
+                               const std::string &external_regno_in,
+                               const int internal_regno_in, const int maccs_ii_number_in,
+                               const uint header_info, const std::vector<std::string> &body_in) :
+    item_name{item_name_in}, external_regno{external_regno_in}, internal_regno{internal_regno_in},
+    maccs_ii_number{maccs_ii_number_in}, use_internal_regno{((header_info & 0x1) == 1U)},
+    use_external_regno{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
     use_maccs_ii_number{((header_info & 0x8) == 8U)}, note_archives{((header_info & 0x10) == 16U)},
     body{body_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number)
+MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *line_advance,
+                               const int compound_line_end, const std::string &title) :
     MolObjDataItem()
-{}
+{
+  // Find an item name in the header line
+  const char* line_ptr = tf.getLinePointer(line_number);
+  const int lnlength = tf.getLineLength(line_number);
+  bool on_item_name = false;
+  bool on_regno = false;
+  for (int i = 1; i < lnlength; i++) {
+    if (line_ptr[i] == '<') {
+      if (on_item_name) {
+        rtErr("The reserved character '<' appears twice on line " + std::to_string(line_number) +
+              " of file " + getBaseName(tf.getFileName()) + ", compound " + title + ".",
+              "MolObjDataItem");
+      }
+      on_item_name = true;
+      use_item_name = true;
+    }
+    else if (line_ptr[i] == '>') {
+      if (on_item_name == false) {
+        rtErr("The reserved character '>' appears before its counterpart '<' on line " +
+              std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + ", "
+              "failing to define a data item name in compound " + title + ".", "MolObjDataItem");
+      }
+      on_item_name = false;
+    }
+    else if (line_ptr[i] == '(') {
+      if (on_regno) {
+        rtErr("The reserved character '(' appears twice on line " + std::to_string(line_number) +
+              " of file " + getBaseName(tf.getFileName()) + ", in compound " + title + ".",
+              "MolObjDataItem");
+      }
+      on_regno = true;
+      use_external_regno = true;
+    }
+    else if (line_ptr[i] == ')') {
+      if (on_regno == false) {
+        rtErr("The reserved character ')' appears before its counterpart '(' on line " +
+              std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + ", "
+              "failing to define an external registry number in compound " + title + ".",
+              "MolObjDataItem");
+      }
+      on_regno = false;
+    }
+    else if (on_item_name == false && on_regno == false) {
+      if (line_ptr[i] == 'D' && i < lnlength - 2 && line_ptr[i + 1] == 'T') {
+        maccs_ii_number = 0;
+        int j = i + 2;
+        while (j < lnlength && line_ptr[j] >= '0' && line_ptr[j] <= '9') {
+          maccs_ii_number *= 10;
+          maccs_ii_number += static_cast<int>(line_ptr[j]) - static_cast<int>('0');
+          j++;
+        }
+        i = j - 1;
+        use_maccs_ii_number = true;
+      }
+      else if (line_ptr[i] == 'F' && i <= lnlength - 13 &&
+               strncmpCased(std::string("FROM ARCHIVES"), &line_ptr[i])) {
+        note_archives = true;
+        i += 12;
+      }
+      else if (line_ptr[i] >= '0' && line_ptr[i] <= '9') {
+        internal_regno = 0;
+        int j = i;
+        while (j < lnlength && line_ptr[j] >= '0' && line_ptr[j] <= '9') {
+          internal_regno *= 10;
+          internal_regno += static_cast<int>(line_ptr[j]) - static_cast<int>('0');
+          j++;
+        }
+        i = j - 1;
+        use_internal_regno = true;
+      }
+    }
+    else {
+      if (on_item_name) {
+        item_name += line_ptr[i];
+      }
+      else if (on_regno) {
+        external_regno += line_ptr[i];
+      }
+    }
+  }
+
+  // Read the data lines
+  int tmp_advance = line_number + 1;
+  bool search_on = true;
+  const int actual_compound_line_end = (compound_line_end == -1) ? tf.getLineCount() :
+                                                                   compound_line_end;
+  while (tmp_advance < actual_compound_line_end && search_on) {
+    const int dl_length = tf.getLineLength(tmp_advance);
+    if (dl_length == 0) {
+      search_on = false;
+    }
+    else {
+      search_on = false;
+      const char* dl_ptr = tf.getLinePointer(tmp_advance);
+      for (int i = 0; i < dl_length; i++) {
+        search_on = (search_on || dl_ptr[i] != ' ');
+      }
+    }
+    if (search_on) {
+      tmp_advance++;
+    }
+  }
+  tmp_advance--;
+  body.reserve(tmp_advance - line_number);
+  *line_advance = tmp_advance;
+  for (int pos = line_number + 1; pos <= tmp_advance; pos++) {
+    body.push_back(tf.extractString(pos));
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataItem::getItemName() const {
+  return item_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataItem::getExternalRegistryNumber() const {
+  return external_regno;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjDataItem::getInternalRegistryNumber() const {
+  return internal_regno;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjDataItem::getMaccsFieldNumber() const {
+  return maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MolObjDataItem::parseString(const int element_number, const int line_number) const {
+  if (line_number >= static_cast<int>(body.size())) {
+    const std::string identifier = (item_name.size() > 0LLU) ? "Item name : <" + item_name + ">" :
+                                                               std::string("");
+    rtErr("Line index " + std::to_string(line_number) + " is inaccessible in a data item with " +
+          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MolObjDataItem",
+          "parseString");
+  }
+  const std::vector<std::string> line_components = separateText(body[line_number]);
+  if (element_number < static_cast<int>(line_components.size()) || element_number < 0) {
+    const std::string identifier = (item_name.size() > 0LLU) ? "Item name : <" + item_name + ">" :
+                                                               std::string("");
+    rtErr("Line index " + std::to_string(line_number) + " has " +
+          std::to_string(line_components.size()) + " components.  Index " +
+          std::to_string(element_number) + " is invalid.", "MolObjDataItem", "parseString");
+  }
+  return line_components[element_number];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MolObjDataItem::parseString(const int start_pos, const int length,
+                                        const int line_number) const {
+  if (line_number >= static_cast<int>(body.size())) {
+    const std::string identifier = (item_name.size() > 0LLU) ? "Item name : <" + item_name + ">" :
+                                                               std::string("");
+    rtErr("Line index " + std::to_string(line_number) + " is inaccessible in a data item with " +
+          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MolObjDataItem",
+          "parseString");
+  }
+  if (start_pos < 0) {
+    rtErr("Starting position " + std::to_string(start_pos) + " is invalid.", "MolObjDataItem",
+          "parseString");
+  }
+  const int lnlength = body[line_number].size();
+  const int actual_length = (length < 0) ? lnlength - start_pos : length;
+  if (start_pos + length > lnlength) {
+    rtErr("Starting position " + std::to_string(start_pos) + " and length " +
+          std::to_string(actual_length) + " combine to make an invalid read of a string with "
+          "length " + std::to_string(body[line_number].size()) + " characters.", "MolObjDataItem",
+          "parseString");
+  }
+  return body[line_number].substr(start_pos, actual_length);
+}
+
+//-------------------------------------------------------------------------------------------------
+llint MolObjDataItem::parseInteger(const int element_number, const int line_number) const {
+  const std::string proto = parseString(element_number, line_number);
+  if (verifyContents(proto, NumberFormat::LONG_LONG_INTEGER)) {
+    return stoll(proto);
+  }
+  else {
+    rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
+          ", " + proto + ", could not be parsed as an integer.", "MolObjDataItem", "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+llint MolObjDataItem::parseInteger(const int start_pos, const int length,
+                                   const int line_number) const {
+  const std::string proto = parseString(start_pos, length, line_number);
+  if (verifyContents(proto, NumberFormat::LONG_LONG_INTEGER)) {
+    return stoll(proto);
+  }
+  else {
+    rtErr("Column-formatted characters \"" + proto + "\" at position " +
+          std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
+          "parsed as an integer.", "MolObjDataItem", "parseString");
+  }
+  __builtin_unreachable();  
+}
+
+//-------------------------------------------------------------------------------------------------
+ullint MolObjDataItem::parseUnsigned(const int element_number, const int line_number) const {
+  const std::string proto = parseString(element_number, line_number);
+  if (verifyContents(proto, NumberFormat::UNSIGNED_LONG_LONG_INTEGER)) {
+    return stoull(proto);
+  }
+  else {
+    rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
+          ", " + proto + ", could not be parsed as an unsigned integer.", "MolObjDataItem",
+          "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+ullint MolObjDataItem::parseUnsigned(const int start_pos, const int length,
+                                     const int line_number) const {
+  const std::string proto = parseString(start_pos, length, line_number);
+  if (verifyContents(proto, NumberFormat::UNSIGNED_LONG_LONG_INTEGER)) {
+    return stoll(proto);
+  }
+  else {
+    rtErr("Column-formatted characters \"" + proto + "\" at position " +
+          std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
+          "parsed as an unsigned integer.", "MolObjDataItem", "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolObjDataItem::parseReal(const int element_number, const int line_number) const {
+  const std::string proto = parseString(element_number, line_number);
+  if (verifyContents(proto, NumberFormat::STANDARD_REAL) ||
+      verifyContents(proto, NumberFormat::SCIENTIFIC)) {
+    return stod(proto);
+  }
+  else {
+    rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
+          ", " + proto + ", could not be parsed as a real number.", "MolObjDataItem",
+          "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolObjDataItem::parseReal(const int start_pos, const int length,
+                                 const int line_number) const {
+  const std::string proto = parseString(start_pos, length, line_number);
+  if (verifyContents(proto, NumberFormat::STANDARD_REAL) ||
+      verifyContents(proto, NumberFormat::SCIENTIFIC)) {
+    return stod(proto);
+  }
+  else {
+    rtErr("Column-formatted characters \"" + proto + "\" at position " +
+          std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
+          "parsed as a real number.", "MolObjDataItem", "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 MolObjDataItem::parseChar4(const int element_number, const int line_number) const {
+  const std::string proto = parseString(element_number, line_number);
+  if (verifyContents(proto, NumberFormat::CHAR4)) {
+    return stringToChar4(proto);
+  }
+  else {
+    rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
+          ", " + proto + ", could not be parsed as a four-character tuple, having " +
+          std::to_string(proto.size()) + " characters in all.", "MolObjDataItem",
+          "parseString");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 MolObjDataItem::parseChar4(const int start_pos, const int length,
+                                 const int line_number) const {
+  const std::string proto = parseString(start_pos, length, line_number);
+  if (verifyContents(proto, NumberFormat::CHAR4)) {
+    return stringToChar4(proto);
+  }
+  else {
+    rtErr("Column-formatted characters \"" + proto + "\" at position " +
+          std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
+          "parsed as a four-character tuple.", "MolObjDataItem", "parseString");
+  }
+  __builtin_unreachable();
+}
 
 //-------------------------------------------------------------------------------------------------
 bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
@@ -1011,7 +1312,8 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   // Default line end of -1 indicates reading to the end of the file.  Otherwise, identify the
   // end of the formatting ("M  END").
   const int mdl_section_end = getMdlMolSectionEnd(tfr, line_start, line_end_in);
-                       
+  const int sd_compound_end = getCompoundSectionEnd(tfr, line_start, line_end_in);
+
   // The range of data now extends from line_start to mdl_section_end.  Sift through that
   // information for a V2000 or V3000 specification.  This should be found on the fourth line.
   version_no = findMolObjVersion(tf, line_start + 3);
@@ -1045,7 +1347,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
         }
         else {
           rtErr("Invalid chirality setting detected at line " + std::to_string(counts_line_idx) +
-                " in .sdf or MDL MOL file " + tf.getFileName() + ".", "MdlMolObj");
+                " in .sdf or MDL MOL file " + getBaseName(tf.getFileName()) + ".", "MdlMolObj");
         }
       }
       if (verifyContents(tf, counts_line_idx, 15, 3, NumberFormat::INTEGER)) {
@@ -1087,8 +1389,8 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   case MdlMolVersion::UNKNOWN:
 
     // This case would be unprocessable.
-    rtErr("No valid MDL MOL version was detected.  Parsing in " + tf.getFileName() + " cannot "
-          "proceed.");
+    rtErr("No valid MDL MOL version was detected.  Parsing in " + getBaseName(tf.getFileName()) +
+          " cannot proceed.");
   }
 
   // Allocate space for information to be read
@@ -1239,6 +1541,23 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     break;
   }
 
+  // Read the data items
+  for (int pos = mdl_section_end; pos < sd_compound_end; pos++) {
+    if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
+      int adv_pos;
+      data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title);
+      pos = adv_pos;
+    }
+  }
+
+  // CHECK
+  printf("There are %zu data items.\n", data_items.size());
+  for (size_t i = 0; i < data_items.size(); i++) {
+    printf("Data item %2zu : > <%s>(%s)\n", i, data_items[i].getItemName().c_str(),
+           data_items[i].getExternalRegistryNumber().c_str());
+  }
+  // END CHECK
+  
   // Update the atom attributes based on properties data.  This provides V3000 functionality and
   // backwards compatibility for the V2000 format.
   updateV2kAtomAttributes();

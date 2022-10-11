@@ -16,8 +16,8 @@ using parse::TextFile;
 using parse::TextFileReader;
 
 /// \brief Find the end of the MDL MOL entry formatting within a specified range.  If the
-///        end of formatting takes it default value of -1, the search will continue until the end
-///        of the TextFile object.
+///        end of the search range takes its default value of -1, the search will continue until
+///        the end of the TextFile object.
 ///
 /// Overloaded:
 ///   - Accept a TextFile object
@@ -32,6 +32,16 @@ using parse::TextFileReader;
 int getMdlMolSectionEnd(const TextFileReader &tfr, int line_start, int line_end_in = -1);
 
 int getMdlMolSectionEnd(const TextFile &tf, int line_start, int line_end_in = -1);
+/// \}
+
+/// \brief Find the end of the SD file compound entry.  If the end of search range takes its
+///        default value of -1, the search will continue until the end of the TextFile object.
+///        The overloading and formal argument descriptors of this function follow from
+///        getMdlMolSectionEnd().
+/// \{
+int getCompoundSectionEnd(const TextFileReader &tfr, int line_start, int line_end_in = -1);
+
+int getCompoundSectionEnd(const TextFile &tf, int line_start, int line_end_in = -1);
 /// \}
   
 /// \brief Find the version stamp in an MDL MOL file (or a part of an SD file, .sdf).  Assume the

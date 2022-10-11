@@ -150,6 +150,11 @@ bool verifyContents(const char* line, const int start_pos, const int length,
 }
 
 //-------------------------------------------------------------------------------------------------
+bool verifyContents(const std::string &line, const NumberFormat fmt) {
+  return verifyNumberFormat(line.c_str(), fmt, 0, line.size());
+}
+
+//-------------------------------------------------------------------------------------------------
 bool verifyContents(const std::string &line, const int start_pos, const int length,
                     const NumberFormat fmt) {
   const int line_length = line.size();

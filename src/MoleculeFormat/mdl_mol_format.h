@@ -401,15 +401,83 @@ public:
   ///                            declaration.
   /// \param tf                  The original text of the SD file, committed to RAM
   /// \param line_number         Line of the file at which to begin reading the data item
+  /// \param line_advance        Line of the file that the construction of the data item leads to
+  ///                            (after taking in lines of the item)
+  /// \param compound_line_end   Index of the last line of the compound within the SD file (the
+  ///                            line contains $$$$)
+  /// \param title               The title of the structure, if known, for error tracing purposes
   /// \{
+  MolObjDataItem(const TextFile &tf, int line_number, int *line_advance,
+                 int compound_line_end = -1,
+                 const std::string &title = std::string(""));
+
   MolObjDataItem(const std::string &item_name_in = std::string(""),
                  const std::string &external_regno_in = std::string(""),
-                 int maccs_ii_number_in = -1, uint header_info = 0U,
+                 int internal_regno_in = -1, int maccs_ii_number_in = -1, uint header_info = 0U,
                  const std::vector<std::string> &body_in = {});
-
-  MolObjDataItem(const TextFile &tf, int line_number);
   /// \}
 
+  /// \brief Get a const reference to the item name, if it exists.  If there is no item name, a
+  ///        const reference to a blank string will be returned.
+  const std::string& getItemName() const;
+
+  /// \brief Get the external registry number.
+  const std::string& getExternalRegistryNumber() const;
+
+  /// \brief Get the internal registry number.  This will return -1 if no such registry number
+  ///        exists.
+  int getInternalRegistryNumber() const;
+
+  /// \brief Get the MACCS-II database field number.
+  int getMaccsFieldNumber() const;
+
+  /// \brief Retrieve a string from the data lines of a data item, assuming that individual words
+  ///        on each line are separated by one or more white space characters and that the
+  ///        quotation marks "" and '' collect everything between them into a single word.
+  ///
+  /// Overloaded:
+  ///   - Extract a free-format string based on words separated by white space, assuming that
+  ///     individual words on each line are separated by one or more white space characters and
+  ///     that the quotation marks "" and '' collect everything between them into a single word.
+  ///   - Extract a column-formatted string based on strict character indices
+  ///
+  /// \param element_number  Number of the word on the line (words are separated by white space)
+  /// \param start_pos       The starting position within the line at which to begin reading
+  /// \param start_pos       Length of the fixed-column reading to perform
+  /// \param line_number     Number of the data line on which to find the string
+  /// \{
+  std::string parseString(int element_number, int line_number) const;
+  std::string parseString(int start_pos, int length, int line_number) const;
+  /// \}
+
+  /// \brief Retrieve a signed integer from the data lines of a data item.  The assumptions of
+  ///        parseString() above apply, as do the overloads and descriptions of formal arguments.
+  /// \{
+  llint parseInteger(int element_number, int line_number) const;
+  llint parseInteger(int start_pos, int length, int line_number) const;
+  /// \}
+  
+  /// \brief Retrieve an unsigned integer from the data lines of a data item.  The assumptions of
+  ///        parseString() above apply, as do the overloads and descriptions of formal arguments.
+  /// \{
+  ullint parseUnsigned(int element_number, int line_number) const;
+  ullint parseUnsigned(int start_pos, int length, int line_number) const;
+  /// \}
+  
+  /// \brief Retrieve a real number from the data lines of a data item.  The assumptions of
+  ///        parseString() above apply, as do the overloads and descriptions of formal arguments.
+  /// \{
+  double parseReal(int element_number, int line_number) const;
+  double parseReal(int start_pos, int length, int line_number) const;
+  /// \}
+  
+  /// \brief Retrieve a tuple of four characters from the data lines of a data item.  Assumptions
+  ///        from parseString() above apply, as do overloads and descriptions of formal arguments.
+  /// \{
+  char4 parseChar4(int element_number, int line_number) const;
+  char4 parseChar4(int start_pos, int length, int line_number) const;
+  /// \}
+  
   /// \brief Match this data item with a series of identification tags.
   ///
   /// \param item_name_comp  Item name for comparison
@@ -430,8 +498,10 @@ private:
   std::string item_name;       ///< Name of the data item (optional, but an effective means of
                                ///<   distiction)
   std::string external_regno;  ///< External registry number
+  int internal_regno;          ///< Internal registry number, based on the structure index within
+                               ///<   the SD file and a pure integer
   int maccs_ii_number;         ///< MACCS-II database field number
-  bool use_internal_id;        ///< Flag to have the header line use the SD file's internal
+  bool use_internal_regno;     ///< Flag to have the header line use the SD file's internal
                                ///<   structure numbering in the data item header line
   bool use_external_regno;     ///< Flag to have the header line use the external registry number
   bool use_item_name;          ///< Flag to use the item name in the header between < > marks
@@ -598,6 +668,11 @@ private:
   /// Properties
   std::vector<MolObjProperty> properties;
 
+  /// Data items: this is what makes the SD file (.sdf) format so extensible.  While technically
+  /// not part of the MDL MOL format, they are stored in the MdlMolObj for association.  Data items
+  /// will be written back to new .sdf files but not .mol files based on the data in this object.
+  std::vector<MolObjDataItem> data_items;
+  
   /// Title (first line from the file header)
   std::string title;
 

@@ -100,6 +100,7 @@ bool verifyNumberFormat(const char* a, NumberFormat cform, int read_begin = 0, i
 /// \{
 bool verifyContents(const char* line, int start_pos, int length,
                     NumberFormat fmt = NumberFormat::CHAR4);
+bool verifyContents(const std::string &line, NumberFormat fmt);
 bool verifyContents(const std::string &line, int start_pos, int length,
                     NumberFormat fmt = NumberFormat::CHAR4);
 bool verifyContents(const TextFile &tf, int line, int start_pos, int length,
