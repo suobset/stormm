@@ -386,8 +386,6 @@ public:
   ///        in the Fortran array indexing (starting at 1).  Integer information read from the
   ///        data body can be adjusted to meet internal array indexing.
   ///
-  /// \param tf                  The original text of the SD file, committed to RAM
-  /// \param line_number         Line of the file at which to begin reading the data item
   /// \param item_name_in        Name of the data item (an item_name of "ABCD" will appear as
   ///                            "<ABCD>" on the data item's first line)
   /// \param external_regno_in   An identification number for the compound referencing an external
@@ -401,11 +399,15 @@ public:
   ///                            the order in the SD file), the external identification number,
   ///                            the item name, the field number, and finally a "FROM ARCHIVES"
   ///                            declaration.
+  /// \param tf                  The original text of the SD file, committed to RAM
+  /// \param line_number         Line of the file at which to begin reading the data item
   /// \{
-  MolObjDataItem(const TextFile &tf, int line_number);
+  MolObjDataItem(const std::string &item_name_in = std::string(""),
+                 const std::string &external_regno_in = std::string(""),
+                 int maccs_ii_number_in = -1, uint header_info = 0U,
+                 const std::vector<std::string> &body_in = {});
 
-  MolObjDataItem(const std::string &item_name_in, const std::string &external_regno,
-                 int maccs_ii_number_in, uint header_info);
+  MolObjDataItem(const TextFile &tf, int line_number);
   /// \}
 
   /// \brief Match this data item with a series of identification tags.
@@ -425,13 +427,16 @@ public:
   /// \}
   
 private:
-  std::string item_name;  ///< Name of the data item (optional, but an effective means of
-                          ///<   distiction)
-  int external_regno;     ///< External registry number
-  int maccs_ii_number;    ///< MACCS-II database field number
-  bool use_internal_id;   ///< Flag to have the header line use the SD file's internal structure
-                          ///<   numbering in the data item header line
-  bool note_archives;     ///< Flag to have the header line note "FROM ARCHIVES"
+  std::string item_name;     ///< Name of the data item (optional, but an effective means of
+                             ///<   distiction)
+  int external_regno;        ///< External registry number
+  int maccs_ii_number;       ///< MACCS-II database field number
+  bool use_internal_id;      ///< Flag to have the header line use the SD file's internal structure
+                             ///<   numbering in the data item header line
+  bool use_external_regno;   ///< Flag to have the header line use the external registry number
+  bool use_item_name;        ///< Flag to use the name of the item in the header between < > marks
+  bool use_maccs_ii_number;  ///< Flag to use the MACCS-II field number in the header after "DT"
+  bool note_archives;        ///< Flag to have the header line note "FROM ARCHIVES"
 
   /// Data lines from the item, one per array element
   std::vector<std::string> body;

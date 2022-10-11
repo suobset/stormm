@@ -948,7 +948,23 @@ void MolObjProperty::checkAttributeValidity(const int entry_index, const int att
           "checkAttributeValidity");
   }
 }
- 
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataItem(const std::string &item_name_in, const std::string &external_regno_in,
+               const int maccs_ii_number_in, const uint header_info,
+               const std::vector<std::string> &body_in) :
+    item_name{item_name_in}, external_regno{external_regno_in},
+    maccs_ii_number{maccs_ii_number_in}, use_internal_id{((header_info & 0x1) == 1U)},
+    use_external_id{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
+    use_maccs_ii_number{((header_info & 0x8) == 8U)}, note_archives{((header_info & 0x10) == 16U)},
+    body{body_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number)
+    MolObjDataItem()
+{}
+
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
