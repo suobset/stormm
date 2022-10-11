@@ -413,10 +413,17 @@ public:
   /// \param item_name_comp  Item name for comparison
   /// \param ext_regno_comp  External registry number for comparison
   /// \param maccs_ii_no_comp  MACCS-II database field number for comparison (omit leading "DT")
-  bool match(const std::string &item_name_comp = mdl_data_item_name_any,
-             const std::string &ext_regno_comp = mdl_external_registry_any,
-             int maccs_ii_no_comp = -1);
+  /// \{
+  bool matchItemName(const std::string &item_name_comp, const std::string &ext_regno_comp,
+                     int maccs_ii_no_comp = -1);
 
+  bool matchItemName(const std::string &item_name_comp, int maccs_ii_no_comp = -1);
+
+  bool matchRegistryNumber(const std::string &ext_regno_comp, int maccs_ii_no_comp = -1);
+
+  bool matchMaccsField(int maccs_ii_no_comp);
+  /// \}
+  
 private:
   std::string item_name;  ///< Name of the data item (optional, but an effective means of
                           ///<   distiction)
@@ -427,7 +434,7 @@ private:
   bool note_archives;     ///< Flag to have the header line note "FROM ARCHIVES"
 
   /// Data lines from the item, one per array element
-  std::vector<std::string>> body;
+  std::vector<std::string> body;
 };
 
 /// \brief A molecular three-dimensional feature.  This special class of MOL object properies has

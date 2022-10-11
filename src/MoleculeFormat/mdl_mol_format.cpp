@@ -777,6 +777,51 @@ std::string MolObjProperty::getStringValue(const int entry_index,
 }
 
 //-------------------------------------------------------------------------------------------------
+void MolObjProperty::setCode(const char x, const char y, const char z, const char major) {
+  code.x = x;
+  code.y = y;
+  code.z = z;
+  code.w = major;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjProperty::setCode(const char4 code_in) {
+  code = code_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjProperty::setSubstrate(const int index) {
+  substrate = index;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjProperty::setEntryFormat(const std::vector<MolObjPropField> &entry_detail_in,
+                                    const std::vector <MolObjIndexKind> &entry_adjustment_in) {
+  if (entry_depth != 0) {
+    rtErr("A property with defined fields cannot be redesigned.", "MolObjProperty",
+          "setEntryFormat");
+  }
+  if (entry_detail_in.size() != entry_adjustment_in.size()) {
+    rtErr("Details and adjustment instructions for each property field must have a one-to-one "
+          "correspondence.", "MolObjProperty", "setEntryFormat");
+  }
+  entry_detail = entry_detail_in;
+  entry_adjustment = entry_adjustment_in;
+  entry_depth = entry_detail.size();
+  for (int i = 0; i < entry_depth; i++) {
+    if (entry_detail[i] != MolObjPropField::INTEGER &&
+        (entry_adjustment[i] == MolObjIndexKind::ATOM ||
+         entry_adjustment[i] == MolObjIndexKind::BOND)) {
+      rtErr("Atom and bond indices must have integer type.  Property field " +
+            std::to_string(i) + " violates convention by combining a " +
+            getEnumerationName(entry_detail[i]) + " data type with " +
+            getEnumerationName(entry_adjustment[i]) + " index adjustment.", "MolObjProperty",
+            "setEntryFormat");
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, const int length) {
   if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
     entry_count = readIntegerValue(line_ptr, start_pos, length);

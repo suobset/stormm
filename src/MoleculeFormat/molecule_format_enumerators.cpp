@@ -62,6 +62,19 @@ MolObjPropertyKind translateMolObjPropertyKind(char4 input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MolObjIndexKind input) {
+  switch (input) {
+  case MolObjIndexKind::ATOM:
+    return std::string("ATOM");
+  case MolObjIndexKind::BOND:
+    return std::string("BOND");
+  case MolObjIndexKind::OTHER:
+    return std::string("OTHER");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const MolObjPropField input) {
   switch (input) {
   case MolObjPropField::INTEGER:

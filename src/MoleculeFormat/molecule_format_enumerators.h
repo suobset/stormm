@@ -129,11 +129,16 @@ enum class MolObjPropertyKind {
 /// \param input  The code to translate
 MolObjPropertyKind translateMolObjPropertyKind(char4 input);
 
-/// \brief Get a string corresponding to the name of the MolObjPropField enumeration.
+/// \brief Get a string corresponding to the name of the MolObjPropField enumeration.  Overloaded
+///        various enumerations as input in this and other libraries.
 ///
 /// \param input  The enumeration to translate
+/// \{
+std::string getEnumerationName(MolObjIndexKind input);
+
 std::string getEnumerationName(MolObjPropField input);
-  
+/// \}
+
 } // namespace structure
 } // namespace stormm
 
