@@ -42,6 +42,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molobj_atomlist.cpp \
 		   $(SRCDIR)/MoleculeFormat/molobj_bond.cpp \
+		   $(SRCDIR)/MoleculeFormat/molobj_dataitem.cpp \
 		   $(SRCDIR)/MoleculeFormat/molobj_property.cpp \
 	           $(SRCDIR)/Namelists/input.cpp \
 	           $(SRCDIR)/Namelists/namelist_element.cpp \
@@ -174,6 +175,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/MoleculeFormat/molobj_atomlist.h \
 		     $(SRCDIR)/MoleculeFormat/molobj_bond.h \
+		     $(SRCDIR)/MoleculeFormat/molobj_dataitem.h \
 		     $(SRCDIR)/MoleculeFormat/molobj_property.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
@@ -341,6 +343,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 	          $(SRCDIR)/MoleculeFormat/molobj_atomlist.o \
 	          $(SRCDIR)/MoleculeFormat/molobj_bond.o \
+	          $(SRCDIR)/MoleculeFormat/molobj_dataitem.o \
 	          $(SRCDIR)/MoleculeFormat/molobj_property.o \
 		  $(SRCDIR)/Namelists/input.o \
 	          $(SRCDIR)/Namelists/namelist_element.o \
