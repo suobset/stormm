@@ -37,7 +37,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
-		   $(SRCDIR)/MoleculeFormat/mdl_mol_format.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdl_mol_obj.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molobj_atomlist.cpp \
@@ -116,6 +116,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Trajectory/phasespace.cpp \
 	           $(SRCDIR)/Trajectory/thermostat.cpp \
 	           $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
+	           $(SRCDIR)/Trajectory/write_annotated_frame.cpp \
 	           $(SRCDIR)/Trajectory/write_frame.cpp \
 		   $(SRCDIR)/UnitTesting/approx.cpp \
 		   $(SRCDIR)/UnitTesting/stopwatch.cpp \
@@ -170,7 +171,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
 		     $(SRCDIR)/MolecularMechanics/mm_controls.h \
 		     $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
-		     $(SRCDIR)/MoleculeFormat/mdl_mol_format.h \
+		     $(SRCDIR)/MoleculeFormat/mdl_mol_obj.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/MoleculeFormat/molobj_atomlist.h \
@@ -253,6 +254,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Trajectory/phasespace.h \
 		     $(SRCDIR)/Trajectory/thermostat.h \
 		     $(SRCDIR)/Trajectory/trajectory_enumerators.h \
+		     $(SRCDIR)/Trajectory/write_annotated_frame.h \
 		     $(SRCDIR)/Trajectory/write_frame.h \
 		     $(SRCDIR)/UnitTesting/approx.h \
 		     $(SRCDIR)/UnitTesting/stopwatch.h \
@@ -338,7 +340,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/MolecularMechanics/minimization.o \
 	          $(SRCDIR)/MolecularMechanics/mm_controls.o \
 	          $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
-	          $(SRCDIR)/MoleculeFormat/mdl_mol_format.o \
+	          $(SRCDIR)/MoleculeFormat/mdl_mol_obj.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 	          $(SRCDIR)/MoleculeFormat/molobj_atomlist.o \
@@ -417,6 +419,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Trajectory/phasespace.o \
 		  $(SRCDIR)/Trajectory/thermostat.o \
 		  $(SRCDIR)/Trajectory/trajectory_enumerators.o \
+		  $(SRCDIR)/Trajectory/write_annotated_frame.o \
 		  $(SRCDIR)/Trajectory/write_frame.o \
 		  $(SRCDIR)/UnitTesting/approx.o \
 		  $(SRCDIR)/UnitTesting/stopwatch.o \

@@ -9,6 +9,7 @@
 #include "Chemistry/znumber.h"
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "FileManagement/file_util.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 #include "Trajectory/coordinateframe.h"
@@ -27,6 +28,7 @@ using chemistry::symbolToZNumber;
 using constants::CartesianDimension;
 using constants::CaseSensitivity;
 using constants::ExceptionResponse;
+using diskutil::PrintSituation;
 using parse::TextFile;
 using trajectory::CoordinateFrame;
 using trajectory::PhaseSpace;
@@ -159,13 +161,13 @@ public:
   ///
   /// \param foutp        Output file stream
   /// \param fname        Name of the output file
-  /// \param expectation  Anticipated (or required) condition of the output file that is to be
-  ///                     opened, if only its name is provided
   /// \param vformat      Format version of the MDL MOL standard to use.  If provided as either
   ///                     V2000 or V3000, this will override information stored in the object.
+  /// \param expectation  Anticipated (or required) condition of the output file that is to be
+  ///                     opened, if only its name is provided
   /// \{
-  void write(std::ofstream *foutp, MdlMolVersion vformat) const;
-  void write(const std::string &fname, MdlMolVersion vformat) const;
+  void write(std::ofstream *foutp, MdlMolVersion vformat, PrintSituation expectation) const;
+  void write(const std::string &fname, MdlMolVersion vformat, PrintSituation expectation) const;
   std::string write(MdlMolVersion vformat) const;
   /// \}
 

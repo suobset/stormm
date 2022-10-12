@@ -59,6 +59,7 @@ void initializeTrajectory(std::ofstream *foutp, const CoordinateFileKind output_
 /// \param box_dimensions  Six-element vector of box dimensions (can be obtained from a
 ///                        transformation matrix)
 /// \param time_point      The time point to write at the top of a restart file
+/// \param 
 /// \{
 void writeFrame(std::ofstream *foutp, const std::string &filename, CoordinateFileKind kind,
                 int natom, const double* x_crd, const double* y_crd, const double* z_crd,
@@ -70,9 +71,13 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, CoordinateFil
                 const std::vector<double> &z_crd, const std::vector<double> &x_vel,
                 const std::vector<double> &y_vel, const std::vector<double> &z_vel,
                 UnitCellType unit_cell, const std::vector<double> &box_dimensions);
-/// \}
 
+void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf);
+/// \}
+  
 } // namespace trajectory
 } // namespace stormm
+
+#include "write_frame.h"
 
 #endif

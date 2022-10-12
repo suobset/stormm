@@ -1,6 +1,6 @@
 #include "copyright.h"
 #include "FileManagement/file_listing.h"
-#include "mdl_mol_format.h"
+#include "mdl_mol_obj.h"
 
 namespace stormm {
 namespace structure {
@@ -412,18 +412,21 @@ int MdlMolObj::getPropertiesCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat) const {
-
+void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat,
+                      const PrintSituation expectation) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat) const {
+void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat,
+                      const PrintSituation expectation) const {
 
 }
 
 //-------------------------------------------------------------------------------------------------
 std::string MdlMolObj::write(const MdlMolVersion vformat) const {
+  std::string result;
 
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

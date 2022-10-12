@@ -1,15 +1,22 @@
+#include <cmath>
 #include <cstring>
 #include "copyright.h"
 #include "Constants/symbol_values.h"
+#include "Math/matrix_ops.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/polynumeric.h"
+#include "Parsing/parse.h"
+#include "UnitTesting/approx.h"
 #include "write_frame.h"
 
 namespace stormm {
 namespace trajectory {
 
+using math::computeBoxTransform;
 using parse::NumberFormat;
 using parse::PolyNumeric;
+using parse::realToString;
+using testing::Approx;
 
 //-------------------------------------------------------------------------------------------------
 PrintSituation adjustTrajectoryOpeningProtocol(const PrintSituation expectation,
@@ -101,7 +108,11 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
   case CoordinateFileKind::SDF:
+
+    // The SD file is treated as a special kind of trajectory, written by a specific overload of
+    // writeFrame.
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
     pn_allvel.resize(3 * natom);
@@ -180,7 +191,9 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
       break;
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_NETCDF_RST:
+      break;
     case CoordinateFileKind::SDF:
+      break;
     case CoordinateFileKind::UNKNOWN:
       break;
     }
@@ -203,6 +216,48 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   }
 
   // Check that all required data is present
+  switch (unit_cell) {
+  case UnitCellType::NONE:
+    if (box_dimensions.size() > 0 &&
+        (box_dimensions[0] > 1.01 || box_dimensions[1] > 1.01 || box_dimensions[2] > 1.01)) {
+      rtErr("Box dimensions of [ " +
+            realToString(box_dimensions[0], 8, 4, NumberFormat::STANDARD_REAL) + " x " +
+            realToString(box_dimensions[1], 8, 4, NumberFormat::STANDARD_REAL) + " x " +
+            realToString(box_dimensions[2], 8, 4, NumberFormat::STANDARD_REAL) + " ] were "
+            "supplied for a system with no boundary conditions.", "writeFrame");
+    }
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+    if (Approx(box_dimensions[3]).test(0.5 * symbols::pi) == false ||
+        Approx(box_dimensions[4]).test(0.5 * symbols::pi) == false ||
+        Approx(box_dimensions[5]).test(0.5 * symbols::pi) == false) {
+      rtErr("An orthorhombic system must have all box angles set to right angles.  Current "
+            "[ alpha, beta, gamma ] = [ " +
+            realToString(box_dimensions[3], 8, 4, NumberFormat::STANDARD_REAL) + ", " +
+            realToString(box_dimensions[4], 8, 4, NumberFormat::STANDARD_REAL) + ", " +
+            realToString(box_dimensions[5], 8, 4, NumberFormat::STANDARD_REAL) + " ].",
+            "writeFrame");
+    }
+    break;
+  case UnitCellType::TRICLINIC:
+
+    // Rebuild the transformation matrices to ensure that the box angles are sane
+    std::vector<double> umat(9), invu(9);
+    computeBoxTransform(box_dimensions, umat.data(), invu.data());
+    for (int i = 0; i < 9; i++) {
+      if (std::isnan(invu[i]) || std::isinf(invu[i])) {
+        rtErr("The triclinic system evaluates to a nonsensical transformation matrix: [ " +
+              realToString(box_dimensions[0], 8, 4, NumberFormat::STANDARD_REAL) + " x " +
+              realToString(box_dimensions[1], 8, 4, NumberFormat::STANDARD_REAL) + " x " +
+              realToString(box_dimensions[2], 8, 4, NumberFormat::STANDARD_REAL) + ", " +
+              realToString(box_dimensions[3], 8, 4, NumberFormat::STANDARD_REAL) + ", " +
+              realToString(box_dimensions[4], 8, 4, NumberFormat::STANDARD_REAL) + ", " +
+              realToString(box_dimensions[5], 8, 4, NumberFormat::STANDARD_REAL) + " ].",
+              "writeFrame");
+      }
+    }
+    break;
+  }
 
   // Check that the box dimensions array is of the correct size
   if (box_dimensions.size() != 6) {
