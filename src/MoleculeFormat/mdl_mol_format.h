@@ -485,14 +485,19 @@ public:
   /// \param maccs_ii_no_comp  MACCS-II database field number for comparison (omit leading "DT")
   /// \{
   bool matchItemName(const std::string &item_name_comp, const std::string &ext_regno_comp,
-                     int maccs_ii_no_comp = -1);
+                     int maccs_ii_no_comp = -1) const;
 
-  bool matchItemName(const std::string &item_name_comp, int maccs_ii_no_comp = -1);
+  bool matchItemName(const std::string &item_name_comp, int maccs_ii_no_comp = -1) const;
 
-  bool matchRegistryNumber(const std::string &ext_regno_comp, int maccs_ii_no_comp = -1);
+  bool matchRegistryNumber(const std::string &ext_regno_comp, int maccs_ii_no_comp = -1) const;
 
-  bool matchMaccsField(int maccs_ii_no_comp);
+  bool matchMaccsField(int maccs_ii_no_comp) const;
   /// \}
+
+  /// \brief Set the item name and apply checks to the result.
+  ///
+  /// \param item_name_in  The item name to assign
+  void setItemName(const std::string &item_name_in);
   
 private:
   std::string item_name;       ///< Name of the data item (optional, but an effective means of
@@ -510,6 +515,9 @@ private:
 
   /// Data lines from the item, one per array element
   std::vector<std::string> body;
+
+  /// \brief Validate the choice of item name.
+  void validateItemName() const;
 };
 
 /// \brief A molecular three-dimensional feature.  This special class of MOL object properies has

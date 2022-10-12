@@ -967,7 +967,10 @@ MolObjDataItem::MolObjDataItem(const std::string &item_name_in,
     use_external_regno{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
     use_maccs_ii_number{((header_info & 0x8) == 8U)}, note_archives{((header_info & 0x10) == 16U)},
     body{body_in}
-{}
+{
+  // Check the sanity of the new object
+  validateItemName();
+}
 
 //-------------------------------------------------------------------------------------------------
 MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *line_advance,
@@ -1054,6 +1057,9 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
     }
   }
 
+  // Validate the header line information
+  validateItemName();
+  
   // Read the data lines
   int tmp_advance = line_number + 1;
   bool search_on = true;
@@ -1268,28 +1274,61 @@ char4 MolObjDataItem::parseChar4(const int start_pos, const int length,
 
 //-------------------------------------------------------------------------------------------------
 bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
-                                   const std::string &ext_regno_comp, const int maccs_ii_no_comp) {
+                                   const std::string &ext_regno_comp,
+                                   const int maccs_ii_no_comp) const {
   return ((use_item_name && item_name_comp == item_name) &&
           (use_external_regno && ext_regno_comp == external_regno) &&
           (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchItemName(const std::string &item_name_comp, const int maccs_ii_no_comp) {
+bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
+                                   const int maccs_ii_no_comp) const {
   return ((use_item_name && item_name_comp == item_name) &&
           (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
 }
 
 //-------------------------------------------------------------------------------------------------
 bool MolObjDataItem::matchRegistryNumber(const std::string &ext_regno_comp,
-                                         const int maccs_ii_no_comp) {
+                                         const int maccs_ii_no_comp) const {
   return ((use_external_regno && ext_regno_comp == external_regno) &&
           (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchMaccsField(const int maccs_ii_no_comp) {
+bool MolObjDataItem::matchMaccsField(const int maccs_ii_no_comp) const {
   return (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataItem::setItemName(const std::string &item_name_in) {
+  item_name = item_name_in;
+  validateItemName();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataItem::validateItemName() const {
+  const int nchar = item_name.size();
+  bool problem = false;
+  if (nchar > 0) {
+    if ((item_name[0] >= 'a' && item_name[0] <= 'z') ||
+        (item_name[0] >= 'A' && item_name[0] <= 'Z') || item_name[0] == '_') {
+      for (int i = 1; i < nchar; i++) {
+        problem = (problem ||
+                   item_name[i] == '-' || item_name[i] == '.' || item_name[i] == '<' ||
+                   item_name[i] == '>' || item_name[i] == '=' || item_name[i] == '%' ||
+                   item_name[i] == ' ');
+      }
+    }
+    else {
+      problem = true;
+    }
+  }
+  if (problem) {
+    rtErr("Data item name " + item_name + " is invalid.  An item name must begin with an "
+          "alphabetical character and thereafter contain alphanumeric characters and "
+          "underscores, with no white space.", "MolObjDataItem", "setItemName");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1548,6 +1587,12 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title);
       pos = adv_pos;
     }
+  }
+  if (data_items.size() == 0LLU && sd_compound_end - mdl_section_end > 1) {
+    rtErr("If there are no data items, the compound section must terminate immediately after the "
+          "MDL MOL format section.  File " + getBaseName(tf.getFileName()) + " violates SD file "
+          "conventions at lines " + std::to_string(mdl_section_end) + " - " +
+          std::to_string(sd_compound_end));
   }
 
   // CHECK
