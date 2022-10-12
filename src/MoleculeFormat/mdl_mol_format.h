@@ -2,6 +2,7 @@
 #ifndef STORMM_MDL_FILE_H
 #define STORMM_MDL_FILE_H
 
+#include <fstream>
 #include <string>
 #include <vector>
 #include "copyright.h"
@@ -148,7 +149,26 @@ public:
   
   /// \brief Get the number of properties found in the MDL MOL entry
   int getPropertiesCount() const;
-  
+
+  /// \brief Write a set of molecular coordinates in MDL MOL format.  Apply all properties already
+  ///        stored in the object, in a 1:1 reversal of the operations for reading such a file.
+  ///
+  /// Overloaded:
+  ///   - Write to an output file
+  ///   - Write to a string
+  ///
+  /// \param foutp        Output file stream
+  /// \param fname        Name of the output file
+  /// \param expectation  Anticipated (or required) condition of the output file that is to be
+  ///                     opened, if only its name is provided
+  /// \param vformat      Format version of the MDL MOL standard to use.  If provided as either
+  ///                     V2000 or V3000, this will override information stored in the object.
+  /// \{
+  void write(std::ofstream *foutp, MdlMolVersion vformat) const;
+  void write(const std::string &fname, MdlMolVersion vformat) const;
+  std::string write(MdlMolVersion vformat) const;
+  /// \}
+
 private:
 
   // Items describing quantities of information (most of them from the counts line)

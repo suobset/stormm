@@ -281,14 +281,6 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
           "conventions at lines " + std::to_string(mdl_section_end) + " - " +
           std::to_string(sd_compound_end));
   }
-
-  // CHECK
-  printf("There are %zu data items.\n", data_items.size());
-  for (size_t i = 0; i < data_items.size(); i++) {
-    printf("Data item %2zu : > <%s>(%s)\n", i, data_items[i].getItemName().c_str(),
-           data_items[i].getExternalRegistryNumber().c_str());
-  }
-  // END CHECK
   
   // Update the atom attributes based on properties data.  This provides V3000 functionality and
   // backwards compatibility for the V2000 format.
@@ -417,6 +409,21 @@ const std::vector<int>& MdlMolObj::getFormalCharges() const {
 //-------------------------------------------------------------------------------------------------
 int MdlMolObj::getPropertiesCount() const {
   return properties_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat) const {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat) const {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MdlMolObj::write(const MdlMolVersion vformat) const {
+
 }
 
 //-------------------------------------------------------------------------------------------------
