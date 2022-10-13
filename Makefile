@@ -113,6 +113,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Trajectory/barostat.cpp \
 	           $(SRCDIR)/Trajectory/coordinateframe.cpp \
 	           $(SRCDIR)/Trajectory/coordinate_intake.cpp \
+	           $(SRCDIR)/Trajectory/coordinate_swap_plan.cpp \
 	           $(SRCDIR)/Trajectory/phasespace.cpp \
 	           $(SRCDIR)/Trajectory/thermostat.cpp \
 	           $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
@@ -251,6 +252,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Trajectory/coordinateframe.h \
 		     $(SRCDIR)/Trajectory/coordinate_intake.h \
 		     $(SRCDIR)/Trajectory/coordinate_series.h \
+		     $(SRCDIR)/Trajectory/coordinate_swap_plan.h \
 		     $(SRCDIR)/Trajectory/phasespace.h \
 		     $(SRCDIR)/Trajectory/thermostat.h \
 		     $(SRCDIR)/Trajectory/trajectory_enumerators.h \
@@ -416,6 +418,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Trajectory/barostat.o \
 		  $(SRCDIR)/Trajectory/coordinateframe.o \
 		  $(SRCDIR)/Trajectory/coordinate_intake.o \
+		  $(SRCDIR)/Trajectory/coordinate_swap_plan.o \
 		  $(SRCDIR)/Trajectory/phasespace.o \
 		  $(SRCDIR)/Trajectory/thermostat.o \
 		  $(SRCDIR)/Trajectory/trajectory_enumerators.o \

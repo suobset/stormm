@@ -65,6 +65,12 @@ enum class CoordinateCycle {
   FUTURE    ///< Set the future positions arrays (x_future_coordinates...) as current
 };
 
+/// \brief Differentiate between fixed-column and free-format (but ordered) files.
+enum class CoordinateLineFormat {
+  FIXED_COLUMN,
+  FREE_FORMAT
+};
+
 /// \brief Produce a description of the coordinate file kind.
 ///
 /// \param cfkind  The enumerator instance of interest

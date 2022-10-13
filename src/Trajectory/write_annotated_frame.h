@@ -6,11 +6,15 @@
 #include "copyright.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "coordinateframe.h"
+#include "coordinate_swap_plan.h"
 #include "phasespace.h"
 
 namespace stormm {
 namespace trajectory {
 
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
+  
 /// \brief Write one or more frames to a trajectory file in a format-agnostic manner.  This
 ///        function accepts text strings, with all of the information for the various lines of the
 ///        file concatenated together with the requisite carriage returns.
@@ -25,37 +29,30 @@ namespace trajectory {
 ///     objects before writing and the TextFile objects themselves will be unaltered.
 /// \{
 void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
-                const double* xcrd, const double* ycrd, const double* zcrd, const int total_width,
-                const int fraction, const std::vector<int> &crd_lines, const int x_start,
-                const int y_start, const int z_start);
+                const double* xcrd, const double* ycrd, const double* zcrd,
+                const CoordinateSwapPlan &excision);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
-                const PhaseSpaceReader &psr, const int total_width, const int fraction,
-                const std::vector<int> &crd_lines, int x_start, int y_start, int z_start);
+                const PhaseSpaceReader &psr, const CoordinateSwapPlan &excision);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
-                const CoordinateFrameReader &cfr, const int total_width, const int fraction,
-                const std::vector<std::vector<int>> &crd_lines, const int x_start,
-                const int y_start, const int z_start);
+                const CoordinateFrameReader &cfr, const CoordinateSwapPlan &excision);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
-                const PhaseSpace &ps, int total_width, int fraction,
-                const std::vector<int> &crd_lines, int x_start, int y_start, int z_start);
+                const PhaseSpace &ps, const CoordinateSwapPlan &excision);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
-                const CoordinateFrame &cf, int total_width, int fraction,
-                const std::vector<std::vector<int>> &crd_lines, int x_start, int y_start,
-		int z_start);
+                const CoordinateFrame &cf, const CoordinateSwapPlan &excision);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename,
-                const std::vector<TextFile> &tf, const PsSynthesisReader &poly_psr,
-                int total_width, int fraction, const std::vector<std::vector<int>> &crd_lines,
-                int x_start, int y_start, int z_start);
+                const std::vector<TextFile> &tf_list, const PsSynthesisReader &poly_psr,
+                const std::vector<CoordinateSwapPlan> &excision_list,
+                const std::vector<int> &plan_indices);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename,
-                const std::vector<TextFile> &tf, const PhaseSpaceSynthesis &poly_ps,
-                int total_width, int fraction, const std::vector<std::vector<int>> &crd_lines,
-                int x_start, int y_start, int z_start);
+                const std::vector<TextFile> &tf_list, const PhaseSpaceSynthesis &poly_ps,
+                const std::vector<CoordinateSwapPlan> &excision,
+                const std::vector<int> &plan_indices);
 /// \}
 
 } // namespace trajectory

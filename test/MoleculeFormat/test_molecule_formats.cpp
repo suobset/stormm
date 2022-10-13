@@ -3,7 +3,7 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
-#include "../../src/MoleculeFormat/mdl_mol_format.h"
+#include "../../src/MoleculeFormat/mdl_mol_obj.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/UnitTesting/unit_test.h"

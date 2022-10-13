@@ -5,7 +5,7 @@
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
-#include "MoleculeFormat/mdl_mol_format.h"
+#include "MoleculeFormat/mdl_mol_obj.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 
