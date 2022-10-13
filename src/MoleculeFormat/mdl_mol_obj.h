@@ -166,7 +166,7 @@ public:
   /// \param expectation  Anticipated (or required) condition of the output file that is to be
   ///                     opened, if only its name is provided
   /// \{
-  void write(std::ofstream *foutp, MdlMolVersion vformat, PrintSituation expectation) const;
+  void write(std::ofstream *foutp, MdlMolVersion vformat) const;
   void write(const std::string &fname, MdlMolVersion vformat, PrintSituation expectation) const;
   std::string write(MdlMolVersion vformat) const;
   /// \}
@@ -186,6 +186,7 @@ private:
   int constraint_count;       ///< The number of three-dimensional constraints
   MolObjChirality chirality;  ///< The molecule's chirality (assumes only one significant center)
   int registry_number;        ///< The molecule registry number
+  int data_item_count;        ///< The number of data items
  
   // Atomic properties
   std::vector<double3> coordinates;         ///< Cartesian coordinates of all atoms

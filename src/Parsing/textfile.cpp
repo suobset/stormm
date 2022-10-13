@@ -224,5 +224,37 @@ int TextFile::checkAvailableLength(const int line_number, const int start_pos,
   return ((string_length < 0) ? available_chars - start_pos : string_length);
 }
 
+//-------------------------------------------------------------------------------------------------
+void TextFile::write(std::ofstream *foutp) const {
+  for (int i = 0; i < line_count; i++) {
+    std::string buffer(line_lengths[i] + 1, '\n');
+    const int hlim = line_limits[i + 1];
+    int k = 0;
+    for (int j = line_limits[i]; j < hlim; j++) {
+      buffer[k] = text[j];
+      k++;
+    }
+    foutp->write(buffer.c_str(), line_lengths[i] + 1);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void TextFile::write(const std::string &new_filename, const PrintSituation expectation) const {
+  if (new_filename.size() == 0LLU && orig_file.size() == 0LLU) {
+    rtErr("No file name is available.", "TextFile", "write");
+  }
+  const std::string& fname = (new_filename.size() > 0LLU) ? new_filename : orig_file;
+  std::ofstream foutp = openOutputFile(fname, expectation, "Open an ASCII file for writing a "
+                                       "TextFile object to disk.");
+  write(&foutp);
+  foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+void TextFile::write(const PrintSituation expectation) const {
+  write(orig_file, expectation);
+}
+
+
 } // namespace parse
 } // namespace stormm

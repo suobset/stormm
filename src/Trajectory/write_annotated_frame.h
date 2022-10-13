@@ -4,6 +4,7 @@
 
 #include <vector>
 #include "copyright.h"
+#include "FileManagement/file_util.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "coordinateframe.h"
 #include "coordinate_swap_plan.h"
@@ -12,6 +13,7 @@
 namespace stormm {
 namespace trajectory {
 
+using diskutil::PrintSituation;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisReader;
   
@@ -28,30 +30,37 @@ using synthesis::PsSynthesisReader;
 ///     case, the coordinates of the TextFile objects will be replaced with those in the coordinate
 ///     objects before writing and the TextFile objects themselves will be unaltered.
 /// \{
-void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
+void writeFrame(std::ofstream *foutp, const TextFile &tf);
+
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf);
+
+void writeFrame(std::ofstream *foutp, const TextFile &tf, const double* xcrd, const double* ycrd,
+                const double* zcrd, const CoordinateSwapPlan &excision);
+
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const double* xcrd, const double* ycrd, const double* zcrd,
                 const CoordinateSwapPlan &excision);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const PhaseSpaceReader &psr, const CoordinateSwapPlan &excision);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const CoordinateFrameReader &cfr, const CoordinateSwapPlan &excision);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const PhaseSpace &ps, const CoordinateSwapPlan &excision);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename, const TextFile &tf,
+void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const CoordinateFrame &cf, const CoordinateSwapPlan &excision);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename,
-                const std::vector<TextFile> &tf_list, const PsSynthesisReader &poly_psr,
+void writeFrame(std::ofstream *foutp, const std::vector<TextFile> &tf_list,
+                const PsSynthesisReader &poly_psr,
                 const std::vector<CoordinateSwapPlan> &excision_list,
                 const std::vector<int> &plan_indices);
 
-void writeFrame(std::ofstream *foutp, const std::string &filename,
+void writeFrame(const std::string &filename, PrintSituation expectation,
                 const std::vector<TextFile> &tf_list, const PhaseSpaceSynthesis &poly_ps,
-                const std::vector<CoordinateSwapPlan> &excision,
+                const std::vector<CoordinateSwapPlan> &excision_list,
                 const std::vector<int> &plan_indices);
 /// \}
 

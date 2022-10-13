@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "FileManagement/file_listing.h"
 #include "mdl_mol_obj.h"
+#include "Trajectory/write_annotated_frame.h"
 
 namespace stormm {
 namespace structure {
@@ -13,19 +14,22 @@ using parse::separateText;
 using parse::stringToChar4;
 using parse::strncmpCased;
 using parse::TextFileReader;
+using parse::TextOrigin;
 using parse::verifyContents;
 using parse::operator==;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpaceWriter;
-  
+using trajectory::writeFrame;
+
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
-    constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, coordinates{},
-    atomic_symbols{}, atomic_numbers{}, formal_charges{}, isotopic_shifts{}, parities{},
-    implicit_hydrogens{}, stereo_considerations{}, valence_connections{},
-    atom_atom_mapping_count{}, orientation_stability{}, bonds{}, element_lists{}, stext_entries{},
-    properties{}, title{""}, software_details{""}, general_comment{""}
+    constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1},
+    data_item_count{0}, coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{},
+    isotopic_shifts{}, parities{}, implicit_hydrogens{}, stereo_considerations{},
+    valence_connections{}, atom_atom_mapping_count{}, orientation_stability{}, bonds{},
+    element_lists{}, stext_entries{}, properties{}, title{""}, software_details{""},
+    general_comment{""}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -275,7 +279,8 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       pos = adv_pos;
     }
   }
-  if (data_items.size() == 0LLU && sd_compound_end - mdl_section_end > 1) {
+  data_item_count = data_items.size();
+  if (data_item_count == 0 && sd_compound_end - mdl_section_end > 1) {
     rtErr("If there are no data items, the compound section must terminate immediately after the "
           "MDL MOL format section.  File " + getBaseName(tf.getFileName()) + " violates SD file "
           "conventions at lines " + std::to_string(mdl_section_end) + " - " +
@@ -412,14 +417,19 @@ int MdlMolObj::getPropertiesCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat,
-                      const PrintSituation expectation) const {
+void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat) const {
+  const TextFile result(write(vformat), TextOrigin::RAM);
+  writeFrame(foutp, result);
 }
 
 //-------------------------------------------------------------------------------------------------
 void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat,
                       const PrintSituation expectation) const {
-
+  const std::string activity = (data_item_count > 0) ?
+    "Open an output file for writing an MDL MOL format structure." :
+    "Open an SDF archive for writing MDL MOL format output with additional data items.";
+  std::ofstream foutp = openOutputFile(fname, expectation, activity);
+  write(&foutp, vformat);
 }
 
 //-------------------------------------------------------------------------------------------------

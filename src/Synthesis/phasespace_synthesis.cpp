@@ -2158,6 +2158,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     download(TrajectoryKind::POSITIONS, low_frame, high_frame, gpu);
     download(TrajectoryKind::VELOCITIES, low_frame, high_frame, gpu);
     break;
+  case CoordinateFileKind::SDF:
   case CoordinateFileKind::UNKNOWN:
     break;
   }
@@ -2185,11 +2186,9 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
                 "PhaseSpaceSynthesis", "printTrajectory");
         }
       }
-      const DataFormat style = (output_kind == CoordinateFileKind::AMBER_CRD) ? DataFormat::ASCII :
-                                                                                DataFormat::BINARY;
       const bool fi_exists = (getDrivePathType(file_name) == DrivePathType::FILE);
       foutp = openOutputFile(file_name, actual_expectation, "Open an output trajectory for "
-                             "writing PhaseSpaceSynthesis contents.", style);
+                             "writing PhaseSpaceSynthesis contents.", DataFormat::ASCII);
 
       // Initialize the trajectory if this is the first time printing it
       if (fi_exists == false || actual_expectation == PrintSituation::OVERWRITE ||
@@ -2200,6 +2199,11 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
+    if (expectation == PrintSituation::UNKNOWN) {
+      actual_expectation = PrintSituation::OPEN_NEW;
+    }
+    foutp = openOutputFile(file_name, actual_expectation, "Open an SD file archive for writing "
+                           "PhaseSpaceSynthesis contents.", DataFormat::BINARY);
     break;
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
@@ -2213,6 +2217,11 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     else if (expectation == PrintSituation::UNKNOWN) {
       actual_expectation = PrintSituation::OPEN_NEW;
     }
+    break;
+  case CoordinateFileKind::SDF:
+    rtErr("Some information needed to print an SD file is not present in a this object alone.  "
+          "The program must use the writeFrame() method and pass this object to one of its "
+          "overloads.", "PhaseSpaceSynthesis", "printTrajectory");
     break;
   case CoordinateFileKind::UNKNOWN:
     rtErr("Printing request for unknown file type.", "PhaseSpaceSynthesis", "printTrajectory");
@@ -2251,6 +2260,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     case CoordinateFileKind::AMBER_CRD:
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_INPCRD:
+    case CoordinateFileKind::SDF:
     case CoordinateFileKind::UNKNOWN:
       break;
     case CoordinateFileKind::AMBER_ASCII_RST:
@@ -2319,6 +2329,8 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       break;
     case CoordinateFileKind::AMBER_NETCDF_RST:
       break;
+    case CoordinateFileKind::SDF:
+      break;
     case CoordinateFileKind::UNKNOWN:
       break;
     }
@@ -2333,6 +2345,8 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
   case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::SDF:
   case CoordinateFileKind::UNKNOWN:
     break;
   }

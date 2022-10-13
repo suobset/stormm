@@ -6,10 +6,13 @@
 #include <vector>
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "FileManagement/file_util.h"
 
 namespace stormm {
 namespace parse {
 
+using diskutil::PrintSituation;
+  
 /// \brief Many searches in TextFile objects will begin at a particular line.  If the query is not
 ///        found, it may be necessary to wrap the search back to the beginning and continue until
 ///        the original starting line.  This will indicate whether to do that.
@@ -133,7 +136,25 @@ public:
   ///                       read four characters, but shorter values will leave blank space at the
   ///                       end of the tuple.
   char4 extractChar4(int line_number, int start_pos, int string_length) const;
-  
+
+  /// \brief Write the contents of the object to disk.
+  ///
+  /// Overloaded:
+  ///   - Supply an open file pointer
+  ///   - Supply a new file name, distinct from the original name stored in the object, and a file
+  ///     status expectation
+  ///   - Supply just a file status expectation and (overwrite, or perhaps append in some clever
+  ///     implementation) the original file
+  ///
+  /// \param foutp         Open output stream
+  /// \param new_filename  Name of a distinct file to write
+  /// \param expectation   Expected state of the output file
+  /// \{
+  void write(std::ofstream *foutp) const;
+  void write(const std::string &new_filename, const PrintSituation expectation) const;
+  void write(const PrintSituation expectation) const;
+  /// \}
+
 private:
 
   /// Name of the file that was read

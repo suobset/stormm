@@ -267,6 +267,6 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   writeFrame(foutp, filename, kind, x_crd.size(), x_crd.data(), y_crd.data(), z_crd.data(),
              x_vel.data(), y_vel.data(), z_vel.data(), unit_cell, box_dimensions.data());
 }
-  
+
 } // namespace trajectory
 } // namespace stormm
