@@ -100,7 +100,7 @@ int TextFile::getLineCount() const {
 
 //-------------------------------------------------------------------------------------------------
 int TextFile::getLineLimits(const int index) const {
-  if (index < 0 || index >= line_count) {
+  if (index < 0 || index > line_count) {
     rtErr("Text file " + orig_file + " has " + std::to_string(line_count) + " lines, " +
           std::to_string(index) + " requested.", "TextFile", "getLinePointer");
   }

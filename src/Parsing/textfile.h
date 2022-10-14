@@ -151,8 +151,9 @@ public:
   /// \param expectation   Expected state of the output file
   /// \{
   void write(std::ofstream *foutp) const;
-  void write(const std::string &new_filename, const PrintSituation expectation) const;
-  void write(const PrintSituation expectation) const;
+  void write(const std::string &new_filename,
+             PrintSituation expectation = PrintSituation::OPEN_NEW) const;
+  void write(PrintSituation expectation = PrintSituation::OPEN_NEW) const;
   /// \}
 
 private:

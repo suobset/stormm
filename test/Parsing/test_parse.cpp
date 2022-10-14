@@ -70,7 +70,41 @@ int main(const int argc, const char* argv[]) {
   const bool comp15 = (sfile_exists) ? (tfr.line_limits[15] == tf.getLineLimits(15)) : false;
   check(comp15, "TextFileReader does not report line limits in agreement with the original "
         "struct.", sfile_check);
-
+  if (oe.getTemporaryDirectoryAccess() == false) {
+    rtWarn("Write access to the temporary directory, " + oe.getTemporaryDirectoryPath() + ", is "
+           "unavailable.  Subsequent tests for writing a TextFile object will be skipped.",
+           "test_parse");
+  }
+  const TestPriority do_write_test = oe.getTemporaryDirectoryAccess() ? TestPriority::CRITICAL :
+                                                                        TestPriority::ABORT;
+  const std::string text_to_obj("There is\n  some text here.\n\"What about a quote?\""
+                                "\n\n\nblah.\n");
+  const TextFile aether(text_to_obj, TextOrigin::RAM);
+  check(aether.getLineCount(), RelationalOperator::EQUAL, 6, "The number of lines in a TextFile "
+        "object built internally from a string is incorrect.");
+  const std::vector<int> aether_lims = { aether.getLineLimits(0), aether.getLineLimits(1),
+                                         aether.getLineLimits(2), aether.getLineLimits(3),
+                                         aether.getLineLimits(4), aether.getLineLimits(5),
+                                         aether.getLineLimits(6) };
+  const std::vector<int> aether_lims_ans = { 0, 8, 25, 46, 46, 46, 51 };
+  check(aether_lims, RelationalOperator::EQUAL, aether_lims_ans, "The line demarcations of a "
+        "TextFile object built internally from a string are not correct.");
+  CHECK_THROWS(aether.write(), "An attempt was made to write a TextFile object with no inherent "
+               "name or surrogate name.");
+  const std::string aether_fi = oe.getTemporaryDirectoryPath() + osSeparator() + "aether.txt";
+  TextFile aether_read;
+  std::vector<int> aether_read_lims(7, 0);
+  if (oe.getTemporaryDirectoryAccess()) {
+    aether.write(aether_fi, PrintSituation::OPEN_NEW);
+    aether_read = TextFile(aether_fi);
+    for (int i = 0; i < 7; i++) {
+      aether_read_lims[i] = aether_read.getLineLimits(i);
+    }
+  }
+  check(aether_read_lims, RelationalOperator::EQUAL, aether_lims_ans, "The line demarcations of a "
+        "TextFile object built internally, written to disk, and read back are not correct.",
+        do_write_test);
+  
   // Test the comment and quotation masking
   section(2);
   const std::vector<TextGuard> comments = { TextGuard("//"),
