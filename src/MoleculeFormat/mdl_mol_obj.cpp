@@ -25,7 +25,8 @@ using trajectory::writeFrame;
 MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
     constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1},
-    data_item_count{0}, coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{},
+    data_item_count{0}, property_formal_charges{false}, property_radicals{false},
+    property_isotopes{false}, coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{},
     isotopic_shifts{}, parities{}, implicit_hydrogens{}, stereo_considerations{},
     valence_connections{}, atom_atom_mapping_count{}, orientation_stability{}, bonds{},
     element_lists{}, stext_entries{}, properties{}, title{""}, software_details{""},
@@ -434,8 +435,42 @@ void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat,
 
 //-------------------------------------------------------------------------------------------------
 std::string MdlMolObj::write(const MdlMolVersion vformat) const {
-  std::string result;
 
+  // Build the result based on the MDL MOL leading three lines, which are common to both V2000 and
+  // V3000 formats.
+  std::string result(title);
+  result += '\n' + software_details + '\n' + general_comment + '\n';
+  std::string buffer(512, ' ');
+  switch (vformat) {
+  case MdlMolVersion::V2000:
+
+    // Write out the counts line.
+    sprintf(buffer.data(), "%3d%3d%3d   %3d%3d            999\n", atom_count, bond_count,
+            list_count, static_cast<int>(chirality), stext_entry_count);\
+    buffer.resize(strlen(buffer.data()));
+    result += buffer;
+
+    // Write out the atoms block.
+    for (int i = 0; i < atom_count; i++) {
+      sprintf(buffer.data(), "%10.4lf%10.4lf%10.4lf %c%c%c%2d%3d%3d%3d%3d%3d%3d  0  0%3d%3d%3d\n",
+              coordinates[i].x, coordinates[i].y, coordinates[i].z, atomic_symbols[i].x,
+              atomic_symbols[i].y, atomic_symbols[i].z, getIsotopicShiftCode(i),
+              getFormalChargeCode(i), static_cast<int>(parities[i]), getImplicitHydrogenCode(i),
+              static_cast<int>(stereo_considerations[i]), static_cast<int>(valence_connections[i]),
+              static_cast<int>(hydrogenation_protocol[i]), atom_atom_mapping_count[i],
+              static_cast<int>(orientation_stability[i]),
+              static_cast<int>(exact_change_enforced[i]));
+      buffer.resize(strlen(buffer.data()));
+      result += buffer;
+    }
+    
+    break;
+  case MdlMolVersion::V3000:
+  case MdlMolVersion::UNKNOWN:
+
+    // Make the default writing method the V3000 format.
+    break;
+  }
   return result;
 }
 
@@ -467,6 +502,17 @@ void MdlMolObj::allocate() {
   stext_entries.reserve(stext_entry_count);
 }
 
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getIsotopicShiftCode(const int atom_index) const {
+  if (property_isotopes) {
+    return 0;
+  }
+  else {
+    return isotopic_shifts[atom_index];
+  }
+  __builtin_unreachable();
+}
+ 
 //-------------------------------------------------------------------------------------------------
 void MdlMolObj::interpretFormalCharge(const int charge_in, const int atom_index) {
   switch (charge_in) {
@@ -500,6 +546,37 @@ void MdlMolObj::interpretFormalCharge(const int charge_in, const int atom_index)
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getFormalChargeCode(const int atom_index) const {
+  if (property_formal_charges) {
+    return 0;
+  }
+  switch (formal_charges[atom_index]) {
+  case 0:
+    return (radicals[atom_index] == RadicalState::DOUBLET) ? 4 : 0;
+  case 1:
+    return 3;
+  case 2:
+    return 2;
+  case 3:
+    return 1;
+  case -1:
+    return 5;
+  case -2:
+    return 6;
+  case -3:
+    return 7;
+  default:
+
+    // Formal charges outside the V2000 range must be handled by properties, and any such case
+    // implies that all formal charges are handled this way.
+    rtErr("A formal charge that cannot be expressed in the atoms block of a V2000 format MDL MOL "
+          "file exists, but there are no properties to account for it.", "MdlMolObj",
+          "getFormalChargeCode");
+  }
+  __builtin_unreachable();
+}
+ 
 //-------------------------------------------------------------------------------------------------
 MolObjAtomStereo MdlMolObj::interpretStereoParity(const int setting_in) {
   switch (setting_in) {
@@ -541,6 +618,17 @@ void MdlMolObj::interpretImplicitHydrogenContent(const int nh_in, const int atom
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getImplicitHydrogenCode(const int atom_index) const {
+  switch (hydrogenation_protocol[atom_index]) {
+  case HydrogenAssignment::VALENCE_SHELL:
+    return (implicit_hydrogens[atom_index] == 0) ? 0 : implicit_hydrogens[atom_index] + 1;
+  case HydrogenAssignment::DO_NOT_HYDROGENATE:
+    return 1;
+  }
+  __builtin_unreachable();
+}
+ 
 //-------------------------------------------------------------------------------------------------
 bool MdlMolObj::interpretBooleanValue(const int value_in, const std::string &desc) {
   if (value_in != 0 && value_in != 1) {
@@ -601,17 +689,20 @@ void MdlMolObj::updateV2kAtomAttributes() {
       for (int j = 0; j < atom_count; j++) {
         formal_charges[j] = 0;
       }
+      property_formal_charges = true;
     }
     if (properties[i].getCode() == char4({ 'R', 'A', 'D', 'M' })) {
       for (int j = 0; j < atom_count; j++) {
         formal_charges[j] = 0;
         radicals[j] = RadicalState::NONE;
       }
+      property_radicals = true;
     }
     if (properties[i].getCode() == char4({ 'I', 'S', 'O', 'M' })) {
       for (int j = 0; j < atom_count; j++) {
         isotopic_shifts[j] = 0;
       }
+      property_isotopes = true;
     }
   }
 

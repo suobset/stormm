@@ -36,11 +36,11 @@ enum class MolObjChirality {
 
 /// \brief Different ways to go about adding hydrogens to a minimal representation of a molecule
 enum class HydrogenAssignment {
-  VALENCE_SHELL,      ///< Add at least the number of hydrogens given in a secondary array, until
-                      ///<   the anticipated valence shell electron content is satisfied.  The
-                      ///<   anticipated content is eight electrons for C, N, O, and F, 10 for P,
-                      ///<   and 8 or 12 for S depending on the hybridization.
-  DO_NOT_HYDROGENATE  ///< Do not attempt to add hydrogens to the atom.
+  VALENCE_SHELL = 0,      ///< Add at least the number of hydrogens given in a secondary array,
+                          ///<   until the anticipated valence shell electron content is satisfied.
+                          ///<   The anticipated content is eight electrons for C, N, O, and F, 10
+                          ///<   for P, and 8 or 12 for S depending on the hybridization.
+  DO_NOT_HYDROGENATE = 1  ///< Do not attempt to add hydrogens to the atom.
 };
   
 /// \brief Enumerate possible bond orders, including aromatics or variable bonds
