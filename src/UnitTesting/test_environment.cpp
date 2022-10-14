@@ -401,7 +401,12 @@ SnapshotOperation TestEnvironment::takeSnapshot() const {
 bool TestEnvironment::getDisplayTimingsOrder() const {
   return display_time;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+void TestEnvironment::setFileRemoval(const bool remove_files_in) {
+  remove_files = remove_files_in;
+}
+
 //-------------------------------------------------------------------------------------------------
 void TestEnvironment::logFileCreated(const std::string &path) {
   std::string abs_path = makePathAbsolute(path);

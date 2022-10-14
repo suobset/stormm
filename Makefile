@@ -869,7 +869,7 @@ test.cuda.exe : $(STORMM_TEST_CUDA_PROGS)
 test : $(STORMM_TEST_PROGS)
 	for PROG in $(STORMM_TEST_PROGS) ; do \
 		echo "[STORMM] Execute $$PROG" ; \
-		$$PROG ; \
+		valgrind $$PROG ; \
 	done
 
 test.cuda : $(STORMM_TEST_CUDA_PROGS)

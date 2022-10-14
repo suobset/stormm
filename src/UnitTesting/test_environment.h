@@ -72,6 +72,11 @@ public:
 
   /// \brief Return the directive on displaying timings at the end of a test program.
   bool getDisplayTimingsOrder() const;
+
+  /// \brief Set the file removal flag.
+  ///
+  /// \param remove_files_in  The new flag value
+  void setFileRemoval(const bool remove_files_in);
   
   /// \brief Catalog that a file has been created by the program.  This function will not actually
   ///        check that the file was created by code recently executed; it just serves as a way to

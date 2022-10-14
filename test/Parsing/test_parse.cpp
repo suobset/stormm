@@ -96,6 +96,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<int> aether_read_lims(7, 0);
   if (oe.getTemporaryDirectoryAccess()) {
     aether.write(aether_fi, PrintSituation::OPEN_NEW);
+    oe.logFileCreated(aether_fi);
     aether_read = TextFile(aether_fi);
     for (int i = 0; i < 7; i++) {
       aether_read_lims[i] = aether_read.getLineLimits(i);
