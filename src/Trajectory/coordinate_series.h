@@ -226,6 +226,25 @@ public:
   std::vector<double> getBoxDimensions(int frame_index,
                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Extract coordinates to a pre-existing object.
+  ///
+  /// Overloaded:
+  ///   - Load coordinates into a CoordinateFrame object or its abstract
+  ///   - Load coordinates into a PhaseSpace object or its abstract, using the stated point in
+  ///     the time cycle or taking the object's current orientation
+  ///
+  /// \param cf
+  /// \param ps
+  /// \param frame_index  Frame to use in coordinate extraction
+  /// \{
+  void extractFrame(CoordinateFrame *cf, int frame_index,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  void extractFrame(PhaseSpace *ps, int frame_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    CoordinateCycle time_point = CoordinateCycle::PRESENT,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
   /// \brief Prepare a CoordinateFrame object based on one frame of the series, accomplishing any
   ///        necessary data conversions to put the coordinates back into the familiar
   ///        double-precision format.

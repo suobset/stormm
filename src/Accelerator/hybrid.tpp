@@ -554,6 +554,34 @@ template <typename T> std::vector<T> Hybrid<T>::readHost() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+void Hybrid<T>::readHost(T* v, const size_t offset, const size_t count) const {
+
+  // Check that there is data on the host
+  if (host_data == nullptr) {
+    rtErr("No host data exists in Hybrid object " + std::string(label.name), "Hybrid",
+          "readHost");
+  }
+  if (offset > length) {
+    rtErr("An offset of " + std::to_string(offset) + " is not accessible in an array of " +
+          std::to_string(length) + " elements in Hybrid object " + std::string(label.name) + ".",
+          "Hybrid", "readHost");
+  }
+  if (offset + count > length) {
+    rtErr("An offset of " + std::to_string(offset) + " cannot provide access to " +
+          std::to_string(count) + " elements in Hybrid object " + std::string(label.name) +
+          " (maximum capacity " + std::to_string(max_capacity) + ", length " +
+          std::to_string(length) + ").", "Hybrid", "readHost");
+  }
+  memcpy(v, &host_data[offset], count * sizeof(T));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::readHost(T* v) const {
+  readHost(v, 0, length);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::putHost(const T value, const size_t index) {
 
   // Check that there is data on the host
@@ -729,6 +757,32 @@ std::vector<T> Hybrid<T>::readDevice(const size_t offset, const size_t count) co
 //-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> Hybrid<T>::readDevice() const {
   return readDevice(0, length);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void Hybrid<T>::readDevice(T* v, const size_t offset, const size_t count) const {
+
+  // Check that there is data on the device
+  if (devc_data == nullptr) {
+    rtErr("No device data exists in Hybrid object " + std::string(label.name) + ".", "Hybrid",
+          "readDevice");
+  }
+  if (offset + count > length) {
+    rtErr("Hybrid object " + std::string(label.name) + " does not have " + std::to_string(count) +
+          " elements after index " + std::to_string(offset) + ".  Its length is " +
+          std::to_string(length) + ".", "Hybrid", "readDevice");
+  }
+  if (cudaMemcpy(v, &devc_data[offset], count * sizeof(T), cudaMemcpyDeviceToHost) !=
+      cudaSuccess) {
+    rtErr("Error in cudaMemcpy (downloading device data in " + std::string(label.name) + ").",
+          "Hybrid", "readDevice");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::readDevice(T* v) const {
+  return readDevice(v, 0, length);
 }
 
 //-------------------------------------------------------------------------------------------------

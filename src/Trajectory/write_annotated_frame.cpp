@@ -39,15 +39,23 @@ void writeFrame(const std::string &filename, const PrintSituation expectation, c
 
 //-------------------------------------------------------------------------------------------------
 void writeFrame(const std::string &filename, const PrintSituation expectation, const TextFile &tf,
-                const CoordinateFrameReader &cfr, const CoordinateSwapPlan &excision) {
-  writeFrame(filename, expectation, tf, cfr.xcrd, cfr.ycrd, cfr.zcrd, excision);
+                const PhaseSpace &ps, const CoordinateSwapPlan &excision) {
+  const PhaseSpaceReader psr = ps.data(ps.getCyclePosition());
+  writeFrame(filename, expectation, tf, psr, excision);
 }
 
 //-------------------------------------------------------------------------------------------------
 void writeFrame(const std::string &filename, const PrintSituation expectation, const TextFile &tf,
-                const PhaseSpace &ps, const CoordinateSwapPlan &excision) {
-  const PhaseSpaceReader psr = ps.data();
+                const PhaseSpace &ps, const CoordinateSwapPlan &excision,
+                const CoordinateCycle time_point) {
+  const PhaseSpaceReader psr = ps.data(time_point);
   writeFrame(filename, expectation, tf, psr, excision);
+}
+
+//-------------------------------------------------------------------------------------------------
+void writeFrame(const std::string &filename, const PrintSituation expectation, const TextFile &tf,
+                const CoordinateFrameReader &cfr, const CoordinateSwapPlan &excision) {
+  writeFrame(filename, expectation, tf, cfr.xcrd, cfr.ycrd, cfr.zcrd, excision);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -81,10 +89,21 @@ void writeFrame(const std::string &filename, const PrintSituation expectation,
                 const std::vector<TextFile> &tf_list, const PhaseSpaceSynthesis &poly_ps,
                 const std::vector<CoordinateSwapPlan> &excision_list,
                 const std::vector<int> &plan_indices) {
-  std::ofstream foutp = openOutputFile(filename, expectation, "Open an SD file to archive "
+  std::ofstream foutp = openOutputFile(filename, expectation, "Open an archive for writing "
                                        "PhaseSpaceSynthesis coordinates from a variety of "
                                        "systems.");
   writeFrame(&foutp, tf_list, poly_ps.data(), excision_list, plan_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+void writeFrame(const std::string &filename, const PrintSituation expectation,
+                const std::vector<TextFile> &tf_list, const PhaseSpaceSynthesis &poly_ps,
+                const std::vector<CoordinateSwapPlan> &excision_list,
+                const std::vector<int> &plan_indices, const CoordinateCycle time_point) {
+  std::ofstream foutp = openOutputFile(filename, expectation, "Open an SD file to archive "
+                                       "PhaseSpaceSynthesis coordinates from a variety of "
+                                       "systems.");
+  writeFrame(&foutp, tf_list, poly_ps.data(time_point), excision_list, plan_indices);
 }
 
 } // namespace trajectory

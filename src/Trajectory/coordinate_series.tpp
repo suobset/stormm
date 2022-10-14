@@ -403,6 +403,76 @@ std::vector<double> CoordinateSeries<T>::getBoxDimensions(const int frame_index,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void CoordinateSeries<T>::extractFrame(CoordinateFrame *cf, const int frame_index,
+                                       const HybridTargetLevel tier) const {
+  if (cf->getAtomCount() != atom_count) {
+    rtErr("Atom count of the destination CoordinateFrame (" + std::to_string(cf->getAtomCount()) +
+          ") does not match the object (" + std::to_string(atom_count) + ").", "CoordinateSeries",
+          "extractFrame");
+  }
+  const size_t fidx_zu  = static_cast<size_t>(frame_index); 
+  const size_t frame_offset = roundUp<size_t>(atom_count, warp_size_zu) * fidx_zu;
+  const size_t bdim_offset  = roundUp<size_t>(6, warp_size_zu) * fidx_zu;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    cf->fill(&x_coordinates.data()[frame_offset], &y_coordinates.data()[frame_offset],
+             &z_coordinates.data()[frame_offset], globalpos_scale_bits,
+             &box_dimensions.data()[bdim_offset]);
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const size_t natom_zu = atom_count;
+      const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
+      cf->fill(tmp_xcrd, tmp_ycrd, tmp_zcrd, globalpos_scale_bits, tmp_bdim);
+    }
+    break;
+#endif
+  }
+
+  // Set the frame number based on the position in the series
+  cf->setFrameNumber(frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::extractFrame(PhaseSpace *ps, const int frame_index,
+                                       const TrajectoryKind kind, const CoordinateCycle time_point,
+                                       const HybridTargetLevel tier) const {
+  if (ps->getAtomCount() != atom_count) {
+    rtErr("Atom count of the destination CoordinateFrame (" + std::to_string(ps->getAtomCount()) +
+          ") does not match the object (" + std::to_string(atom_count) + ").", "CoordinateSeries",
+          "extractFrame");
+  }
+  const size_t fidx_zu  = static_cast<size_t>(frame_index); 
+  const size_t frame_offset = roundUp<size_t>(atom_count, warp_size_zu) * fidx_zu;
+  const size_t bdim_offset  = roundUp<size_t>(6, warp_size_zu) * fidx_zu;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    ps->fill(&x_coordinates.data()[frame_offset], &y_coordinates.data()[frame_offset],
+             &z_coordinates.data()[frame_offset], kind, time_point, globalpos_scale_bits,
+             &box_dimensions.data()[bdim_offset]);
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const size_t natom_zu = atom_count;
+      const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
+      ps->fill(tmp_xcrd, tmp_ycrd, tmp_zcrd, kind, time_point, globalpos_scale_bits, tmp_bdim);
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
                                                  const HybridTargetLevel tier) const {
   CoordinateFrame result(atom_count, unit_cell);
@@ -505,6 +575,9 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
     }
     break;
   case CoordinateFileKind::SDF:
+    rtErr("The object does not have sufficient information to create an annotated SD file.  The "
+          "program must use one of the writeFrame() overloads from the write_annotated_frame "
+          "library instead.", "CoordinateSeries", "exportToFile");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;

@@ -310,6 +310,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Trajectory/coordinate_series.tpp \
 		   $(SRCDIR)/Trajectory/phasespace.tpp \
 		   $(SRCDIR)/Trajectory/thermostat.tpp \
+		   $(SRCDIR)/Trajectory/write_annotated_frame.tpp \
 		   $(SRCDIR)/UnitTesting/approx.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp
 

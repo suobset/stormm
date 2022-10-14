@@ -933,6 +933,9 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
                unit_cell, box_dimensions.data());
     break;
   case CoordinateFileKind::SDF:
+    rtErr("The object does not have sufficient information to create an annotated SD file.  The "
+          "program must use one of the writeFrame() overloads from the write_annotated_frame "
+          "library instead.", "PhaseSpace", "exportToFile");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:

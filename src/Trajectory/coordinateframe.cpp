@@ -523,6 +523,9 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
                z_coordinates.data(), nullptr, nullptr, nullptr, unit_cell, box_dimensions.data());
     break;
   case CoordinateFileKind::SDF:
+    rtErr("The object does not have sufficient information to create an annotated SD file.  The "
+          "program must use one of the writeFrame() overloads from the write_annotated_frame "
+          "library instead.", "CoordinateSeries", "exportToFile");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;

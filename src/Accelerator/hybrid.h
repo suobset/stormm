@@ -331,7 +331,8 @@ public:
   /// Overloaded:
   ///   - Read a single element
   ///   - Read a subset of the elements, starting at an arbitrary point in the host_data array
-  ///   - Read the entire host_data array, up to its length
+  ///   - Read the entire host_data array, up to its length, into a new (out-of-place) array
+  ///   - Read data into a pre-allocated, trusted array
   ///
   /// \param index   Index of the host_data array to read
   /// \param offset  Starting index of the host_data array to read
@@ -340,6 +341,8 @@ public:
   T readHost(size_t index) const;
   std::vector<T> readHost(size_t offset, size_t count) const;
   std::vector<T> readHost() const;
+  void readHost(T* v, size_t offset, size_t count) const;
+  void readHost(T* v) const;
   /// \}
 
   /// \brief Put data into the host_data array.  This substitutes for direct array access via the
@@ -381,7 +384,9 @@ public:
   /// Overloaded:
   ///   - Read and return data at a specific index
   ///   - Read and return an array of data, starting at a specific offset with a specific length
-  ///   - Read and return the entire array of data from the device
+  ///   - Read and return the entire array of data from the device as a Standard Template Library
+  ///     vector (out-of-place)
+  ///   - Read data into a pre-allocated, trusted array
   ///
   /// \param index   Index of the device data to read
   /// \param offset  Index of the device data at which to begin reading
@@ -390,6 +395,8 @@ public:
   T readDevice(size_t index) const;
   std::vector<T> readDevice(size_t offset, size_t count) const;
   std::vector<T> readDevice() const;
+  void readDevice(T* v, (size_t offset, size_t count) const;
+  void readDevice(T* v) const;
   /// \}
 
   /// \brief Put data into the devc_data array.  This allows direct host-to-device transfer of
