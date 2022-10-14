@@ -26,11 +26,11 @@ MdlMolObj::MdlMolObj():
     version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
     constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1},
     data_item_count{0}, property_formal_charges{false}, property_radicals{false},
-    property_isotopes{false}, coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{},
-    isotopic_shifts{}, parities{}, implicit_hydrogens{}, stereo_considerations{},
-    valence_connections{}, atom_atom_mapping_count{}, orientation_stability{}, bonds{},
-    element_lists{}, stext_entries{}, properties{}, title{""}, software_details{""},
-    general_comment{""}
+    property_isotopes{false}, property_element_lists{false}, coordinates{}, atomic_symbols{},
+    atomic_numbers{}, formal_charges{}, isotopic_shifts{}, parities{}, implicit_hydrogens{},
+    stereo_considerations{}, valence_connections{}, atom_atom_mapping_count{},
+    orientation_stability{}, bonds{}, element_lists{}, stext_entries{}, properties{}, title{""},
+    software_details{""}, general_comment{""}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   // Allocate space for information to be read
   allocate();
     
-  // Read the atoms block
+  // Read the atom block
   int iatm = 0;
   switch (version_no) {
   case MdlMolVersion::V2000:
@@ -438,21 +438,20 @@ std::string MdlMolObj::write(const MdlMolVersion vformat) const {
 
   // Build the result based on the MDL MOL leading three lines, which are common to both V2000 and
   // V3000 formats.
-  std::string result(title);
-  result += '\n' + software_details + '\n' + general_comment + '\n';
+  std::string result(title + '\n' + software_details + '\n' + general_comment + '\n');
   std::string buffer(512, ' ');
+  char* buffer_data = buffer.data();
   switch (vformat) {
   case MdlMolVersion::V2000:
 
     // Write out the counts line.
     sprintf(buffer.data(), "%3d%3d%3d   %3d%3d            999\n", atom_count, bond_count,
             list_count, static_cast<int>(chirality), stext_entry_count);\
-    buffer.resize(strlen(buffer.data()));
-    result += buffer;
-
-    // Write out the atoms block.
+    result.append(buffer_data, 34);
+    
+    // Write out the atom block.
     for (int i = 0; i < atom_count; i++) {
-      sprintf(buffer.data(), "%10.4lf%10.4lf%10.4lf %c%c%c%2d%3d%3d%3d%3d%3d%3d  0  0%3d%3d%3d\n",
+      sprintf(buffer_data, "%10.4lf%10.4lf%10.4lf %c%c%c%2d%3d%3d%3d%3d%3d%3d  0  0%3d%3d%3d\n",
               coordinates[i].x, coordinates[i].y, coordinates[i].z, atomic_symbols[i].x,
               atomic_symbols[i].y, atomic_symbols[i].z, getIsotopicShiftCode(i),
               getFormalChargeCode(i), static_cast<int>(parities[i]), getImplicitHydrogenCode(i),
@@ -460,8 +459,108 @@ std::string MdlMolObj::write(const MdlMolVersion vformat) const {
               static_cast<int>(hydrogenation_protocol[i]), atom_atom_mapping_count[i],
               static_cast<int>(orientation_stability[i]),
               static_cast<int>(exact_change_enforced[i]));
-      buffer.resize(strlen(buffer.data()));
-      result += buffer;
+      result.append(buffer_data, 70);
+    }
+
+    // Write out the bond block.
+    for (int i = 0; i < bond_count; i++) {
+      sprintf(buffer.data(), "%3d%3d%3d%3d  0%3d%3d\n", bonds[i].getFirstAtom(),
+              bonds[i].getSecondAtom(), static_cast<int>(bonds[i].getOrder()),
+              static_cast<int>(bonds[i].getStereochemistry()),
+              static_cast<int>(bonds[i].getRingStatus()),
+              static_cast<int>(bonds[i].getReactivity()));
+      result.append(buffer_data, 22);
+    }
+
+    // Write out the atom list block, if appropriate.
+    if (property_element_lists == false) {
+      for (int i = 0; i < list_count; i++) {
+        const int n_entry = element_lists[i].getEntryCount();
+        sprintf(buffer_data, "%3d %c    %d", element_lists[i].getAttachmentPoint(),
+                element_lists[i].getExclusionCode(), n_entry);
+        int nchar = 10;
+        for (int j = 0; j < n_entry; j++) {
+          sprintf(&buffer_data[nchar], " %3d", element_lists[i].getEntry(j));
+          nchar += 4;
+        }
+        buffer_data[nchar] = '\n';
+        nchar++;
+        buffer_data[nchar] = '\0';
+        result.append(buffer_data, nchar);
+      }
+    }
+
+    // Write out the S-text block
+
+    // Write out the properties block.
+    for (int i = 0; i < properties_count; i++) {
+
+      // The code is always printed in full.  For two properties, the final three letters of the
+      // code will be overwritten.
+      const char4 p_code = properties[i].getCode();
+      sprintf(buffer_data, "%c  %c%c%c", p_code.w, p_code.x, p_code.y, p_code.z);
+      switch (properties[i].getKind()) {
+      case MolObjPropertyKind::ATOM_ALIAS:
+      case MolObjPropertyKind::ATOM_VALUE:
+        sprintf(&buffer_data[3], "%3d\n", properties[i].getSubstrate());
+        result.append(buffer_data, 7);
+        result.append(properties[i].getDataLine(0));
+        break;
+      case MolObjPropertyKind::GROUP_ABBREVIATION:
+        sprintf(&buffer_data[3], "%3d%3d\n", properties[i].getSubstrate(),
+                properties[i].getIntegerValue(0, 0));
+        result.append(buffer_data, 10);
+        result.append(properties[i].getDataLine(0));
+        break;
+      case MolObjPropertyKind::CHARGE:
+      case MolObjPropertyKind::RADICAL:
+      case MolObjPropertyKind::ISOTOPE:
+      case MolObjPropertyKind::RING_BOND_COUNT:
+      case MolObjPropertyKind::SUBSTITUTION_COUNT:
+      case MolObjPropertyKind::UNSATURATED_COUNT:
+      case MolObjPropertyKind::ATOM_LIST:
+      case MolObjPropertyKind::ATTACHMENT_POINT:
+      case MolObjPropertyKind::ATTACHMENT_ORDER:
+      case MolObjPropertyKind::RGROUP_LABEL_LOCATION:
+      case MolObjPropertyKind::SGROUP_TYPE:
+      case MolObjPropertyKind::SGROUP_SUBTYPE:
+      case MolObjPropertyKind::SGROUP_LABELS:
+      case MolObjPropertyKind::SGROUP_CONNECTIVITY:
+      case MolObjPropertyKind::SGROUP_HIERARCHY:
+      case MolObjPropertyKind::SGROUP_COMP_NUMBER:
+      case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
+        {
+          const int n_entry = properties[i].getEntryCount();
+          sprintf(&buffer_data[6], "%3d", n_entry);
+          int nchar = 9;
+          for (int j = 0; j < n_entry; j++) {
+            sprintf(&buffer_data[nchar], " %3d %3d", properties[i].getIntegerValue(j, 0),
+                    properties[i].getIntegerValue(j, 1));
+            nchar += 8;
+          }
+        }
+        break;
+      case MolObjPropertyKind::SGROUP_ATOM_LIST:
+      case MolObjPropertyKind::SGROUP_BOND_LIST:
+      case MolObjPropertyKind::SGROUP_DISPLAY:
+      case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
+      case MolObjPropertyKind::LINK_ATOM:
+      case MolObjPropertyKind::RGROUP_LOGIC:
+      case MolObjPropertyKind::SGROUP_EXPANSION:
+      case MolObjPropertyKind::SGROUP_SUBSCRIPT:
+      case MolObjPropertyKind::SGROUP_CORRESPONENCE:
+      case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
+      case MolObjPropertyKind::SGROUP_BOND_VECTOR:
+      case MolObjPropertyKind::SGROUP_FIELD:
+      case MolObjPropertyKind::SGROUP_DATA:
+      case MolObjPropertyKind::SPATIAL_FEATURE:
+      case MolObjPropertyKind::PHANTOM_ATOM:
+      case MolObjPropertyKind::SGROUP_ATTACH_POINT:
+      case MolObjPropertyKind::SGROUP_CLASS:
+      case MolObjPropertyKind::LARGE_REGNO:
+      case MolObjPropertyKind::SKIP:
+        break;
+      }
     }
     
     break;
@@ -703,6 +802,9 @@ void MdlMolObj::updateV2kAtomAttributes() {
         isotopic_shifts[j] = 0;
       }
       property_isotopes = true;
+    }
+    if (properties[i].getCode() == char4({ 'A', 'L', 'S', 'M' })) {
+      property_element_lists = true;
     }
   }
 

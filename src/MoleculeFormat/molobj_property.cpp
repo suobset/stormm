@@ -413,6 +413,11 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
 }
 
 //-------------------------------------------------------------------------------------------------
+MolObjPropertyKind MolObjProperty::getKind() const {
+  return kind;
+}
+
+//-------------------------------------------------------------------------------------------------
 char4 MolObjProperty::getCode() const {
   return code;
 }
@@ -454,6 +459,16 @@ std::string MolObjProperty::getStringValue(const int entry_index,
                                            const int attribute_index) const {
   checkAttributeValidity(entry_index, attribute_index, MolObjPropField::STRING);
   return str_data[int_data[(entry_depth * entry_index) + attribute_index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjProperty::getDataLine(const int index) const {
+  if (index < 0 || index > static_cast<int>(data_lines.size())) {
+    rtErr("A property (code \"" + std::to_string(code.w) + "  " + code.x + code.y + code.z +
+          "\") with " + std::to_string(data_lines.size()) + " cannot produce a data line with "
+          "index " + std::to_string(index) + ".", "MolObjProperty", "getDataLine");
+  }
+  return data_lines[index];
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -31,6 +31,24 @@ public:
   MolObjAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
+  /// \brief Get the number of element (atomic number) entries.
+  int getEntryCount() const;
+
+  /// \brief Get one of the elemental entries.
+  ///
+  /// \param index  The entry of interest
+  int getEntry(int index) const;
+
+  /// \brief Get a TRUE or FALSE reading on whether this atom list pertains to exclusions.
+  bool applyToExclusions() const;
+
+  /// \brief Get the coded letter for a V2000 atom list block entry detailing the exclusion
+  ///        behavior.
+  char getExclusionCode() const;
+
+  /// \brief Get the central atom to which all listed elements will attach.
+  int getAttachmentPoint() const;
+  
 private:
   int entry_count;                  ///< The number of atomic elements (identified by Z-numbers)
                                     ///<   in this list

@@ -193,16 +193,21 @@ private:
                                             ///<   were set by properties.  This will cause any
                                             ///<   printing in V2000 format to list a zero for the
                                             ///<   formal charge property of every atom in the
-                                            ///<   atoms block.  The actual value will be given in
+                                            ///<   atom block.  The actual value will be given in
                                             ///<   one of the MDL MOL properties.
   bool property_radicals;                   ///< Flag to indicate that the radical character of
                                             ///<   one or more atoms was set by a property,
-                                            ///<   removing such information from the atoms block
+                                            ///<   removing such information from the atom block
                                             ///<   of a V2000 printout.
   bool property_isotopes;                   ///< Flag to indicate that the isotopic shift of one or
                                             ///<   more atoms was set by a property, removing such
-                                            ///<   information from the atoms block of a V2000
+                                            ///<   information from the atom block of a V2000
                                             ///<   printout.
+  bool property_element_lists;              ///< Flag to indicate that properties control the "atom
+                                            ///<   lists," which are really lists of elements with
+                                            ///<   an attachment point.  If this is the case, no
+                                            ///<   atom list block information from the deprecated
+                                            ///<   format will be written to a V2000 MOL file.
   std::vector<double3> coordinates;         ///< Cartesian coordinates of all atoms
   std::vector<char4> atomic_symbols;        ///< Symbols for all atoms
   std::vector<int> atomic_numbers;          ///< Atomic numbers for all atoms
@@ -266,9 +271,9 @@ private:
 
   /// \brief Produce the correct code for an atom's isotopic shift.  While the number in the atoms
   ///        block of the V2000 format most often corresponds to the value in the actual array,
-  ///        there are extreme isotopes (> +4 or < -3) that place a zero in the atoms block and
+  ///        there are extreme isotopes (> +4 or < -3) that place a zero in the atom block and
   ///        must be handled by property lines.  Furthermore, if any atoms' shifts are handled in
-  ///        this way, it invalidates the atoms block information for all of them, so report zero
+  ///        this way, it invalidates the atom block information for all of them, so report zero
   ///        if there are any isotope-related properties.
   ///
   /// \param atom_index  Index of the atom in question
@@ -283,7 +288,7 @@ private:
   void interpretFormalCharge(int charge_in, int atom_index);
 
   /// \brief Reverse the work of interpretFormalCharge() above to obtain a code suitable for the
-  ///        atoms block of the V2000 format.
+  ///        atom block of the V2000 format.
   ///
   /// \param atom_index  Index of the atom in question
   int getFormalChargeCode(int atom_index) const;
@@ -305,7 +310,7 @@ private:
   void interpretImplicitHydrogenContent(int nh_in, int atom_index);
 
   /// \brief Reverse the operation of interpretImplicitHydrogenContent() above, to produce the
-  ///        appropriate code for implicit hydrogens in a V2000 MDL MOL format entry atoms block.
+  ///        appropriate code for implicit hydrogens in a V2000 MDL MOL format entry atom block.
   ///
   /// \param atom_index  Atom to which the hydrogen content applies.
   int getImplicitHydrogenCode(const int atom_index) const;
@@ -328,7 +333,7 @@ private:
   StereoRetention interpretStereoStability(int code_in);
 
   /// \brief Scan properties (of a V2000-format molecule) and update information that may have been
-  ///        read from the atoms block.
+  ///        read from the atom block.
   void updateV2kAtomAttributes();
   
   /// \brief Add hydrogens to fill out valence shells based on the stated bond orders, formal

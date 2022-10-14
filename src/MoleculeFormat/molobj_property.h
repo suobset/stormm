@@ -39,6 +39,9 @@ public:
                  const std::string &title = std::string(""));
   /// \}
 
+  /// \brief Get the kind of property according to the internal enumerator.
+  MolObjPropertyKind getKind() const;
+
   /// \brief Get the property code.  This will indicate whether to obliterate certain types of
   ///        information from the atom block of the V2000 MDL MOL format entry.
   char4 getCode() const;
@@ -62,6 +65,9 @@ public:
   std::string getStringValue(int entry_index, int attribute_index) const;
   /// \}
 
+  /// \brief Get a const pointer to one of the data lines.
+  const std::string& getDataLine(int index) const;
+  
   /// \brief Define the property code.
   ///
   /// Overloaded:

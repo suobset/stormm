@@ -141,5 +141,34 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+int MolObjAtomList::getEntryCount() const {
+  return entry_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjAtomList::getEntry(const int index) const {
+  if (index < 0 || index >= entry_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an atom list containing " +
+          std::to_string(entry_count) + " entries.", "MolObjAtomList", "getEntry");
+  }
+  return atomic_numbers[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjAtomList::applyToExclusions() const {
+  return exclusions;
+}
+
+//-------------------------------------------------------------------------------------------------
+char MolObjAtomList::getExclusionCode() const {
+  return (exclusions) ? 'T' : 'F';
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjAtomList::getAttachmentPoint() const {
+  return atom_attachment;
+}
+
 } // namespace structure
 } // namespace stormm
