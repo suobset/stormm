@@ -418,23 +418,23 @@ int MdlMolObj::getPropertiesCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::write(std::ofstream *foutp, const MdlMolVersion vformat) const {
-  const TextFile result(write(vformat), TextOrigin::RAM);
+void MdlMolObj::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
+  const TextFile result(writeMdl(vformat), TextOrigin::RAM);
   writeFrame(foutp, result);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::write(const std::string &fname, const MdlMolVersion vformat,
-                      const PrintSituation expectation) const {
+void MdlMolObj::writeMdl(const std::string &fname, const MdlMolVersion vformat,
+                         const PrintSituation expectation) const {
   const std::string activity = (data_item_count > 0) ?
     "Open an output file for writing an MDL MOL format structure." :
     "Open an SDF archive for writing MDL MOL format output with additional data items.";
   std::ofstream foutp = openOutputFile(fname, expectation, activity);
-  write(&foutp, vformat);
+  writeMdl(&foutp, vformat);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MdlMolObj::write(const MdlMolVersion vformat) const {
+std::string MdlMolObj::writeMdl(const MdlMolVersion vformat) const {
 
   // Build the result based on the MDL MOL leading three lines, which are common to both V2000 and
   // V3000 formats.
@@ -445,9 +445,9 @@ std::string MdlMolObj::write(const MdlMolVersion vformat) const {
   case MdlMolVersion::V2000:
 
     // Write out the counts line.
-    sprintf(buffer.data(), "%3d%3d%3d   %3d%3d            999\n", atom_count, bond_count,
-            list_count, static_cast<int>(chirality), stext_entry_count);\
-    result.append(buffer_data, 34);
+    sprintf(buffer.data(), "%3d%3d%3d   %3d%3d            999 V2000\n", atom_count, bond_count,
+            list_count, static_cast<int>(chirality), stext_entry_count);
+    result.append(buffer_data, 40);
     
     // Write out the atom block.
     for (int i = 0; i < atom_count; i++) {
@@ -464,8 +464,11 @@ std::string MdlMolObj::write(const MdlMolVersion vformat) const {
 
     // Write out the bond block.
     for (int i = 0; i < bond_count; i++) {
-      sprintf(buffer.data(), "%3d%3d%3d%3d  0%3d%3d\n", bonds[i].getFirstAtom(),
-              bonds[i].getSecondAtom(), static_cast<int>(bonds[i].getOrder()),
+
+      // Add 1 to the bond atom indices to get back into the file format.  This adjustment is
+      // automated for the properties.
+      sprintf(buffer.data(), "%3d%3d%3d%3d  0%3d%3d\n", bonds[i].getFirstAtom() + 1,
+              bonds[i].getSecondAtom() + 1, static_cast<int>(bonds[i].getOrder()),
               static_cast<int>(bonds[i].getStereochemistry()),
               static_cast<int>(bonds[i].getRingStatus()),
               static_cast<int>(bonds[i].getReactivity()));
@@ -494,74 +497,11 @@ std::string MdlMolObj::write(const MdlMolVersion vformat) const {
 
     // Write out the properties block.
     for (int i = 0; i < properties_count; i++) {
-
-      // The code is always printed in full.  For two properties, the final three letters of the
-      // code will be overwritten.
-      const char4 p_code = properties[i].getCode();
-      sprintf(buffer_data, "%c  %c%c%c", p_code.w, p_code.x, p_code.y, p_code.z);
-      switch (properties[i].getKind()) {
-      case MolObjPropertyKind::ATOM_ALIAS:
-      case MolObjPropertyKind::ATOM_VALUE:
-        sprintf(&buffer_data[3], "%3d\n", properties[i].getSubstrate());
-        result.append(buffer_data, 7);
-        result.append(properties[i].getDataLine(0));
-        break;
-      case MolObjPropertyKind::GROUP_ABBREVIATION:
-        sprintf(&buffer_data[3], "%3d%3d\n", properties[i].getSubstrate(),
-                properties[i].getIntegerValue(0, 0));
-        result.append(buffer_data, 10);
-        result.append(properties[i].getDataLine(0));
-        break;
-      case MolObjPropertyKind::CHARGE:
-      case MolObjPropertyKind::RADICAL:
-      case MolObjPropertyKind::ISOTOPE:
-      case MolObjPropertyKind::RING_BOND_COUNT:
-      case MolObjPropertyKind::SUBSTITUTION_COUNT:
-      case MolObjPropertyKind::UNSATURATED_COUNT:
-      case MolObjPropertyKind::ATOM_LIST:
-      case MolObjPropertyKind::ATTACHMENT_POINT:
-      case MolObjPropertyKind::ATTACHMENT_ORDER:
-      case MolObjPropertyKind::RGROUP_LABEL_LOCATION:
-      case MolObjPropertyKind::SGROUP_TYPE:
-      case MolObjPropertyKind::SGROUP_SUBTYPE:
-      case MolObjPropertyKind::SGROUP_LABELS:
-      case MolObjPropertyKind::SGROUP_CONNECTIVITY:
-      case MolObjPropertyKind::SGROUP_HIERARCHY:
-      case MolObjPropertyKind::SGROUP_COMP_NUMBER:
-      case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
-        {
-          const int n_entry = properties[i].getEntryCount();
-          sprintf(&buffer_data[6], "%3d", n_entry);
-          int nchar = 9;
-          for (int j = 0; j < n_entry; j++) {
-            sprintf(&buffer_data[nchar], " %3d %3d", properties[i].getIntegerValue(j, 0),
-                    properties[i].getIntegerValue(j, 1));
-            nchar += 8;
-          }
-        }
-        break;
-      case MolObjPropertyKind::SGROUP_ATOM_LIST:
-      case MolObjPropertyKind::SGROUP_BOND_LIST:
-      case MolObjPropertyKind::SGROUP_DISPLAY:
-      case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
-      case MolObjPropertyKind::LINK_ATOM:
-      case MolObjPropertyKind::RGROUP_LOGIC:
-      case MolObjPropertyKind::SGROUP_EXPANSION:
-      case MolObjPropertyKind::SGROUP_SUBSCRIPT:
-      case MolObjPropertyKind::SGROUP_CORRESPONENCE:
-      case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
-      case MolObjPropertyKind::SGROUP_BOND_VECTOR:
-      case MolObjPropertyKind::SGROUP_FIELD:
-      case MolObjPropertyKind::SGROUP_DATA:
-      case MolObjPropertyKind::SPATIAL_FEATURE:
-      case MolObjPropertyKind::PHANTOM_ATOM:
-      case MolObjPropertyKind::SGROUP_ATTACH_POINT:
-      case MolObjPropertyKind::SGROUP_CLASS:
-      case MolObjPropertyKind::LARGE_REGNO:
-      case MolObjPropertyKind::SKIP:
-        break;
-      }
+      result.append(properties[i].getMdlText());
     }
+
+    // Write out the terminal line (not considered a property, even in the V2000 format)
+    result.append("M  END\n");
     
     break;
   case MdlMolVersion::V3000:

@@ -20,13 +20,19 @@ using parse::verifyContents;
 //-------------------------------------------------------------------------------------------------
 MolObjProperty::MolObjProperty(const char4 code_in, const int substrate_in,
                                const int entry_count_in, const int entry_depth_in,
+                               const bool exclusions_in, const int substrate_line_pos_in,
+                               const int entry_count_line_pos_in,
+                               const int entry_read_start_pos_in,
+                               const std::vector<int> &entry_data_bounds_in,
                                const std::vector<MolObjPropField> &entry_detail_in,
                                const std::vector<MolObjIndexKind> &entry_adjustment_in,
                                const std::vector<int> &int_data_in,
                                const std::vector<double> &real_data_in,
                                const std::vector<std::string> &str_data_in,
                                const std::vector<std::string> &data_lines_in) :
-    code{code_in}, substrate{substrate_in}, entry_count{entry_count_in},
+    code{code_in}, substrate{substrate_in}, entry_count{entry_count_in}, exclusions{exclusions_in},
+    substrate_line_pos{substrate_line_pos_in}, entry_count_line_pos{entry_count_line_pos_in},
+    entry_read_start_pos{entry_read_start_pos_in}, entry_data_bounds{entry_data_bounds_in},
     entry_depth{entry_depth_in}, entry_detail{entry_detail_in}, int_data{int_data_in},
     real_data{real_data_in}, str_data{str_data_in}, data_lines{data_lines_in}
 {}
@@ -44,7 +50,7 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
           std::to_string(lnlength) + ".");
   }
 
-  // Read the initial letter and three-letter code,
+  // Read the initial letter and three-letter code, then translate the property kind
   code.w = line_ptr[0];
   code.x = line_ptr[3];
   code.y = line_ptr[4];
@@ -57,7 +63,6 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::ATOM_ALIAS:
   case MolObjPropertyKind::ATOM_VALUE:
   case MolObjPropertyKind::GROUP_ABBREVIATION:
-  case MolObjPropertyKind::ATOM_LIST:
   case MolObjPropertyKind::SGROUP_SUBSCRIPT:
   case MolObjPropertyKind::SGROUP_BOND_VECTOR:
   case MolObjPropertyKind::SGROUP_FIELD:
@@ -68,6 +73,7 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_CLASS:
   case MolObjPropertyKind::LARGE_REGNO:
     break;
+  case MolObjPropertyKind::ATOM_LIST:
   case MolObjPropertyKind::SGROUP_EXPANSION:
   case MolObjPropertyKind::SGROUP_ATOM_LIST:
   case MolObjPropertyKind::SGROUP_BOND_LIST:
@@ -114,8 +120,6 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   int tmp_advance = 0;
   bool entry_count_unrecognized = false;
   bool substrate_unrecognized = false;
-  int entry_read_start_pos;
-  std::vector<int> entry_data_bounds;
   switch (kind) {
   case MolObjPropertyKind::ATOM_ALIAS:
   case MolObjPropertyKind::ATOM_VALUE:
@@ -147,13 +151,20 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_TYPE:
   case MolObjPropertyKind::SGROUP_SUBTYPE:
   case MolObjPropertyKind::SGROUP_LABELS:
-  case MolObjPropertyKind::SGROUP_CONNECTIVITY:
   case MolObjPropertyKind::SGROUP_HIERARCHY:
   case MolObjPropertyKind::SGROUP_COMP_NUMBER:
   case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
     entry_count_unrecognized = readEntryCount(line_ptr);
     entry_depth = 2;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER };
+    entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER };
+    entry_read_start_pos = 9;
+    entry_data_bounds = { 0, 4, 8 };
+    break;
+  case MolObjPropertyKind::SGROUP_CONNECTIVITY:
+    entry_count_unrecognized = readEntryCount(line_ptr);
+    entry_depth = 2;
+    entry_detail = { MolObjPropField::INTEGER, MolObjPropField::CHAR4 };
     entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER };
     entry_read_start_pos = 9;
     entry_data_bounds = { 0, 4, 8 };
@@ -168,10 +179,18 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_data_bounds = { 0, 4, 8, 12, 16 };
     break;
   case MolObjPropertyKind::ATOM_LIST:
+    substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
+    entry_depth = 1;
+    exclusions = (lnlength >= 15 && line_ptr[14] == 'T');
+    entry_detail = std::vector<MolObjPropField>(4, MolObjPropField::CHAR4);
+    entry_adjustment = std::vector<MolObjIndexKind>(4, MolObjIndexKind::OTHER);
+    entry_read_start_pos = 16;
+    entry_data_bounds = { 0, 4 };
     break;
   case MolObjPropertyKind::ATTACHMENT_ORDER:
-    entry_count_unrecognized = readEntryCount(line_ptr, 10);
     substrate_unrecognized = readSubstrateIndex(line_ptr);
+    entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 4;
     entry_detail = std::vector<MolObjPropField>(4, MolObjPropField::INTEGER);
     entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER, MolObjIndexKind::ATOM,
@@ -199,7 +218,12 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_depth = 1;
     entry_detail = { MolObjPropField::INTEGER };
-    entry_adjustment = { MolObjIndexKind::ATOM };
+    if (kind == MolObjPropertyKind::SGROUP_BOND_LIST) {
+      entry_adjustment = { MolObjIndexKind::BOND };
+    }
+    else {
+      entry_adjustment = { MolObjIndexKind::ATOM };
+    }
     entry_read_start_pos = 13;
     entry_data_bounds = { 0, 4 };
     break;
@@ -285,6 +309,9 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     // The S-group data will be read as part of the parent S-group display entry.
     break;
   case MolObjPropertyKind::SPATIAL_FEATURE:
+
+    // The spatial features properties constitute a distinct block and are read by a separate
+    // object.
     break;
   case MolObjPropertyKind::PHANTOM_ATOM:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
@@ -299,7 +326,7 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_ATTACH_POINT:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
-    entry_depth = 5;
+    entry_depth = 3;
     entry_detail = { MolObjPropField::INTEGER, MolObjPropField::INTEGER, MolObjPropField::CHAR4 };
     entry_adjustment = { MolObjIndexKind::ATOM, MolObjIndexKind::ATOM, MolObjIndexKind::OTHER };
     entry_read_start_pos = 13;
@@ -367,6 +394,11 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
     data_lines.push_back(tf.extractString(tmp_advance, 0, tf.getLineLength(line_number)));
     break;
   case MolObjPropertyKind::SGROUP_DISPLAY:
+    parseEntries(tf, line_number, entry_read_start_pos, entry_data_bounds);
+    for (int i = line_number + 1; i < tmp_advance; i++) {
+      data_lines.push_back(tf.extractString(i, 12, std::min(tf.getLineLength(i) - 12, 69)));
+    }
+  case MolObjPropertyKind::SKIP:
     for (int i = line_number + 1; i < tmp_advance; i++) {
       data_lines.push_back(tf.extractString(i, 12, std::min(tf.getLineLength(i) - 12, 69)));
     }
@@ -374,8 +406,6 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::CHARGE:
   case MolObjPropertyKind::RADICAL:
   case MolObjPropertyKind::ISOTOPE:
-    parseEntries(tf, line_number, entry_read_start_pos, entry_data_bounds);
-    break;
   case MolObjPropertyKind::RING_BOND_COUNT:
   case MolObjPropertyKind::SUBSTITUTION_COUNT:
   case MolObjPropertyKind::UNSATURATED_COUNT:
@@ -393,21 +423,22 @@ MolObjProperty::MolObjProperty(const TextFile &tf, const int line_number, int *l
   case MolObjPropertyKind::SGROUP_ATOM_LIST:
   case MolObjPropertyKind::SGROUP_BOND_LIST:
   case MolObjPropertyKind::MG_PARENT_ATOM_LIST:
-  case MolObjPropertyKind::SGROUP_SUBSCRIPT:
   case MolObjPropertyKind::SGROUP_CORRESPONENCE:
   case MolObjPropertyKind::SGROUP_DISPLAY_INFO:
   case MolObjPropertyKind::SGROUP_BOND_VECTOR:
   case MolObjPropertyKind::SGROUP_FIELD:
-  case MolObjPropertyKind::SGROUP_DATA:
+  case MolObjPropertyKind::SGROUP_SUBSCRIPT:
   case MolObjPropertyKind::SGROUP_HIERARCHY:
   case MolObjPropertyKind::SGROUP_COMP_NUMBER:
-  case MolObjPropertyKind::SPATIAL_FEATURE:
+  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
   case MolObjPropertyKind::PHANTOM_ATOM:
   case MolObjPropertyKind::SGROUP_ATTACH_POINT:
   case MolObjPropertyKind::SGROUP_CLASS:
   case MolObjPropertyKind::LARGE_REGNO:
-  case MolObjPropertyKind::SGROUP_BRACKET_STYLE:
-  case MolObjPropertyKind::SKIP:
+    parseEntries(tf, line_number, entry_read_start_pos, entry_data_bounds);
+    break;
+  case MolObjPropertyKind::SGROUP_DATA:
+  case MolObjPropertyKind::SPATIAL_FEATURE:
     break;
   }
 }
@@ -428,14 +459,55 @@ int MolObjProperty::getSubstrate() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int MolObjProperty::getPrintedSubstrate() const {
+  return substrate + 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjProperty::applyToExclusions() const {
+  if (kind != MolObjPropertyKind::ATOM_LIST) {
+    rtErr("Only the atom list property (\"M  ALS\") has defined exclusion behavior.  \"" +
+          std::to_string(code.w) + "  " + code.x + code.y + code.z + "\" does not.",
+          "MolObjProperty", "applyToExclusions");    
+  }
+  return exclusions;
+}
+
+//-------------------------------------------------------------------------------------------------
+char MolObjProperty::getExclusionCode() const {
+
+  // Invoke the public member function to engage its error-checking behavior.
+  return (applyToExclusions()) ? 'T' : 'F';
+}
+
+//-------------------------------------------------------------------------------------------------
 int MolObjProperty::getEntryCount() const {
   return entry_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjProperty::getDataLineCount() const {
+  return data_lines.size();
 }
 
 //-------------------------------------------------------------------------------------------------
 int MolObjProperty::getIntegerValue(const int entry_index, const int attribute_index) const {
   checkAttributeValidity(entry_index, attribute_index, MolObjPropField::INTEGER);
   return int_data[(entry_depth * entry_index) + attribute_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjProperty::getPrintedIntegerValue(const int entry_index,
+                                           const int attribute_index) const {
+  checkAttributeValidity(entry_index, attribute_index, MolObjPropField::INTEGER);
+  switch (entry_adjustment[attribute_index]) {
+  case MolObjIndexKind::ATOM:
+  case MolObjIndexKind::BOND:
+    return int_data[(entry_depth * entry_index) + attribute_index] + 1;
+  case MolObjIndexKind::OTHER:
+    return int_data[(entry_depth * entry_index) + attribute_index];
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -469,6 +541,85 @@ const std::string& MolObjProperty::getDataLine(const int index) const {
           "index " + std::to_string(index) + ".", "MolObjProperty", "getDataLine");
   }
   return data_lines[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MolObjProperty::getMdlText() const {
+
+  // Initialize an empty string and reserve an amount of space that will cover most properties.
+  std::string result(128, ' ');
+  char* result_data = result.data();
+
+  // Add the property code
+  result_data[0] = code.w;
+  if (kind != MolObjPropertyKind::ATOM_ALIAS && kind != MolObjPropertyKind::ATOM_VALUE &&
+      kind != MolObjPropertyKind::GROUP_ABBREVIATION) {
+    result_data[3] = code.x;
+    result_data[4] = code.y;
+    result_data[5] = code.z;
+  }
+  
+  // Write the substrate index and the number of entries, each time erasing the string terminating
+  // character '\0' placed by sprintf().
+  if (substrate_line_pos + 3 > 128 || entry_count_line_pos + 3 > 128) {
+    result.resize(std::max(substrate_line_pos, entry_count_line_pos) + 3, ' ');
+    result_data = result.data();
+  }
+  if (substrate_line_pos > 0) {
+    sprintf(&result_data[substrate_line_pos], "%3d", getPrintedSubstrate());
+    result_data[substrate_line_pos + 3] = ' ';
+  }
+  if (entry_count_line_pos > 0) {
+    sprintf(&result_data[entry_count_line_pos], "%3d", entry_count);
+    result_data[entry_count_line_pos + 3] = ' ';
+  }
+  if (kind == MolObjPropertyKind::ATOM_LIST) {
+    result_data[14] = getExclusionCode();
+  }
+  int pos = entry_read_start_pos;
+  for (int i = 0; i < entry_count; i++) {
+    for (int j = 0; j < entry_depth; j++) {
+      const int span = entry_data_bounds[j + 1] - entry_data_bounds[j];
+      if (pos + span > static_cast<int>(result.size())) {
+        result.resize(result.size() + 128LLU, ' ');
+        result_data = result.data();
+      }
+      switch (entry_detail[j]) {
+      case MolObjPropField::INTEGER:
+        sprintf(&result_data[pos], "%*d", span, getPrintedIntegerValue(i, j));
+        break;
+      case MolObjPropField::REAL:
+        sprintf(&result_data[pos], "%*.4lf", span, getRealValue(i, j));
+        break;
+      case MolObjPropField::CHAR4:
+        {
+          const char4 cvv = getChar4Value(i, j);
+          if (span >= 1) result_data[pos    ] = cvv.x;
+          if (span >= 2) result_data[pos + 1] = cvv.y;
+          if (span >= 3) result_data[pos + 2] = cvv.z;
+          if (span >= 4) result_data[pos + 3] = cvv.w;
+        }
+        break;
+      case MolObjPropField::STRING:
+        sprintf(&result_data[pos], "%*.*s", span, span, getStringValue(i, j).c_str());
+      }
+      pos += span;
+    }
+  }
+  if (pos > static_cast<int>(result.size()) - 2) {
+    result.resize(pos + 2, ' ');
+    result_data = result.data();
+  }
+  result_data[pos] = '\n';
+  pos++;
+  result_data[pos] = '\0';
+  result.resize(pos);
+  const int n_dl = data_lines.size();
+  for (int i = 0; i < n_dl; i++) {
+    result.append(data_lines[i]);
+    result.push_back('\n');
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -519,6 +670,7 @@ void MolObjProperty::setEntryFormat(const std::vector<MolObjPropField> &entry_de
 //-------------------------------------------------------------------------------------------------
 bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, const int length) {
   if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
+    entry_count_line_pos = start_pos;
     entry_count = readIntegerValue(line_ptr, start_pos, length);
     return false;
   }
@@ -532,6 +684,7 @@ bool MolObjProperty::readEntryCount(const char* line_ptr, const int start_pos, c
 bool MolObjProperty::readSubstrateIndex(const char* line_ptr, const int start_pos,
                                         const int length) {
   if (verifyContents(line_ptr, start_pos, length, NumberFormat::INTEGER)) {
+    substrate_line_pos = start_pos;
     substrate = readIntegerValue(line_ptr, start_pos, length) - 1;
     return false;
   }

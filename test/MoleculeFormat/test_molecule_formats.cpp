@@ -4,6 +4,7 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/MoleculeFormat/mdl_mol_obj.h"
+#include "../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -74,6 +75,10 @@ int main(const int argc, const char* argv[]) {
   check(fc_result, RelationalOperator::EQUAL, std::vector<int>(2, 1), "Formal charges were not "
         "properly interpreted from an MDL MOL V2000 format property.", do_tests);
 
+  // CHECK
+  printf("[[[\n%s]]]\n", chemaxon_mols[1].writeMdl(MdlMolVersion::V2000).c_str());
+  // END CHECK
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

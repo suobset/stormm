@@ -27,7 +27,10 @@ public:
   /// \param title         The title of the structure, if known, for error tracing purposes
   /// \{
   MolObjProperty(const char4 code_in = { ' ', ' ', ' ', ' ' }, int substrate_in = -1,
-                 int entry_count_in = 0, int entry_depth_in = 0,
+                 int entry_count_in = 0, int entry_depth_in = 0, bool exclusions_in = false,
+                 int substrate_line_pos_in = -1, int entry_count_line_pos_in = -1,
+                 int entry_read_start_pos_in = 0,
+                 const std::vector<int> &entry_data_bounds_in = {},
                  const std::vector<MolObjPropField> &entry_detail_in = {},
                  const std::vector<MolObjIndexKind> &entry_adjustment_in = {},
                  const std::vector<int> &int_data_in = {},
@@ -50,9 +53,27 @@ public:
   ///        type of substrate this is.
   int getSubstrate() const;
 
+  /// \brief Get the substrate atom or S-group for the purposes of printing.  The nature of the
+  ///        property will indicate which type of substrate this is, but all substrates' indices
+  ///        shift by -1 when being read and therefore shift by +1 when being written to the MDL
+  ///        MOL format.
+  int getPrintedSubstrate() const;
+
+  /// \brief Indicate whether the atom list encoded by this property is based on excluded elements
+  ///        (return TRUE) or included ones (return FALSE).  If the property is not an "M  ALS"
+  ///        entry, raise a runtime error.
+  bool applyToExclusions() const;
+
+  /// \brief Get a code ('T' if TRUE, 'F' if FALSE) to indicate whether the atom list describes
+  ///        exclusions.
+  char getExclusionCode() const;
+  
   /// \brief Get the number of entries for this property.
   int getEntryCount() const;
 
+  /// \brief Get the number of data lines for this property.
+  int getDataLineCount() const;
+  
   /// \brief Get a value from the property for a specific entry.  Inputs to these functions
   ///        will be checked by checkAttributeValidity().
   ///
@@ -60,6 +81,7 @@ public:
   /// \param attribute_index  The index of the attribute to retrieve
   /// \{
   int getIntegerValue(int entry_index, int attribute_index) const;
+  int getPrintedIntegerValue(int entry_index, int attribute_index) const;
   double getRealValue(int entry_index, int attribute_index) const;
   char4 getChar4Value(int entry_index, int attribute_index) const;
   std::string getStringValue(int entry_index, int attribute_index) const;
@@ -67,6 +89,9 @@ public:
 
   /// \brief Get a const pointer to one of the data lines.
   const std::string& getDataLine(int index) const;
+
+  /// \brief Recompose the text string for this property as it would appear in an MDL MOL file.
+  std::string getMdlText() const;
   
   /// \brief Define the property code.
   ///
@@ -103,7 +128,7 @@ public:
   ///        is read from a file--programmatic input is still expected to occur in the C / C++
   ///        array numbering.
   void setEntryFormat(const std::vector<MolObjPropField> &entry_detail_in,
-                      const std::vector <MolObjIndexKind> &entry_adjustment_in);
+                      const std::vector<MolObjIndexKind> &entry_adjustment_in);
 
   /// \brief Add an entry to the MDL MOL V2000 format property.  The layout must match that
   ///        established in the detail array.  Adjustments will not be applied to the indexing for
@@ -132,7 +157,23 @@ private:
   int entry_count;          ///< Number of entries (some properties have maximum numbers of entries
                             ///<   hard-wired into the format, and thus into the constructor)
   int entry_depth;          ///< The number of fields in each entry
+  bool exclusions;          ///< Specific to the ATOM_LIST property enumeration, stores the value
+                            ///<   of the exclusions flag for elements named in the list ('T' if
+                            ///<   the elements are excluded, 'F' if they are not)
+  int substrate_line_pos;   ///< The substrate of this property should be displayed on the MDL MOL
+                            ///<   file line at this position.  A negative value indicates that the
+                            ///<   substrate is not present on the line.  The substrate is always
+                            ///<   displayed in %3d format.
+  int entry_count_line_pos; ///< The entry count of this property should be displayed on the MDL
+                            ///<   MOL file line at this position.  A negative value indicates that
+                            ///<   the entry count is not displayed.
+  int entry_read_start_pos; ///< The position on the text line at which entries of the property
+                            ///<   begin to appear.
 
+  /// Pattern of character lengths for accessing entries of the property, beginning at the
+  /// entry_read_start_pos position.
+  std::vector<int> entry_data_bounds;
+  
   /// Nature of each field in each entry.  The most important classifications are INTEGER and
   ///   CHAR4, although some properties contain longer strings or real numbers.
   std::vector<MolObjPropField> entry_detail;
@@ -159,7 +200,8 @@ private:
                                              ///<   complement the property
 
   /// \brief Extract the number of entries for the property.  Returns FALSE if there is no error
-  ///        encountered, TRUE if there is a problem.
+  ///        encountered, TRUE if there is a problem.  This will also mark the position on the
+  ///        text line at which the entry count occurs.
   ///
   /// \param line_ptr   The line containing the property text
   /// \param start_pos  The starting position at which to read the value (default 6)
@@ -167,7 +209,8 @@ private:
   bool readEntryCount(const char* line_ptr, int start_pos = 6, int length = 3);
 
   /// \brief Extract the index of the substrate atom or group for the property.  Returns FALSE if
-  ///        there is no error encountered, TRUE if there is a problem.
+  ///        there is no error encountered, TRUE if there is a problem.  This will also mark the
+  ///        position on the text line at which the entry count occurs.
   ///
   /// \param line_ptr   The line containing the property text
   /// \param start_pos  The starting position at which to read the value (default 7)

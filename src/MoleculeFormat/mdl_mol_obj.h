@@ -152,8 +152,14 @@ public:
   /// \brief Get the number of properties found in the MDL MOL entry
   int getPropertiesCount() const;
 
-  /// \brief Write a set of molecular coordinates in MDL MOL format.  Apply all properties already
-  ///        stored in the object, in a 1:1 reversal of the operations for reading such a file.
+  /// \brief Write a set of molecular coordinates, bonds, and their annotations in MDL MOL format.
+  ///        Apply all properties already stored in the object, such that the result is not an
+  ///        exact reversal of the operations for reading such a file but correctly conveys the
+  ///        relevant information to any other SDF / MDL MOL reader.  The data items are not
+  ///        part of this output--for that section of the SD file format, use writeDataItems()
+  ///        below.  The intention is that different coordinates can then be edited for a new
+  ///        structure while the (smaller) data section is re-written separately for a more
+  ///        efficient file I/O process.
   ///
   /// Overloaded:
   ///   - Write to an output file
@@ -166,9 +172,11 @@ public:
   /// \param expectation  Anticipated (or required) condition of the output file that is to be
   ///                     opened, if only its name is provided
   /// \{
-  void write(std::ofstream *foutp, MdlMolVersion vformat) const;
-  void write(const std::string &fname, MdlMolVersion vformat, PrintSituation expectation) const;
-  std::string write(MdlMolVersion vformat) const;
+  void writeMdl(std::ofstream *foutp, MdlMolVersion vformat) const;
+
+  void writeMdl(const std::string &fname, MdlMolVersion vformat, PrintSituation expectation) const;
+
+  std::string writeMdl(MdlMolVersion vformat = MdlMolVersion::V3000) const;
   /// \}
 
 private:
