@@ -51,8 +51,8 @@ public:
   /// \{
   MolObjBond(const MolObjBond &original) = default;
   MolObjBond(MolObjBond &&original) = default;
-  MolObjBond& operator=(const MolObjBond &original) = default;
-  MolObjBond& operator=(MolObjBond &&original) = default;
+  MolObjBond& operator=(const MolObjBond &other) = default;
+  MolObjBond& operator=(MolObjBond &&other) = default;
   /// \}
 
   /// \brief Get the first atom in the bond.  Having separate functions for each atom is a more

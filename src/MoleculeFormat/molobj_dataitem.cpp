@@ -12,7 +12,144 @@ using parse::stringToChar4;
 using parse::strncmpCased;
 using parse::separateText;
 using parse::verifyContents;
-  
+
+//-------------------------------------------------------------------------------------------------
+  MolObjDataRequest::MolObjDataRequest(const std::string &title_in, const std::string &label_in) :
+    kind{DataRequestKind::STRING}, title{title_in}, energy_component{StateVariable::BOND},
+    atom_mask{std::string("")}, valence_kind{StateVariable::BOND}, message{std::string("")},
+    atom_types{}, system_label{label_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataRequest::MolObjDataRequest(const std::string &title_in,
+                                     const StateVariable energy_component_in,
+                                     const std::string &label_in) :
+    MolObjDataRequest(title_in, label_in)
+{
+  kind = DataRequestKind::STATE_VARIABLE;
+  energy_component = energy_component_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataRequest::MolObjDataRequest(const DataRequestKind kind_in, const std::string &title_in,
+                                     const std::string &message_in, const std::string &label_in) :
+    MolObjDataRequest(title_in, label_in)
+{
+  kind = kind_in;
+  switch (kind) {
+  case DataRequestKind::STATE_VARIABLE:
+    rtErr("In order to construct a data request for a particular energy component, use "
+          "MolObjDataRequest(<title>, <energy component>, <label>).", "MolObjDataRequest");
+    break;
+  case DataRequestKind::TOPOLOGY_PARAMETER:
+    rtErr("In order to construct a data request for the actions of a topological energy "
+          "parameter, use MolObjDataRequest(<title>, <interaction type>, <list of atom types>, "
+          "<label>).", "MolObjDataRequest");
+    break;
+  case DataRequestKind::ATOM_INFLUENCES:
+    atom_mask = message_in;
+    break;
+  case DataRequestKind::STRING:
+    message = message_in;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataRequest::MolObjDataRequest(const std::string &title_in,
+                                     const StateVariable valence_kind_in,
+                                     const std::vector<char4> &atom_types_in,
+                                     const std::string &label_in) :
+    MolObjDataRequest(title_in, label_in)
+{
+  kind = DataRequestKind::TOPOLOGY_PARAMETER;
+  valence_kind = valence_kind_in;
+  atom_types = atom_types_in;
+
+  // Check the type of valence interaction and the corresponding number of atom types supplied.
+  const int ntypes = atom_types.size();
+  int nreq;
+  switch (valence_kind) {
+  case StateVariable::BOND:
+  case StateVariable::UREY_BRADLEY:
+    nreq = 2;
+    break;
+  case StateVariable::ANGLE:
+    nreq = 3;
+    break;
+  case StateVariable::PROPER_DIHEDRAL:
+  case StateVariable::IMPROPER_DIHEDRAL:
+  case StateVariable::CHARMM_IMPROPER:
+    nreq = 4;
+    break;
+  case StateVariable::CMAP:
+    nreq = 5;
+    break;
+  case StateVariable::VDW:
+  case StateVariable::VDW_ONE_FOUR:
+  case StateVariable::ELECTROSTATIC:
+  case StateVariable::ELECTROSTATIC_ONE_FOUR:
+  case StateVariable::GENERALIZED_BORN:
+  case StateVariable::RESTRAINT:
+  case StateVariable::KINETIC:
+  case StateVariable::PRESSURE:
+  case StateVariable::VIRIAL_11:
+  case StateVariable::VIRIAL_12:
+  case StateVariable::VIRIAL_22:
+  case StateVariable::VIRIAL_13:
+  case StateVariable::VIRIAL_23:
+  case StateVariable::VIRIAL_33:
+  case StateVariable::VOLUME:
+  case StateVariable::TEMPERATURE_ALL:
+  case StateVariable::TEMPERATURE_PROTEIN:
+  case StateVariable::TEMPERATURE_LIGAND:
+  case StateVariable::TEMPERATURE_SOLVENT:
+  case StateVariable::DU_DLAMBDA:
+  case StateVariable::POTENTIAL_ENERGY:
+  case StateVariable::TOTAL_ENERGY:
+  case StateVariable::ALL_STATES:
+    rtErr("The accepted topology parameter types for printing in data items of an SD file "
+          "include BOND, ANGLE, PROPER_DIHEDRAL, IMPROPER_DIHEDRAL, UREY_BRADLEY, "
+          "CHARMM_IMPROPER, and CMAP.", "MolObjDataRequest");
+    break;
+  }
+  if (ntypes != nreq) {
+    rtErr("A " + getEnumerationName(valence_kind) + " requires specification of " +
+          std::to_string(nreq) + " atom types, but " + std::to_string(ntypes) + " were provided.",
+          "MolObjDataRequest");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+DataRequestKind MolObjDataRequest::getKind() const {
+  return kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataRequest::getTitle() const {
+  return title;
+}
+
+//-------------------------------------------------------------------------------------------------
+StateVariable MolObjDataRequest::getEnergyComponent() const {
+  return energy_component;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataRequest::getAtomMask() const {
+  return atom_mask;
+}
+
+//-------------------------------------------------------------------------------------------------
+StateVariable MolObjDataRequest::getValenceParameter() const {
+  return valence_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataRequest::getMessage() const {
+  return message;
+}
+
 //-------------------------------------------------------------------------------------------------
 MolObjDataItem::MolObjDataItem(const std::string &item_name_in,
                                const std::string &external_regno_in,

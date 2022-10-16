@@ -82,6 +82,17 @@ enum class MolObjPropField {
   INTEGER, CHAR4, REAL, STRING
 };
 
+/// \brief Various kinds of information that can be encoded in an SD file data item upon request
+enum class DataRequestKind {
+  STATE_VARIABLE,      ///< Information from a state variable (see Potential/energy_enumerators.h)
+                       ///<   will br presented as a single, real number in a data item.
+  ATOM_INFLUENCES,     ///< The origins and effects of all valence interactions, including
+                       ///<   restraint terms, affecting the specified atoms will be presented in
+                       ///<   a formatted data item.
+  TOPOLOGY_PARAMETER,  ///< Information to be extracted from the topology guiding the structure
+  STRING               ///< Information in the form of a custom string issued by the user
+};
+
 /// \brief Enumerate the types of data that property fields could contain
 enum class MolObjPropertyKind {
   ATOM_ALIAS,             ///< Deprecated ISIS / desktop concept
@@ -143,7 +154,24 @@ enum class MolObjPropertyKind {
 
 /// \brief Enumerate the types of data that property fields could contain
 enum class MolObjFeatureKind {
-  
+  PT_FD_2,
+  PT_FLEX_2,
+  PT_PN_NORMAL,
+  LN_BEST_FIT,
+  PN_BEST_FIT,
+  PN_PT_LN,
+  CENTROID,
+  LN_PN_NORMAL,
+  DISTANCE_PT_PT,
+  DISTANCE_PT_LN,
+  DISTANCE_PT_PN,
+  ANGLE_PT_PT_PT,
+  ANGLE_LN_LN,
+  ANGLE_PN_PN,
+  SPHERE_PT,
+  FIXED_ATOMS,
+  ATOM_CONSTRAINT,
+  PAIR_CONSTRAINT
 };
 
 /// \brief Translate a four-character tuple into one of the known MDL MOL format properties.

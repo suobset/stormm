@@ -67,6 +67,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Parsing/textfile.cpp \
 	           $(SRCDIR)/Parsing/textguard.cpp \
 	           $(SRCDIR)/Potential/cacheresource.cpp \
+	           $(SRCDIR)/Potential/energy_enumerators.cpp \
 	           $(SRCDIR)/Potential/eval_valence_workunit.cpp \
 	           $(SRCDIR)/Potential/forward_exclusionmask.cpp \
 	           $(SRCDIR)/Potential/nonbonded_potential.cpp \
@@ -373,6 +374,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/Parsing/textfile.o \
 	          $(SRCDIR)/Parsing/textguard.o \
 	          $(SRCDIR)/Potential/cacheresource.o \
+	          $(SRCDIR)/Potential/energy_enumerators.o \
 	          $(SRCDIR)/Potential/eval_valence_workunit.o \
 	          $(SRCDIR)/Potential/forward_exclusionmask.o \
 	          $(SRCDIR)/Potential/nonbonded_potential.o \

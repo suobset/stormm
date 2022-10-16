@@ -2,6 +2,7 @@
 #ifndef STORMM_ENERGY_ENUMERATORS_H
 #define STORMM_ENERGY_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
@@ -73,6 +74,12 @@ enum class StateVariable {
                           ///<   quantities is equal to the value of this entry (ALL_STATES does
                           ///<   not define its own index in the subsequent tracking arrays).
 };
+
+/// \brief Get a human-readable name for the enumerations detailed above.
+/// \{
+std::string getEnumerationName(StateVariable DihedralStyle);
+std::string getEnumerationName(StateVariable input);
+/// \}
 
 } // namespace energy
 } // namespace stormm

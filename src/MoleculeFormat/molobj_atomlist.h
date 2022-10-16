@@ -31,6 +31,15 @@ public:
   MolObjAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
+  /// \brief The default copy and move constructors, as well as copy and move assignment operators,
+  ///        are applicable to this object which has no const members or pointers to repair.
+  /// \{
+  MolObjAtomList(const MolObjAtomList &original) = default;
+  MolObjAtomList(MolObjAtomList &&original) = default;
+  MolObjAtomList& operator=(const MolObjAtomList &other) = default;
+  MolObjAtomList& operator=(MolObjAtomList &&other) = default;
+  /// \}
+
   /// \brief Get the number of element (atomic number) entries.
   int getEntryCount() const;
 

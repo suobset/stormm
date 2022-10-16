@@ -42,6 +42,15 @@ public:
                  const std::string &title = std::string(""));
   /// \}
 
+  /// \brief The default copy and move constructors, as well as copy and move assignment operators,
+  ///        are applicable to this object which has no const members or pointers to repair.
+  /// \{
+  MolObjProperty(const MolObjProperty &original) = default;
+  MolObjProperty(MolObjProperty &&original) = default;
+  MolObjProperty& operator=(const MolObjProperty &other) = default;
+  MolObjProperty& operator=(MolObjProperty &&other) = default;
+  /// \}
+  
   /// \brief Get the kind of property according to the internal enumerator.
   MolObjPropertyKind getKind() const;
 
