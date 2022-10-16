@@ -47,7 +47,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Namelists/input.cpp \
 	           $(SRCDIR)/Namelists/namelist_element.cpp \
 	           $(SRCDIR)/Namelists/namelist_emulator.cpp \
-	           $(SRCDIR)/Namelists/namelist_enumerations.cpp \
+	           $(SRCDIR)/Namelists/namelist_enumerators.cpp \
 	           $(SRCDIR)/Namelists/nml_conformer.cpp \
 	           $(SRCDIR)/Namelists/nml_dynamics.cpp \
 	           $(SRCDIR)/Namelists/nml_ffmorph.cpp \
@@ -78,6 +78,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Reporting/code_dox.cpp \
 	           $(SRCDIR)/Reporting/display.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
+		   $(SRCDIR)/Reporting/reporting_enumerators.cpp \
 		   $(SRCDIR)/Reporting/summary_file.cpp \
 		   $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
@@ -183,7 +184,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \
-		     $(SRCDIR)/Namelists/namelist_enumerations.h \
+		     $(SRCDIR)/Namelists/namelist_enumerators.h \
 		     $(SRCDIR)/Namelists/nml_conformer.h \
 		     $(SRCDIR)/Namelists/nml_dynamics.h \
 		     $(SRCDIR)/Namelists/nml_ffmorph.h \
@@ -216,6 +217,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
 	             $(SRCDIR)/Reporting/error_format.h \
+	             $(SRCDIR)/Reporting/reporting_enumerators.h \
 	             $(SRCDIR)/Reporting/summary_file.h \
 	             $(SRCDIR)/Restraints/bounded_restraint.h \
 	             $(SRCDIR)/Restraints/restraint_apparatus.h \
@@ -354,7 +356,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Namelists/input.o \
 	          $(SRCDIR)/Namelists/namelist_element.o \
 	          $(SRCDIR)/Namelists/namelist_emulator.o \
-	          $(SRCDIR)/Namelists/namelist_enumerations.o \
+	          $(SRCDIR)/Namelists/namelist_enumerators.o \
 	          $(SRCDIR)/Namelists/nml_conformer.o \
 	          $(SRCDIR)/Namelists/nml_dynamics.o \
 	          $(SRCDIR)/Namelists/nml_ffmorph.o \
@@ -385,6 +387,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
 	          $(SRCDIR)/Reporting/error_format.o \
+	          $(SRCDIR)/Reporting/reporting_enumerators.o \
 	          $(SRCDIR)/Reporting/summary_file.o \
 	          $(SRCDIR)/Restraints/bounded_restraint.o \
 	          $(SRCDIR)/Restraints/restraint_apparatus.o \

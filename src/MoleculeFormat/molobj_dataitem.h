@@ -94,6 +94,13 @@ private:
                                   ///<   output, this label will be checked against the molecular
                                   ///<   system's label to ensure that the information goes only
                                   ///<   into the intended places.
+
+  /// \brief Check that the data request is of the right kind to return a particular member
+  ///        variable, or possibly to perform other functions.
+  ///
+  /// \param accepted_kind  The kind of request that this object must be making in order for it to
+  ///                       function as the developer wants
+  void checkKind(DataRequestKind accepted_kind) const;
 };
   
 /// \brief Store a data item from within an SD file.  Data items begin with a line of the form

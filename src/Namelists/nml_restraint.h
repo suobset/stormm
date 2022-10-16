@@ -5,7 +5,7 @@
 #include "copyright.h"
 #include "input.h"
 #include "namelist_emulator.h"
-#include "namelist_enumerations.h"
+#include "namelist_enumerators.h"
 #include "Chemistry/chemical_features.h"
 #include "Parsing/textfile.h"
 #include "Restraints/bounded_restraint.h"

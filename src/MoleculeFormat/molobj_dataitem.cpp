@@ -132,22 +132,35 @@ const std::string& MolObjDataRequest::getTitle() const {
 
 //-------------------------------------------------------------------------------------------------
 StateVariable MolObjDataRequest::getEnergyComponent() const {
+  checkKind(DataRequestKind::STATE_VARIABLE);
   return energy_component;
 }
 
 //-------------------------------------------------------------------------------------------------
 const std::string& MolObjDataRequest::getAtomMask() const {
+  checkKind(DataRequestKind::ATOM_INFLUENCES);
   return atom_mask;
 }
 
 //-------------------------------------------------------------------------------------------------
 StateVariable MolObjDataRequest::getValenceParameter() const {
+  checkKind(DataRequestKind::TOPOLOGY_PARAMETER);
   return valence_kind;
 }
 
 //-------------------------------------------------------------------------------------------------
 const std::string& MolObjDataRequest::getMessage() const {
+  checkKind(DataRequestKind::STRING);
   return message;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataRequest::checkKind(const DataRequestKind accepted_kind) const {
+  if (kind != accepted_kind) {
+    rtErr("A data request of type " + getEnumerationName(kind) + " cannot function as a request "
+          "for " + getEnumerationName(accepted_kind) + " data.", "MolObjDataRequest",
+          "checkKind");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 #include <vector>
 #include "copyright.h"
 #include "Constants/behavior.h"
-#include "namelist_enumerations.h"
+#include "namelist_enumerators.h"
 
 namespace stormm {
 namespace namelist {

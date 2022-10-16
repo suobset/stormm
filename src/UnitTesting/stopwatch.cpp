@@ -270,7 +270,7 @@ void StopWatch::printResults(const double precision) {
 
 //-------------------------------------------------------------------------------------------------
 double StopWatch::translateCurrentTime() const {
-  struct timeval x;
+  timeval x;
   gettimeofday(&x, nullptr);
   return static_cast<double>(x.tv_sec) + (static_cast<double>(x.tv_usec) * 1.0e-6);
 }

@@ -62,6 +62,20 @@ MolObjPropertyKind translateMolObjPropertyKind(char4 input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const DataRequestKind input) {
+  switch (input) {
+  case DataRequestKind::STATE_VARIABLE:
+    return std::string("STATE_VARIABLE");
+  case DataRequestKind::ATOM_INFLUENCES:
+    return std::string("ATOM_INLFUENCES");
+  case DataRequestKind::TOPOLOGY_PARAMETER:
+    return std::string("TOPOLOGY_PARAMETER");
+  case DataRequestKind::STRING:
+    return std::string("STRING");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const MolObjIndexKind input) {
   switch (input) {
   case MolObjIndexKind::ATOM:

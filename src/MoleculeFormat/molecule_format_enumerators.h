@@ -184,6 +184,8 @@ MolObjPropertyKind translateMolObjPropertyKind(char4 input);
 ///
 /// \param input  The enumeration to translate
 /// \{
+std::string getEnumerationName(DataRequestKind input);
+
 std::string getEnumerationName(MolObjIndexKind input);
 
 std::string getEnumerationName(MolObjPropField input);
