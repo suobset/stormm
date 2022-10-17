@@ -52,7 +52,7 @@ void stormmRmdir(const std::string &path, ExceptionResponse protocol = Exception
 /// \param paths     The list of directory paths to (attempt to) remove
 /// \param protocol  Indication of what to do in the event of an exception
 void stormmBatchRmdir(const std::vector<std::string> &paths,
-                    ExceptionResponse protocol = ExceptionResponse::WARN);
+                      ExceptionResponse protocol = ExceptionResponse::WARN);
 
 }
 }

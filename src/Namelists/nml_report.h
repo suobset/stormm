@@ -2,14 +2,18 @@
 #ifndef STORMM_NML_OUTPUT_H
 #define STORMM_NML_OUTPUT_H
 
+#include <cstring>
 #include <string>
 #include <vector>
 #include <cstdio>
 #include <sys/time.h>
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "MoleculeFormat/molobj_dataitem.h"
+#include "Parsing/textfile.h"
 #include "Potential/energy_enumerators.h"
 #include "Reporting/reporting_enumerators.h"
-#include "Structure/molobj_dataitem.h"
+#include "input.h"
 #include "namelist_element.h"
 #include "namelist_emulator.h"
 
@@ -17,8 +21,11 @@ namespace stormm {
 namespace namelist {
 
 using energy::StateVariable;
+using parse::TextFile;
+using parse::WrapTextSearch;
 using review::OutputScope;
 using review::OutputSyntax;
+using structure::MolObjDataRequest;
 
 /// \brief Collect output directives relating to the diagnostics file.  While the output frequency
 ///        is controlled by another namelist such as &minimize or &dynamics, STORMM is designed to
@@ -57,7 +64,7 @@ public:
 
   /// \brief Get the date on which the program began to run, taken as the time that this
   ///        ReportControls object was constructed.
-  const std::string& getStartDate() const;
+  timeval getStartDate() const;
 
   /// \brief Indicate whether to print timings data from the calculations.
   bool printWallTimeData() const;
@@ -114,18 +121,33 @@ public:
 
   /// \brief Set the preference for printing wall clock timings.
   ///
-  /// \param preference  Set to TRUE to activate printing of wall time results
-  void setWallTimeData(bool preference);
-
-  /// \brief Set the reported quantities that will be reported.
-  ///
   /// Overloaded:
   ///   - Accept a single state variable to report
   ///   - Accept a vector of state variables to report
   ///
+  /// \param preference  Set to TRUE to activate printing of wall time results
+  /// \{
+  void setWallTimeData(bool preference);
+  void setWallTimeData(const std::string &preference);
+  /// \}
+
+  /// \brief Set the reported quantities that will be reported.  Some quantities are obligatory:
+  ///        Total, total potential, and total kinetic energy; thermodynamic integration energy
+  ///        derivatives (if applicable); pressure and volume (if applicable); and overall system
+  ///        temperature.  By default, all components of the molecular mechanics energy are also
+  ///        recorded, but requesting specific components through this function will disable all
+  ///        molecular mechanics energy components not specifically requested.
+  ///
+  /// Overloaded:
+  ///   - Accept a string to translate into some state variable code
+  ///   - Accept a single state variable to report
+  ///   - Accept a vector of state variables to report
+  ///
+  /// \param quantity_in    String indicating some state variable
   /// \param quantities_in  A state variable quantity, or list of quantities, to include in the
   ///                       diagnostics report file
   /// \{
+  void setReportedQuantities(const std::string &quantity_in);
   void setReportedQuantities(StateVariable quantities_in);
   void setReportedQuantities(const std::vector<StateVariable> &quantities_in);
   /// \}
@@ -145,13 +167,21 @@ private:
                                ///<   be taken as a good approximation of the date and time on
                                ///<   which the calling program was executed.
   bool print_walltime_data;    ///< Flag to activate printing of wall time data (collected from
-                               ///    functions that issue results) to help profile the calculation
+                               ///<   functions that issue results) to help profile the calculation
 
   /// List the energetic quantities to report
   std::vector<StateVariable> reported_quantities;
 
   /// List of data item requests for information to be included in an SD file output
   std::vector<MolObjDataRequest> sdf_addons;
+
+  /// \brief Translate the namelist STRUCT input for an SD file data item into the internal object
+  ///        encoding such a request.
+  ///
+  /// \param t_nml  The original namelist object, complete with keywords and values read from the
+  ///               input file
+  /// \param index  Index of the STRUCT keyword value to translate into a data item request
+  MolObjDataRequest translateSdfKeywordInput(const NamelistEmulator &t_nml, int index);
 };
 
 /// \brief Produce a namelist for specifying content and format of the output diagnostics report,

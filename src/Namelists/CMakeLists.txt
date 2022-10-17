@@ -11,12 +11,13 @@ add_library(nml_minimize nml_minimize.cpp)
 add_library(nml_precision nml_precision.cpp)
 add_library(nml_random nml_random.cpp)
 add_library(nml_restraint nml_restraint.cpp)
+add_library(nml_report nml_report.cpp)
 add_library(nml_solvent nml_solvent.cpp)
 add_library(user_settings user_settings.cpp)
 
 install(TARGETS input namelist_element namelist_emulator nml_conformer nml_dynamics nml_ffmorph
-        nml_files nml_minimize nml_precision nml_random nml_restraint nml_solvent user_settings
-        DESTINATION lib)
+        nml_files nml_minimize nml_precision nml_random nml_report nml_restraint nml_solvent
+        user_settings DESTINATION lib)
 install(FILES input.h namelist_element.h namelist_emulator.h nml_conformer.h nml_dynamics.h
         nml_ffmorph.h nml_files.h nml_minimize.h nml_precision.h nml_random.h nml_restraint.h
-        nml_solvent.h user_settings.h DESTINATION include)
+        nml_report.h nml_solvent.h user_settings.h DESTINATION include)

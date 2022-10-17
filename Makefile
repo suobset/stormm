@@ -55,6 +55,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Namelists/nml_minimize.cpp \
 	           $(SRCDIR)/Namelists/nml_precision.cpp \
 	           $(SRCDIR)/Namelists/nml_random.cpp \
+	           $(SRCDIR)/Namelists/nml_report.cpp \
 	           $(SRCDIR)/Namelists/nml_restraint.cpp \
 	           $(SRCDIR)/Namelists/nml_solvent.cpp \
 	           $(SRCDIR)/Namelists/user_settings.cpp \
@@ -192,6 +193,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Namelists/nml_minimize.h \
 		     $(SRCDIR)/Namelists/nml_precision.h \
 		     $(SRCDIR)/Namelists/nml_random.h \
+		     $(SRCDIR)/Namelists/nml_report.h \
 		     $(SRCDIR)/Namelists/nml_restraint.h \
 		     $(SRCDIR)/Namelists/nml_solvent.h \
 		     $(SRCDIR)/Namelists/user_settings.h \
@@ -364,6 +366,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/Namelists/nml_minimize.o \
 	          $(SRCDIR)/Namelists/nml_precision.o \
 	          $(SRCDIR)/Namelists/nml_random.o \
+	          $(SRCDIR)/Namelists/nml_report.o \
 	          $(SRCDIR)/Namelists/nml_restraint.o \
 	          $(SRCDIR)/Namelists/nml_solvent.o \
 	          $(SRCDIR)/Namelists/user_settings.o \

@@ -155,6 +155,11 @@ const std::string& MolObjDataRequest::getMessage() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataRequest::getSystemLabel() const {
+  return system_label;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MolObjDataRequest::checkKind(const DataRequestKind accepted_kind) const {
   if (kind != accepted_kind) {
     rtErr("A data request of type " + getEnumerationName(kind) + " cannot function as a request "

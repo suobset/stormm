@@ -73,7 +73,10 @@ public:
   /// \brief Get the vector of atom types defining a valence parameter of itnerest, again raising
   ///        a runtime error if the request is not of the appropriate kind.
   const std::vector<char4>& getAtomTypes() const;
-  
+
+  /// \brief Get the system label to which the data item should be applied.
+  const std::string& getSystemLabel() const;
+
 private:
   DataRequestKind kind;           ///< Define the type of data request
   std::string title;              ///< Title for the data item, to be displayed as "> <title>" in
