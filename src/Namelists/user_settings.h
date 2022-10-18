@@ -10,6 +10,7 @@
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_random.h"
+#include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
 #include "Namelists/nml_solvent.h"
 #include "Parsing/textfile.h"
@@ -29,6 +30,7 @@ using namelist::FFMorphControls;
 using namelist::FilesControls;
 using namelist::MinimizeControls;
 using namelist::RandomControls;
+using namelist::ReportControls;
 using namelist::RestraintControls;
 using namelist::SolventControls;
 using parse::TextFile;
@@ -82,25 +84,31 @@ struct UserSettings {
   bool getConformerPresence() const;
 
   /// \brief Get the block of information associated with the &files namelist.
-  FilesControls getFilesNamelistInfo() const;
+  const FilesControls& getFilesNamelistInfo() const;
   
   /// \brief Get the block of information associated with the &minimize namelist.
-  MinimizeControls getMinimizeNamelistInfo() const;
+  const MinimizeControls& getMinimizeNamelistInfo() const;
   
   /// \brief Get the block of information associated with the &solvent namelist.
-  SolventControls getSolventNamelistInfo() const;
+  const SolventControls& getSolventNamelistInfo() const;
   
   /// \brief Get the block of information associated with the &random namelist.
-  RandomControls getRandomNamelistInfo() const;
+  const RandomControls& getRandomNamelistInfo() const;
 
   /// \brief Get the block of information associated with the &conformer namelist.
-  ConformerControls getConformerNamelistInfo() const;
+  const ConformerControls& getConformerNamelistInfo() const;
 
+  /// \brief Get force field hyperparameter optimization controls through the &ffmorph namelist.
+  const FFMorphControls& getFFMorphNamelistInfo() const;
+
+  /// \brief Get the user-specified diagnostics report features.
+  const ReportControls& getReportNamelistInfo() const;
+  
   /// \brief Get a const reference to the vector of &restraint namelist objects.
   const std::vector<RestraintControls>& getRestraintNamelistInfo() const;
 
   /// \brief Get one block of information associated with a particular &restraint namelist.
-  RestraintControls getRestraintNamelistInfo(int index) const;
+  const RestraintControls& getRestraintNamelistInfo(int index) const;
     
   /// \brief Produce the file overwriting policy.
   PrintSituation getPrintingPolicy() const;
@@ -115,6 +123,7 @@ private:
   bool has_conformer_nml;       ///< Indicate the presence of a &conformer namelist in the input
   bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
   bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
+  bool has_report_nml;          ///< Indicate the presence of a &report namelist in the input
   int restraint_nml_count;      ///< Number of &restraint namelists found in the input
   
   /// Name of the original input file
@@ -128,6 +137,7 @@ private:
   ConformerControls conf_input;     ///< Conformer generation instructions
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions
+  ReportControls diagnostic_input;  ///< Diagnostics report file details and layout
 
   /// There can be many restraint controls sections in the input.  This vector holds them all.
   std::vector<RestraintControls> rstr_inputs;

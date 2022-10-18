@@ -1,8 +1,13 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Parsing/parse.h"
 #include "energy_enumerators.h"
 
 namespace stormm {
 namespace energy {
+
+using constants::CaseSensitivity;
+using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const DihedralStyle input) {

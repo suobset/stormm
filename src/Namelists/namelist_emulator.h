@@ -30,7 +30,7 @@ public:
                    const std::string &help_in = std::string("No description provided"));
 
   /// \brief Obtain the title of this namelist (i.e. &cntrl or &dock)
-  std::string getTitle() const;
+  const std::string& getTitle() const;
 
   /// \brief Obtain the number of parameters catalogged within this namelist emulator.
   int getKeywordCount() const;
@@ -47,7 +47,7 @@ public:
   /// \param index  Index of the keyword in the list held by this namelist.  In fact, this is
   ///               best used to step through the list of keywords in the order they were added,
   ///               not much more.
-  std::string getKeyword(size_t index) const;
+  const std::string& getKeyword(size_t index) const;
 
   /// \brief Get the type of a specific keyword within this namelist.
   ///
@@ -126,9 +126,9 @@ public:
   /// \param sub_key        Identifier for the member variable within the STRUCT of interest
   /// \param index          For keywords that store multiple values, retrieve this value
   /// \{
-  std::string getStringValue(const std::string &keyword_query, int index = 0) const;
-  std::string getStringValue(const std::string &keyword_query, const std::string &sub_key,
-                             int index = 0) const;
+  const std::string& getStringValue(const std::string &keyword_query, int index = 0) const;
+  const std::string& getStringValue(const std::string &keyword_query, const std::string &sub_key,
+                                    int index = 0) const;
   /// \}
 
   /// \brief Get all integer values assigned to a particular keyword
@@ -160,9 +160,9 @@ public:
   ///
   /// \param keyword_query  Identifier of the keyword of interest
   /// \param sub_key        Identifier for the member variable within the STRUCT of interest
-  std::string getHelp() const;
-  std::string getHelp(const std::string &keyword_query) const;
-  std::string getHelp(const std::string &keyword_query, const std::string &sub_key) const;
+  const std::string& getHelp() const;
+  const std::string& getHelp(const std::string &keyword_query) const;
+  const std::string& getHelp(const std::string &keyword_query, const std::string &sub_key) const;
   /// \}
 
   /// \brief Add a keyword to the namelist.

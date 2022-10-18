@@ -181,7 +181,8 @@ private:
   /// \param t_nml  The original namelist object, complete with keywords and values read from the
   ///               input file
   /// \param index  Index of the STRUCT keyword value to translate into a data item request
-  MolObjDataRequest translateSdfKeywordInput(const NamelistEmulator &t_nml, int index);
+  std::vector<MolObjDataRequest> translateSdfKeywordInput(const NamelistEmulator &t_nml,
+                                                          int index);
 };
 
 /// \brief Produce a namelist for specifying content and format of the output diagnostics report,

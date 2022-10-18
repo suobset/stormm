@@ -32,10 +32,10 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
     has_minimize_nml{false}, has_solvent_nml{false},
     has_random_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
-    has_ffmorph_nml{false}, restraint_nml_count{0},
+    has_ffmorph_nml{false}, has_report_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{}, dyna_input{},
-    ffmod_input{}, rstr_inputs{}
+    ffmod_input{}, diagnostic_input{}, rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -153,6 +153,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   start_line = 0;
   ffmod_input = FFMorphControls(inp_tf, &start_line, &has_ffmorph_nml, policy);
   start_line = 0;
+  diagnostic_input = ReportControls(inp_tf, &start_line, &has_report_nml, policy);
+  start_line = 0;
   while (start_line < inp_tf.getLineCount()) {
     bool restraint_nml_found = false;
     RestraintControls tmp_rstr_input = RestraintControls(inp_tf, &start_line, &restraint_nml_found,
@@ -225,28 +227,38 @@ bool UserSettings::getConformerPresence() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-FilesControls UserSettings::getFilesNamelistInfo() const {
+const FilesControls& UserSettings::getFilesNamelistInfo() const {
   return file_io_input;
 }
 
 //-------------------------------------------------------------------------------------------------
-MinimizeControls UserSettings::getMinimizeNamelistInfo() const {
+const MinimizeControls& UserSettings::getMinimizeNamelistInfo() const {
   return line_min_input;
 }
 
 //-------------------------------------------------------------------------------------------------
-SolventControls UserSettings::getSolventNamelistInfo() const {
+const SolventControls& UserSettings::getSolventNamelistInfo() const {
   return solvent_input;
 }
 
 //-------------------------------------------------------------------------------------------------
-RandomControls UserSettings::getRandomNamelistInfo() const {
+const RandomControls& UserSettings::getRandomNamelistInfo() const {
   return prng_input;
 }
 
 //-------------------------------------------------------------------------------------------------
-ConformerControls UserSettings::getConformerNamelistInfo() const {
+const ConformerControls& UserSettings::getConformerNamelistInfo() const {
   return conf_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const FFMorphControls& UserSettings::getFFMorphNamelistInfo() const {
+  return ffmod_input;
+}
+  
+//-------------------------------------------------------------------------------------------------
+const ReportControls& UserSettings::getReportNamelistInfo() const {
+  return diagnostic_input;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -255,7 +267,7 @@ const std::vector<RestraintControls>& UserSettings::getRestraintNamelistInfo() c
 }
 
 //-------------------------------------------------------------------------------------------------
-RestraintControls UserSettings::getRestraintNamelistInfo(const int index) const {
+const RestraintControls& UserSettings::getRestraintNamelistInfo(const int index) const {
   if (index < 0 || index >= restraint_nml_count) {
     rtErr("The input contained " + std::to_string(restraint_nml_count) + " &restraint namelists.  "
           "Index " + std::to_string(index) + " is invalid.", "UserSettings",

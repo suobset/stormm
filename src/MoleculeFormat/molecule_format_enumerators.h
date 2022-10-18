@@ -84,13 +84,15 @@ enum class MolObjPropField {
 
 /// \brief Various kinds of information that can be encoded in an SD file data item upon request
 enum class DataRequestKind {
-  STATE_VARIABLE,      ///< Information from a state variable (see Potential/energy_enumerators.h)
+  STATE_VARIABLE = 0,  ///< Information from a state variable (see Potential/energy_enumerators.h)
                        ///<   will br presented as a single, real number in a data item.
   ATOM_INFLUENCES,     ///< The origins and effects of all valence interactions, including
                        ///<   restraint terms, affecting the specified atoms will be presented in
                        ///<   a formatted data item.
   TOPOLOGY_PARAMETER,  ///< Information to be extracted from the topology guiding the structure
-  STRING               ///< Information in the form of a custom string issued by the user
+  STRING,              ///< Information in the form of a custom string issued by the user
+  ALL_TYPES            ///< This enumeration must always come last and will be used to track the
+                       ///<   total number of data request classifications.
 };
 
 /// \brief Enumerate the types of data that property fields could contain

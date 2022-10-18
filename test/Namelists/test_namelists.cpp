@@ -13,6 +13,7 @@
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_minimize.h"
 #include "../../src/Namelists/nml_random.h"
+#include "../../src/Namelists/nml_report.h"
 #include "../../src/Namelists/nml_restraint.h"
 #include "../../src/Namelists/nml_solvent.h"
 #include "../../src/Parsing/parse.h"
@@ -33,7 +34,9 @@ using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::energy::EvaluateForce;
 using stormm::energy::evaluateRestraints;
+using stormm::energy::getEnumerationName;
 using stormm::energy::ScoreCard;
+using stormm::energy::StateVariable;
 using stormm::errors::rtWarn;
 using stormm::math::mean;
 using stormm::math::variance;
@@ -331,7 +334,23 @@ int main(const int argc, const char* argv[]) {
         "applied to a variety of systems show non-zero initial energies.  This indicates that the "
         "restraint targets, and possibly other aspects of the restraints, do not match the "
         "structures to which they were assigned.", tsm.getTestingStatus());
-  
+
+  // The report namelist needs to be able to convey information for an SD file, among other
+  // features of the output.
+  const std::string rep_nml_a("&report\n  sdf_item { -title BOND_E -label sulfonamide -detail "
+                              "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -detail "
+                              "angle }\n  detail bond\n  detail angle\n&end\n");
+  const TextFile repinp_tf(rep_nml_a, TextOrigin::RAM);
+  start_line = 0;
+  ReportControls repcon(repinp_tf, &start_line, nullptr);
+  check(repcon.getReportedQuantityCount(), RelationalOperator::EQUAL, 10, "The number of reported "
+        "quantities in a &report namelist does not meet expectations.");
+  check(repcon.getReportedQuantities()[8] == StateVariable::ANGLE &&
+        repcon.getReportedQuantities()[8] == StateVariable::UREY_BRADLEY, "Details of the "
+        "reported quantities in a &report namelist do not meet expectations.");
+  check(repcon.getSDFileDataRequestCount(), RelationalOperator::EQUAL, 2, "The number of data "
+        "requests in a &report namelist is incorrect.");
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

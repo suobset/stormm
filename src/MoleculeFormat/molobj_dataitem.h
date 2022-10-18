@@ -70,7 +70,7 @@ public:
   ///        appropriate kind.
   const std::string& getMessage() const;
 
-  /// \brief Get the vector of atom types defining a valence parameter of itnerest, again raising
+  /// \brief Get the vector of atom types defining a valence parameter of interest, again raising
   ///        a runtime error if the request is not of the appropriate kind.
   const std::vector<char4>& getAtomTypes() const;
 

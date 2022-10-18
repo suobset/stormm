@@ -53,10 +53,10 @@ public:
   /// \}
 
   /// \brief Get the keyword for a namelist element, i.e. nstlim in Amber &ctrl
-  std::string getLabel() const;
+  const std::string& getLabel() const;
 
   /// \brief Get a sub-key for this element
-  std::string getSubLabel(size_t index) const;
+  const std::string& getSubLabel(size_t index) const;
 
   /// \brief Get the kind associated with a namelist element, i.e. nstlim is an INTEGER in Amber
   ///        &ctrl.
@@ -136,8 +136,8 @@ public:
   /// \param member_key    The (optional) name of a STRUCT member to access
   /// \param index         The entry to access
   /// \{
-  std::string getStringValue(const std::string &member_key, int index) const;
-  std::string getStringValue(int index) const;
+  const std::string& getStringValue(const std::string &member_key, int index) const;
+  const std::string& getStringValue(int index) const;
   std::vector<std::string> getStringValue(const std::string &member_key = std::string("")) const;
   /// \}
 

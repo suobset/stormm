@@ -72,6 +72,8 @@ std::string getEnumerationName(const DataRequestKind input) {
     return std::string("TOPOLOGY_PARAMETER");
   case DataRequestKind::STRING:
     return std::string("STRING");
+  case DataRequestKind::ALL_TYPES:
+    return std::string("ALL_TYPES");
   }
 }
 

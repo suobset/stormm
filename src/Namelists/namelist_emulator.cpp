@@ -30,7 +30,7 @@ NamelistEmulator::NamelistEmulator(const std::string &title_in, const CaseSensit
 {}
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getTitle() const {
+const std::string& NamelistEmulator::getTitle() const {
   return title;
 }
 
@@ -50,7 +50,7 @@ ExceptionResponse NamelistEmulator::getPolicy() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getKeyword(const size_t index) const {
+const std::string& NamelistEmulator::getKeyword(const size_t index) const {
   if (index > keywords.size()) {
     rtErr("Namelist \"" + title + "\" has " + std::to_string(keywords.size()) + " keywords, " +
           "not enough to return index " + std::to_string(index) + ".", "getKeyword");
@@ -166,8 +166,8 @@ double NamelistEmulator::getRealValue(const std::string &keyword_query, const st
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getStringValue(const std::string &keyword_query,
-                                             const int index) const {
+const std::string& NamelistEmulator::getStringValue(const std::string &keyword_query,
+                                                    const int index) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
@@ -178,8 +178,9 @@ std::string NamelistEmulator::getStringValue(const std::string &keyword_query,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getStringValue(const std::string &keyword_query,
-                                             const std::string &sub_key, const int index) const {
+const std::string& NamelistEmulator::getStringValue(const std::string &keyword_query,
+                                                    const std::string &sub_key,
+                                                    const int index) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
@@ -226,12 +227,12 @@ std::vector<std::string> NamelistEmulator::getAllStringValues(const std::string 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getHelp() const {
+const std::string& NamelistEmulator::getHelp() const {
   return help_message;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getHelp(const std::string &keyword_query) const {
+const std::string& NamelistEmulator::getHelp(const std::string &keyword_query) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
@@ -241,7 +242,7 @@ std::string NamelistEmulator::getHelp(const std::string &keyword_query) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getHelp(const std::string &keyword_query,
+const std::string& NamelistEmulator::getHelp(const std::string &keyword_query,
                                       const std::string &sub_key) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {

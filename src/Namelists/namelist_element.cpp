@@ -222,12 +222,12 @@ NamelistElement::NamelistElement(const std::string keyword_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistElement::getLabel() const {
+const std::string& NamelistElement::getLabel() const {
   return label;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistElement::getSubLabel(const size_t index) const {
+const std::string& NamelistElement::getSubLabel(const size_t index) const {
   if (kind == NamelistType::STRUCT && index < sub_keys.size()) {
     return sub_keys[index];
   }
@@ -399,8 +399,8 @@ std::vector<double> NamelistElement::getRealValue(const std::string &sub_key_que
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistElement::getStringValue(const std::string &sub_key_query,
-                                            const int index) const {
+const std::string& NamelistElement::getStringValue(const std::string &sub_key_query,
+                                                   const int index) const {
 
   // Check the entry count
   if (index > entry_count) {
@@ -434,7 +434,7 @@ std::string NamelistElement::getStringValue(const std::string &sub_key_query,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistElement::getStringValue(const int index) const {
+const std::string& NamelistElement::getStringValue(const int index) const {
   return getStringValue(std::string(""), index);
 }
 

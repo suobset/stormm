@@ -6,6 +6,7 @@
 #endif
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "MoleculeFormat/molecule_format_enumerators.h"
 #include "Parsing/parse.h"
 #include "namelist_enumerators.h"
 #include "nml_report.h"
@@ -15,6 +16,8 @@ namespace namelist {
 
 using constants::CaseSensitivity;
 using parse::strcmpCased;
+using parse::stringToChar4;
+using structure::DataRequestKind;
   
 //-------------------------------------------------------------------------------------------------
 ReportControls::ReportControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
@@ -56,13 +59,20 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   if (t_nml.getKeywordStatus("timings") != InputStatus::MISSING) {
     setWallTimeData(t_nml.getStringValue("timings"));
   }
-  const int ndetail = t_nml.getKeywordEntries("detail");
-  for (int i = 0; i < ndetail; i++) {
-    setReportedQuantities(t_nml.getStringValue("detail", i));
+  if (t_nml.getKeywordStatus("detail") != InputStatus::MISSING) {
+    const int ndetail = t_nml.getKeywordEntries("detail");
+    for (int i = 0; i < ndetail; i++) {
+      setReportedQuantities(t_nml.getStringValue("detail", i));
+    }
   }
-  const int ndata = t_nml.getKeywordEntries("sdf_item");
-  for (int i = 0; i < ndata; i++) {
-    addDataItem(translateSdfKeywordInput(t_nml, i));
+  if (t_nml.getKeywordStatus("sdf_item") != InputStatus::MISSING) {
+    const int ndata = t_nml.getKeywordEntries("sdf_item");
+    for (int i = 0; i < ndata; i++) {
+      const std::vector<MolObjDataRequest> new_items = translateSdfKeywordInput(t_nml, i);
+      for (size_t j = 0; j < new_items.size(); j++) {
+        addDataItem(new_items[j]);
+      }
+    }
   }
 
   // Construct the list of state variables that will be presented in the output file (the actual
@@ -399,8 +409,16 @@ void ReportControls::setReportedQuantities(const std::vector<StateVariable> &qua
   const int ns = static_cast<int>(StateVariable::ALL_STATES);
   std::vector<bool> activated(ns, false);
   const int nq = quantities_in.size();
+  const int ncurr = reported_quantities.size();
   int n_monitored = 0;
-  for (int i = 0LLU; i < nq; i++) {
+  for (int i = 0; i < ncurr; i++) {
+    const int qno = static_cast<int>(reported_quantities[i]);
+    if (reported_quantities[i] != StateVariable::ALL_STATES && activated[qno] == false) {
+      activated[qno] = true;
+      n_monitored++;
+    }    
+  }
+  for (int i = 0; i < nq; i++) {
     const int qno = static_cast<int>(quantities_in[i]);
     if (quantities_in[i] != StateVariable::ALL_STATES && activated[qno] == false) {
       activated[qno] = true;
@@ -412,6 +430,7 @@ void ReportControls::setReportedQuantities(const std::vector<StateVariable> &qua
   for (int i = 0LLU; i < ns; i++) {
     if (activated[i]) {
       reported_quantities[j] = static_cast<StateVariable>(i);
+      j++;
     }
   }
 }
@@ -419,6 +438,10 @@ void ReportControls::setReportedQuantities(const std::vector<StateVariable> &qua
 //-------------------------------------------------------------------------------------------------
 void ReportControls::addDataItem(const MolObjDataRequest &ask) {
 
+  // CHECK
+  printf("title = %s\n", ask.getTitle().c_str());
+  // END CHECK
+  
   // Check that there is no other data item with a conflicting title.
   bool problem = false;
   const int n_items = sdf_addons.size();
@@ -431,9 +454,163 @@ void ReportControls::addDataItem(const MolObjDataRequest &ask) {
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataRequest ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml,
-                                                           const int index) {
-  MolObjDataRequest result;
+std::vector<MolObjDataRequest>
+ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const int index) {
+
+  // Get the title and system label.
+  const std::string ttl = t_nml.getStringValue("sdf_item", "-title", index);
+  const std::string lbl = t_nml.getStringValue("sdf_item", "-label", index);
+
+  // Search for clues as to what the data item could be about.
+  const InputStatus missing = InputStatus::MISSING;
+  std::vector<bool> rqt(static_cast<size_t>(DataRequestKind::ALL_TYPES), false);
+  rqt[static_cast<size_t>(DataRequestKind::STATE_VARIABLE)] =
+    (t_nml.getKeywordStatus("sdf_item", "-detail", index) != missing);
+  rqt[static_cast<size_t>(DataRequestKind::ATOM_INFLUENCES)] =
+    (t_nml.getKeywordStatus("sdf_item", "-mask", index) != missing);
+  rqt[static_cast<size_t>(DataRequestKind::TOPOLOGY_PARAMETER)] =
+    (t_nml.getKeywordStatus("sdf_item", "-parameter", index) != missing);
+  rqt[static_cast<size_t>(DataRequestKind::STRING)] =
+    (t_nml.getKeywordStatus("sdf_item", "-message", index) != missing);
+
+  // The data item can only be one thing.  Request types will be prioritized in the order in which
+  // they appear in the dedicated enum class.
+  DataRequestKind result_kind = DataRequestKind::ALL_TYPES;
+  for (int i = 0; i < static_cast<int>(DataRequestKind::ALL_TYPES); i++) {
+    if (rqt[i] == false) {
+      continue;
+    }
+    result_kind = static_cast<DataRequestKind>(i);
+    for (int j = i + 1; j < static_cast<int>(DataRequestKind::ALL_TYPES); j++) {
+      if (rqt[j]) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("An SD file data item can encode only one type of information.  Both " +
+                getEnumerationName(static_cast<DataRequestKind>(i)) + " and " +
+                getEnumerationName(static_cast<DataRequestKind>(j)) + " were indicated.",
+                "ReportControls", "translateSdfKeywordInput");
+        case ExceptionResponse::WARN:
+          rtWarn("An SD file data item can encode only one type of information.  Both " +
+                 getEnumerationName(static_cast<DataRequestKind>(i)) + " and " +
+                 getEnumerationName(static_cast<DataRequestKind>(j)) + " were indicated.  " +
+                 getEnumerationName(static_cast<DataRequestKind>(i)) + " will take precedence.",
+                 "ReportControls", "translateSdfKeywordInput");
+          rqt[j] = false;
+          break;
+        case ExceptionResponse::SILENT:
+          rqt[j] = false;
+          break;
+        }
+      }
+    }
+  }
+
+  // Create the appropriate result
+  std::vector<MolObjDataRequest> result;
+  switch (result_kind) {
+  case DataRequestKind::STATE_VARIABLE:
+  case DataRequestKind::ATOM_INFLUENCES:
+    break;
+  case DataRequestKind::TOPOLOGY_PARAMETER:
+    {
+      std::vector<char4> atom_types;
+      if (t_nml.getKeywordStatus("sdf_item", "-typeI", index) != missing) {
+        atom_types.push_back(stringToChar4(t_nml.getStringValue("sdf_item", "-typeI", index)));
+      }
+      if (t_nml.getKeywordStatus("sdf_item", "-typeJ", index) != missing) {
+        atom_types.push_back(stringToChar4(t_nml.getStringValue("sdf_item", "-typeJ", index)));
+      }
+      if (t_nml.getKeywordStatus("sdf_item", "-typeK", index) != missing) {
+        atom_types.push_back(stringToChar4(t_nml.getStringValue("sdf_item", "-typeK", index)));
+      }
+      if (t_nml.getKeywordStatus("sdf_item", "-typeL", index) != missing) {
+        atom_types.push_back(stringToChar4(t_nml.getStringValue("sdf_item", "-typeL", index)));
+      }
+      if (t_nml.getKeywordStatus("sdf_item", "-typeM", index) != missing) {
+        atom_types.push_back(stringToChar4(t_nml.getStringValue("sdf_item", "-typeM", index)));
+      }
+      const std::string& sval = t_nml.getStringValue("sdf_item", "-parameter", index);
+      StateVariable term_type = StateVariable::ALL_STATES;
+      int ntypes_req;
+      if (strcmpCased(sval, "bond")) {
+        ntypes_req = 2;
+        term_type = StateVariable::BOND;
+      }
+      else if (strcmpCased(sval, "angle") || strcmpCased(sval, "harmonic_angle") ||
+               strcmpCased(sval, "harmonicangle")) {
+        ntypes_req = 3;
+        term_type = StateVariable::ANGLE;
+      }
+      else if (strcmpCased(sval, "proper_dihedral") || strcmpCased(sval, "properdihedral") ||
+               strcmpCased(sval, "proper_torsion") || strcmpCased(sval, "propertorsion")) {
+        ntypes_req = 4;
+        term_type = StateVariable::PROPER_DIHEDRAL;
+      }
+      else if (strcmpCased(sval, "improper_dihedral") || strcmpCased(sval, "improperdihedral") ||
+               strcmpCased(sval, "improper_torsion") || strcmpCased(sval, "impropertorsion")) {
+        ntypes_req = 4;
+        term_type = StateVariable::IMPROPER_DIHEDRAL;
+      }
+      else if (strcmpCased(sval, "urey_bradley") || strcmpCased(sval, "ureybradley")) {
+        ntypes_req = 2;
+        term_type = StateVariable::UREY_BRADLEY;
+      }
+      else if (strcmpCased(sval, "charmm_improper") || strcmpCased(sval, "charmmimproper")) {
+        ntypes_req = 4;
+        term_type = StateVariable::CHARMM_IMPROPER;
+      }
+      else if (strcmpCased(sval, "cmap") || strcmpCased(sval, "correction_map") ||
+               strcmpCased(sval, "correctionmap")) {
+        ntypes_req = 5;
+        term_type = StateVariable::CMAP;
+      }
+
+      // Report or die if any errors were encountered.
+      if (term_type == StateVariable::ALL_STATES) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("No valid energy term could be translated from \"" + sval + "\" in sdf_item " +
+                std::to_string(index + 1) + ".  Name a valid valence term in this field.",
+                "ReportControls", "translateSdfKeywordInput");
+        case ExceptionResponse::WARN:
+          rtWarn("No valid energy term could be translated from \"" + sval + "\" in sdf_item " +
+                 std::to_string(index + 1) + ".  No such output will be produced.",
+                 "ReportControls", "translateSdfKeywordInput");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      else if (static_cast<int>(atom_types.size()) != ntypes_req) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("The energy term \"" + sval + "\" is defined by " + std::to_string(ntypes_req) +
+                " atom types, but " + std::to_string(atom_types.size()) + " types were provided.",
+                "ReportControls", "translateSdfKeywordInput");
+        }
+      }
+      else {
+        result.emplace_back(ttl, term_type, atom_types, lbl);
+      }
+    }
+    break;
+  case DataRequestKind::STRING:
+    result.emplace_back(DataRequestKind::STRING, ttl,
+                        t_nml.getStringValue("sdf_item", "-message", index), lbl);
+    break;
+  case DataRequestKind::ALL_TYPES:
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No kind was discernible for sdf_item " + std::to_string(index) + " in the &report "
+            "namelist.", "ReportControls", "translateSdfKeywordInput");
+    case ExceptionResponse::WARN:
+      rtWarn("No kind was discernible for sdf_item " + std::to_string(index) + " in the &report "
+             "namelist.", "ReportControls", "translateSdfKeywordInput");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
 
   return result;
 }
@@ -446,24 +623,28 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                          "This degree of control, while optional, can be important for managing "
                          "the voluminous output that can come from a program which runs multiple "
                          "simulations in a single runtime process.");
-  const std::string sdf_help("");
+  const std::string sdf_help("Transfer one of a recognized assortment of energy or other "
+                             "structural quantities computed by STORMM to a data item in an SD "
+                             "file (.sdf format).  The results will appear after the MDL MOL "
+                             "section detailing atoms, properties, and bonding patterns.");
   const std::vector<std::string> sdf_keys_help = {
   };
   t_nml.addKeyword(NamelistElement("syntax", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("scope", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("username", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("timings", NamelistType::STRING, "MISSING"));
-  t_nml.addKeyword(NamelistElement("detail", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("detail", NamelistType::STRING, "MISSING",
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("sdf_item", { "-title", "-label", "-detail", "-message",
-                                                 "-mask", "-parameter", "-type1", "-type2",
-                                                 "-type3", "-type4", "-type5" },
+                                                 "-mask", "-parameter", "-typeI", "-typeJ",
+                                                 "-typeK", "-typeL", "-typeM" },
                                    { NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING },
-                                   { std::string(""), std::string(""), std::string(""),
+                                   { std::string(""), std::string("ALL"), std::string(""),
                                      std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string("") },
