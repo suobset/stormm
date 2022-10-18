@@ -81,11 +81,16 @@ public:
   /// \brief Get the number of data item requests for printing to an SD file.
   int getSDFileDataRequestCount() const;
   
-  /// \brief Get a list of data items to be displayed in an SDF file.  Reported quantities can
+  /// \brief Get a list of data items to be displayed in an SD file.  Reported quantities can
   ///        include topological parameters, components of the molecular mechanics energy for the
   ///        structure, the username, and notes about external factors affecting the final
   ///        conformation.
   const std::vector<MolObjDataRequest>& getSDFileDataRequests() const;
+
+  /// \brief Get a specific data request to be displayed in an SD file.
+  ///
+  /// \param index  Index of the request to produce
+  MolObjDataRequest getSDFileDataRequest(int index) const;
 
   /// \brief Set the output format.
   ///

@@ -90,7 +90,17 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
 
 //-------------------------------------------------------------------------------------------------
 std::string TextFile::getFileName() const {
-  return orig_file;
+  if (orig_file.size() > 0LLU) {
+    return orig_file;
+  }
+  else {
+    
+    // If there is no file name, assume that the text was assembled in RAM.  A file name will need
+    // to be assigned for writing purposes, but to the rest of the program the file will report
+    // this as its origin.
+    return std::string("[RAM-assembled text]");
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

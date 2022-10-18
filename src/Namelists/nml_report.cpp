@@ -200,6 +200,16 @@ const std::vector<MolObjDataRequest>& ReportControls::getSDFileDataRequests() co
 }
 
 //-------------------------------------------------------------------------------------------------
+MolObjDataRequest ReportControls::getSDFileDataRequest(const int index) const {
+  if (index < 0 || index > static_cast<int>(sdf_addons.size())) {
+    rtErr("A &report namelist with " + std::to_string(sdf_addons.size()) + " requests cannot "
+          "produce request index " + std::to_string(index) + ".", "ReportControls",
+          "getSDFileDataRequest");
+  }
+  return sdf_addons[index];
+}
+
+//-------------------------------------------------------------------------------------------------
 void ReportControls::setOutputSyntax(const OutputSyntax report_layout_in) {
   report_layout = report_layout_in;
 }
@@ -583,6 +593,8 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
     }
     break;
   case DataRequestKind::ATOM_INFLUENCES:
+    result.emplace_back(DataRequestKind::ATOM_INFLUENCES, ttl,
+                        t_nml.getStringValue("sdf_item", "-mask", index), lbl);
     break;
   case DataRequestKind::TOPOLOGY_PARAMETER:
     {

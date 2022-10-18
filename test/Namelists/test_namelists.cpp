@@ -8,6 +8,7 @@
 #include "../../src/ForceField/forcefield_enumerators.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Math/statistics.h"
+#include "../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../src/Namelists/input.h"
 #include "../../src/Namelists/nml_ffmorph.h"
 #include "../../src/Namelists/nml_files.h"
@@ -21,6 +22,7 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/reporting_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/test_system_manager.h"
@@ -46,7 +48,10 @@ using stormm::modeling::ParameterKind;
 using stormm::parse::separateText;
 using stormm::parse::strcmpCased;
 using stormm::parse::TextOrigin;
+using stormm::review::OutputScope;
+using stormm::review::OutputSyntax;
 using stormm::restraints::RestraintApparatus;
+using stormm::structure::DataRequestKind;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
 using stormm::topology::ImplicitSolventModel;
@@ -346,17 +351,22 @@ int main(const int argc, const char* argv[]) {
   section(7);
   const std::string rep_nml_a("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
                               "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -energy "
-                              "HarmonicAngle }\n  energy bond\n  energy angle\n&end\n");
-  const TextFile repinp_tf(rep_nml_a, TextOrigin::RAM);
+                              "HarmonicAngle }\n  energy bond\n  energy angle\n  scope full  "
+                              "syntax matplotlib &end\n");
+  const TextFile repinpa_tf(rep_nml_a, TextOrigin::RAM);
   start_line = 0;
-  ReportControls repcon(repinp_tf, &start_line, nullptr);
-  check(repcon.getReportedQuantityCount(), RelationalOperator::EQUAL, 10, "The number of reported "
-        "quantities in a &report namelist does not meet expectations.");
-  check(repcon.getReportedQuantities()[8] == StateVariable::ANGLE &&
-        repcon.getReportedQuantities()[9] == StateVariable::UREY_BRADLEY, "Details of the "
+  ReportControls repcon_a(repinpa_tf, &start_line, nullptr);
+  check(repcon_a.getReportedQuantityCount(), RelationalOperator::EQUAL, 10, "The number of "
+        "reported quantities in a &report namelist does not meet expectations.");
+  check(repcon_a.getReportedQuantities()[8] == StateVariable::ANGLE &&
+        repcon_a.getReportedQuantities()[9] == StateVariable::UREY_BRADLEY, "Details of the "
         "reported quantities in a &report namelist do not meet expectations.");
-  check(repcon.getSDFileDataRequestCount(), RelationalOperator::EQUAL, 2, "The number of data "
+  check(repcon_a.getSDFileDataRequestCount(), RelationalOperator::EQUAL, 2, "The number of data "
         "requests in a &report namelist is incorrect.");
+  check(repcon_a.getOutputSyntax() == OutputSyntax::MATPLOTLIB, "The ouptut format conveyed by a "
+        "&report namelist was not correct.");
+  check(repcon_a.getOutputScope() == OutputScope::FULL, "The ouptut scope conveyed by a &report "
+        "namelist was not correct.");
   testBadNamelist("report", "sdf_item { -title SomeTitle -energy ANGLE }", "A composite energy "
                   "term would be printed to a SD data item");
   testBadNamelist("report", "sdf_item { -energy HarmonicAngle }", "A data item with no title was "
@@ -377,6 +387,18 @@ int main(const int argc, const char* argv[]) {
   testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter HarmonicAngle -typeI CT "
                   "-typeJ CN -typeK CB -message blah }", "A data item printing angle force field "
                   "parameters was accepted, but there is an extra messaged tacked on");
+  
+  // Test the automatic correction of an SD file item when conflicting directives are supplied
+  const std::string rep_nml_b("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
+                              "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -energy "
+                              "HarmonicAngle -parameter bond -typeI CA -typeJ NV }\n  energy "
+                              "bond\n  energy angle\n&end\n");
+  const TextFile repinpb_tf(rep_nml_b, TextOrigin::RAM);
+  start_line = 0;
+  ReportControls repcon_b(repinpb_tf, &start_line, nullptr, ExceptionResponse::SILENT);
+  check(repcon_b.getSDFileDataRequest(1).getKind() == DataRequestKind::STATE_VARIABLE,
+        "The subject of an SD file data item request is not correctly conveyed by a &report "
+        "namelist.");
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

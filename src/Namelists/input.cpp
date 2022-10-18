@@ -167,7 +167,8 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
               if (line_commented[k] || line_quoted[k]) {
                 continue;
               }
-              if (tweaked_line[k] == '/' && (k == n_pad_char - 1 || tweaked_line[k + 1] == ' ')) {
+              if (tweaked_line[k] == '/' && (k == 0 || tweaked_line[k - 1] == ' ') &&
+                  (k == n_pad_char - 1 || tweaked_line[k + 1] == ' ')) {
                 tweaked_line = tweaked_line.substr(0, k + 1);
                 end_found = true;
                 break;
@@ -179,20 +180,33 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
                                 line_quoted[k + m] == false);
                 }
                 if (card_clear) {
+                  bool end_seems_found = false;
                   switch (case_sensitivity) {
                   case CaseSensitivity::YES:
                   case CaseSensitivity::NO:
                     if (strncmpCased(&tweaked_line[k], "&end", 4, case_sensitivity)) {
-                      tweaked_line = tweaked_line.substr(0, k + 4);
-                      end_found = true;
+                      end_seems_found = true;
                     }
-                    break;
                   case CaseSensitivity::AUTOMATIC:
                     if (strncmpCased(&tweaked_line[k], "&end", 4, CaseSensitivity::NO)) {
+                      end_seems_found = true;
+                    }
+                  }
+                  if (end_seems_found) {
+
+                    // Check that this &end card occurs as a separate word
+                    if ((k > 0 && tweaked_line[k - 1] != ' ') ||
+                        (k < n_pad_char - 4 && tweaked_line[k + 4] != ' ')) {
+                      rtWarn("What appears to be an &end card is concatenated to additional text "
+                             "on line " + std::to_string(next_line) + " of input from file " +
+                             tf.getFileName() + ".  This may indicate a mistake in the input.",
+                             "pullNamelist");
+                    }
+                    else {
                       tweaked_line = tweaked_line.substr(0, k + 4);
                       end_found = true;
+                      break;
                     }
-                    break;
                   }
                 }
               }
