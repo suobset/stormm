@@ -91,7 +91,7 @@ enum class DataRequestKind {
                        ///<   a formatted data item.
   TOPOLOGY_PARAMETER,  ///< Information to be extracted from the topology guiding the structure
   STRING,              ///< Information in the form of a custom string issued by the user
-  ALL_TYPES            ///< This enumeration must always come last and will be used to track the
+  ALL_KINDS            ///< This enumeration must always come last and will be used to track the
                        ///<   total number of data request classifications.
 };
 

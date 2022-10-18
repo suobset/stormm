@@ -59,10 +59,10 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   if (t_nml.getKeywordStatus("timings") != InputStatus::MISSING) {
     setWallTimeData(t_nml.getStringValue("timings"));
   }
-  if (t_nml.getKeywordStatus("detail") != InputStatus::MISSING) {
-    const int ndetail = t_nml.getKeywordEntries("detail");
+  if (t_nml.getKeywordStatus("energy") != InputStatus::MISSING) {
+    const int ndetail = t_nml.getKeywordEntries("energy");
     for (int i = 0; i < ndetail; i++) {
-      setReportedQuantities(t_nml.getStringValue("detail", i));
+      setReportedQuantities(t_nml.getStringValue("energy", i));
     }
   }
   if (t_nml.getKeywordStatus("sdf_item") != InputStatus::MISSING) {
@@ -82,6 +82,8 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   bool specific_mm   = false;
   bool specific_temp = false;
   bool specific_vir  = false;
+  std::vector<StateVariable> tmp_rq;
+  tmp_rq.reserve(n_reported_sv);
   for (int i = 0; i < n_reported_sv; i++) {
     switch (reported_quantities[i]) {
     case StateVariable::BOND:
@@ -98,11 +100,13 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
     case StateVariable::GENERALIZED_BORN:
     case StateVariable::RESTRAINT:
       specific_mm   = true;
+      tmp_rq.push_back(reported_quantities[i]);
       break;
     case StateVariable::TEMPERATURE_PROTEIN:
     case StateVariable::TEMPERATURE_LIGAND:
     case StateVariable::TEMPERATURE_SOLVENT:
       specific_temp = true;
+      tmp_rq.push_back(reported_quantities[i]);
       break;
     case StateVariable::VIRIAL_11:
     case StateVariable::VIRIAL_12:
@@ -111,6 +115,7 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
     case StateVariable::VIRIAL_23:
     case StateVariable::VIRIAL_33:
       specific_vir  = true;
+      tmp_rq.push_back(reported_quantities[i]);
       break;
     case StateVariable::KINETIC:
     case StateVariable::PRESSURE:
@@ -123,7 +128,6 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
       break;
     }
   }
-  const std::vector<StateVariable> tmp_rq = reported_quantities;
   reported_quantities.resize(0);
   reported_quantities.push_back(StateVariable::TOTAL_ENERGY);
   reported_quantities.push_back(StateVariable::POTENTIAL_ENERGY);
@@ -320,83 +324,7 @@ void ReportControls::setWallTimeData(const std::string &preference) {
 
 //-------------------------------------------------------------------------------------------------
 void ReportControls::setReportedQuantities(const std::string &quantity_in) {
-  std::vector<StateVariable> sv_deciphered;
-  if (strcmpCased(quantity_in, "bond") || strcmpCased(quantity_in, "bonds")) {
-    sv_deciphered.push_back(StateVariable::BOND);
-  }
-  else if (strcmpCased(quantity_in, "angle") || strcmpCased(quantity_in, "angles")) {
-    sv_deciphered.push_back(StateVariable::ANGLE);
-    sv_deciphered.push_back(StateVariable::UREY_BRADLEY);
-  }
-  else if (strcmpCased(quantity_in, "dihedral") || strcmpCased(quantity_in, "torsion") ||
-           strcmpCased(quantity_in, "dihedrals") || strcmpCased(quantity_in, "torsions")) {
-    sv_deciphered.push_back(StateVariable::PROPER_DIHEDRAL);
-    sv_deciphered.push_back(StateVariable::IMPROPER_DIHEDRAL);
-    sv_deciphered.push_back(StateVariable::CHARMM_IMPROPER);
-  }
-  else if (strcmpCased(quantity_in, "proper_dihedral") ||
-           strcmpCased(quantity_in, "proper_dihedrals") ||
-           strcmpCased(quantity_in, "properdihedral") ||
-           strcmpCased(quantity_in, "properdihedrals")) {
-    sv_deciphered.push_back(StateVariable::PROPER_DIHEDRAL);    
-  }
-  else if (strcmpCased(quantity_in, "improper_dihedral") ||
-           strcmpCased(quantity_in, "improper_dihedrals") ||
-           strcmpCased(quantity_in, "improperdihedral") ||
-           strcmpCased(quantity_in, "improperdihedrals")) {
-    sv_deciphered.push_back(StateVariable::IMPROPER_DIHEDRAL);
-    sv_deciphered.push_back(StateVariable::CHARMM_IMPROPER);
-  }
-  else if (strcmpCased(quantity_in, "cmap") || strcmpCased(quantity_in, "cmaps")) {
-    sv_deciphered.push_back(StateVariable::CMAP);
-  }
-  else if (strcmpCased(quantity_in, "vdw") || strcmpCased(quantity_in, "van_der_waals") ||
-           strcmpCased(quantity_in, "vanderwaals") || strcmpCased(quantity_in, "lennardjones") ||
-           strcmpCased(quantity_in, "lj")) {
-    sv_deciphered.push_back(StateVariable::VDW);
-    sv_deciphered.push_back(StateVariable::VDW_ONE_FOUR);
-  }
-  else if (strcmpCased(quantity_in, "elec") || strcmpCased(quantity_in, "electrostatic")) {
-    sv_deciphered.push_back(StateVariable::ELECTROSTATIC);
-    sv_deciphered.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
-  }
-  else if (strcmpCased(quantity_in, "gb") || strcmpCased(quantity_in, "generalized_born") ||
-           strcmpCased(quantity_in, "solvent") || strcmpCased(quantity_in, "generalizedborn")) {
-    sv_deciphered.push_back(StateVariable::GENERALIZED_BORN);
-  }
-  else if (strcmpCased(quantity_in, "restraint") || strcmpCased(quantity_in, "nmr")) {
-    sv_deciphered.push_back(StateVariable::RESTRAINT);
-  }
-  else if (strcmpCased(quantity_in, "local_temperature")) {
-    sv_deciphered.push_back(StateVariable::TEMPERATURE_PROTEIN);
-    sv_deciphered.push_back(StateVariable::TEMPERATURE_LIGAND);
-    sv_deciphered.push_back(StateVariable::TEMPERATURE_SOLVENT);
-  }
-  else if (strcmpCased(quantity_in, "virial_components")) {
-    sv_deciphered.push_back(StateVariable::VIRIAL_11);
-    sv_deciphered.push_back(StateVariable::VIRIAL_12);
-    sv_deciphered.push_back(StateVariable::VIRIAL_22);
-    sv_deciphered.push_back(StateVariable::VIRIAL_13);
-    sv_deciphered.push_back(StateVariable::VIRIAL_23);
-    sv_deciphered.push_back(StateVariable::VIRIAL_33);
-  }
-  else {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr(quantity_in + " was not recognized as a molecular mechanics energy component valid "
-            "for focused reporting.  Providing no input in this section will have all molecular "
-            "mechanics terms be reported.", "ReportControls", "setReportedQuantities");
-    case ExceptionResponse::WARN:
-      rtWarn(quantity_in + " was not recognized as a molecular mechanics energy component valid "
-             "for focused reporting.  Providing no input in this section will have all molecular "
-             "mechanics terms be reported.  The present input will be ignored.", "ReportControls",
-             "setReportedQuantities");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-  setReportedQuantities(sv_deciphered);
+  setReportedQuantities(translateEnergyComponent(quantity_in));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -437,10 +365,6 @@ void ReportControls::setReportedQuantities(const std::vector<StateVariable> &qua
 
 //-------------------------------------------------------------------------------------------------
 void ReportControls::addDataItem(const MolObjDataRequest &ask) {
-
-  // CHECK
-  printf("title = %s\n", ask.getTitle().c_str());
-  // END CHECK
   
   // Check that there is no other data item with a conflicting title.
   bool problem = false;
@@ -454,6 +378,128 @@ void ReportControls::addDataItem(const MolObjDataRequest &ask) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::string &inpstr) {
+  std::vector<StateVariable> result;
+  const CaseSensitivity noc = CaseSensitivity::NO;
+  if (strcmpCased(inpstr, "bond", noc) || strcmpCased(inpstr, "bonds", noc)) {
+    result.push_back(StateVariable::BOND);
+  }
+  else if (strcmpCased(inpstr, "angle", noc) || strcmpCased(inpstr, "angles", noc)) {
+    result.push_back(StateVariable::ANGLE);
+    result.push_back(StateVariable::UREY_BRADLEY);
+  }
+  else if (strcmpCased(inpstr, "harmonic_angle", noc) ||
+           strcmpCased(inpstr, "harmonicangle", noc)) {
+    result.push_back(StateVariable::UREY_BRADLEY);
+  }
+  else if (strcmpCased(inpstr, "urey_bradley", noc) || strcmpCased(inpstr, "ureybradley", noc)) {
+    result.push_back(StateVariable::UREY_BRADLEY);
+  }
+  else if (strcmpCased(inpstr, "dihedral", noc) || strcmpCased(inpstr, "torsion", noc) ||
+           strcmpCased(inpstr, "dihedrals", noc) || strcmpCased(inpstr, "torsions", noc)) {
+    result.push_back(StateVariable::PROPER_DIHEDRAL);
+    result.push_back(StateVariable::IMPROPER_DIHEDRAL);
+    result.push_back(StateVariable::CHARMM_IMPROPER);
+  }
+  else if (strcmpCased(inpstr, "proper_dihedral", noc) ||
+           strcmpCased(inpstr, "proper_dihedrals", noc) ||
+           strcmpCased(inpstr, "properdihedral", noc) ||
+           strcmpCased(inpstr, "properdihedrals", noc)) {
+    result.push_back(StateVariable::PROPER_DIHEDRAL);    
+  }
+  else if (strcmpCased(inpstr, "improper_dihedral", noc) ||
+           strcmpCased(inpstr, "improper_dihedrals", noc) ||
+           strcmpCased(inpstr, "improperdihedral", noc) ||
+           strcmpCased(inpstr, "improperdihedrals", noc)) {
+    result.push_back(StateVariable::IMPROPER_DIHEDRAL);
+  }
+  else if (strcmpCased(inpstr, "charmm_improper", noc) ||
+           strcmpCased(inpstr, "charmmimproper", noc)) {
+    result.push_back(StateVariable::CHARMM_IMPROPER);
+  }
+  else if (strcmpCased(inpstr, "cmap", noc) || strcmpCased(inpstr, "cmaps", noc)) {
+    result.push_back(StateVariable::CMAP);
+  }
+  else if (strcmpCased(inpstr, "vdw", noc) || strcmpCased(inpstr, "van_der_waals", noc) ||
+           strcmpCased(inpstr, "vanderwaals", noc) || strcmpCased(inpstr, "lennardjones", noc) ||
+           strcmpCased(inpstr, "lj", noc)) {
+    result.push_back(StateVariable::VDW);
+    result.push_back(StateVariable::VDW_ONE_FOUR);
+  }
+  else if (strcmpCased(inpstr, "vdw_nonbonded", noc) || strcmpCased(inpstr, "vdwnonbonded", noc) ||
+           strcmpCased(inpstr, "lj_nonbonded", noc) || strcmpCased(inpstr, "ljnonbonded", noc)) {
+    result.push_back(StateVariable::VDW);
+  }
+  else if (strcmpCased(inpstr, "vdw_14", noc) || strcmpCased(inpstr, "vdw14", noc) ||
+           strcmpCased(inpstr, "vdw_near", noc) || strcmpCased(inpstr, "vdwnear", noc) ||
+           strcmpCased(inpstr, "lj_14", noc) || strcmpCased(inpstr, "lj14", noc) ||
+           strcmpCased(inpstr, "lj_near", noc) || strcmpCased(inpstr, "ljnear", noc)) {
+    result.push_back(StateVariable::VDW_ONE_FOUR);
+  }
+  else if (strcmpCased(inpstr, "elec", noc) || strcmpCased(inpstr, "electrostatic", noc)) {
+    result.push_back(StateVariable::ELECTROSTATIC);
+    result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
+  }
+  else if (strcmpCased(inpstr, "elec_nonbonded", noc) ||
+           strcmpCased(inpstr, "elecnonbonded", noc) ||
+           strcmpCased(inpstr, "electrostatic_nonbonded", noc) ||
+           strcmpCased(inpstr, "electrostaticnonbonded", noc)) {
+    result.push_back(StateVariable::ELECTROSTATIC);
+  }
+  else if (strcmpCased(inpstr, "elec_14", noc) || strcmpCased(inpstr, "elec14", noc) ||
+           strcmpCased(inpstr, "elec_near", noc) || strcmpCased(inpstr, "elecnear", noc) ||
+           strcmpCased(inpstr, "electrostatic_near", noc) ||
+           strcmpCased(inpstr, "electrostaticnear", noc)) {
+    result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
+  }
+  else if (strcmpCased(inpstr, "gb", noc) || strcmpCased(inpstr, "generalized_born", noc) ||
+           strcmpCased(inpstr, "solvent", noc) || strcmpCased(inpstr, "generalizedborn", noc)) {
+    result.push_back(StateVariable::GENERALIZED_BORN);
+  }
+  else if (strcmpCased(inpstr, "restraint", noc) || strcmpCased(inpstr, "nmr", noc)) {
+    result.push_back(StateVariable::RESTRAINT);
+  }
+  else if (strcmpCased(inpstr, "local_temperature", noc)) {
+    result.push_back(StateVariable::TEMPERATURE_PROTEIN);
+    result.push_back(StateVariable::TEMPERATURE_LIGAND);
+    result.push_back(StateVariable::TEMPERATURE_SOLVENT);
+  }
+  else if (strcmpCased(inpstr, "virial_components", noc)) {
+    result.push_back(StateVariable::VIRIAL_11);
+    result.push_back(StateVariable::VIRIAL_12);
+    result.push_back(StateVariable::VIRIAL_22);
+    result.push_back(StateVariable::VIRIAL_13);
+    result.push_back(StateVariable::VIRIAL_23);
+    result.push_back(StateVariable::VIRIAL_33);
+  }
+  else if (strcmpCased(inpstr, "total_energy", noc) || strcmpCased(inpstr, "totalenergy", noc) ||
+           strcmpCased(inpstr, "etot", noc)) {
+    result.push_back(StateVariable::TOTAL_ENERGY);
+  }
+  else if (strcmpCased(inpstr, "potential_energy", noc) ||
+           strcmpCased(inpstr, "potentialenergy", noc) || strcmpCased(inpstr, "pe", noc)) {
+    result.push_back(StateVariable::POTENTIAL_ENERGY);
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr(inpstr + " was not recognized as a molecular mechanics energy component valid "
+            "for focused reporting.  Providing no input in this section will have all molecular "
+            "mechanics terms be reported.", "ReportControls", "setReportedQuantities");
+    case ExceptionResponse::WARN:
+      rtWarn(inpstr + " was not recognized as a molecular mechanics energy component valid "
+             "for focused reporting.  Providing no input in this section will have all molecular "
+             "mechanics terms be reported.  The present input will be ignored.", "ReportControls",
+             "setReportedQuantities");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<MolObjDataRequest>
 ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const int index) {
 
@@ -463,25 +509,25 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
 
   // Search for clues as to what the data item could be about.
   const InputStatus missing = InputStatus::MISSING;
-  std::vector<bool> rqt(static_cast<size_t>(DataRequestKind::ALL_TYPES), false);
+  std::vector<bool> rqt(static_cast<size_t>(DataRequestKind::ALL_KINDS), false);
   rqt[static_cast<size_t>(DataRequestKind::STATE_VARIABLE)] =
-    (t_nml.getKeywordStatus("sdf_item", "-detail", index) != missing);
+    (t_nml.getKeywordStatus("sdf_item", "-energy", index) != missing);
   rqt[static_cast<size_t>(DataRequestKind::ATOM_INFLUENCES)] =
     (t_nml.getKeywordStatus("sdf_item", "-mask", index) != missing);
   rqt[static_cast<size_t>(DataRequestKind::TOPOLOGY_PARAMETER)] =
     (t_nml.getKeywordStatus("sdf_item", "-parameter", index) != missing);
   rqt[static_cast<size_t>(DataRequestKind::STRING)] =
     (t_nml.getKeywordStatus("sdf_item", "-message", index) != missing);
-
+  
   // The data item can only be one thing.  Request types will be prioritized in the order in which
   // they appear in the dedicated enum class.
-  DataRequestKind result_kind = DataRequestKind::ALL_TYPES;
-  for (int i = 0; i < static_cast<int>(DataRequestKind::ALL_TYPES); i++) {
+  DataRequestKind result_kind = DataRequestKind::ALL_KINDS;
+  for (int i = 0; i < static_cast<int>(DataRequestKind::ALL_KINDS); i++) {
     if (rqt[i] == false) {
       continue;
     }
     result_kind = static_cast<DataRequestKind>(i);
-    for (int j = i + 1; j < static_cast<int>(DataRequestKind::ALL_TYPES); j++) {
+    for (int j = i + 1; j < static_cast<int>(DataRequestKind::ALL_KINDS); j++) {
       if (rqt[j]) {
         switch (policy) {
         case ExceptionResponse::DIE:
@@ -509,6 +555,33 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
   std::vector<MolObjDataRequest> result;
   switch (result_kind) {
   case DataRequestKind::STATE_VARIABLE:
+    {
+      // Do not count composite terms in the SD file energy recordings.
+      const std::string& detail_name = t_nml.getStringValue("sdf_item", "-energy", index);
+      const std::vector<StateVariable> tmp_sv = translateEnergyComponent(detail_name);
+      if (tmp_sv.size() > 1LLU) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr(detail_name + " implies a composite of " + std::to_string(tmp_sv.size()) +
+                " molecular mechanics energy components.  Use a term corresponding to only one "
+                "energy component.", "ReportControls", "translateSdfKeywordInput");
+        case ExceptionResponse::WARN:
+          rtWarn(detail_name + " implies a composite of " + std::to_string(tmp_sv.size()) +
+                 " molecular mechanics energy components.  Use a term corresponding to only one "
+                 "energy component.  This item will be omitted from the SD file results.",
+                 "ReportControls", "translateSdfKeywordInput");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      else {
+        for (size_t i = 0; i < tmp_sv.size(); i++) {
+          result.emplace_back(ttl, tmp_sv[i], lbl);
+        }
+      }
+    }
+    break;
   case DataRequestKind::ATOM_INFLUENCES:
     break;
   case DataRequestKind::TOPOLOGY_PARAMETER:
@@ -532,35 +605,41 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
       const std::string& sval = t_nml.getStringValue("sdf_item", "-parameter", index);
       StateVariable term_type = StateVariable::ALL_STATES;
       int ntypes_req;
-      if (strcmpCased(sval, "bond")) {
+      const CaseSensitivity noc = CaseSensitivity::NO;
+      if (strcmpCased(sval, "bond", noc)) {
         ntypes_req = 2;
         term_type = StateVariable::BOND;
       }
-      else if (strcmpCased(sval, "angle") || strcmpCased(sval, "harmonic_angle") ||
-               strcmpCased(sval, "harmonicangle")) {
+      else if (strcmpCased(sval, "angle", noc) || strcmpCased(sval, "harmonic_angle", noc) ||
+               strcmpCased(sval, "harmonicangle", noc)) {
         ntypes_req = 3;
         term_type = StateVariable::ANGLE;
       }
-      else if (strcmpCased(sval, "proper_dihedral") || strcmpCased(sval, "properdihedral") ||
-               strcmpCased(sval, "proper_torsion") || strcmpCased(sval, "propertorsion")) {
+      else if (strcmpCased(sval, "proper_dihedral", noc) ||
+               strcmpCased(sval, "properdihedral", noc) ||
+               strcmpCased(sval, "proper_torsion", noc) ||
+               strcmpCased(sval, "propertorsion", noc)) {
         ntypes_req = 4;
         term_type = StateVariable::PROPER_DIHEDRAL;
       }
-      else if (strcmpCased(sval, "improper_dihedral") || strcmpCased(sval, "improperdihedral") ||
-               strcmpCased(sval, "improper_torsion") || strcmpCased(sval, "impropertorsion")) {
+      else if (strcmpCased(sval, "improper_dihedral", noc) ||
+               strcmpCased(sval, "improperdihedral", noc) ||
+               strcmpCased(sval, "improper_torsion", noc) ||
+               strcmpCased(sval, "impropertorsion", noc)) {
         ntypes_req = 4;
         term_type = StateVariable::IMPROPER_DIHEDRAL;
       }
-      else if (strcmpCased(sval, "urey_bradley") || strcmpCased(sval, "ureybradley")) {
+      else if (strcmpCased(sval, "urey_bradley", noc) || strcmpCased(sval, "ureybradley", noc)) {
         ntypes_req = 2;
         term_type = StateVariable::UREY_BRADLEY;
       }
-      else if (strcmpCased(sval, "charmm_improper") || strcmpCased(sval, "charmmimproper")) {
+      else if (strcmpCased(sval, "charmm_improper", noc) ||
+               strcmpCased(sval, "charmmimproper", noc)) {
         ntypes_req = 4;
         term_type = StateVariable::CHARMM_IMPROPER;
       }
-      else if (strcmpCased(sval, "cmap") || strcmpCased(sval, "correction_map") ||
-               strcmpCased(sval, "correctionmap")) {
+      else if (strcmpCased(sval, "cmap", noc) || strcmpCased(sval, "correction_map", noc) ||
+               strcmpCased(sval, "correctionmap", noc)) {
         ntypes_req = 5;
         term_type = StateVariable::CMAP;
       }
@@ -598,7 +677,7 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
     result.emplace_back(DataRequestKind::STRING, ttl,
                         t_nml.getStringValue("sdf_item", "-message", index), lbl);
     break;
-  case DataRequestKind::ALL_TYPES:
+  case DataRequestKind::ALL_KINDS:
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("No kind was discernible for sdf_item " + std::to_string(index) + " in the &report "
@@ -628,14 +707,32 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                              "file (.sdf format).  The results will appear after the MDL MOL "
                              "section detailing atoms, properties, and bonding patterns.");
   const std::vector<std::string> sdf_keys_help = {
+    "Custom title of the data item, which will appear as \"> <TITLE>\" in the resulting SD file",
+    "System label linking the data item to particular systems in the calculation.  Only those "
+    "systems matching this label will have the data item in their output.",
+    "One of a number of recognized energy terms for singular molecular mechanics energy "
+    "components.  Accepted arguments include BOND, HARMONIC_ANGLE, PROPER_DIHEDRAL, "
+    "IMPROPER_DIHEDRAL, UREY_BRADLEY, CHARMM_IMPROPER, CMAP, ELECTROSTATIC (NEAR or NONBONDED), "
+    "VDW (NEAR OR NONBONDED), GENERALIZED_BORN, RESTRAINT, TOTAL_ENERGY, and POTENTIAL_ENERGY.",
+    "A customizable message from the user conveyed into the SD file output",
+    "An atom mask indicating a subset of the atoms for which to enumerate relevant valence "
+    "interactions",
+    "A type of parameter for which to search the relevant topology, in conjunction with the "
+    "following atom types.  If found, the settings of the parameter will be printed to the SD "
+    "file output.",
+    "An atom type that helps define the topology parameter being sought",
+    "An atom type that helps define the topology parameter being sought",
+    "An atom type that helps define the topology parameter being sought",
+    "An atom type that helps define the topology parameter being sought",
+    "An atom type that helps define the topology parameter being sought"    
   };
   t_nml.addKeyword(NamelistElement("syntax", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("scope", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("username", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("timings", NamelistType::STRING, "MISSING"));
-  t_nml.addKeyword(NamelistElement("detail", NamelistType::STRING, "MISSING",
+  t_nml.addKeyword(NamelistElement("energy", NamelistType::STRING, "MISSING",
                                    DefaultIsObligatory::NO, InputRepeats::YES));
-  t_nml.addKeyword(NamelistElement("sdf_item", { "-title", "-label", "-detail", "-message",
+  t_nml.addKeyword(NamelistElement("sdf_item", { "-title", "-label", "-energy", "-message",
                                                  "-mask", "-parameter", "-typeI", "-typeJ",
                                                  "-typeK", "-typeL", "-typeM" },
                                    { NamelistType::STRING, NamelistType::STRING,
@@ -665,7 +762,7 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addHelp("timings", "By default, the wall time devoted to various aspects of a calculation "
                 "will be displayed at the end of the run.  Set to ON or ACTIVE to ensure this "
                 "behavior, or OFF to decline printed timings.");
-  t_nml.addHelp("detail", "In addition to certain obligatory outputs, a user can select that only "
+  t_nml.addHelp("energy", "In addition to certain obligatory outputs, a user can select that only "
                 "specific molecular mechanics energy components be printed, to help focus the "
                 "output and reduce file sizes.  In all cases, the total, total potential, and "
                 "total kinetic energies will be reported, as will thermodynamic integration "

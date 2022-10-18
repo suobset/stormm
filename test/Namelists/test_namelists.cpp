@@ -91,6 +91,9 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   else if (strcmpCased(nml_name, "ffmorph")) {
     CHECK_THROWS(FFMorphControls t_ffmcon(bad_input, &start_line, &found_nml), updated_error);
   }
+  else if (strcmpCased(nml_name, "report")) {
+    CHECK_THROWS(ReportControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
+  }
   else {
     rtErr("The namelist &" + nml_name + " does not pair with any known case.", "test_namelists");
   }
@@ -129,7 +132,10 @@ int main(const int argc, const char* argv[]) {
 
   // Section 6
   section("Test the &restraint namelist");
-  
+
+  // Section 7
+  section("Test the &report namelist");
+
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any STORMM app
   section(1);
@@ -337,19 +343,40 @@ int main(const int argc, const char* argv[]) {
 
   // The report namelist needs to be able to convey information for an SD file, among other
   // features of the output.
-  const std::string rep_nml_a("&report\n  sdf_item { -title BOND_E -label sulfonamide -detail "
-                              "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -detail "
-                              "angle }\n  detail bond\n  detail angle\n&end\n");
+  section(7);
+  const std::string rep_nml_a("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
+                              "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -energy "
+                              "HarmonicAngle }\n  energy bond\n  energy angle\n&end\n");
   const TextFile repinp_tf(rep_nml_a, TextOrigin::RAM);
   start_line = 0;
   ReportControls repcon(repinp_tf, &start_line, nullptr);
   check(repcon.getReportedQuantityCount(), RelationalOperator::EQUAL, 10, "The number of reported "
         "quantities in a &report namelist does not meet expectations.");
   check(repcon.getReportedQuantities()[8] == StateVariable::ANGLE &&
-        repcon.getReportedQuantities()[8] == StateVariable::UREY_BRADLEY, "Details of the "
+        repcon.getReportedQuantities()[9] == StateVariable::UREY_BRADLEY, "Details of the "
         "reported quantities in a &report namelist do not meet expectations.");
   check(repcon.getSDFileDataRequestCount(), RelationalOperator::EQUAL, 2, "The number of data "
         "requests in a &report namelist is incorrect.");
+  testBadNamelist("report", "sdf_item { -title SomeTitle -energy ANGLE }", "A composite energy "
+                  "term would be printed to a SD data item");
+  testBadNamelist("report", "sdf_item { -energy HarmonicAngle }", "A data item with no title was "
+                  "accepted");
+  testBadNamelist("report", "sdf_item { -title PrintAngle -parameter HarmonicAngle -typeI CT "
+                  "-typeJ CN }", "A data item printing angle force field parameters was "
+                  "accepted without the correct number of atom types");
+  testBadNamelist("report", "sdf_item { -title PrintBond -parameter bond -typeI CT "
+                  "-typeJ CN -typeK CB }", "A data item printing bond force field parameters was "
+                  "accepted without the correct number of atom types");
+  testBadNamelist("report", "sdf_item { -title PrintAngle -parameter anglep -typeI CT "
+                  "-typeJ CN -typeK CB }", "A data item with a nonsensicale parameter name was "
+                  "accepted for SD file output");
+  testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter dihedral -typeI CT "
+                  "-typeJ CN -typeK CB -typeL OT }", "A data item printing dihedral force field "
+                  "parameters was accepted, but this is a composite of proper, improper, and "
+                  "CHARMM improper energy terms unsuitable for a single SD file data item");
+  testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter HarmonicAngle -typeI CT "
+                  "-typeJ CN -typeK CB -message blah }", "A data item printing angle force field "
+                  "parameters was accepted, but there is an extra messaged tacked on");
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

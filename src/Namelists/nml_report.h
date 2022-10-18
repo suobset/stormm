@@ -175,6 +175,12 @@ private:
   /// List of data item requests for information to be included in an SD file output
   std::vector<MolObjDataRequest> sdf_addons;
 
+  /// \brief Translate a user-supplied string into one or more energy quantities classifiable with
+  ///        the state variable.
+  ///
+  /// \param inpstr  The user input
+  std::vector<StateVariable> translateEnergyComponent(const std::string &inpstr);
+  
   /// \brief Translate the namelist STRUCT input for an SD file data item into the internal object
   ///        encoding such a request.
   ///

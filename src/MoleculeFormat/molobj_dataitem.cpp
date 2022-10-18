@@ -52,8 +52,8 @@ MolObjDataRequest::MolObjDataRequest(const DataRequestKind kind_in, const std::s
   case DataRequestKind::STRING:
     message = message_in;
     break;
-  case DataRequestKind::ALL_TYPES:
-    rtErr("The ALL_TYPES enumeration does not indicate an actual data request and no program "
+  case DataRequestKind::ALL_KINDS:
+    rtErr("The ALL_KINDS enumeration does not indicate an actual data request and no program "
           "should invoke it here.", "MolObjDataRequest");
     break;
   }
