@@ -4,7 +4,7 @@ cat > ffld.in << EOF
 &files
   -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
          -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
-         -label sulfonamide frame_end -1 }
+         -label sulfonamide frame_end -1 -r sulfonamide.rst r_kind AMBER_INPCRD }
 &end
 
 &ffrefine
@@ -22,11 +22,17 @@ cat > ffld.in << EOF
   penalty 50.0, fbhw 0.0,
 &end
 
-%&restraint
-%  system sulfonamide
-%  ensemble heavy_dihedrals
-%  penalty 20.0, fbhw 0.1,
-%&end
+&restraint
+  system sulfonamide
+  ensemble heavy_dihedrals
+  penalty 20.0, fbhw 0.1,
+&end
+
+&restraint
+  system sulfonamide
+  ensemble prevent_hbonds
+  penalty 16.0, proximity 3.2,
+&end
 EOF
 
 ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn

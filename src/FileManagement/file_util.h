@@ -7,27 +7,12 @@
 #include <string>
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "file_enumerators.h"
 
 namespace stormm {
 namespace diskutil {
 
 using constants::ExceptionResponse;
-
-/// \brief Enumerate the situations that might be encountered when writing a trajectory file
-enum class PrintSituation {
-  OPEN_NEW,   ///< Expect to open a new file, and only open a new file if no file by the given name
-              ///<   already exists
-  APPEND,     ///< Append an existing file, or open a new file if no file by the given name exists
-  OVERWRITE,  ///< Always open a new file, overwriting any existing file by the same name
-  UNKNOWN     ///< Option to let the program decide what printing behavior to use, in lieu of user
-              ///<   or developer input
-};
-
-/// \brief Format of the file (just a fancy way of coding "binary" or "ascii")
-enum class DataFormat {
-  ASCII,   ///< Ascii, formatted and human-readable output
-  BINARY   ///< Binary, direct-to-disk copy of numbers
-};
 
 /// \brief Open a file for output writing.  This encapsulates error messages in the event that
 ///        the file cannot be opened as expected.

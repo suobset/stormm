@@ -9,7 +9,7 @@
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "Accelerator/hybrid.h"
-#include "FileManagement/file_util.h"
+#include "FileManagement/file_enumerators.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/file_snapshot.h"

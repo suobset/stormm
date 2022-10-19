@@ -21,8 +21,7 @@ using structure::imageValue;
 using structure::ImagingMethod;
 
 //-------------------------------------------------------------------------------------------------
-RestraintControls::RestraintControls(const ExceptionResponse policy_in,
-                                     const WrapTextSearch wrap) :
+RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
     policy{policy_in}, restraint_is_valid{true}, system{std::string("ALL")},
     domain{RestraintEnsemble::SPECIFIC_ATOMS}, mask_i{std::string("")}, mask_j{std::string("")},
     mask_k{std::string("")}, mask_l{std::string("")},
@@ -33,14 +32,15 @@ RestraintControls::RestraintControls(const ExceptionResponse policy_in,
     initial_crd{0.0, 0.0, 0.0}, mature_crd{0.0, 0.0, 0.0},
     penalty{default_restraint_ensemble_penalty},
     flat_bottom_half_width{default_restraint_ensemble_half_width},
-    cutoff{default_restraint_ensemble_distance_cutoff}
+    cutoff{default_restraint_ensemble_distance_cutoff},
+    proximity{default_restraint_ensemble_hbond_proximity}
 {}
   
 //-------------------------------------------------------------------------------------------------
 RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *found_nml,
                                      const ExceptionResponse policy_in,
                                      const WrapTextSearch wrap) :
-    RestraintControls(policy_in)
+  RestraintControls(policy_in)
 {
   NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy, wrap);
   const int starting_line = *start_line + 1;
@@ -367,6 +367,7 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *
   // Take in parameters for ensembles of restraints, built based on the existing structure.
   penalty = t_nml.getRealValue("penalty");
   flat_bottom_half_width = t_nml.getRealValue("fbhw");
+  proximity = t_nml.getRealValue("proximity");
   cutoff = t_nml.getRealValue("cutoff");
 }
 
@@ -510,7 +511,7 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
     }
     break;
   case RestraintEnsemble::PREVENT_HBONDS:
-    return applyHydrogenBondPreventors(ag, *chemfe, penalty, flat_bottom_half_width);
+    return applyHydrogenBondPreventors(ag, *chemfe, penalty, proximity);
   case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
     {
       const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
@@ -590,6 +591,8 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
                                    std::to_string(default_restraint_ensemble_penalty)));
   t_nml.addKeyword(NamelistElement("fbhw", NamelistType::REAL,
                                    std::to_string(default_restraint_ensemble_half_width)));
+  t_nml.addKeyword(NamelistElement("proximity", NamelistType::REAL,
+                                   std::to_string(default_restraint_ensemble_hbond_proximity)));
   t_nml.addKeyword(NamelistElement("cutoff", NamelistType::REAL,
                                    std::to_string(default_restraint_ensemble_distance_cutoff)));
   t_nml.addKeyword(NamelistElement("system", NamelistType::STRING, "MISSING"));
@@ -659,6 +662,8 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
                 "restraint ensembles.");
   t_nml.addHelp("fbhw", "General value of the permissive, flat-bottom well to incorporate into a "
                 "restraint ensemble.");
+  t_nml.addHelp("proximity", "The proximity at which hydrogen-bond preventor restraints will "
+                "engage.");
   t_nml.addHelp("system", "The system to which this restraint shall apply.  The value of this "
                 "keyword should match one of the labels given to a system with the -sys keyword "
                 "of the &files namelist, or use one of the reserved values 'all' or "

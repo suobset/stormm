@@ -562,7 +562,7 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::AMBER_INPCRD:
     if (kind == CoordinateFileKind::AMBER_INPCRD && actual_high_index - low_index != 1) {
-      rtErr("The " + getCoordinateFileKindName(kind) + " file format requires one and only "
+      rtErr("The " + getEnumerationName(kind) + " file format requires one and only "
             "one frame.  It cannot accept a series of " +
             std::to_string(actual_high_index - low_index) + " frames.", "CoordinateSeries",
             "exportToFile");

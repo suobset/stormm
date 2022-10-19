@@ -163,6 +163,11 @@ const std::string& MolObjDataRequest::getMessage() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<char4>& MolObjDataRequest::getAtomTypes() const {
+  return atom_types;
+}
+
+//-------------------------------------------------------------------------------------------------
 const std::string& MolObjDataRequest::getSystemLabel() const {
   return system_label;
 }

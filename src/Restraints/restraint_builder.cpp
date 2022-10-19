@@ -9,9 +9,17 @@
 #include "restraint_apparatus.h"
 #include "restraint_builder.h"
 
+// CHECK
+#include "Parsing/parse.h"
+// END CHECK
+
 namespace stormm {
 namespace restraints {
 
+// CHECK
+using parse::char4ToString;
+// END CHECK
+  
 using chemistry::ChemicalFeatures;
 using chemistry::MaskTraversalMode;
 using restraints::BoundedRestraint;
@@ -332,7 +340,7 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
 
   // Prepare the flat-bottom well template based on the input and a generous assumption
   // about the maximum size of a molecule
-  FlatBottomPlan fbhw_template(penalty, 0.0, 0.0, approach_point, 1000.0, 1100.0, 0);
+  FlatBottomPlan bumper_template(penalty, 0.0, 0.0, approach_point, 1000.0, 1100.0, 0);
   
   // Get lists of all proton donors and acceptors
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
@@ -368,7 +376,7 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
     }
     acceptors.resize(j);
   }
-
+  
   // Run through the (trimmed) lists to add restraints that prevent internal hydrogen bonding.
   // For systems with many distinct molecules each having donors and / or acceptors, this search
   // is still far less efficient than it could be, but the problem has been reduced to edge cases.
@@ -384,16 +392,16 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
         continue;
       }
       bool excluded = false;
-      for (int k = nbk.nb12_bounds[donor_atom]; k < nbk.nb12_bounds[donor_atom]; k++) {
+      for (int k = nbk.nb12_bounds[donor_atom]; k < nbk.nb12_bounds[donor_atom + 1]; k++) {
         excluded = (excluded || nbk.nb12x[k] == acceptor_atom);
       }
       if (excluded == false) {
-        for (int k = nbk.nb13_bounds[donor_atom]; k < nbk.nb13_bounds[donor_atom]; k++) {
+        for (int k = nbk.nb13_bounds[donor_atom]; k < nbk.nb13_bounds[donor_atom + 1]; k++) {
           excluded = (excluded || nbk.nb13x[k] == acceptor_atom);
         }
       }
       if (excluded == false) {
-        for (int k = nbk.nb14_bounds[donor_atom]; k < nbk.nb14_bounds[donor_atom]; k++) {
+        for (int k = nbk.nb14_bounds[donor_atom]; k < nbk.nb14_bounds[donor_atom + 1]; k++) {
           excluded = (excluded || nbk.nb14x[k] == acceptor_atom);
         }
       }
@@ -401,7 +409,7 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
 
         // Use the push_back method without pre-allocation, as it is not clear from the start
         // how large the final array will need to be.
-        result.push_back(applyDistanceRestraint(ag, donor_atom, acceptor_atom, fbhw_template));
+        result.push_back(applyDistanceRestraint(ag, donor_atom, acceptor_atom, bumper_template));
       }
     }
   }

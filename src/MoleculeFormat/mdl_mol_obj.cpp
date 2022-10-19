@@ -1,7 +1,10 @@
+#include <cmath>
 #include "copyright.h"
 #include "FileManagement/file_listing.h"
-#include "mdl_mol_obj.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/write_annotated_frame.h"
+#include "mdl_mol_obj.h"
 
 namespace stormm {
 namespace structure {
@@ -17,6 +20,9 @@ using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyContents;
 using parse::operator==;
+using topology::ChemicalDetailsKit;
+using topology::TorsionKind;
+using topology::ValenceKit;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpaceWriter;
 using trajectory::writeFrame;
@@ -424,10 +430,319 @@ void MdlMolObj::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
   std::vector<std::string> di_body;
   switch (ask.getKind()) {
   case DataRequestKind::STATE_VARIABLE:
+
+    // The text will a single number, supplied by an external function or re-evaluated.
+    break;
   case DataRequestKind::ATOM_INFLUENCES:
+
+    // The text will be constructed during the energy re-evaluation when the data item is printed.
+    break;
   case DataRequestKind::TOPOLOGY_PARAMETER:
+    {
+      // Search for all instances of a particular parameter type affecting the stated atom types
+      // in the given order (or the reverse order).  Each instance of the parameter in the topology
+      // will become one data line of the data item.  If no instances are found, a single data line
+      // is entered to indicate this fact.  The first string in the body will be reserved to hold
+      // a message indicating however many instances were found.
+      int nfound = 0;
+      di_body.push_back("");
+      char buffer_data[256];
+      const ValenceKit<double> vk  = ag.getDoublePrecisionValenceKit();
+      const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+      const std::vector<char4> atom_types = ask.getAtomTypes();
+      switch (ask.getValenceParameter()) {
+      case StateVariable::BOND:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 j_tref = atom_types[1];
+          for (int pos = 0; pos < vk.nbond; pos++) {
+            const int i_atom = vk.bond_i_atoms[pos];
+            const int j_atom = vk.bond_j_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 j_type = cdk.atom_types[j_atom];
+            if ((i_type == i_tref && j_type == j_tref) || (i_type == j_tref && j_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[j_atom];
+              const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.bond_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness\n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : j_atom + 1;
+              const int j_index = (forward) ? j_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf\n", i_name.x,
+                      i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z, j_name.w,
+                      i_index, j_index, vk.bond_leq[param_idx], vk.bond_keq[param_idx]);
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::ANGLE:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 j_tref = atom_types[1];
+          const char4 k_tref = atom_types[2];
+          for (int pos = 0; pos < vk.nangl; pos++) {
+            const int i_atom = vk.angl_i_atoms[pos];
+            const int j_atom = vk.angl_j_atoms[pos];
+            const int k_atom = vk.angl_k_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 j_type = cdk.atom_types[j_atom];
+            const char4 k_type = cdk.atom_types[k_atom];
+            if ((i_type == i_tref && j_type == j_tref && k_type == k_tref) ||
+                (i_type == k_tref && j_type == j_tref && k_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[k_atom];
+              const char4 j_name = cdk.atom_names[j_atom];
+              const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.angl_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, "    Atom Names        Indices       Eq. L0    Stiffness\n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ---- ----  ---- ---- ----  ---------- ----------\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
+              const int j_index = j_atom + 1;
+              const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d  %10.4lf %10.4lf\n",
+                      i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z,
+                      j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, i_index, j_index, k_index,
+                      vk.angl_theta[param_idx] * 180.0 / symbols::pi, vk.angl_keq[param_idx]);
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::PROPER_DIHEDRAL:
+      case StateVariable::IMPROPER_DIHEDRAL:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 j_tref = atom_types[1];
+          const char4 k_tref = atom_types[2];
+          const char4 l_tref = atom_types[3];
+          const bool is_proper = (ask.getValenceParameter() == StateVariable::PROPER_DIHEDRAL);
+          for (int pos = 0; pos < vk.ndihe; pos++) {
+            switch (static_cast<TorsionKind>(vk.dihe_modifiers[pos].w)) {
+            case TorsionKind::PROPER:
+            case TorsionKind::PROPER_NO_14:
+              if (is_proper == false) {
+                continue;
+              }
+              break;
+            case TorsionKind::IMPROPER:
+            case TorsionKind::IMPROPER_NO_14:
+              if (is_proper) {
+                continue;
+              }
+            }
+            const int i_atom = vk.dihe_i_atoms[pos];
+            const int j_atom = vk.dihe_j_atoms[pos];
+            const int k_atom = vk.dihe_k_atoms[pos];
+            const int l_atom = vk.dihe_l_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 j_type = cdk.atom_types[j_atom];
+            const char4 k_type = cdk.atom_types[k_atom];
+            const char4 l_type = cdk.atom_types[l_atom];
+            if ((i_type == i_tref && j_type == j_tref && k_type == k_tref && l_type == l_tref) ||
+                (i_type == l_tref && j_type == k_tref && k_type == j_tref && l_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[l_atom];
+              const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[k_atom];
+              const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[j_atom];
+              const char4 l_name = (forward) ? cdk.atom_names[l_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.dihe_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, "       Atom Names            Indices         Amplitude "
+                        "   Phase    N\n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
+                        "---------- --\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
+              const int j_index = (forward) ? j_atom + 1 : k_atom + 1;
+              const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
+              const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
+                      "%10.4lf %10.4lf %2d\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                      j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                      l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
+                      vk.dihe_amp[param_idx], vk.dihe_phi[param_idx] * 180.0 / symbols::pi,
+                      static_cast<int>(std::round(vk.dihe_freq[param_idx])));
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::UREY_BRADLEY:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 k_tref = atom_types[1];
+          for (int pos = 0; pos < vk.nubrd; pos++) {
+            const int i_atom = vk.ubrd_i_atoms[pos];
+            const int k_atom = vk.ubrd_k_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 k_type = cdk.atom_types[k_atom];
+            if ((i_type == i_tref && k_type == k_tref) || (i_type == k_tref && k_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[k_atom];
+              const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.ubrd_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness\n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
+              const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf\n", i_name.x,
+                      i_name.y, i_name.z, i_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                      i_index, k_index, vk.ubrd_leq[param_idx], vk.ubrd_keq[param_idx]);
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::CHARMM_IMPROPER:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 j_tref = atom_types[1];
+          const char4 k_tref = atom_types[2];
+          const char4 l_tref = atom_types[3];
+          for (int pos = 0; pos < vk.ndihe; pos++) {
+            const int i_atom = vk.cimp_i_atoms[pos];
+            const int j_atom = vk.cimp_j_atoms[pos];
+            const int k_atom = vk.cimp_k_atoms[pos];
+            const int l_atom = vk.cimp_l_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 j_type = cdk.atom_types[j_atom];
+            const char4 k_type = cdk.atom_types[k_atom];
+            const char4 l_type = cdk.atom_types[l_atom];
+            if ((i_type == i_tref && j_type == j_tref && k_type == k_tref && l_type == l_tref) ||
+                (i_type == l_tref && j_type == k_tref && k_type == j_tref && l_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[l_atom];
+              const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[k_atom];
+              const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[j_atom];
+              const char4 l_name = (forward) ? cdk.atom_names[l_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.cimp_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, "       Atom Names            Indices         Stiffness "
+                        "   Phase  \n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
+                        "----------\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
+              const int j_index = (forward) ? j_atom + 1 : k_atom + 1;
+              const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
+              const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
+                      "%10.4lf %10.4lf\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                      j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                      l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
+                      vk.cimp_keq[param_idx], vk.cimp_phi[param_idx] * 180.0 / symbols::pi);
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::CMAP:
+        {
+          const char4 i_tref = atom_types[0];
+          const char4 j_tref = atom_types[1];
+          const char4 k_tref = atom_types[2];
+          const char4 l_tref = atom_types[3];
+          const char4 m_tref = atom_types[4];
+          for (int pos = 0; pos < vk.ndihe; pos++) {
+            const int i_atom = vk.cmap_i_atoms[pos];
+            const int j_atom = vk.cmap_j_atoms[pos];
+            const int k_atom = vk.cmap_k_atoms[pos];
+            const int l_atom = vk.cmap_l_atoms[pos];
+            const int m_atom = vk.cmap_m_atoms[pos];
+            const char4 i_type = cdk.atom_types[i_atom];
+            const char4 j_type = cdk.atom_types[j_atom];
+            const char4 k_type = cdk.atom_types[k_atom];
+            const char4 l_type = cdk.atom_types[l_atom];
+            const char4 m_type = cdk.atom_types[m_atom];
+            if ((i_type == i_tref && j_type == j_tref && k_type == k_tref && l_type == l_tref &&
+                 m_type == m_tref) ||
+                (i_type == m_tref && j_type == l_tref && k_type == k_tref && l_type == j_tref &&
+                 m_type == i_tref)) {
+              const bool forward = (i_type == i_tref);
+              const char4 i_name = (forward) ? cdk.atom_names[i_atom] : cdk.atom_names[m_atom];
+              const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[l_atom];
+              const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[k_atom];
+              const char4 l_name = (forward) ? cdk.atom_names[l_atom] : cdk.atom_names[j_atom];
+              const char4 m_name = (forward) ? cdk.atom_names[m_atom] : cdk.atom_names[i_atom];
+              const int param_idx = vk.cimp_param_idx[pos];
+              if (nfound == 0) {
+                sprintf(buffer_data, "          Atom Names                 Indices          "
+                        " Map\n");
+                di_body.push_back(buffer_data);
+                sprintf(buffer_data, "  ---- ---- ---- ---- ----  ---- ---- ---- ---- ----  "
+                        "----\n");
+                di_body.push_back(buffer_data);
+              }
+              const int i_index = (forward) ? i_atom + 1 : m_atom + 1;
+              const int j_index = (forward) ? j_atom + 1 : l_atom + 1;
+              const int k_index = (forward) ? k_atom + 1 : k_atom + 1;
+              const int l_index = (forward) ? l_atom + 1 : j_atom + 1;
+              const int m_index = (forward) ? m_atom + 1 : i_atom + 1;
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d "
+                      "%4d %4d  %4d\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y,
+                      j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, l_name.x,
+                      l_name.y, l_name.z, l_name.w, m_name.x, m_name.y, m_name.z, m_name.w,
+                      i_index, j_index, k_index, l_index, m_index, vk.cmap_surf_idx[param_idx]);
+              di_body.push_back(buffer_data);
+              nfound++;
+            }
+          }
+        }
+        break;
+      case StateVariable::RESTRAINT:
+      case StateVariable::VDW:
+      case StateVariable::VDW_ONE_FOUR:
+      case StateVariable::ELECTROSTATIC:
+      case StateVariable::ELECTROSTATIC_ONE_FOUR:
+      case StateVariable::GENERALIZED_BORN:
+      case StateVariable::KINETIC:
+      case StateVariable::PRESSURE:
+      case StateVariable::VIRIAL_11:
+      case StateVariable::VIRIAL_12:
+      case StateVariable::VIRIAL_22:
+      case StateVariable::VIRIAL_13:
+      case StateVariable::VIRIAL_23:
+      case StateVariable::VIRIAL_33:
+      case StateVariable::VOLUME:
+      case StateVariable::TEMPERATURE_ALL:
+      case StateVariable::TEMPERATURE_PROTEIN:
+      case StateVariable::TEMPERATURE_LIGAND:
+      case StateVariable::TEMPERATURE_SOLVENT:
+      case StateVariable::DU_DLAMBDA:
+      case StateVariable::POTENTIAL_ENERGY:
+      case StateVariable::TOTAL_ENERGY:
+      case StateVariable::ALL_STATES:
+        break;
+      }
+    }
     break;
   case DataRequestKind::STRING:
+
+    // The text is the user-supplied message
+    di_body.push_back(ask.getMessage());
     break;
   }
   data_items.emplace_back(ask, di_body);

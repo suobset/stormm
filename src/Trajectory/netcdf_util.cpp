@@ -65,7 +65,7 @@ void AmberNetcdf::checkNetcdfStatus(const int status, const std::string activity
 
   // Report any abnormalities as a runtime error
   if (problem) {
-    errmsg = "Problem encountered working with " + getCoordinateFileKindName(outkind) +
+    errmsg = "Problem encountered working with " + getEnumerationName(outkind) +
              " file " + file_name + ": " + errmsg;
 
     // Add to the error message

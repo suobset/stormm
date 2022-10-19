@@ -25,6 +25,7 @@ using parse::NumberFormat;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
 using parse::WrapTextSearch;
+using trajectory::getEnumerationName;
 using trajectory::translateCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
@@ -124,9 +125,9 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable",
                   "UserSettings");
   std::vector<std::string> alternatives = {
-    "coordinate_input_format",      getCoordinateFileKindName(c_kind),
-    "coordinate_output_format",     getCoordinateFileKindName(x_kind),
-    "coordinate_checkpoint_format", getCoordinateFileKindName(r_kind)
+    "coordinate_input_format",      getEnumerationName(c_kind),
+    "coordinate_output_format",     getEnumerationName(x_kind),
+    "coordinate_checkpoint_format", getEnumerationName(r_kind)
   };
   std::vector<std::string> sys_reqs = { "-pe", "-ce" };
   switch (prog_set) {

@@ -60,7 +60,7 @@ void AmberNetcdf::AmberNetcdf(const std::string &filename_in, const CoordinateFi
   case CoordinateFileKind::AMBER_ASCII_RST:
   case CoordinateFileKind::SDF:
     rtErr("The Amber NetCDF writer should not be called to output an " +
-          getCoordinateFileKindName(output_kind) + " file " + file_name + ".", "AmberNetcdf");
+          getEnumerationName(output_kind) + " file " + file_name + ".", "AmberNetcdf");
   case CoordinateFileKind::UNKNOWN:
     rtErr("The file type of " + file_name + " is unknown.", "AmberNetcdf");
   }

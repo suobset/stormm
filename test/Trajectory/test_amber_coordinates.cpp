@@ -107,7 +107,7 @@ int main(const int argc, const char* argv[]) {
                                                        CoordinateFileKind::UNKNOWN;
   check(t3p_kind == CoordinateFileKind::AMBER_INPCRD, "Coordinate file type detection did not "
         "succeed for an Amber ASCII input coordinate file.  The file was marked " +
-        getCoordinateFileKindName(t3p_kind) + ".", do_tip3p);
+        getEnumerationName(t3p_kind) + ".", do_tip3p);
   double oh_mean = 0.0;
   if (tip3p_exists) {
     for (int i = 0; i < tip3pwr.natom; i += 3) {
@@ -247,7 +247,7 @@ int main(const int argc, const char* argv[]) {
                                                        CoordinateFileKind::UNKNOWN;
   check(t5p_kind == CoordinateFileKind::AMBER_ASCII_RST, "Coordinate file type detection did not "
         "succeed for an Amber ASCII restart file.  The file was marked " +
-        getCoordinateFileKindName(t5p_kind) + ".", do_tip5p);
+        getEnumerationName(t5p_kind) + ".", do_tip5p);
   PhaseSpaceWriter tip5pwr = tip5p.data();
   check(tip5pwr.unit_cell == UnitCellType::ORTHORHOMBIC, "An orthorhombic unit cell is not "
         "correctly interpreted in the TIP5P system.", do_tip5p);

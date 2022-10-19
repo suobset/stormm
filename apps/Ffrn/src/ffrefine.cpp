@@ -1,18 +1,21 @@
 #include <vector>
 #include "../../../src/Constants/behavior.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
+#include "../../../src/FileManagement/file_enumerators.h"
 #include "../../../src/MolecularMechanics/minimization.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
+#include "../../../src/Trajectory/trajectory_enumerators.h"
 #include "../../../src/Trajectory/phasespace.h"
 #include "../../../src/UnitTesting/stopwatch.h"
 #include "../../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::constants;
 using namespace stormm::chemistry;
+using namespace stormm::diskutil;
 using namespace stormm::energy;
 using namespace stormm::mm;
 using namespace stormm::namelist;
@@ -106,6 +109,13 @@ int main(int argc, const char* argv[]) {
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
       const PhaseSpace ps = sc.getCoordinateReference(i);
+
+      // CHECK
+      printf("Print a %s with expectation %s\n",
+             getEnumerationName(sc.getSystemCheckpointKind(i)).c_str(),
+             getEnumerationName(ui.getPrintingPolicy()).c_str());
+      // END CHECK
+      
       ps.exportToFile(sc.getSystemCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
                       sc.getSystemCheckpointKind(i), ui.getPrintingPolicy());
     }

@@ -41,7 +41,7 @@ std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
+std::string getEnumerationName(const CoordinateFileKind cfkind) {
   switch (cfkind) {
   case CoordinateFileKind::AMBER_CRD:
     return std::string("AMBER_CRD");
@@ -217,7 +217,7 @@ CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
 }
   
 //-------------------------------------------------------------------------------------------------
-std::string getAncdfVariableName(const AncdfVariable key) {
+std::string getEnumerationName(const AncdfVariable key) {
   switch (key) {
   case AncdfVariable::NCFRAME:
     return std::string("frame");

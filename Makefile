@@ -19,6 +19,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Constants/behavior.cpp \
 		   $(SRCDIR)/Constants/generalized_born.cpp \
 		   $(SRCDIR)/FileManagement/directory_util.cpp \
+		   $(SRCDIR)/FileManagement/file_enumerators.cpp \
 		   $(SRCDIR)/FileManagement/file_listing.cpp \
 		   $(SRCDIR)/FileManagement/file_util.cpp \
 		   $(SRCDIR)/ForceField/forcefield_element.cpp \
@@ -152,6 +153,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/DataTypes/mixed_types.h \
 		     $(SRCDIR)/DataTypes/stormm_vector_types.h \
 		     $(SRCDIR)/FileManagement/directory_util.h \
+		     $(SRCDIR)/FileManagement/file_enumerators.h \
 		     $(SRCDIR)/FileManagement/file_listing.h \
 		     $(SRCDIR)/FileManagement/file_util.h \
 		     $(SRCDIR)/ForceField/forcefield_element.h \
@@ -330,6 +332,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Constants/behavior.o \
 		  $(SRCDIR)/Constants/generalized_born.o \
 		  $(SRCDIR)/FileManagement/directory_util.o \
+		  $(SRCDIR)/FileManagement/file_enumerators.o \
 		  $(SRCDIR)/FileManagement/file_listing.o \
 		  $(SRCDIR)/FileManagement/file_util.o \
 		  $(SRCDIR)/ForceField/forcefield_element.o \

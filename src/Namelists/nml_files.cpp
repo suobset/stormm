@@ -17,6 +17,7 @@ using diskutil::SearchStyle;
 using parse::findStringInVector;
 using parse::strcmpCased;
 using parse::strncmpCased;
+using trajectory::getEnumerationName;
 using trajectory::translateCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
@@ -703,9 +704,9 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                                      NamelistType::STRING },
                                    { std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string(""), "0", "0", "1",
-                                     getCoordinateFileKindName(crd_input_format),
-                                     getCoordinateFileKindName(crd_output_format),
-                                     getCoordinateFileKindName(crd_chkpt_format) },
+                                     getEnumerationName(crd_input_format),
+                                     getEnumerationName(crd_output_format),
+                                     getEnumerationName(crd_chkpt_format) },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sys_help,
                                    sys_keys_help, sys_keyword_reqs));
   t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING,

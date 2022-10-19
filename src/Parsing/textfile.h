@@ -6,7 +6,7 @@
 #include <vector>
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
-#include "FileManagement/file_util.h"
+#include "FileManagement/file_enumerators.h"
 
 namespace stormm {
 namespace parse {

@@ -333,9 +333,8 @@ int main(const int argc, const char* argv[]) {
     applyHoldingRestraints(&gy_ag, gy_cfr, ":TYR & ! @CA,N,C,O,CB & ! @H*", 2.5);
   const std::vector<int> gy_pos_atom_ans = {  4,  5,  6,  8, 11, 12, 13, 15, 32, 33, 34 };
   const std::vector<int> gk_pos_atom_ans = {  4,  5,  6,  8, 11, 12, 13, 15, 29, 33, 34, 35 };
-  const std::vector<int> gk_hb_atom_ans = {
-     6,  5,  6, 12,  6, 13,  6, 34,  6, 35, 13,  5, 13,  6, 13, 12, 13, 34, 13, 35, 29,  5, 29,
-     6, 29, 12, 29, 13, 29, 34, 29, 35, 35,  5, 35,  6, 35, 12, 35, 13, 35, 34 };
+  const std::vector<int> gk_hb_atom_ans = {  6, 34,  6, 35, 13,  5, 29,  5, 29,  6, 29, 12,
+                                            29, 13, 29, 34, 29, 35, 35,  5, 35,  6, 35, 12 };
   std::vector<double> k_elem = { 0.0, 1.0, 0.0, 1.0 };
   std::vector<double> r_elem = { 0.0, 0.0, 0.0, 16.0, 0.0, 0.0, 0.0, 16.0 };
   std::vector<double> gy_pos_k_ans, gk_pos_k_ans, gy_pos_r_ans, gk_pos_r_ans;
@@ -360,7 +359,7 @@ int main(const int argc, const char* argv[]) {
   r_elem[5] =    3.1;
   r_elem[6] = 1000.0;
   r_elem[7] = 1100.0;
-  for (int i = 0; i < 21; i++) {
+  for (int i = 0; i < 12; i++) {
     gk_hb_k_ans.insert(gk_hb_k_ans.end(), k_elem.begin(), k_elem.end());
     gk_hb_r_ans.insert(gk_hb_r_ans.end(), r_elem.begin(), r_elem.end());
   }

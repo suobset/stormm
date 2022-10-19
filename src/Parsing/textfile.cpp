@@ -2,10 +2,13 @@
 #include <fstream>
 #include "copyright.h"
 #include "textfile.h"
+#include "FileManagement/file_util.h"
 #include "Reporting/error_format.h"
 
 namespace stormm {
 namespace parse {
+
+using diskutil::openOutputFile;
 
 //-------------------------------------------------------------------------------------------------
 TextFileReader::TextFileReader(const int line_count_in, const int* line_lengths_in,

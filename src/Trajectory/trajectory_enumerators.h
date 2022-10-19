@@ -79,7 +79,7 @@ std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind);
 /// \brief Translate the CoordinateFileKind enumeration.
 ///
 /// \param cfkind  The enumerator instance of interest
-std::string getCoordinateFileKindName(CoordinateFileKind cfkind);
+std::string getEnumerationName(CoordinateFileKind cfkind);
 
 /// \brief Get the nature of a trajectory file based on the stated format (this will return
 ///        binary or ASCII based on the stated trajectory file kind)
@@ -111,7 +111,7 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
 ///        in an Amber binary trajectory or restart file.
 ///
 /// \param key  The enumerator instance of interest
-std::string getCoordinateFileKindName(AncdfVariable key);
+std::string getEnumerationName(AncdfVariable key);
 
 } // namespace trajectory
 } // namespace stormm
