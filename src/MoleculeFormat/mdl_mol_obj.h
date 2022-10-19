@@ -12,6 +12,8 @@
 #include "FileManagement/file_util.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
+#include "Restraints/restraint_apparatus.h"
+#include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "molecule_file_io.h"
@@ -30,6 +32,8 @@ using constants::CaseSensitivity;
 using constants::ExceptionResponse;
 using diskutil::PrintSituation;
 using parse::TextFile;
+using restraints::RestraintApparatus;
+using topology::AtomGraph;
 using trajectory::CoordinateFrame;
 using trajectory::PhaseSpace;
 
@@ -88,12 +92,12 @@ public:
   /// \param policy          Course of action to take if errors are encountered when inferring
   ///                        atomic elements
   /// \{
-  MdlMolObj();
-  MdlMolObj(const std::string &filename);
-  MdlMolObj(const char* filename);
+  MdlMolObj(ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMolObj(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMolObj(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
   MdlMolObj(const TextFile &tf, int line_start = 0, int line_end = -1,
             CaseSensitivity capitalization = CaseSensitivity::YES,
-            ExceptionResponse policy = ExceptionResponse::WARN);
+            ExceptionResponse policy_in = ExceptionResponse::WARN);
   /// \}
 
   /// \brief Get the system's atom count.
@@ -152,6 +156,27 @@ public:
   /// \brief Get the number of properties found in the MDL MOL entry
   int getPropertiesCount() const;
 
+  /// \brief Add a data item to the object.  These data items follow the classifications set forth
+  ///        in the DataRequestKind enumerator (see molecule_format_enumerators.h).  Each overload
+  ///        is designed to serve a particular case.
+  ///
+  /// Overloaded:
+  ///   - Add a molecular mechanics energy term, with a value supplied by evaluating the structure
+  ///     coordinates with the topology and restraint apparatus.
+  ///   - Add a summary of the valence interaction influences (including restraints) on each atom
+  ///     in a mask, with forces and energies supplied by evaluating the topology and restraints.
+  ///   - Track down a specific restraint or topological energy term based on a series of atom
+  ///     types and display its settings.
+  ///   - Add a user-defined string as a message in the SD output.
+  ///
+  /// \param ask  The request for an item to impart ot the SD file
+  /// \param ag   The topology guiding the motion of the system
+  /// \param ra   The system of restraints guiding the structure alongside the topology
+  /// \{
+  void addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
+                   const RestraintApparatus &ra);
+  /// \}
+  
   /// \brief Write a set of molecular coordinates, bonds, and their annotations in MDL MOL format.
   ///        Apply all properties already stored in the object, such that the result is not an
   ///        exact reversal of the operations for reading such a file but correctly conveys the
@@ -179,9 +204,14 @@ public:
   std::string writeMdl(MdlMolVersion vformat = MdlMolVersion::V3000) const;
   /// \}
 
+  /// \brief Write the set of all applicable data items to a string or file.  This is to be used in
+  ///        concert with the writeMdl() member function above, to write MDL MOL format entries and
+  ///        then follow them with the 
+  
 private:
 
   // Items describing quantities of information (most of them from the counts line)
+  ExceptionResponse policy;   ///<
   MdlMolVersion version_no;   ///< The format in which this entry was read (does not necessarily
                               ///<   dictate the version in which it will be written)
   int atom_count;             ///< The number of atoms in the molecule
@@ -274,6 +304,10 @@ private:
   /// General comments for the file (third line of the file header)
   std::string general_comment;
 
+  /// An external registry number for the molecule.  This can be imparted explicitly, or imparted
+  /// by adding a data item indicating an external registry number.
+  std::string external_regno;
+  
   /// \brief Allocate space for information in amounts described on the MOL entry's counts line.
   void allocate();
 
@@ -347,6 +381,17 @@ private:
   /// \brief Add hydrogens to fill out valence shells based on the stated bond orders, formal
   ///        charges, and elements of the molecule.
   void hydrogenate();
+
+  /// \brief Compare the external registry number (if any) coming from an added data item with
+  ///        that stored in the molecule object itself.  This provides a check that all data items
+  ///        will display a consistent external registry number.
+  ///
+  /// \param regno_in  The registry number to compare to anything that exists.  If this string is
+  ///                  blank, no comparison will be made.  If this string is substantial and the
+  ///                  object's own number is blank, take this as the object's registry number.
+  ///                  If both the object's own number and this string are substantial and they
+  ///                  disagree, produce a warning or error.
+  void compareExternalRegistryNumbers(const std::string &regno_in);
 };
 
 /// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.

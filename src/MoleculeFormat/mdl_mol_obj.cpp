@@ -22,21 +22,21 @@ using trajectory::PhaseSpaceWriter;
 using trajectory::writeFrame;
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj():
-    version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0},
-    constraint_count{0}, chirality{MolObjChirality::ACHIRAL}, registry_number{-1},
-    data_item_count{0}, property_formal_charges{false}, property_radicals{false},
-    property_isotopes{false}, property_element_lists{false}, coordinates{}, atomic_symbols{},
-    atomic_numbers{}, formal_charges{}, isotopic_shifts{}, parities{}, implicit_hydrogens{},
-    stereo_considerations{}, valence_connections{}, atom_atom_mapping_count{},
-    orientation_stability{}, bonds{}, element_lists{}, stext_entries{}, properties{}, title{""},
-    software_details{""}, general_comment{""}
+MdlMolObj::MdlMolObj(const ExceptionResponse policy_in):
+    policy{policy_in}, version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0},
+    list_count{0}, sgroup_count{0}, constraint_count{0}, chirality{MolObjChirality::ACHIRAL},
+    registry_number{-1}, data_item_count{0}, property_formal_charges{false},
+    property_radicals{false}, property_isotopes{false}, property_element_lists{false},
+    coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{}, isotopic_shifts{},
+    parities{}, implicit_hydrogens{}, stereo_considerations{}, valence_connections{},
+    atom_atom_mapping_count{}, orientation_stability{}, bonds{}, element_lists{}, stext_entries{},
+    properties{}, title{""}, software_details{""}, general_comment{""}
 {}
 
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_end_in,
-                     const CaseSensitivity capitalization, const ExceptionResponse policy):
-  MdlMolObj()
+                     const CaseSensitivity capitalization, const ExceptionResponse policy_in):
+  MdlMolObj(policy_in)
 {
   const TextFileReader tfr = tf.data();
 
@@ -277,6 +277,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
       int adv_pos;
       data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title);
+      compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
       pos = adv_pos;
     }
   }
@@ -310,13 +311,13 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
 }
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const std::string &filename):
-  MdlMolObj(TextFile(filename))
+MdlMolObj::MdlMolObj(const std::string &filename, const ExceptionResponse policy_in):
+    MdlMolObj(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const char* filename):
-  MdlMolObj(std::string(filename))
+MdlMolObj::MdlMolObj(const char* filename, const ExceptionResponse policy_in):
+    MdlMolObj(std::string(filename), policy_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -415,6 +416,22 @@ const std::vector<int>& MdlMolObj::getFormalCharges() const {
 //-------------------------------------------------------------------------------------------------
 int MdlMolObj::getPropertiesCount() const {
   return properties_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
+                            const RestraintApparatus &ra) {
+  std::vector<std::string> di_body;
+  switch (ask.getKind()) {
+  case DataRequestKind::STATE_VARIABLE:
+  case DataRequestKind::ATOM_INFLUENCES:
+  case DataRequestKind::TOPOLOGY_PARAMETER:
+    break;
+  case DataRequestKind::STRING:
+    break;
+  }
+  data_items.emplace_back(ask, di_body);
+  compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -786,6 +803,32 @@ void MdlMolObj::updateV2kAtomAttributes() {
 //-------------------------------------------------------------------------------------------------
 void MdlMolObj::hydrogenate() {
 
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::compareExternalRegistryNumbers(const std::string &regno_in) {
+  if (regno_in.size() > 0LLU) {
+    if (external_regno.size() == 0LLU) {
+      external_regno = regno_in;
+    }
+    else {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("The external registry number associated with a data item to add (" + regno_in +
+              ") is inconsistent with the external registry number already associated with the "
+              "MDL MOL entry (" + external_regno + ").", "MdlMolObj",
+              "compareExternalRegistryNumbers");
+      case ExceptionResponse::WARN:
+        rtWarn("The external registry number associated with a data item to add (" + regno_in +
+               ") is inconsistent with the external registry number already associated with the "
+               "MDL MOL entry (" + external_regno + ").  The existing registry number will take "
+               "precedence.", "MdlMolObj", "compareExternalRegistryNumbers");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

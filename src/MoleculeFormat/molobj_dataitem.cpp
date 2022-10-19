@@ -14,10 +14,11 @@ using parse::separateText;
 using parse::verifyContents;
 
 //-------------------------------------------------------------------------------------------------
-  MolObjDataRequest::MolObjDataRequest(const std::string &title_in, const std::string &label_in) :
+MolObjDataRequest::MolObjDataRequest(const std::string &title_in, const std::string &label_in) :
     kind{DataRequestKind::STRING}, title{title_in}, energy_component{StateVariable::BOND},
     atom_mask{std::string("")}, valence_kind{StateVariable::BOND}, message{std::string("")},
-    atom_types{}, system_label{label_in}
+    atom_types{}, system_label{label_in}, use_maccs_ii_number{false}, maccs_ii_number{0},
+    use_internal_registry{false}, external_regno{std::string("")}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -164,6 +165,26 @@ const std::string& MolObjDataRequest::getSystemLabel() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataRequest::getExternalRegistryNumber() const {
+  return external_regno;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataRequest::placeMaccsFieldInHeader() const {
+  return use_maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataRequest::placeInternalRegistryInHeader() const {
+  return use_internal_registry;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjDataRequest::getMaccsFieldNumber() const {
+  return maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MolObjDataRequest::checkKind(const DataRequestKind accepted_kind) const {
   if (kind != accepted_kind) {
     rtErr("A data request of type " + getEnumerationName(kind) + " cannot function as a request "
@@ -303,6 +324,13 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
     body.push_back(tf.extractString(pos));
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+MolObjDataItem::MolObjDataItem(const MolObjDataRequest &ask,
+                               const std::vector<std::string> &body_in) :
+    MolObjDataItem(ask.getTitle(), ask.getExternalRegistryNumber(), -1, ask.getMaccsFieldNumber(),
+                   getDataItemHeaderCode(ask), body_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
 const std::string& MolObjDataItem::getItemName() const {
@@ -545,6 +573,33 @@ void MolObjDataItem::validateItemName() const {
           "underscores, with no white space.", "MolObjDataItem", "setItemName");
   }
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+uint getDataItemHeaderCode(const bool use_internal_regno, const bool use_external_regno,
+                           const bool use_item_name, const bool use_maccs_ii_field,
+                           const bool state_from_archives) {
+  return static_cast<int>(use_internal_regno) + (static_cast<int>(use_external_regno) * 2) +
+         (static_cast<int>(use_item_name) * 4) + (static_cast<int>(use_maccs_ii_field) * 8) +
+         (static_cast<int>(state_from_archives) * 16);
+}
+
+//-------------------------------------------------------------------------------------------------
+uint getDataItemHeaderCode(const MolObjDataRequest &ask) {
+
+  // It is obligatory to display the item name for requested data items, and "FROM ARCHIVES" is
+  // not displayed in such data items.
+  uint result = 4U;
+  if (ask.placeInternalRegistryInHeader()) {
+    result += 1U;
+  }
+  if (ask.getExternalRegistryNumber().size() > 0LLU) { 
+    result += 2U;
+  }
+  if (ask.placeMaccsFieldInHeader()) {
+    result += 8U;
+  }
+  return result;
+}
+
 } // namespace structure
 } // namespace stormm

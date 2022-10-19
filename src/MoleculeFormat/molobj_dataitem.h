@@ -77,6 +77,20 @@ public:
   /// \brief Get the system label to which the data item should be applied.
   const std::string& getSystemLabel() const;
 
+  /// \brief Get the external registry number for the compound, as transcribed for this request
+  const std::string& getExternalRegistryNumber() const;
+
+  /// \brief Indicate that the MACCS-II field number should go in the resulting data item's header
+  ///        line.
+  bool placeMaccsFieldInHeader() const;
+
+  /// \brief Indicate that the internal registry numbre (known only once the SD file is ready for
+  ///        assembly) should be placed in the resulting data item's header.
+  bool placeInternalRegistryInHeader() const;
+
+  /// \brief Get the MACCS-II field number.
+  int getMaccsFieldNumber() const;
+  
 private:
   DataRequestKind kind;           ///< Define the type of data request
   std::string title;              ///< Title for the data item, to be displayed as "> <title>" in
@@ -97,6 +111,17 @@ private:
                                   ///<   output, this label will be checked against the molecular
                                   ///<   system's label to ensure that the information goes only
                                   ///<   into the intended places.
+
+  // The following information is intended to cover the breadth of the SD file format's data item
+  // header lines.
+  bool use_maccs_ii_number;       ///< Flag to have the MACCS-II number used in the header line
+  int maccs_ii_number;            ///< The field number of the property described by this data
+                                  ///<   item in the MACCS-II database
+  bool use_internal_registry;     ///< Flag to have the data item make use of the internal order
+                                  ///<   of molecules present in the SD file archive in the
+                                  ///<   header identification
+  std::string external_regno;     ///< An external registry number for the compound to include
+                                  ///<   in data items created in response to this request
 
   /// \brief Check that the data request is of the right kind to return a particular member
   ///        variable, or possibly to perform other functions.
@@ -151,6 +176,8 @@ public:
                  const std::string &external_regno_in = std::string(""),
                  int internal_regno_in = -1, int maccs_ii_number_in = -1, uint header_info = 0U,
                  const std::vector<std::string> &body_in = {});
+
+  MolObjDataItem(const MolObjDataRequest &ask, const std::vector<std::string> &body_in);
   /// \}
 
   /// \brief The default copy and move constructors, as well as copy and move assignment operators,
@@ -264,6 +291,27 @@ private:
   /// \brief Validate the choice of item name.
   void validateItemName() const;
 };
+
+/// \brief Get the unsigned integer bit-packed code expressing various aspects of the data item
+///        header line.
+///
+/// Overloaded:
+///   - Accept boolean arguments for all five aspects
+///   - Accept a data item request and glean the details from that
+///
+/// \param use_internal_regno   Flag to display the internal registry number
+/// \param use_external_regno   Flag to display the external registry number (in parentheses)
+/// \param use_item_name        Flag to display the item name (in angular brackets)
+/// \param use_maccs_ii_field   Flag to display the MACCS-II database field number (after "DT")
+/// \param state_from_archives  Flag to display "FROM ARCHIVES"
+/// \param ask                  The data item request
+/// \{
+uint getDataItemHeaderCode(bool use_internal_regno = false, bool use_external_regno = false,
+                           bool use_item_name = true, bool use_maccs_ii_field = false,
+                           bool state_from_archives = false);
+
+uint getDataItemHeaderCode(const MolObjDataRequest &ask);
+/// \}
 
 } // namespace structure
 } // namespace stormm
