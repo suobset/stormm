@@ -90,6 +90,22 @@ public:
 
   /// \brief Get the MACCS-II field number.
   int getMaccsFieldNumber() const;
+
+  /// \brief Set the external registry number.
+  ///
+  /// \param regno_in  The external registry number for the compound described by this data item
+  void setExternalRegistryNumber(const std::string &regno_in);
+  
+  /// \brief Set the MACCS-II field number.
+  ///
+  /// \param maccs_in  The MACCS-II database field number for the requested data item
+  void setMaccsFieldNumber(int maccs_in);
+
+  /// \brief Set the data item to make use of the SD file archive's internal registry number (the
+  ///        number of the molecule or conformation within the file) in its header line.
+  ///
+  /// \param input  The directive can be set to "OFF" or "ON / ACTIVE"
+  void setInternalRegistryUsage(const std::string &input);
   
 private:
   DataRequestKind kind;           ///< Define the type of data request

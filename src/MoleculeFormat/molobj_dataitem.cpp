@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
 #include "molobj_dataitem.h"
@@ -6,8 +7,10 @@
 namespace stormm {
 namespace structure {
 
+using constants::CaseSensitivity;
 using diskutil::getBaseName;
 using parse::NumberFormat;
+using parse::strcmpCased;
 using parse::stringToChar4;
 using parse::strncmpCased;
 using parse::separateText;
@@ -182,6 +185,33 @@ bool MolObjDataRequest::placeInternalRegistryInHeader() const {
 //-------------------------------------------------------------------------------------------------
 int MolObjDataRequest::getMaccsFieldNumber() const {
   return maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataRequest::setExternalRegistryNumber(const std::string &regno_in) {
+  external_regno = regno_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataRequest::setMaccsFieldNumber(int maccs_in) {
+  maccs_ii_number = maccs_in;
+  use_maccs_ii_number = true;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjDataRequest::setInternalRegistryUsage(const std::string &input) {
+  if (strcmpCased(input, "on", CaseSensitivity::NO) ||
+      strcmpCased(input, "active", CaseSensitivity::NO)) {
+    use_internal_registry = true;
+  }
+  else if (strcmpCased(input, "off", CaseSensitivity::NO)) {
+    use_internal_registry = false;
+  }
+  else {
+    rtErr("Invalid directive " + input + " to an SD file data item request, pertaining to "
+          "internal registry number usage.  Use ON or OFF.", "MolObjDataRequest",
+          "setInternalRegistryUsage");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

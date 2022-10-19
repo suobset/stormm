@@ -561,7 +561,8 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
     }
   }
 
-  // Create the appropriate result
+  // Create the appropriate result.  Track the additions so that further edits may take place
+  // later in this function.
   std::vector<MolObjDataRequest> result;
   switch (result_kind) {
   case DataRequestKind::STATE_VARIABLE:
@@ -703,6 +704,16 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
     }
   }
 
+  // Further adjustments based on additional user input
+  for (size_t i = 0LLU; i < result.size(); i++) {
+    if (t_nml.getKeywordStatus("sdf_item", "-internal_regno", index) != missing) {
+      result[i].setInternalRegistryUsage(t_nml.getStringValue("sdf_item", "-internal_regno",
+                                                              index));
+    }
+    if (t_nml.getKeywordStatus("sdf_item", "-maccsid", index) != missing) {
+      result[i].setMaccsFieldNumber(t_nml.getIntValue("sdf_item", "-maccsid", index));    
+    }
+  }  
   return result;
 }
 
@@ -736,7 +747,12 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
     "An atom type that helps define the topology parameter being sought",
     "An atom type that helps define the topology parameter being sought",
     "An atom type that helps define the topology parameter being sought",
-    "An atom type that helps define the topology parameter being sought"    
+    "An atom type that helps define the topology parameter being sought",
+    "The external registry number for the compound (will be displayed on the headline in "
+    "parentheses)",
+    "Set to ON to have this data item state the internal registry number within the SDF on its "
+    "headline (default OFF)",
+    "The field number of this type of data in a MACCS-II database"
   };
   t_nml.addKeyword(NamelistElement("syntax", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("scope", NamelistType::STRING, "MISSING"));
@@ -746,17 +762,20 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                                    DefaultIsObligatory::NO, InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("sdf_item", { "-title", "-label", "-energy", "-message",
                                                  "-mask", "-parameter", "-typeI", "-typeJ",
-                                                 "-typeK", "-typeL", "-typeM" },
+                                                 "-typeK", "-typeL", "-typeM", "-exregno",
+                                                 "-internal_regno", "-maccsid" },
                                    { NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
-                                     NamelistType::STRING },
+                                     NamelistType::STRING, NamelistType::STRING,
+                                     NamelistType::STRING, NamelistType::INTEGER },
                                    { std::string(""), std::string("ALL"), std::string(""),
                                      std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string(""), std::string(""),
-                                     std::string(""), std::string("") },
+                                     std::string(""), std::string(""), std::string(""),
+                                     std::string("OFF"), std::to_string(-1) },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sdf_help,
                                    sdf_keys_help,
                                    { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
@@ -764,7 +783,8 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                                      SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
                                      SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
                                      SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL }));
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
   t_nml.addHelp("syntax", "Layout of the diagnostics report file, intended to make it amenable "
                 "to one of a variety of plotting programs for further analysis.");
   t_nml.addHelp("scope", "The extent of reporting that shall take place for the energies and "
@@ -788,7 +808,9 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                 "sensitive.  A user may also opt to print temperatures of specific regions of the "
                 "simulation by supplying the LOCAL_TEMPERATURE argument, and components of the "
                 "virial using the VIRIAL_COMPONENTS argument.");
-  t_nml.addHelp("sdf_item", "");
+  t_nml.addHelp("sdf_item", "Detail a data item to be included in an SD file archive.  These "
+                "items can be attached to specific systems and display particular aspects of the "
+                "energy or the model that calculated it.");
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
