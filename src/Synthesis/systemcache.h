@@ -427,7 +427,7 @@ private:
   ///                      separator.
   /// \param system_index  System index out of all systems in the cache (this will be used to find
   ///                      the label index and its degeneracy)
-  std::string multiplyName(const std::string &fname_in, int system_index) const;
+  std::string nondegenerateName(const std::string &fname_in, int system_index) const;
 };
   
 } // namespace synthesis

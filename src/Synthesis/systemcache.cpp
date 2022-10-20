@@ -1124,7 +1124,7 @@ std::string SystemCache::getSystemTrajectoryName(const int system_index) const {
           std::to_string(system_trajectory_names.size()) + ".", "SystemCache",
           "getTrajectoryFileName");
   }
-  return system_trajectory_names[system_index];
+  return nondegenerateName(system_trajectory_names[system_index], system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1134,7 +1134,7 @@ std::string SystemCache::getSystemCheckpointName(const int system_index) const {
           std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
           "getCheckpointFileName");
   }
-  return multiplyName(system_checkpoint_names[system_index], system_index);
+  return nondegenerateName(system_checkpoint_names[system_index], system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1167,7 +1167,8 @@ CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::multiplyName(const std::string &fname_in, const int system_index) const {
+std::string SystemCache::nondegenerateName(const std::string &fname_in,
+                                           const int system_index) const {
   const int label_idx = label_indices[system_index];
   const int label_deg = label_degeneracy[label_idx];
   std::string result;
