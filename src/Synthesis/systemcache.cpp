@@ -13,6 +13,7 @@ namespace stormm {
 namespace synthesis {
 
 using diskutil::getBaseName;
+using diskutil::osSeparator;
 using diskutil::splitPath;
 using energy::evaluateBondTerms;
 using energy::evaluateAngleTerms;
@@ -29,11 +30,12 @@ using trajectory::detectCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
-    system_count{0}, topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
-    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, restraint_indices{},
-    example_indices{}, topology_cases{}, topology_case_bounds{}, system_trajectory_names{},
-    system_checkpoint_names{}, system_labels{}, system_trajectory_kinds{},
-    system_checkpoint_kinds{}
+    system_count{0}, topology_count{0}, label_count{0}, restraint_count{0}, topology_cache{},
+    coordinates_cache{}, label_cache{}, features_cache{}, restraints_cache{}, static_masks_cache{},
+    forward_masks_cache{}, topology_indices{}, label_indices{}, label_degeneracy{},
+    label_subindices{}, restraint_indices{}, example_indices{}, topology_cases{},
+    topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{}, system_labels{},
+    system_trajectory_kinds{}, system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -545,12 +547,12 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       }
     }
   }
-  
+
   // Collect examples of all systems, taking the first system in the list to use each topology
   // as the example of coordinates for that topology.
-  const int top_count = topology_cache.size();
+  topology_count = topology_cache.size();
   const int system_count = coordinates_cache.size();
-  example_indices.resize(top_count, -1);
+  example_indices.resize(topology_count, -1);
   for (int i = 0; i < system_count; i++) {
     const int top_idx = topology_indices[i];
     if (example_indices[top_idx] == -1) {
@@ -560,7 +562,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 
   // Make a list of all the systems making use of each topology, plus a bounds list to navigate it
   topology_cases.resize(system_count);
-  topology_case_bounds.resize(top_count + 1, 0);
+  topology_case_bounds.resize(topology_count + 1, 0);
   for (int i = 0; i < system_count; i++) {
     topology_case_bounds[topology_indices[i]] += 1;
   }
@@ -570,11 +572,41 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
     topology_cases[case_idx] = i;
     topology_case_bounds[topology_indices[i]] = case_idx + 1;
   }
-  for (int i = top_count; i > 0; i--) {
+  for (int i = topology_count; i > 0; i--) {
     topology_case_bounds[i] = topology_case_bounds[i - 1];
   }
   topology_case_bounds[0] = 0;
 
+  // With all labels now known, condense a list of all unique labels and mark each system with an
+  // index into this list, based on its own label.
+  std::vector<bool> label_coverage(system_count, false);
+  label_indices.resize(system_count);
+  for (int i = 0; i < system_count; i++) {
+    if (label_coverage[i]) {
+      continue;
+    }
+    label_coverage[i] = true;
+    label_indices[i] = label_count;
+    for (int j = i + 1; j < label_count; j++) {
+      if (label_coverage[j]) {
+        continue;
+      }
+      if (system_labels[j] == system_labels[i]) {
+        label_coverage[j] = true;
+        label_indices[j] = label_count;
+      }
+    }
+    label_cache.push_back(system_labels[i]);
+    label_count += 1;
+  }
+  label_degeneracy.resize(label_count, 0);
+  label_subindices.resize(system_count);
+  for (int i = 0; i < system_count; i++) {
+    const int current_count = label_degeneracy[label_indices[i]];
+    label_subindices[i] = current_count;
+    label_degeneracy[label_indices[i]] = current_count + 1;
+  }
+  
   // Create ChemicalFeatures objects to pair with each system--the majority of the work in
   // computing the ChemicalFeatures lies in ring detection and drawing the Lewis structure to
   // determine formal charges and bond orders, aspects which are invariant to coordinates.
@@ -598,8 +630,8 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   }
 
   // Create Exclusion masks of the appropriate kind
-  std::vector<bool> need_static_mask(top_count, false);
-  std::vector<bool> need_forward_mask(top_count, false);
+  std::vector<bool> need_static_mask(topology_count, false);
+  std::vector<bool> need_forward_mask(topology_count, false);
   for (int i = 0; i < system_count; i++) {
     const int top_idx = topology_indices[i];
     switch (coordinates_cache[i].getUnitCellType()) {
@@ -612,9 +644,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       break;
     }
   }
-  static_masks_cache.reserve(top_count);
-  forward_masks_cache.reserve(top_count);
-  for (int i = 0; i < top_count; i++) {
+  static_masks_cache.reserve(topology_count);
+  forward_masks_cache.reserve(topology_count);
+  for (int i = 0; i < topology_count; i++) {
     if (need_static_mask[i]) {
       static_masks_cache.emplace_back(&topology_cache[i]);
     }
@@ -682,6 +714,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
     if (ra.getTotalRestraintCount() == 0) {
       if (blank_ra[topology_indices[i]] < 0) {
         restraints_cache.push_back(ra);
+        restraint_count += 1;
         blank_ra[topology_indices[i]] = static_cast<int>(restraints_cache.size()) - 1;
       }
       restraint_indices[i] = blank_ra[topology_indices[i]];
@@ -706,7 +739,17 @@ int SystemCache::getSystemCount() const {
 
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getTopologyCount() const {
-  return topology_cache.size();
+  return topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getLabelCount() const {
+  return label_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getRestraintCount() const {
+  return restraint_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1091,7 +1134,7 @@ std::string SystemCache::getSystemCheckpointName(const int system_index) const {
           std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
           "getCheckpointFileName");
   }
-  return system_checkpoint_names[system_index];
+  return multiplyName(system_checkpoint_names[system_index], system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1122,6 +1165,41 @@ CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) 
   }
   return system_checkpoint_kinds[system_index];
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::string SystemCache::multiplyName(const std::string &fname_in, const int system_index) const {
+  const int label_idx = label_indices[system_index];
+  const int label_deg = label_degeneracy[label_idx];
+  std::string result;
+  if (label_deg > 1) {
+    const int label_pos = label_subindices[system_index];
+    int last_slash = 0;
+    int last_dot = 0;
+    const char osc = osSeparator();
+    for (int i = 0; i < fname_in.size(); i++) {
+
+      // This logic assumes that the OS directory separator is not a '.', but no file system works
+      // in that way.
+      if (fname_in[i] == osc) {
+        last_slash = i;
+      }
+      else if (fname_in[i] == '.') {
+        last_dot = i;
+      }
+    }
+    if (last_dot > last_slash) {
+      result = fname_in.substr(0, last_dot) + "_" + std::to_string(label_pos) +
+               fname_in.substr(last_dot, fname_in.size());
+    }
+    else {
+      result = fname_in + "_" + std::to_string(label_pos);
+    }
+  }
+  else {
+    result = fname_in;
+  }
+  return result;
+}
+
 } // namespace synthesis
 } // namespace stormm

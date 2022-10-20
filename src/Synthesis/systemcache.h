@@ -80,6 +80,15 @@ public:
   /// \brief Get the number of topologies
   int getTopologyCount() const;
 
+  /// \brief Get the number of unique labels across all systems
+  int getLabelCount() const;
+
+  /// \brief Get the number of different restraint apparatuses.  Many restraint apparatuses may be
+  ///        unique in the sense that they have different stiffness and displacement settings,
+  ///        even though they apply their restraints to the same atoms of different systems guided
+  ///        by the same topology.
+  int getRestraintCount() const;
+
   /// \brief Get the topology index of one of the coordinate sets contained in this cache.  This
   ///        will apply a bounds check to the coordinate index query.  This function should be used
   ///        to access topologies in the output of a getTopologyReference() or getTopologyPointer()
@@ -319,11 +328,19 @@ public:
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   CoordinateFileKind getSystemCheckpointKind(const int system_index) const;
-
+  
 private:
 
-  /// An official record of the total number of systems in the cache
-  int system_count;
+  // Counts are kept as separate integers, to have a single authoritative number on some central
+  // quantities in this systems cache.
+  int system_count;       ///< An official record of the total number of systems in the cache
+  int topology_count;     ///< The number of unique topologies
+  int label_count;        ///< The number of unique labels
+  int restraint_count;    ///< The number of unique restraint setups.  Each RestraintApparatus
+                          ///<   object must pertain to a specific topology and each system may
+                          ///<   reference but one RestraintApparatus, but many RestraintApparatus
+                          ///<   objects may involve the same topology in order to guide different
+                          ///<   systems.
 
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.
@@ -333,6 +350,9 @@ private:
   /// coordinates read as part of a MoleculeSystem.
   std::vector<PhaseSpace> coordinates_cache;
 
+  /// A collection of the unique labels across all systems
+  std::vector<std::string> label_cache;
+  
   /// Chemical features objects outline the important aspects of each system.
   std::vector<ChemicalFeatures> features_cache;
 
@@ -349,6 +369,16 @@ private:
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.
   std::vector<int> topology_indices;
+
+  /// The vector of all systems' indices into the array of unique labels.
+  std::vector<int> label_indices;
+
+  /// The number of systems sharing each label in the label cache
+  std::vector<int> label_degeneracy;
+  
+  /// When systems share the same label, the degeneracy implies that each system can only be
+  /// distinguished by a unique sub-index within that label group.
+  std::vector<int> label_subindices;
 
   /// The vector of all restraint indices guiding each simulation.  Like topology_indices, this
   /// list may contain multiple systems pointing to the same restraint apparatus, especially if
@@ -382,6 +412,22 @@ private:
 
   /// File types for the various output checkpoint files
   std::vector<CoordinateFileKind> system_checkpoint_kinds;
+
+  /// \brief When multiple replicas are guided by one topology fall under the same system label,
+  ///        it is not clear what to do when each of them is to be written to a trajectory or a
+  ///        checkpoint file.  This function will examine the case of a particular system, with a
+  ///        given name, and extend the name with a unique replica number to eliminate any
+  ///        degeneracy in the
+  ///
+  /// \param fname_in      Name of the file to print.  In the event of a name collision with
+  ///                      other systems under the same label, this name will be extended based on
+  ///                      a system sub-index within that label group.  The extension will take
+  ///                      the form of "_<sub-index>" just before the final '.' in the name, or at
+  ///                      the end of the name if there is no '.' after the final OS directory
+  ///                      separator.
+  /// \param system_index  System index out of all systems in the cache (this will be used to find
+  ///                      the label index and its degeneracy)
+  std::string multiplyName(const std::string &fname_in, int system_index) const;
 };
   
 } // namespace synthesis

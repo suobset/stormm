@@ -513,8 +513,19 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
   std::ofstream foutp;
   foutp = openOutputFile(file_name, aexp, "Open an output file for writing CoordinateFrame "
                          "contents", style);
-  if (fi_exists == false) {
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::SDF:
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    if (fi_exists == false) {
+      initializeTrajectory(&foutp, kind, atom_count);
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
     initializeTrajectory(&foutp, kind, atom_count);
+    break;
   }
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:

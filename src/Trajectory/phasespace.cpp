@@ -910,8 +910,19 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   std::ofstream foutp;
   foutp = openOutputFile(file_name, aexp, "Open an output file for writing PhaseSpace contents",
                          style);
-  if (fi_exists == false) {
+  switch (output_kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::SDF:
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    if (fi_exists == false) {
+      initializeTrajectory(&foutp, output_kind, atom_count, current_time);
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
     initializeTrajectory(&foutp, output_kind, atom_count, current_time);
+    break;
   }
   switch (output_kind) {
   case CoordinateFileKind::AMBER_CRD:

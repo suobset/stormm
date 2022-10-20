@@ -127,7 +127,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
     // The case of an unknown format is handled in the switch above
     break;
   }
-
+  
   // Print the coordinates
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
