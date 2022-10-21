@@ -37,7 +37,7 @@ int main(int argc, const char* argv[]) {
   
   // Read topologies and coordinate files
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::YES,
-                 &master_timer);
+                 ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
 
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare

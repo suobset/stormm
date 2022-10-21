@@ -36,7 +36,8 @@ int main(int argc, const char* argv[]) {
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
-                 ui.getExceptionBehavior(), MapRotatableGroups::YES, &timer);
+                 ui.getExceptionBehavior(), ui.getPrintingPolicy(), MapRotatableGroups::YES,
+                 &timer);
 
   // Perform minimizations as requested.
   const int system_count = sc.getSystemCount();

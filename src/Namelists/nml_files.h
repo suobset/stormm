@@ -15,6 +15,7 @@ namespace namelist {
 
 using parse::WrapTextSearch;
 using trajectory::CoordinateFileKind;
+using trajectory::TrajectoryFusion;
 
 /// \brief Default file names and extensions.  The default input file name varies according to the
 ///        particular application and is therefore not defined within these libraries.
@@ -27,6 +28,7 @@ constexpr char default_filecon_trajectory_name[] = "md.crd";
 constexpr char default_filecon_checkpoint_name[] = "md.rst";
 constexpr char default_filecon_warnings_name[] = "warn.out";
 constexpr char default_filecon_errors_name[] = "err.out";
+constexpr char default_filecon_result_fusion[] = "AUTO";
 constexpr CoordinateFileKind default_filecon_inpcrd_type = CoordinateFileKind::UNKNOWN;
 constexpr CoordinateFileKind default_filecon_outcrd_type = CoordinateFileKind::AMBER_CRD;
 constexpr CoordinateFileKind default_filecon_chkcrd_type = CoordinateFileKind::AMBER_ASCII_RST;
@@ -272,6 +274,9 @@ public:
   /// \brief Get the coordinate (checkpoint) file output format
   CoordinateFileKind getCheckpointFormat() const;
   
+  /// \brief Get the preferences for fusing output coordinate files.
+  TrajectoryFusion getFileFusionProtocol() const;
+  
   /// \brief Get one or more free topology names.
   ///
   /// Overloaded:
@@ -416,18 +421,20 @@ private:
   ExceptionResponse policy;
   
   // Counts of critical data
-  int structure_count;        ///< Total number of initial structures, the sum of all free
-                              ///<   coordinate files (for which only the first frame will be read,
-                              ///<   if multiple frames are present) and all frames arising from
-                              ///<   system definitions (which can include trajectory files and
-                              ///<   span multiple frames)
-  int free_topology_count;    ///< The number of free topologies, which will be matched to free
-                              ///<   coordinate files
-  int free_coordinate_count;  ///< The number of free coordinate files, which will be paired to
-                              ///<   free trajectories
-  int system_count;           ///< The number of system keyword specifications
-  bool all_free_frames;       ///< Flag to have all free coordinate files' frames read (if true),
-                              ///<   or just the first (if false, default)
+  int structure_count;          ///< Total number of initial structures, the sum of all free
+                                ///<   coordinate files (for which only the first frame will be 
+                                ///<   read, if multiple frames are present) and all frames arising
+                                ///<   from system definitions (which can include trajectory files
+                                ///<   and span multiple frames)
+  int free_topology_count;      ///< The number of free topologies, which will be matched to free
+                                ///<   coordinate files
+  int free_coordinate_count;    ///< The number of free coordinate files, which will be paired to
+                                ///<   free trajectories
+  int system_count;             ///< The number of system keyword specifications
+  bool all_free_frames;         ///< Flag to have all free coordinate files' frames read (if true),
+                                ///<   or just the first (if false, default)
+  TrajectoryFusion fuse_files;  ///< Indicate whether to fuse output coordinate files (checkpoint
+                                ///<   and trajectory files)
 
   /// Format of the coordinate output files
   CoordinateFileKind coordinate_input_format;

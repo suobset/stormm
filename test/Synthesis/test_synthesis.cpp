@@ -41,6 +41,7 @@
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::chemistry::AtomMask;
@@ -990,7 +991,7 @@ int main(const int argc, const char* argv[]) {
                       "\n&end\n";
   const TextFile multi_label_tf(multi_label_deck, TextOrigin::RAM);
   start_line = 0;
-  FilesControls multi_label_fcon(multi_label_tf, &start_line);
+  const FilesControls multi_label_fcon(multi_label_tf, &start_line);
   SystemCache multi_label_sysc(multi_label_fcon, ExceptionResponse::SILENT);
   check(multi_label_sysc.getSystemCheckpointName(10), RelationalOperator::EQUAL, "md_0_10.rst",
         "The SystemCache object does not produced the expected non-colliding name for a frame of "
@@ -998,7 +999,31 @@ int main(const int argc, const char* argv[]) {
   check(multi_label_sysc.getSystemCheckpointName(38), RelationalOperator::EQUAL, "md_1_2.rst",
         "The SystemCache object does not produced the expected non-colliding name for a replica "
         "of an coordinate system first read from an Amber ASCII restart file.", test_sysc);
-  
+
+  std::string cat_output_deck("&files\n");
+  cat_output_deck += "  -sys { -c " + testdir + "MoleculeFormat" + osc + "sulfonamide_rots.sdf "
+                     "-p " + testdir + "Topology" + osc + "sulfonamide.top -label sulfonamide "
+                     "frame_end -1 -r min_sulf.sdf r_kind SDF }";
+  cat_output_deck += "  -sys { -c " + testdir + "Trajectory" + osc + "stereo_L1_vs.inpcrd -p " +
+                     testdir + "Topology" + osc + "stereo_L1_vs.top -label stereo -n 16 "
+                     "-x min_stereo.crd r_kind AMBER_CRD }\n&end\n";
+  const TextFile cat_output_tf(cat_output_deck, TextOrigin::RAM);
+  start_line = 0;
+  const FilesControls cat_output_fcon(cat_output_tf, &start_line);
+  SystemCache cat_output_sysc(cat_output_fcon, ExceptionResponse::SILENT);
+
+  // CHECK
+#if 0
+  for (int i = 0; i < cat_output_sysc.getSystemCount(); i++) {
+    printf("  %2d : %80.80s of type %12.12s -> %20.20s of type %12.12s\n", i,
+           cat_output_sysc.getSystemInputCoordinatesName(i).c_str(),
+           getEnumerationName(cat_output_sysc.getSystemInputCoordinatesKind(i)).c_str(),
+           cat_output_sysc.getSystemCheckpointName(i).c_str(),
+           getEnumerationName(cat_output_sysc.getSystemCheckpointKind(i)).c_str());
+  }
+#endif
+  // END CHECK
+
   // Create some topologies and coordinate sets.
   Xoroshiro128pGenerator my_prng(oe.getRandomSeed());
   const std::string base_crd_name = testdir + "Trajectory";

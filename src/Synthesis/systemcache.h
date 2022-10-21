@@ -7,6 +7,7 @@
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
+#include "FileManagement/file_enumerators.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_restraint.h"
 #include "Potential/forward_exclusionmask.h"
@@ -24,6 +25,7 @@ namespace synthesis {
 using chemistry::ChemicalFeatures;
 using chemistry::MapRotatableGroups;
 using constants::ExceptionResponse;
+using diskutil::PrintSituation;
 using energy::ForwardExclusionMask;
 using energy::StaticExclusionMask;
 using namelist::FilesControls;
@@ -31,12 +33,14 @@ using namelist::RestraintControls;
 using restraints::RestraintApparatus;
 using testing::StopWatch;
 using topology::AtomGraph;
-using trajectory::PhaseSpace;
 using trajectory::CoordinateFileKind;
+using trajectory::CoordinateFileRole;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
 using trajectory::detectCoordinateFileKind;
+using trajectory::PhaseSpace;
+using trajectory::TrajectoryFusion;
 
 /// \brief Simple but central struct to store the primitive form of the collection of systems that
 ///        most STORMM applications will work with.  There are topologies, coordinate sets, and a
@@ -51,17 +55,21 @@ public:
   ///        trivial and works well for delegation.
   ///
   /// \param file_io_input  Object built from a &files namelist and possible command-line edits
-  /// \param policy         Response to bad user input, i.e. files of the wrong type
+  /// \param policy_in      Response to bad user input, i.e. files of the wrong type
   /// \{
-  SystemCache();
+  SystemCache(ExceptionResponse policy_in = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW);
 
   SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-              ExceptionResponse policy = ExceptionResponse::DIE,
+              ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
 
   SystemCache(const FilesControls &fcon, ExceptionResponse policy = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
   /// \}
 
@@ -329,6 +337,11 @@ public:
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemLabel(int system_index) const;
 
+  /// \brief Get the coordinate file type associated with a particular system's input.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  CoordinateFileKind getSystemInputCoordinatesKind(const int system_index) const;
+  
   /// \brief Get the coordinate file type associated with a particular system's trajectory.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
@@ -338,9 +351,36 @@ public:
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   CoordinateFileKind getSystemCheckpointKind(const int system_index) const;
-  
+
+  /// \brief When multiple systems' coordinates are to be combined into a particular file, the
+  ///        file may be opened as a new file once, with whatever overwriting protocol, to write
+  ///        the first set of coordinates.  Thereafter, the printing protocol must change: it
+  ///        should be appended with other systems from the same label group.  This function will
+  ///        determine how to modulate the printing protcol.
+  ///
+  /// \param purpose  The role that the file will play
+  /// \param 
+  PrintSituation getPrintingProtocol(CoordinateFileRole purpose, int system_index) const;
+
+  /// \brief Set the printing protocol.
+  ///
+  /// \param expectation_in  The protocol to use in printing any files
+  void setPrintingProtocol(const PrintSituation expectation_in);
+
 private:
 
+  /// The object will store the exception response behavior under which it was created, so that
+  /// output irregularities may be handled in the same manner as input errors.
+  ExceptionResponse policy;
+
+  /// The SystemCache is built to organize a (potentially large) collection of systems for
+  /// molecular mechanics calculations and then manage the output stream.  In a scenario where a
+  /// program built on STORMM executes and then shuts down, this will mean file printing.  In
+  /// a situation where a function based on STORMM takes inputs from a python environment and then
+  /// returns results, it may still need to decide whether to overwrite or add to a growing array.
+  /// This parameter indicates the SystemCache's way to handle existing data when writing it own.
+  PrintSituation expectation;
+  
   // Counts are kept as separate integers, to have a single authoritative number on some central
   // quantities in this systems cache.
   int system_count;       ///< An official record of the total number of systems in the cache
@@ -352,6 +392,16 @@ private:
                           ///<   objects may involve the same topology in order to guide different
                           ///<   systems.
 
+  /// The question of whether to fuse trajectories and checkpoint files is pertinent to a program
+  /// that is designed to run hundreds to thousands of calculations simultaneously.  The default
+  /// behavior will be to fuse checkpoint files for systems grouped under the same label into a
+  /// single file, if the provided format seems fit to accommodate that (in fact, there is no
+  /// existing molecular dynamics file format that can handle multiple frames of both positions
+  /// and velocities simultaneously, but for docking calculations and energy minimizations when
+  /// the only output is the positions fusing the final states of many systems into a single
+  /// file can be a great convenience).
+  TrajectoryFusion file_merger_protocol;
+  
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.
   std::vector<AtomGraph> topology_cache;
@@ -420,12 +470,34 @@ private:
   /// Labels applied to each system (whether from user input or auto-generated)
   std::vector<std::string> system_labels;
 
+  /// File types for the various input coordinate files
+  std::vector<CoordinateFileKind> system_input_coordinate_kinds;
+
   /// File types for the various output trajectory files
   std::vector<CoordinateFileKind> system_trajectory_kinds;
 
   /// File types for the various output checkpoint files
   std::vector<CoordinateFileKind> system_checkpoint_kinds;
 
+  /// \brief Check that the requested index is within the number of systems present in the cache.
+  ///
+  /// \param index   The requested system index
+  /// \param caller  Name of the calling function (for backtracing purposes after an error)
+  void checkSystemBounds(int index, const char* caller) const;
+
+  /// \brief Determine whether output files from multiple systems should be concatenated or fused.
+  ///        This can happen in particular cases:
+  ///        - The role of the files is checkpointing and the format provided is able to
+  ///          accept multiple frames
+  ///        - The role of the files is trajectories and the user has specified "concatenate files
+  ///          from the same label"
+  ///
+  /// \param purpose       The role that the files written will play
+  /// \param system_index  The index of the system about to be written--only if the system is
+  ///                      grouped with others under a single, degenerate label will file fusion
+  ///                      come into play
+  bool determineFileMerger(CoordinateFileRole purpose, int system_index) const;
+  
   /// \brief When multiple replicas are guided by one topology fall under the same system label,
   ///        it is not clear what to do when each of them is to be written to a trajectory or a
   ///        checkpoint file.  This function will examine the case of a particular system, with a
@@ -438,9 +510,12 @@ private:
   ///                      the form of "_<sub-index>" just before the final '.' in the name, or at
   ///                      the end of the name if there is no '.' after the final OS directory
   ///                      separator.
+  /// \param purpose       The role that the file will play, used to distinguish checkpoint files
+  ///                      from trajectories
   /// \param system_index  System index out of all systems in the cache (this will be used to find
   ///                      the label index and its degeneracy)
-  std::string nondegenerateName(const std::string &fname_in, int system_index) const;
+  std::string nondegenerateName(const std::string &fname_in, CoordinateFileRole purpose,
+                                int system_index) const;
 };
   
 } // namespace synthesis

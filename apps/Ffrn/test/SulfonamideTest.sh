@@ -4,7 +4,7 @@ cat > ffld.in << EOF
 &files
   -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
          -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
-         -label sulfonamide frame_end -1 -r sulfonamide.rst r_kind AMBER_INPCRD }
+         -label sulfonamide frame_end -1 -r sulfonamide.rst r_kind SDF }
 &end
 
 &ffrefine

@@ -71,15 +71,42 @@ enum class CoordinateLineFormat {
   FREE_FORMAT
 };
 
+/// \brief Enumerate the purposes that a coordinate file can have.  One could imagine a matrix of
+///        combinations of these enumerations and those of the CoordinateFileKind enumerator,
+///        showing which formats are suitable for which purposes.
+enum class CoordinateFileRole {
+  INITIATE,    ///< Contents of the file serve to seed the initial states of one or more systems
+  TRAJECTORY,  ///< The file will collect or present a trajectory of a single system
+  CHECKPOINT   ///< The contents of the file will record final states of one or more systems
+};
+
+/// \brief Enumerate the protocols for fusing trajectories and checkpoint files.
+enum class TrajectoryFusion {
+  ON,   ///< Fuse trajectory files as well as checkpoint files (if possible) for systems grouped
+        ///<   under the same label
+  OFF,  ///< Do not fuse trajectory or checkpoint files (even if possible)
+  AUTO  ///< Fuse checkpoint files (if the format will support it) but not trajectories for systems
+        ///<   grouped under the same label
+};
+
 /// \brief Produce a description of the coordinate file kind.
 ///
 /// \param cfkind  The enumerator instance of interest
 std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind);
   
-/// \brief Translate the CoordinateFileKind enumeration.
+/// \brief Translate the CoordinateFileKind enumeration.  Various overloads serve different
+///        enumerators.
 ///
-/// \param cfkind  The enumerator instance of interest
+/// \param cfkind    The enumerator instance of interest
+/// \param key       The enumerator instance of interest
+/// \param cpkind    The enumerator instance of interest
+/// \param protocol  The enumerator instance of interest
+/// \{
 std::string getEnumerationName(CoordinateFileKind cfkind);
+std::string getEnumerationName(AncdfVariable key);
+std::string getEnumerationName(CoordinateFileRole cpkind);
+std::string getEnumerationName(TrajectoryFusion protocol);
+/// \}
 
 /// \brief Get the nature of a trajectory file based on the stated format (this will return
 ///        binary or ASCII based on the stated trajectory file kind)
@@ -111,7 +138,6 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
 ///        in an Amber binary trajectory or restart file.
 ///
 /// \param key  The enumerator instance of interest
-std::string getEnumerationName(AncdfVariable key);
 
 } // namespace trajectory
 } // namespace stormm

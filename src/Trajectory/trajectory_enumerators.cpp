@@ -62,6 +62,63 @@ std::string getEnumerationName(const CoordinateFileKind cfkind) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const AncdfVariable key) {
+  switch (key) {
+  case AncdfVariable::NCFRAME:
+    return std::string("frame");
+  case AncdfVariable::NCSPATIAL:
+    return std::string("spatial");
+  case AncdfVariable::NCATOM:
+    return std::string("atom");
+  case AncdfVariable::NCCELL_SPATIAL:
+    return std::string("cell_spatial");
+  case AncdfVariable::NCCELL_LENGTHS:
+    return std::string("cell_lengths");
+  case AncdfVariable::NCCELL_ANGULAR:
+    return std::string("cell_angular");
+  case AncdfVariable::NCCELL_ANGLES:
+    return std::string("cell_angles");
+  case AncdfVariable::NCCOORDS:
+    return std::string("coordinates");
+  case AncdfVariable::NCVELO:
+    return std::string("velocities");
+  case AncdfVariable::NCTEMPERATURE:
+    return std::string("temp0");
+  case AncdfVariable::NCTIME:
+    return std::string("time");
+  case AncdfVariable::NCLABEL:
+    return std::string("label");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const CoordinateFileRole cpkind) {
+  switch (cpkind) {
+  case CoordinateFileRole::INITIATE:
+    return std::string("INITIATE");
+  case CoordinateFileRole::TRAJECTORY:
+    return std::string("TRAJECTORY");
+  case CoordinateFileRole::CHECKPOINT:
+    return std::string("CHECKPOINT");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TrajectoryFusion protocol) {
+  switch (protocol) {
+  case TrajectoryFusion::ON:
+    return std::string("ON");
+  case TrajectoryFusion::OFF:
+    return std::string("OFF");
+  case TrajectoryFusion::AUTO:
+    return std::string("AUTO");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   switch (cfkind) {
   case CoordinateFileKind::AMBER_CRD:
@@ -229,36 +286,5 @@ CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
   return detectCoordinateFileKind(tf);
 }
   
-//-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const AncdfVariable key) {
-  switch (key) {
-  case AncdfVariable::NCFRAME:
-    return std::string("frame");
-  case AncdfVariable::NCSPATIAL:
-    return std::string("spatial");
-  case AncdfVariable::NCATOM:
-    return std::string("atom");
-  case AncdfVariable::NCCELL_SPATIAL:
-    return std::string("cell_spatial");
-  case AncdfVariable::NCCELL_LENGTHS:
-    return std::string("cell_lengths");
-  case AncdfVariable::NCCELL_ANGULAR:
-    return std::string("cell_angular");
-  case AncdfVariable::NCCELL_ANGLES:
-    return std::string("cell_angles");
-  case AncdfVariable::NCCOORDS:
-    return std::string("coordinates");
-  case AncdfVariable::NCVELO:
-    return std::string("velocities");
-  case AncdfVariable::NCTEMPERATURE:
-    return std::string("temp0");
-  case AncdfVariable::NCTIME:
-    return std::string("time");
-  case AncdfVariable::NCLABEL:
-    return std::string("label");
-  }
-  __builtin_unreachable();
-}
-
 } // namespace trajectory
 } // namespace stormm

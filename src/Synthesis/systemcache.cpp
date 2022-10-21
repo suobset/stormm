@@ -27,24 +27,33 @@ using structure::readStructureDataFile;
 using topology::UnitCellType;
 using topology::ValenceKit;
 using trajectory::detectCoordinateFileKind;
+using trajectory::getEnumerationName;
   
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache() :
-    system_count{0}, topology_count{0}, label_count{0}, restraint_count{0}, topology_cache{},
-    coordinates_cache{}, label_cache{}, features_cache{}, restraints_cache{}, static_masks_cache{},
-    forward_masks_cache{}, topology_indices{}, label_indices{}, label_degeneracy{},
-    label_subindices{}, restraint_indices{}, example_indices{}, topology_cases{},
-    topology_case_bounds{}, system_input_coordinate_names{}, system_trajectory_names{},
-    system_checkpoint_names{}, system_labels{}, system_trajectory_kinds{},
-    system_checkpoint_kinds{}
+SystemCache::SystemCache(const ExceptionResponse policy_in,
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in) :
+    policy{policy_in}, expectation{expectation_in}, system_count{0}, topology_count{0},
+    label_count{0}, restraint_count{0}, file_merger_protocol{TrajectoryFusion::AUTO},
+    topology_cache{}, coordinates_cache{}, label_cache{}, features_cache{}, restraints_cache{},
+    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, label_indices{},
+    label_degeneracy{}, label_subindices{}, restraint_indices{}, example_indices{},
+    topology_cases{}, topology_case_bounds{}, system_input_coordinate_names{},
+    system_trajectory_names{}, system_checkpoint_names{}, system_labels{},
+    system_input_coordinate_kinds{}, system_trajectory_kinds{}, system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         const ExceptionResponse policy,
-                         const MapRotatableGroups map_chemfe_rotators, StopWatch *timer_in) :
-    SystemCache()
+                         const ExceptionResponse policy_in,
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in,
+                         StopWatch *timer_in) :
+    SystemCache(policy_in, map_chemfe_rotators, expectation_in)
 {
+  // Read critical details from the namelist that will guide the I/O
+  file_merger_protocol = fcon.getFileFusionProtocol();
+  
   // Read all free topologies, using a try-catch block to filter out things that may not work.
   int n_free_top = fcon.getFreeTopologyCount();
   topology_cache.reserve(n_free_top);
@@ -547,6 +556,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
               system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
               system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
               system_labels.push_back(sysvec[i].getLabel());
+              system_input_coordinate_kinds.push_back(icrd_kind);
               system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
               system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
               system_count += 1;
@@ -618,6 +628,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
                 system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
                 system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
                 system_labels.push_back(sysvec[i].getLabel());
+                system_input_coordinate_kinds.push_back(icrd_kind);
                 system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
                 system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
                 system_count += 1;
@@ -824,8 +835,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
-                         const MapRotatableGroups map_chemfe_rotators, StopWatch *timer_in) :
-    SystemCache(fcon, {}, policy, map_chemfe_rotators, timer_in)
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in, StopWatch *timer_in) :
+    SystemCache(fcon, {}, policy, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -1215,70 +1227,149 @@ std::vector<int> SystemCache::getTopologicalCases(const int topology_index) cons
 
 //-------------------------------------------------------------------------------------------------
 const std::string& SystemCache::getSystemInputCoordinatesName(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_trajectory_names.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_trajectory_names.size()) + ".", "SystemCache",
-          "getSystemInputCoordinatesName");
-  }
+  checkSystemBounds(system_index, "getSystemInputCoordinatesName");
   return system_input_coordinate_names[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemTrajectoryName(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_trajectory_names.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_trajectory_names.size()) + ".", "SystemCache",
-          "getTrajectoryFileName");
-  }
-  return nondegenerateName(system_trajectory_names[system_index], system_index);
+  checkSystemBounds(system_index, "getSystemTrajectoryName");
+  return nondegenerateName(system_trajectory_names[system_index], CoordinateFileRole::TRAJECTORY,
+                           system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemCheckpointName(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_names.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_checkpoint_names.size()) + ".", "SystemCache",
-          "getCheckpointFileName");
-  }
-  return nondegenerateName(system_checkpoint_names[system_index], system_index);
+  checkSystemBounds(system_index, "getSystemCheckpointName");
+  return nondegenerateName(system_checkpoint_names[system_index], CoordinateFileRole::CHECKPOINT,
+                           system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::string SystemCache::getSystemLabel(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_labels.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_labels.size()) + ".", "SystemCache", "getSystemLabel");
-  }
+  checkSystemBounds(system_index, "getSystemLabel");
   return system_labels[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
+CoordinateFileKind SystemCache::getSystemInputCoordinatesKind(const int system_index) const {
+  checkSystemBounds(system_index, "getSystemInputCoordinatesKind");
+  return system_trajectory_kinds[system_index];
+}
+
+//-------------------------------------------------------------------------------------------------
 CoordinateFileKind SystemCache::getSystemTrajectoryKind(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_trajectory_kinds.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_trajectory_kinds.size()) + ".", "SystemCache",
-          "getSystemTrajectoryKind");
-  }
+  checkSystemBounds(system_index, "getSystemTrajectoryKind");
   return system_trajectory_kinds[system_index];
 }
   
 //-------------------------------------------------------------------------------------------------
 CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) const {
-  if (system_index < 0 || system_index >= static_cast<int>(system_checkpoint_kinds.size())) {
-    rtErr("Index " + std::to_string(system_index) + " is invalid for an array of length " +
-          std::to_string(system_checkpoint_kinds.size()) + ".", "SystemCache",
-          "getSystemCheckpointKind");
-  }
+  checkSystemBounds(system_index, "getSystemCheckpointKind");
   return system_checkpoint_kinds[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
+PrintSituation SystemCache::getPrintingProtocol(const CoordinateFileRole purpose,
+                                                const int system_index) const {
+  if (determineFileMerger(purpose, system_index)) {
+
+    // If the system is the first of those grouped under a particular label, return the original
+    // expectation.  Otherwise, set the printing to append to the growing file.
+    return (label_subindices[system_index] > 0) ? PrintSituation::APPEND : expectation;
+  }
+  else {
+    return expectation;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void SystemCache::setPrintingProtocol(const PrintSituation expectation_in) {
+  expectation = expectation_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void SystemCache::checkSystemBounds(const int index, const char* caller) const {
+  if (index < 0 || index >= system_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(system_count) + ".", "SystemCache", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+bool SystemCache::determineFileMerger(const CoordinateFileRole purpose,
+                                      const int system_index) const {
+  switch (file_merger_protocol) {
+  case TrajectoryFusion::ON:
+    switch (purpose) {
+    case CoordinateFileRole::INITIATE:
+      return false;
+    case CoordinateFileRole::TRAJECTORY:
+
+      // File formats that can be trajectories are fit to accept multiple frames per file.
+      return true;
+    case CoordinateFileRole::CHECKPOINT:
+      switch (system_checkpoint_kinds[system_index]) {
+      case CoordinateFileKind::AMBER_CRD:
+      case CoordinateFileKind::AMBER_NETCDF:
+      case CoordinateFileKind::SDF:
+        return true;
+      case CoordinateFileKind::AMBER_INPCRD:
+      case CoordinateFileKind::AMBER_ASCII_RST:
+      case CoordinateFileKind::AMBER_NETCDF_RST:    
+
+        // Files will still not be concatenated if the format can only support a single frame.
+        return false;
+      case CoordinateFileKind::UNKNOWN:
+        rtErr("The format of an output file in the role of " + getEnumerationName(purpose) +
+              " must be known.", "SystemCache", "nondegenerateName");
+      }
+      break;
+    }
+    break;
+  case TrajectoryFusion::OFF:
+    return false;
+  case TrajectoryFusion::AUTO:
+    switch (purpose) {
+    case CoordinateFileRole::INITIATE:
+      return false;
+    case CoordinateFileRole::TRAJECTORY:
+      return false;
+    case CoordinateFileRole::CHECKPOINT:
+      switch (system_checkpoint_kinds[system_index]) {
+      case CoordinateFileKind::AMBER_CRD:
+      case CoordinateFileKind::AMBER_NETCDF:
+      case CoordinateFileKind::SDF:
+        return true;
+      case CoordinateFileKind::AMBER_INPCRD:
+      case CoordinateFileKind::AMBER_ASCII_RST:
+      case CoordinateFileKind::AMBER_NETCDF_RST:
+
+        // Files will not be concatenated if the format can only support a single frame.
+        return false;
+      case CoordinateFileKind::UNKNOWN:
+        rtErr("The format of an output file in the role of " + getEnumerationName(purpose) +
+              " must be known.", "SystemCache", "nondegenerateName");
+      }
+      break;
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string SystemCache::nondegenerateName(const std::string &fname_in,
+                                           const CoordinateFileRole purpose,
                                            const int system_index) const {
+
+  // The system does not need a non-degenerate name if there is only one system under the label,
+  // or if the output is a checkpoint and the output format is suitable for multiple frames.
   const int label_idx = label_indices[system_index];
   const int label_deg = label_degeneracy[label_idx];
   std::string result;
-  if (label_deg > 1) {
+  if (label_deg > 1 && determineFileMerger(purpose, system_index) == false) {
     const int label_pos = label_subindices[system_index];
     int last_slash = 0;
     int last_dot = 0;

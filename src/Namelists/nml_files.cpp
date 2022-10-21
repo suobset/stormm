@@ -193,6 +193,7 @@ FilesControls::FilesControls(const ExceptionResponse policy_in,
     policy{policy_in}, structure_count{0}, free_topology_count{0}, free_coordinate_count{0},
     system_count{0},
     all_free_frames{default_filecon_read_all_free},
+    fuse_files{TrajectoryFusion::AUTO},
     coordinate_input_format{default_filecon_inpcrd_type},
     coordinate_output_format{default_filecon_outcrd_type},
     coordinate_checkpoint_format{default_filecon_chkcrd_type},
@@ -411,11 +412,13 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
         const std::vector<std::string> allfi = listDirectory(fipath);
         topology_file_names.insert(topology_file_names.end(), allfi.begin(), allfi.end());
       }
+      break;
     case DrivePathType::REGEXP:
       {
         const std::vector<std::string> allfi = listFilesInPath(fipath, SearchStyle::RECURSIVE);
         topology_file_names.insert(topology_file_names.end(), allfi.begin(), allfi.end());        
       }
+      break;
     }
   }
   free_topology_count = topology_file_names.size();
@@ -435,14 +438,29 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
         const std::vector<std::string> allfi = listDirectory(fipath);
         coordinate_file_names.insert(coordinate_file_names.end(), allfi.begin(), allfi.end());
       }
+      break;
     case DrivePathType::REGEXP:
       {
         const std::vector<std::string> allfi = listFilesInPath(fipath, SearchStyle::RECURSIVE);
         coordinate_file_names.insert(coordinate_file_names.end(), allfi.begin(), allfi.end());
       }
+      break;
     }
   }
   free_coordinate_count = coordinate_file_names.size();  
+
+  // Get directives on I/O behavior
+  const std::string& fusion_cmd = t_nml.getStringValue("fusion");
+  if (strcmpCased(fusion_cmd, std::string("ON")) ||
+      strcmpCased(fusion_cmd, std::string("ACTIVE"))) {
+    fuse_files = TrajectoryFusion::ON;
+  }
+  else if (strcmpCased(fusion_cmd, std::string("OFF"))) {
+    fuse_files = TrajectoryFusion::OFF;
+  }
+  else if (strcmpCased(fusion_cmd, std::string("AUTO"))) {
+    fuse_files = TrajectoryFusion::AUTO;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -478,6 +496,11 @@ CoordinateFileKind FilesControls::getOutputCoordinateFormat() const {
 //-------------------------------------------------------------------------------------------------
 CoordinateFileKind FilesControls::getCheckpointFormat() const {
   return coordinate_checkpoint_format;
+}
+
+//-------------------------------------------------------------------------------------------------
+TrajectoryFusion FilesControls::getFileFusionProtocol() const {
+  return fuse_files;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -717,6 +740,8 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                                    std::string(default_filecon_checkpoint_name)));
   t_nml.addKeyword(NamelistElement("-wrn", NamelistType::STRING,
                                    std::string(default_filecon_warnings_name)));
+  t_nml.addKeyword(NamelistElement("fusion", NamelistType::STRING,
+                                   std::string(default_filecon_result_fusion)));
   t_nml.addHelp("-p", "System topology file.  Repeatable for multiple systems.  Also accepts "
                 "regular expressions.");
   t_nml.addHelp("-c", "Input coordinates file.  Repeatable for multiple systems.  Also accepts "
@@ -741,7 +766,19 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                 "fallback for free topology / coordinate pairs or systems with no specified "
                 "restart file name.");
   t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
-  
+  t_nml.addHelp("fusion", "Indicate whether multiple trajectories or checkpoint files produced "
+                "from systems classified under the same label should be fused into a single file "
+                "of the specified format.  By default (\"AUTO\"), this fusion will apply to "
+                "checkpoint files when the format is something that can accept multiple frames "
+                "(e.g. SDF or AMBER_NETCDF), but not to trajectory files under any "
+                "circumstances.  Set to ON / ACTIVE to activate an aggressive fusion of all "
+                "trajectory files produced under the same label, in addition to checkpoint files "
+                "(again, if the checkpoint file format is suitable).  The order of frames in a "
+                "fused trajectory will proceed { A1, B1, C1, D1, A2, B2, C2, D2, A3, ... }, where "
+                "A, B, C, and D are the individual systems grouped under a single label and 1, 2, "
+                "... represent the frame numbers.  Set this to OFF to de-activate fusion of "
+                "checkpoint files and keep trajectories from becoming fused as well.");
+
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
   *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());
