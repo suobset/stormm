@@ -68,19 +68,19 @@ public:
   /// \}
 
   /// \brief Get the name of the topology file in this system.
-  std::string getTopologyFileName() const;
+  const std::string& getTopologyFileName() const;
 
   /// \brief Get the name of the input coordinates file.
-  std::string getInputCoordinateFileName() const;
+  const std::string& getInputCoordinateFileName() const;
 
   /// \brief Get the name of the trajectory file.
-  std::string getTrajectoryFileName() const;
+  const std::string& getTrajectoryFileName() const;
 
   /// \brief Get the name of the checkpoint file to write for this system.
-  std::string getCheckpointFileName() const;
+  const std::string& getCheckpointFileName() const;
 
   /// \brief Get the assigned label for this system.
-  std::string getLabel() const;
+  const std::string& getLabel() const;
 
   /// \brief Get the starting frame that this system will read for initial coordinate states.
   int getStartingFrame() const;

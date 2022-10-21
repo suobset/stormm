@@ -21,6 +21,7 @@
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Numerics/split_fixed_precision.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
@@ -49,13 +50,6 @@ using stormm::constants::ExceptionResponse;
 using stormm::constants::verytiny;
 using stormm::constants::tiny;
 using stormm::constants::warp_size_int;
-using stormm::data_types::int2;
-using stormm::data_types::uint2;
-using stormm::data_types::uint3;
-using stormm::data_types::double2;
-using stormm::data_types::double3;
-using stormm::data_types::double4;
-using stormm::data_types::ValueWithCounter;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
@@ -63,7 +57,9 @@ using stormm::diskutil::openOutputFile;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::namelist::FilesControls;
+using stormm::parse::findStringInVector;
 using stormm::parse::TextFile;
+using stormm::parse::TextOrigin;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::restraints::applyHydrogenBondPreventors;
 using stormm::restraints::applyPositionalRestraints;
@@ -74,6 +70,7 @@ using stormm::structure::distance;
 using stormm::structure::angle;
 using stormm::structure::dihedral_angle;
 using namespace stormm::card;
+using namespace stormm::data_types;
 using namespace stormm::energy;
 using namespace stormm::math;
 using namespace stormm::numerics;
@@ -904,14 +901,13 @@ int main(const int argc, const char* argv[]) {
   const TestPriority test_sysc = (oe.getTemporaryDirectoryAccess()) ? TestPriority::CRITICAL :
                                                                       TestPriority::ABORT;
   const std::string mdin_name = oe.getTemporaryDirectoryPath() + osc + "cachetest.in";
+  const std::string testdir =  oe.getStormmSourcePath() + osc + "test" + osc;
   if (oe.getTemporaryDirectoryAccess()) {
     std::ofstream foutp = openOutputFile(mdin_name, PrintSituation::OVERWRITE, "Prepare a brief "
                                          "input file for testing the SystemCache machinery.");
     std::string buffer("&files\n  -p ");
-    buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
-              ".*.top\n  -c ";
-    buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
-              ".*.inpcrd\n&end\n";
+    buffer += testdir + "Namelists" + osc + "topol" + osc + ".*.top\n  -c ";
+    buffer += testdir + "Namelists" + osc + "coord" + osc + ".*.inpcrd\n&end\n";
     foutp.write(buffer.c_str(), buffer.size());
     foutp.close();
     oe.logFileCreated(mdin_name);
@@ -955,11 +951,58 @@ int main(const int argc, const char* argv[]) {
   check(ag_ref_atoms, RelationalOperator::EQUAL, ps_atoms, "The numbers of atoms found with "
         "pointers and references matched to topologies and coordinate sets of the same "
         "SystemCache object disagree.", test_sysc);
+  const std::vector<std::string> base_aa = { "arg", "trp", "gly", "gly_arg", "gly_trp", "gly_phe",
+                                             "tyr", "gly_pro", "gly_tyr", "phe", "gly", "gly_gly",
+                                             "pro", "lys", "gly_ala", "gly_lys", "ala" };
+  const int nbase_aa = base_aa.size();
+  std::vector<std::string> rst_outputs, trj_outputs;
+  rst_outputs.reserve(nbase_aa);
+  trj_outputs.reserve(nbase_aa);
+  for (int i = 0; i < nbase_aa; i++) {
+    rst_outputs.push_back("md_" + base_aa[i] + ".rst");
+    trj_outputs.push_back("md_" + base_aa[i] + ".crd");
+  }
+  bool rst_outside_list = false;
+  bool trj_outside_list = false;
+  for (int i = 0; i < nsys; i++) {
+    rst_outside_list = (rst_outside_list ||
+                        (findStringInVector(rst_outputs,
+                                            sysc.getSystemCheckpointName(i)) == nbase_aa));
+    trj_outside_list = (trj_outside_list ||
+                        (findStringInVector(trj_outputs,
+                                            sysc.getSystemTrajectoryName(i)) == nbase_aa));
+  }
+  check(rst_outside_list == false, "One of the SystemCache's checkpoint file names was outside "
+        "the expected list.  The name extension feature, for differentiating names of multiple "
+        "systems under the same label, may be malfunctioning.", test_sysc);
+  check(trj_outside_list == false, "One of the SystemCache's trajectory file names was outside "
+        "the expected list.  The name extension feature, for differentiating names of multiple "
+        "systems under the same label, may be malfunctioning.", test_sysc);
+
+  // Make a new systems cache and verify that multiple frames under the same label are properly
+  // handled.
+  std::string multi_label_deck("&files\n");
+  multi_label_deck += "  -sys { -c " + testdir + "MoleculeFormat" + osc + "sulfonamide_rots.sdf "
+                      "-p " + testdir + "Topology" + osc + "sulfonamide.top -label sulfonamide "
+                      "frame_end -1 }";
+  multi_label_deck += "  -sys { -c " + testdir + "Trajectory" + osc + "stereo_L1_vs.inpcrd -p " +
+                      testdir + "Topology" + osc + "stereo_L1_vs.top -label stereo -n 16 }"
+                      "\n&end\n";
+  const TextFile multi_label_tf(multi_label_deck, TextOrigin::RAM);
+  start_line = 0;
+  FilesControls multi_label_fcon(multi_label_tf, &start_line);
+  SystemCache multi_label_sysc(multi_label_fcon, ExceptionResponse::SILENT);
+  check(multi_label_sysc.getSystemCheckpointName(10), RelationalOperator::EQUAL, "md_0_10.rst",
+        "The SystemCache object does not produced the expected non-colliding name for a frame of "
+        "an SD file.", test_sysc);
+  check(multi_label_sysc.getSystemCheckpointName(38), RelationalOperator::EQUAL, "md_1_2.rst",
+        "The SystemCache object does not produced the expected non-colliding name for a replica "
+        "of an coordinate system first read from an Amber ASCII restart file.", test_sysc);
   
   // Create some topologies and coordinate sets.
   Xoroshiro128pGenerator my_prng(oe.getRandomSeed());
-  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = testdir + "Trajectory";
+  const std::string base_top_name = testdir + "Topology";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
   const std::string tip3p_top_name = base_top_name + osc + "tip3p.top";
   const std::string tip4p_crd_name = base_crd_name + osc + "tip4p.inpcrd";

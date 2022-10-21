@@ -304,12 +304,22 @@ public:
   /// \param topology_index  The index of the topology of interest
   std::vector<int> getTopologicalCases(int topology_index) const;
 
-  /// \brief Get the name of the trajectory file associated with one of the systems.
+  /// \brief Get the input coordinate file name for a particular system.  This is not subject to
+  ///        manipulations to differentiate the name as the output formats are.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  const std::string& getSystemInputCoordinatesName(int system_index) const;
+  
+  /// \brief Get the name of the trajectory file associated with one of the systems.  The name
+  ///        will be manipulated (by adding _## before the final '.', or at the end of the file
+  ///        name if there is no '.').
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemTrajectoryName(int system_index) const;
   
   /// \brief Get the name of the checkpoint (restart) file associated with one of the systems.
+  ///        This name will also be manipulated to differentiate systems making use of the same
+  ///        label.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemCheckpointName(int system_index) const;
@@ -398,6 +408,9 @@ private:
   /// Bounds array for topology_cases above
   std::vector<int> topology_case_bounds;
 
+  /// Names of coordinate input files for each system (for records keeping purposes)
+  std::vector<std::string> system_input_coordinate_names;
+  
   /// Names of trajectory files to write for each system
   std::vector<std::string> system_trajectory_names;
 

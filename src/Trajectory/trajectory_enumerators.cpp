@@ -156,12 +156,12 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
     return CoordinateFileKind::AMBER_CRD;
   }
   
-  // If the fourth line looks like an MDL MOL-format counts line, return that result
+  // If the fourth line looks like an MDL MOL-format counts line, return that result after checking
+  // the first atom line.
   if (tfr.line_count > 4 &&
       verifyContents(tfr, 3, 0, 3, NumberFormat::INTEGER) &&
       verifyContents(tfr, 3, 3, 3, NumberFormat::INTEGER) &&
       readIntegerValue(&tfr.text[tfr.line_limits[3]], 0, 3) >= 0) {
-    // Check the first atom line
     if (verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4], 10) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4] + 10, 10) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[4] + 20, 10)) {
@@ -169,6 +169,19 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
     }
   }
 
+  // If the phrase "V2000" or "V3000" can be detected anywhere in the fourth through tenth lines,
+  // return that result as well.
+  const int nsearch_lines = std::min(10, tfr.line_count);
+  for (int i = 3; i < nsearch_lines; i++) {
+    const int jlim = tfr.line_limits[i + 1] - 4;
+    for (int j = tfr.line_limits[i]; j < jlim; j++) {
+      if (tfr.text[j] == 'V' && (tfr.text[j + 1] == '2' || tfr.text[j + 1] == '3') &&
+          tfr.text[j + 2] == '0' && tfr.text[j + 3] == '0' && tfr.text[j + 4] == '0') {
+        return CoordinateFileKind::SDF;
+      }
+    }
+  }
+  
   // If the file type has not yet been ascertained, return UNKNOWN
   return CoordinateFileKind::UNKNOWN;
 }

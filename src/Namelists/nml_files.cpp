@@ -23,7 +23,7 @@ using trajectory::translateCoordinateFileKind;
 //-------------------------------------------------------------------------------------------------
 MoleculeSystem::MoleculeSystem() :
     topology_file_name{}, coordinate_file_name{}, coordinate_output_name{}, checkpoint_name{},
-    label{}, frame_start{0}, frame_end{0}, replica_count{0},
+    label{}, frame_start{0}, frame_end{0}, replica_count{1},
     coordinate_kind{CoordinateFileKind::UNKNOWN},
     trajectory_kind{CoordinateFileKind::AMBER_CRD},
     checkpoint_kind{CoordinateFileKind::AMBER_ASCII_RST}
@@ -53,27 +53,27 @@ MoleculeSystem::MoleculeSystem(const std::string &topology_file_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-std::string MoleculeSystem::getTopologyFileName() const {
+const std::string& MoleculeSystem::getTopologyFileName() const {
   return topology_file_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MoleculeSystem::getInputCoordinateFileName() const {
+const std::string& MoleculeSystem::getInputCoordinateFileName() const {
   return coordinate_file_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MoleculeSystem::getTrajectoryFileName() const {
+const std::string& MoleculeSystem::getTrajectoryFileName() const {
   return coordinate_output_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MoleculeSystem::getCheckpointFileName() const {
+const std::string& MoleculeSystem::getCheckpointFileName() const {
   return checkpoint_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MoleculeSystem::getLabel() const {
+const std::string& MoleculeSystem::getLabel() const {
   return label;
 }
 
