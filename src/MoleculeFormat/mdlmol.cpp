@@ -4,7 +4,7 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/write_annotated_frame.h"
-#include "mdl_mol_obj.h"
+#include "mdlmol.h"
 
 namespace stormm {
 namespace structure {
@@ -26,7 +26,7 @@ using topology::ValenceKit;
 using trajectory::writeFrame;
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const ExceptionResponse policy_in):
+MdlMol::MdlMol(const ExceptionResponse policy_in):
     policy{policy_in}, version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0},
     list_count{0}, sgroup_count{0}, constraint_count{0}, chirality{MolObjChirality::ACHIRAL},
     registry_number{-1}, data_item_count{0}, property_formal_charges{false},
@@ -38,9 +38,9 @@ MdlMolObj::MdlMolObj(const ExceptionResponse policy_in):
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_end_in,
-                     const CaseSensitivity capitalization, const ExceptionResponse policy_in):
-  MdlMolObj(policy_in)
+MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
+               const CaseSensitivity capitalization, const ExceptionResponse policy_in):
+  MdlMol(policy_in)
 {
   const TextFileReader tfr = tf.data();
 
@@ -82,7 +82,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
         }
         else {
           rtErr("Invalid chirality setting detected at line " + std::to_string(counts_line_idx) +
-                " in .sdf or MDL MOL file " + getBaseName(tf.getFileName()) + ".", "MdlMolObj");
+                " in .sdf or MDL MOL file " + getBaseName(tf.getFileName()) + ".", "MdlMol");
         }
       }
       if (verifyContents(tf, counts_line_idx, 15, 3, NumberFormat::INTEGER)) {
@@ -99,12 +99,12 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
           rtErr("A V2000 MOL format entry in file " + getBaseName(tf.getFileName()) + " at line " +
                 std::to_string(line_start) + " contains invalid numbers of atoms (" +
                 std::to_string(atom_count) + ") and/or bonds (" + std::to_string(bond_count) +
-                ").", "MdlMolObj");
+                ").", "MdlMol");
         case ExceptionResponse::WARN:
           rtWarn("A V2000 MOL format entry in file " + getBaseName(tf.getFileName()) + " at " +
                  "line " + std::to_string(line_start) + " contains invalid numbers of atoms (" +
                  std::to_string(atom_count) + ") and/or bonds (" + std::to_string(bond_count) +
-                 ").  This will become a blank entry", "MdlMolObj");
+                 ").  This will become a blank entry", "MdlMol");
           break;
         case ExceptionResponse::SILENT:
           break;
@@ -148,7 +148,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
         if (isotopic_shifts[iatm] > 4 || isotopic_shifts[iatm] < -3) {
           rtErr("A V2000 MOL format entry should not describe an isotopic shift outside the range "
                 "[-3, 4].  Shift found: " + std::to_string(isotopic_shifts[iatm]) +
-                ".  Title of entry: \"" + title + "\".", "MdlMolObj");
+                ".  Title of entry: \"" + title + "\".", "MdlMol");
         }
       }
       
@@ -176,7 +176,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
           rtErr("The H0 designation, indicating that implicit hydrogens are not allowed on atom " +
                 std::to_string(iatm + 1) + " of MDL MOL entry \"" +  title + "\", is present but "
                 "the number of implicit hydrogens has also been indicated as " +
-                std::to_string(implicit_hydrogens[iatm]) + ".", "MdlMolObj");
+                std::to_string(implicit_hydrogens[iatm]) + ".", "MdlMol");
         }
       }
       if (verifyContents(tf, i, 60, 3, NumberFormat::INTEGER)) {
@@ -315,37 +315,37 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
 }
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const std::string &filename, const ExceptionResponse policy_in):
-    MdlMolObj(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in)
+MdlMol::MdlMol(const std::string &filename, const ExceptionResponse policy_in):
+    MdlMol(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const char* filename, const ExceptionResponse policy_in):
-    MdlMolObj(std::string(filename), policy_in)
+MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in):
+    MdlMol(std::string(filename), policy_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getAtomCount() const {
+int MdlMol::getAtomCount() const {
   return atom_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getBondCount() const {
+int MdlMol::getBondCount() const {
   return bond_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-double3 MdlMolObj::getCoordinates(const int index) const {
+double3 MdlMol::getCoordinates(const int index) const {
   return coordinates[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<double3>& MdlMolObj::getCoordinates() const {
+const std::vector<double3>& MdlMol::getCoordinates() const {
   return coordinates;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> MdlMolObj::getCoordinates(const CartesianDimension dim) const {
+std::vector<double> MdlMol::getCoordinates(const CartesianDimension dim) const {
   std::vector<double> result(atom_count);
   for (int i = 0; i < atom_count; i++) {
     switch (dim) {
@@ -364,7 +364,7 @@ std::vector<double> MdlMolObj::getCoordinates(const CartesianDimension dim) cons
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace MdlMolObj::exportPhaseSpace() const {
+PhaseSpace MdlMol::exportPhaseSpace() const {
   PhaseSpace result(atom_count);
   PhaseSpaceWriter rw = result.data();
   for (int i = 0; i < atom_count; i++) {
@@ -376,7 +376,7 @@ PhaseSpace MdlMolObj::exportPhaseSpace() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFrame MdlMolObj::exportCoordinateFrame() const {
+CoordinateFrame MdlMol::exportCoordinateFrame() const {
   CoordinateFrame result(atom_count);
   CoordinateFrameWriter rw = result.data();
   for (int i = 0; i < atom_count; i++) {
@@ -388,79 +388,83 @@ CoordinateFrame MdlMolObj::exportCoordinateFrame() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-char4 MdlMolObj::getAtomSymbol(const int index) const {
+char4 MdlMol::getAtomSymbol(const int index) const {
   return atomic_symbols[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<char4>& MdlMolObj::getAtomSymbols() const {
+const std::vector<char4>& MdlMol::getAtomSymbols() const {
   return atomic_symbols;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getAtomicNumber(const int index) const {
+int MdlMol::getAtomicNumber(const int index) const {
   return atomic_numbers[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<int>& MdlMolObj::getAtomicNumbers() const {
+const std::vector<int>& MdlMol::getAtomicNumbers() const {
   return atomic_numbers;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getFormalCharge(const int index) const {
+int MdlMol::getFormalCharge(const int index) const {
   return formal_charges[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<int>& MdlMolObj::getFormalCharges() const {
+const std::vector<int>& MdlMol::getFormalCharges() const {
   return formal_charges;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getPropertiesCount() const {
+int MdlMol::getPropertiesCount() const {
   return properties_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const PhaseSpaceReader &psr) {
+void MdlMol::impartCoordinates(const PhaseSpaceReader &psr) {
+  checkAtomCount(psr.natom);
   impartCoordinates(psr.xcrd, psr.ycrd, psr.zcrd, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const PhaseSpaceWriter &psw) {
+void MdlMol::impartCoordinates(const PhaseSpaceWriter &psw) {
+  checkAtomCount(psw.natom);
   impartCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const PhaseSpace &ps, const CoordinateCycle orientation,
-                                  const HybridTargetLevel tier) {
+void MdlMol::impartCoordinates(const PhaseSpace &ps, const CoordinateCycle orientation,
+                               const HybridTargetLevel tier) {
   impartCoordinates(ps.data(orientation, tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const PhaseSpace &ps, const HybridTargetLevel tier) {
+void MdlMol::impartCoordinates(const PhaseSpace &ps, const HybridTargetLevel tier) {
   impartCoordinates(ps, ps.getCyclePosition(), tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const CoordinateFrameReader &cfr) {
+void MdlMol::impartCoordinates(const CoordinateFrameReader &cfr) {
+  checkAtomCount(cfr.natom);
   impartCoordinates(cfr.xcrd, cfr.ycrd, cfr.zcrd, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const CoordinateFrameWriter &cfw) {
+void MdlMol::impartCoordinates(const CoordinateFrameWriter &cfw) {
+  checkAtomCount(cfw.natom);
   impartCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::impartCoordinates(const CoordinateFrame &cf, const HybridTargetLevel tier) {
+void MdlMol::impartCoordinates(const CoordinateFrame &cf, const HybridTargetLevel tier) {
   impartCoordinates(cf.data());
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
-                            const RestraintApparatus &ra) {
+void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
+                         const RestraintApparatus &ra) {
   std::vector<std::string> di_body;
   switch (ask.getKind()) {
   case DataRequestKind::STATE_VARIABLE:
@@ -784,14 +788,14 @@ void MdlMolObj::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
+void MdlMol::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
   const TextFile result(writeMdl(vformat), TextOrigin::RAM);
   writeFrame(foutp, result);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::writeMdl(const std::string &fname, const MdlMolVersion vformat,
-                         const PrintSituation expectation) const {
+void MdlMol::writeMdl(const std::string &fname, const MdlMolVersion vformat,
+                      const PrintSituation expectation) const {
   const std::string activity = (data_item_count > 0) ?
     "Open an output file for writing an MDL MOL format structure." :
     "Open an SDF archive for writing MDL MOL format output with additional data items.";
@@ -800,7 +804,7 @@ void MdlMolObj::writeMdl(const std::string &fname, const MdlMolVersion vformat,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MdlMolObj::writeMdl(const MdlMolVersion vformat) const {
+std::string MdlMol::writeMdl(const MdlMolVersion vformat) const {
 
   // Build the result based on the MDL MOL leading three lines, which are common to both V2000 and
   // V3000 formats.
@@ -880,9 +884,9 @@ std::string MdlMolObj::writeMdl(const MdlMolVersion vformat) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::allocate() {
+void MdlMol::allocate() {
 
-  // Atom property fields are resized and then set as part of a loop in the parent MdlMolObj
+  // Atom property fields are resized and then set as part of a loop in the parent MdlMol
   // constructor.
   coordinates.resize(atom_count);
   atomic_symbols.resize(atom_count, default_mdl_atomic_symbol);
@@ -908,7 +912,7 @@ void MdlMolObj::allocate() {
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getIsotopicShiftCode(const int atom_index) const {
+int MdlMol::getIsotopicShiftCode(const int atom_index) const {
   if (property_isotopes) {
     return 0;
   }
@@ -919,7 +923,7 @@ int MdlMolObj::getIsotopicShiftCode(const int atom_index) const {
 }
  
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::interpretFormalCharge(const int charge_in, const int atom_index) {
+void MdlMol::interpretFormalCharge(const int charge_in, const int atom_index) {
   switch (charge_in) {
   case 0:
     formal_charges[atom_index] = 0;
@@ -947,12 +951,12 @@ void MdlMolObj::interpretFormalCharge(const int charge_in, const int atom_index)
     break;
   default:
     rtErr("A formal charge code of " + std::to_string(charge_in) + " is invalid for an MDL MOL "
-          "entry.  Title of entry: \"" + title + "\".", "MdlMolObj", "interpretFormalCharge");    
+          "entry.  Title of entry: \"" + title + "\".", "MdlMol", "interpretFormalCharge");    
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getFormalChargeCode(const int atom_index) const {
+int MdlMol::getFormalChargeCode(const int atom_index) const {
   if (property_formal_charges) {
     return 0;
   }
@@ -976,14 +980,14 @@ int MdlMolObj::getFormalChargeCode(const int atom_index) const {
     // Formal charges outside the V2000 range must be handled by properties, and any such case
     // implies that all formal charges are handled this way.
     rtErr("A formal charge that cannot be expressed in the atoms block of a V2000 format MDL MOL "
-          "file exists, but there are no properties to account for it.", "MdlMolObj",
+          "file exists, but there are no properties to account for it.", "MdlMol",
           "getFormalChargeCode");
   }
   __builtin_unreachable();
 }
  
 //-------------------------------------------------------------------------------------------------
-MolObjAtomStereo MdlMolObj::interpretStereoParity(const int setting_in) {
+MolObjAtomStereo MdlMol::interpretStereoParity(const int setting_in) {
   switch (setting_in) {
   case 0:
     return MolObjAtomStereo::NOT_STEREO;
@@ -995,17 +999,17 @@ MolObjAtomStereo MdlMolObj::interpretStereoParity(const int setting_in) {
     return MolObjAtomStereo::UNMARKED;
   default:
     rtErr("A stereochemical parity setting of " + std::to_string(setting_in) + " is invalid.  "
-          "Title of entry: \"" + title + "\".", "MdlMolObj", "interpretStereoParity");
+          "Title of entry: \"" + title + "\".", "MdlMol", "interpretStereoParity");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::interpretImplicitHydrogenContent(const int nh_in, const int atom_index) {
+void MdlMol::interpretImplicitHydrogenContent(const int nh_in, const int atom_index) {
   if (nh_in > 5 || nh_in < 0) {
     rtErr("An implicit hydrogen content of " + std::to_string(nh_in) + " would imply " +
           std::to_string(nh_in - 1) + " hydrogens can be inferred around an atom in MDL MOL "
-          "entry \"" + title + "\".", "MdlMolObj", "interpretImplicitHydrogenContent");
+          "entry \"" + title + "\".", "MdlMol", "interpretImplicitHydrogenContent");
   }
   if (nh_in > 0) {
     implicit_hydrogens[atom_index] = nh_in - 1;
@@ -1024,7 +1028,7 @@ void MdlMolObj::interpretImplicitHydrogenContent(const int nh_in, const int atom
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::getImplicitHydrogenCode(const int atom_index) const {
+int MdlMol::getImplicitHydrogenCode(const int atom_index) const {
   switch (hydrogenation_protocol[atom_index]) {
   case HydrogenAssignment::VALENCE_SHELL:
     return (implicit_hydrogens[atom_index] == 0) ? 0 : implicit_hydrogens[atom_index] + 1;
@@ -1035,16 +1039,16 @@ int MdlMolObj::getImplicitHydrogenCode(const int atom_index) const {
 }
  
 //-------------------------------------------------------------------------------------------------
-bool MdlMolObj::interpretBooleanValue(const int value_in, const std::string &desc) {
+bool MdlMol::interpretBooleanValue(const int value_in, const std::string &desc) {
   if (value_in != 0 && value_in != 1) {
     rtErr("A directive of " + std::to_string(value_in) + " is invalid when " + desc + ".  Title "
-          "of entry: \"" + title + "\".", "MdlMolObj", "interpretBooleanValue");
+          "of entry: \"" + title + "\".", "MdlMol", "interpretBooleanValue");
   }
   return (value_in == 1);
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMolObj::interpretValenceNumber(const int count_in) {
+int MdlMol::interpretValenceNumber(const int count_in) {
   if (count_in == 15) {
     return 0;
   }
@@ -1053,14 +1057,14 @@ int MdlMolObj::interpretValenceNumber(const int count_in) {
   }
   else {
     rtErr("An atom cannot have " + std::to_string(count_in) + " valence connections, as is the "
-          "case for one atom in MDL MOL entry \"" + title + "\".", "MdlMolObj",
+          "case for one atom in MDL MOL entry \"" + title + "\".", "MdlMol",
           "interpretValenceNumber");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-StereoRetention MdlMolObj::interpretStereoStability(const int code_in) {
+StereoRetention MdlMol::interpretStereoStability(const int code_in) {
   switch (code_in) {
   case 0:
     return StereoRetention::NOT_APPLIED;
@@ -1070,13 +1074,13 @@ StereoRetention MdlMolObj::interpretStereoStability(const int code_in) {
     return StereoRetention::RETAINED;
   default:
     rtErr("A stereochemistry retention code of " + std::to_string(code_in) + " is invalid in MDL "
-          "MOL entry \"" + title + "\".", "MdlMolObj", "interpretStereoStability");
+          "MOL entry \"" + title + "\".", "MdlMol", "interpretStereoStability");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::updateV2kAtomAttributes() {
+void MdlMol::updateV2kAtomAttributes() {
 
   // Return immediately if the version is not V2000
   switch (version_no) {
@@ -1150,12 +1154,12 @@ void MdlMolObj::updateV2kAtomAttributes() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::hydrogenate() {
+void MdlMol::hydrogenate() {
 
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolObj::compareExternalRegistryNumbers(const std::string &regno_in) {
+void MdlMol::compareExternalRegistryNumbers(const std::string &regno_in) {
   if (regno_in.size() > 0LLU) {
     if (external_regno.size() == 0LLU) {
       external_regno = regno_in;
@@ -1165,18 +1169,27 @@ void MdlMolObj::compareExternalRegistryNumbers(const std::string &regno_in) {
       case ExceptionResponse::DIE:
         rtErr("The external registry number associated with a data item to add (" + regno_in +
               ") is inconsistent with the external registry number already associated with the "
-              "MDL MOL entry (" + external_regno + ").", "MdlMolObj",
+              "MDL MOL entry (" + external_regno + ").", "MdlMol",
               "compareExternalRegistryNumbers");
       case ExceptionResponse::WARN:
         rtWarn("The external registry number associated with a data item to add (" + regno_in +
                ") is inconsistent with the external registry number already associated with the "
                "MDL MOL entry (" + external_regno + ").  The existing registry number will take "
-               "precedence.", "MdlMolObj", "compareExternalRegistryNumbers");
+               "precedence.", "MdlMol", "compareExternalRegistryNumbers");
         break;
       case ExceptionResponse::SILENT:
         break;
       }
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::checkAtomCount(int ext_atom_count) {
+  if (ext_atom_count != atom_count) {
+    rtErr("The number of atoms coming in (" + std::to_string(ext_atom_count) + ") is not "
+          "consistent with the number of atoms in the molecule (" + std::to_string(atom_count) +
+          ").", "MdlMol", "checkAtomCount");
   }
 }
 
@@ -1189,11 +1202,11 @@ std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf, const int low_frame_limit,
-                                             const int high_frame_limit,
-                                             const CaseSensitivity capitalization,
-                                             const ExceptionResponse policy) {
-  std::vector<MdlMolObj> result;
+std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const int low_frame_limit,
+                                          const int high_frame_limit,
+                                          const CaseSensitivity capitalization,
+                                          const ExceptionResponse policy) {
+  std::vector<MdlMol> result;
 
   // Find the limits for different MDL MOL entries
   const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
@@ -1234,10 +1247,9 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf, const int low_f
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
-                                             const CaseSensitivity capitalization,
-                                             const ExceptionResponse policy) {
-  std::vector<MdlMolObj> result;
+std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const CaseSensitivity capitalization,
+                                          const ExceptionResponse policy) {
+  std::vector<MdlMol> result;
 
   // Find the limits for different MDL MOL entries
   const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
@@ -1252,9 +1264,9 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
-                                             const CaseSensitivity capitalization,
-                                             const ExceptionResponse policy) {
+std::vector<MdlMol> readStructureDataFile(const std::string &file_name,
+                                          const CaseSensitivity capitalization,
+                                          const ExceptionResponse policy) {
   const TextFile tf(file_name);
   return readStructureDataFile(tf, capitalization, policy);
 }

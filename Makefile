@@ -38,7 +38,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
-		   $(SRCDIR)/MoleculeFormat/mdl_mol_obj.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molobj_atomlist.cpp \
@@ -177,7 +177,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
 		     $(SRCDIR)/MolecularMechanics/mm_controls.h \
 		     $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
-		     $(SRCDIR)/MoleculeFormat/mdl_mol_obj.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/MoleculeFormat/molobj_atomlist.h \
@@ -293,7 +293,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
-		   $(SRCDIR)/MoleculeFormat/mdl_mol_obj.tpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol.tpp \
 		   $(SRCDIR)/Parsing/polynumeric.tpp \
 		   $(SRCDIR)/Potential/cacheresource.tpp \
 		   $(SRCDIR)/Potential/energy_abstracts.tpp \
@@ -352,7 +352,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/MolecularMechanics/minimization.o \
 	          $(SRCDIR)/MolecularMechanics/mm_controls.o \
 	          $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
-	          $(SRCDIR)/MoleculeFormat/mdl_mol_obj.o \
+	          $(SRCDIR)/MoleculeFormat/mdlmol.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 	          $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 	          $(SRCDIR)/MoleculeFormat/molobj_atomlist.o \

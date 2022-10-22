@@ -8,7 +8,7 @@
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
 #include "FileManagement/file_enumerators.h"
-#include "MoleculeFormat/mdl_mol_obj.h"
+#include "MoleculeFormat/mdlmol.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_restraint.h"
 #include "Potential/forward_exclusionmask.h"
@@ -32,7 +32,7 @@ using energy::StaticExclusionMask;
 using namelist::FilesControls;
 using namelist::RestraintControls;
 using restraints::RestraintApparatus;
-using structure::MdlMolObj;
+using structure::MdlMol;
 using testing::StopWatch;
 using topology::AtomGraph;
 using trajectory::CoordinateFileKind;
@@ -64,13 +64,13 @@ public:
               PrintSituation expectation_in = PrintSituation::OPEN_NEW);
 
   SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-              std::vector<MdlMolObj> *sdf_recovery,
+              std::vector<MdlMol> *sdf_recovery,
               ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
 
-  SystemCache(const FilesControls &fcon, std::vector<MdlMolObj> *sdf_recovery,
+  SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
               ExceptionResponse policy = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,

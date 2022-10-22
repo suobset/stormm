@@ -3,7 +3,7 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
-#include "../../src/MoleculeFormat/mdl_mol_obj.h"
+#include "../../src/MoleculeFormat/mdlmol.h"
 #include "../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
@@ -42,7 +42,7 @@ int main(const int argc, const char* argv[]) {
            "subdirectory test/MoleculeFormat.  Subsequent tests will be skipped.");
   }
   TextFile mdl_a(mdl_name);
-  MdlMolObj sulf_a(mdl_a);
+  MdlMol sulf_a(mdl_a);
   check(sulf_a.getAtomCount(), RelationalOperator::EQUAL, 16, "The atom count from an MDL MOL "
         "file is incorrect.", do_tests);
   check(sulf_a.getBondCount(), RelationalOperator::EQUAL, 15, "The bond count from an MDL MOL "
@@ -56,7 +56,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> sulf_a_znumbers = { 6, 7, 16, 8, 8, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
   check(sulf_a.getAtomicNumbers(), RelationalOperator::EQUAL, sulf_a_znumbers, "Atomic numbers "
         "inferred for an MDL MOL entry do notmeet expectations.", do_tests);
-  std::vector<MdlMolObj> sulf_rtm = readStructureDataFile(sdf_name);
+  std::vector<MdlMol> sulf_rtm = readStructureDataFile(sdf_name);
   const std::vector<double> sulf_rtm_c_xcrds = {  2.2071,  1.4262, -0.0626, -0.5187,  0.1066,
                                                  -1.1940, -1.9484,  1.8501,  3.2455,  2.1797,
                                                   1.4358, -1.8772, -0.5739, -2.5472, -2.6168,
@@ -66,7 +66,7 @@ int main(const int argc, const char* argv[]) {
         "SD file were not taken up as expected.  The X coordinate values do not match.", do_tests);
 
   // Read an SD file with V2000 MDL MOL entries containing some properties
-  std::vector<MdlMolObj> chemaxon_mols = readStructureDataFile(chemaxon_name);
+  std::vector<MdlMol> chemaxon_mols = readStructureDataFile(chemaxon_name);
   check(chemaxon_mols[1].getPropertiesCount(), RelationalOperator::EQUAL, 1, "An incorrect number "
         "of properties were found in the second V2000 MDL MOL entry of " + chemaxon_name + ".",
         do_tests);

@@ -83,13 +83,13 @@ private:
 ///
 ///        http://help.accelrysonline.com/ (...)
 ///          ulm/onelab/1.0/content/ulm_pdfs/direct/reference/ctfileformats2016.pdf
-class MdlMolObj {
+class MdlMol {
 public:
 
   /// \brief Constructors for the MDL molecule format object (known as MolObj in RDKit)
   ///
   /// Overloaded:
-  ///   - Basic constructor for creating a blank MdlMolObj, referenced by all other constructors'
+  ///   - Basic constructor for creating a blank MdlMol, referenced by all other constructors'
   ///     initializer lists
   ///   - Constructors based on a file name (string or const char* array)
   ///   - Constructor based on a TextFile object from an SDF container previously committed to RAM
@@ -104,22 +104,22 @@ public:
   /// \param policy          Course of action to take if errors are encountered when inferring
   ///                        atomic elements
   /// \{
-  MdlMolObj(ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMolObj(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMolObj(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMolObj(const TextFile &tf, int line_start = 0, int line_end = -1,
-            CaseSensitivity capitalization = CaseSensitivity::YES,
-            ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(const TextFile &tf, int line_start = 0, int line_end = -1,
+         CaseSensitivity capitalization = CaseSensitivity::YES,
+         ExceptionResponse policy_in = ExceptionResponse::WARN);
   /// \}
 
   /// \brief Default copy and move constructors, as well as assignment operators, are appropriate
   ///        for this object which consists entirely of scalar data types, Standard Template
   ///        Library objects, and no const members.
   /// \{
-  MdlMolObj(const MdlMolObj &original) = default;
-  MdlMolObj(MdlMolObj &&original) = default;
-  MdlMolObj& operator=(const MdlMolObj &original) = default;
-  MdlMolObj& operator=(MdlMolObj &&original) = default;
+  MdlMol(const MdlMol &original) = default;
+  MdlMol(MdlMol &&original) = default;
+  MdlMol& operator=(const MdlMol &original) = default;
+  MdlMol& operator=(MdlMol &&original) = default;
   /// \}
   
   /// \brief Get the system's atom count.
@@ -194,7 +194,7 @@ public:
   ///   - Present a CoordinateSeries object, or abstract thereof, with a frame index number
   ///
   /// \param xcrd          Cartesian X coordinates of all particles, trusted to describe a number
-  ///                      of atoms equal to that found in the MdlMolObject and in the same order
+  ///                      of atoms equal to that found in the MdlMol and in the same order
   /// \param ycrd          Cartesian Y coordinates of all particles
   /// \param zcrd          Cartesian Z coordinates of all particles
   /// \param scale_factor  The scaling factor by which to multiply coordinates in order to take
@@ -376,7 +376,7 @@ private:
   std::vector<MolObjProperty> properties;
 
   /// Data items: this is what makes the SD file (.sdf) format so extensible.  While technically
-  /// not part of the MDL MOL format, they are stored in the MdlMolObj for association.  Data items
+  /// not part of the MDL MOL format, they are stored in the MdlMol for association.  Data items
   /// will be written back to new .sdf files but not .mol files based on the data in this object.
   std::vector<MolObjDataItem> data_items;
   
@@ -477,6 +477,11 @@ private:
   ///                  If both the object's own number and this string are substantial and they
   ///                  disagree, produce a warning or error.
   void compareExternalRegistryNumbers(const std::string &regno_in);
+
+  /// \brief Check the atom count of some external object against the internal number.
+  ///
+  /// \param ext_atom_count  The number of atoms coming from the external struct
+  void checkAtomCount(int ext_atom_count);
 };
 
 /// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.
@@ -493,22 +498,22 @@ private:
 /// \param policy          Course of action to take if errors are encountered when inferring
 ///                        atomic elements
 /// \{
-std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf, int low_frame_limit,
-                                             int high_frame_limit,
-                                             CaseSensitivity capitalization = CaseSensitivity::YES,
-                                             ExceptionResponse policy = ExceptionResponse::WARN);
-std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
-                                             CaseSensitivity capitalization = CaseSensitivity::YES,
-                                             ExceptionResponse policy = ExceptionResponse::WARN);
+std::vector<MdlMol> readStructureDataFile(const TextFile &tf, int low_frame_limit,
+                                          int high_frame_limit,
+                                          CaseSensitivity capitalization = CaseSensitivity::YES,
+                                          ExceptionResponse policy = ExceptionResponse::WARN);
+std::vector<MdlMol> readStructureDataFile(const std::string &file_name,
+                                          CaseSensitivity capitalization = CaseSensitivity::YES,
+                                          ExceptionResponse policy = ExceptionResponse::WARN);
 
-std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
-                                             CaseSensitivity capitalization = CaseSensitivity::YES,
-                                             ExceptionResponse policy = ExceptionResponse::WARN);
+std::vector<MdlMol> readStructureDataFile(const TextFile &tf,
+                                          CaseSensitivity capitalization = CaseSensitivity::YES,
+                                          ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
   
 } // namespace structure
 } // namespace stormm
 
-#include "mdl_mol_obj.tpp"
+#include "mdlmol.tpp"
 
 #endif

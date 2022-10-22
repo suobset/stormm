@@ -43,7 +43,7 @@ SystemCache::SystemCache(const ExceptionResponse policy_in,
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         std::vector<MdlMolObj> *sdf_recovery, const ExceptionResponse policy_in,
+                         std::vector<MdlMol> *sdf_recovery, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
@@ -130,7 +130,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       break;
     case CoordinateFileKind::SDF:
       try {
-        const std::vector<MdlMolObj> all_frames = readStructureDataFile(crd_name);
+        const std::vector<MdlMol> all_frames = readStructureDataFile(crd_name);
         const size_t n_entries = all_frames.size();
         for (size_t i = 0; i < n_entries; i++) {
           tmp_coordinates_cache.push_back(all_frames[i].exportCoordinateFrame());
@@ -575,7 +575,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
           // Otherwise, check the specified range against the file's actual contents.
           const int fr_init  = sysvec[i].getStartingFrame();
           const int fr_final = sysvec[i].getFinalFrame();
-          std::vector<MdlMolObj> frame_selection;
+          std::vector<MdlMol> frame_selection;
           try {
             frame_selection = (fr_init == 0 && fr_final == -1) ?
               readStructureDataFile(sysvec[i].getInputCoordinateFileName()) :
@@ -838,7 +838,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 }
 
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, std::vector<MdlMolObj> *sdf_recovery,
+SystemCache::SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
                          const ExceptionResponse policy,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,

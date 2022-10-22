@@ -3,7 +3,8 @@
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_enumerators.h"
 #include "../../../src/MolecularMechanics/minimization.h"
-#include "../../../src/MoleculeFormat/mdl_mol_obj.h"
+#include "../../../src/MoleculeFormat/mdlmol.h"
+#include "../../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
@@ -37,7 +38,7 @@ int main(int argc, const char* argv[]) {
   UserSettings ui(argc, argv, AppName::FFREFINE);
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
-  std::vector<MdlMolObj> sdf_recovery;
+  std::vector<MdlMol> sdf_recovery;
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
                  &sdf_recovery, ui.getExceptionBehavior(), MapRotatableGroups::YES,
                  ui.getPrintingPolicy(), &timer);
@@ -132,10 +133,13 @@ int main(int argc, const char* argv[]) {
                         sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
         break;
       case CoordinateFileKind::SDF:
-        sdf_recovery[
+        sdf_recovery[i].impartCoordinates(ps);
+        sdf_recovery[i].writeMdl(sc.getCheckpointName(i), MdlMolVersion::V2000,
+                                 sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
         break;        
       case CoordinateFileKind::UNKNOWN:
         break;
+      }
     }
   }
 
