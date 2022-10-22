@@ -1657,6 +1657,7 @@ PhaseSpace PhaseSpaceSynthesis::exportSystem(const int index, const HybridTarget
   
 //-------------------------------------------------------------------------------------------------
 CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
+                                                       const CoordinateCycle orientation,
                                                        const TrajectoryKind trajkind,
                                                        const HybridTargetLevel tier) const {
   if (index < 0 || index >= system_count) {
@@ -1671,7 +1672,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
   case HybridTargetLevel::HOST:
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_coordinates.readHost(astart, rsw.natom);
         ybuffer = y_prior_coordinates.readHost(astart, rsw.natom);
@@ -1690,7 +1691,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       }
       break;
     case TrajectoryKind::VELOCITIES:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_velocities.readHost(astart, rsw.natom);
         ybuffer = y_prior_velocities.readHost(astart, rsw.natom);
@@ -1709,7 +1710,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       }
       break;
     case TrajectoryKind::FORCES:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_forces.readHost(astart, rsw.natom);
         ybuffer = y_prior_forces.readHost(astart, rsw.natom);
@@ -1733,7 +1734,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
   case HybridTargetLevel::DEVICE:
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_coordinates.readDevice(astart, rsw.natom);
         ybuffer = y_prior_coordinates.readDevice(astart, rsw.natom);
@@ -1752,7 +1753,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       }
       break;
     case TrajectoryKind::VELOCITIES:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_velocities.readDevice(astart, rsw.natom);
         ybuffer = y_prior_velocities.readDevice(astart, rsw.natom);
@@ -1771,7 +1772,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       }
       break;
     case TrajectoryKind::FORCES:
-      switch (cycle_position) {
+      switch (orientation) {
       case CoordinateCycle::PAST:
         xbuffer = x_prior_forces.readDevice(astart, rsw.natom);
         ybuffer = y_prior_forces.readDevice(astart, rsw.natom);
@@ -1816,7 +1817,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
     case HybridTargetLevel::HOST:
       switch (trajkind) {
       case TrajectoryKind::POSITIONS:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_coord_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_prior_coord_overflow.readHost(astart, rsw.natom);
@@ -1835,7 +1836,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         }
         break;
       case TrajectoryKind::VELOCITIES:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_velocity_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_prior_velocity_overflow.readHost(astart, rsw.natom);
@@ -1854,7 +1855,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         }
         break;
       case TrajectoryKind::FORCES:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_force_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_prior_force_overflow.readHost(astart, rsw.natom);
@@ -1878,7 +1879,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
     case HybridTargetLevel::DEVICE:
       switch (trajkind) {
       case TrajectoryKind::POSITIONS:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_coord_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_prior_coord_overflow.readDevice(astart, rsw.natom);
@@ -1897,7 +1898,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         }
         break;
       case TrajectoryKind::VELOCITIES:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_velocity_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_prior_velocity_overflow.readDevice(astart, rsw.natom);
@@ -1916,7 +1917,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         }
         break;
       case TrajectoryKind::FORCES:
-        switch (cycle_position) {
+        switch (orientation) {
         case CoordinateCycle::PAST:
           x_ovrf_buffer = x_prior_force_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_prior_force_overflow.readDevice(astart, rsw.natom);
@@ -1947,7 +1948,14 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
   }
   return result;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
+                                                       const TrajectoryKind trajkind,
+                                                       const HybridTargetLevel tier) const {
+  exportCoordinates(index, cycle_position, trajkind, tier);
+}
+
 //-------------------------------------------------------------------------------------------------
 #ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu,

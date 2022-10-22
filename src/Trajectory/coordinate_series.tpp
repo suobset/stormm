@@ -560,7 +560,8 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   case CoordinateFileKind::SDF:
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
-    if (fi_exists == false) {
+    if (fi_exists == false ||
+        aexp == PrintSituation::OVERWRITE || aexp == PrintSituation::OPEN_NEW) {
       initializeTrajectory(&foutp, kind, atom_count);
     }
     break;

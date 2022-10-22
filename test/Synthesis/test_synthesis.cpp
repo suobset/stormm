@@ -968,10 +968,10 @@ int main(const int argc, const char* argv[]) {
   for (int i = 0; i < nsys; i++) {
     rst_outside_list = (rst_outside_list ||
                         (findStringInVector(rst_outputs,
-                                            sysc.getSystemCheckpointName(i)) == nbase_aa));
+                                            sysc.getCheckpointName(i)) == nbase_aa));
     trj_outside_list = (trj_outside_list ||
                         (findStringInVector(trj_outputs,
-                                            sysc.getSystemTrajectoryName(i)) == nbase_aa));
+                                            sysc.getTrajectoryName(i)) == nbase_aa));
   }
   check(rst_outside_list == false, "One of the SystemCache's checkpoint file names was outside "
         "the expected list.  The name extension feature, for differentiating names of multiple "
@@ -993,10 +993,10 @@ int main(const int argc, const char* argv[]) {
   start_line = 0;
   const FilesControls multi_label_fcon(multi_label_tf, &start_line);
   SystemCache multi_label_sysc(multi_label_fcon, ExceptionResponse::SILENT);
-  check(multi_label_sysc.getSystemCheckpointName(10), RelationalOperator::EQUAL, "md_0_10.rst",
+  check(multi_label_sysc.getCheckpointName(10), RelationalOperator::EQUAL, "md_0_10.rst",
         "The SystemCache object does not produced the expected non-colliding name for a frame of "
         "an SD file.", test_sysc);
-  check(multi_label_sysc.getSystemCheckpointName(38), RelationalOperator::EQUAL, "md_1_2.rst",
+  check(multi_label_sysc.getCheckpointName(38), RelationalOperator::EQUAL, "md_1_2.rst",
         "The SystemCache object does not produced the expected non-colliding name for a replica "
         "of an coordinate system first read from an Amber ASCII restart file.", test_sysc);
 
@@ -1011,18 +1011,17 @@ int main(const int argc, const char* argv[]) {
   start_line = 0;
   const FilesControls cat_output_fcon(cat_output_tf, &start_line);
   SystemCache cat_output_sysc(cat_output_fcon, ExceptionResponse::SILENT);
-
-  // CHECK
-#if 0
+  std::vector<int> prnt_situ_ans(52, static_cast<int>(PrintSituation::APPEND));
+  std::vector<int> prnt_situ(52);
+  prnt_situ_ans[0] = static_cast<int>(PrintSituation::OPEN_NEW);
+  prnt_situ_ans[36] = prnt_situ_ans[0];
+  const CoordinateFileRole chk_purpose = CoordinateFileRole::CHECKPOINT;
   for (int i = 0; i < cat_output_sysc.getSystemCount(); i++) {
-    printf("  %2d : %80.80s of type %12.12s -> %20.20s of type %12.12s\n", i,
-           cat_output_sysc.getSystemInputCoordinatesName(i).c_str(),
-           getEnumerationName(cat_output_sysc.getSystemInputCoordinatesKind(i)).c_str(),
-           cat_output_sysc.getSystemCheckpointName(i).c_str(),
-           getEnumerationName(cat_output_sysc.getSystemCheckpointKind(i)).c_str());
+    prnt_situ[i] = static_cast<int>(cat_output_sysc.getPrintingProtocol(chk_purpose, i));
   }
-#endif
-  // END CHECK
+  check(prnt_situ, RelationalOperator::EQUAL, prnt_situ_ans, "The printing protocols for multiple "
+        "systems grouped under the same label feeding into a common output file able to accept "
+        "multiple frames do not meet expectations.");
 
   // Create some topologies and coordinate sets.
   Xoroshiro128pGenerator my_prng(oe.getRandomSeed());

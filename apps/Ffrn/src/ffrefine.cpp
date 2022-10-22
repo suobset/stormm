@@ -3,6 +3,7 @@
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_enumerators.h"
 #include "../../../src/MolecularMechanics/minimization.h"
+#include "../../../src/MoleculeFormat/mdl_mol_obj.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
@@ -20,6 +21,7 @@ using namespace stormm::energy;
 using namespace stormm::mm;
 using namespace stormm::namelist;
 using namespace stormm::restraints;
+using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -35,9 +37,10 @@ int main(int argc, const char* argv[]) {
   UserSettings ui(argc, argv, AppName::FFREFINE);
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
+  std::vector<MdlMolObj> sdf_recovery;
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
-                 ui.getExceptionBehavior(), ui.getPrintingPolicy(), MapRotatableGroups::YES,
-                 &timer);
+                 &sdf_recovery, ui.getExceptionBehavior(), MapRotatableGroups::YES,
+                 ui.getPrintingPolicy(), &timer);
 
   // Perform minimizations as requested.
   const int system_count = sc.getSystemCount();
@@ -78,7 +81,7 @@ int main(int argc, const char* argv[]) {
       const std::vector<double> qqnb_nrg =
         all_mme[i].reportEnergyHistory(StateVariable::ELECTROSTATIC, 0);
       const std::vector<double> ljnb_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::VDW, 0);
+          all_mme[i].reportEnergyHistory(StateVariable::VDW, 0);
       const std::vector<double> rstr_nrg =
         all_mme[i].reportEnergyHistory(StateVariable::RESTRAINT, 0);
       all_mme[i].computePotentialEnergy();      
@@ -113,12 +116,26 @@ int main(int argc, const char* argv[]) {
 
       // CHECK
       printf("Print a %s with expectation %s\n",
-             getEnumerationName(sc.getSystemCheckpointKind(i)).c_str(),
-             getEnumerationName(ui.getPrintingPolicy()).c_str());
+             getEnumerationName(sc.getCheckpointKind(i)).c_str(),
+             getEnumerationName(sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT,
+                                                       i)).c_str());
       // END CHECK
-      
-      ps.exportToFile(sc.getSystemCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
-                      sc.getSystemCheckpointKind(i), ui.getPrintingPolicy());
+
+      switch (sc.getCheckpointKind(i)) {
+      case CoordinateFileKind::AMBER_CRD:
+      case CoordinateFileKind::AMBER_INPCRD:
+      case CoordinateFileKind::AMBER_ASCII_RST:
+      case CoordinateFileKind::AMBER_NETCDF:
+      case CoordinateFileKind::AMBER_NETCDF_RST:
+        ps.exportToFile(sc.getCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
+                        sc.getCheckpointKind(i),
+                        sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
+        break;
+      case CoordinateFileKind::SDF:
+        sdf_recovery[
+        break;        
+      case CoordinateFileKind::UNKNOWN:
+        break;
     }
   }
 

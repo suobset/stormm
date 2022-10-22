@@ -293,6 +293,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
+		   $(SRCDIR)/MoleculeFormat/mdl_mol_obj.tpp \
 		   $(SRCDIR)/Parsing/polynumeric.tpp \
 		   $(SRCDIR)/Potential/cacheresource.tpp \
 		   $(SRCDIR)/Potential/energy_abstracts.tpp \

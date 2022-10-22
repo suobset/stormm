@@ -23,8 +23,6 @@ using parse::operator==;
 using topology::ChemicalDetailsKit;
 using topology::TorsionKind;
 using topology::ValenceKit;
-using trajectory::CoordinateFrameWriter;
-using trajectory::PhaseSpaceWriter;
 using trajectory::writeFrame;
 
 //-------------------------------------------------------------------------------------------------
@@ -422,6 +420,42 @@ const std::vector<int>& MdlMolObj::getFormalCharges() const {
 //-------------------------------------------------------------------------------------------------
 int MdlMolObj::getPropertiesCount() const {
   return properties_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const PhaseSpaceReader &psr) {
+  impartCoordinates(psr.xcrd, psr.ycrd, psr.zcrd, 1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const PhaseSpaceWriter &psw) {
+  impartCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, 1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const PhaseSpace &ps, const CoordinateCycle orientation,
+                                  const HybridTargetLevel tier) {
+  impartCoordinates(ps.data(orientation, tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const PhaseSpace &ps, const HybridTargetLevel tier) {
+  impartCoordinates(ps, ps.getCyclePosition(), tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const CoordinateFrameReader &cfr) {
+  impartCoordinates(cfr.xcrd, cfr.ycrd, cfr.zcrd, 1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const CoordinateFrameWriter &cfw) {
+  impartCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolObj::impartCoordinates(const CoordinateFrame &cf, const HybridTargetLevel tier) {
+  impartCoordinates(cf.data());
 }
 
 //-------------------------------------------------------------------------------------------------

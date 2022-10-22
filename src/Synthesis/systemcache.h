@@ -8,6 +8,7 @@
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
 #include "FileManagement/file_enumerators.h"
+#include "MoleculeFormat/mdl_mol_obj.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_restraint.h"
 #include "Potential/forward_exclusionmask.h"
@@ -31,6 +32,7 @@ using energy::StaticExclusionMask;
 using namelist::FilesControls;
 using namelist::RestraintControls;
 using restraints::RestraintApparatus;
+using structure::MdlMolObj;
 using testing::StopWatch;
 using topology::AtomGraph;
 using trajectory::CoordinateFileKind;
@@ -60,6 +62,19 @@ public:
   SystemCache(ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW);
+
+  SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
+              std::vector<MdlMolObj> *sdf_recovery,
+              ExceptionResponse policy_in = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
+              StopWatch *timer_in = nullptr);
+
+  SystemCache(const FilesControls &fcon, std::vector<MdlMolObj> *sdf_recovery,
+              ExceptionResponse policy = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
+              StopWatch *timer_in = nullptr);
 
   SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
               ExceptionResponse policy_in = ExceptionResponse::DIE,
@@ -316,21 +331,21 @@ public:
   ///        manipulations to differentiate the name as the output formats are.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  const std::string& getSystemInputCoordinatesName(int system_index) const;
+  const std::string& getInputCoordinatesName(int system_index) const;
   
   /// \brief Get the name of the trajectory file associated with one of the systems.  The name
   ///        will be manipulated (by adding _## before the final '.', or at the end of the file
   ///        name if there is no '.').
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  std::string getSystemTrajectoryName(int system_index) const;
+  std::string getTrajectoryName(int system_index) const;
   
   /// \brief Get the name of the checkpoint (restart) file associated with one of the systems.
   ///        This name will also be manipulated to differentiate systems making use of the same
   ///        label.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  std::string getSystemCheckpointName(int system_index) const;
+  std::string getCheckpointName(int system_index) const;
 
   /// \brief Get the label associated with a particular system in the cache.
   ///
@@ -340,17 +355,17 @@ public:
   /// \brief Get the coordinate file type associated with a particular system's input.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  CoordinateFileKind getSystemInputCoordinatesKind(const int system_index) const;
+  CoordinateFileKind getInputCoordinatesKind(const int system_index) const;
   
   /// \brief Get the coordinate file type associated with a particular system's trajectory.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  CoordinateFileKind getSystemTrajectoryKind(const int system_index) const;
+  CoordinateFileKind getTrajectoryKind(const int system_index) const;
 
   /// \brief Get the coordinate file type associated with a particular system's checkpoint file.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
-  CoordinateFileKind getSystemCheckpointKind(const int system_index) const;
+  CoordinateFileKind getCheckpointKind(const int system_index) const;
 
   /// \brief When multiple systems' coordinates are to be combined into a particular file, the
   ///        file may be opened as a new file once, with whatever overwriting protocol, to write
@@ -358,9 +373,20 @@ public:
   ///        should be appended with other systems from the same label group.  This function will
   ///        determine how to modulate the printing protcol.
   ///
-  /// \param purpose  The role that the file will play
-  /// \param 
+  /// Overloaded:
+  ///   - Call with no arguments to get the baseline printing protocol, and that used for the
+  ///     first frames written under any label group
+  ///   - Call with the role of a coordinates file and the system index to get the modified
+  ///     protocol specific to writing frames of that system
+  ///
+  /// \param purpose      The role that the file will play
+  /// \param systm_index  A particular system for which to obtain the printing protocol, which may
+  ///                     be modified from the original if the system shares the same label as any
+  ///                     others
+  /// \{
+  PrintSituation getPrintingProtocol() const;
   PrintSituation getPrintingProtocol(CoordinateFileRole purpose, int system_index) const;
+  /// \}
 
   /// \brief Set the printing protocol.
   ///

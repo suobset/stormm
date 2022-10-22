@@ -70,7 +70,7 @@ int main(int argc, const char* argv[]) {
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
       const PhaseSpace ps = sc.getCoordinateReference(i);
-      ps.exportToFile(sc.getSystemCheckpointName(i));
+      ps.exportToFile(sc.getCheckpointName(i));
     }
   }
 

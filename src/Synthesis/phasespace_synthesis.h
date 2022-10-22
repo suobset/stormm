@@ -592,11 +592,22 @@ public:
   /// \brief Export a system's coordinates, velocities, or forces to a compact CoordinateFrame
   ///        object.
   ///
-  /// \param index     Index of the system of interest within the synthesis
-  /// \param trajkind  Type of coordinates to copy
-  /// \param tier      The level (host or device) at which to get the data
+  /// Overloaded:
+  ///   - Provide the stage of the coordinate cycle from which to obtain coordinates
+  ///   - Assume that the PRESENT stage of the coordinate cycle is desired
+  ///
+  /// \param index        Index of the system of interest within the synthesis
+  /// \param trajkind     Type of coordinates to copy
+  /// \param orientation  Stage of the coordinate cycle from which to obtain coordinates
+  /// \param tier         The level (host or device) at which to get the data
+  /// \{
+  CoordinateFrame exportCoordinates(int index, CoordinateCycle orientation,
+                                    TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   CoordinateFrame exportCoordinates(int index, TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
 
   /// \brief Initialize the forces within a PhaseSpaceSynthesis object.  This is the analog of the
   ///        eponymous function in the PhaseSpace object.

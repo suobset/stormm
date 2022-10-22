@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "Accelerator/hybrid.h"
 #include "Chemistry/znumber.h"
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -15,7 +16,9 @@
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "molecule_file_io.h"
 #include "molecule_format_enumerators.h"
 #include "molobj_atomlist.h"
@@ -26,6 +29,7 @@
 namespace stormm {
 namespace structure {
 
+using card::HybridTargetLevel;
 using chemistry::symbolToZNumber;
 using constants::CartesianDimension;
 using constants::CaseSensitivity;
@@ -34,8 +38,16 @@ using diskutil::PrintSituation;
 using parse::TextFile;
 using restraints::RestraintApparatus;
 using topology::AtomGraph;
+using trajectory::CoordinateCycle;
 using trajectory::CoordinateFrame;
+using trajectory::CoordinateFrameReader;
+using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesReader;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
+using trajectory::PhaseSpaceReader;
+using trajectory::PhaseSpaceWriter;
 
 /// \brief Default settings for the MDL MOL object atom initializations
 /// \{
@@ -100,6 +112,16 @@ public:
             ExceptionResponse policy_in = ExceptionResponse::WARN);
   /// \}
 
+  /// \brief Default copy and move constructors, as well as assignment operators, are appropriate
+  ///        for this object which consists entirely of scalar data types, Standard Template
+  ///        Library objects, and no const members.
+  /// \{
+  MdlMolObj(const MdlMolObj &original) = default;
+  MdlMolObj(MdlMolObj &&original) = default;
+  MdlMolObj& operator=(const MdlMolObj &original) = default;
+  MdlMolObj& operator=(MdlMolObj &&original) = default;
+  /// \}
+  
   /// \brief Get the system's atom count.
   int getAtomCount() const;
   
@@ -156,6 +178,69 @@ public:
   /// \brief Get the number of properties found in the MDL MOL entry
   int getPropertiesCount() const;
 
+  /// \brief Impart a new set of coordinates to the atoms based on one of STORMM's major coordinate
+  ///        classes.  This will permanently modify the underlying coordinates of the object and
+  ///        also any properties dependent of the structure.  If providing a standalone coordinate
+  ///        object, the atom count of the incoming coordinate set will be checked.  In all cases,
+  ///        the order of atoms in the incoming coordinate set is expect to match this object's
+  ///        own arrangement.  If presenting an abstract of a PhaseSpace object, the coordinates of
+  ///        the PRESENT stage in the time cycle will be taken.  When presenting the original
+  ///        objects, the developer may select the stage in the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Present three C-style arrays for X, Y, and Z coordinates with trusted lengths
+  ///   - Present a PhaseSpace object, or abstract thereof
+  ///   - Present a CoordinateFrame object, or abstract thereof
+  ///   - Present a CoordinateSeries object, or abstract thereof, with a frame index number
+  ///
+  /// \param xcrd          Cartesian X coordinates of all particles, trusted to describe a number
+  ///                      of atoms equal to that found in the MdlMolObject and in the same order
+  /// \param ycrd          Cartesian Y coordinates of all particles
+  /// \param zcrd          Cartesian Z coordinates of all particles
+  /// \param scale_factor  The scaling factor by which to multiply coordinates in order to take
+  ///                      them into units of Angstroms
+  /// \param ps            Coordinates to transfer
+  /// \param cf            Coordinates to transfer
+  /// \param cs            A series of frames, one containing the coordinates to transfer
+  /// \param poly_ps       A complex collection of systems containing coordinates to transfer
+  /// \param frame_index   Frame within the coordinate series to transfer
+  /// \param system_index  System within the phase space synthesis to transfer
+  /// \param tier          Indicate whether to obtain coordinates from either the CPU host or
+  ///                      GPU device memory
+  /// \{
+  template <typename T> void impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
+                                               double scale_factor);
+
+  void impartCoordinates(const PhaseSpaceReader &psr);
+
+  void impartCoordinates(const PhaseSpaceWriter &psw);
+
+  void impartCoordinates(const PhaseSpace &ps, CoordinateCycle orientation,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void impartCoordinates(const PhaseSpace &ps,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void impartCoordinates(const CoordinateFrameReader &cfr);
+
+  void impartCoordinates(const CoordinateFrameWriter &cfw);
+
+  void impartCoordinates(const CoordinateFrame &cf,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void impartCoordinates(const CoordinateSeriesReader<T> &cs, int frame_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void impartCoordinates(const CoordinateSeriesWriter<T> &cs, int frame_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void impartCoordinates(const CoordinateSeries<T> &cs, int frame_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
   /// \brief Add a data item to the object.  These data items follow the classifications set forth
   ///        in the DataRequestKind enumerator (see molecule_format_enumerators.h).  Each overload
   ///        is designed to serve a particular case.
@@ -423,5 +508,7 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
   
 } // namespace structure
 } // namespace stormm
+
+#include "mdl_mol_obj.tpp"
 
 #endif

@@ -5,7 +5,6 @@
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
-#include "MoleculeFormat/mdl_mol_obj.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 
@@ -22,7 +21,6 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using namelist::MoleculeSystem;
 using parse::findStringInVector;
-using structure::MdlMolObj;
 using structure::readStructureDataFile;
 using topology::UnitCellType;
 using topology::ValenceKit;
@@ -45,7 +43,7 @@ SystemCache::SystemCache(const ExceptionResponse policy_in,
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         const ExceptionResponse policy_in,
+                         std::vector<MdlMolObj> *sdf_recovery, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
@@ -559,6 +557,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
               system_input_coordinate_kinds.push_back(icrd_kind);
               system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
               system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
+              if (sdf_recovery != nullptr) {
+                sdf_recovery->emplace_back();
+              }
               system_count += 1;
             }
           }
@@ -631,6 +632,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
                 system_input_coordinate_kinds.push_back(icrd_kind);
                 system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
                 system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
+                if (sdf_recovery != nullptr) {
+                  sdf_recovery->push_back(frame_selection[j]);
+                }
                 system_count += 1;
               }
             }
@@ -834,10 +838,28 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 }
 
 //-------------------------------------------------------------------------------------------------
+SystemCache::SystemCache(const FilesControls &fcon, std::vector<MdlMolObj> *sdf_recovery,
+                         const ExceptionResponse policy,
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in,
+                         StopWatch *timer_in) :
+    SystemCache(fcon, {}, sdf_recovery, policy, map_chemfe_rotators, expectation_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
+                         const ExceptionResponse policy_in,
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in,
+                         StopWatch *timer_in) :
+    SystemCache(fcon, rstcon, nullptr, policy, map_chemfe_rotators, expectation_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in, StopWatch *timer_in) :
-    SystemCache(fcon, {}, policy, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, {}, nullptr, policy, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -1226,21 +1248,21 @@ std::vector<int> SystemCache::getTopologicalCases(const int topology_index) cons
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string& SystemCache::getSystemInputCoordinatesName(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemInputCoordinatesName");
+const std::string& SystemCache::getInputCoordinatesName(const int system_index) const {
+  checkSystemBounds(system_index, "getInputCoordinatesName");
   return system_input_coordinate_names[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getSystemTrajectoryName(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemTrajectoryName");
+std::string SystemCache::getTrajectoryName(const int system_index) const {
+  checkSystemBounds(system_index, "getTrajectoryName");
   return nondegenerateName(system_trajectory_names[system_index], CoordinateFileRole::TRAJECTORY,
                            system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getSystemCheckpointName(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemCheckpointName");
+std::string SystemCache::getCheckpointName(const int system_index) const {
+  checkSystemBounds(system_index, "getCheckpointName");
   return nondegenerateName(system_checkpoint_names[system_index], CoordinateFileRole::CHECKPOINT,
                            system_index);
 }
@@ -1252,21 +1274,26 @@ std::string SystemCache::getSystemLabel(const int system_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFileKind SystemCache::getSystemInputCoordinatesKind(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemInputCoordinatesKind");
+CoordinateFileKind SystemCache::getInputCoordinatesKind(const int system_index) const {
+  checkSystemBounds(system_index, "getInputCoordinatesKind");
   return system_trajectory_kinds[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFileKind SystemCache::getSystemTrajectoryKind(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemTrajectoryKind");
+CoordinateFileKind SystemCache::getTrajectoryKind(const int system_index) const {
+  checkSystemBounds(system_index, "getTrajectoryKind");
   return system_trajectory_kinds[system_index];
 }
   
 //-------------------------------------------------------------------------------------------------
-CoordinateFileKind SystemCache::getSystemCheckpointKind(const int system_index) const {
-  checkSystemBounds(system_index, "getSystemCheckpointKind");
+CoordinateFileKind SystemCache::getCheckpointKind(const int system_index) const {
+  checkSystemBounds(system_index, "getCheckpointKind");
   return system_checkpoint_kinds[system_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+PrintSituation SystemCache::getPrintingProtocol() const {
+  return expectation;
 }
 
 //-------------------------------------------------------------------------------------------------
