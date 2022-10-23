@@ -38,6 +38,8 @@ cat > ffld.in << EOF
   sdf_item { -title etot  -label ALL -energy TOTAL_ENERGY }
   sdf_item { -title eptot -label ALL -energy POTENTIAL_ENERGY }
   sdf_item { -title edihe -label ALL -energy PROPER_DIHEDRAL }
+  sdf_item { -title note  -label ALL -message "Hello world" }
+  sdf_item { -title "S_N_bond" -parameter BOND -label ALL -typeI ab -typeJ ad }
 &end
 EOF
 

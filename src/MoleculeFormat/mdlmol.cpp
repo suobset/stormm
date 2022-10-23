@@ -504,14 +504,14 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.bond_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness\n");
+                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------\n");
+                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : j_atom + 1;
               const int j_index = (forward) ? j_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf\n", i_name.x,
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
                       i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z, j_name.w,
                       i_index, j_index, vk.bond_leq[param_idx], vk.bond_keq[param_idx]);
               di_body.push_back(buffer_data);
@@ -540,15 +540,15 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.angl_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, "    Atom Names        Indices       Eq. L0    Stiffness\n");
+                sprintf(buffer_data, "    Atom Names        Indices       Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ---- ----  ---- ---- ----  ---------- ----------\n");
+                sprintf(buffer_data, "  ---- ---- ----  ---- ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
               const int j_index = j_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d  %10.4lf %10.4lf\n",
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d  %10.4lf %10.4lf",
                       i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z,
                       j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, i_index, j_index, k_index,
                       vk.angl_theta[param_idx] * 180.0 / symbols::pi, vk.angl_keq[param_idx]);
@@ -598,10 +598,10 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int param_idx = vk.dihe_param_idx[pos];
               if (nfound == 0) {
                 sprintf(buffer_data, "       Atom Names            Indices         Amplitude "
-                        "   Phase    N\n");
+                        "   Phase    N");
                 di_body.push_back(buffer_data);
                 sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
-                        "---------- --\n");
+                        "---------- --");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
@@ -609,7 +609,7 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
               const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
               sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
-                      "%10.4lf %10.4lf %2d\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                      "%10.4lf %10.4lf %2d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
                       j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
                       l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
                       vk.dihe_amp[param_idx], vk.dihe_phi[param_idx] * 180.0 / symbols::pi,
@@ -635,14 +635,14 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.ubrd_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness\n");
+                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------\n");
+                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf\n", i_name.x,
+              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
                       i_name.y, i_name.z, i_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
                       i_index, k_index, vk.ubrd_leq[param_idx], vk.ubrd_keq[param_idx]);
               di_body.push_back(buffer_data);
@@ -676,10 +676,10 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int param_idx = vk.cimp_param_idx[pos];
               if (nfound == 0) {
                 sprintf(buffer_data, "       Atom Names            Indices         Stiffness "
-                        "   Phase  \n");
+                        "   Phase  ");
                 di_body.push_back(buffer_data);
                 sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
-                        "----------\n");
+                        "----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
@@ -687,7 +687,7 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
               const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
               sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
-                      "%10.4lf %10.4lf\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                      "%10.4lf %10.4lf", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
                       j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
                       l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
                       vk.cimp_keq[param_idx], vk.cimp_phi[param_idx] * 180.0 / symbols::pi);
@@ -728,10 +728,10 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int param_idx = vk.cimp_param_idx[pos];
               if (nfound == 0) {
                 sprintf(buffer_data, "          Atom Names                 Indices          "
-                        " Map\n");
+                        " Map");
                 di_body.push_back(buffer_data);
                 sprintf(buffer_data, "  ---- ---- ---- ---- ----  ---- ---- ---- ---- ----  "
-                        "----\n");
+                        "----");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : m_atom + 1;
@@ -740,7 +740,7 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
               const int l_index = (forward) ? l_atom + 1 : j_atom + 1;
               const int m_index = (forward) ? m_atom + 1 : i_atom + 1;
               sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d "
-                      "%4d %4d  %4d\n", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y,
+                      "%4d %4d  %4d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y,
                       j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, l_name.x,
                       l_name.y, l_name.z, l_name.w, m_name.x, m_name.y, m_name.z, m_name.w,
                       i_index, j_index, k_index, l_index, m_index, vk.cmap_surf_idx[param_idx]);
@@ -775,6 +775,30 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
       case StateVariable::ALL_STATES:
         break;
       }
+
+      // Mark the number of findings on the first line
+      if (nfound == 0) {
+        di_body[0] = std::string("No");
+      }
+      else {
+        di_body[0] = std::string("A total of ") + std::to_string(nfound);
+      }
+      di_body[0].append(" instances of a " + getEnumerationName(ask.getValenceParameter()) +
+                        " involving atom type");
+      const int natypes = atom_types.size();
+      if (natypes > 1) {
+        di_body[0] += 's';
+      }
+      for (int i = 0; i < natypes; i++) {
+        di_body[0] += ' ';
+        di_body[0] += '[';
+        if (atom_types[i].x != ' ') di_body[0] += atom_types[i].x;
+        if (atom_types[i].y != ' ') di_body[0] += atom_types[i].y;
+        if (atom_types[i].z != ' ') di_body[0] += atom_types[i].z;
+        if (atom_types[i].w != ' ') di_body[0] += atom_types[i].w;
+        di_body[0] += ']';        
+      }
+      di_body[0].append(" were found.");
     }
     break;
   case DataRequestKind::STRING:
@@ -933,7 +957,12 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
       result.append(data_items[i].getDataLine(j));
       result += '\n';
     }
-    result += '\n';
+
+    // There must be a blank line between any data item and the next, but not between the last
+    // data item and the SD file's terminating "$$$$" card.
+    if (i < data_item_count - 1) {
+      result += '\n';
+    }
   }
   result.append("$$$$\n");
   return result;
