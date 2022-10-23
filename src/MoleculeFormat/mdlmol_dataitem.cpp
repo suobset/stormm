@@ -2,7 +2,7 @@
 #include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
-#include "molobj_dataitem.h"
+#include "mdlmol_dataitem.h"
 
 namespace stormm {
 namespace structure {
@@ -410,6 +410,25 @@ int MolObjDataItem::getInternalRegistryNumber() const {
 //-------------------------------------------------------------------------------------------------
 int MolObjDataItem::getMaccsFieldNumber() const {
   return maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjDataItem::getDataLineCount() const {
+  return body.size();
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MolObjDataItem::getDataLine(const int line_index) const {
+  if (line_index < 0 || line_index >= static_cast<int>(body.size())) {
+    rtErr("Request for data line " + std::to_string(line_index) + " is invalid for a data item "
+          "with " + std::to_string(body.size()) + " lines.", "MolObjDataItem", "getDataLine");
+  }
+  return body[line_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<std::string>& MolObjDataItem::getBody() const {
+  return body;
 }
 
 //-------------------------------------------------------------------------------------------------

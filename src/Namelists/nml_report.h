@@ -9,7 +9,8 @@
 #include <sys/time.h>
 #include "copyright.h"
 #include "Constants/behavior.h"
-#include "MoleculeFormat/molobj_dataitem.h"
+#include "DataTypes/common_types.h"
+#include "MoleculeFormat/mdlmol_dataitem.h"
 #include "Parsing/textfile.h"
 #include "Potential/energy_enumerators.h"
 #include "Reporting/reporting_enumerators.h"

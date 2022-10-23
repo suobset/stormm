@@ -21,10 +21,10 @@
 #include "Trajectory/trajectory_enumerators.h"
 #include "molecule_file_io.h"
 #include "molecule_format_enumerators.h"
-#include "molobj_atomlist.h"
-#include "molobj_bond.h"
-#include "molobj_dataitem.h"
-#include "molobj_property.h"
+#include "mdlmol_atomlist.h"
+#include "mdlmol_bond.h"
+#include "mdlmol_dataitem.h"
+#include "mdlmol_property.h"
 
 namespace stormm {
 namespace structure {

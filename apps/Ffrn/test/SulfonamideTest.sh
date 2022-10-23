@@ -4,7 +4,7 @@ cat > ffld.in << EOF
 &files
   -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
          -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
-         -label sulfonamide frame_end -1 -r sulfonamide.rst r_kind SDF }
+         -label sulfonamide frame_end -1 -r sulfonamide.sdf r_kind SDF }
 &end
 
 &ffrefine
@@ -12,7 +12,7 @@ cat > ffld.in << EOF
 &end
 
 &minimize
-  ncyc 50,  maxcyc 500,
+  ncyc 5,  maxcyc 10,
 &end
 
 &restraint
@@ -32,6 +32,12 @@ cat > ffld.in << EOF
   system sulfonamide
   ensemble prevent_hbonds
   penalty 16.0, proximity 3.2,
+&end
+
+&report
+  sdf_item { -title etot  -label ALL -energy TOTAL_ENERGY }
+  sdf_item { -title eptot -label ALL -energy POTENTIAL_ENERGY }
+  sdf_item { -title edihe -label ALL -energy PROPER_DIHEDRAL }
 &end
 EOF
 

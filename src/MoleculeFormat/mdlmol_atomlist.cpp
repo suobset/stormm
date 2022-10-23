@@ -5,7 +5,7 @@
 #include "FileManagement/file_listing.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
-#include "molobj_atomlist.h"
+#include "mdlmol_atomlist.h"
 
 namespace stormm {
 namespace structure {

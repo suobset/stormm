@@ -174,6 +174,6 @@ std::vector<double3> extractSdfCoordinates(const TextFile &tf, const int frame_n
   }
   return extractSdfCoordinates(tf, limits[frame_number].x, limits[frame_number].y);
 }
-
+  
 } // namespace structure
 } // namespace stormm

@@ -56,8 +56,19 @@ public:
   ///        additional command-line edits.  An empty object overload is available because it is
   ///        trivial and works well for delegation.
   ///
-  /// \param file_io_input  Object built from a &files namelist and possible command-line edits
-  /// \param policy_in      Response to bad user input, i.e. files of the wrong type
+  /// \param fcon                 Contents of the input deck's &files namelist and possible
+  ///                             command-line edits
+  /// \param rstcon               Contents of the input deck's &restraint namelists and possible
+  ///                             command-line edits
+  /// \param sdf_recovery         List of structures read in MDL MOL format, along with any data
+  ///                             items found in the SD file containing them, tracking the order
+  ///                             of all systems in the cache.  Modified and returned.  Systems
+  ///                             whose coordinates do not enter by an SD file will have
+  ///                             placeholder MdlMol entries in this list with zero atoms.  If set
+  ///                             to nullptr, no list of MdlMol objects will be generated.
+  /// \param policy_in            Response to bad user input, i.e. files of the wrong type
+  /// \param map_chemfe_rotators  Directive to have all topologies' chemical features mapped
+  /// \param expectation_in       The expected presence of output files
   /// \{
   SystemCache(ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
@@ -543,7 +554,7 @@ private:
   std::string nondegenerateName(const std::string &fname_in, CoordinateFileRole purpose,
                                 int system_index) const;
 };
-  
+
 } // namespace synthesis
 } // namespace stormm
 

@@ -2,7 +2,7 @@
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 #include "FileManagement/file_listing.h"
-#include "molobj_bond.h"
+#include "mdlmol_bond.h"
 
 namespace stormm {
 namespace structure {

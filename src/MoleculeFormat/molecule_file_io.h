@@ -14,7 +14,7 @@ namespace structure {
 using constants::ExceptionResponse;
 using parse::TextFile;
 using parse::TextFileReader;
-
+  
 /// \brief Find the end of the MDL MOL entry formatting within a specified range.  If the
 ///        end of the search range takes its default value of -1, the search will continue until
 ///        the end of the TextFile object.

@@ -39,46 +39,47 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_bond.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_property.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_refinement.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
-		   $(SRCDIR)/MoleculeFormat/molobj_atomlist.cpp \
-		   $(SRCDIR)/MoleculeFormat/molobj_bond.cpp \
-		   $(SRCDIR)/MoleculeFormat/molobj_dataitem.cpp \
-		   $(SRCDIR)/MoleculeFormat/molobj_property.cpp \
-	           $(SRCDIR)/Namelists/input.cpp \
-	           $(SRCDIR)/Namelists/namelist_element.cpp \
-	           $(SRCDIR)/Namelists/namelist_emulator.cpp \
-	           $(SRCDIR)/Namelists/namelist_enumerators.cpp \
-	           $(SRCDIR)/Namelists/nml_conformer.cpp \
-	           $(SRCDIR)/Namelists/nml_dynamics.cpp \
-	           $(SRCDIR)/Namelists/nml_ffmorph.cpp \
-	           $(SRCDIR)/Namelists/nml_files.cpp \
-	           $(SRCDIR)/Namelists/nml_minimize.cpp \
-	           $(SRCDIR)/Namelists/nml_precision.cpp \
-	           $(SRCDIR)/Namelists/nml_random.cpp \
-	           $(SRCDIR)/Namelists/nml_report.cpp \
-	           $(SRCDIR)/Namelists/nml_restraint.cpp \
-	           $(SRCDIR)/Namelists/nml_solvent.cpp \
-	           $(SRCDIR)/Namelists/user_settings.cpp \
-	           $(SRCDIR)/Numerics/split_fixed_precision.cpp \
-	           $(SRCDIR)/Parsing/ascii_numbers.cpp \
-	           $(SRCDIR)/Parsing/citation.cpp \
+		   $(SRCDIR)/Namelists/input.cpp \
+		   $(SRCDIR)/Namelists/namelist_element.cpp \
+		   $(SRCDIR)/Namelists/namelist_emulator.cpp \
+		   $(SRCDIR)/Namelists/namelist_enumerators.cpp \
+		   $(SRCDIR)/Namelists/nml_conformer.cpp \
+		   $(SRCDIR)/Namelists/nml_dynamics.cpp \
+		   $(SRCDIR)/Namelists/nml_ffmorph.cpp \
+		   $(SRCDIR)/Namelists/nml_files.cpp \
+		   $(SRCDIR)/Namelists/nml_minimize.cpp \
+		   $(SRCDIR)/Namelists/nml_precision.cpp \
+		   $(SRCDIR)/Namelists/nml_random.cpp \
+		   $(SRCDIR)/Namelists/nml_report.cpp \
+		   $(SRCDIR)/Namelists/nml_restraint.cpp \
+		   $(SRCDIR)/Namelists/nml_solvent.cpp \
+		   $(SRCDIR)/Namelists/user_settings.cpp \
+		   $(SRCDIR)/Numerics/split_fixed_precision.cpp \
+		   $(SRCDIR)/Parsing/ascii_numbers.cpp \
+		   $(SRCDIR)/Parsing/citation.cpp \
 		   $(SRCDIR)/Parsing/parse.cpp \
 		   $(SRCDIR)/Parsing/polynumeric.cpp \
-	           $(SRCDIR)/Parsing/tabulation.cpp \
-	           $(SRCDIR)/Parsing/textfile.cpp \
-	           $(SRCDIR)/Parsing/textguard.cpp \
-	           $(SRCDIR)/Potential/cacheresource.cpp \
-	           $(SRCDIR)/Potential/energy_enumerators.cpp \
-	           $(SRCDIR)/Potential/eval_valence_workunit.cpp \
-	           $(SRCDIR)/Potential/forward_exclusionmask.cpp \
-	           $(SRCDIR)/Potential/nonbonded_potential.cpp \
-	           $(SRCDIR)/Potential/scorecard.cpp \
-	           $(SRCDIR)/Potential/static_exclusionmask.cpp \
-	           $(SRCDIR)/Potential/valence_potential.cpp \
+		   $(SRCDIR)/Parsing/tabulation.cpp \
+		   $(SRCDIR)/Parsing/textfile.cpp \
+		   $(SRCDIR)/Parsing/textguard.cpp \
+		   $(SRCDIR)/Potential/cacheresource.cpp \
+		   $(SRCDIR)/Potential/energy_enumerators.cpp \
+		   $(SRCDIR)/Potential/eval_valence_workunit.cpp \
+		   $(SRCDIR)/Potential/forward_exclusionmask.cpp \
+		   $(SRCDIR)/Potential/nonbonded_potential.cpp \
+		   $(SRCDIR)/Potential/scorecard.cpp \
+		   $(SRCDIR)/Potential/static_exclusionmask.cpp \
+		   $(SRCDIR)/Potential/valence_potential.cpp \
 		   $(SRCDIR)/Random/random.cpp \
-	           $(SRCDIR)/Reporting/code_dox.cpp \
-	           $(SRCDIR)/Reporting/display.cpp \
+		   $(SRCDIR)/Reporting/code_dox.cpp \
+		   $(SRCDIR)/Reporting/display.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
 		   $(SRCDIR)/Reporting/reporting_enumerators.cpp \
 		   $(SRCDIR)/Reporting/summary_file.cpp \
@@ -100,29 +101,29 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
 		   $(SRCDIR)/Synthesis/systemcache.cpp \
 		   $(SRCDIR)/Synthesis/valence_workunit.cpp \
-	           $(SRCDIR)/Topology/amber_prmtop_util.cpp \
-	           $(SRCDIR)/Topology/atomgraph_constructors.cpp \
-	           $(SRCDIR)/Topology/atomgraph_detailers.cpp \
-	           $(SRCDIR)/Topology/atomgraph_getters.cpp \
-	           $(SRCDIR)/Topology/atomgraph_intake.cpp \
-	           $(SRCDIR)/Topology/atomgraph_setters.cpp \
-	           $(SRCDIR)/Topology/atomgraph_miscellaneous.cpp \
-	           $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
-	           $(SRCDIR)/Topology/atomgraph_analysis.cpp \
-	           $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
-	           $(SRCDIR)/Topology/atomgraph_refinement.cpp \
-	           $(SRCDIR)/Topology/topology_limits.cpp \
-	           $(SRCDIR)/Topology/topology_util.cpp \
-	           $(SRCDIR)/Trajectory/amber_ascii.cpp \
-	           $(SRCDIR)/Trajectory/barostat.cpp \
-	           $(SRCDIR)/Trajectory/coordinateframe.cpp \
-	           $(SRCDIR)/Trajectory/coordinate_intake.cpp \
-	           $(SRCDIR)/Trajectory/coordinate_swap_plan.cpp \
-	           $(SRCDIR)/Trajectory/phasespace.cpp \
-	           $(SRCDIR)/Trajectory/thermostat.cpp \
-	           $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
-	           $(SRCDIR)/Trajectory/write_annotated_frame.cpp \
-	           $(SRCDIR)/Trajectory/write_frame.cpp \
+		   $(SRCDIR)/Topology/amber_prmtop_util.cpp \
+		   $(SRCDIR)/Topology/atomgraph_constructors.cpp \
+		   $(SRCDIR)/Topology/atomgraph_detailers.cpp \
+		   $(SRCDIR)/Topology/atomgraph_getters.cpp \
+		   $(SRCDIR)/Topology/atomgraph_intake.cpp \
+		   $(SRCDIR)/Topology/atomgraph_setters.cpp \
+		   $(SRCDIR)/Topology/atomgraph_miscellaneous.cpp \
+		   $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
+		   $(SRCDIR)/Topology/atomgraph_analysis.cpp \
+		   $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
+		   $(SRCDIR)/Topology/atomgraph_refinement.cpp \
+		   $(SRCDIR)/Topology/topology_limits.cpp \
+		   $(SRCDIR)/Topology/topology_util.cpp \
+		   $(SRCDIR)/Trajectory/amber_ascii.cpp \
+		   $(SRCDIR)/Trajectory/barostat.cpp \
+		   $(SRCDIR)/Trajectory/coordinateframe.cpp \
+		   $(SRCDIR)/Trajectory/coordinate_intake.cpp \
+		   $(SRCDIR)/Trajectory/coordinate_swap_plan.cpp \
+		   $(SRCDIR)/Trajectory/phasespace.cpp \
+		   $(SRCDIR)/Trajectory/thermostat.cpp \
+		   $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
+		   $(SRCDIR)/Trajectory/write_annotated_frame.cpp \
+		   $(SRCDIR)/Trajectory/write_frame.cpp \
 		   $(SRCDIR)/UnitTesting/approx.cpp \
 		   $(SRCDIR)/UnitTesting/stopwatch.cpp \
 		   $(SRCDIR)/UnitTesting/checklist.cpp \
@@ -161,29 +162,30 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Math/matrix.h \
 		     $(SRCDIR)/Math/matrix_ops.h \
 		     $(SRCDIR)/Math/multiplication.h \
-	             $(SRCDIR)/Math/reduction.h \
-	             $(SRCDIR)/Math/reduction_abstracts.h \
-	             $(SRCDIR)/Math/reduction_bridge.h \
-	             $(SRCDIR)/Math/reduction_enumerators.h \
-	             $(SRCDIR)/Math/reduction_workunit.h \
+		     $(SRCDIR)/Math/reduction.h \
+		     $(SRCDIR)/Math/reduction_abstracts.h \
+		     $(SRCDIR)/Math/reduction_bridge.h \
+		     $(SRCDIR)/Math/reduction_enumerators.h \
+		     $(SRCDIR)/Math/reduction_workunit.h \
 		     $(SRCDIR)/Math/rounding.h \
 		     $(SRCDIR)/Math/series_ops.h \
 		     $(SRCDIR)/Math/sorting.h \
-	             $(SRCDIR)/Math/statistics.h \
-	             $(SRCDIR)/Math/summation.h \
-	             $(SRCDIR)/Math/tickcounter.h \
-	             $(SRCDIR)/Math/vector_ops.h \
+		     $(SRCDIR)/Math/statistics.h \
+		     $(SRCDIR)/Math/summation.h \
+		     $(SRCDIR)/Math/tickcounter.h \
+		     $(SRCDIR)/Math/vector_ops.h \
 		     $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
 		     $(SRCDIR)/MolecularMechanics/mm_controls.h \
 		     $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_bond.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_property.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_refinement.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
-		     $(SRCDIR)/MoleculeFormat/molobj_atomlist.h \
-		     $(SRCDIR)/MoleculeFormat/molobj_bond.h \
-		     $(SRCDIR)/MoleculeFormat/molobj_dataitem.h \
-		     $(SRCDIR)/MoleculeFormat/molobj_property.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \
@@ -202,32 +204,32 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Numerics/split_fixed_precision.h \
 		     $(SRCDIR)/Parsing/ascii_numbers.h \
 		     $(SRCDIR)/Parsing/citation.h \
-	             $(SRCDIR)/Parsing/parse.h \
-	             $(SRCDIR)/Parsing/polynumeric.h \
-	             $(SRCDIR)/Parsing/tabulation.h \
-	             $(SRCDIR)/Parsing/textfile.h \
-	             $(SRCDIR)/Parsing/textguard.h \
-	             $(SRCDIR)/Potential/cacheresource.h \
-	             $(SRCDIR)/Potential/energy_abstracts.h \
-	             $(SRCDIR)/Potential/energy_enumerators.h \
-	             $(SRCDIR)/Potential/eval_valence_workunit.h \
-	             $(SRCDIR)/Potential/eval_synthesis.h \
-	             $(SRCDIR)/Potential/forward_exclusionmask.h \
-	             $(SRCDIR)/Potential/nonbonded_potential.h \
-	             $(SRCDIR)/Potential/scorecard.h \
-	             $(SRCDIR)/Potential/static_exclusionmask.h \
-	             $(SRCDIR)/Potential/valence_potential.h \
+		     $(SRCDIR)/Parsing/parse.h \
+		     $(SRCDIR)/Parsing/polynumeric.h \
+		     $(SRCDIR)/Parsing/tabulation.h \
+		     $(SRCDIR)/Parsing/textfile.h \
+		     $(SRCDIR)/Parsing/textguard.h \
+		     $(SRCDIR)/Potential/cacheresource.h \
+		     $(SRCDIR)/Potential/energy_abstracts.h \
+		     $(SRCDIR)/Potential/energy_enumerators.h \
+		     $(SRCDIR)/Potential/eval_valence_workunit.h \
+		     $(SRCDIR)/Potential/eval_synthesis.h \
+		     $(SRCDIR)/Potential/forward_exclusionmask.h \
+		     $(SRCDIR)/Potential/nonbonded_potential.h \
+		     $(SRCDIR)/Potential/scorecard.h \
+		     $(SRCDIR)/Potential/static_exclusionmask.h \
+		     $(SRCDIR)/Potential/valence_potential.h \
 		     $(SRCDIR)/Random/random.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
-	             $(SRCDIR)/Reporting/error_format.h \
-	             $(SRCDIR)/Reporting/reporting_enumerators.h \
-	             $(SRCDIR)/Reporting/summary_file.h \
-	             $(SRCDIR)/Restraints/bounded_restraint.h \
-	             $(SRCDIR)/Restraints/restraint_apparatus.h \
-	             $(SRCDIR)/Restraints/restraint_builder.h \
-	             $(SRCDIR)/Restraints/restraint_enumerators.h \
-	             $(SRCDIR)/Restraints/restraint_util.h \
+		     $(SRCDIR)/Reporting/error_format.h \
+		     $(SRCDIR)/Reporting/reporting_enumerators.h \
+		     $(SRCDIR)/Reporting/summary_file.h \
+		     $(SRCDIR)/Restraints/bounded_restraint.h \
+		     $(SRCDIR)/Restraints/restraint_apparatus.h \
+		     $(SRCDIR)/Restraints/restraint_builder.h \
+		     $(SRCDIR)/Restraints/restraint_enumerators.h \
+		     $(SRCDIR)/Restraints/restraint_util.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
@@ -344,62 +346,63 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/reduction_bridge.o \
 		  $(SRCDIR)/Math/reduction_workunit.o \
 		  $(SRCDIR)/Math/rounding.o \
-	          $(SRCDIR)/Math/series_ops.o \
-	          $(SRCDIR)/Math/statistics.o \
-	          $(SRCDIR)/Math/tickcounter.o \
-	          $(SRCDIR)/Math/vector_ops.o \
-	          $(SRCDIR)/MolecularMechanics/line_minimization.o \
-	          $(SRCDIR)/MolecularMechanics/minimization.o \
-	          $(SRCDIR)/MolecularMechanics/mm_controls.o \
-	          $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
-	          $(SRCDIR)/MoleculeFormat/mdlmol.o \
-	          $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
-	          $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
-	          $(SRCDIR)/MoleculeFormat/molobj_atomlist.o \
-	          $(SRCDIR)/MoleculeFormat/molobj_bond.o \
-	          $(SRCDIR)/MoleculeFormat/molobj_dataitem.o \
-	          $(SRCDIR)/MoleculeFormat/molobj_property.o \
+		  $(SRCDIR)/Math/series_ops.o \
+		  $(SRCDIR)/Math/statistics.o \
+		  $(SRCDIR)/Math/tickcounter.o \
+		  $(SRCDIR)/Math/vector_ops.o \
+		  $(SRCDIR)/MolecularMechanics/line_minimization.o \
+		  $(SRCDIR)/MolecularMechanics/minimization.o \
+		  $(SRCDIR)/MolecularMechanics/mm_controls.o \
+		  $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_bond.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_property.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_refinement.o \
+		  $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
+		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 		  $(SRCDIR)/Namelists/input.o \
-	          $(SRCDIR)/Namelists/namelist_element.o \
-	          $(SRCDIR)/Namelists/namelist_emulator.o \
-	          $(SRCDIR)/Namelists/namelist_enumerators.o \
-	          $(SRCDIR)/Namelists/nml_conformer.o \
-	          $(SRCDIR)/Namelists/nml_dynamics.o \
-	          $(SRCDIR)/Namelists/nml_ffmorph.o \
-	          $(SRCDIR)/Namelists/nml_files.o \
-	          $(SRCDIR)/Namelists/nml_minimize.o \
-	          $(SRCDIR)/Namelists/nml_precision.o \
-	          $(SRCDIR)/Namelists/nml_random.o \
-	          $(SRCDIR)/Namelists/nml_report.o \
-	          $(SRCDIR)/Namelists/nml_restraint.o \
-	          $(SRCDIR)/Namelists/nml_solvent.o \
-	          $(SRCDIR)/Namelists/user_settings.o \
-	          $(SRCDIR)/Numerics/split_fixed_precision.o \
+		  $(SRCDIR)/Namelists/namelist_element.o \
+		  $(SRCDIR)/Namelists/namelist_emulator.o \
+		  $(SRCDIR)/Namelists/namelist_enumerators.o \
+		  $(SRCDIR)/Namelists/nml_conformer.o \
+		  $(SRCDIR)/Namelists/nml_dynamics.o \
+		  $(SRCDIR)/Namelists/nml_ffmorph.o \
+		  $(SRCDIR)/Namelists/nml_files.o \
+		  $(SRCDIR)/Namelists/nml_minimize.o \
+		  $(SRCDIR)/Namelists/nml_precision.o \
+		  $(SRCDIR)/Namelists/nml_random.o \
+		  $(SRCDIR)/Namelists/nml_report.o \
+		  $(SRCDIR)/Namelists/nml_restraint.o \
+		  $(SRCDIR)/Namelists/nml_solvent.o \
+		  $(SRCDIR)/Namelists/user_settings.o \
+		  $(SRCDIR)/Numerics/split_fixed_precision.o \
 		  $(SRCDIR)/Parsing/ascii_numbers.o \
-	          $(SRCDIR)/Parsing/citation.o \
-	          $(SRCDIR)/Parsing/parse.o \
-	          $(SRCDIR)/Parsing/polynumeric.o \
-	          $(SRCDIR)/Parsing/tabulation.o \
-	          $(SRCDIR)/Parsing/textfile.o \
-	          $(SRCDIR)/Parsing/textguard.o \
-	          $(SRCDIR)/Potential/cacheresource.o \
-	          $(SRCDIR)/Potential/energy_enumerators.o \
-	          $(SRCDIR)/Potential/eval_valence_workunit.o \
-	          $(SRCDIR)/Potential/forward_exclusionmask.o \
-	          $(SRCDIR)/Potential/nonbonded_potential.o \
-	          $(SRCDIR)/Potential/scorecard.o \
-	          $(SRCDIR)/Potential/static_exclusionmask.o \
-	          $(SRCDIR)/Potential/valence_potential.o \
+		  $(SRCDIR)/Parsing/citation.o \
+		  $(SRCDIR)/Parsing/parse.o \
+		  $(SRCDIR)/Parsing/polynumeric.o \
+		  $(SRCDIR)/Parsing/tabulation.o \
+		  $(SRCDIR)/Parsing/textfile.o \
+		  $(SRCDIR)/Parsing/textguard.o \
+		  $(SRCDIR)/Potential/cacheresource.o \
+		  $(SRCDIR)/Potential/energy_enumerators.o \
+		  $(SRCDIR)/Potential/eval_valence_workunit.o \
+		  $(SRCDIR)/Potential/forward_exclusionmask.o \
+		  $(SRCDIR)/Potential/nonbonded_potential.o \
+		  $(SRCDIR)/Potential/scorecard.o \
+		  $(SRCDIR)/Potential/static_exclusionmask.o \
+		  $(SRCDIR)/Potential/valence_potential.o \
 		  $(SRCDIR)/Random/random.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
-	          $(SRCDIR)/Reporting/error_format.o \
-	          $(SRCDIR)/Reporting/reporting_enumerators.o \
-	          $(SRCDIR)/Reporting/summary_file.o \
-	          $(SRCDIR)/Restraints/bounded_restraint.o \
-	          $(SRCDIR)/Restraints/restraint_apparatus.o \
-	          $(SRCDIR)/Restraints/restraint_builder.o \
-	          $(SRCDIR)/Restraints/restraint_enumerators.o \
+		  $(SRCDIR)/Reporting/error_format.o \
+		  $(SRCDIR)/Reporting/reporting_enumerators.o \
+		  $(SRCDIR)/Reporting/summary_file.o \
+		  $(SRCDIR)/Restraints/bounded_restraint.o \
+		  $(SRCDIR)/Restraints/restraint_apparatus.o \
+		  $(SRCDIR)/Restraints/restraint_builder.o \
+		  $(SRCDIR)/Restraints/restraint_enumerators.o \
 		  $(SRCDIR)/Structure/global_manipulation.o \
 		  $(SRCDIR)/Structure/isomerization.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \

@@ -468,8 +468,8 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
   std::vector<std::string> di_body;
   switch (ask.getKind()) {
   case DataRequestKind::STATE_VARIABLE:
-
-    // The text will a single number, supplied by an external function or re-evaluated.
+    
+    // The text will be a single number, supplied by an external function or re-evaluated.
     break;
   case DataRequestKind::ATOM_INFLUENCES:
 
@@ -784,6 +784,7 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
     break;
   }
   data_items.emplace_back(ask, di_body);
+  data_item_count = data_items.size();
   compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
 }
 
@@ -902,6 +903,7 @@ void MdlMol::writeDataItems(const std::string &fname, const PrintSituation expec
 
 //-------------------------------------------------------------------------------------------------
 std::string MdlMol::writeDataItems(const int mol_index) const {
+  std::string result;
   for (int i = 0; i < data_item_count; i++) {
 
     // Compose the header line
@@ -911,10 +913,10 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
       header_line += std::to_string(mol_index);
     }
     if (data_items[i].placeExternalRegnoInHeader()) {
-      header_line += "(" + data_items[i].getExternalRegistryNumber() + ")";
+      header_line += '(' + data_items[i].getExternalRegistryNumber() + ')';
     }
     if (data_items[i].placeTitleInHeader()) {
-      header_line += "<" + data_items[i].getItemName() + ">";
+      header_line += '<' + data_items[i].getItemName() + '>';
       required_id = true;
     }
     if (data_items[i].placeMaccsIIFieldInHeader()) {
@@ -924,11 +926,17 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
     if (data_items[i].noteArchivesInHeader()) {
       header_line += " FROM ARCHIVES";
     }
-
-    // CHECK
-    printf("Header = %s\n", header_line.c_str()); 
-    // END CHECK
+    header_line += '\n';
+    result.append(header_line);
+    const int ndl = data_items[i].getDataLineCount();
+    for (int j = 0; j < ndl; j++) {
+      result.append(data_items[i].getDataLine(j));
+      result += '\n';
+    }
+    result += '\n';
   }
+  result.append("$$$$\n");
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1318,6 +1326,6 @@ std::vector<MdlMol> readStructureDataFile(const std::string &file_name,
   const TextFile tf(file_name);
   return readStructureDataFile(tf, capitalization, policy);
 }
-
+  
 } // namespace structure
 } // namespace stormm

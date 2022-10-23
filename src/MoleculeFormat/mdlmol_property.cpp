@@ -3,7 +3,7 @@
 #include "FileManagement/file_listing.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
-#include "molobj_property.h"
+#include "mdlmol_property.h"
 
 namespace stormm {
 namespace structure {

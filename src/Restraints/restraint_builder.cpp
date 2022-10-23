@@ -9,16 +9,8 @@
 #include "restraint_apparatus.h"
 #include "restraint_builder.h"
 
-// CHECK
-#include "Parsing/parse.h"
-// END CHECK
-
 namespace stormm {
 namespace restraints {
-
-// CHECK
-using parse::char4ToString;
-// END CHECK
   
 using chemistry::ChemicalFeatures;
 using chemistry::MaskTraversalMode;

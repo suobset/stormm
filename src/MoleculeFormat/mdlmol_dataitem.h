@@ -237,6 +237,17 @@ public:
   /// \brief Get the MACCS-II database field number.
   int getMaccsFieldNumber() const;
 
+  /// \brief Get the data line count.
+  int getDataLineCount() const;
+  
+  /// \brief Get a particular data lines from the item body.
+  ///
+  /// \param line_index  The data line of interest
+  const std::string& getDataLine(const int line_index) const;
+  
+  /// \brief Get all data lines.
+  const std::vector<std::string>& getBody() const;
+  
   /// \brief Retrieve a string from the data lines of a data item, assuming that individual words
   ///        on each line are separated by one or more white space characters and that the
   ///        quotation marks "" and '' collect everything between them into a single word.
@@ -304,7 +315,7 @@ public:
   ///
   /// \param item_name_in  The item name to assign
   void setItemName(const std::string &item_name_in);
-
+  
 private:
   std::string item_name;       ///< Name of the data item (optional, but an effective means of
                                ///<   distiction)
