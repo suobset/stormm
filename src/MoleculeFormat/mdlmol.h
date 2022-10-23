@@ -289,9 +289,28 @@ public:
   std::string writeMdl(MdlMolVersion vformat = MdlMolVersion::V3000) const;
   /// \}
 
-  /// \brief Write the set of all applicable data items to a string or file.  This is to be used in
-  ///        concert with the writeMdl() member function above, to write MDL MOL format entries and
-  ///        then follow them with the 
+  /// \brief Write the non-MDL components of an SD file, including all applicable data items, to a
+  ///        string or file.  This is to be used in concert with the writeMdl() member function
+  ///        above.
+  ///
+  /// Overloaded:
+  ///   - Write to an output file
+  ///   - Write to a string
+  ///
+  /// \param foutp        Output file stream
+  /// \param fname        Name of the output file
+  /// \param expectation  Anticipated (or required) condition of the output file that is to be
+  ///                     opened, if only its name is provided
+  /// \param mol_index    Index of the molecule within the SD file (a detail which may be added to
+  ///                     each data item's header line)
+  /// \{
+  void writeDataItems(std::ofstream *foutp, int mol_index = 0) const;
+
+  void writeDataItems(const std::string &fname, PrintSituation expectation,
+                      int mol_index = 0) const;
+
+  std::string writeDataItems(int mol_index = 0) const;
+  /// \}
   
 private:
 

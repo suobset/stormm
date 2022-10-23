@@ -438,7 +438,7 @@ CoordinateFrame::getInterlacedCoordinates(const HybridTargetLevel tier) const {
 std::vector<double>
 CoordinateFrame::getInterlacedCoordinates(const int low_index, const int high_index,
                                           const HybridTargetLevel tier) const {
-
+  
   // Range check as this will use pointers
   if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
     rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +

@@ -1953,7 +1953,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
 CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
                                                        const TrajectoryKind trajkind,
                                                        const HybridTargetLevel tier) const {
-  exportCoordinates(index, cycle_position, trajkind, tier);
+  return exportCoordinates(index, cycle_position, trajkind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------

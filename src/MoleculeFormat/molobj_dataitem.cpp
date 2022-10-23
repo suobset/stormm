@@ -368,6 +368,31 @@ MolObjDataItem::MolObjDataItem(const MolObjDataRequest &ask,
 {}
 
 //-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::placeInternalRegnoInHeader() const {
+  return use_internal_regno;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::placeExternalRegnoInHeader() const {
+  return use_external_regno;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::placeTitleInHeader() const {
+  return use_item_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::placeMaccsIIFieldInHeader() const {
+  return use_maccs_ii_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MolObjDataItem::noteArchivesInHeader() const {
+  return note_archives;
+}
+
+//-------------------------------------------------------------------------------------------------
 const std::string& MolObjDataItem::getItemName() const {
   return item_name;
 }

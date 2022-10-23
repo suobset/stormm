@@ -204,6 +204,24 @@ public:
   MolObjDataItem& operator=(const MolObjDataItem &other) = default;
   MolObjDataItem& operator=(MolObjDataItem &&other) = default;
   /// \}
+
+  /// \brief Indicate whether to display the internal identification number (based on the position
+  ///        of the molecule in the SD file) in the header line.
+  bool placeInternalRegnoInHeader() const;
+
+  /// \brief Indicate whether to display the (user-supplied) external identification number in the
+  ///        header line.
+  bool placeExternalRegnoInHeader() const;
+  
+  /// \brief Indicate whether to display the data item name (title) in the header line, between
+  ///        angular brackets.
+  bool placeTitleInHeader() const;
+
+  /// \brief Indicate whether to display the MACCS-II field number in the header.
+  bool placeMaccsIIFieldInHeader() const;
+
+  /// \brief Indicate that the "FROM ARCHIVES" tag should go in the header line.
+  bool noteArchivesInHeader() const;
   
   /// \brief Get a const reference to the item name, if it exists.  If there is no item name, a
   ///        const reference to a blank string will be returned.

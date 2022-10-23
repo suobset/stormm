@@ -801,6 +801,7 @@ void MdlMol::writeMdl(const std::string &fname, const MdlMolVersion vformat,
     "Open an SDF archive for writing MDL MOL format output with additional data items.";
   std::ofstream foutp = openOutputFile(fname, expectation, activity);
   writeMdl(&foutp, vformat);
+  foutp.close();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -881,6 +882,53 @@ std::string MdlMol::writeMdl(const MdlMolVersion vformat) const {
     break;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::writeDataItems(std::ofstream *foutp, const int mol_index) const {
+  const TextFile result(writeDataItems(mol_index), TextOrigin::RAM);
+  writeFrame(foutp, result);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::writeDataItems(const std::string &fname, const PrintSituation expectation,
+                            const int mol_index) const {
+  const std::string activity("Open an SDF archive for writing MDL MOL format output with "
+                             "additional data items.");
+  std::ofstream foutp = openOutputFile(fname, expectation, activity);
+  writeDataItems(&foutp, mol_index);
+  foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MdlMol::writeDataItems(const int mol_index) const {
+  for (int i = 0; i < data_item_count; i++) {
+
+    // Compose the header line
+    std::string header_line("> ");
+    bool required_id = false;
+    if (data_items[i].placeInternalRegnoInHeader()) {
+      header_line += std::to_string(mol_index);
+    }
+    if (data_items[i].placeExternalRegnoInHeader()) {
+      header_line += "(" + data_items[i].getExternalRegistryNumber() + ")";
+    }
+    if (data_items[i].placeTitleInHeader()) {
+      header_line += "<" + data_items[i].getItemName() + ">";
+      required_id = true;
+    }
+    if (data_items[i].placeMaccsIIFieldInHeader()) {
+      header_line += "DT" + std::to_string(data_items[i].getMaccsFieldNumber());
+      required_id = true;
+    }
+    if (data_items[i].noteArchivesInHeader()) {
+      header_line += " FROM ARCHIVES";
+    }
+
+    // CHECK
+    printf("Header = %s\n", header_line.c_str()); 
+    // END CHECK
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
