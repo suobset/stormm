@@ -924,6 +924,8 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   case CoordinateFileKind::AMBER_ASCII_RST:
     initializeTrajectory(&foutp, output_kind, atom_count, current_time);
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("Coordinate file format unspecified.", "PhaseSpace", "exportToFile");
   }
   switch (output_kind) {
   case CoordinateFileKind::AMBER_CRD:
@@ -953,7 +955,7 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
   case CoordinateFileKind::UNKNOWN:
-    rtErr("Coordinate file format unspecified.", "PhaseSpace", "exportToFile");
+    break;
   }
   foutp.close();
 }

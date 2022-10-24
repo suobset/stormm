@@ -839,11 +839,11 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
-                         const ExceptionResponse policy,
+                         const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
-    SystemCache(fcon, {}, sdf_recovery, policy, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, {}, sdf_recovery, policy_in, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -852,14 +852,14 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
-    SystemCache(fcon, rstcon, nullptr, policy, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, rstcon, nullptr, policy_in, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
+SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in, StopWatch *timer_in) :
-    SystemCache(fcon, {}, nullptr, policy, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, {}, nullptr, policy_in, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------

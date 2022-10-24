@@ -527,6 +527,8 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
   case CoordinateFileKind::AMBER_ASCII_RST:
     initializeTrajectory(&foutp, kind, atom_count);
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("Coordinate file format unspecified.", "CoordinateFrame", "exportToFile");
   }
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
@@ -548,7 +550,7 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
           "CoordinateFrame", "exportToFile");
     break;
   case CoordinateFileKind::UNKNOWN:
-    rtErr("Coordinate file format unspecified.", "CoordinateFrame", "exportToFile");
+    break;
   }
   foutp.close();
 }

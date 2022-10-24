@@ -3763,6 +3763,8 @@ void AtomGraphSynthesis::setImplicitSolventModel() {
   case ImplicitSolventModel::NONE:
     break;
   case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
     for (int i = 0; i < system_count; i++) {
       importImplicitSolventAtomParameters(i);
     }

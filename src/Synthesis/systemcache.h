@@ -82,7 +82,7 @@ public:
               StopWatch *timer_in = nullptr);
 
   SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
-              ExceptionResponse policy = ExceptionResponse::DIE,
+              ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
@@ -93,7 +93,7 @@ public:
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
 
-  SystemCache(const FilesControls &fcon, ExceptionResponse policy = ExceptionResponse::DIE,
+  SystemCache(const FilesControls &fcon, ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
               StopWatch *timer_in = nullptr);
