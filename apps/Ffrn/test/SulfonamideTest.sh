@@ -43,4 +43,4 @@ cat > ffld.in << EOF
 &end
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn
+${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn
