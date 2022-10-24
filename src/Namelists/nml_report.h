@@ -26,7 +26,7 @@ using parse::TextFile;
 using parse::WrapTextSearch;
 using review::OutputScope;
 using review::OutputSyntax;
-using structure::MolObjDataRequest;
+using structure::MdlMolDataRequest;
 
 /// \brief Collect output directives relating to the diagnostics file.  While the output frequency
 ///        is controlled by another namelist such as &minimize or &dynamics, STORMM is designed to
@@ -86,12 +86,12 @@ public:
   ///        include topological parameters, components of the molecular mechanics energy for the
   ///        structure, the username, and notes about external factors affecting the final
   ///        conformation.
-  const std::vector<MolObjDataRequest>& getSDFileDataRequests() const;
+  const std::vector<MdlMolDataRequest>& getSDFileDataRequests() const;
 
   /// \brief Get a specific data request to be displayed in an SD file.
   ///
   /// \param index  Index of the request to produce
-  MolObjDataRequest getSDFileDataRequest(int index) const;
+  MdlMolDataRequest getSDFileDataRequest(int index) const;
 
   /// \brief Set the output format.
   ///
@@ -161,7 +161,7 @@ public:
   /// \brief Add a request for a data item in an output SD file.
   ///
   /// \param ask  The requested data item
-  void addDataItem(const MolObjDataRequest &ask);
+  void addDataItem(const MdlMolDataRequest &ask);
   
 private:
   ExceptionResponse policy;    ///< Course of action if bad input is encountered
@@ -179,7 +179,7 @@ private:
   std::vector<StateVariable> reported_quantities;
 
   /// List of data item requests for information to be included in an SD file output
-  std::vector<MolObjDataRequest> sdf_addons;
+  std::vector<MdlMolDataRequest> sdf_addons;
 
   /// \brief Translate a user-supplied string into one or more energy quantities classifiable with
   ///        the state variable.
@@ -193,7 +193,7 @@ private:
   /// \param t_nml  The original namelist object, complete with keywords and values read from the
   ///               input file
   /// \param index  Index of the STRUCT keyword value to translate into a data item request
-  std::vector<MolObjDataRequest> translateSdfKeywordInput(const NamelistEmulator &t_nml,
+  std::vector<MdlMolDataRequest> translateSdfKeywordInput(const NamelistEmulator &t_nml,
                                                           int index);
 };
 

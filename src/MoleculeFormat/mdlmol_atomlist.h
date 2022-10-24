@@ -14,7 +14,7 @@ using parse::TextFile;
 
 /// \brief An atom list entry (this object can be assembled either from one of the deprecated
 ///        V2000 format lines after the bonds block, or from one of the "M  ALS" properties)
-class MolObjAtomList {
+class MdlMolAtomList {
 public:
 
   /// \brief The constructor can take all member variables (and all come with default values to
@@ -25,19 +25,19 @@ public:
   /// \param line_number  Number of the line on which to read the data
   /// \param title        The title of the structure, if known, for error tracing purposes
   /// \{
-  MolObjAtomList(const std::vector<int> &atomic_numbers_in = {}, bool exclusions_in = false,
+  MdlMolAtomList(const std::vector<int> &atomic_numbers_in = {}, bool exclusions_in = false,
                  int atom_attachment_in = 0);
 
-  MolObjAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
+  MdlMolAtomList(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
   /// \brief The default copy and move constructors, as well as copy and move assignment operators,
   ///        are applicable to this object which has no const members or pointers to repair.
   /// \{
-  MolObjAtomList(const MolObjAtomList &original) = default;
-  MolObjAtomList(MolObjAtomList &&original) = default;
-  MolObjAtomList& operator=(const MolObjAtomList &other) = default;
-  MolObjAtomList& operator=(MolObjAtomList &&other) = default;
+  MdlMolAtomList(const MdlMolAtomList &original) = default;
+  MdlMolAtomList(MdlMolAtomList &&original) = default;
+  MdlMolAtomList& operator=(const MdlMolAtomList &other) = default;
+  MdlMolAtomList& operator=(MdlMolAtomList &&other) = default;
   /// \}
 
   /// \brief Get the number of element (atomic number) entries.

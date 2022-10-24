@@ -68,7 +68,7 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   if (t_nml.getKeywordStatus("sdf_item") != InputStatus::MISSING) {
     const int ndata = t_nml.getKeywordEntries("sdf_item");
     for (int i = 0; i < ndata; i++) {
-      const std::vector<MolObjDataRequest> new_items = translateSdfKeywordInput(t_nml, i);
+      const std::vector<MdlMolDataRequest> new_items = translateSdfKeywordInput(t_nml, i);
       for (size_t j = 0; j < new_items.size(); j++) {
         addDataItem(new_items[j]);
       }
@@ -195,12 +195,12 @@ int ReportControls::getSDFileDataRequestCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<MolObjDataRequest>& ReportControls::getSDFileDataRequests() const {
+const std::vector<MdlMolDataRequest>& ReportControls::getSDFileDataRequests() const {
   return sdf_addons;
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataRequest ReportControls::getSDFileDataRequest(const int index) const {
+MdlMolDataRequest ReportControls::getSDFileDataRequest(const int index) const {
   if (index < 0 || index > static_cast<int>(sdf_addons.size())) {
     rtErr("A &report namelist with " + std::to_string(sdf_addons.size()) + " requests cannot "
           "produce request index " + std::to_string(index) + ".", "ReportControls",
@@ -374,7 +374,7 @@ void ReportControls::setReportedQuantities(const std::vector<StateVariable> &qua
 }
 
 //-------------------------------------------------------------------------------------------------
-void ReportControls::addDataItem(const MolObjDataRequest &ask) {
+void ReportControls::addDataItem(const MdlMolDataRequest &ask) {
   
   // Check that there is no other data item with a conflicting title.
   bool problem = false;
@@ -510,7 +510,7 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<MolObjDataRequest>
+std::vector<MdlMolDataRequest>
 ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const int index) {
 
   // Get the title and system label.
@@ -563,7 +563,7 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
 
   // Create the appropriate result.  Track the additions so that further edits may take place
   // later in this function.
-  std::vector<MolObjDataRequest> result;
+  std::vector<MdlMolDataRequest> result;
   switch (result_kind) {
   case DataRequestKind::STATE_VARIABLE:
     {

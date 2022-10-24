@@ -40,25 +40,25 @@ int main(int argc, const char* argv[]) {
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
   std::vector<MdlMol> sdf_recovery;
-  SystemCache sc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
-                 &sdf_recovery, ui.getExceptionBehavior(), MapRotatableGroups::YES,
-                 ui.getPrintingPolicy(), &timer);
-  customizeDataItems(&sdf_recovery, sc, ui.getReportNamelistInfo());
+  SystemCache sysc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
+                   &sdf_recovery, ui.getExceptionBehavior(), MapRotatableGroups::YES,
+                   ui.getPrintingPolicy(), &timer);
+  customizeDataItems(&sdf_recovery, sysc, ui.getReportNamelistInfo());
 
   // Perform minimizations as requested.
-  const int system_count = sc.getSystemCount();
+  const int system_count = sysc.getSystemCount();
   const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
   const int mini_timings = timer.addCategory("Minimization");
+  std::vector<ScoreCard> all_mme;
   if (ui.getMinimizePresence()) {
-    std::vector<ScoreCard> all_mme;
     all_mme.reserve(system_count);
     for (int i = 0; i < system_count; i++) {
-      PhaseSpace *ps = sc.getCoordinatePointer(i);
-      const RestraintApparatus& ra = sc.getRestraintReference(i);
+      PhaseSpace *ps = sysc.getCoordinatePointer(i);
+      const RestraintApparatus& ra = sysc.getRestraintReference(i);
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
-        all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
-                                      sc.getSystemStaticMaskReference(i), mincon));
+        all_mme.emplace_back(minimize(ps, sysc.getSystemTopologyReference(i), ra,
+                                      sysc.getSystemStaticMaskReference(i), mincon));
         timer.assignTime(mini_timings);
       case UnitCellType::ORTHORHOMBIC:
       case UnitCellType::TRICLINIC:
@@ -66,7 +66,6 @@ int main(int argc, const char* argv[]) {
       }
       
       // CHECK
-#if 0
       printf("Energy progression in system %2d\n", i);
       printf("STEP    BOND    ANGLE   DIHEDRAL IMPROPER  ELEC 1-4  VDW 1-4    ELEC     VDW   "
              "  RESTRAINT    TOTAL  \n");
@@ -89,6 +88,7 @@ int main(int argc, const char* argv[]) {
       const std::vector<double> rstr_nrg =
         all_mme[i].reportEnergyHistory(StateVariable::RESTRAINT, 0);
       all_mme[i].computePotentialEnergy();      
+      all_mme[i].computeTotalEnergy();
       const std::vector<double> totl_nrg =
         all_mme[i].reportEnergyHistory(StateVariable::POTENTIAL_ENERGY, 0);        
       for (int j = 0; j < all_mme[i].getSampleSize(); j += 50) {
@@ -96,10 +96,11 @@ int main(int argc, const char* argv[]) {
                j, bond_nrg[j], angl_nrg[j], dihe_nrg[j], impr_nrg[j], qq14_nrg[j], lj14_nrg[j],
                qqnb_nrg[j], ljnb_nrg[j], rstr_nrg[j], totl_nrg[j]);
       }
-      const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
+#if 0
+      const AtomGraph *iag_ptr = sysc.getSystemTopologyPointer(i);
       const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
       if (i >= 0) {
-        printf("Label %2d = %s (%s)\n", i, sc.getSystemLabel(i).c_str(),
+        printf("Label %2d = %s (%s)\n", i, sysc.getSystemLabel(i).c_str(),
                getImplicitSolventModelName(i_ism).c_str());
         PhaseSpaceWriter psw = ps->data();
         for (int i = 0; i < psw.natom; i++) {
@@ -115,22 +116,23 @@ int main(int argc, const char* argv[]) {
   // Print restart files from energy minimization
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
-      const PhaseSpace ps = sc.getCoordinateReference(i);
-      switch (sc.getCheckpointKind(i)) {
+      const PhaseSpace ps = sysc.getCoordinateReference(i);
+      switch (sysc.getCheckpointKind(i)) {
       case CoordinateFileKind::AMBER_CRD:
       case CoordinateFileKind::AMBER_INPCRD:
       case CoordinateFileKind::AMBER_ASCII_RST:
       case CoordinateFileKind::AMBER_NETCDF:
       case CoordinateFileKind::AMBER_NETCDF_RST:
-        ps.exportToFile(sc.getCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
-                        sc.getCheckpointKind(i),
-                        sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
+        ps.exportToFile(sysc.getCheckpointName(i), 0.0, TrajectoryKind::POSITIONS,
+                        sysc.getCheckpointKind(i),
+                        sysc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
         break;
       case CoordinateFileKind::SDF:
         sdf_recovery[i].impartCoordinates(ps);
-        sdf_recovery[i].writeMdl(sc.getCheckpointName(i), MdlMolVersion::V2000,
-                                 sc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
-        sdf_recovery[i].writeDataItems(sc.getCheckpointName(i), PrintSituation::APPEND);
+        updateDataItemReadouts(&sdf_recovery[i], sysc, all_mme[i]);
+        sdf_recovery[i].writeMdl(sysc.getCheckpointName(i), MdlMolVersion::V2000,
+                                 sysc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
+        sdf_recovery[i].writeDataItems(sysc.getCheckpointName(i), PrintSituation::APPEND);
         break;        
       case CoordinateFileKind::UNKNOWN:
         break;

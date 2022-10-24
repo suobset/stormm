@@ -9,143 +9,12 @@
 #include "Parsing/textfile.h"
 #include "Potential/energy_enumerators.h"
 #include "molecule_format_enumerators.h"
+#include "mdlmol_request.h"
 
 namespace stormm {
 namespace structure {
 
-using energy::StateVariable;
 using parse::TextFile;
-
-/// \brief A request for one of a sanctioned list of information types to be included in a data
-///        item of an SD file.  When printing an SD file, MolObjDataItem objects will be created
-///        based on these requests.
-class MolObjDataRequest {
-public:
-
-  /// \brief The constructor takes arguments corresponding to each member variable.  Various
-  ///        overloads allow the object ot be constructed for a specific type of request, ignoring
-  ///        member variables that are not relevant.
-  /// \{
-  MolObjDataRequest(const std::string &title_in = std::string(""),
-                    const std::string &label_in = std::string(""));
-
-  MolObjDataRequest(const std::string &title_in, StateVariable energy_component_in,
-                    const std::string &label_in);
-
-  MolObjDataRequest(DataRequestKind kind_in, const std::string &title_in,
-                    const std::string &message_in, const std::string &label_in);
-
-  MolObjDataRequest(const std::string &title_in, StateVariable valence_kind_in,
-                    const std::vector<char4> &atom_types_in, const std::string &label_in);
-  /// \}
-  
-  /// \brief The default copy and move constructors, as well as copy and move assignment operators,
-  ///        are applicable to this object which has no const members or pointers to repair.
-  /// \{
-  MolObjDataRequest(const MolObjDataRequest &original) = default;
-  MolObjDataRequest(MolObjDataRequest &&original) = default;
-  MolObjDataRequest& operator=(const MolObjDataRequest &other) = default;
-  MolObjDataRequest& operator=(MolObjDataRequest &&other) = default;
-  /// \}
-
-  /// \brief Get the kind of request.
-  DataRequestKind getKind() const;
-
-  /// \brief Get the title for the printed SD file's data item.
-  const std::string& getTitle() const;
-  
-  /// \brief Get the type of energy requested, or produce a runtime error if this request is not
-  ///        of the appropriate kind.
-  StateVariable getEnergyComponent() const;
-
-  /// \brief Get the atom mask string.  Raise a runtime error if this request is not of the
-  ///        appropriate kind.
-  const std::string& getAtomMask() const;
-
-  /// \brief Get the valence parameter type.  Raise a runtime error if this request is not of the
-  ///        appropriate kind.
-  StateVariable getValenceParameter() const;
-
-  /// \brief Get the custom string, again raising a runtime error if the request is not of the
-  ///        appropriate kind.
-  const std::string& getMessage() const;
-
-  /// \brief Get the vector of atom types defining a valence parameter of interest, again raising
-  ///        a runtime error if the request is not of the appropriate kind.
-  const std::vector<char4>& getAtomTypes() const;
-
-  /// \brief Get the system label to which the data item should be applied.
-  const std::string& getSystemLabel() const;
-
-  /// \brief Get the external registry number for the compound, as transcribed for this request
-  const std::string& getExternalRegistryNumber() const;
-
-  /// \brief Indicate that the MACCS-II field number should go in the resulting data item's header
-  ///        line.
-  bool placeMaccsFieldInHeader() const;
-
-  /// \brief Indicate that the internal registry numbre (known only once the SD file is ready for
-  ///        assembly) should be placed in the resulting data item's header.
-  bool placeInternalRegistryInHeader() const;
-
-  /// \brief Get the MACCS-II field number.
-  int getMaccsFieldNumber() const;
-
-  /// \brief Set the external registry number.
-  ///
-  /// \param regno_in  The external registry number for the compound described by this data item
-  void setExternalRegistryNumber(const std::string &regno_in);
-  
-  /// \brief Set the MACCS-II field number.
-  ///
-  /// \param maccs_in  The MACCS-II database field number for the requested data item
-  void setMaccsFieldNumber(int maccs_in);
-
-  /// \brief Set the data item to make use of the SD file archive's internal registry number (the
-  ///        number of the molecule or conformation within the file) in its header line.
-  ///
-  /// \param input  The directive can be set to "OFF" or "ON / ACTIVE"
-  void setInternalRegistryUsage(const std::string &input);
-  
-private:
-  DataRequestKind kind;           ///< Define the type of data request
-  std::string title;              ///< Title for the data item, to be displayed as "> <title>" in
-                                  ///<   the resulting SD file.
-  StateVariable energy_component; ///< The type of energy quantity requested, i.e. PROPER_DIHEDRAL
-  std::string atom_mask;          ///< Mask defining atoms for which valence interactions are to be
-                                  ///<   listed in the SD file's data item, if the request is for
-                                  ///<   atom influences
-  StateVariable valence_kind;     ///< A type of valence parameter (including restraint terms)
-                                  ///<   which, in conjunction with the appropriate number of named
-                                  ///<   atom types, will cause the program to output all instances
-                                  ///<   of the parameter in the model, listing the parameter's
-                                  ///<   settings, atom indices to which it applies and the
-                                  ///<   energies of each interaction.
-  std::string message;            ///< A custom string provided by the user
-  std::vector<char4> atom_types;  ///< Vector of atom types defining a valence
-  std::string system_label;       ///< When applying the request to create data items in SD file
-                                  ///<   output, this label will be checked against the molecular
-                                  ///<   system's label to ensure that the information goes only
-                                  ///<   into the intended places.
-
-  // The following information is intended to cover the breadth of the SD file format's data item
-  // header lines.
-  bool use_maccs_ii_number;       ///< Flag to have the MACCS-II number used in the header line
-  int maccs_ii_number;            ///< The field number of the property described by this data
-                                  ///<   item in the MACCS-II database
-  bool use_internal_registry;     ///< Flag to have the data item make use of the internal order
-                                  ///<   of molecules present in the SD file archive in the
-                                  ///<   header identification
-  std::string external_regno;     ///< An external registry number for the compound to include
-                                  ///<   in data items created in response to this request
-
-  /// \brief Check that the data request is of the right kind to return a particular member
-  ///        variable, or possibly to perform other functions.
-  ///
-  /// \param accepted_kind  The kind of request that this object must be making in order for it to
-  ///                       function as the developer wants
-  void checkKind(DataRequestKind accepted_kind) const;
-};
   
 /// \brief Store a data item from within an SD file.  Data items begin with a line of the form
 ///        "> <ITEM_NAME>" (additional specifications are possible), end with a single blank line,
@@ -153,7 +22,7 @@ private:
 ///        of raw strings, one per line and each representing a whole line.  Once read, member
 ///        functions of the class can extract specific integer, real, char4, or string coded data
 ///        from within the item.
-class MolObjDataItem {
+class MdlMolDataItem {
 public:
 
   /// \brief The constructor takes the original text file and the number of the first line of the
@@ -184,25 +53,25 @@ public:
   ///                            line contains $$$$)
   /// \param title               The title of the structure, if known, for error tracing purposes
   /// \{
-  MolObjDataItem(const TextFile &tf, int line_number, int *line_advance,
+  MdlMolDataItem(const TextFile &tf, int line_number, int *line_advance,
                  int compound_line_end = -1,
                  const std::string &title = std::string(""));
 
-  MolObjDataItem(const std::string &item_name_in = std::string(""),
+  MdlMolDataItem(const std::string &item_name_in = std::string(""),
                  const std::string &external_regno_in = std::string(""),
                  int internal_regno_in = -1, int maccs_ii_number_in = -1, uint header_info = 0U,
                  const std::vector<std::string> &body_in = {});
 
-  MolObjDataItem(const MolObjDataRequest &ask, const std::vector<std::string> &body_in);
+  MdlMolDataItem(const MdlMolDataRequest &ask, const std::vector<std::string> &body_in);
   /// \}
 
   /// \brief The default copy and move constructors, as well as copy and move assignment operators,
   ///        are applicable to this object which has no const members or pointers to repair.
   /// \{
-  MolObjDataItem(const MolObjDataItem &original) = default;
-  MolObjDataItem(MolObjDataItem &&original) = default;
-  MolObjDataItem& operator=(const MolObjDataItem &other) = default;
-  MolObjDataItem& operator=(MolObjDataItem &&other) = default;
+  MdlMolDataItem(const MdlMolDataItem &original) = default;
+  MdlMolDataItem(MdlMolDataItem &&original) = default;
+  MdlMolDataItem& operator=(const MdlMolDataItem &other) = default;
+  MdlMolDataItem& operator=(MdlMolDataItem &&other) = default;
   /// \}
 
   /// \brief Indicate whether to display the internal identification number (based on the position
@@ -237,6 +106,12 @@ public:
   /// \brief Get the MACCS-II database field number.
   int getMaccsFieldNumber() const;
 
+  /// \brief Get the state variable enumeration for this data item.  This is used in the case of a
+  ///        STATE_VARIABLE kind of data item, to signal that a particular component of the
+  ///        molecular mechanics energy, or some intensive or expansive system property, should be
+  ///        retrieved.
+  StateVariable getTrackedState() const;
+
   /// \brief Get the data line count.
   int getDataLineCount() const;
   
@@ -247,6 +122,10 @@ public:
   
   /// \brief Get all data lines.
   const std::vector<std::string>& getBody() const;
+
+  /// \brief Get the custom data item type.  Here, the "NATIVE" code indicates that no custom
+  ///        enumeration is present.
+  MdlMolDataItemKind getKind() const;
   
   /// \brief Retrieve a string from the data lines of a data item, assuming that individual words
   ///        on each line are separated by one or more white space characters and that the
@@ -315,8 +194,20 @@ public:
   ///
   /// \param item_name_in  The item name to assign
   void setItemName(const std::string &item_name_in);
+
+  /// \brief Add a line to the data item.
+  ///
+  /// \param text  The text of the line to add.  This should not include carriage returns, but if
+  ///              it does then it will all be taken as one "data line" to be printed.
+  void addDataLine(const std::string &text);
   
 private:
+  MdlMolDataItemKind kind;     ///< Classifies the data item.  All data items found in the original
+                               ///<   SD file are considered "NATIVE", whereas each custom data
+                               ///<   item falls under one of the other classifications.
+  StateVariable tracked_state; ///< The type of energy term to track if the kind is STATE_VARIABLE.
+                               ///<   If the kind is anything else, this member variable is set to
+                               ///<   ALL_STATES and ignored.
   std::string item_name;       ///< Name of the data item (optional, but an effective means of
                                ///<   distiction)
   std::string external_regno;  ///< External registry number
@@ -332,7 +223,7 @@ private:
 
   /// Data lines from the item, one per array element
   std::vector<std::string> body;
-
+  
   /// \brief Validate the choice of item name.
   void validateItemName() const;
 };
@@ -355,7 +246,7 @@ uint getDataItemHeaderCode(bool use_internal_regno = false, bool use_external_re
                            bool use_item_name = true, bool use_maccs_ii_field = false,
                            bool state_from_archives = false);
 
-uint getDataItemHeaderCode(const MolObjDataRequest &ask);
+uint getDataItemHeaderCode(const MdlMolDataRequest &ask);
 /// \}
 
 } // namespace structure

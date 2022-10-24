@@ -12,29 +12,29 @@ using parse::readIntegerValue;
 using parse::verifyContents;
   
 //-------------------------------------------------------------------------------------------------
-MolObjBond::MolObjBond() :
-    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder::SINGLE}, stereo{MolObjBondStereo::NOT_STEREO},
+MdlMolBond::MdlMolBond() :
+    i_atom{-1}, j_atom{-1}, order{MdlMolBondOrder::SINGLE}, stereo{MdlMolBondStereo::NOT_STEREO},
     ring_state{MolObjRingState::EITHER}, reactivity{MolObjReactionCenter::NON_CENTER}
 {}
 
 //-------------------------------------------------------------------------------------------------
-MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in) :
-    i_atom{i_atom_in}, j_atom{j_atom_in}, order{MolObjBondOrder::SINGLE},
-    stereo{MolObjBondStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
+MdlMolBond::MdlMolBond(const int i_atom_in, const int j_atom_in) :
+    i_atom{i_atom_in}, j_atom{j_atom_in}, order{MdlMolBondOrder::SINGLE},
+    stereo{MdlMolBondStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
     reactivity{MolObjReactionCenter::NON_CENTER}
 {}
 
 //-------------------------------------------------------------------------------------------------
-MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in, const MolObjBondOrder order_in,
-                       const MolObjBondStereo stereo_in, const MolObjRingState ring_state_in,
+MdlMolBond::MdlMolBond(const int i_atom_in, const int j_atom_in, const MdlMolBondOrder order_in,
+                       const MdlMolBondStereo stereo_in, const MolObjRingState ring_state_in,
                        const MolObjReactionCenter reactivity_in) :
     i_atom{i_atom_in}, j_atom{j_atom_in}, order{order_in}, stereo{stereo_in},
     ring_state{ring_state_in}, reactivity{reactivity_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-MolObjBond::MolObjBond(const TextFile &tf, const int line_number, const std::string &title) :
-    MolObjBond()
+MdlMolBond::MdlMolBond(const TextFile &tf, const int line_number, const std::string &title) :
+    MdlMolBond()
 {
   const char* bond_line_ptr = tf.getLinePointer(line_number);
   if (tf.getLineLength(line_number) < 6) {
@@ -61,24 +61,24 @@ MolObjBond::MolObjBond(const TextFile &tf, const int line_number, const std::str
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjBondOrder MolObjBond::interpretBondOrder(const int code_in, const std::string &title) {
+MdlMolBondOrder MdlMolBond::interpretBondOrder(const int code_in, const std::string &title) {
   switch (code_in) {
   case 1:
-    return MolObjBondOrder::SINGLE;
+    return MdlMolBondOrder::SINGLE;
   case 2:
-    return MolObjBondOrder::DOUBLE;
+    return MdlMolBondOrder::DOUBLE;
   case 3:
-    return MolObjBondOrder::TRIPLE;
+    return MdlMolBondOrder::TRIPLE;
   case 4:
-    return MolObjBondOrder::AROMATIC;
+    return MdlMolBondOrder::AROMATIC;
   case 5:
-    return MolObjBondOrder::SINGLE_OR_DOUBLE;
+    return MdlMolBondOrder::SINGLE_OR_DOUBLE;
   case 6:
-    return MolObjBondOrder::SINGLE_OR_AROMATIC;
+    return MdlMolBondOrder::SINGLE_OR_AROMATIC;
   case 7:
-    return MolObjBondOrder::DOUBLE_OR_AROMATIC;
+    return MdlMolBondOrder::DOUBLE_OR_AROMATIC;
   case 8:
-    return MolObjBondOrder::ANY;
+    return MdlMolBondOrder::ANY;
   default:
     rtErr("An invalid bond order code " + std::to_string(code_in) + " was specified in an MDL MOL "
           "entry titled \"" + title + "\".", "MdlMolObj", "interpretBondOrder");
@@ -87,19 +87,19 @@ MolObjBondOrder MolObjBond::interpretBondOrder(const int code_in, const std::str
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjBondStereo MolObjBond::interpretBondStereochemistry(const int code_in,
+MdlMolBondStereo MdlMolBond::interpretBondStereochemistry(const int code_in,
                                                           const std::string &title) {
   switch (code_in) {
   case 0:
-    return MolObjBondStereo::NOT_STEREO;
+    return MdlMolBondStereo::NOT_STEREO;
   case 1:
-    return MolObjBondStereo::UP;
+    return MdlMolBondStereo::UP;
   case 3:
-    return MolObjBondStereo::CIS_OR_TRANS;
+    return MdlMolBondStereo::CIS_OR_TRANS;
   case 4:
-    return MolObjBondStereo::EITHER;
+    return MdlMolBondStereo::EITHER;
   case 6:
-    return MolObjBondStereo::DOWN;
+    return MdlMolBondStereo::DOWN;
   default:
     rtErr("An invalid bond stereochemistry code " + std::to_string(code_in) + " was specified in "
           "an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
@@ -109,7 +109,7 @@ MolObjBondStereo MolObjBond::interpretBondStereochemistry(const int code_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjRingState MolObjBond::interpretRingState(const int code_in, const std::string &title) {
+MolObjRingState MdlMolBond::interpretRingState(const int code_in, const std::string &title) {
   switch (code_in) {
   case 0:
     return MolObjRingState::EITHER;
@@ -125,7 +125,7 @@ MolObjRingState MolObjBond::interpretRingState(const int code_in, const std::str
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjReactionCenter MolObjBond::interpretBondReactivePotential(const int code_in,
+MolObjReactionCenter MdlMolBond::interpretBondReactivePotential(const int code_in,
                                                                 const std::string &title) {
   switch (code_in) {
   case -1:
@@ -157,62 +157,62 @@ MolObjReactionCenter MolObjBond::interpretBondReactivePotential(const int code_i
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjBond::getFirstAtom() const {
+int MdlMolBond::getFirstAtom() const {
   return i_atom;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjBond::getSecondAtom() const {
+int MdlMolBond::getSecondAtom() const {
   return j_atom;
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjBondOrder MolObjBond::getOrder() const {
+MdlMolBondOrder MdlMolBond::getOrder() const {
   return order;
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjBondStereo MolObjBond::getStereochemistry() const {
+MdlMolBondStereo MdlMolBond::getStereochemistry() const {
   return stereo;
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjRingState MolObjBond::getRingStatus() const {
+MolObjRingState MdlMolBond::getRingStatus() const {
   return ring_state;
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjReactionCenter MolObjBond::getReactivity() const {
+MolObjReactionCenter MdlMolBond::getReactivity() const {
   return reactivity;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setFirstAtom(const int index_in) {
+void MdlMolBond::setFirstAtom(const int index_in) {
   i_atom = index_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setSecondAtom(const int index_in) {
+void MdlMolBond::setSecondAtom(const int index_in) {
   j_atom = index_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setOrder(const MolObjBondOrder order_in) {
+void MdlMolBond::setOrder(const MdlMolBondOrder order_in) {
   order = order_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setStereochemistry(const MolObjBondStereo stereo_in) {
+void MdlMolBond::setStereochemistry(const MdlMolBondStereo stereo_in) {
   stereo = stereo_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setRingStatus(const MolObjRingState status_in) {
+void MdlMolBond::setRingStatus(const MolObjRingState status_in) {
   ring_state = status_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setReactivity(const MolObjReactionCenter potential_in) {
+void MdlMolBond::setReactivity(const MolObjReactionCenter potential_in) {
   reactivity = potential_in;
 }
 

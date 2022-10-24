@@ -335,6 +335,16 @@ int MdlMol::getBondCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int MdlMol::getPropertiesCount() const {
+  return properties_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMol::getDataItemCount() const {
+  return data_item_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 double3 MdlMol::getCoordinates(const int index) const {
   return coordinates[index];
 }
@@ -418,11 +428,6 @@ const std::vector<int>& MdlMol::getFormalCharges() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int MdlMol::getPropertiesCount() const {
-  return properties_count;
-}
-
-//-------------------------------------------------------------------------------------------------
 void MdlMol::impartCoordinates(const PhaseSpaceReader &psr) {
   checkAtomCount(psr.natom);
   impartCoordinates(psr.xcrd, psr.ycrd, psr.zcrd, 1.0);
@@ -463,8 +468,10 @@ void MdlMol::impartCoordinates(const CoordinateFrame &cf, const HybridTargetLeve
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
+void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
                          const RestraintApparatus &ra) {
+
+  // If the text of the data item can be prepared in advance, do so.
   std::vector<std::string> di_body;
   switch (ask.getKind()) {
   case DataRequestKind::STATE_VARIABLE:
@@ -810,6 +817,24 @@ void MdlMol::addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
   data_items.emplace_back(ask, di_body);
   data_item_count = data_items.size();
   compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
+}
+
+//-------------------------------------------------------------------------------------------------
+MdlMolDataItemKind MdlMol::getDataItemKind(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemKind");
+  return data_items[item_index].getKind();
+}
+
+//-------------------------------------------------------------------------------------------------
+StateVariable MdlMol::getTrackedState(const int item_index) const {
+  checkDataItemIndex(item_index, "getTrackedState");
+  return data_items[item_index].getTrackedState();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::addLineToDataItem(const std::string &text, int item_index) {
+  checkDataItemIndex(item_index, "addLineToDataItem");
+  data_items[item_index].addDataLine(text);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1270,7 +1295,7 @@ void MdlMol::compareExternalRegistryNumbers(const std::string &regno_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMol::checkAtomCount(int ext_atom_count) {
+void MdlMol::checkAtomCount(const int ext_atom_count) const {
   if (ext_atom_count != atom_count) {
     rtErr("The number of atoms coming in (" + std::to_string(ext_atom_count) + ") is not "
           "consistent with the number of atoms in the molecule (" + std::to_string(atom_count) +
@@ -1279,9 +1304,17 @@ void MdlMol::checkAtomCount(int ext_atom_count) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
-				  const std::vector<MolObjBond> &rhs) {
-  std::vector<MolObjBond> result(lhs.begin(), lhs.end());
+void MdlMol::checkDataItemIndex(const int item_index, const char* caller) const {
+  if (item_index < 0 || item_index >= data_item_count) {
+    rtErr("An index of " + std::to_string(item_index) + " is invalid for an MDL MOL entry with " +
+          std::to_string(data_item_count) + " entries.", "MdlMol", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<MdlMolBond> operator+(const std::vector<MdlMolBond> &lhs,
+				  const std::vector<MdlMolBond> &rhs) {
+  std::vector<MdlMolBond> result(lhs.begin(), lhs.end());
   result.insert(result.end(), rhs.begin(), rhs.end());
   return result;
 }

@@ -20,7 +20,7 @@ using parse::strncmpCased;
 using parse::verifyContents;
 
 //-------------------------------------------------------------------------------------------------
-MolObjAtomList::MolObjAtomList(const std::vector<int> &atomic_numbers_in, bool const exclusions_in,
+MdlMolAtomList::MdlMolAtomList(const std::vector<int> &atomic_numbers_in, bool const exclusions_in,
                                const int atom_attachment_in) :
   entry_count{static_cast<int>(atomic_numbers_in.size())},
   atomic_numbers{atomic_numbers_in},
@@ -29,9 +29,9 @@ MolObjAtomList::MolObjAtomList(const std::vector<int> &atomic_numbers_in, bool c
 {}
 
 //-------------------------------------------------------------------------------------------------
-MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
+MdlMolAtomList::MdlMolAtomList(const TextFile &tf, const int line_number,
                                const std::string &title) :
-    MolObjAtomList()
+    MdlMolAtomList()
 {
   // Determine whether this originates in an atom list entry or a property of the MDL section
   const char* line_ptr = tf.getLinePointer(line_number);
@@ -49,7 +49,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     if (lnlength < 15) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + " to read a property-based MDL MOL atom list.",
-            "MolObjAtomList");
+            "MdlMolAtomList");
     }
     if (verifyContents(line_ptr, 7, 3, NumberFormat::INTEGER)) {
       atom_attachment = readIntegerValue(line_ptr, 7, 3);
@@ -60,7 +60,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     if (entry_count < 0 || entry_count > 16) {
       rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
             "line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) + ".",
-            "MolObjAtomList");
+            "MdlMolAtomList");
     }
     switch (line_ptr[14]) {
     case 'T':
@@ -72,12 +72,12 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     default:
       rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + ", " + line_ptr[14] + ", is invalid.",
-            "MolObjAtomList");
+            "MdlMolAtomList");
     }
     if (lnlength < 16 + (4 * entry_count)) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + " to read an atom list with " +
-            std::to_string(entry_count) + "items.", "MolObjAtomList");
+            std::to_string(entry_count) + "items.", "MdlMolAtomList");
     }
     std::vector<char4> tmp_symbols;
     for (int i = 0; i < entry_count; i++) {
@@ -92,7 +92,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     if (lnlength < 10) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + " to read one of the (deprecated) MDL MOL atom list "
-            "entries.", "MolObjAtomList");
+            "entries.", "MdlMolAtomList");
     }
 
     // Read the deprecated atom list entry format
@@ -109,7 +109,7 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     default:
       rtErr("The exclusions flag at line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + ", " + line_ptr[4] + ", is invalid.",
-            "MolObjAtomList");
+            "MdlMolAtomList");
     }
     if (verifyContents(line_ptr, 5, 5, NumberFormat::INTEGER)) {
       entry_count = readIntegerValue(line_ptr, 5, 5);
@@ -117,12 +117,12 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
     if (entry_count < 0 || entry_count > 5) {
       rtErr("An invalid number of entries, " + std::to_string(entry_count) + ", was recorded at "
             "line " + std::to_string(line_number) + " of " + getBaseName(tf.getFileName()) + ".",
-            "MolObjAtomList");
+            "MdlMolAtomList");
     }
     if (lnlength < 10 + (4 * entry_count)) {
       rtErr("There is insufficient information on line " + std::to_string(line_number) + " of " +
             getBaseName(tf.getFileName()) + " to read an atom list with " +
-            std::to_string(entry_count) + "items.", "MolObjAtomList");
+            std::to_string(entry_count) + "items.", "MdlMolAtomList");
     }
     atomic_numbers.resize(entry_count);
     for (int i = 0; i < entry_count; i++) {
@@ -135,38 +135,38 @@ MolObjAtomList::MolObjAtomList(const TextFile &tf, const int line_number,
               tf.extractString(line_number, 11 + (4 * i), 3) + ".  The entries of one of the "
               "(deprecated) MDL MOL format atom lists must be integers corresponding to atomic "
               "numbers.  Use IUPAC element symbols in the new format, placed on MOL property "
-              "lines beginning \"M  ALS\".", "MolObjAtomList");
+              "lines beginning \"M  ALS\".", "MdlMolAtomList");
       }
     }
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjAtomList::getEntryCount() const {
+int MdlMolAtomList::getEntryCount() const {
   return entry_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjAtomList::getEntry(const int index) const {
+int MdlMolAtomList::getEntry(const int index) const {
   if (index < 0 || index >= entry_count) {
     rtErr("Index " + std::to_string(index) + " is invalid for an atom list containing " +
-          std::to_string(entry_count) + " entries.", "MolObjAtomList", "getEntry");
+          std::to_string(entry_count) + " entries.", "MdlMolAtomList", "getEntry");
   }
   return atomic_numbers[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjAtomList::applyToExclusions() const {
+bool MdlMolAtomList::applyToExclusions() const {
   return exclusions;
 }
 
 //-------------------------------------------------------------------------------------------------
-char MolObjAtomList::getExclusionCode() const {
+char MdlMolAtomList::getExclusionCode() const {
   return (exclusions) ? 'T' : 'F';
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjAtomList::getAttachmentPoint() const {
+int MdlMolAtomList::getAttachmentPoint() const {
   return atom_attachment;
 }
 

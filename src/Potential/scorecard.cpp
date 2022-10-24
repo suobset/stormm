@@ -597,394 +597,468 @@ void ScoreCard::resetSampleCount(const int count_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportTotalEnergies(const HybridTargetLevel tier) {
+std::vector<double> ScoreCard::reportPotentialEnergies(const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   std::vector<double> result(system_count);
-  llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<llint> devc_acc;
-#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
-    inst_acc_ptr = instantaneous_accumulators.data();
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        const size_t info_start = (i * padded_nvar);
+        result[i] = sumPotentialEnergy(&inst_acc_ptr[info_start]);
+      }
+    }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = instantaneous_accumulators.readDevice();
-    inst_acc_ptr = devc_acc.data();
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice();
+      const llint* inst_acc_ptr = devc_acc.data();
+      for (int i = 0; i < system_count; i++) {
+        const size_t info_start = (i * padded_nvar);
+        result[i] = sumPotentialEnergy(&inst_acc_ptr[info_start]);
+      }
+    }
     break;
 #endif
-  }
-  for (int i = 0; i < system_count; i++) {
-    const size_t info_start = (i * padded_nvar);
-    result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-double ScoreCard::reportTotalEnergy(const int system_index, const HybridTargetLevel tier) {
+double ScoreCard::reportPotentialEnergy(const int system_index,
+                                        const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   const int info_start = system_index * padded_nvar;
-  llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<llint> devc_acc;
-#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
-    inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
-    break;
+    return sumPotentialEnergy(&instantaneous_accumulators.data()[info_start]);
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = instantaneous_accumulators.readDevice(info_start, padded_nvar);
-    inst_acc_ptr = devc_acc.data();
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice(info_start,
+                                                                                padded_nvar);
+      return sumPotentialEnergy(devc_acc.data());
+    }
     break;
 #endif
   }
-  return sumTotalEnergy(inst_acc_ptr);
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportInstantaneousStates(const HybridTargetLevel tier) {
+std::vector<double> ScoreCard::reportTotalEnergies(const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  llint* inst_acc_ptr;
-  std::vector<llint> devc_acc;
+  std::vector<double> result(system_count);
   switch (tier) {
   case HybridTargetLevel::HOST:
-    inst_acc_ptr = instantaneous_accumulators.data();
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        const size_t info_start = (i * padded_nvar);
+        result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
+      }
+    }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = instantaneous_accumulators.readDevice();
-    inst_acc_ptr = devc_acc.data();
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice();
+      const llint* inst_acc_ptr = devc_acc.data();
+      for (int i = 0; i < system_count; i++) {
+        const size_t info_start = (i * padded_nvar);
+        result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
+      }
+    }
     break;
 #endif
   }
-  std::vector<double> result(nvar * system_count);
-  for (int i = 0; i < system_count; i++) {
-    for (int j = 0; j < nvar; j++) {
-      const llint lacc = inst_acc_ptr[(i * padded_nvar) + j];
-      result[(i * nvar) + j] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::reportTotalEnergy(const int system_index, const HybridTargetLevel tier) const {
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  const int padded_nvar = roundUp(nvar, warp_size_int);
+  const int info_start = system_index * padded_nvar;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return sumTotalEnergy(&instantaneous_accumulators.data()[info_start]);
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice(info_start,
+                                                                                padded_nvar);
+      return sumTotalEnergy(devc_acc.data());
     }
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportInstantaneousStates(const HybridTargetLevel tier) const {
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  const int padded_nvar = roundUp(nvar, warp_size_int);
+  std::vector<double> result(nvar * system_count);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          const llint lacc = inst_acc_ptr[(i * padded_nvar) + j];
+          result[(i * nvar) + j] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+        }
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          const llint lacc = devc_acc[(i * padded_nvar) + j];
+          result[(i * nvar) + j] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+        }
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportInstantaneousStates(const int system_index,
-                                                         const HybridTargetLevel tier) {
+                                                         const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int offset = system_index * roundUp(nvar, warp_size_int);
-  llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<llint> devc_acc;
-#endif
+  std::vector<double> result(nvar);
   switch (tier) {
   case HybridTargetLevel::HOST:
-    inst_acc_ptr = instantaneous_accumulators.data();
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      for (int i = 0; i < nvar; i++) {
+        result[i] = inverse_nrg_scale_lf * static_cast<double>(inst_acc_ptr[offset + i]);
+      }
+    }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = instantaneous_accumulators.readDevice();
-    inst_acc_ptr = devc_acc.data();
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice();
+      for (int i = 0; i < nvar; i++) {
+        result[i] = inverse_nrg_scale_lf * static_cast<double>(devc_acc[offset + i]);
+      }
+    }
     break;
 #endif
-  }
-  std::vector<double> result(nvar);
-  for (int i = 0; i < nvar; i++) {
-    result[i] = inverse_nrg_scale_lf * static_cast<double>(inst_acc_ptr[offset + i]);
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportInstantaneousStates(const StateVariable aspect,
-                                                         const HybridTargetLevel tier) {
+                                                         const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<llint> devc_acc;
-#endif
+  std::vector<double> result(system_count);
   switch (tier) {
   case HybridTargetLevel::HOST:
-    inst_acc_ptr = instantaneous_accumulators.data();
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        const llint lacc = inst_acc_ptr[(i * padded_nvar) + aspect_no];
+        result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+      }
+    }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = instantaneous_accumulators.readDevice();
-    inst_acc_ptr = devc_acc.data();
+    {
+      const std::vector<llint> devc_acc = instantaneous_accumulators.readDevice();
+      for (int i = 0; i < system_count; i++) {
+        const llint lacc = devc_acc[(i * padded_nvar) + aspect_no];
+        result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+      }
+    }
     break;
 #endif
-  }
-  std::vector<double> result(system_count);
-  for (int i = 0; i < system_count; i++) {
-    const llint lacc = inst_acc_ptr[(i * padded_nvar) + aspect_no];
-    result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 double ScoreCard::reportInstantaneousStates(const StateVariable aspect, const int system_index,
-                                            const HybridTargetLevel tier) {
+                                            const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  llint lacc;
+  const int didx = (system_index * padded_nvar) + aspect_no;
   switch (tier) {
   case HybridTargetLevel::HOST:
-    lacc = instantaneous_accumulators.readHost((system_index * padded_nvar) + aspect_no);
-    break;
+    return inverse_nrg_scale_lf * static_cast<double>(instantaneous_accumulators.readHost(didx));
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    lacc = instantaneous_accumulators.readDevice((system_index * padded_nvar) + aspect_no);
-    break;
+    return inverse_nrg_scale_lf * static_cast<double>(instantaneous_accumulators.readDevice(didx));
 #endif
   }
-  return inverse_nrg_scale_lf * static_cast<double>(lacc);
+  __builtin_unreachable;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportAverageStates(const HybridTargetLevel tier) {
+std::vector<double> ScoreCard::reportAverageStates(const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  double* run_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_acc;
+  const double nsamp = static_cast<double>(sampled_step_count);
+  std::vector<double> result(nvar * system_count);
   switch (tier) {
   case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
-    break;
-  case HybridTargetLevel::DEVICE:
-    devc_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_acc.data();
-    break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
-#endif
-  std::vector<double> result(nvar * system_count);
-  const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < system_count; i++) {
-    for (int j = 0; j < nvar; j++) {
-      result[(i * nvar) + j] = run_acc_ptr[(i * padded_nvar) + j] / nsamp;
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          result[(i * nvar) + j] = run_acc_ptr[(i * padded_nvar) + j] / nsamp;
+        }
+      }
     }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<double> devc_acc = running_accumulators.readDevice();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          result[(i * nvar) + j] = devc_acc[(i * padded_nvar) + j] / nsamp;
+        }
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportAverageStates(const int system_index,
-                                                   const HybridTargetLevel tier) {
+                                                   const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int offset = system_index * roundUp(nvar, warp_size_int);
-  double* run_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_acc;
+  const double nsamp = static_cast<double>(sampled_step_count);
+  std::vector<double> result(nvar);
   switch (tier) {
   case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      for (int i = 0; i < nvar; i++) {
+        result[i] = run_acc_ptr[offset + i] / nsamp;
+      }
+    }
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    devc_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_acc.data();
+    {
+      const std::vector<double> devc_acc = running_accumulators.readDevice();
+      for (int i = 0; i < nvar; i++) {
+        result[i] = devc_acc[offset + i] / nsamp;
+      }
+    }
     break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
 #endif
-  std::vector<double> result(nvar);
-  const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < nvar; i++) {
-    result[i] = run_acc_ptr[offset + i] / nsamp;
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportAverageStates(const StateVariable aspect,
-                                                   const HybridTargetLevel tier) {
-  double* run_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_acc;
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
-    break;
-  case HybridTargetLevel::DEVICE:
-    devc_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_acc.data();
-    break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
-#endif
+                                                   const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  std::vector<double> result(system_count);
   const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < system_count; i++) {
-    result[i] = run_acc_ptr[(i * padded_nvar) + aspect_no] / nsamp;
+  std::vector<double> result(system_count);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        result[i] = run_acc_ptr[(i * padded_nvar) + aspect_no] / nsamp;
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<double> devc_acc = running_accumulators.readDevice();
+      const double* run_acc_ptr = devc_acc.data();
+      for (int i = 0; i < system_count; i++) {
+        result[i] = run_acc_ptr[(i * padded_nvar) + aspect_no] / nsamp;
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 double ScoreCard::reportAverageStates(const StateVariable aspect, const int system_index,
-                                      const HybridTargetLevel tier) {
+                                      const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int offset = system_index * roundUp(nvar, warp_size_int);
   const double nsamp = static_cast<double>(sampled_step_count);
-#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     return running_accumulators.readHost(offset + aspect_no) / nsamp;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return running_accumulators.readDevice(offset + aspect_no) / nsamp;
+#endif
   }
   __builtin_unreachable();
-#else
-  return running_accumulators.readHost(offset + aspect_no) / nsamp;
-#endif
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportVarianceOfStates(const HybridTargetLevel tier) {
-  double* run_acc_ptr;
-  double* sqr_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_run_acc, devc_sqr_acc;
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
-    sqr_acc_ptr = squared_accumulators.data();
-    break;
-  case HybridTargetLevel::DEVICE:
-    devc_run_acc = running_accumulators.readDevice();
-    devc_sqr_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_run_acc.data();
-    sqr_acc_ptr = devc_sqr_acc.data();
-    break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
-  sqr_acc_ptr = squared_accumulators.data();
-#endif
+std::vector<double> ScoreCard::reportVarianceOfStates(const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  std::vector<double> result(nvar * system_count, 0.0);
   const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < system_count; i++) {
-    for (int j = 0; j < nvar; j++) {
-      const double s1 = run_acc_ptr[(i * padded_nvar) + j];
-      const double s2 = sqr_acc_ptr[(i * padded_nvar) + j];
-      result[(i * nvar) + j] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+  std::vector<double> result(nvar * system_count, 0.0);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      const double* sqr_acc_ptr = squared_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          const double s1 = run_acc_ptr[(i * padded_nvar) + j];
+          const double s2 = sqr_acc_ptr[(i * padded_nvar) + j];
+          result[(i * nvar) + j] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+        }
+      }
     }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<double> devc_run_acc = running_accumulators.readDevice();
+      const std::vector<double> devc_sqr_acc = running_accumulators.readDevice();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          const double s1 = devc_run_acc[(i * padded_nvar) + j];
+          const double s2 = devc_sqr_acc[(i * padded_nvar) + j];
+          result[(i * nvar) + j] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+        }
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportVarianceOfStates(const int system_index,
-                                                      const HybridTargetLevel tier) {
-  double* run_acc_ptr;
-  double* sqr_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_run_acc, devc_sqr_acc;
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
-    sqr_acc_ptr = squared_accumulators.data();
-    break;
-  case HybridTargetLevel::DEVICE:
-    devc_run_acc = running_accumulators.readDevice();
-    devc_sqr_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_run_acc.data();
-    sqr_acc_ptr = devc_sqr_acc.data();
-    break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
-  sqr_acc_ptr = squared_accumulators.data();
-#endif
+                                                      const HybridTargetLevel tier) const {
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int offset = system_index * roundUp(nvar, warp_size_int);
-  std::vector<double> result(nvar);
   const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < nvar; i++) {
-    const double s1 = run_acc_ptr[offset + i];
-    const double s2 = sqr_acc_ptr[offset + i];
-    result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+  std::vector<double> result(nvar);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      const double* sqr_acc_ptr = squared_accumulators.data();
+      for (int i = 0; i < nvar; i++) {
+        const double s1 = run_acc_ptr[offset + i];
+        const double s2 = sqr_acc_ptr[offset + i];
+        result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<double> devc_run_acc = running_accumulators.readDevice();
+      const std::vector<double> devc_sqr_acc = running_accumulators.readDevice();
+      for (int i = 0; i < nvar; i++) {
+        const double s1 = devc_run_acc[offset + i];
+        const double s2 = devc_sqr_acc[offset + i];
+        result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportVarianceOfStates(const StateVariable aspect,
-                                                      const HybridTargetLevel tier) {
-  double* run_acc_ptr;
-  double* sqr_acc_ptr;
-#ifdef STORMM_USE_HPC
-  std::vector<double> devc_run_acc, devc_sqr_acc;
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    run_acc_ptr = running_accumulators.data();
-    sqr_acc_ptr = squared_accumulators.data();
-    break;
-  case HybridTargetLevel::DEVICE:
-    devc_run_acc = running_accumulators.readDevice();
-    devc_sqr_acc = running_accumulators.readDevice();
-    run_acc_ptr = devc_run_acc.data();
-    sqr_acc_ptr = devc_sqr_acc.data();
-    break;
-  }
-#else
-  run_acc_ptr = running_accumulators.data();
-  sqr_acc_ptr = squared_accumulators.data();
-#endif
+                                                      const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
-  std::vector<double> result(system_count, 0.0);
   const double nsamp = static_cast<double>(sampled_step_count);
-  for (int i = 0; i < system_count; i++) {
-    const double s1 = run_acc_ptr[(i * padded_nvar) + aspect_no];
-    const double s2 = sqr_acc_ptr[(i * padded_nvar) + aspect_no];
-    result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+  std::vector<double> result(system_count, 0.0);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const double* run_acc_ptr = running_accumulators.data();
+      const double* sqr_acc_ptr = squared_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        const double s1 = run_acc_ptr[(i * padded_nvar) + aspect_no];
+        const double s2 = sqr_acc_ptr[(i * padded_nvar) + aspect_no];
+        result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<double> devc_run_acc = running_accumulators.readDevice();
+      const std::vector<double> devc_sqr_acc = running_accumulators.readDevice();
+      for (int i = 0; i < system_count; i++) {
+        const double s1 = devc_run_acc[(i * padded_nvar) + aspect_no];
+        const double s2 = devc_sqr_acc[(i * padded_nvar) + aspect_no];
+        result[i] = sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+      }
+    }
+    break;
+#endif
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 double ScoreCard::reportVarianceOfStates(const StateVariable aspect, const int system_index,
-                                         const HybridTargetLevel tier) {
+                                         const HybridTargetLevel tier) const {
   const int aspect_no = static_cast<int>(aspect);
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int offset = system_index * roundUp(nvar, warp_size_int);
   const double nsamp = static_cast<double>(sampled_step_count);
   double s1, s2;
-#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     s1 = running_accumulators.readHost(offset + aspect_no);
     s2 = squared_accumulators.readHost(offset + aspect_no);
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     s1 = running_accumulators.readDevice(offset + aspect_no);
     s2 = squared_accumulators.readDevice(offset + aspect_no);    
     break;
-  }
-#else
-  s1 = running_accumulators.readHost(offset + aspect_no);
-  s2 = squared_accumulators.readHost(offset + aspect_no);
 #endif
+  }
   return sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
 }
 

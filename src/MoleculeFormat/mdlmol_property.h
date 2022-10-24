@@ -14,7 +14,7 @@ namespace structure {
 using parse::TextFile;
   
 /// \brief A molecular or atomic property read from an MDL .mol or SDF file
-class MolObjProperty {
+class MdlMolProperty {
 public:
 
   /// \brief The constructor takes all member variable inputs, or the original text and a line
@@ -26,7 +26,7 @@ public:
   ///                      some properties
   /// \param title         The title of the structure, if known, for error tracing purposes
   /// \{
-  MolObjProperty(const char4 code_in = { ' ', ' ', ' ', ' ' }, int substrate_in = -1,
+  MdlMolProperty(const char4 code_in = { ' ', ' ', ' ', ' ' }, int substrate_in = -1,
                  int entry_count_in = 0, int entry_depth_in = 0, bool exclusions_in = false,
                  int substrate_line_pos_in = -1, int entry_count_line_pos_in = -1,
                  int entry_read_start_pos_in = 0,
@@ -38,21 +38,21 @@ public:
                  const std::vector<std::string> &str_data_in = {},
                  const std::vector<std::string> &data_lines_in = {});
 
-  MolObjProperty(const TextFile &tf, int line_number, int *line_advance,
+  MdlMolProperty(const TextFile &tf, int line_number, int *line_advance,
                  const std::string &title = std::string(""));
   /// \}
 
   /// \brief The default copy and move constructors, as well as copy and move assignment operators,
   ///        are applicable to this object which has no const members or pointers to repair.
   /// \{
-  MolObjProperty(const MolObjProperty &original) = default;
-  MolObjProperty(MolObjProperty &&original) = default;
-  MolObjProperty& operator=(const MolObjProperty &other) = default;
-  MolObjProperty& operator=(MolObjProperty &&other) = default;
+  MdlMolProperty(const MdlMolProperty &original) = default;
+  MdlMolProperty(MdlMolProperty &&original) = default;
+  MdlMolProperty& operator=(const MdlMolProperty &other) = default;
+  MdlMolProperty& operator=(MdlMolProperty &&other) = default;
   /// \}
   
   /// \brief Get the kind of property according to the internal enumerator.
-  MolObjPropertyKind getKind() const;
+  MdlMolPropertyKind getKind() const;
 
   /// \brief Get the property code.  This will indicate whether to obliterate certain types of
   ///        information from the atom block of the V2000 MDL MOL format entry.
@@ -128,7 +128,7 @@ public:
   ///               information is committed to a file).
   void setSubstrate(int index);
 
-  /// \brief Define the entry format for the property.  If applied to an existing MolObjProperty
+  /// \brief Define the entry format for the property.  If applied to an existing MdlMolProperty
   ///        with nonzero depth, this will create an error.
   ///
   /// \param entry_detail_in  List of data types of the entry elements
@@ -160,7 +160,7 @@ private:
   char4 code;               ///< A three-letter code indicating what the property is.  The "w"
                             ///<   member stores the first letter on the line, which is usually
                             ///<   but not always 'M'.
-  MolObjPropertyKind kind;  ///< The type of property
+  MdlMolPropertyKind kind;  ///< The type of property
   int substrate;            ///< One atom or S-group that is central to all entries, relevant to
                             ///<   some properties
   int entry_count;          ///< Number of entries (some properties have maximum numbers of entries

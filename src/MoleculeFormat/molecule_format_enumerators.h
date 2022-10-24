@@ -45,13 +45,13 @@ enum class HydrogenAssignment {
 };
   
 /// \brief Enumerate possible bond orders, including aromatics or variable bonds
-enum class MolObjBondOrder {
+enum class MdlMolBondOrder {
   SINGLE = 1, DOUBLE = 2, TRIPLE = 3, AROMATIC = 4, SINGLE_OR_DOUBLE = 5,
   SINGLE_OR_AROMATIC = 6, DOUBLE_OR_AROMATIC = 7, ANY = 8
 };
 
 /// \brief Enumerate possible stereochemistries arising from a bond
-enum class MolObjBondStereo {
+enum class MdlMolBondStereo {
   NOT_STEREO = 0, UP = 1, CIS_OR_TRANS = 3, EITHER = 4, DOWN = 6
 };
 
@@ -95,8 +95,16 @@ enum class DataRequestKind {
                        ///<   total number of data request classifications.
 };
 
+/// \brief A data item can encode various types of information, mirroring the data item request
+///        but adding a category for "NATIVE" data items original to the SD file and "NONE" as a
+///        placeholder until an item can be classified.  Descriptions of other enumerations follow
+///        from the DataRequestKind enumerator above.
+enum class MdlMolDataItemKind {
+  STATE_VARIABLE, ATOM_INFLUENCES, TOPOLOGY_PARAMETER, STRING, NATIVE, NONE
+};
+
 /// \brief Enumerate the types of data that property fields could contain
-enum class MolObjPropertyKind {
+enum class MdlMolPropertyKind {
   ATOM_ALIAS,             ///< Deprecated ISIS / desktop concept
   ATOM_VALUE,             ///< Deprecated ISIS / desktop concept
   GROUP_ABBREVIATION,     ///< Deprecated ISIS / desktop concept
@@ -179,7 +187,7 @@ enum class MolObjFeatureKind {
 /// \brief Translate a four-character tuple into one of the known MDL MOL format properties.
 ///
 /// \param input  The code to translate
-MolObjPropertyKind translateMolObjPropertyKind(char4 input);
+MdlMolPropertyKind translateMdlMolPropertyKind(char4 input);
 
 /// \brief Get a string corresponding to the name of the MolObjPropField enumeration.  Overloaded
 ///        various enumerations as input in this and other libraries.

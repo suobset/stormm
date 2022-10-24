@@ -17,222 +17,11 @@ using parse::separateText;
 using parse::verifyContents;
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataRequest::MolObjDataRequest(const std::string &title_in, const std::string &label_in) :
-    kind{DataRequestKind::STRING}, title{title_in}, energy_component{StateVariable::BOND},
-    atom_mask{std::string("")}, valence_kind{StateVariable::BOND}, message{std::string("")},
-    atom_types{}, system_label{label_in}, use_maccs_ii_number{false}, maccs_ii_number{0},
-    use_internal_registry{false}, external_regno{std::string("")}
-{}
-
-//-------------------------------------------------------------------------------------------------
-MolObjDataRequest::MolObjDataRequest(const std::string &title_in,
-                                     const StateVariable energy_component_in,
-                                     const std::string &label_in) :
-    MolObjDataRequest(title_in, label_in)
-{
-  kind = DataRequestKind::STATE_VARIABLE;
-  energy_component = energy_component_in;
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjDataRequest::MolObjDataRequest(const DataRequestKind kind_in, const std::string &title_in,
-                                     const std::string &message_in, const std::string &label_in) :
-    MolObjDataRequest(title_in, label_in)
-{
-  kind = kind_in;
-  switch (kind) {
-  case DataRequestKind::STATE_VARIABLE:
-    rtErr("In order to construct a data request for a particular energy component, use "
-          "MolObjDataRequest(<title>, <energy component>, <label>).", "MolObjDataRequest");
-    break;
-  case DataRequestKind::TOPOLOGY_PARAMETER:
-    rtErr("In order to construct a data request for the actions of a topological energy "
-          "parameter, use MolObjDataRequest(<title>, <interaction type>, <list of atom types>, "
-          "<label>).", "MolObjDataRequest");
-    break;
-  case DataRequestKind::ATOM_INFLUENCES:
-    atom_mask = message_in;
-    break;
-  case DataRequestKind::STRING:
-    message = message_in;
-    break;
-  case DataRequestKind::ALL_KINDS:
-    rtErr("The ALL_KINDS enumeration does not indicate an actual data request and no program "
-          "should invoke it here.", "MolObjDataRequest");
-    break;
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjDataRequest::MolObjDataRequest(const std::string &title_in,
-                                     const StateVariable valence_kind_in,
-                                     const std::vector<char4> &atom_types_in,
-                                     const std::string &label_in) :
-    MolObjDataRequest(title_in, label_in)
-{
-  kind = DataRequestKind::TOPOLOGY_PARAMETER;
-  valence_kind = valence_kind_in;
-  atom_types = atom_types_in;
-
-  // Check the type of valence interaction and the corresponding number of atom types supplied.
-  const int ntypes = atom_types.size();
-  int nreq;
-  switch (valence_kind) {
-  case StateVariable::BOND:
-  case StateVariable::UREY_BRADLEY:
-    nreq = 2;
-    break;
-  case StateVariable::ANGLE:
-    nreq = 3;
-    break;
-  case StateVariable::PROPER_DIHEDRAL:
-  case StateVariable::IMPROPER_DIHEDRAL:
-  case StateVariable::CHARMM_IMPROPER:
-    nreq = 4;
-    break;
-  case StateVariable::CMAP:
-    nreq = 5;
-    break;
-  case StateVariable::VDW:
-  case StateVariable::VDW_ONE_FOUR:
-  case StateVariable::ELECTROSTATIC:
-  case StateVariable::ELECTROSTATIC_ONE_FOUR:
-  case StateVariable::GENERALIZED_BORN:
-  case StateVariable::RESTRAINT:
-  case StateVariable::KINETIC:
-  case StateVariable::PRESSURE:
-  case StateVariable::VIRIAL_11:
-  case StateVariable::VIRIAL_12:
-  case StateVariable::VIRIAL_22:
-  case StateVariable::VIRIAL_13:
-  case StateVariable::VIRIAL_23:
-  case StateVariable::VIRIAL_33:
-  case StateVariable::VOLUME:
-  case StateVariable::TEMPERATURE_ALL:
-  case StateVariable::TEMPERATURE_PROTEIN:
-  case StateVariable::TEMPERATURE_LIGAND:
-  case StateVariable::TEMPERATURE_SOLVENT:
-  case StateVariable::DU_DLAMBDA:
-  case StateVariable::POTENTIAL_ENERGY:
-  case StateVariable::TOTAL_ENERGY:
-  case StateVariable::ALL_STATES:
-    rtErr("The accepted topology parameter types for printing in data items of an SD file "
-          "include BOND, ANGLE, PROPER_DIHEDRAL, IMPROPER_DIHEDRAL, UREY_BRADLEY, "
-          "CHARMM_IMPROPER, and CMAP.", "MolObjDataRequest");
-    break;
-  }
-  if (ntypes != nreq) {
-    rtErr("A " + getEnumerationName(valence_kind) + " requires specification of " +
-          std::to_string(nreq) + " atom types, but " + std::to_string(ntypes) + " were provided.",
-          "MolObjDataRequest");
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-DataRequestKind MolObjDataRequest::getKind() const {
-  return kind;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataRequest::getTitle() const {
-  return title;
-}
-
-//-------------------------------------------------------------------------------------------------
-StateVariable MolObjDataRequest::getEnergyComponent() const {
-  checkKind(DataRequestKind::STATE_VARIABLE);
-  return energy_component;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataRequest::getAtomMask() const {
-  checkKind(DataRequestKind::ATOM_INFLUENCES);
-  return atom_mask;
-}
-
-//-------------------------------------------------------------------------------------------------
-StateVariable MolObjDataRequest::getValenceParameter() const {
-  checkKind(DataRequestKind::TOPOLOGY_PARAMETER);
-  return valence_kind;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataRequest::getMessage() const {
-  checkKind(DataRequestKind::STRING);
-  return message;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<char4>& MolObjDataRequest::getAtomTypes() const {
-  return atom_types;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataRequest::getSystemLabel() const {
-  return system_label;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataRequest::getExternalRegistryNumber() const {
-  return external_regno;
-}
-
-//-------------------------------------------------------------------------------------------------
-bool MolObjDataRequest::placeMaccsFieldInHeader() const {
-  return use_maccs_ii_number;
-}
-
-//-------------------------------------------------------------------------------------------------
-bool MolObjDataRequest::placeInternalRegistryInHeader() const {
-  return use_internal_registry;
-}
-
-//-------------------------------------------------------------------------------------------------
-int MolObjDataRequest::getMaccsFieldNumber() const {
-  return maccs_ii_number;
-}
-
-//-------------------------------------------------------------------------------------------------
-void MolObjDataRequest::setExternalRegistryNumber(const std::string &regno_in) {
-  external_regno = regno_in;
-}
-
-//-------------------------------------------------------------------------------------------------
-void MolObjDataRequest::setMaccsFieldNumber(int maccs_in) {
-  maccs_ii_number = maccs_in;
-  use_maccs_ii_number = true;
-}
-
-//-------------------------------------------------------------------------------------------------
-void MolObjDataRequest::setInternalRegistryUsage(const std::string &input) {
-  if (strcmpCased(input, "on", CaseSensitivity::NO) ||
-      strcmpCased(input, "active", CaseSensitivity::NO)) {
-    use_internal_registry = true;
-  }
-  else if (strcmpCased(input, "off", CaseSensitivity::NO)) {
-    use_internal_registry = false;
-  }
-  else {
-    rtErr("Invalid directive " + input + " to an SD file data item request, pertaining to "
-          "internal registry number usage.  Use ON or OFF.", "MolObjDataRequest",
-          "setInternalRegistryUsage");
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-void MolObjDataRequest::checkKind(const DataRequestKind accepted_kind) const {
-  if (kind != accepted_kind) {
-    rtErr("A data request of type " + getEnumerationName(kind) + " cannot function as a request "
-          "for " + getEnumerationName(accepted_kind) + " data.", "MolObjDataRequest",
-          "checkKind");
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-MolObjDataItem::MolObjDataItem(const std::string &item_name_in,
+MdlMolDataItem::MdlMolDataItem(const std::string &item_name_in,
                                const std::string &external_regno_in,
                                const int internal_regno_in, const int maccs_ii_number_in,
                                const uint header_info, const std::vector<std::string> &body_in) :
+    kind{MdlMolDataItemKind::NONE}, tracked_state{StateVariable::ALL_STATES},
     item_name{item_name_in}, external_regno{external_regno_in}, internal_regno{internal_regno_in},
     maccs_ii_number{maccs_ii_number_in}, use_internal_regno{((header_info & 0x1) == 1U)},
     use_external_regno{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
@@ -244,9 +33,9 @@ MolObjDataItem::MolObjDataItem(const std::string &item_name_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *line_advance,
+MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *line_advance,
                                const int compound_line_end, const std::string &title) :
-    MolObjDataItem()
+    MdlMolDataItem()
 {
   // Find an item name in the header line
   const char* line_ptr = tf.getLinePointer(line_number);
@@ -258,7 +47,7 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
       if (on_item_name) {
         rtErr("The reserved character '<' appears twice on line " + std::to_string(line_number) +
               " of file " + getBaseName(tf.getFileName()) + ", compound " + title + ".",
-              "MolObjDataItem");
+              "MdlMolDataItem");
       }
       on_item_name = true;
       use_item_name = true;
@@ -267,7 +56,7 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
       if (on_item_name == false) {
         rtErr("The reserved character '>' appears before its counterpart '<' on line " +
               std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + ", "
-              "failing to define a data item name in compound " + title + ".", "MolObjDataItem");
+              "failing to define a data item name in compound " + title + ".", "MdlMolDataItem");
       }
       on_item_name = false;
     }
@@ -275,7 +64,7 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
       if (on_regno) {
         rtErr("The reserved character '(' appears twice on line " + std::to_string(line_number) +
               " of file " + getBaseName(tf.getFileName()) + ", in compound " + title + ".",
-              "MolObjDataItem");
+              "MdlMolDataItem");
       }
       on_regno = true;
       use_external_regno = true;
@@ -285,7 +74,7 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
         rtErr("The reserved character ')' appears before its counterpart '(' on line " +
               std::to_string(line_number) + " of file " + getBaseName(tf.getFileName()) + ", "
               "failing to define an external registry number in compound " + title + ".",
-              "MolObjDataItem");
+              "MdlMolDataItem");
       }
       on_regno = false;
     }
@@ -328,6 +117,9 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
     }
   }
 
+  // The data item is native to the file.
+  kind = MdlMolDataItemKind::NATIVE;
+
   // Validate the header line information
   validateItemName();
 
@@ -361,83 +153,115 @@ MolObjDataItem::MolObjDataItem(const TextFile &tf, const int line_number, int *l
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjDataItem::MolObjDataItem(const MolObjDataRequest &ask,
+MdlMolDataItem::MdlMolDataItem(const MdlMolDataRequest &ask,
                                const std::vector<std::string> &body_in) :
-    MolObjDataItem(ask.getTitle(), ask.getExternalRegistryNumber(), -1, ask.getMaccsFieldNumber(),
+    MdlMolDataItem(ask.getTitle(), ask.getExternalRegistryNumber(), -1, ask.getMaccsFieldNumber(),
                    getDataItemHeaderCode(ask), body_in)
-{}
+{
+  // The request may incorporate one or more values that are not yet known, e.g. details of the
+  // energy evaluation.  Place indications in the data item so that a post-analysis can add the
+  // details later.
+  switch (ask.getKind()) {
+  case DataRequestKind::STATE_VARIABLE:
+    kind = MdlMolDataItemKind::STATE_VARIABLE;
+    tracked_state = ask.getEnergyComponent();
+    break;
+  case DataRequestKind::ATOM_INFLUENCES:
+    kind = MdlMolDataItemKind::ATOM_INFLUENCES;
+    break;
+  case DataRequestKind::TOPOLOGY_PARAMETER:
+    kind = MdlMolDataItemKind::TOPOLOGY_PARAMETER;
+    break;
+  case DataRequestKind::STRING:
+    kind = MdlMolDataItemKind::STRING;
+    break;
+  case DataRequestKind::ALL_KINDS:
+    rtErr("A nonsensical request type of " + getEnumerationName(ask.getKind()) + " was conveyed.",
+          "MdlMolDataItem");
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::placeInternalRegnoInHeader() const {
+bool MdlMolDataItem::placeInternalRegnoInHeader() const {
   return use_internal_regno;
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::placeExternalRegnoInHeader() const {
+bool MdlMolDataItem::placeExternalRegnoInHeader() const {
   return use_external_regno;
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::placeTitleInHeader() const {
+bool MdlMolDataItem::placeTitleInHeader() const {
   return use_item_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::placeMaccsIIFieldInHeader() const {
+bool MdlMolDataItem::placeMaccsIIFieldInHeader() const {
   return use_maccs_ii_number;
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::noteArchivesInHeader() const {
+bool MdlMolDataItem::noteArchivesInHeader() const {
   return note_archives;
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataItem::getItemName() const {
+const std::string& MdlMolDataItem::getItemName() const {
   return item_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataItem::getExternalRegistryNumber() const {
+const std::string& MdlMolDataItem::getExternalRegistryNumber() const {
   return external_regno;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjDataItem::getInternalRegistryNumber() const {
+int MdlMolDataItem::getInternalRegistryNumber() const {
   return internal_regno;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjDataItem::getMaccsFieldNumber() const {
+int MdlMolDataItem::getMaccsFieldNumber() const {
   return maccs_ii_number;
 }
 
 //-------------------------------------------------------------------------------------------------
-int MolObjDataItem::getDataLineCount() const {
+StateVariable MdlMolDataItem::getTrackedState() const {
+  return tracked_state;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMolDataItem::getDataLineCount() const {
   return body.size();
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string& MolObjDataItem::getDataLine(const int line_index) const {
+const std::string& MdlMolDataItem::getDataLine(const int line_index) const {
   if (line_index < 0 || line_index >= static_cast<int>(body.size())) {
     rtErr("Request for data line " + std::to_string(line_index) + " is invalid for a data item "
-          "with " + std::to_string(body.size()) + " lines.", "MolObjDataItem", "getDataLine");
+          "with " + std::to_string(body.size()) + " lines.", "MdlMolDataItem", "getDataLine");
   }
   return body[line_index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<std::string>& MolObjDataItem::getBody() const {
+const std::vector<std::string>& MdlMolDataItem::getBody() const {
   return body;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MolObjDataItem::parseString(const int element_number, const int line_number) const {
+MdlMolDataItemKind MdlMolDataItem::getKind() const {
+  return kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MdlMolDataItem::parseString(const int element_number, const int line_number) const {
   if (line_number >= static_cast<int>(body.size())) {
     const std::string identifier = (item_name.size() > 0LLU) ? "Item name : <" + item_name + ">" :
                                                                std::string("");
     rtErr("Line index " + std::to_string(line_number) + " is inaccessible in a data item with " +
-          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MolObjDataItem",
+          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MdlMolDataItem",
           "parseString");
   }
   const std::vector<std::string> line_components = separateText(body[line_number]);
@@ -446,23 +270,23 @@ std::string MolObjDataItem::parseString(const int element_number, const int line
                                                                std::string("");
     rtErr("Line index " + std::to_string(line_number) + " has " +
           std::to_string(line_components.size()) + " components.  Index " +
-          std::to_string(element_number) + " is invalid.", "MolObjDataItem", "parseString");
+          std::to_string(element_number) + " is invalid.", "MdlMolDataItem", "parseString");
   }
   return line_components[element_number];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string MolObjDataItem::parseString(const int start_pos, const int length,
+std::string MdlMolDataItem::parseString(const int start_pos, const int length,
                                         const int line_number) const {
   if (line_number >= static_cast<int>(body.size())) {
     const std::string identifier = (item_name.size() > 0LLU) ? "Item name : <" + item_name + ">" :
                                                                std::string("");
     rtErr("Line index " + std::to_string(line_number) + " is inaccessible in a data item with " +
-          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MolObjDataItem",
+          std::to_string(body.size()) + " data lines.  " + identifier + ".", "MdlMolDataItem",
           "parseString");
   }
   if (start_pos < 0) {
-    rtErr("Starting position " + std::to_string(start_pos) + " is invalid.", "MolObjDataItem",
+    rtErr("Starting position " + std::to_string(start_pos) + " is invalid.", "MdlMolDataItem",
           "parseString");
   }
   const int lnlength = body[line_number].size();
@@ -470,27 +294,27 @@ std::string MolObjDataItem::parseString(const int start_pos, const int length,
   if (start_pos + length > lnlength) {
     rtErr("Starting position " + std::to_string(start_pos) + " and length " +
           std::to_string(actual_length) + " combine to make an invalid read of a string with "
-          "length " + std::to_string(body[line_number].size()) + " characters.", "MolObjDataItem",
+          "length " + std::to_string(body[line_number].size()) + " characters.", "MdlMolDataItem",
           "parseString");
   }
   return body[line_number].substr(start_pos, actual_length);
 }
 
 //-------------------------------------------------------------------------------------------------
-llint MolObjDataItem::parseInteger(const int element_number, const int line_number) const {
+llint MdlMolDataItem::parseInteger(const int element_number, const int line_number) const {
   const std::string proto = parseString(element_number, line_number);
   if (verifyContents(proto, NumberFormat::LONG_LONG_INTEGER)) {
     return stoll(proto);
   }
   else {
     rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
-          ", " + proto + ", could not be parsed as an integer.", "MolObjDataItem", "parseString");
+          ", " + proto + ", could not be parsed as an integer.", "MdlMolDataItem", "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-llint MolObjDataItem::parseInteger(const int start_pos, const int length,
+llint MdlMolDataItem::parseInteger(const int start_pos, const int length,
                                    const int line_number) const {
   const std::string proto = parseString(start_pos, length, line_number);
   if (verifyContents(proto, NumberFormat::LONG_LONG_INTEGER)) {
@@ -499,27 +323,27 @@ llint MolObjDataItem::parseInteger(const int start_pos, const int length,
   else {
     rtErr("Column-formatted characters \"" + proto + "\" at position " +
           std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
-          "parsed as an integer.", "MolObjDataItem", "parseString");
+          "parsed as an integer.", "MdlMolDataItem", "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-ullint MolObjDataItem::parseUnsigned(const int element_number, const int line_number) const {
+ullint MdlMolDataItem::parseUnsigned(const int element_number, const int line_number) const {
   const std::string proto = parseString(element_number, line_number);
   if (verifyContents(proto, NumberFormat::UNSIGNED_LONG_LONG_INTEGER)) {
     return stoull(proto);
   }
   else {
     rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
-          ", " + proto + ", could not be parsed as an unsigned integer.", "MolObjDataItem",
+          ", " + proto + ", could not be parsed as an unsigned integer.", "MdlMolDataItem",
           "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-ullint MolObjDataItem::parseUnsigned(const int start_pos, const int length,
+ullint MdlMolDataItem::parseUnsigned(const int start_pos, const int length,
                                      const int line_number) const {
   const std::string proto = parseString(start_pos, length, line_number);
   if (verifyContents(proto, NumberFormat::UNSIGNED_LONG_LONG_INTEGER)) {
@@ -528,13 +352,13 @@ ullint MolObjDataItem::parseUnsigned(const int start_pos, const int length,
   else {
     rtErr("Column-formatted characters \"" + proto + "\" at position " +
           std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
-          "parsed as an unsigned integer.", "MolObjDataItem", "parseString");
+          "parsed as an unsigned integer.", "MdlMolDataItem", "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-double MolObjDataItem::parseReal(const int element_number, const int line_number) const {
+double MdlMolDataItem::parseReal(const int element_number, const int line_number) const {
   const std::string proto = parseString(element_number, line_number);
   if (verifyContents(proto, NumberFormat::STANDARD_REAL) ||
       verifyContents(proto, NumberFormat::SCIENTIFIC)) {
@@ -542,14 +366,14 @@ double MolObjDataItem::parseReal(const int element_number, const int line_number
   }
   else {
     rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
-          ", " + proto + ", could not be parsed as a real number.", "MolObjDataItem",
+          ", " + proto + ", could not be parsed as a real number.", "MdlMolDataItem",
           "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-double MolObjDataItem::parseReal(const int start_pos, const int length,
+double MdlMolDataItem::parseReal(const int start_pos, const int length,
                                  const int line_number) const {
   const std::string proto = parseString(start_pos, length, line_number);
   if (verifyContents(proto, NumberFormat::STANDARD_REAL) ||
@@ -559,13 +383,13 @@ double MolObjDataItem::parseReal(const int start_pos, const int length,
   else {
     rtErr("Column-formatted characters \"" + proto + "\" at position " +
           std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
-          "parsed as a real number.", "MolObjDataItem", "parseString");
+          "parsed as a real number.", "MdlMolDataItem", "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-char4 MolObjDataItem::parseChar4(const int element_number, const int line_number) const {
+char4 MdlMolDataItem::parseChar4(const int element_number, const int line_number) const {
   const std::string proto = parseString(element_number, line_number);
   if (verifyContents(proto, NumberFormat::CHAR4)) {
     return stringToChar4(proto);
@@ -573,14 +397,14 @@ char4 MolObjDataItem::parseChar4(const int element_number, const int line_number
   else {
     rtErr("Element " + std::to_string(element_number) + " of line " + std::to_string(line_number) +
           ", " + proto + ", could not be parsed as a four-character tuple, having " +
-          std::to_string(proto.size()) + " characters in all.", "MolObjDataItem",
+          std::to_string(proto.size()) + " characters in all.", "MdlMolDataItem",
           "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-char4 MolObjDataItem::parseChar4(const int start_pos, const int length,
+char4 MdlMolDataItem::parseChar4(const int start_pos, const int length,
                                  const int line_number) const {
   const std::string proto = parseString(start_pos, length, line_number);
   if (verifyContents(proto, NumberFormat::CHAR4)) {
@@ -589,13 +413,13 @@ char4 MolObjDataItem::parseChar4(const int start_pos, const int length,
   else {
     rtErr("Column-formatted characters \"" + proto + "\" at position " +
           std::to_string(start_pos) + " of line " + std::to_string(line_number) + " could not be "
-          "parsed as a four-character tuple.", "MolObjDataItem", "parseString");
+          "parsed as a four-character tuple.", "MdlMolDataItem", "parseString");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
+bool MdlMolDataItem::matchItemName(const std::string &item_name_comp,
                                    const std::string &ext_regno_comp,
                                    const int maccs_ii_no_comp) const {
   return ((use_item_name && item_name_comp == item_name) &&
@@ -604,32 +428,37 @@ bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchItemName(const std::string &item_name_comp,
+bool MdlMolDataItem::matchItemName(const std::string &item_name_comp,
                                    const int maccs_ii_no_comp) const {
   return ((use_item_name && item_name_comp == item_name) &&
           (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchRegistryNumber(const std::string &ext_regno_comp,
+bool MdlMolDataItem::matchRegistryNumber(const std::string &ext_regno_comp,
                                          const int maccs_ii_no_comp) const {
   return ((use_external_regno && ext_regno_comp == external_regno) &&
           (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number));
 }
 
 //-------------------------------------------------------------------------------------------------
-bool MolObjDataItem::matchMaccsField(const int maccs_ii_no_comp) const {
+bool MdlMolDataItem::matchMaccsField(const int maccs_ii_no_comp) const {
   return (use_maccs_ii_number && maccs_ii_no_comp == maccs_ii_number);
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjDataItem::setItemName(const std::string &item_name_in) {
+void MdlMolDataItem::setItemName(const std::string &item_name_in) {
   item_name = item_name_in;
   validateItemName();
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjDataItem::validateItemName() const {
+void MdlMolDataItem::addDataLine(const std::string &text) {
+  body.push_back(text);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMolDataItem::validateItemName() const {
   const int nchar = item_name.size();
   bool problem = false;
   if (nchar > 0) {
@@ -649,7 +478,7 @@ void MolObjDataItem::validateItemName() const {
   if (problem) {
     rtErr("Data item name " + item_name + " is invalid.  An item name must begin with an "
           "alphabetical character and thereafter contain alphanumeric characters and "
-          "underscores, with no white space.", "MolObjDataItem", "setItemName");
+          "underscores, with no white space.", "MdlMolDataItem", "setItemName");
   }
 }
 
@@ -663,7 +492,7 @@ uint getDataItemHeaderCode(const bool use_internal_regno, const bool use_externa
 }
 
 //-------------------------------------------------------------------------------------------------
-uint getDataItemHeaderCode(const MolObjDataRequest &ask) {
+uint getDataItemHeaderCode(const MdlMolDataRequest &ask) {
 
   // It is obligatory to display the item name for requested data items, and "FROM ARCHIVES" is
   // not displayed in such data items.

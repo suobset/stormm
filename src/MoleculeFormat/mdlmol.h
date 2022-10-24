@@ -13,6 +13,7 @@
 #include "FileManagement/file_util.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
+#include "Potential/energy_enumerators.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
@@ -35,6 +36,7 @@ using constants::CartesianDimension;
 using constants::CaseSensitivity;
 using constants::ExceptionResponse;
 using diskutil::PrintSituation;
+using energy::StateVariable;
 using parse::TextFile;
 using restraints::RestraintApparatus;
 using topology::AtomGraph;
@@ -128,6 +130,13 @@ public:
   /// \brief Get the number of bonds in the system.
   int getBondCount() const;
 
+  /// \brief Get the number of properties found in the MDL MOL entry.
+  int getPropertiesCount() const;
+
+  /// \brief Get the number of data items (XML-like note found after the MDL section of the entry
+  ///        in a BIOVIA Structure Data (SD)-format file).
+  int getDataItemCount() const;
+
   /// \brief Get the { X, Y, Z } coordinate tuple for a particular atom, or for all atoms.
   ///
   /// Overloaded:
@@ -175,9 +184,6 @@ public:
   /// \brief Get a const reference to the vector of all formal charges.
   const std::vector<int>& getFormalCharges() const;
   
-  /// \brief Get the number of properties found in the MDL MOL entry
-  int getPropertiesCount() const;
-
   /// \brief Impart a new set of coordinates to the atoms based on one of STORMM's major coordinate
   ///        classes.  This will permanently modify the underlying coordinates of the object and
   ///        also any properties dependent of the structure.  If providing a standalone coordinate
@@ -258,9 +264,25 @@ public:
   /// \param ag   The topology guiding the motion of the system
   /// \param ra   The system of restraints guiding the structure alongside the topology
   /// \{
-  void addDataItem(const MolObjDataRequest &ask, const AtomGraph &ag,
+  void addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
                    const RestraintApparatus &ra);
   /// \}
+
+  /// \brief Get the classification of a data item from within the MDL MOL entry.
+  ///
+  /// \param item_index  Position of the data item of interest in the data_items array
+  MdlMolDataItemKind getDataItemKind(int item_index) const;
+
+  /// \brief Get the state variable that one of the data items is tracking.
+  StateVariable getTrackedState(int item_index) const;
+
+  /// \brief Add a line of text to a specific data item within the MDL MOL entry.  This text may
+  ///        contain a pre-formatted string displaying some energy quantity, or more complex
+  ///        syntax.
+  ///
+  /// \param text        The text to append
+  /// \param item_index  Index of the data item to update
+  void addLineToDataItem(const std::string &text, int item_index);
   
   /// \brief Write a set of molecular coordinates, bonds, and their annotations in MDL MOL format.
   ///        Apply all properties already stored in the object, such that the result is not an
@@ -383,21 +405,21 @@ private:
   std::vector<StereoRetention> orientation_stability;
 
   /// Bonds between atoms
-  std::vector<MolObjBond> bonds;
+  std::vector<MdlMolBond> bonds;
 
   /// Lists of atomic elements to be used in arbitrary operations
-  std::vector<MolObjAtomList> element_lists;
+  std::vector<MdlMolAtomList> element_lists;
 
   /// Stext entries (these are deprecated and used by ISIS / Desktop applications only)
   std::vector<MolObjSTextGroup> stext_entries;
   
   /// Properties
-  std::vector<MolObjProperty> properties;
+  std::vector<MdlMolProperty> properties;
 
   /// Data items: this is what makes the SD file (.sdf) format so extensible.  While technically
   /// not part of the MDL MOL format, they are stored in the MdlMol for association.  Data items
   /// will be written back to new .sdf files but not .mol files based on the data in this object.
-  std::vector<MolObjDataItem> data_items;
+  std::vector<MdlMolDataItem> data_items;
   
   /// Title (first line from the file header)
   std::string title;
@@ -500,7 +522,13 @@ private:
   /// \brief Check the atom count of some external object against the internal number.
   ///
   /// \param ext_atom_count  The number of atoms coming from the external struct
-  void checkAtomCount(int ext_atom_count);
+  void checkAtomCount(int ext_atom_count) const;
+
+  /// \brief Check the data item count of the object against a requested index.
+  ///
+  /// \param item_index  The item of interest
+  /// \param caller      Name of the calling function (for backtracing purposes)
+  void checkDataItemIndex(int item_index, const char* caller) const;
 };
 
 /// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.

@@ -279,19 +279,29 @@ public:
   /// \param count_in  The number of samples to set the object as having (default 0, full reset)
   void resetSampleCount(int count_in = 0);
   
-  /// \brief Report the total energy for all systems.  Each result will be summed in the internal
-  ///        fixed-point accumulation before conversion to real values in units of kcal/mol.
+  /// \brief Report the total energy, or total potential energy, for one system or for all systems.
+  ///        Each result will be summed in the internal fixed-point accumulation before conversion
+  ///        to real values in units of kcal/mol.
   ///
-  /// \param tier  Level from which to extract the data
-  std::vector<double> reportTotalEnergies(const HybridTargetLevel tier);
-  
-  /// \brief Report the total energy for one system in the list, following the summation protocol
-  ///        from reportTotalEnergies() above.
+  /// Overloaded:
+  ///   - Sum the total or potential energies of a selected system
+  ///   - Sum the total or potential energies of all systems
   ///
   /// \param system_index  Index of the system of interest
   /// \param tier          Level from which to extract the data
-  double reportTotalEnergy(int system_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST);
-  
+  /// \{
+  std::vector<double>
+  reportPotentialEnergies(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  double reportPotentialEnergy(int system_index = 0,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double> reportTotalEnergies(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  double reportTotalEnergy(int system_index = 0,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
   /// \brief Report instantaneous results in kcal/mol, as a double-precision vector.
   ///
   /// Overloaded:
@@ -304,13 +314,19 @@ public:
   /// \param aspect        The type of energy or virial quantity of interest
   /// \param tier          Level from which to extract the data
   /// \{
-  std::vector<double> reportInstantaneousStates(HybridTargetLevel tier = HybridTargetLevel::HOST);
-  std::vector<double> reportInstantaneousStates(int system_index,
-                                                HybridTargetLevel tier = HybridTargetLevel::HOST);
-  std::vector<double> reportInstantaneousStates(StateVariable aspect,
-                                                HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double>
+  reportInstantaneousStates(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  reportInstantaneousStates(int system_index,
+                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  reportInstantaneousStates(StateVariable aspect,
+                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   double reportInstantaneousStates(StateVariable aspect, int system_index,
-                                   HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                   HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Report averaged results in kcal/mol, as a double-precision vector.
@@ -325,13 +341,13 @@ public:
   /// \param aspect        The type of energy or virial quantity of interest
   /// \param tier          Level from which to extract the data
   /// \{
-  std::vector<double> reportAverageStates(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double> reportAverageStates(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double> reportAverageStates(int system_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double> reportAverageStates(StateVariable aspect,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   double reportAverageStates(StateVariable aspect, int system_index,
-                             HybridTargetLevel tier = HybridTargetLevel::HOST);
+                             HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Report standard deviations in kcal/mol, as a double-precision vector.
@@ -346,13 +362,18 @@ public:
   /// \param aspect        The type of energy or virial quantity of interest
   /// \param tier          Level from which to extract the data
   /// \{
-  std::vector<double> reportVarianceOfStates(HybridTargetLevel tier = HybridTargetLevel::HOST);
-  std::vector<double> reportVarianceOfStates(int system_index,
-                                             HybridTargetLevel tier = HybridTargetLevel::HOST);
-  std::vector<double> reportVarianceOfStates(StateVariable aspect,
-                                             HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double>
+  reportVarianceOfStates(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  reportVarianceOfStates(int system_index, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  reportVarianceOfStates(StateVariable aspect,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   double reportVarianceOfStates(StateVariable aspect, int system_index,
-                                HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Report the energy history for one or more systems.

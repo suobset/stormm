@@ -44,6 +44,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_property.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_refinement.cpp \
+		   $(SRCDIR)/MoleculeFormat/mdlmol_request.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/Namelists/input.cpp \
@@ -184,6 +185,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_property.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_refinement.h \
+		     $(SRCDIR)/MoleculeFormat/mdlmol_request.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/Namelists/input.h \
@@ -360,6 +362,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_dataitem.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_property.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_refinement.o \
+		  $(SRCDIR)/MoleculeFormat/mdlmol_request.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 		  $(SRCDIR)/Namelists/input.o \

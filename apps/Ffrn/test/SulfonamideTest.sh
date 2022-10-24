@@ -12,7 +12,7 @@ cat > ffld.in << EOF
 &end
 
 &minimize
-  ncyc 5,  maxcyc 10,
+  ncyc 50,  maxcyc 500,
 &end
 
 &restraint
@@ -43,4 +43,4 @@ cat > ffld.in << EOF
 &end
 EOF
 
-${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn
+valgrind ${STORMM_HOME}/apps/bin/ffrefine.stormm -O -i ffld.in -warn

@@ -15,8 +15,8 @@ using parse::TextFile;
   
 /// \brief Default settings for the MDL MOL bond initializations
 /// \{
-constexpr MolObjBondOrder default_mdl_bond_order = MolObjBondOrder::SINGLE;
-constexpr MolObjBondStereo default_mdl_bond_stereochemistry = MolObjBondStereo::NOT_STEREO;
+constexpr MdlMolBondOrder default_mdl_bond_order = MdlMolBondOrder::SINGLE;
+constexpr MdlMolBondStereo default_mdl_bond_stereochemistry = MdlMolBondStereo::NOT_STEREO;
 constexpr MolObjRingState default_mdl_ring_status = MolObjRingState::EITHER;
 constexpr MolObjReactionCenter default_mdl_bond_reactivity = MolObjReactionCenter::NON_CENTER;
 /// \}
@@ -24,7 +24,7 @@ constexpr MolObjReactionCenter default_mdl_bond_reactivity = MolObjReactionCente
 /// \brief A bond, as presented in the MDL molecule file format.  This unguarded struct will be
 ///        returned to the developer from a private array inside of the MdlMolObj object, so
 ///        further protection would be a hindrance.
-class MolObjBond {
+class MdlMolBond {
 public:
 
   /// \brief The constructor can take all member variables, or just the atoms so that more
@@ -40,19 +40,19 @@ public:
   /// \param line_number  Number of the line on which to read the data
   /// \param title        The title of the structure, if known, for error tracing purposes
   /// \{
-  MolObjBond();
-  MolObjBond(int i_atom_in, int j_atom_in);
-  MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjBondStereo stereo_in,
+  MdlMolBond();
+  MdlMolBond(int i_atom_in, int j_atom_in);
+  MdlMolBond(int i_atom_in, int j_atom_in, MdlMolBondOrder order_in, MdlMolBondStereo stereo_in,
              MolObjRingState ring_state_in, MolObjReactionCenter reactivity_in);
-  MolObjBond(const TextFile &tf, int line_number, const std::string &title = std::string(""));
+  MdlMolBond(const TextFile &tf, int line_number, const std::string &title = std::string(""));
   /// \}
 
   /// \brief The default copy and move constructors as well as assignment operators are adequate.
   /// \{
-  MolObjBond(const MolObjBond &original) = default;
-  MolObjBond(MolObjBond &&original) = default;
-  MolObjBond& operator=(const MolObjBond &other) = default;
-  MolObjBond& operator=(MolObjBond &&other) = default;
+  MdlMolBond(const MdlMolBond &original) = default;
+  MdlMolBond(MdlMolBond &&original) = default;
+  MdlMolBond& operator=(const MdlMolBond &other) = default;
+  MdlMolBond& operator=(MdlMolBond &&other) = default;
   /// \}
 
   /// \brief Get the first atom in the bond.  Having separate functions for each atom is a more
@@ -64,10 +64,10 @@ public:
   int getSecondAtom() const;
 
   /// \brief Get the order of the bond.
-  MolObjBondOrder getOrder() const;
+  MdlMolBondOrder getOrder() const;
 
   /// \brief Get the order of the bond.
-  MolObjBondStereo getStereochemistry() const;
+  MdlMolBondStereo getStereochemistry() const;
 
   /// \brief Get the ring status--is the bond known to be part of a ring?
   MolObjRingState getRingStatus() const;
@@ -83,10 +83,10 @@ public:
 
   /// \brief Set the order of the bond, perhaps after computations with an associated
   ///        ChemicalFeatures object.
-  void setOrder(MolObjBondOrder order_in);
+  void setOrder(MdlMolBondOrder order_in);
 
   /// \brief Set the stereochemical details of the bond.
-  void setStereochemistry(MolObjBondStereo stereo_in);
+  void setStereochemistry(MdlMolBondStereo stereo_in);
 
   /// \brief Mark the status of the bond with respect to any ring features.
   void setRingStatus(MolObjRingState status_in);
@@ -97,8 +97,8 @@ public:
 private:
   int i_atom;                       ///< The first atom in the bond
   int j_atom;                       ///< The second atom in the bond
-  MolObjBondOrder order;            ///< The bond order (single, double, aromatic, etc.)
-  MolObjBondStereo stereo;          ///< Indicator of the bond stereochemistry
+  MdlMolBondOrder order;            ///< The bond order (single, double, aromatic, etc.)
+  MdlMolBondStereo stereo;          ///< Indicator of the bond stereochemistry
   MolObjRingState ring_state;       ///< Indicator of whether the atom is part of a ring
   MolObjReactionCenter reactivity;  ///< Indicator of a bond as a center of reactivity
 
@@ -106,13 +106,13 @@ private:
   ///
   /// \param code_in  A numeric code to be translated into the bond order
   /// \param title    Title of the parent structure, for error tracing purposes
-  MolObjBondOrder interpretBondOrder(int code_in, const std::string &title);
+  MdlMolBondOrder interpretBondOrder(int code_in, const std::string &title);
 
   /// \brief Interpret a code for the stereochemistry of a bond in the structure.
   ///
   /// \param code_in  A numeric code to be translated into the bond stereochemistry
   /// \param title    Title of the parent structure, for error tracing purposes
-  MolObjBondStereo interpretBondStereochemistry(int code_in, const std::string &title);
+  MdlMolBondStereo interpretBondStereochemistry(int code_in, const std::string &title);
 
   /// \brief Interpret a code for the ring status of a bond in the structure.
   ///
@@ -128,8 +128,8 @@ private:
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.
-std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
-                                  const std::vector<MolObjBond> &rhs);
+std::vector<MdlMolBond> operator+(const std::vector<MdlMolBond> &lhs,
+                                  const std::vector<MdlMolBond> &rhs);
 
 } // namespace structure
 } // namespace stormm
