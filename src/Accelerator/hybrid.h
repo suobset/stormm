@@ -395,7 +395,7 @@ public:
   T readDevice(size_t index) const;
   std::vector<T> readDevice(size_t offset, size_t count) const;
   std::vector<T> readDevice() const;
-  void readDevice(T* v, (size_t offset, size_t count) const;
+  void readDevice(T* v, size_t offset, size_t count) const;
   void readDevice(T* v) const;
   /// \}
 

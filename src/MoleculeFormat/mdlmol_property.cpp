@@ -363,9 +363,9 @@ MdlMolProperty::MdlMolProperty(const TextFile &tf, const int line_number, int *l
   }
   *line_advance = line_number + tmp_advance;
   if (*line_advance >= tf.getLineCount()) {
-    rtErr("The advancement due to property " + std::to_string(code.w) + "  " + code.x + code.y +
-          code.z + " overruns the length of file " + getBaseName(tf.getFileName()) + ".",
-          "MdlMolProperty");
+    rtErr("The advancement due to property " + std::to_string(code.w) + "  " +
+          std::to_string(code.x) + std::to_string(code.y) + std::to_string(code.z) +
+          " overruns the length of file " + getBaseName(tf.getFileName()) + ".", "MdlMolProperty");
   }
   if (entry_count_unrecognized) {
     rtErr("The entry count on line " + std::to_string(line_number) + " of file " +
@@ -467,8 +467,8 @@ int MdlMolProperty::getPrintedSubstrate() const {
 bool MdlMolProperty::applyToExclusions() const {
   if (kind != MdlMolPropertyKind::ATOM_LIST) {
     rtErr("Only the atom list property (\"M  ALS\") has defined exclusion behavior.  \"" +
-          std::to_string(code.w) + "  " + code.x + code.y + code.z + "\" does not.",
-          "MdlMolProperty", "applyToExclusions");    
+          std::to_string(code.w) + "  " + std::to_string(code.x) + std::to_string(code.y) +
+          std::to_string(code.z) + "\" does not.", "MdlMolProperty", "applyToExclusions");    
   }
   return exclusions;
 }
@@ -536,9 +536,10 @@ std::string MdlMolProperty::getStringValue(const int entry_index,
 //-------------------------------------------------------------------------------------------------
 const std::string& MdlMolProperty::getDataLine(const int index) const {
   if (index < 0 || index > static_cast<int>(data_lines.size())) {
-    rtErr("A property (code \"" + std::to_string(code.w) + "  " + code.x + code.y + code.z +
-          "\") with " + std::to_string(data_lines.size()) + " cannot produce a data line with "
-          "index " + std::to_string(index) + ".", "MdlMolProperty", "getDataLine");
+    rtErr("A property (code \"" + std::to_string(code.w) + "  " + std::to_string(code.x) +
+          std::to_string(code.y) + std::to_string(code.z) + "\") with " +
+          std::to_string(data_lines.size()) + " cannot produce a data line with index " +
+          std::to_string(index) + ".", "MdlMolProperty", "getDataLine");
   }
   return data_lines[index];
 }
@@ -780,14 +781,15 @@ void MdlMolProperty::parseEntries(const TextFile &tf, const int line_number, con
 void MdlMolProperty::checkAttributeValidity(const int entry_index, const int attribute_index,
                                             const MolObjPropField expectation) const {
   if (entry_index < 0 || entry_index >= entry_count) {
-    rtErr("Entry " + std::to_string(entry_index) + " does not exist for an \"" + code.w + "  " +
-          code.x + code.y + code.z + "\" property with " + std::to_string(entry_count) +
-          " entries.", "MdlMolProperty", "checkAttributeValidity");
+    rtErr("Entry " + std::to_string(entry_index) + " does not exist for an \"" +
+          std::to_string(code.w) + "  " + std::to_string(code.x) + std::to_string(code.y) +
+          std::to_string(code.z) + "\" property with " + std::to_string(entry_count) + " entries.",
+          "MdlMolProperty", "checkAttributeValidity");
   }
   if (attribute_index < 0 || attribute_index >= entry_depth) {
     rtErr("Attribute index " + std::to_string(attribute_index) + " is invalid for an \"" +
-          code.w + "  " + code.x + code.y + code.z + "\" property.", "MdlMolProperty",
-          "checkAttributeValidity");
+          std::to_string(code.w) + "  " + std::to_string(code.x) + std::to_string(code.y) +
+          std::to_string(code.z) + "\" property.", "MdlMolProperty", "checkAttributeValidity");
   }
   if (entry_detail[attribute_index] != expectation) {
     rtErr("Attribute " + std::to_string(attribute_index) + " is of type " +

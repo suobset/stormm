@@ -434,7 +434,8 @@ int main(const int argc, const char* argv[]) {
   const TextFile tf(buffer, TextOrigin::RAM);
   int start_line = 0;
   FilesControls fcon(tf, &start_line);
-  const SystemCache sysc(fcon, ExceptionResponse::SILENT, MapRotatableGroups::NO, &timer);
+  const SystemCache sysc(fcon, ExceptionResponse::SILENT, MapRotatableGroups::NO,
+                         PrintSituation::OPEN_NEW, &timer);
 
   // Form the syntheses of topologies and coordinates
   section(1);

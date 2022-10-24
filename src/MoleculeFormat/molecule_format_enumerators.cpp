@@ -54,7 +54,8 @@ MdlMolPropertyKind translateMdlMolPropertyKind(char4 input) {
   else if (input == char4({ 'S', 'B', 'T', 'M' })) return MdlMolPropertyKind::SGROUP_BRACKET_STYLE;
   else if (input == char4({ 'S', 'K', 'P', 'S' })) return MdlMolPropertyKind::SKIP;
   else {
-    const std::string str_code = std::to_string(input.w) + "  " + input.x + input.y + input.z;
+    const std::string str_code = std::to_string(input.w) + "  " + std::to_string(input.x) +
+                                 std::to_string(input.y) + std::to_string(input.z);
     rtErr("The MDL MOL property code " + str_code + " is unrecognized.",
           "translateMdlMolPropertyKind");
   }
