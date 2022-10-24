@@ -569,6 +569,8 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   case CoordinateFileKind::AMBER_ASCII_RST:
     initializeTrajectory(&foutp, kind, atom_count);
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("A trajectory format must be specified.", "CoordinateSeries", "exportToFile");
   }
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
@@ -600,7 +602,7 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
           "CoordinateFrame", "exportToFile");
     break;
   case CoordinateFileKind::UNKNOWN:
-    rtErr("A trajectory format must be specified.", "CoordinateSeries", "exportToFile");
+    break;
   }
   foutp.close();
 }

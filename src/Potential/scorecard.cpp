@@ -811,7 +811,7 @@ double ScoreCard::reportInstantaneousStates(const StateVariable aspect, const in
     return inverse_nrg_scale_lf * static_cast<double>(instantaneous_accumulators.readDevice(didx));
 #endif
   }
-  __builtin_unreachable;
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -813,6 +813,8 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
     // The text is the user-supplied message
     di_body.push_back(ask.getMessage());
     break;
+  case DataRequestKind::ALL_KINDS:
+    break;
   }
   data_items.emplace_back(ask, di_body);
   data_item_count = data_items.size();

@@ -679,6 +679,14 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
           rtErr("The energy term \"" + sval + "\" is defined by " + std::to_string(ntypes_req) +
                 " atom types, but " + std::to_string(atom_types.size()) + " types were provided.",
                 "ReportControls", "translateSdfKeywordInput");
+        case ExceptionResponse::WARN:
+          rtWarn("The energy term \"" + sval + "\" is defined by " + std::to_string(ntypes_req) +
+                 " atom types, but " + std::to_string(atom_types.size()) + " types were "
+                 "provided.  This item will be skipped.", "ReportControls",
+                 "translateSdfKeywordInput");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
         }
       }
       else {
