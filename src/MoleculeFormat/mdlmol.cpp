@@ -43,12 +43,12 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
   MdlMol(policy_in)
 {
   const TextFileReader tfr = tf.data();
-
+  
   // Default line end of -1 indicates reading to the end of the file.  Otherwise, identify the
   // end of the formatting ("M  END").
   const int mdl_section_end = getMdlMolSectionEnd(tfr, line_start, line_end_in);
   const int sd_compound_end = getCompoundSectionEnd(tfr, line_start, line_end_in);
-
+  
   // The range of data now extends from line_start to mdl_section_end.  Sift through that
   // information for a V2000 or V3000 specification.  This should be found on the fourth line.
   version_no = findMolObjVersion(tf, line_start + 3);
@@ -60,7 +60,7 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
     software_details = tf.extractString(line_start + 1);
     general_comment  = tf.extractString(line_start + 2);
   }
-
+  
   // Read the counts line
   switch (version_no) {
   case MdlMolVersion::V2000:
@@ -91,7 +91,7 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
       if (verifyContents(tf, counts_line_idx, 30, 3, NumberFormat::INTEGER)) {
         properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
       }
-
+      
       // Validation of the atom counts line
       if (atom_count <= 0 || bond_count < 0) {
         switch (policy) {
@@ -275,7 +275,7 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
   case MdlMolVersion::UNKNOWN:
     break;
   }
-  
+    
   // Read the data items
   for (int pos = mdl_section_end; pos < sd_compound_end; pos++) {
     if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
@@ -1330,7 +1330,7 @@ std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const int low_fram
                                           const CaseSensitivity capitalization,
                                           const ExceptionResponse policy) {
   std::vector<MdlMol> result;
-
+  
   // Find the limits for different MDL MOL entries
   const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
   const int nsection = mol_entry_limits.size();
@@ -1373,7 +1373,7 @@ std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const int low_fram
 std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const CaseSensitivity capitalization,
                                           const ExceptionResponse policy) {
   std::vector<MdlMol> result;
-
+  
   // Find the limits for different MDL MOL entries
   const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
 

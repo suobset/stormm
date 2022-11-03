@@ -400,7 +400,7 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
   }
   else if (strcmpCased(inpstr, "harmonic_angle", noc) ||
            strcmpCased(inpstr, "harmonicangle", noc)) {
-    result.push_back(StateVariable::UREY_BRADLEY);
+    result.push_back(StateVariable::ANGLE);
   }
   else if (strcmpCased(inpstr, "urey_bradley", noc) || strcmpCased(inpstr, "ureybradley", noc)) {
     result.push_back(StateVariable::UREY_BRADLEY);
@@ -437,13 +437,15 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
     result.push_back(StateVariable::VDW_ONE_FOUR);
   }
   else if (strcmpCased(inpstr, "vdw_nonbonded", noc) || strcmpCased(inpstr, "vdwnonbonded", noc) ||
+           strcmpCased(inpstr, "nonbonded_lj", noc) || strcmpCased(inpstr, "nonbondedlj", noc) ||
            strcmpCased(inpstr, "lj_nonbonded", noc) || strcmpCased(inpstr, "ljnonbonded", noc)) {
     result.push_back(StateVariable::VDW);
   }
   else if (strcmpCased(inpstr, "vdw_14", noc) || strcmpCased(inpstr, "vdw14", noc) ||
            strcmpCased(inpstr, "vdw_near", noc) || strcmpCased(inpstr, "vdwnear", noc) ||
            strcmpCased(inpstr, "lj_14", noc) || strcmpCased(inpstr, "lj14", noc) ||
-           strcmpCased(inpstr, "lj_near", noc) || strcmpCased(inpstr, "ljnear", noc)) {
+           strcmpCased(inpstr, "lj_near", noc) || strcmpCased(inpstr, "ljnear", noc) ||
+           strcmpCased(inpstr, "near_lj", noc) || strcmpCased(inpstr, "nearlj", noc)) {
     result.push_back(StateVariable::VDW_ONE_FOUR);
   }
   else if (strcmpCased(inpstr, "elec", noc) || strcmpCased(inpstr, "electrostatic", noc)) {
@@ -453,13 +455,17 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
   else if (strcmpCased(inpstr, "elec_nonbonded", noc) ||
            strcmpCased(inpstr, "elecnonbonded", noc) ||
            strcmpCased(inpstr, "electrostatic_nonbonded", noc) ||
-           strcmpCased(inpstr, "electrostaticnonbonded", noc)) {
+           strcmpCased(inpstr, "electrostaticnonbonded", noc) ||
+           strcmpCased(inpstr, "nonbonded_electrostatic", noc) ||
+           strcmpCased(inpstr, "nonbondedelectrostatic", noc)) {
     result.push_back(StateVariable::ELECTROSTATIC);
   }
   else if (strcmpCased(inpstr, "elec_14", noc) || strcmpCased(inpstr, "elec14", noc) ||
            strcmpCased(inpstr, "elec_near", noc) || strcmpCased(inpstr, "elecnear", noc) ||
            strcmpCased(inpstr, "electrostatic_near", noc) ||
-           strcmpCased(inpstr, "electrostaticnear", noc)) {
+           strcmpCased(inpstr, "near_electrostatic", noc) ||
+           strcmpCased(inpstr, "electrostaticnear", noc) ||
+           strcmpCased(inpstr, "nearelectrostatic", noc)) {
     result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
   }
   else if (strcmpCased(inpstr, "gb", noc) || strcmpCased(inpstr, "generalized_born", noc) ||

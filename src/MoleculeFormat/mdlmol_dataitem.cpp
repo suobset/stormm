@@ -458,27 +458,41 @@ void MdlMolDataItem::addDataLine(const std::string &text) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolDataItem::validateItemName() const {
-  const int nchar = item_name.size();
+void MdlMolDataItem::validateItemName() {
   bool problem = false;
+  bool modified = false;
+  const std::string original_item_name = item_name;
+  int nchar = item_name.size();
   if (nchar > 0) {
+    if (item_name[0] == '_' || (item_name[0] >= '0' && item_name[0] <= '9')) {
+      item_name = 'x' + item_name;
+      nchar++;
+      modified = true;
+    }
     if ((item_name[0] >= 'a' && item_name[0] <= 'z') ||
-        (item_name[0] >= 'A' && item_name[0] <= 'Z') || item_name[0] == '_') {
+        (item_name[0] >= 'A' && item_name[0] <= 'Z')) {
       for (int i = 1; i < nchar; i++) {
-        problem = (problem ||
-                   item_name[i] == '-' || item_name[i] == '.' || item_name[i] == '<' ||
-                   item_name[i] == '>' || item_name[i] == '=' || item_name[i] == '%' ||
-                   item_name[i] == ' ');
+        problem = (problem || item_name[i] == '>' || item_name[i] == '<');
+        if (item_name[i] == '-' || item_name[i] == '.' || item_name[i] == '=' ||
+            item_name[i] == '%' || item_name[i] == ' ') {
+          item_name[i] = '_';
+          modified = true;
+        }
       }
     }
     else {
       problem = true;
     }
   }
+  if (modified) {
+    rtWarn("Data item > <" + original_item_name + "> will appear as > <" + item_name + "> in the "
+           "output to remain in compliance with BIovia SD file formatting requirements.",
+           "MdlMolDataItem", "validateItemName");
+  }
   if (problem) {
     rtErr("Data item name " + item_name + " is invalid.  An item name must begin with an "
           "alphabetical character and thereafter contain alphanumeric characters and "
-          "underscores, with no white space.", "MdlMolDataItem", "setItemName");
+          "underscores, with no white space.", "MdlMolDataItem", "validateItemName");
   }
 }
 

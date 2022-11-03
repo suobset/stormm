@@ -225,7 +225,7 @@ private:
   std::vector<std::string> body;
   
   /// \brief Validate the choice of item name.
-  void validateItemName() const;
+  void validateItemName();
 };
 
 /// \brief Get the unsigned integer bit-packed code expressing various aspects of the data item
