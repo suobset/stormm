@@ -1107,27 +1107,27 @@ ChemicalFeatures& SystemCache::getFeaturesReference(const int index) {
 
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus* SystemCache::getRestraintPointer(const int index) const {
-  if (index >= static_cast<int>(restraints_cache.size())) {
+  if (index >= static_cast<int>(restraint_indices.size())) {
     rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
           "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
   }
   return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus* SystemCache::getRestraintPointer(const int index) {
-  if (index >= static_cast<int>(restraints_cache.size())) {
+  if (index >= static_cast<int>(restraint_indices.size())) {
     rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
           "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
   }
   return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus& SystemCache::getRestraintReference(const int index) const {
-  if (index >= static_cast<int>(restraints_cache.size())) {
+  if (index >= static_cast<int>(restraint_indices.size())) {
     rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
           "system " + std::to_string(index) + ", is invalid for an array of length " +
           std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
@@ -1137,7 +1137,7 @@ const RestraintApparatus& SystemCache::getRestraintReference(const int index) co
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus& SystemCache::getRestraintReference(const int index) {
-  if (index >= static_cast<int>(restraints_cache.size())) {
+  if (index >= static_cast<int>(restraint_indices.size())) {
     rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
           "system " + std::to_string(index) + ", is invalid for an array of length " +
           std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");

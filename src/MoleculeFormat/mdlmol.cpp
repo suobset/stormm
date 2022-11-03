@@ -275,7 +275,7 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
   case MdlMolVersion::UNKNOWN:
     break;
   }
-
+  
   // Read the data items
   for (int pos = mdl_section_end; pos < sd_compound_end; pos++) {
     if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
@@ -1275,6 +1275,9 @@ void MdlMol::compareExternalRegistryNumbers(const std::string &regno_in) {
   if (regno_in.size() > 0LLU) {
     if (external_regno.size() == 0LLU) {
       external_regno = regno_in;
+    }
+    else if (regno_in == external_regno) {
+      return;
     }
     else {
       switch (policy) {

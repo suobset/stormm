@@ -5,11 +5,11 @@ cat > ffld.in << EOF
   -sys { -p ${STORMM_SOURCE}/test/Topology/sulfonamide.top
          -c ${STORMM_SOURCE}/test/MoleculeFormat/sulfonamide_rots.sdf
          -label sulfonamide frame_end -1 -r sulfonamide_min.sdf r_kind SDF }
-/*
+
   -sys { -p ligand_11_5707.parm7
          -c ligand_11_5707.sdf frame_end -1
          -label ligand11 -r ligand11_min.sdf r_kind SDF }
-*/
+
 &end
 
 &ffrefine
