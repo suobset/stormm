@@ -81,6 +81,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Random/random.cpp \
 		   $(SRCDIR)/Reporting/code_dox.cpp \
 		   $(SRCDIR)/Reporting/display.cpp \
+		   $(SRCDIR)/Reporting/help_messages.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
 		   $(SRCDIR)/Reporting/reporting_enumerators.cpp \
 		   $(SRCDIR)/Reporting/summary_file.cpp \
@@ -224,6 +225,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Random/random.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
+		     $(SRCDIR)/Reporting/help_messages.h \
 		     $(SRCDIR)/Reporting/error_format.h \
 		     $(SRCDIR)/Reporting/reporting_enumerators.h \
 		     $(SRCDIR)/Reporting/summary_file.h \
@@ -399,6 +401,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Random/random.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
+		  $(SRCDIR)/Reporting/help_messages.o \
 		  $(SRCDIR)/Reporting/error_format.o \
 		  $(SRCDIR)/Reporting/reporting_enumerators.o \
 		  $(SRCDIR)/Reporting/summary_file.o \

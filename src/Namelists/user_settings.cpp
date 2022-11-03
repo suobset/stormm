@@ -113,7 +113,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
             "UserSettings");
     }
   }
-
+  
   // Process the input file.  Take only the first instance of each namelist, as found by searching
   // from the beginning.
   if (getDrivePathType(input_file) != DrivePathType::FILE) {

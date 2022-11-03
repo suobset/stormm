@@ -8,6 +8,8 @@
 #include "../../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/user_settings.h"
+#include "../../../src/Reporting/error_format.h"
+#include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
@@ -19,7 +21,9 @@
 using namespace stormm::constants;
 using namespace stormm::chemistry;
 using namespace stormm::diskutil;
+using namespace stormm::display;
 using namespace stormm::energy;
+using namespace stormm::errors;
 using namespace stormm::mm;
 using namespace stormm::namelist;
 using namespace stormm::restraints;
@@ -30,10 +34,39 @@ using namespace stormm::topology;
 using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
+// Display a general helpmessage for this program
+//-------------------------------------------------------------------------------------------------
+void displayGeneralHelpMessage() {
+  const std::string base_msg =
+    terminalFormat("A program for performing energy minimizations on many structures and then "
+                   "editing parameters for cyclical refinement of force constants based on their "
+                   "structural consequences.\n\n", "ffrefine");
+  const std::string nml_msg =
+    terminalFormat("Applicable namelists (re-run with one of these terms as the command-line "
+                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n"
+                   "  - &files\n  - &restraint\n  - &minimize\n  - &report\n", nullptr, nullptr,
+                   0, 2, 2);
+  printf("%s", base_msg.c_str());
+  printf("%s", nml_msg.c_str());
+  printf("\n");
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
 
   // Wall time tracking
   StopWatch timer("Timings for ffrefine.omni");
+
+  // Check for a help message
+  if (detectHelpSignal(argc, argv)) {
+    displayGeneralHelpMessage();
+    return 0;
+  }
+  if (displayNamelistHelp(argc, argv, { "&files", "&restraint", "&minimize", "&report" })) {
+    return 0;
+  }
   
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::FFREFINE);
@@ -66,6 +99,7 @@ int main(int argc, const char* argv[]) {
       }
       
       // CHECK
+#if 0
       printf("Energy progression in system %2d\n", i);
       printf("STEP    BOND    ANGLE   DIHEDRAL IMPROPER  ELEC 1-4  VDW 1-4    ELEC     VDW   "
              "  RESTRAINT    TOTAL  \n");
@@ -96,7 +130,6 @@ int main(int argc, const char* argv[]) {
                j, bond_nrg[j], angl_nrg[j], dihe_nrg[j], impr_nrg[j], qq14_nrg[j], lj14_nrg[j],
                qqnb_nrg[j], ljnb_nrg[j], rstr_nrg[j], totl_nrg[j]);
       }
-#if 0
       const AtomGraph *iag_ptr = sysc.getSystemTopologyPointer(i);
       const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
       if (i >= 0) {

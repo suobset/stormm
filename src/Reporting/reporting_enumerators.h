@@ -5,6 +5,19 @@
 #include <string>
 
 namespace stormm {
+namespace display {
+
+/// \brief Possible modes in which command line program invocations can call for help messages
+enum class HelpSignalKind {
+  NO_ARGS,       ///< A command line call with no arguments will trigger a help message display
+  NO_ARGS_ONLY,  ///< Only a call with no arguments, not a keyword, can trigger a help message
+  KEYWORD,       ///< A keyword, by default any case-insensitive version of "help", "-help", or
+                 ///<   or "--help" will trigger a help message display
+  KEYWORD_ONLY   ///< Help messages are triggered only by an explicit keyword on the command line
+};
+
+} // namespace display
+
 namespace review {
 
 /// \brief Possible formats for organized numerical output.
