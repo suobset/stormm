@@ -486,7 +486,7 @@ void MdlMolDataItem::validateItemName() {
   }
   if (modified) {
     rtWarn("Data item <" + original_item_name + "> will be interpreted as <" + item_name +
-           "> in analyses and any output to remain in compliance with BIovia SD file formatting "
+           "> in analyses and any output to remain in compliance with Biovia SD file formatting "
            "requirements.", "MdlMolDataItem", "validateItemName");
   }
   if (problem) {
