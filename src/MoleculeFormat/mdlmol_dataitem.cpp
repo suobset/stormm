@@ -485,9 +485,9 @@ void MdlMolDataItem::validateItemName() {
     }
   }
   if (modified) {
-    rtWarn("Data item > <" + original_item_name + "> will appear as > <" + item_name + "> in the "
-           "output to remain in compliance with BIovia SD file formatting requirements.",
-           "MdlMolDataItem", "validateItemName");
+    rtWarn("Data item <" + original_item_name + "> will be interpreted as <" + item_name +
+           "> in analyses and any output to remain in compliance with BIovia SD file formatting "
+           "requirements.", "MdlMolDataItem", "validateItemName");
   }
   if (problem) {
     rtErr("Data item name " + item_name + " is invalid.  An item name must begin with an "
