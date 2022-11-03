@@ -129,6 +129,7 @@ bool displayNamelistHelp(const std::string &module_name) {
     rtErr("No namelist " + module_name + " is known in the STORMM libraries.",
           "displayNamelistHelp");
   }
+  __builtin_unreachable();
 }
 
 } // namespace display
