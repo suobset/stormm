@@ -130,7 +130,7 @@ void forgeConformation(CoordinateSeries<double> *cseries, const int fc,
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
+PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc, 
                                      Xoshiro256ppGenerator *xrs, StopWatch *tm) {
   const ConformerControls conf_input = ui.getConformerNamelistInfo();
 
@@ -161,7 +161,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   int nneighborhood = 0;
   for (int i = 0; i < ntop; i++) {
 
-    // Obtain the topology poitner for possible use later
+    // Obtain the topology pointer for possible use later
     const AtomGraph *iag_ptr = sc.getTopologyPointer(i);
     
     // Create a list of ways to change the conformation
@@ -205,13 +205,6 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     const double ln_choices = ptrack.getLogPermutationCount();
     SamplingStrategy strat;
     int conformations_per_case;
-
-    // CHECK
-    printf("There would be %.0lf local permutations out of %.0lf in all.\n",
-           computeLocalPermutations(permutation_limits, isomerizers, iag_ptr),
-           ptrack.getApproximatePermutationCount());
-    // END CHECK
-    
     if (ln_choices < log(conf_input.getSystemTrialCount())) {
       conformations_per_case = ptrack.getExactPermutationCount();
       strat = SamplingStrategy::FULL;

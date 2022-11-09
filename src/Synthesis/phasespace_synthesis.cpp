@@ -7,8 +7,9 @@
 #include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "FileManagement/file_listing.h"
-#include "Math/rounding.h"
 #include "Math/matrix_ops.h"
+#include "Math/rounding.h"
+#include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Trajectory/write_frame.h"
@@ -26,8 +27,9 @@ using diskutil::splitPath;
 using diskutil::DataFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-using math::roundUp;
 using math::invertSquareMatrix;
+using math::roundUp;
+using math::sum;
 using math::tileVector;
 using numerics::checkGlobalPositionBits;
 using numerics::checkLocalPositionBits;
@@ -1123,6 +1125,49 @@ int PhaseSpaceSynthesis::getForceAccumulationBits() const {
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int index) const {
   return topologies[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<AtomGraph*> PhaseSpaceSynthesis::getUniqueTopologies() const {
+  std::vector<AtomGraph*> result;
+  std::vector<bool> unique(system_count, true);
+  for (int i = 0; i < system_count; i++) {
+    if (unique[i]) {
+      for (int j = i + 1; j < system_count; j++) {
+        if (topologies[j] == topologies[i]) {
+          unique[j] = false;
+        }
+      }
+    }
+  }
+  const int n_unique = sum<int>(unique);
+  result.reserve(n_unique);
+  for (int i = 0; i < system_count; i++) {
+    if (unique[i]) {
+      result.push_back(const_cast<AtomGraph*>(topologies[i]));
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyIndices() const {
+  std::vector<int> result(system_count);
+  std::vector<bool> unique(system_count, true);
+  int n_unique = 0;
+  for (int i = 0; i < system_count; i++) {
+    if (unique[i]) {
+      result[i] = n_unique;
+      for (int j = i + 1; j < system_count; j++) {
+        if (topologies[j] == topologies[i]) {
+          unique[j] = false;
+          result[j] = n_unique;
+        }
+      }
+      n_unique++;
+    }
+  }
+  return result;
 }
 
 #ifdef STORMM_USE_HPC

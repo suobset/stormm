@@ -34,7 +34,7 @@ using namespace stormm::topology;
 using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
-// Display a general helpmessage for this program
+// Display a general help message for this program.
 //-------------------------------------------------------------------------------------------------
 void displayGeneralHelpMessage() {
   const std::string base_msg =

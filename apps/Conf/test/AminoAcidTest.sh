@@ -12,6 +12,14 @@ cat >> cgen.in << EOF
   rotation_samples 3,
   max_system_trials 1024,
 &end
+
+&solvent
+  igb 5
+&end
+
+&minimize
+  ncyc 50, maxcyc 500
+&end
 EOF
 
 cat >> cgen.in << EOF

@@ -556,6 +556,9 @@ STORMM_APPS = $(APPDIR)/bin/conformer.stormm \
 	      $(APPDIR)/bin/dynamics.stormm \
 	      $(APPDIR)/bin/ffrefine.stormm
 
+# Applications using stormm.cuda
+STORMM_CUDA_APPS = $(APPDIR)/bin/conformer.stormm.cuda
+
 # Compilation variables
 CC=g++
 CUCC=nvcc
@@ -844,7 +847,7 @@ $(BENCHDIR)/bin/test_nonperiodic_kernels : $(LIBDIR)/libstormm_cuda.so \
 
 # Target: Conformer generation
 $(APPDIR)/bin/conformer.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Conf/src/conformer.cpp \
-			       $(APPDIR)/Conf/src/setup.cpp
+				 $(APPDIR)/Conf/src/setup.cpp
 	@echo "[STORMM]  Building conformer.stormm..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.stormm \
 	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/setup.cpp \
@@ -861,6 +864,15 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 	@echo "[STORMM]  Building ffrefine.stormm..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/ffrefine.stormm \
 	  $(APPDIR)/Ffrn/src/ffrefine.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
+# Target: Conformer generation with CUDA
+$(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
+				      $(APPDIR)/Conf/src/conformer.cu \
+				      $(APPDIR)/Conf/src/setup.cpp
+	@echo "[STORMM]  Building conformer.stormm.cuda..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
+	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cu \
+	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so
 
@@ -882,6 +894,12 @@ clean.bench:
 clean.apps:
 	@echo "[STORMM]  Cleaning application programs"
 	$(VB)if [ -e $(APPDIR)/bin/conformer.stormm ] ; then /bin/rm $(APPDIR)/bin/* ; fi
+
+clean.apps.cuda:
+	@echo "[STORMM]  Cleaning CUDA_based application programs"
+	$(VB)if [ -e $(APPDIR)/bin/conformer.stormm.cuda ] ; then \
+	  /bin/rm $(APPDIR)/bin/*.stormm.cuda ; \
+	fi
 
 test.exe : $(STORMM_TEST_PROGS)
 
@@ -916,5 +934,7 @@ bench.cuda : $(STORMM_BENCH_CUDA_PROGS)
 	done
 
 apps : $(STORMM_APPS)
+
+apps.cuda : $(STORMM_CUDA_APPS)
 
 yes:  install

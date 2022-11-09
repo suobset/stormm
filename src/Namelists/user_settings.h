@@ -25,14 +25,6 @@ namespace namelist {
 
 using constants::ExceptionResponse;
 using diskutil::PrintSituation;
-using namelist::DynamicsControls;
-using namelist::FFMorphControls;
-using namelist::FilesControls;
-using namelist::MinimizeControls;
-using namelist::RandomControls;
-using namelist::ReportControls;
-using namelist::RestraintControls;
-using namelist::SolventControls;
 using parse::TextFile;
 using topology::AtomGraph;
 using topology::ImplicitSolventModel;

@@ -5,6 +5,7 @@
 #include <cmath>
 #include "copyright.h"
 #include "Constants/fixed_precision.h"
+#include "Constants/generalized_born.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
 #include "Namelists/nml_minimize.h"
@@ -38,6 +39,8 @@ using restraints::RestraintKit;
 using structure::placeVirtualSites;
 using structure::transmitVirtualSiteForces;
 using topology::AtomGraph;
+using topology::ImplicitSolventKit;
+using topology::ImplicitSolventModel;
 using topology::NonbondedKit;
 using topology::UnitCellType;
 using topology::ValenceKit;
@@ -46,6 +49,7 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
+using namespace generalized_born_defaults;
 
 /// \brief Compute the move based on the computed forces.  This is a normalized unit vector along
 ///        the direction of the forces if the minimization is still in a steepest descent phase,
@@ -137,6 +141,7 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
                    Tforce* zfrc, Tforce* xprv_move, Tforce* yprv_move, Tforce* zprv_move,
                    Tcalc* x_cg_temp, Tcalc* y_cg_temp, Tcalc* z_cg_temp,
                    const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                   const ImplicitSolventKit<Tcalc> &isk, const NeckGeneralizedBornKit<Tcalc> &ngbk,
                    const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar,
                    const VirtualSiteKit<Tcalc> &vsk, const StaticExclusionMaskReader &ser,
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits,
@@ -145,12 +150,21 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,
                    int nrg_scale_bits = default_energy_scale_bits);
+  
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const NeckGeneralizedBornTable &ngb_tab,
+                   const RestraintApparatus &ra, const StaticExclusionMask &se,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask &se,
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
+  
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const NeckGeneralizedBornTable &ngb_tab,
+                   const StaticExclusionMask &se, const MinimizeControls &mincon,
+                   int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
-                   const NonbondedKit<double> &nbk,
+                   const NonbondedKit<double> &nbk, const ImplicitSolventKit<double> &isk,
+                   const NeckGeneralizedBornKit<double> &ngbk,
                    const RestraintKit<double, double2, double4> &rar,
                    const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);

@@ -12,7 +12,6 @@ namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
-using namelist::NamelistEmulator;
 using parse::TextFile;
 using parse::WrapTextSearch;
 
