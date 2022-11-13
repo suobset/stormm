@@ -11,9 +11,11 @@
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/tickcounter.h"
+#include "../../src/Math/tricubic_cell.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
@@ -740,6 +742,25 @@ int main(const int argc, const char* argv[]) {
   CHECK_THROWS(dials.set({ 0, 0, -1, 1, 5, 3, 0, 0}), "A TickCounter allowed a negative number to "
                "enter its state settings.");
 
+  // Check tricubic interpolation mechanics
+  const Hybrid<double> tcmat = getTricubicMatrix();
+  bool all_integer = true;
+  const double* tcmat_ptr = tcmat.data();
+  for (int i = 0; i < 4096; i++) {
+    all_integer = (all_integer && Approx(tcmat_ptr[i]).test(round(tcmat_ptr[i])));
+  }
+  check(all_integer, "The tricubic spline coefficients matrix contains non-integral elements.");
+  std::vector<double> tccol_sums(64, 0.0);
+  std::vector<double> tccol_sums_ans(64, 0.0);
+  tccol_sums_ans[7] = 1.0;
+  for (int i = 0; i < 64; i++) {
+    for (int j = 0; j < 64; j++) {
+      tccol_sums[i] += tcmat_ptr[(64 * i) + j];
+    }
+  }
+  check(tccol_sums, RelationalOperator::EQUAL, tccol_sums_ans, "The column sums of the tricubic "
+        "spline coefficients matrix do not meet expectations.");
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

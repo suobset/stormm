@@ -6,6 +6,7 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Reporting/error_format.h"
+#include "summation.h"
 
 namespace stormm {
 namespace math {
@@ -14,7 +15,7 @@ using card::Hybrid;
   
 /// \brief A list of the different boundary components that determine a tricubic spline, covering
 ///        the values and all derivatives at the boundaries of the grid element.
-enum class TriCubicBound {
+enum class TricubicBound {
   VALUE,   ///< Value of the function at a particular grid point
   DX,      ///< Derivative of the function along the Cartesian X direction
   DY,      ///< Derivative of the function along the Cartesian Y direction
@@ -34,9 +35,9 @@ public:
   ///        the tricubic weights matrix (solved by getTricubicMatrix below) and details of the
   ///        potential function.
   /// \{
-  TriCubicCell();
+  TricubicCell();
 
-  TriCubicCell(const std::vector<double> weights_matrix, const std::vector<T> &f_in,
+  TricubicCell(const std::vector<double> weights_matrix, const std::vector<T> &f_in,
                const std::vector<T> &dx_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
                const std::vector<T> &dy_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
                const std::vector<T> &dz_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
@@ -51,7 +52,7 @@ public:
   /// \param i  The ith coefficient relevant to the notation Aijk
   /// \param j  The jth coefficient relevant to the notation Aijk
   /// \param k  The kth coefficient relevant to the notation Aijk
-  T getCoefficient(int i, int j, int k);
+  T getCoefficient(int i, int j, int k) const;
 
   /// \brief Set one of the 64 coefficients Aijk for the tricubic spline.  Parameter descriptions
   ///        follow from above, with the addition of:
@@ -63,10 +64,10 @@ public:
   ///        above, with the addition of:
   ///
   /// \param kind  The classification of the boundary condition as a derivative (or value)
-  T getData(TriCubicBound kind, int i, int j, int k);
+  T getData(TricubicBound kind, int i, int j, int k) const;
 
   /// \brief Set one of the data items.  Parameter descriptions follow from above.
-  void setData(T value, TriCubicBound kind, int i, int j, int k);
+  void setData(T value, TricubicBound kind, int i, int j, int k);
 
 private:
   T coefficients[64];  ///< Solved coefficients of the tricubic spline that satisfies all boundary
@@ -85,7 +86,7 @@ private:
 };
 
 /// \brief Construct a matrix for grinding out tricubic spline coefficients given the eight vectors
-///        found in the TriCubicCell object.  The matrix is constructed in double-precision format
+///        found in the TricubicCell object.  The matrix is constructed in double-precision format
 ///        to ensure that all subsequent calculations are reasonably accurate, at least with
 ///        respect to this step.  Once the coefficients have been pre-computed they can be stored
 ///        and used in lower-precision formats.

@@ -6,7 +6,7 @@ namespace math {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-TriCubicCell<T>::TriCubicCell() :
+TricubicCell<T>::TricubicCell() :
     coefficients{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -19,7 +19,7 @@ TriCubicCell<T>::TriCubicCell() :
     
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-TriCubicCell<T>::TriCubicCell(const std::vector<double> weights_matrix, const std::vector<T> &f_in,
+TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix, const std::vector<T> &f_in,
                               const std::vector<T> &dx_in, const std::vector<T> &dy_in,
                               const std::vector<T> &dz_in, const std::vector<T> &dxy_in,
                               const std::vector<T> &dxz_in, const std::vector<T> &dyz_in,
@@ -51,66 +51,66 @@ TriCubicCell<T>::TriCubicCell(const std::vector<double> weights_matrix, const st
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-T TriCubicCell<T>::getCoefficient(const int i, const int j, const int k) {
+T TricubicCell<T>::getCoefficient(const int i, const int j, const int k) const {
   if (i > 3 || j > 3 || k > 3 || i < 0 || j < 0 || k < 0) {
     rtErr("A coefficient for x, y, and z powers " + std::to_string(i) + ", " + std::to_string(j) +
-          ", and " + std::to_string(k) + " is not acceptable.", "TriCubicCell", "getCoefficient");
+          ", and " + std::to_string(k) + " is not acceptable.", "TricubicCell", "getCoefficient");
   }
   return coefficients[(4 * ((4 * k) + j)) + i];
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void TriCubicCell<T>::setCoefficient(const T value, const int i, const int j, const int k) {
+void TricubicCell<T>::setCoefficient(const T value, const int i, const int j, const int k) {
   if (i > 3 || j > 3 || k > 3 || i < 0 || j < 0 || k < 0) {
     rtErr("A coefficient for x, y, and z powers " + std::to_string(i) + ", " + std::to_string(j) +
-          ", and " + std::to_string(k) + " is not acceptable.", "TriCubicCell", "getCoefficient");
+          ", and " + std::to_string(k) + " is not acceptable.", "TricubicCell", "getCoefficient");
   }
   coefficients[(4 * ((4 * k) + j)) + i] = value;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void TriCubicCell::getData(const TriCubicBound kind, const int i,  const int j, const int k) {
+T TricubicCell<T>::getData(const TricubicBound kind, const int i, const int j, const int k) const {
   switch (kind) {
-  case TriCubicKind::VALUE:
+  case TricubicBound::VALUE:
     return f[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DX:
+  case TricubicBound::DX:
     return dx[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DY:
+  case TricubicBound::DY:
     return dy[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DZ:
+  case TricubicBound::DZ:
     return dz[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DXY:
+  case TricubicBound::DXY:
     return dxy[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DXZ:
+  case TricubicBound::DXZ:
     return dxz[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DYZ:
+  case TricubicBound::DYZ:
     return dyz[(2 * ((2 * i) + j)) + k];
-  case TriCubicKind::DXYZ:
+  case TricubicBound::DXYZ:
     return dxyz[(2 * ((2 * i) + j)) + k];
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void TriCubicCell::setData(const T value, const TriCubicBound kind,
-                                                 const int i, const int j, const int k) {
+template <typename T> void TricubicCell<T>::setData(const T value, const TricubicBound kind,
+                                                    const int i, const int j, const int k) {
   switch (kind) {
-  case TriCubicKind::VALUE:
+  case TricubicBound::VALUE:
     f[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DX:
+  case TricubicBound::DX:
     dx[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DY:
+  case TricubicBound::DY:
     dy[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DZ:
+  case TricubicBound::DZ:
     dz[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DXY:
+  case TricubicBound::DXY:
     dxy[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DXZ:
+  case TricubicBound::DXZ:
     dxz[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DYZ:
+  case TricubicBound::DYZ:
     dyz[(2 * ((2 * i) + j)) + k] = value;
-  case TriCubicKind::DXYZ:
+  case TricubicBound::DXYZ:
     dxyz[(2 * ((2 * i) + j)) + k] = value;
   }
 }

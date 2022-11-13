@@ -356,6 +356,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/series_ops.o \
 		  $(SRCDIR)/Math/statistics.o \
 		  $(SRCDIR)/Math/tickcounter.o \
+		  $(SRCDIR)/Math/tricubic_cell.o \
 		  $(SRCDIR)/Math/vector_ops.o \
 		  $(SRCDIR)/MolecularMechanics/line_minimization.o \
 		  $(SRCDIR)/MolecularMechanics/minimization.o \
