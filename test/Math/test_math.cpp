@@ -326,6 +326,117 @@ void finiteDifferenceDisparity(const double x, const double y, const double z,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run a series of tests on a grid of TricubicCell objects.
+//
+// Arguments:
+//   tcmat:   Standard Template Library copy of the tricubic spline weights matrix
+//   coeffs:  [Optional] Vector of coefficients for individual terms in the polynomial
+//-------------------------------------------------------------------------------------------------
+void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<double> coeffs = {}) {
+
+  // Begin by testing the polynomial's analytic evaluation, to ensure subsequent tests are valid.
+  finiteDifferenceDisparity( 0.5,  0.9,  0.4, coeffs);
+  finiteDifferenceDisparity(-1.7,  2.6, -1.8, coeffs);
+  finiteDifferenceDisparity( 2.3,  1.1, -2.0, coeffs);
+  std::vector<TricubicCell<double>> grid;
+  grid.reserve(343);
+  for (int k = -3; k < 4; k++) {
+    for (int j = -3; j < 4; j++) {
+      for (int i = -3; i < 4; i++) {
+
+        // Map the function U = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
+        // to a grid.  The function is encoded in triPolynomial() above.
+        std::vector<double> f(8), dx(8), dy(8), dz(8), dxy(8), dxz(8), dyz(8), dxyz(8);
+        for (int pi = 0; pi < 2; pi++) {
+          for (int pj = 0; pj < 2; pj++) {
+            for (int pk = 0; pk < 2; pk++) {
+              const int m = (2 * ((2 * pk) + pj)) + pi;
+              f[m]    = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::VALUE, coeffs);
+              dx[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DX, coeffs);
+              dy[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DY, coeffs);
+              dz[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DZ, coeffs);
+              dxy[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXY, coeffs);
+              dxz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXZ, coeffs);
+              dyz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DYZ, coeffs);
+              dxyz[m] = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXYZ, coeffs);
+            }
+          }
+        }
+        const std::vector<double> anchor = { static_cast<double>(i), static_cast<double>(j),
+                                             static_cast<double>(k), 1.0, 1.0, 1.0 };
+        grid.emplace_back(tcmat, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
+      }
+    }
+  }
+  const std::vector<double> test_points = {  0.10,  0.50, -0.40,
+                                            -0.80,  1.20, -1.30,
+                                             1.80,  2.20, -0.70,
+                                             0.01,  0.01,  0.01,
+                                             1.00,  1.00,  1.00,
+                                             1.01,  1.01,  1.01,
+                                             1.50,  1.20,  1.40,
+                                            -2.00,  1.00,  2.00,
+                                            -0.01,  1.01,  0.41 };
+  const int npts = static_cast<int>(test_points.size()) / 3;
+  std::vector<double> analytic_tc(npts), spline_tc(npts);
+  std::vector<double> analytic_tc_dx(npts), spline_tc_dx(npts);
+  std::vector<double> analytic_tc_dy(npts), spline_tc_dy(npts);
+  std::vector<double> analytic_tc_dz(npts), spline_tc_dz(npts);
+  std::vector<double> analytic_tc_dxy(npts), spline_tc_dxy(npts);
+  std::vector<double> analytic_tc_dxz(npts), spline_tc_dxz(npts);
+  std::vector<double> analytic_tc_dyz(npts), spline_tc_dyz(npts);
+  std::vector<double> analytic_tc_dxyz(npts), spline_tc_dxyz(npts);
+  for (int i = 0; i < npts; i++) {
+    const double ptx = test_points[(3 * i)    ];
+    const double pty = test_points[(3 * i) + 1];
+    const double ptz = test_points[(3 * i) + 2];
+    analytic_tc[i] = triPolynomial(ptx, pty, ptz, TricubicBound::VALUE, coeffs);
+    const int gcell_x = ptx - grid[0].getCellOrigin(CartesianDimension::X);
+    const int gcell_y = pty - grid[0].getCellOrigin(CartesianDimension::Y);
+    const int gcell_z = ptz - grid[0].getCellOrigin(CartesianDimension::Z);
+    const int gcell = (7 * ((7 * gcell_z) + gcell_y)) + gcell_x;
+    spline_tc[i] = grid[gcell].evaluate(ptx, pty, ptz);
+    analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DX, coeffs);
+    analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DY, coeffs);
+    analytic_tc_dz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DZ, coeffs);
+    analytic_tc_dxy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXY, coeffs);
+    analytic_tc_dxz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXZ, coeffs);
+    analytic_tc_dyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DYZ, coeffs);
+    analytic_tc_dxyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXYZ, coeffs);
+    spline_tc_dx[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DX);
+    spline_tc_dy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DY);
+    spline_tc_dz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DZ);
+    spline_tc_dxy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXY);
+    spline_tc_dxz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXZ);
+    spline_tc_dyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DYZ);
+    spline_tc_dxyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXYZ);
+  }
+  check(spline_tc, RelationalOperator::EQUAL, Approx(analytic_tc).margin(1.0e-6), "Spline-based "
+        "computations for a tricubic function do not match the analytic results.");
+  check(spline_tc_dx, RelationalOperator::EQUAL, Approx(analytic_tc_dx).margin(1.0e-6),
+        "Spline-based computations for d/dx partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dy, RelationalOperator::EQUAL, Approx(analytic_tc_dy).margin(1.0e-6),
+        "Spline-based computations for d/dy partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dz, RelationalOperator::EQUAL, Approx(analytic_tc_dz).margin(1.0e-6),
+        "Spline-based computations for d/dz partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxy).margin(1.0e-6),
+        "Spline-based computations for d2/dxdy mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxz).margin(1.0e-6),
+        "Spline-based computations for d2/dxdz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyz).margin(1.0e-6),
+        "Spline-based computations for d2/dydz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxyz, RelationalOperator::EQUAL, Approx(analytic_tc_dxyz).margin(1.0e-6),
+        "Spline-based computations for d3/dxdydz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -957,106 +1068,12 @@ int main(const int argc, const char* argv[]) {
   }
   check(tccol_sums, RelationalOperator::EQUAL, tccol_sums_ans, "The column sums of the tricubic "
         "spline coefficients matrix do not meet expectations.");
-  finiteDifferenceDisparity( 0.5,  0.9,  0.4);
-  finiteDifferenceDisparity(-1.7,  2.6, -1.8);
-  finiteDifferenceDisparity( 2.3,  1.1, -2.0);
-  const std::vector<double> tcmat_vec = tcmat.readHost();
-  std::vector<TricubicCell<double>> grid;
-  grid.reserve(343);
-  for (int k = -3; k < 4; k++) {
-    for (int j = -3; j < 4; j++) {
-      for (int i = -3; i < 4; i++) {
-
-        // Map the function U = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
-        // to a grid.  The function is encoded in triPolynomial() above.
-        std::vector<double> f(8), dx(8), dy(8), dz(8), dxy(8), dxz(8), dyz(8), dxyz(8);
-        for (int pi = 0; pi < 2; pi++) {
-          for (int pj = 0; pj < 2; pj++) {
-            for (int pk = 0; pk < 2; pk++) {
-              const int m = (2 * ((2 * pk) + pj)) + pi;
-              f[m]    = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::VALUE);
-              dx[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DX);
-              dy[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DY);
-              dz[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DZ);
-              dxy[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXY);
-              dxz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXZ);
-              dyz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DYZ);
-              dxyz[m] = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXYZ);
-            }
-          }
-        }
-        const std::vector<double> anchor = { static_cast<double>(i), static_cast<double>(j),
-                                             static_cast<double>(k), 1.0, 1.0, 1.0 };
-        grid.emplace_back(tcmat_vec, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
-      }
-    }
+  tricubicTestBundle(tcmat.readHost());
+  std::vector<double> random_coefficients(64);
+  for (int i = 0; i < 64; i++) {
+    random_coefficients[i] = xrs256pp.gaussianRandomNumber();
   }
-  const std::vector<double> test_points = {  0.10,  0.50, -0.40,
-                                            -0.80,  1.20, -1.30,
-                                             1.80,  2.20, -0.70,
-                                             0.01,  0.01,  0.01,
-                                             1.00,  1.00,  1.00,
-                                             1.01,  1.01,  1.01,
-                                             1.50,  1.20,  1.40,
-                                            -2.00,  1.00,  2.00,
-                                            -0.01,  1.01,  0.41 };
-  const int ntpts = static_cast<int>(test_points.size()) / 3;
-  std::vector<double> analytic_tc(ntpts), spline_tc(ntpts);
-  std::vector<double> analytic_tc_dx(ntpts), spline_tc_dx(ntpts);
-  std::vector<double> analytic_tc_dy(ntpts), spline_tc_dy(ntpts);
-  std::vector<double> analytic_tc_dz(ntpts), spline_tc_dz(ntpts);
-  std::vector<double> analytic_tc_dxy(ntpts), spline_tc_dxy(ntpts);
-  std::vector<double> analytic_tc_dxz(ntpts), spline_tc_dxz(ntpts);
-  std::vector<double> analytic_tc_dyz(ntpts), spline_tc_dyz(ntpts);
-  std::vector<double> analytic_tc_dxyz(ntpts), spline_tc_dxyz(ntpts);
-  for (int i = 0; i < ntpts; i++) {
-    const double ptx = test_points[(3 * i)    ];
-    const double pty = test_points[(3 * i) + 1];
-    const double ptz = test_points[(3 * i) + 2];
-    analytic_tc[i] = triPolynomial(ptx, pty, ptz, TricubicBound::VALUE);
-    const int gcell_x = ptx - grid[0].getCellOrigin(CartesianDimension::X);
-    const int gcell_y = pty - grid[0].getCellOrigin(CartesianDimension::Y);
-    const int gcell_z = ptz - grid[0].getCellOrigin(CartesianDimension::Z);
-    const int gcell = (7 * ((7 * gcell_z) + gcell_y)) + gcell_x;
-    spline_tc[i] = grid[gcell].evaluate(ptx, pty, ptz);
-    analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DX);
-    analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DY);
-    analytic_tc_dz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DZ);
-    analytic_tc_dxy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXY);
-    analytic_tc_dxz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXZ);
-    analytic_tc_dyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DYZ);
-    analytic_tc_dxyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXYZ);
-    spline_tc_dx[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DX);
-    spline_tc_dy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DY);
-    spline_tc_dz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DZ);
-    spline_tc_dxy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXY);
-    spline_tc_dxz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXZ);
-    spline_tc_dyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DYZ);
-    spline_tc_dxyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXYZ);
-  }
-  check(spline_tc, RelationalOperator::EQUAL, Approx(analytic_tc).margin(1.0e-6), "Spline-based "
-        "computations for a tricubic function do not match the analytic results.");
-  check(spline_tc_dx, RelationalOperator::EQUAL, Approx(analytic_tc_dx).margin(1.0e-6),
-        "Spline-based computations for d/dx partial derivatives of a tricubic function do not "
-        "match the analytic results.");
-  check(spline_tc_dy, RelationalOperator::EQUAL, Approx(analytic_tc_dy).margin(1.0e-6),
-        "Spline-based computations for d/dy partial derivatives of a tricubic function do not "
-        "match the analytic results.");
-  check(spline_tc_dz, RelationalOperator::EQUAL, Approx(analytic_tc_dz).margin(1.0e-6),
-        "Spline-based computations for d/dz partial derivatives of a tricubic function do not "
-        "match the analytic results.");
-  check(spline_tc_dxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxy).margin(1.0e-6),
-        "Spline-based computations for d2/dxdy mixed partial derivatives of a tricubic function "
-        "do not match the analytic results.");
-  check(spline_tc_dxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxz).margin(1.0e-6),
-        "Spline-based computations for d2/dxdz mixed partial derivatives of a tricubic function "
-        "do not match the analytic results.");
-  check(spline_tc_dyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyz).margin(1.0e-6),
-        "Spline-based computations for d2/dydz mixed partial derivatives of a tricubic function "
-        "do not match the analytic results.");
-  check(spline_tc_dxyz, RelationalOperator::EQUAL, Approx(analytic_tc_dxyz).margin(1.0e-6),
-        "Spline-based computations for d3/dxdydz mixed partial derivatives of a tricubic function "
-        "do not match the analytic results.");
+  tricubicTestBundle(tcmat.readHost(), random_coefficients);
   
   // Print results
   printTestSummary(oe.getVerbosity());
