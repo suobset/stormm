@@ -5,14 +5,17 @@
 #include <vector>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
-#include "summation.h"
+#include "matrix_ops.h"
 
 namespace stormm {
 namespace math {
 
 using card::Hybrid;
-  
+using constants::CartesianDimension;
+
 /// \brief A list of the different boundary components that determine a tricubic spline, covering
 ///        the values and all derivatives at the boundaries of the grid element.
 enum class TricubicBound {
@@ -32,19 +35,49 @@ template <typename T> class TricubicCell {
 public:
 
   /// \brief The constructor can take nothing and simply initialize all values to zero, or accept
-  ///        the tricubic weights matrix (solved by getTricubicMatrix below) and details of the
-  ///        potential function.
+  ///        the tricubic weights matrix, a dimensions array, and details of the potential
+  ///        function.
+  ///
+  /// \param weights_matrix  The inverse matrix of polynomial weights obtained from
+  ///                        getTricubicMatrix() in this library
+  /// \param bounds          Array containing the Cartesian x, y, and z coordinates of the grid
+  ///                        cell origin plus its lengths along each axis (the grid cell is assumed
+  ///                        to be orthorhombic).  This array can have four entries (in which case
+  ///                        the final entry is assumed to be the isotropic length parameter) or
+  ///                        six (for anisotropic cells).
   /// \{
   TricubicCell();
 
-  TricubicCell(const std::vector<double> weights_matrix, const std::vector<T> &f_in,
-               const std::vector<T> &dx_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dy_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dz_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dxy_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dxz_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dyz_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-               const std::vector<T> &dxyz_in = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 });
+  TricubicCell(const std::vector<double> weights_matrix, const std::vector<double> &bounds,
+               const std::vector<T> &f_in,
+               const std::vector<T> &dx_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dy_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0),
+                                               static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dxy_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dxz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dyz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dxyz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                 static_cast<T>(0.0), static_cast<T>(0.0),
+                                                 static_cast<T>(0.0), static_cast<T>(0.0),
+                                                 static_cast<T>(0.0), static_cast<T>(0.0) });
   /// \}
 
   /// \brief Retrieve one of the 64 coefficients Aijk for the tricubic spline.
@@ -69,6 +102,25 @@ public:
   /// \brief Set one of the data items.  Parameter descriptions follow from above.
   void setData(T value, TricubicBound kind, int i, int j, int k);
 
+  /// \brief Get the cell origin along one dimension.
+  ///
+  /// \param dim  The Cartesian dimension along which to return the origin coordinate
+  T getCellOrigin(CartesianDimension dim) const;
+
+  /// \brief Get the cell length along one dimension.
+  ///
+  /// \param dim  The Cartesian dimension along which to return the cell length
+  T getCellLength(CartesianDimension dim) const;
+
+  /// \brief Evaluate the function at a specific point in space.  This will take into account the
+  ///        grid cell's origin and lengths to determine where in the grid cell the point of
+  ///        interest lies.  If the point is outside the grid cell, produce an error.
+  ///
+  /// \param point_x  Cartesian X location of the point
+  /// \param point_y  Cartesian Y location of the point
+  /// \param point_z  Cartesian Z location of the point
+  T evaluate(T x, T y, T z) const;
+  
 private:
   T coefficients[64];  ///< Solved coefficients of the tricubic spline that satisfies all boundary
                        ///<   conditions.
@@ -83,6 +135,14 @@ private:
   T dxz[8];    ///< Cartesian X/Z cross-derivatives of the function at the bounding grid points
   T dyz[8];    ///< Cartesian Y/Z cross-derivatives of the function at the bounding grid points
   T dxyz[8];   ///< Cartesian X/Y/Z triple-derivatives of the function at the bounding grid points
+
+  // The grid cell boundaries are stored in double precision for accuracy considerations.
+  double origin_x;  ///< Cartesian X location of the grid cell origin
+  double origin_y;  ///< Cartesian Y location of the grid cell origin
+  double origin_z;  ///< Cartesian Z location of the grid cell origin
+  double length_x;  ///< Cartesian X length of the grid cell
+  double length_y;  ///< Cartesian Y length of the grid cell
+  double length_z;  ///< Cartesian Z length of the grid cell
 };
 
 /// \brief Construct a matrix for grinding out tricubic spline coefficients given the eight vectors
