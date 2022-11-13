@@ -1,4 +1,5 @@
 #include <string>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "atomgraph_enumerators.h"
 

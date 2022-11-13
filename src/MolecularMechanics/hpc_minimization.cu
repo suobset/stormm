@@ -469,7 +469,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
 //-------------------------------------------------------------------------------------------------
 extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
-                                    const StaticExclusionMaskSynthesis poly_se,
+                                    const StaticExclusionMaskSynthesis &poly_se,
                                     PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                                     const GpuDetails &gpu, const PrecisionModel prec,
                                     StopWatch *timer, const std::string &task_name) {

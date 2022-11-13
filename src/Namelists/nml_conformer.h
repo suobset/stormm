@@ -26,6 +26,7 @@ constexpr char default_conf_stop_hbonds[]       = "false";
 constexpr int default_conf_running_states       = 16;
 constexpr int default_conf_final_states         = 100;
 constexpr double default_conf_rmsd_tolerance    = 0.5;
+constexpr double default_conf_core_restraint    = 16.0;
 constexpr int default_conf_reshuffle_iterations = 0;
 constexpr int active_states_limit  = 524288;
 /// \}
@@ -50,8 +51,23 @@ struct ConformerControls {
                     WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
-  /// \brief Get the common atom mask string.
-  std::string getCommonAtomMask() const;
+  /// \brief Get the core atom mask string.
+  const std::string& getCoreAtomMask() const;
+
+  /// \brief Get the name of the data item expected to contain core atoms.
+  const std::string& getCoreDataItemName() const;
+
+  /// \brief Get the core restraint r2 penalty (near-repulsive potential) stiffness.
+  double getCoreRK2Value() const;
+
+  /// \brief Get the core restraint r3 penalty (position-keeping potential) stiffness.
+  double getCoreRK3Value() const;
+
+  /// \brief Get the core restraint r2 displacement.
+  double getCoreR2Value() const;
+
+  /// \brief Get the core restraint r3 displacement.
+  double getCoreR3Value() const;
 
   /// \brief Get an indicator of whether to sample chirality.
   bool sampleChirality() const;
@@ -89,6 +105,9 @@ struct ConformerControls {
   ///        confomer.
   double getRmsdTolerance() const;
 
+  /// \brief Validate the restraining potential that will define the common core.
+  void validateCoreRestraint() const;
+  
   /// \brief Validate input pertaining to chiral sampling .
   ///
   /// \param directive  The keyword setting for chirality sampling (must be 'true' or 'false',
@@ -116,7 +135,14 @@ private:
                                     ///<   the default value if one is available, SILENT = do not
                                     ///<   warn the user, but also likely reset to the default
                                     ///<   value if one is available.
-  std::string common_atom_mask;     ///< Mask of common core atoms, applied to all systems
+  std::string core_atom_mask;       ///< Mask of common core atoms, applied to all systems
+  std::string core_data_item;       ///< Name of a data item from a Biovia SD file indicating the
+                                    ///<   core atom mask.  Various formats of the input in the
+                                    ///<   SD file will be automatically detected and accepted.
+  double core_rk2;                  ///< Core atom repulsive positional restraint stiffness
+  double core_rk3;                  ///< Core atom attractive positional restraint stiffness
+  double core_r2;                   ///< Core atom maximum repulsive potential range
+  double core_r3;                   ///< Range for onset of core atom attractive potential
   std::string anchor_conformation;  ///< The other half of the common core mask, the thing to align
                                     ///<   core atoms against.  This anchor conformation will be
                                     ///<   docked or placed within the receptor of interest and

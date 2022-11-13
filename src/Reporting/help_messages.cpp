@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_conformer.h"
 #include "Namelists/nml_dynamics.h"

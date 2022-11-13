@@ -33,6 +33,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
 		   $(SRCDIR)/Math/statistics.cpp \
 		   $(SRCDIR)/Math/tickcounter.cpp \
+		   $(SRCDIR)/Math/tricubic_cell.cpp \
 		   $(SRCDIR)/Math/vector_ops.cpp \
 		   $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
@@ -175,6 +176,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Math/statistics.h \
 		     $(SRCDIR)/Math/summation.h \
 		     $(SRCDIR)/Math/tickcounter.h \
+		     $(SRCDIR)/Math/tricubic_cell.h \
 		     $(SRCDIR)/Math/vector_ops.h \
 		     $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
@@ -295,6 +297,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Math/series_ops.tpp \
 		   $(SRCDIR)/Math/summation.tpp \
 		   $(SRCDIR)/Math/tickcounter.tpp \
+		   $(SRCDIR)/Math/tricubic_cell.tpp \
 		   $(SRCDIR)/Math/vector_ops.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
@@ -565,8 +568,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O3
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \

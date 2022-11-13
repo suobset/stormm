@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "Namelists/input.h"
 #include "Parsing/parse.h"
+#include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 #include "nml_conformer.h"
 
@@ -15,13 +16,16 @@ using namelist::readNamelist;
 using errors::rtErr;
 using errors::rtWarn;
 using parse::CaseSensitivity;
+using parse::NumberFormat;
+using parse::realToString;
 using parse::strcmpCased;
 using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 ConformerControls::ConformerControls(const ExceptionResponse policy_in,
                                      const WrapTextSearch wrap) :
-    policy{policy_in}, common_atom_mask{std::string("")}, anchor_conformation{std::string("")},
+    policy{policy_in}, core_atom_mask{std::string("")}, core_data_item{std::string("")},
+    core_rk2{0.0}, core_rk3{0.0}, core_r2{0.0}, core_r3{0.0}, anchor_conformation{std::string("")},
     sample_chirality{false}, sample_cis_trans{false}, prevent_hbonds{false},
     running_states{default_conf_running_states},
     final_states{default_conf_final_states},
@@ -38,8 +42,47 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
     ConformerControls(policy_in)
 {
   const NamelistEmulator t_nml = conformerInput(tf, start_line, found_nml, policy, wrap);
-  if (t_nml.getKeywordStatus("commonmask") != InputStatus::MISSING) {
-    common_atom_mask = t_nml.getStringValue("commonmask");
+  if (t_nml.getKeywordStatus("core_mask") != InputStatus::MISSING) {
+    core_atom_mask = t_nml.getStringValue("core_mask", "atoms");
+    core_data_item = t_nml.getStringValue("core_mask", "data_item");
+
+    // Get the rk2 restraint value
+    if (t_nml.getKeywordStatus("core_mask", "rk2") != InputStatus::MISSING) {
+      core_rk2 = t_nml.getRealValue("core_mask", "rk2");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "replusion") != InputStatus::MISSING) {
+      core_rk2 = t_nml.getRealValue("core_mask", "repulsion");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "stiffness") != InputStatus::MISSING) {
+      core_rk2 = t_nml.getRealValue("core_mask", "stiffness");
+    }
+
+    // Get the rk3 restraint value
+    if (t_nml.getKeywordStatus("core_mask", "rk3") != InputStatus::MISSING) {
+      core_rk3 = t_nml.getRealValue("core_mask", "rk3");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "attraction") != InputStatus::MISSING) {
+      core_rk3 = t_nml.getRealValue("core_mask", "attraction");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "stiffness") != InputStatus::MISSING) {
+      core_rk3 = t_nml.getRealValue("core_mask", "stiffness");
+    }
+
+    // Get the r2 restraint value
+    if (t_nml.getKeywordStatus("core_mask", "r2") != InputStatus::MISSING) {
+      core_r2 = t_nml.getRealValue("core_mask", "r2");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "demand") != InputStatus::MISSING) {
+      core_r2 = t_nml.getRealValue("core_mask", "demand");
+    }
+
+    // Get the r3 restraint value
+    if (t_nml.getKeywordStatus("core_mask", "r3") != InputStatus::MISSING) {
+      core_r3 = t_nml.getRealValue("core_mask", "r3");
+    }
+    else if (t_nml.getKeywordStatus("core_mask", "grace") != InputStatus::MISSING) {
+      core_r3 = t_nml.getRealValue("core_mask", "grace");
+    }
   }
   if (t_nml.getKeywordStatus("anchor_conf") != InputStatus::MISSING) {
     anchor_conformation = t_nml.getStringValue("anchor_conf");
@@ -65,8 +108,33 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string ConformerControls::getCommonAtomMask() const {
-  return common_atom_mask;
+const std::string& ConformerControls::getCoreAtomMask() const {
+  return core_atom_mask;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& ConformerControls::getCoreDataItemName() const {
+  return core_data_item;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getCoreRK2Value() const {
+  return core_rk2;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getCoreRK3Value() const {
+  return core_rk3;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getCoreR2Value() const {
+  return core_r2;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getCoreR3Value() const {
+  return core_r3;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -112,6 +180,24 @@ int ConformerControls::getSystemTrialCount() const {
 //-------------------------------------------------------------------------------------------------
 double ConformerControls::getRmsdTolerance() const {
   return rmsd_tolerance;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateCoreRestraint() const {
+  if (core_r2 < 0.0 || core_r2 > core_r3) {
+    rtErr("Displacement limits of " + realToString(core_r2, 7, 4, NumberFormat::STANDARD_REAL) +
+          " to " + realToString(core_r3, 7, 4, NumberFormat::STANDARD_REAL) + " are invalid.",
+          "ConformerControls", "validateCoreRestraint");
+  }
+  if (core_rk2 < 0.0) {
+    rtErr("A repulsive restraint penalty of " +
+          realToString(core_rk2, 7, 4, NumberFormat::STANDARD_REAL) + " kcal/mol-A^2 is "
+          "unacceptable.", "ConformerControls", "validateCoreRestraint");
+  }
+  if (core_rk3 < 0.0) {
+    rtErr("A restraint penalty of " + realToString(core_rk3, 7, 4, NumberFormat::STANDARD_REAL) +
+          " kcal/mol-A^2 is unacceptable.", "ConformerControls", "validateCoreRestraint");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -242,7 +328,50 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                 const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("conformer", CaseSensitivity::AUTOMATIC, policy,
                          "Collects instructions for conformer sampling in STORMM.");
-  t_nml.addKeyword(NamelistElement("commonmask", NamelistType::STRING, std::string("")));
+  const std::string core_help("Define a subset of atoms that will be prevented from moving, or "
+                              "constrained to move in proximity to their initial positions.");
+  const std::vector<std::string> core_keys_help = {
+    "A data item in a system's SD file to seek out, which will contain one of the following: a "
+    "list of atom indices, a list of atom names, or an atom mask specific to that file.  If "
+    "the coordinates are not present in an SD file or the SD file does not contain such a data "
+    "item, no core atoms will be defined.",
+    "An atom mask defining the core atoms.  If given, this will supercede any data items in SD "
+    "files and apply to all systems in the calculation.",
+    "The restraint penalty, in kcal/mol-Angstrom^2, defining a harmonic repulsive potential that "
+    "pushes core atoms away from their initial coordinates.",
+    "Alias for 'rk2' in this context.  If both are supplied, the value of 'rk2' will take "
+    "precedence.",
+    "The harmonic restraint stiffness, in units of kcal/mol-Angstrom^2, preventing atoms from "
+    "wandering away from their initial positions.",
+    "Alias for 'rk3'.  If both are defined, the value of 'rk3' will take precedence.",
+    "Alias for 'rk2' and 'rk3', in units of kcal/mol-Angstrom^2 with a default of 16.0.  This "
+    "value will apply to both stiffness constants, but specifying either 'rk2', 'repulsion', "
+    "'rk3', or 'attraction' will override the effect.",
+    "The distance, in Angstroms, at which to stop applying a repulsive potential pushing atoms "
+    "away from their initial positions.",
+    "Alias for 'r2', with a default value of 0.0 Angstroms.  If 'r2' is supplied, that value will "
+    "take precedence.",
+    "The distance, in Angstroms, at which to begin applying an attractive potential that keeps "
+    "atoms from wandering away from their initial positions.",
+    "Alias for 'r3', with a default value of 0.0 Angstroms.  If 'r3' is supplied, that value will "
+    "take precedence." };
+  t_nml.addKeyword(NamelistElement("core_mask",
+                                   { "data_item", "atoms", "rk2", "repulsion", "rk3", "attraction",
+                                     "stiffness", "r2", "demand", "r3", "grace" },
+                                   { NamelistType::STRING, NamelistType::STRING,
+                                     NamelistType::REAL, NamelistType::REAL, NamelistType::REAL,
+                                     NamelistType::REAL, NamelistType::REAL, NamelistType::REAL,
+                                     NamelistType::REAL, NamelistType::REAL, NamelistType::REAL },
+                                   { std::string(""), std::string(""), std::string(""),
+                                     std::string(""), std::string(""), "16.0", std::string(""),
+                                     "0.0", std::string(""), "0.0" }, DefaultIsObligatory::NO,
+                                   InputRepeats::NO, core_help, core_keys_help,
+                                   { SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
+                                     SubkeyRequirement::OPTIONAL }));
   t_nml.addKeyword(NamelistElement("anchor_conf", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("sample_chirality", NamelistType::STRING,
                                    std::string(default_conf_chirality)));
@@ -262,12 +391,16 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                    std::to_string(default_conf_max_system_trials)));
   t_nml.addKeyword(NamelistElement("rmsd_tol", NamelistType::REAL,
                                    std::to_string(default_conf_rmsd_tolerance)));
-  t_nml.addHelp("commonmask", "Atom mask for common core atoms.  These atoms will be held in a "
+  t_nml.addHelp("core_mask", "Atom mask for common core atoms.  These atoms will be held in a "
                 "rigid configuration during energy minimization and other sampling operations.");
   t_nml.addHelp("sample_chirality", "Sample chiral states of identifiable chiral centers.  "
                 "Specify 'yes' / 'true' to sample or 'no' / 'false' to decline.");
   t_nml.addHelp("sample_cis_trans", "Sample cis and trans states of double bonds.  Specify "
                 "'yes' / 'true' to sample or 'no' / 'false' to decline.");
+  t_nml.addHelp("prevent_hbonds", "A quick way to have STORMM prevent hydrogen bonding between "
+                "donors and acceptor atoms that it can identify in the molecule(s).  This will "
+                "establish a restraint ensemble for each case with default parameters to prevent "
+                "donor and acceptor pairs from coming too close.");
   t_nml.addHelp("running_states", "Number of energy-minimizations to carry out at one time in "
                 "order to generate a smaller set of final states.");
   t_nml.addHelp("final_states", "Number of final, energy-minimized states to accept as unique "
