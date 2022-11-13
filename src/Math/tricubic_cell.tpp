@@ -184,7 +184,8 @@ template <typename T> T TricubicCell<T>::getCellLength(CartesianDimension dim) c
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T z) const {
+template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T z,
+                                                  const TricubicBound kind) const {
   if (x < origin_x || y < origin_y || z < origin_z ||
       x >= origin_x + length_x || y >= origin_y + length_y || z >= origin_z + length_z) {
     rtErr("Point (" + realToString(x, 7, 4, NumberFormat::STANDARD_REAL) + ", " +
@@ -204,17 +205,139 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
   T result = 0.0;
   const T v_one = 1.0; 
   T xv = v_one;
-  for (int i = 0; i < 4; i++) {
-    T yv = v_one;
-    for (int j = 0; j < 4; j++) {
-      T zv = v_one;
-      for (int k = 0; k < 4; k++) {
-        result += coefficients[(4 * ((4 * k) + j)) + i] * xv * yv * zv;
-        zv *= z_frac;
+  switch (kind) {
+  case TricubicBound::VALUE:
+    for (int i = 0; i < 4; i++) {
+      T yv = v_one;
+      for (int j = 0; j < 4; j++) {
+        T zv = v_one;
+        for (int k = 0; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * xv * yv * zv;
+          zv *= z_frac;
+        }
+        yv *= y_frac;
       }
-      yv *= y_frac;
+      xv *= x_frac;
     }
-    xv *= x_frac;
+    break;
+  case TricubicBound::DX:
+    for (int i = 1; i < 4; i++) {
+      T yv = v_one;
+      const double difac = i;
+      for (int j = 0; j < 4; j++) {
+        T zv = v_one;
+        for (int k = 0; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * difac * xv * yv * zv;
+          zv *= z_frac;
+        }
+        yv *= y_frac;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DY:
+    for (int i = 0; i < 4; i++) {
+      T yv = v_one;
+      double djfac = 1.0;
+      for (int j = 1; j < 4; j++) {
+        T zv = v_one;
+        for (int k = 0; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * xv * djfac * yv * zv;
+          zv *= z_frac;
+        }
+        yv *= y_frac;
+        djfac += 1.0;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DZ:
+    for (int i = 0; i < 4; i++) {
+      T yv = v_one;
+      for (int j = 0; j < 4; j++) {
+        T zv = v_one;
+        double dkfac = 1.0;
+        for (int k = 1; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * xv * yv * dkfac * zv;
+          zv *= z_frac;
+          dkfac += 1.0;
+        }
+        yv *= y_frac;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DXY:
+    for (int i = 1; i < 4; i++) {
+      T yv = v_one;
+      const double difac = i;
+      double djfac = 1.0;
+      for (int j = 1; j < 4; j++) {
+        T zv = v_one;
+        for (int k = 0; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * difac * xv * djfac * yv * zv;
+          zv *= z_frac;
+        }
+        yv *= y_frac;
+        djfac += 1.0;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DXZ:
+    for (int i = 1; i < 4; i++) {
+      T yv = v_one;
+      const double difac = i;
+      for (int j = 0; j < 4; j++) {
+        T zv = v_one;
+        double dkfac = 1.0;
+        for (int k = 1; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * difac * xv * yv * dkfac * zv;
+          zv *= z_frac;
+          dkfac += 1.0;
+        }
+        yv *= y_frac;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DYZ:
+    for (int i = 0; i < 4; i++) {
+      T yv = v_one;
+      double djfac = 1.0;
+      for (int j = 1; j < 4; j++) {
+        T zv = v_one;
+        double dkfac = 1.0;
+        for (int k = 1; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * xv * djfac * yv * dkfac * zv;
+          zv *= z_frac;
+          dkfac += 1.0;
+        }
+        yv *= y_frac;
+        djfac += 1.0;
+      }
+      xv *= x_frac;
+    }
+    break;
+  case TricubicBound::DXYZ:
+    for (int i = 1; i < 4; i++) {
+      T yv = v_one;
+      const double difac = i;
+      double djfac = 1.0;
+      for (int j = 1; j < 4; j++) {
+        T zv = v_one;
+        double dkfac = 1.0;
+        for (int k = 1; k < 4; k++) {
+          result += coefficients[(4 * ((4 * k) + j)) + i] * difac * xv * djfac * yv * dkfac * zv;
+          zv *= z_frac;
+          dkfac += 1.0;
+        }
+        yv *= y_frac;
+        djfac += 1.0;
+      }
+      xv *= x_frac;
+    }
+    break;
   }
   return result;
 }

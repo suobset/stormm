@@ -116,10 +116,11 @@ public:
   ///        grid cell's origin and lengths to determine where in the grid cell the point of
   ///        interest lies.  If the point is outside the grid cell, produce an error.
   ///
-  /// \param point_x  Cartesian X location of the point
-  /// \param point_y  Cartesian Y location of the point
-  /// \param point_z  Cartesian Z location of the point
-  T evaluate(T x, T y, T z) const;
+  /// \param x     Cartesian X location of the point
+  /// \param y     Cartesian Y location of the point
+  /// \param z     Cartesian Z location of the point
+  /// \param kind  Return a partial derivative or value of the function
+  T evaluate(T x, T y, T z, TricubicBound kind = TricubicBound::VALUE) const;
   
 private:
   T coefficients[64];  ///< Solved coefficients of the tricubic spline that satisfies all boundary
