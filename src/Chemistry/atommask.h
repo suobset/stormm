@@ -6,6 +6,7 @@
 #include <vector>
 #include <climits>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
@@ -14,6 +15,7 @@
 namespace stormm {
 namespace chemistry {
 
+using constants::ExceptionResponse;
 using parse::WildCardKind;
 using topology::AtomGraph;
 using trajectory::CoordinateFrame;
@@ -250,7 +252,7 @@ public:
 
   /// \brief Get the raw mask as a vector of unsigned long integers (bit strings storing whether
   ///        each atom is masked at one atom per bit)
-  std::vector<uint> getRawMask() const;
+  const std::vector<uint>& getRawMask() const;
 
   /// \brief Get a count of the number of masked atoms
   int getMaskedAtomCount() const;
@@ -269,11 +271,15 @@ public:
   /// \brief Get the input text used to generate this atom mask
   std::string getInputText() const;
 
+  /// \brief Get the input text mode, e.g. AMBMASK to indicate that an Amber-style atom mask
+  ///        string was used to make this mask.
+  MaskInputMode getInputKind() const;
+  
   /// \brief Get the description of the mask, if provided
   std::string getDescription() const;
 
   /// \brief Get a pointer to the topology that this mask describes
-  const AtomGraph* getAtomGraphPointer() const;
+  const AtomGraph* getTopologyPointer() const;
 
   /// \brief Add atoms to the atom mask.
   ///
@@ -284,14 +290,22 @@ public:
   ///   - Add the atoms of another mask (the topologies will be checked for a reasonable degree of
   ///     congruity)
   ///   - Add atoms implied by another mask string.
+  ///
+  /// \param new_indices  The atom indices to add to the current mask
+  /// \param new_names    The names of atoms to add to the current mask
+  /// \param new_mask     Another atom mask (or mask string) to add to the current mask
+  /// \param policy       The policy to take in the event that an error is encountered
   /// \{
-  void addAtoms(const std::vector<int> &new_indices);
+  void addAtoms(const std::vector<int> &new_indices,
+                ExceptionResponse policy = ExceptionResponse::DIE);
 
   void addAtoms(const std::vector<char4> &new_names);
 
-  void addAtoms(const AtomMask &new_mask);
+  void addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
+                const ChemicalFeatures *chemfe = nullptr);
 
-  void addAtoms(const std::string &new_mask);
+  void addAtoms(const std::string &new_mask, const CoordinateFrame &cf,
+		const ChemicalFeatures *chemfe = nullptr);
   /// \}
   
 private:

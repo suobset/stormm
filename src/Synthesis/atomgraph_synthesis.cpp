@@ -1177,7 +1177,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
                              cdk.natom);
     sp_inverse_atomic_masses.putHost(ag_ptr->getAtomicMass<float>(MassForm::INVERSE),
                                      synth_atom_base, cdk.natom);
-    atom_types.putHost(ag_ptr->getAtomType(), synth_atom_base, cdk.natom);
+    atom_types.putHost(ag_ptr->getAtomType().readHost(), synth_atom_base, cdk.natom);
   }
 
   // Fill in the valence term atom indexing arrays.

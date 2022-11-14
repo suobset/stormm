@@ -1,3 +1,4 @@
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -7,6 +8,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
 
+using stormm::card::Hybrid;
 using stormm::constants::tiny;
 using stormm::data_types::ulint;
 using stormm::data_types::char4;
@@ -311,7 +313,8 @@ std::vector<char4> charAGProp(const std::vector<AtomGraph*> &topols, const bool 
     case CharInfoCode::MOST_COMMON_TYPE_NAME:
       {
         const int natom = topols[i]->getAtomCount();
-        std::vector<char4> all_type_names = topols[i]->getAtomType();
+        const Hybrid<char4>& iag_at = topols[i]->getAtomType();
+        std::vector<char4> all_type_names = iag_at.readHost();
         std::vector<bool> found(natom, false);
         int max_repeats = 0;
         for (int j = 0; j < natom; j++) {

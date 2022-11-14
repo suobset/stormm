@@ -113,10 +113,10 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
           std::to_string(natom_expected) + " and " + std::to_string(cframe.natom) + " differ.",
           "applyPositionalRestraints");
   }
-  if (natom_expected != mask.getAtomGraphPointer()->getAtomCount()) {
+  if (natom_expected != mask.getTopologyPointer()->getAtomCount()) {
     rtErr("The atom mask must match the input topology.  Atom counts of " +
           std::to_string(natom_expected) + " and " +
-          std::to_string(mask.getAtomGraphPointer()->getAtomCount()) + " differ.",
+          std::to_string(mask.getTopologyPointer()->getAtomCount()) + " differ.",
           "applyPositionalRestraints");
   }
 }

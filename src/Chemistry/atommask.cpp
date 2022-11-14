@@ -1,5 +1,6 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "atommask.h"
@@ -10,6 +11,8 @@ namespace chemistry {
 
 using card::HybridKind;
 using card::HybridTargetLevel;
+using math::accumulateBitmask;
+using math::readBitFromMask;
 using parse::char4ToString;
 using parse::NumberFormat;
 using parse::TextGuard;
@@ -18,6 +21,7 @@ using parse::resolveScopes;
 using parse::separateText;
 using parse::stringToChar4;
 using parse::strcmpWildCard;
+using parse::operator==;
 using topology::ChemicalDetailsKit;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
@@ -534,7 +538,7 @@ MaskTraversalMode AtomMask::getRecommendation() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint> AtomMask::getRawMask() const {
+const std::vector<uint>& AtomMask::getRawMask() const {
   return raw_mask;
 }
 
@@ -580,13 +584,132 @@ std::string AtomMask::getInputText() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+MaskInputMode AtomMask::getInputKind() const {
+  return style;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string AtomMask::getDescription() const {
   return description;
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph* AtomMask::getAtomGraphPointer() const {
+const AtomGraph* AtomMask::getTopologyPointer() const {
   return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const std::vector<int> &new_indices, const ExceptionResponse policy) {
+  const int n_adds = new_indices.size();
+  const int n_atoms = ag_pointer->getAtomCount();
+  std::string mask_addendum;
+  bool addendum_started = false;
+  for (int i = 0; i < n_adds; i++) {
+    if (new_indices[i] < 0 || new_indices[i] >= n_atoms) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Atom " + std::to_string(new_indices[i] + 1) + " is invalid for a topology with " +
+              std::to_string(n_atoms) + " atoms.", "AtomMask", "addAtoms");
+      case ExceptionResponse::WARN:
+        rtWarn("Atom " + std::to_string(new_indices[i] + 1) + " is invalid for a topology with " +
+               std::to_string(n_atoms) + " atoms.  This entry will not be added.", "AtomMask",
+               "addAtoms");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+    else if (readBitFromMask(raw_mask, new_indices[i]) == 0) {
+      accumulateBitmask(&raw_mask, new_indices[i]);
+      segments.push_back({new_indices[i], new_indices[i] + 1});
+      masked_atom_count += 1;
+      if (addendum_started) {
+        mask_addendum.append("," + std::to_string(new_indices[i]));
+      }
+      else {
+        mask_addendum.append("@" + std::to_string(new_indices[i]));
+        addendum_started = true;
+      }
+    }
+  }
+
+  // Update the mask string with the added atoms
+  if (addendum_started) {
+    input_text = "(" + input_text + ") | (" + mask_addendum + ")";
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const std::vector<char4> &new_names) {
+  const int n_names = new_names.size();
+  const int n_atoms = ag_pointer->getAtomCount();
+  const char4* topology_names = ag_pointer->getAtomName().data();
+  std::string mask_addendum;
+  bool addendum_started = false;
+  for (int i = 0; i < n_names; i++) {
+    const char4 tname = new_names[i];
+    for (int j = 0; j < n_atoms; j++) {
+      if (readBitFromMask(raw_mask, j) == 0 && tname == topology_names[j]) {
+        accumulateBitmask(&raw_mask, j);
+        segments.push_back({j, j + 1});
+        masked_atom_count += 1;
+        if (addendum_started) {
+          mask_addendum.append("," + char4ToString(new_names[i]));
+        }
+        else {
+          mask_addendum.append("@" + char4ToString(new_names[i]));
+          addendum_started = true;
+        }
+      }
+    }
+  }
+
+  // Update the mask string with the added atom names
+  if (addendum_started) {
+    input_text = "(" + input_text + ") | (" + mask_addendum + ")";
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
+                        const ChemicalFeatures *chemfe) {
+
+  // Determine if the two masks point to the same topology.  If so, the addition can be a simple
+  // union of sets.  Otherwise, take the input text from the new mask and apply it to the current
+  // mask's topology.
+  if (new_mask.getTopologyPointer() == ag_pointer) {
+    const std::vector<uint>& new_raw_mask = new_mask.getRawMask();
+    const size_t nr_val = raw_mask.size();
+    for (size_t i = 0LLU; i < nr_val; i++) {
+      raw_mask[i] |= new_raw_mask[i];
+    }
+    const int natom = ag_pointer->getAtomCount();
+    int update_ac = 0;
+    for (int i = 0; i < natom; i++) {
+      update_ac += readBitFromMask(raw_mask, i);
+    }
+    if (update_ac > masked_atom_count) {
+      input_text = "(" + input_text + ") | (" + new_mask.getInputText() + ")";
+    }
+    masked_atom_count = update_ac;
+  }
+  else {
+    addAtoms(new_mask.getInputText(), cf, chemfe);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const std::string &new_mask, const CoordinateFrame &cf,
+                        const ChemicalFeatures *chemfe) {
+  if (chemfe == nullptr) {
+    const ChemicalFeatures my_chemfe(ag_pointer, cf.data());
+    AtomMask applied_criteria(new_mask, ag_pointer, &my_chemfe, cf, style);
+    addAtoms(applied_criteria, cf, &my_chemfe);
+  }
+  else {
+    AtomMask applied_criteria(new_mask, ag_pointer, chemfe, cf, style);
+    addAtoms(applied_criteria, cf, chemfe);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
