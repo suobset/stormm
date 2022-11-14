@@ -455,7 +455,7 @@ MaskComponent MaskComponent::applyRangeOperator(const std::vector<uint> &other,
 }
   
 //-------------------------------------------------------------------------------------------------
-AtomMask::AtomMask(const AtomGraph *ag_in, const ChemicalFeatures *chemfe_in) :
+AtomMask::AtomMask(const AtomGraph *ag_in) :
     recommended_scan{MaskTraversalMode::COMPLETE},
     style{MaskInputMode::AMBMASK},
     masked_atom_count{0},
@@ -463,23 +463,26 @@ AtomMask::AtomMask(const AtomGraph *ag_in, const ChemicalFeatures *chemfe_in) :
     segments{},
     input_text{std::string("")},
     description{std::string("")},
-    ag_pointer{ag_in},
-    chemfe_pointer{chemfe_in}
-{}
+    ag_pointer{ag_in}
+{
+  if (ag_pointer != nullptr) {
+    raw_mask = std::vector<uint>((ag_pointer->getAtomCount() + (sizeof(uint) * 8) - 1) /
+                                 (sizeof(uint) * 8), 0U);
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe_in, const CoordinateFrameReader &cfr,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
                    const MaskInputMode mode, const std::string &description_in) :
     recommended_scan{MaskTraversalMode::COMPLETE},
     style{mode},
     raw_mask{std::vector<uint>((ag_in->getAtomCount() + (sizeof(uint) * 8) - 1) /
-                               (sizeof(uint) * 8), 0ul)},
+                               (sizeof(uint) * 8), 0U)},
     segments{},
     input_text{input_text_in},
     description{description_in},
-    ag_pointer{ag_in},
-    chemfe_pointer{chemfe_in}
+    ag_pointer{ag_in}
 {
   // Parse the mask text into its scopes.  Aside from the outermost scope (level 0), scopes are
   // denoted by '(' ... ')', '{' ... '}', and '[' ... ']'.
@@ -494,7 +497,7 @@ AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
   int eval_pos = 0;
   switch (mode) {
   case MaskInputMode::AMBMASK:
-    raw_mask = parseMask(scope_levels, &eval_pos, cfr);
+    raw_mask = parseMask(scope_levels, &eval_pos, cfr, chemfe);
     break;
   case MaskInputMode::VMD:
     break;
@@ -513,16 +516,16 @@ AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
 
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe_in, const CoordinateFrame &cf,
+                   const ChemicalFeatures *chemfe, const CoordinateFrame &cf,
                    const MaskInputMode mode, const std::string &description_in) :
-    AtomMask(input_text_in, ag_in, chemfe_in, cf.data(), mode, description_in)
+    AtomMask(input_text_in, ag_in, chemfe, cf.data(), mode, description_in)
 {}
   
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe_in, const PhaseSpace &ps,
+                   const ChemicalFeatures *chemfe, const PhaseSpace &ps,
                    const MaskInputMode mode, const std::string &description_in) :
-    AtomMask(input_text_in, ag_in, chemfe_in, CoordinateFrameReader(ps), mode, description_in)
+    AtomMask(input_text_in, ag_in, chemfe, CoordinateFrameReader(ps), mode, description_in)
 {}
   
 //-------------------------------------------------------------------------------------------------
@@ -819,7 +822,8 @@ std::vector<SelectionItem> AtomMask::evaluateInclusions(const std::string &inclu
 
 //-------------------------------------------------------------------------------------------------
 std::vector<uint> AtomMask::parseMask(const std::vector<int> &scope_levels, int *position,
-                                      const CoordinateFrameReader &cfr) {
+                                      const CoordinateFrameReader &cfr,
+                                      const ChemicalFeatures *chemfe) {
 
   // Bail out immediately if the mask contains no information
   if (scope_levels.size() == 0LLU) {
@@ -953,7 +957,7 @@ std::vector<uint> AtomMask::parseMask(const std::vector<int> &scope_levels, int 
       std::string incl_list = input_text.substr(i, j - i);
       
       // Evaluate this inclusion list and add it to the scope components
-      scope_cmp.push_back(MaskComponent(evaluateInclusions(incl_list), ag_pointer, chemfe_pointer,
+      scope_cmp.push_back(MaskComponent(evaluateInclusions(incl_list), ag_pointer, chemfe,
                                         incl_list, i, j));
 
       // Advance the overall counter to reflect the progress of reading this inclusion list
@@ -964,7 +968,7 @@ std::vector<uint> AtomMask::parseMask(const std::vector<int> &scope_levels, int 
     // Recursive call to handle higher level scopes
     else if (input_text[i] == '(' || input_text[i] == '{' || input_text[i] == '[') {
       *position = i + 1;
-      const std::vector<uint> subscope_mask = parseMask(scope_levels, position, cfr);
+      const std::vector<uint> subscope_mask = parseMask(scope_levels, position, cfr, chemfe);
       scope_cmp.push_back(MaskComponent(subscope_mask,
                                         input_text.substr(i, *position - i), i, *position));
       i = *position;

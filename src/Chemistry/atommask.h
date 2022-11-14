@@ -212,29 +212,37 @@ public:
   ///
   /// \param input_text_in  The mask string
   /// \param ag_in          System topology
-  /// \param chemfe_in      Chemical features computed for the topology
+  /// \param chemfe         Chemical features computed for the topology
   /// \param crd            Coordinates obtained from a CoordinateFrame object
   /// \param xcrd           Cartesian X coordinates of all atoms
   /// \param ycrd           Cartesian Y coordinates of all atoms
   /// \param zcrd           Cartesian Z coordinates of all atoms
   /// \param description    [Optional] description of the mask and its purpose
   /// \{
-  AtomMask(const AtomGraph *ag_in = nullptr, const ChemicalFeatures *chemfe_in = nullptr);
+  AtomMask(const AtomGraph *ag_in = nullptr);
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const CoordinateFrameReader &cfr,
+           const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const CoordinateFrame &cf,
+           const ChemicalFeatures *chemfe, const CoordinateFrame &cf,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const PhaseSpace &ps,
+           const ChemicalFeatures *chemfe, const PhaseSpace &ps,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
+  /// \}
+
+  /// The standard copy and move constructors will be effective for this object, which has no
+  /// pointers to repair.  Because there is a const member, the copy and move assignment operators
+  /// will be implicitly deleted.
+  /// \{
+  AtomMask(const AtomMask &original) = default;
+  AtomMask(AtomMask &&original) = default;
   /// \}
   
   /// \brief Get the recommendation for scanning this mask
@@ -266,6 +274,25 @@ public:
 
   /// \brief Get a pointer to the topology that this mask describes
   const AtomGraph* getAtomGraphPointer() const;
+
+  /// \brief Add atoms to the atom mask.
+  ///
+  /// Overloaded:
+  ///   - Add a series of atom indices, with indexing beginning at 0.
+  ///   - Add a series of atom names.  All examples of any supplied name will be matched and added
+  ///     to the mask (an O(NM) operation for N atom names and a topology of M atoms)
+  ///   - Add the atoms of another mask (the topologies will be checked for a reasonable degree of
+  ///     congruity)
+  ///   - Add atoms implied by another mask string.
+  /// \{
+  void addAtoms(const std::vector<int> &new_indices);
+
+  void addAtoms(const std::vector<char4> &new_names);
+
+  void addAtoms(const AtomMask &new_mask);
+
+  void addAtoms(const std::string &new_mask);
+  /// \}
   
 private:
   MaskTraversalMode recommended_scan;      ///< Indicates the most efficient way to read this mask
@@ -278,8 +305,6 @@ private:
   std::string description;                 ///< Description of this AtomMask object, indicating its
                                            ///<   place in a program
   const AtomGraph *ag_pointer;             ///< Pointer to the topology this mask is based on
-  const ChemicalFeatures *chemfe_pointer;  ///< Pointer to the chemical features that helped create
-                                           ///<   this mask
 
   /// \brief Function to extract a ranged value when prompted by range operators in an atom mask
   ///
@@ -304,7 +329,7 @@ private:
   /// \param position      Used to return the position of the last character used in finding the
   ///                      range value of interest
   std::vector<uint> parseMask(const std::vector<int> &scope_levels, int *position,
-                              const CoordinateFrameReader &cfr);
+                              const CoordinateFrameReader &cfr, const ChemicalFeatures *chemfe);
 };
 
 } // namespace chemistry

@@ -41,8 +41,19 @@ AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecul
 
     // If the data item content could not be processed as an atom mask, try parsing it as as list
     // of integers, which would be assumed to indicate atom indices (starting at 1, and thus
-    // decremented for C / C++ array indexing).
-    
+    // decremented for C / C++ array indexing).  The text is assumed not to contain comments or
+    // quoted strings.  Commas will be counted as delimiters.
+    const std::vector<std::string> words = separateText(all_data, {}, {}, { "\"", "\"", "'", "'" },
+                                                        { "," });
+    const int word_count = words.size();
+    bool all_integer = true;
+    for (int i = 0; i < word_count; i++) {
+      all_integer = (all_integer && verifyNumberFormat(words.c_str(), NumberFormat::INTEGER));
+    }
+    AtomMask result(ag);
+    if (all_integer == true) {
+      for (
+    }
   }
 }
 
