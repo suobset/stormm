@@ -283,7 +283,32 @@ public:
   /// \param text        The text to append
   /// \param item_index  Index of the data item to update
   void addLineToDataItem(const std::string &text, int item_index);
+
+  /// \brief Get the name of a data item based on its number
+  ///
+  /// \param item_index  Index of the data item of interest
+  const std::string& getDataItemName(int item_index) const;
+
+  /// \brief Get the index of a data item based on a name.
+  ///
+  /// \param item_name   Name of the data item of interest
+  int getDataItemIndex(const std::string &item_name) const;
   
+  /// \brief Get the lines from a data item as an array of strings.
+  ///
+  /// Overloaded:
+  ///   - Accept the index of the data item and return a const reference to its content (this is
+  ///     possible because a data item with a valid index will have content to reference)
+  ///   - Accept the name of the data item and return a copy of the content, if any data item is
+  ///     found (if the search fails, a const reference to a temporary would be dangerous)
+  ///
+  /// \param item_index  Index of the data item of interest
+  /// \param item_name   Name of the data item of interest
+  /// \{
+  const std::vector<std::string>& getDataItemContent(int item_index) const;
+  std::vector<std::string> getDataItemContent(const std::string &item_name) const;
+  /// \}
+
   /// \brief Write a set of molecular coordinates, bonds, and their annotations in MDL MOL format.
   ///        Apply all properties already stored in the object, such that the result is not an
   ///        exact reversal of the operations for reading such a file but correctly conveys the

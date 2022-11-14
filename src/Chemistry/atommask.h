@@ -212,13 +212,14 @@ public:
   ///
   /// \param input_text_in  The mask string
   /// \param ag_in          System topology
+  /// \param chemfe_in      Chemical features computed for the topology
   /// \param crd            Coordinates obtained from a CoordinateFrame object
   /// \param xcrd           Cartesian X coordinates of all atoms
   /// \param ycrd           Cartesian Y coordinates of all atoms
   /// \param zcrd           Cartesian Z coordinates of all atoms
   /// \param description    [Optional] description of the mask and its purpose
   /// \{
-  AtomMask();
+  AtomMask(const AtomGraph *ag_in = nullptr, const ChemicalFeatures *chemfe_in = nullptr);
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
            const ChemicalFeatures *chemfe_in, const CoordinateFrameReader &cfr,

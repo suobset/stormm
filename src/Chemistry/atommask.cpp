@@ -455,7 +455,7 @@ MaskComponent MaskComponent::applyRangeOperator(const std::vector<uint> &other,
 }
   
 //-------------------------------------------------------------------------------------------------
-AtomMask::AtomMask() :
+AtomMask::AtomMask(const AtomGraph *ag_in, const ChemicalFeatures *chemfe_in) :
     recommended_scan{MaskTraversalMode::COMPLETE},
     style{MaskInputMode::AMBMASK},
     masked_atom_count{0},
@@ -463,8 +463,8 @@ AtomMask::AtomMask() :
     segments{},
     input_text{std::string("")},
     description{std::string("")},
-    ag_pointer{nullptr},
-    chemfe_pointer{nullptr}
+    ag_pointer{ag_in},
+    chemfe_pointer{chemfe_in}
 {}
 
 //-------------------------------------------------------------------------------------------------

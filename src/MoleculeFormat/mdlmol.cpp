@@ -840,6 +840,39 @@ void MdlMol::addLineToDataItem(const std::string &text, int item_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getDataItemName(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemName");
+  return data_items[item_index].getItemName();
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMol::getDataItemIndex(const std::string &item_name) const {
+  for (int i = 0; i < data_item_count; i++) {
+    if (item_name == data_items[i].getItemName()) {
+      return i;
+    }
+  }
+  return data_item_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<std::string>& MdlMol::getDataItemContent(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemContent");
+  return data_items[item_index].getBody();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<std::string> MdlMol::getDataItemContent(const std::string &item_name) const {
+  std::vector<std::string> result;
+  for (int i = 0; i < data_item_count; i++) {
+    if (item_name == data_items[i].getItemName()) {
+      result = data_items[i].getBody();
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMol::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
   const TextFile result(writeMdl(vformat), TextOrigin::RAM);
   writeFrame(foutp, result);
