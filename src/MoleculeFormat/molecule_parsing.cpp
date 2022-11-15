@@ -7,7 +7,7 @@ namespace structure {
 //-------------------------------------------------------------------------------------------------
 AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecule,
                              const AtomGraph *ag, const ChemicalFeatures &chemfe,
-                             const CoordinateFrame &cf) {
+                             const CoordinateFrame &cf, const ExceptionResponse policy) {
   std::vector<std::string> data_lines = molecule.getDataItemContent(item_name);
 
   // If there is no data item, return an empty mask.
@@ -47,26 +47,52 @@ AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecul
                                                         { "," });
     const int word_count = words.size();
     bool all_integer = true;
+    bool all_atom_names = true;
     for (int i = 0; i < word_count; i++) {
-      all_integer = (all_integer && verifyNumberFormat(words.c_str(), NumberFormat::INTEGER));
+      all_integer = (all_integer && verifyNumberFormat(words[i].c_str(), NumberFormat::INTEGER));
+      all_atom_names = (all_atom_names && words[i].size() <= 4LLU);
     }
     AtomMask result(ag);
-    if (all_integer == true) {
+    if (all_integer) {
       std::vector<int> atom_adds(word_count);
       for (int i = 0; i < word_count; i++) {
-        atom_adds[i] = stoi(words[i]);
+        atom_adds[i] = stoi(words[i]) - 1;
+      }
+      result.addAtoms(atom_adds, policy);
+    }
+    else if (all_atom_names) {
+      std::vector<char4> atom_adds(word_count);
+      for (int i = 0; i < word_count; i++) {
+        atom_adds[i] = stringToChar4(words[i]);
       }
       result.addAtoms(atom_adds);
     }
+    else {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("The text in data item <" + item_name + "> of SD file " + molecule.getFileName() +
+              " could not be interpreted as a valid atom mask string, a list of integers, or a "
+              "list of atom names.", "maskFromSdfDataItem");
+      case ExceptionResponse::WARN:
+        rtWarn("The text in data item <" + item_name + "> of SD file " + molecule.getFileName() +
+               " could not be interpreted as a valid atom mask string, a list of integers, or a "
+               "list of atom names.  No atoms will be selected.", "maskFromSdfDataItem");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+    return result;
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecule,
-                             const AtomGraph *ag) {
+                             const AtomGraph *ag, const ExceptionResponse policy) {
   const CoordinateFrame cf = molecule.exportCoordinateFrame();
   const ChemicalFeatures chemfe(ag, cf.data());
-  maskFromSdfDataItem(item_name, molecule, ag, chemfe, cf);
+  maskFromSdfDataItem(item_name, molecule, ag, chemfe, cf, policy);
 }
 
 } // namespace structure
