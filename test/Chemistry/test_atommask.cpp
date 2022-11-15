@@ -82,7 +82,7 @@ int main(const int argc, const char* argv[]) {
                                         ChemicalFeatures(&trpcage, trpcage_crd) :
                                         ChemicalFeatures();
   const std::string mask_a_input(":1-5");
-  const AtomMask mask_a = (trpcage_exists) ? AtomMask(mask_a_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_a = (trpcage_exists) ? AtomMask(mask_a_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "First five residues") : AtomMask();
   std::vector<int> mask_a_answer(trpcage.getAtomCount(), 0);
@@ -112,7 +112,7 @@ int main(const int argc, const char* argv[]) {
            trpcage_top_name + " does not meet expectations.", oe.takeSnapshot(), 1.0e-1, 1.0e-8,
            PrintSituation::OVERWRITE, do_trpcage);
   const std::string mask_b_input(":1-5, 15-19, 237");
-  const AtomMask mask_b = (trpcage_exists) ? AtomMask(mask_b_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_b = (trpcage_exists) ? AtomMask(mask_b_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered residues") : AtomMask();
   const std::vector<uint> mbvec = mask_b.getRawMask();
@@ -137,7 +137,7 @@ int main(const int argc, const char* argv[]) {
   // many more checks to perform.  Try atom selections.
   ChemicalDetailsKit trp_cdk = trpcage.getChemicalDetailsKit(HybridTargetLevel::HOST);
   const std::string mask_c_input("@2-5,151-155,298,1014-1207,45");
-  const AtomMask mask_c = (trpcage_exists) ? AtomMask(mask_c_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_c = (trpcage_exists) ? AtomMask(mask_c_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms") : AtomMask();
   std::vector<int> mask_c_answer(trp_cdk.natom, 0);
@@ -154,7 +154,7 @@ int main(const int argc, const char* argv[]) {
   // Try using the OR operator to combine atom selections, rather than just commas
   section(4);
   const std::string mask_d_input("@2-5,45,298 | @151-155 | @1014-1207");
-  const AtomMask mask_d = (trpcage_exists) ? AtomMask(mask_d_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_d = (trpcage_exists) ? AtomMask(mask_d_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms linked by OR operators") :
                                              AtomMask();
@@ -168,7 +168,7 @@ int main(const int argc, const char* argv[]) {
 
   // Test the AND operator
   const std::string mask_e_input("@2-5,45,298 & :1-18");
-  const AtomMask mask_e = (trpcage_exists) ? AtomMask(mask_e_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_e = (trpcage_exists) ? AtomMask(mask_e_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms limited by an "
                                                       "AND operator") : AtomMask();
@@ -184,7 +184,7 @@ int main(const int argc, const char* argv[]) {
 
   // Try a combination of OR and AND operators
   const std::string mask_f_input("@2-5,45,298 | @151-155 | @1014-1207 & :1-18");
-  const AtomMask mask_f = (trpcage_exists) ? AtomMask(mask_f_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_f = (trpcage_exists) ? AtomMask(mask_f_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms linked by OR operators and "
                                                       "limited by an AND operator") : AtomMask();
@@ -201,7 +201,7 @@ int main(const int argc, const char* argv[]) {
 
   // Throw in a NOT operator to modify one of the atom selections
   const std::string mask_g_input("! @2-5,45,298 | @151-155 | @1014-1207 & :1-18");
-  const AtomMask mask_g = (trpcage_exists) ? AtomMask(mask_g_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_g = (trpcage_exists) ? AtomMask(mask_g_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms linked by OR operators, "
                                                       "limited by an AND operator, partially "
@@ -219,7 +219,7 @@ int main(const int argc, const char* argv[]) {
   // Try making the spacing dumb--no one would write a mask like this or purpose but it's just
   // ugly, not broken.
   const std::string mask_h_input("!@2 -5, 45,298|@151- 155| @1014-1207&:1- 18  ");
-  const AtomMask mask_h = (trpcage_exists) ? AtomMask(mask_h_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_h = (trpcage_exists) ? AtomMask(mask_h_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Scattered atoms linked by OR operators, "
                                                       "limited by an AND operator, inverted by a "
@@ -233,7 +233,7 @@ int main(const int argc, const char* argv[]) {
   // Try selecting atoms and residues by name, not number
   section(2);
   const std::string mask_i_input("@CA | @HA,CD,O & !:WAT"); 
-  const AtomMask mask_i = (trpcage_exists) ? AtomMask(mask_i_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_i = (trpcage_exists) ? AtomMask(mask_i_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A mask based on atom names, excluding "
                                                       "water residues") : AtomMask();
@@ -261,7 +261,7 @@ int main(const int argc, const char* argv[]) {
         mask_i_answer, "Atom mask \"" + mask_i_input + "\" does not generate the expected "
         "pattern.", do_trpcage);
   const std::string mask_j_input(":TRP | :ARG,ASN,PRO & !:WAT"); 
-  const AtomMask mask_j = (trpcage_exists) ? AtomMask(mask_j_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_j = (trpcage_exists) ? AtomMask(mask_j_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A mask based on residue names") :
                                              AtomMask();
@@ -289,7 +289,7 @@ int main(const int argc, const char* argv[]) {
   // Try selecting atoms and residues by names with wildcards
   section(3);
   const std::string mask_k_input(":T?? | :A??,PR? & !:TYR,ASP");  
-  const AtomMask mask_k = (trpcage_exists) ? AtomMask(mask_k_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_k = (trpcage_exists) ? AtomMask(mask_k_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A mask based on residue names, with "
                                                       "wildcard characters") : AtomMask();
@@ -309,7 +309,7 @@ int main(const int argc, const char* argv[]) {
         mask_k_answer, "Atom mask \"" + mask_k_input + "\" does not generate the expected "
         "pattern.", do_trpcage);
   const std::string mask_l_input(":T* | :A=,P* & !:?Y=,A*P,=T");
-  const AtomMask mask_l = (trpcage_exists) ? AtomMask(mask_l_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_l = (trpcage_exists) ? AtomMask(mask_l_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A mask based on residue names, with "
                                                       "wildcard stretches") : AtomMask();
@@ -320,7 +320,7 @@ int main(const int argc, const char* argv[]) {
   check(mask_l.getMaskedAtomCount(), RelationalOperator::EQUAL, 141, "Atom mask \"" +
         mask_l_input + "\" does not generate the expected number of masked atoms.\n");
   const std::string mask_m_input("@?A | @*D,O & !:W*??");
-  const AtomMask mask_m = (trpcage_exists) ? AtomMask(mask_m_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_m = (trpcage_exists) ? AtomMask(mask_m_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A mask based on atom names, with wildcards "
                                                       "of all kinds") : AtomMask();
@@ -332,7 +332,7 @@ int main(const int argc, const char* argv[]) {
   // Apply parentheses to get multiple scopes
   section(5);
   const std::string mask_n_input(":7-8 | (:6-12 & !:7-8)"); 
-  const AtomMask mask_n = (trpcage_exists) ? AtomMask(mask_n_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_n = (trpcage_exists) ? AtomMask(mask_n_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A continuous stretch of residues, where "
                                                       "two residues are eliminated in the context "
@@ -348,7 +348,7 @@ int main(const int argc, const char* argv[]) {
         mask_n_answer, "Atom mask \"" + mask_n_input + "\" does not generate the expected "
         "pattern.", do_trpcage);
   const std::string mask_o_input("[{(:7-8 | ([:6-12] & !{:7-8}))}]"); 
-  const AtomMask mask_o = (trpcage_exists) ? AtomMask(mask_o_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_o = (trpcage_exists) ? AtomMask(mask_o_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "A continuous stretch of residues, where "
                                                       "two residues are eliminated in the context "
@@ -362,7 +362,7 @@ int main(const int argc, const char* argv[]) {
   // Try selections using elements (@/)
   section(1);
   const std::string mask_p_input("@/6,8"); 
-  const AtomMask mask_p = (trpcage_exists) ? AtomMask(mask_p_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_p = (trpcage_exists) ? AtomMask(mask_p_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Carbon and oxygen, selected by atomic "
                                                       "number") : AtomMask();
@@ -376,7 +376,7 @@ int main(const int argc, const char* argv[]) {
         mask_p_answer, "Atom mask \"" + mask_p_input + "\" does not generate the expected "
         "pattern.", do_trpcage);
   const std::string mask_q_input("@/6-8"); 
-  const AtomMask mask_q = (trpcage_exists) ? AtomMask(mask_q_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_q = (trpcage_exists) ? AtomMask(mask_q_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Carbon, nitrogen, and oxygen, selected by "
                                                       "atomic number") :
@@ -392,7 +392,7 @@ int main(const int argc, const char* argv[]) {
         "pattern.", do_trpcage);
   section(2);
   const std::string mask_r_input("@/C?,O="); 
-  const AtomMask mask_r = (trpcage_exists) ? AtomMask(mask_r_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_r = (trpcage_exists) ? AtomMask(mask_r_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Carbon and oxygen, selected by atomic "
                                                       "number (wildcards were added that could "
@@ -404,7 +404,7 @@ int main(const int argc, const char* argv[]) {
         mask_p_answer, "Atom mask \"" + mask_r_input + "\" does not generate the expected "
         "pattern.", do_trpcage);
   const std::string mask_s_input("@/ C, N, O"); 
-  const AtomMask mask_s = (trpcage_exists) ? AtomMask(mask_s_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_s = (trpcage_exists) ? AtomMask(mask_s_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "Carbon, nitrogen, and oxygen, selected by "
                                                       "atomic number (wildcards were added that "
@@ -419,14 +419,13 @@ int main(const int argc, const char* argv[]) {
 
   // Select atoms by atom type (name)
   const std::string mask_t_input("@%C, N, OW"); 
-  const AtomMask mask_t = (trpcage_exists) ? AtomMask(mask_t_input, &trpcage, &trpcage_chem,
-                                                      trpcage_crd, MaskInputMode::AMBMASK,
-                                                      "Backbone sp2 carbon, nitrogen, and TIP3P "
-                                                      "water oxygen, selected by atomic number "
-                                                      "(wildcards were added that could increase "
-                                                      "the number of detected atoms, but not for "
-                                                      "this simple peptide in water system)") :
-                                             AtomMask();
+  AtomMask mask_t = (trpcage_exists) ? AtomMask(mask_t_input, &trpcage, trpcage_chem, trpcage_crd,
+                                                MaskInputMode::AMBMASK, "Backbone sp2 carbon, "
+                                                "nitrogen, and TIP3P water oxygen, selected by "
+                                                "atomic number (wildcards were added that could "
+                                                "increase the number of detected atoms, but not "
+                                                "for this simple peptide in water system)") :
+                                       AtomMask();
   std::vector<int> mask_t_answer(trp_cdk.natom);
   const char4 atc_c4 = {'C', ' ', ' ', ' '};
   const char4 atn_c4 = {'N', ' ', ' ', ' '};
@@ -448,13 +447,27 @@ int main(const int argc, const char* argv[]) {
   check(mask_e.getMaskedAtomList(), RelationalOperator::EQUAL, mask_e_list_answer, "Atom mask \"" +
         mask_e_input + "\" does not report the correct list of masked atoms.", do_trpcage);
   std::string mask_x_input("");
-  const AtomMask mask_x = (trpcage_exists) ? AtomMask(mask_x_input, &trpcage, &trpcage_chem,
+  const AtomMask mask_x = (trpcage_exists) ? AtomMask(mask_x_input, &trpcage, trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,
                                                       "No selection") :
                                              AtomMask();
   check(mask_x.getMaskedAtomCount(), RelationalOperator::EQUAL, 0, "A blank atom mask creates a "
         "significant group of atoms.", do_trpcage);
+  check(strncmp(mask_t.getDescription().c_str(), "Backbone sp2 c", 14) == 0, "The description "
+        "returned by a mask does not meet expectations.", do_trpcage);
+  check(mask_t.getInputText(), RelationalOperator::EQUAL, std::string("@%C, N, OW"), "A mask "
+        "input string was not properly transcribed.", do_trpcage);
 
+  // Check mask post-processing operations: adding atoms
+  const std::vector<int> atom_adds = { 0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 24, 25, 32 };
+  mask_t.addAtoms(atom_adds);
+  check(mask_t.getMaskedAtomCount(), RelationalOperator::EQUAL, 1611, "The number of atoms in a "
+        "mask after adding a new list does not meet expectations.", do_trpcage);
+  check(mask_t.getMaskedAtomList().size(), RelationalOperator::EQUAL, 1611, "The list of masked "
+        "atoms is no longer consistent with the reported size after new additions.", do_trpcage);
+  CHECK_THROWS_SOFT(mask_t.addAtoms(std::vector<int>(2, 5700000), ExceptionResponse::DIE),
+                    "Atoms with bogus indices were incorrectly added to a mask.", do_trpcage);
+  
   // Try ranged operations
   const std::string mask_u_input(":1-20 @< 5.0");
   

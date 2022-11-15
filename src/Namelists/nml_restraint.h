@@ -84,13 +84,13 @@ public:
   /// \param cf      Coordinates of the system
   /// \param ps      Coordinates of the system
   /// \{
-  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                              const CoordinateFrameReader &cf) const;
 
-  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                              const CoordinateFrame &cf) const;
 
-  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+  std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                              const PhaseSpace &ps) const;
   /// \}
   

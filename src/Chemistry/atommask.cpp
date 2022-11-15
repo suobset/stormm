@@ -70,7 +70,7 @@ MaskComponent::MaskComponent(const MaskOperator op_in, const double range_in,
 
 //-------------------------------------------------------------------------------------------------
 MaskComponent::MaskComponent(const std::vector<SelectionItem> &parts_in, const AtomGraph *ag,
-                             const ChemicalFeatures *chemfe, const std::string &basis_in,
+                             const ChemicalFeatures &chemfe, const std::string &basis_in,
                              const int start_idx, const int end_idx) :
     kind{MaskComponentKind::MASK},
     op{MaskOperator::NONE},
@@ -179,8 +179,8 @@ MaskComponent::MaskComponent(const std::vector<SelectionItem> &parts_in, const A
 #if 0
     case SelectionItemKind::RING_SIZE:
       {
-        const std::vector<uint> ring_mask = chemfe->getRingMask(parts_in[i].scan_begin,
-                                                                parts_in[i].scan_end);
+        const std::vector<uint> ring_mask = chemfe.getRingMask(parts_in[i].scan_begin,
+                                                               parts_in[i].scan_end);
         for (int j = 0; j < cdk.natom; j++) {
           const int jidx = j / n_bits;
           const int jbit = j - (jidx * n_bits);
@@ -190,8 +190,8 @@ MaskComponent::MaskComponent(const std::vector<SelectionItem> &parts_in, const A
       break;
     case SelectionItemKind::AROMATICITY:
       {
-        const std::vector<uint> aromatic_mask = chemfe->getAromaticMask(parts_in[i].scan_begin,
-                                                                        parts_in[i].scan_end);
+        const std::vector<uint> aromatic_mask = chemfe.getAromaticMask(parts_in[i].scan_begin,
+                                                                       parts_in[i].scan_end);
         for (int j = 0; j < cdk.natom; j++) {
           const int jidx = j / n_bits;
           const int jbit = j - (jidx * n_bits);
@@ -202,7 +202,7 @@ MaskComponent::MaskComponent(const std::vector<SelectionItem> &parts_in, const A
     case SelectionItemKind::CHIRALITY:
       {
         const std::vector<uint> chiral_mask =
-          chemfe->getChiralityMask(static_cast<ChiralOrientation>(parts_in[i].begin));
+          chemfe.getChiralityMask(static_cast<ChiralOrientation>(parts_in[i].begin));
         for (int j = 0; j < cdk.natom; j++) {
           const int jidx = j / n_bits;
           const int jbit = j - (jidx * n_bits);
@@ -477,7 +477,7 @@ AtomMask::AtomMask(const AtomGraph *ag_in) :
 
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
+                   const ChemicalFeatures &chemfe, const CoordinateFrameReader &cfr,
                    const MaskInputMode mode, const std::string &description_in) :
     recommended_scan{MaskTraversalMode::COMPLETE},
     style{mode},
@@ -520,14 +520,14 @@ AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
 
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe, const CoordinateFrame &cf,
+                   const ChemicalFeatures &chemfe, const CoordinateFrame &cf,
                    const MaskInputMode mode, const std::string &description_in) :
     AtomMask(input_text_in, ag_in, chemfe, cf.data(), mode, description_in)
 {}
   
 //-------------------------------------------------------------------------------------------------
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-                   const ChemicalFeatures *chemfe, const PhaseSpace &ps,
+                   const ChemicalFeatures &chemfe, const PhaseSpace &ps,
                    const MaskInputMode mode, const std::string &description_in) :
     AtomMask(input_text_in, ag_in, chemfe, CoordinateFrameReader(ps), mode, description_in)
 {}
@@ -672,7 +672,7 @@ void AtomMask::addAtoms(const std::vector<char4> &new_names) {
 
 //-------------------------------------------------------------------------------------------------
 void AtomMask::addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
-                        const ChemicalFeatures *chemfe) {
+                        const ChemicalFeatures &chemfe) {
 
   // Determine if the two masks point to the same topology.  If so, the addition can be a simple
   // union of sets.  Otherwise, take the input text from the new mask and apply it to the current
@@ -700,16 +700,21 @@ void AtomMask::addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
 
 //-------------------------------------------------------------------------------------------------
 void AtomMask::addAtoms(const std::string &new_mask, const CoordinateFrame &cf,
-                        const ChemicalFeatures *chemfe) {
-  if (chemfe == nullptr) {
-    const ChemicalFeatures my_chemfe(ag_pointer, cf.data());
-    AtomMask applied_criteria(new_mask, ag_pointer, &my_chemfe, cf, style);
-    addAtoms(applied_criteria, cf, &my_chemfe);
-  }
-  else {
-    AtomMask applied_criteria(new_mask, ag_pointer, chemfe, cf, style);
-    addAtoms(applied_criteria, cf, chemfe);
-  }
+                        const ChemicalFeatures &chemfe) {
+  AtomMask applied_criteria(new_mask, ag_pointer, chemfe, cf, style);
+  addAtoms(applied_criteria, cf, chemfe);
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf) {
+  const ChemicalFeatures chemfe(ag_pointer, cf.data());
+  addAtoms(new_mask, cf, chemfe);
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomMask::addAtoms(const std::string &new_mask, const CoordinateFrame &cf) {
+  const ChemicalFeatures chemfe(ag_pointer, cf.data());
+  addAtoms(new_mask, cf, chemfe);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -946,7 +951,7 @@ std::vector<SelectionItem> AtomMask::evaluateInclusions(const std::string &inclu
 //-------------------------------------------------------------------------------------------------
 std::vector<uint> AtomMask::parseMask(const std::vector<int> &scope_levels, int *position,
                                       const CoordinateFrameReader &cfr,
-                                      const ChemicalFeatures *chemfe) {
+                                      const ChemicalFeatures &chemfe) {
 
   // Bail out immediately if the mask contains no information
   if (scope_levels.size() == 0LLU) {

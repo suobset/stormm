@@ -1246,7 +1246,7 @@ int main(const int argc, const char* argv[]) {
     const PhaseSpace &ps_i = sysc.getCoordinateReference(example_system_idx);
     const CoordinateFrameReader cfr_i(ps_i);
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
-    const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
+    const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, chemfe_i, cfr_i);
     ra_vec.emplace_back(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
     ra_vec[i].addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }

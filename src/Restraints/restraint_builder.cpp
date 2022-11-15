@@ -143,8 +143,8 @@ applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_
                           const double displacement_onset, const double displacement_plateau,
                           const double proximity_penalty, const double proximity_onset,
                           const double proximity_plateau) {
-  ChemicalFeatures chemfe(ag, ref_cfr);
-  return applyPositionalRestraints(ag, ref_cfr, AtomMask(mask, ag, &chemfe, ref_cfr),
+  const ChemicalFeatures chemfe(ag, ref_cfr);
+  return applyPositionalRestraints(ag, ref_cfr, AtomMask(mask, ag, chemfe, ref_cfr),
                                    displacement_penalty, displacement_onset, displacement_plateau,
                                    proximity_penalty, proximity_onset, proximity_plateau);
 }
@@ -183,8 +183,8 @@ std::vector<BoundedRestraint>
 applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
                         const std::string &mask, const double penalty,
                         const double flat_bottom_half_width, const double cutoff) {
-  ChemicalFeatures chemfe(ag, ref_cfr);
-  return applyDistanceRestraints(ag, ref_cfr, AtomMask(mask, ag, &chemfe, ref_cfr), penalty,
+  const ChemicalFeatures chemfe(ag, ref_cfr);
+  return applyDistanceRestraints(ag, ref_cfr, AtomMask(mask, ag, chemfe, ref_cfr), penalty,
                                  flat_bottom_half_width, cutoff);
 }
 
@@ -317,8 +317,8 @@ std::vector<BoundedRestraint>
 applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                        const std::string &mask, const double penalty,
                        const double flat_bottom_half_width, const double harmonic_maximum) {
-  ChemicalFeatures chemfe(ag, cfr);
-  return applyHoldingRestraints(ag, cfr, AtomMask(mask, ag, &chemfe, cfr), penalty,
+  const ChemicalFeatures chemfe(ag, cfr);
+  return applyHoldingRestraints(ag, cfr, AtomMask(mask, ag, chemfe, cfr), penalty,
                                 flat_bottom_half_width, harmonic_maximum);
 }
 
@@ -412,7 +412,7 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
 std::vector<BoundedRestraint>
 applyHydrogenBondPreventors(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                             const double penalty, const double approach_point) {
-  ChemicalFeatures chemfe(ag, cfr);
+  const ChemicalFeatures chemfe(ag, cfr);
   return applyHydrogenBondPreventors(ag, chemfe, penalty, approach_point);
 }
 

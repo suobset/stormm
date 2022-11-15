@@ -398,12 +398,12 @@ int main(const int argc, const char* argv[]) {
            "Holding restraints for the Gly-Tyr system do not incorporate the expected "
            "displacements.", oe.takeSnapshot(), 1.0e-4, 1.0e-6, PrintSituation::APPEND, do_snps);
   CHECK_THROWS_SOFT(BoundedRestraint trick_br(":GLY & @CA", ":GLY & @C", ":LYS & @PH",
-                                              ":LYS & @CA", &gk_ag, &gk_chemfe, gk_cfr, 0, 0,
+                                              ":LYS & @CA", &gk_ag, gk_chemfe, gk_cfr, 0, 0,
                                               1.0, 1.0, 0.5, 1.5, 1.6, 2.0, 1.0, 1.0, 0.5, 1.5,
                                               1.6, 2.0), "A four-point dihedral angle restraint "
                     "was created based on a nonsensical atom mask.", do_tests);
   CHECK_THROWS_SOFT(BoundedRestraint trick_br(":GLY & @CA,C", ":GLY & @C", ":LYS & @N",
-                                              ":LYS & @CA", &gk_ag, &gk_chemfe, gk_cfr, 0, 0,
+                                              ":LYS & @CA", &gk_ag, gk_chemfe, gk_cfr, 0, 0,
                                               1.0, 1.0, 0.5, 1.5, 1.6, 2.0, 1.0, 1.0, 0.5, 1.5,
                                               1.6, 2.0), "A four-point dihedral angle restraint "
                     "was created based on an atom mask specifying multiple atoms.", do_tests);

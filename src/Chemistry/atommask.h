@@ -115,7 +115,7 @@ public:
   MaskComponent(MaskOperator op_in, double range, const std::string &basis_in, int start_idx,
                 int end_idx);
   MaskComponent(const std::vector<SelectionItem> &parts_in, const AtomGraph *ag,
-                const ChemicalFeatures *chemfe, const std::string &basis_in, int start_idx,
+                const ChemicalFeatures &chemfe, const std::string &basis_in, int start_idx,
                 int end_idx);
   MaskComponent(const std::vector<uint> &primitive_mask_in, const std::string &basis_in,
                 int start_idx, int end_idx);
@@ -224,17 +224,17 @@ public:
   AtomMask(const AtomGraph *ag_in = nullptr);
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
+           const ChemicalFeatures &chemfe, const CoordinateFrameReader &cfr,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe, const CoordinateFrame &cf,
+           const ChemicalFeatures &chemfe, const CoordinateFrame &cf,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe, const PhaseSpace &ps,
+           const ChemicalFeatures &chemfe, const PhaseSpace &ps,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
   /// \}
@@ -290,6 +290,7 @@ public:
   ///   - Add the atoms of another mask (the topologies will be checked for a reasonable degree of
   ///     congruity)
   ///   - Add atoms implied by another mask string.
+  ///   - Supply the system's pre-computed chemical features, or have it constructed temporarily.
   ///
   /// \param new_indices  The atom indices to add to the current mask
   /// \param new_names    The names of atoms to add to the current mask
@@ -302,10 +303,14 @@ public:
   void addAtoms(const std::vector<char4> &new_names);
 
   void addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
-                const ChemicalFeatures *chemfe = nullptr);
+                const ChemicalFeatures &chemfe);
 
   void addAtoms(const std::string &new_mask, const CoordinateFrame &cf,
-		const ChemicalFeatures *chemfe = nullptr);
+		const ChemicalFeatures &chemfe);
+
+  void addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf);
+  
+  void addAtoms(const std::string &new_mask, const CoordinateFrame &cf);
   /// \}
   
 private:
@@ -343,7 +348,7 @@ private:
   /// \param position      Used to return the position of the last character used in finding the
   ///                      range value of interest
   std::vector<uint> parseMask(const std::vector<int> &scope_levels, int *position,
-                              const CoordinateFrameReader &cfr, const ChemicalFeatures *chemfe);
+                              const CoordinateFrameReader &cfr, const ChemicalFeatures &chemfe);
 };
 
 } // namespace chemistry

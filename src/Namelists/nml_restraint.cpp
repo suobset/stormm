@@ -484,7 +484,7 @@ std::string RestraintControls::getSystemLabel() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                 const CoordinateFrameReader &cfr) const {
   std::vector<BoundedRestraint> result;
   switch (domain) {
@@ -511,7 +511,7 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
     }
     break;
   case RestraintEnsemble::PREVENT_HBONDS:
-    return applyHydrogenBondPreventors(ag, *chemfe, penalty, proximity);
+    return applyHydrogenBondPreventors(ag, chemfe, penalty, proximity);
   case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
     {
       const AtomMask cordon(ensemble_mask, ag, chemfe, cfr, MaskInputMode::AMBMASK,
@@ -540,14 +540,14 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *che
 
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                 const CoordinateFrame &cf) const {
   return getRestraint(ag, chemfe, cf.data());
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                 const PhaseSpace &ps) const {
   return getRestraint(ag, chemfe, CoordinateFrameReader(ps));
 }

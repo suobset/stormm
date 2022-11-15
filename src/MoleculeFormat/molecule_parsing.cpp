@@ -6,7 +6,7 @@ namespace structure {
 
 //-------------------------------------------------------------------------------------------------
 AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecule,
-                             const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                             const AtomGraph *ag, const ChemicalFeatures &chemfe,
                              const CoordinateFrame &cf) {
   std::vector<std::string> data_lines = molecule.getDataItemContent(item_name);
 
@@ -52,7 +52,11 @@ AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecul
     }
     AtomMask result(ag);
     if (all_integer == true) {
-      for (
+      std::vector<int> atom_adds(word_count);
+      for (int i = 0; i < word_count; i++) {
+        atom_adds[i] = stoi(words[i]);
+      }
+      result.addAtoms(atom_adds);
     }
   }
 }
