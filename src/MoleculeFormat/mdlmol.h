@@ -103,15 +103,26 @@ public:
   /// \param line_end        Last relevant line of the TextFile object at which reading will stop
   /// \param capitalization  Indicate whether atomic symbol capitalization can be ignored when
   ///                        assigning elements to each atom
-  /// \param policy          Course of action to take if errors are encountered when inferring
-  ///                        atomic elements
+  /// \param policy_in       Course of action to take if errors are encountered when inferring
+  ///                        atomic elements or other critical features of the structure
+  /// \param dimod_policy    Preferred course of action if the names of some data items are found
+  ///                        to break the strict Biovia standard: should they be repaired
+  ///                        (modified) or left as they are?
+  /// \param dimod_notify    Indicate whether to alert the user if modifications are made to data
+  ///                        items.
   /// \{
   MdlMol(ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
+  MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   MdlMol(const TextFile &tf, int line_start = 0, int line_end = -1,
          CaseSensitivity capitalization = CaseSensitivity::YES,
-         ExceptionResponse policy_in = ExceptionResponse::WARN);
+         ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   /// \}
 
   /// \brief Default copy and move constructors, as well as assignment operators, are appropriate
@@ -123,6 +134,9 @@ public:
   MdlMol& operator=(const MdlMol &original) = default;
   MdlMol& operator=(MdlMol &&original) = default;
   /// \}
+
+  /// \brief Get the title of the MDL MOL entry (for its first three lines)
+  const std::string& getTitle() const;
   
   /// \brief Get the system's atom count.
   int getAtomCount() const;
@@ -288,6 +302,12 @@ public:
   ///
   /// \param item_index  Index of the data item of interest
   const std::string& getDataItemName(int item_index) const;
+
+  /// \brief Get the name of a data item based on its number, fit for output in the proper Biovia
+  ///        SD file format standard.
+  ///
+  /// \param item_index  Index of the data item of interest
+  const std::string& getDataItemOutputName(int item_index) const;
 
   /// \brief Get the index of a data item based on a name.
   ///

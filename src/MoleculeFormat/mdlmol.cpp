@@ -39,7 +39,8 @@ MdlMol::MdlMol(const ExceptionResponse policy_in):
 
 //-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
-               const CaseSensitivity capitalization, const ExceptionResponse policy_in):
+               const CaseSensitivity capitalization, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
   MdlMol(policy_in)
 {
   const TextFileReader tfr = tf.data();
@@ -280,7 +281,8 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
   for (int pos = mdl_section_end; pos < sd_compound_end; pos++) {
     if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
       int adv_pos;
-      data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title);
+      data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title, dimod_policy,
+                              dimod_notify);
       compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
       pos = adv_pos;
     }
@@ -315,14 +317,21 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-MdlMol::MdlMol(const std::string &filename, const ExceptionResponse policy_in):
-    MdlMol(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in)
+MdlMol::MdlMol(const std::string &filename, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
+  MdlMol(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in, dimod_policy, dimod_notify)
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in):
-    MdlMol(std::string(filename), policy_in)
+MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
+    MdlMol(std::string(filename), policy_in, dimod_policy, dimod_notify)
 {}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getTitle() const {
+  return title;
+}
 
 //-------------------------------------------------------------------------------------------------
 int MdlMol::getAtomCount() const {
@@ -843,6 +852,12 @@ void MdlMol::addLineToDataItem(const std::string &text, int item_index) {
 const std::string& MdlMol::getDataItemName(const int item_index) const {
   checkDataItemIndex(item_index, "getDataItemName");
   return data_items[item_index].getItemName();
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getDataItemOutputName(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemOutputName");
+  return data_items[item_index].getOutputItemName();
 }
 
 //-------------------------------------------------------------------------------------------------

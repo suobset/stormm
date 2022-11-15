@@ -14,6 +14,12 @@ enum class ExceptionResponse {
   DIE, WARN, SILENT
 };
 
+/// \brief Enumerate the degree of modification to make to user input that, while it may not meet
+///        a strict standard, is nevertheless tolerable and salvageable.
+enum class ModificationPolicy {
+  MODIFY, DO_NOT_MODIFY
+};
+  
 /// \brief Express choices for the case-sensitivity of various inputs
 enum class CaseSensitivity {
   YES,      ///< Case matters

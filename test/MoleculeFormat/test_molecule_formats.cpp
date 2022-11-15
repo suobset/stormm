@@ -5,6 +5,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/MoleculeFormat/mdlmol.h"
 #include "../../src/MoleculeFormat/molecule_format_enumerators.h"
+#include "../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -32,9 +33,11 @@ int main(const int argc, const char* argv[]) {
   const std::string mdl_name      = base_name + osc + "sulfonamide.mol";
   const std::string sdf_name      = base_name + osc + "sulfonamide_rots.sdf";
   const std::string chemaxon_name = base_name + osc + "sdf_chemaxon.sdf";
+  const std::string tether_name = base_name + osc + "tethered_atoms.sdf";
   const bool files_ready = (getDrivePathType(mdl_name) == DrivePathType::FILE &&
                             getDrivePathType(sdf_name) == DrivePathType::FILE &&
-                            getDrivePathType(chemaxon_name) == DrivePathType::FILE);
+                            getDrivePathType(chemaxon_name) == DrivePathType::FILE &&
+                            getDrivePathType(tether_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_ready) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (files_ready == false) {
     rtWarn("Files for MDL MOL format molecules were not found.  Check the STORMM source path, "
@@ -74,6 +77,21 @@ int main(const int argc, const char* argv[]) {
                                        chemaxon_mols[1].getFormalCharge(22) };
   check(fc_result, RelationalOperator::EQUAL, std::vector<int>(2, 1), "Formal charges were not "
         "properly interpreted from an MDL MOL V2000 format property.", do_tests);
+
+  // Read an SD file containing specific data items from which information can be extracted.
+  std::vector<MdlMol> tether_mols = readStructureDataFile(tether_name);
+  const std::vector<double> nrg_rep = realFromSdfDataItem("Internal_energy_repulsive",
+                                                          tether_mols[0]);
+  check(nrg_rep, RelationalOperator::EQUAL,
+        Approx(std::vector<double>(1, 17.733681)).margin(1.0e-7), "A real value was not read "
+        "correctly from one of the data items of an SDF file.", do_tests);
+  const std::vector<int> hbond_donors = intFromSdfDataItem("HBond_Donors", tether_mols[0]);
+  check(hbond_donors, RelationalOperator::EQUAL, std::vector<int>(1, 3), "An integer value was "
+        "not read correctly from one of the data items of an SDF file.", do_tests);
+  const std::vector<int> teth_atom_list = intFromSdfDataItem("TETHERED ATOMS", tether_mols[0]);
+  const std::vector<int> teth_atom_ans = { 16, 18, 14, 37, 19, 17, 15, 12, 13, 8, 9, 10, 11 };
+  check(teth_atom_list, RelationalOperator::EQUAL, teth_atom_ans, "A list of integers pulled from "
+        "an SD file data item does not meet expectations.", do_tests);
   
   // Print results
   printTestSummary(oe.getVerbosity());

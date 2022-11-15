@@ -48,6 +48,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_request.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
+		   $(SRCDIR)/MoleculeFormat/molecule_parsing.cpp \
 		   $(SRCDIR)/Namelists/input.cpp \
 		   $(SRCDIR)/Namelists/namelist_element.cpp \
 		   $(SRCDIR)/Namelists/namelist_emulator.cpp \
@@ -191,6 +192,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_request.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
+		     $(SRCDIR)/MoleculeFormat/molecule_parsing.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \
@@ -371,6 +373,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_request.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
+		  $(SRCDIR)/MoleculeFormat/molecule_parsing.o \
 		  $(SRCDIR)/Namelists/input.o \
 		  $(SRCDIR)/Namelists/namelist_element.o \
 		  $(SRCDIR)/Namelists/namelist_emulator.o \
