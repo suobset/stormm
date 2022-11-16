@@ -113,15 +113,15 @@ public:
   /// \{
   MdlMol(ExceptionResponse policy_in = ExceptionResponse::WARN);
   MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
-         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
-         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   MdlMol(const TextFile &tf, int line_start = 0, int line_end = -1,
          CaseSensitivity capitalization = CaseSensitivity::YES,
          ExceptionResponse policy_in = ExceptionResponse::WARN,
-         ModificationPolicy dimod_policy = ModificationPolicy::MODIFY,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   /// \}
 

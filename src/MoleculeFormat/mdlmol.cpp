@@ -1015,7 +1015,7 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
       header_line += '(' + data_items[i].getExternalRegistryNumber() + ')';
     }
     if (data_items[i].placeTitleInHeader()) {
-      header_line += '<' + data_items[i].getItemName() + '>';
+      header_line += '<' + data_items[i].getOutputItemName() + '>';
       required_id = true;
     }
     if (data_items[i].placeMaccsIIFieldInHeader()) {

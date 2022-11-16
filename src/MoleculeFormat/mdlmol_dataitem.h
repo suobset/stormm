@@ -64,16 +64,16 @@ public:
                  const std::string &external_regno_in = std::string(""),
                  int internal_regno_in = -1, int maccs_ii_number_in = -1, uint header_info = 0U,
                  const std::vector<std::string> &body_in = {},
-                 ModificationPolicy mpol = ModificationPolicy::MODIFY,
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
                  ExceptionResponse notify = ExceptionResponse::WARN);
 
   MdlMolDataItem(const TextFile &tf, int line_number, int *line_advance,
                  int compound_line_end = -1, const std::string &title = std::string(""),
-                 ModificationPolicy mpol = ModificationPolicy::MODIFY,
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
                  ExceptionResponse notify = ExceptionResponse::WARN);
 
   MdlMolDataItem(const MdlMolDataRequest &ask, const std::vector<std::string> &body_in,
-                 ModificationPolicy mpol = ModificationPolicy::MODIFY,
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
                  ExceptionResponse notify = ExceptionResponse::WARN);
   /// \}
 
@@ -213,7 +213,7 @@ public:
   ///                      SD file standards but is otherwise salvageable.
   /// \param notify        Indicate what to do if modifications are made to the proposed name.
   void setItemName(const std::string &item_name_in,
-                   ModificationPolicy mpol = ModificationPolicy::MODIFY,
+                   ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
                    ExceptionResponse notify = ExceptionResponse::WARN);
 
   /// \brief Add a line to the data item.
@@ -250,7 +250,7 @@ private:
   std::vector<std::string> body;
   
   /// \brief Validate the choice of item name.
-  void validateItemName(ModificationPolicy mpol = ModificationPolicy::MODIFY,
+  void validateItemName(ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
                         ExceptionResponse notify = ExceptionResponse::WARN);
 };
 
