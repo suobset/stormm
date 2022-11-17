@@ -601,8 +601,8 @@ void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name
       printf("   * %-*.*s : %s\n", member_width, member_width,
              keywords[p_idx].sub_keys[i].c_str(),
              terminalFormat("[" + getNamelistTypeName(keywords[p_idx].sub_kinds[i]) + "] " +
-                            keywords[p_idx].sub_help_messages[i], "", "", 8 + name_width, 0,
-                            8 + name_width, 0, RTMessageKind::TABULAR).c_str());
+                            keywords[p_idx].sub_help_messages[i], "", "", 8 + member_width, 0,
+                            8 + member_width, 0, RTMessageKind::TABULAR).c_str());
     }
   }
 }

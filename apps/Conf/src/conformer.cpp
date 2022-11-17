@@ -98,9 +98,24 @@ int main(int argc, const char* argv[]) {
   AtomGraphSynthesis conf_poly_ag(unique_topologies, conformer_topology_indices);
   master_timer.assignTime(3);
 
+  // Loop over all systems and perform energy minimizations
+  std::vector<StaticExclusionMask> conformer_masks;
+  conformer_masks.reserve(unique_topologies.size());
+  for (int i = 0; i < unique_topologies.size(); i++) {
+    conformer_masks.emplace_back(unique_topologies[i]);
+  }
+  const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
+  const int nconf = conformer_population.getSystemCount();
+  for (int i = 0; i < nconf; i++) {
+    PhaseSpace psi = conformer_population.exportSystem(i);
+    AtomGraph *agi = conf_poly_ag.getSystemTopologyPointer(i);
+    const ScoreCard emin = minimize(&psi, agi, conformer_masks[conformer_topology_indices[i]],
+                                    mincon);
+  }
+  master_timer.assignTime(4);
+
   // CHECK
   std::vector<bool> is_printed(conformer_population.getSystemCount(), false);
-  const int nconf = conformer_population.getSystemCount();
   for (int i = 0; i < nconf; i++) {
     if (is_printed[i]) {
       continue;
@@ -121,21 +136,6 @@ int main(int argc, const char* argv[]) {
                                          PrintSituation::OVERWRITE);
   }
   // END CHECK
-
-  // Loop over all systems and perform energy minimizations
-  std::vector<StaticExclusionMask> conformer_masks;
-  conformer_masks.reserve(unique_topologies.size());
-  for (int i = 0; i < unique_topologies.size(); i++) {
-    conformer_masks.emplace_back(unique_topologies[i]);
-  }
-  const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
-  for (int i = 0; i < nconf; i++) {
-    PhaseSpace psi = conformer_population.exportSystem(i);
-    AtomGraph *agi = conf_poly_ag.getSystemTopologyPointer(i);
-    const ScoreCard emin = minimize(&psi, agi, conformer_masks[conformer_topology_indices[i]],
-                                    mincon);
-  }
-  master_timer.assignTime(4);
 
   // Print timings results
   master_timer.printResults();

@@ -83,15 +83,21 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> nrg_rep = realFromSdfDataItem("Internal_energy_repulsive",
                                                           tether_mols[0]);
   check(nrg_rep, RelationalOperator::EQUAL,
-        Approx(std::vector<double>(1, 17.733681)).margin(1.0e-7), "A real value was not read "
+        Approx(std::vector<double>(1, 13.451076)).margin(1.0e-7), "A real value was not read "
         "correctly from one of the data items of an SDF file.", do_tests);
   const std::vector<int> hbond_donors = intFromSdfDataItem("HBond_Donors", tether_mols[0]);
-  check(hbond_donors, RelationalOperator::EQUAL, std::vector<int>(1, 3), "An integer value was "
+  check(hbond_donors, RelationalOperator::EQUAL, std::vector<int>(1, 2), "An integer value was "
         "not read correctly from one of the data items of an SDF file.", do_tests);
   const std::vector<int> teth_atom_list = intFromSdfDataItem("TETHERED ATOMS", tether_mols[0]);
-  const std::vector<int> teth_atom_ans = { 16, 18, 14, 37, 19, 17, 15, 12, 13, 8, 9, 10, 11 };
+  const std::vector<int> teth_atom_ans = { 16, 11, 12, 13, 14, 15, 26, 24, 18, 17, 10,  9,  8,  7,
+                                            6, 33, 32,  5, 25 };
   check(teth_atom_list, RelationalOperator::EQUAL, teth_atom_ans, "A list of integers pulled from "
         "an SD file data item does not meet expectations.", do_tests);
+  const std::vector<double> real_storage_list = realFromSdfDataItem("REAL_NUMBERS",
+                                                                    tether_mols[0]);
+  const std::vector<double> real_storage_ans = { 0.1, 814.232, 97.354, -3.245 };
+  check(real_storage_list, RelationalOperator::EQUAL, real_storage_ans, "A list of real numbers "
+        "pulled from an SD file data item does not meet expectations.", do_tests);
   
   // Print results
   printTestSummary(oe.getVerbosity());

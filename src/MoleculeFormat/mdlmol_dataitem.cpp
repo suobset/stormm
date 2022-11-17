@@ -44,8 +44,23 @@ MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *l
   const int lnlength = tf.getLineLength(line_number);
   bool on_item_name = false;
   bool on_regno = false;
+  bool name_read = false;
+  bool regno_read = false;
   for (int i = 1; i < lnlength; i++) {
     if (line_ptr[i] == '<') {
+      if (name_read) {
+        switch (notify) {
+        case ExceptionResponse::DIE:
+        case ExceptionResponse::WARN:
+          rtWarn("Two item names, given between < >, were found in a data item "
+                 "of SD file " + tf.getFileName() + " (line " + std::to_string(line_number + 1) +
+                 ").  Only the first such name will be printed to subsequent output files.",
+                 "MdlMolDataItem");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }          
+      }
       if (on_item_name) {
         rtErr("The reserved character '<' appears twice on line " + std::to_string(line_number) +
               " of file " + getBaseName(tf.getFileName()) + ", compound " + title + ".",
@@ -63,6 +78,19 @@ MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *l
       on_item_name = false;
     }
     else if (line_ptr[i] == '(') {
+      if (regno_read) {
+        switch (notify) {
+        case ExceptionResponse::DIE:
+        case ExceptionResponse::WARN:
+          rtWarn("Two external registry numbers, given between ( ), were found in a data item "
+                 "of SD file " + tf.getFileName() + " (line " + std::to_string(line_number + 1) +
+                 ").  Only the first such registry number will be printed to subsequent output "
+                 "files.", "MdlMolDataItem");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }          
+      }
       if (on_regno) {
         rtErr("The reserved character '(' appears twice on line " + std::to_string(line_number) +
               " of file " + getBaseName(tf.getFileName()) + ", in compound " + title + ".",
@@ -79,6 +107,7 @@ MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *l
               "MdlMolDataItem");
       }
       on_regno = false;
+      regno_read = true;
     }
     else if (on_item_name == false && on_regno == false) {
       if (line_ptr[i] == 'D' && i < lnlength - 2 && line_ptr[i + 1] == 'T') {
