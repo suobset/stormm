@@ -115,7 +115,7 @@ AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecul
                              const AtomGraph *ag, const ExceptionResponse policy) {
   const CoordinateFrame cf = molecule.exportCoordinateFrame();
   const ChemicalFeatures chemfe(ag, cf.data());
-  maskFromSdfDataItem(item_name, molecule, ag, chemfe, cf, policy);
+  return maskFromSdfDataItem(item_name, molecule, ag, chemfe, cf, policy);
 }
 
 //-------------------------------------------------------------------------------------------------
