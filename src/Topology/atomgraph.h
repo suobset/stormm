@@ -469,7 +469,7 @@ public:
   /// \param high_index  The end of a stretch of atoms
   /// \param index       A specific atom index
   /// \{
-  std::vector<char4> getAtomName() const;
+  const Hybrid<char4>& getAtomName() const;
   std::vector<char4> getAtomName(int low_index, int high_index) const;
   char4 getAtomName(int index) const;
   /// \}
@@ -485,7 +485,7 @@ public:
   /// \param high_index  The end of a stretch of atoms
   /// \param index       A specific atom index
   /// \{
-  std::vector<char4> getAtomType() const;
+  const Hybrid<char4>& getAtomType() const;
   std::vector<char4> getAtomType(int low_index, int high_index) const;
   char4 getAtomType(int index) const;
   /// \}
@@ -498,7 +498,7 @@ public:
   ///
   /// \param index       A specific residue index
   /// \{
-  std::vector<char4> getResidueName() const;
+  const Hybrid<char4>& getResidueName() const;
   char4 getResidueName(int index) const;
   /// \}
 

@@ -33,6 +33,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
 		   $(SRCDIR)/Math/statistics.cpp \
 		   $(SRCDIR)/Math/tickcounter.cpp \
+		   $(SRCDIR)/Math/tricubic_cell.cpp \
 		   $(SRCDIR)/Math/vector_ops.cpp \
 		   $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
@@ -47,6 +48,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_request.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
+		   $(SRCDIR)/MoleculeFormat/molecule_parsing.cpp \
 		   $(SRCDIR)/Namelists/input.cpp \
 		   $(SRCDIR)/Namelists/namelist_element.cpp \
 		   $(SRCDIR)/Namelists/namelist_emulator.cpp \
@@ -175,6 +177,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Math/statistics.h \
 		     $(SRCDIR)/Math/summation.h \
 		     $(SRCDIR)/Math/tickcounter.h \
+		     $(SRCDIR)/Math/tricubic_cell.h \
 		     $(SRCDIR)/Math/vector_ops.h \
 		     $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
@@ -189,6 +192,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_request.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_file_io.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
+		     $(SRCDIR)/MoleculeFormat/molecule_parsing.h \
 		     $(SRCDIR)/Namelists/input.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \
@@ -295,6 +299,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Math/series_ops.tpp \
 		   $(SRCDIR)/Math/summation.tpp \
 		   $(SRCDIR)/Math/tickcounter.tpp \
+		   $(SRCDIR)/Math/tricubic_cell.tpp \
 		   $(SRCDIR)/Math/vector_ops.tpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
@@ -353,6 +358,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/series_ops.o \
 		  $(SRCDIR)/Math/statistics.o \
 		  $(SRCDIR)/Math/tickcounter.o \
+		  $(SRCDIR)/Math/tricubic_cell.o \
 		  $(SRCDIR)/Math/vector_ops.o \
 		  $(SRCDIR)/MolecularMechanics/line_minimization.o \
 		  $(SRCDIR)/MolecularMechanics/minimization.o \
@@ -367,6 +373,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_request.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
+		  $(SRCDIR)/MoleculeFormat/molecule_parsing.o \
 		  $(SRCDIR)/Namelists/input.o \
 		  $(SRCDIR)/Namelists/namelist_element.o \
 		  $(SRCDIR)/Namelists/namelist_emulator.o \
@@ -555,6 +562,9 @@ STORMM_BENCH_CUDA_PROGS = $(BENCHDIR)/bin/accumulate \
 STORMM_APPS = $(APPDIR)/bin/conformer.stormm \
 	      $(APPDIR)/bin/dynamics.stormm \
 	      $(APPDIR)/bin/ffrefine.stormm
+
+# Applications using stormm.cuda
+STORMM_CUDA_APPS = $(APPDIR)/bin/conformer.stormm.cuda
 
 # Compilation variables
 CC=g++
@@ -844,7 +854,7 @@ $(BENCHDIR)/bin/test_nonperiodic_kernels : $(LIBDIR)/libstormm_cuda.so \
 
 # Target: Conformer generation
 $(APPDIR)/bin/conformer.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Conf/src/conformer.cpp \
-			       $(APPDIR)/Conf/src/setup.cpp
+				 $(APPDIR)/Conf/src/setup.cpp
 	@echo "[STORMM]  Building conformer.stormm..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.stormm \
 	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/setup.cpp \
@@ -861,6 +871,15 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 	@echo "[STORMM]  Building ffrefine.stormm..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/ffrefine.stormm \
 	  $(APPDIR)/Ffrn/src/ffrefine.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
+# Target: Conformer generation with CUDA
+$(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
+				      $(APPDIR)/Conf/src/conformer.cu \
+				      $(APPDIR)/Conf/src/setup.cpp
+	@echo "[STORMM]  Building conformer.stormm.cuda..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
+	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cu \
+	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so
 
@@ -882,6 +901,12 @@ clean.bench:
 clean.apps:
 	@echo "[STORMM]  Cleaning application programs"
 	$(VB)if [ -e $(APPDIR)/bin/conformer.stormm ] ; then /bin/rm $(APPDIR)/bin/* ; fi
+
+clean.apps.cuda:
+	@echo "[STORMM]  Cleaning CUDA_based application programs"
+	$(VB)if [ -e $(APPDIR)/bin/conformer.stormm.cuda ] ; then \
+	  /bin/rm $(APPDIR)/bin/*.stormm.cuda ; \
+	fi
 
 test.exe : $(STORMM_TEST_PROGS)
 
@@ -916,5 +941,7 @@ bench.cuda : $(STORMM_BENCH_CUDA_PROGS)
 	done
 
 apps : $(STORMM_APPS)
+
+apps.cuda : $(STORMM_CUDA_APPS)
 
 yes:  install

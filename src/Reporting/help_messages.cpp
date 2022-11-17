@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_conformer.h"
 #include "Namelists/nml_dynamics.h"
@@ -6,6 +7,7 @@
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
+#include "Namelists/nml_solvent.h"
 #include "Parsing/parse.h"
 #include "Parsing/textfile.h"
 #include "help_messages.h"
@@ -20,6 +22,7 @@ using namelist::filesInput;
 using namelist::minimizeInput;
 using namelist::reportInput;
 using namelist::restraintInput;
+using namelist::solventInput;
 using namelist::SubkeyRequirement;
 using parse::strcmpCased;
 using parse::TextFile;
@@ -102,6 +105,11 @@ bool displayNamelistHelp(const std::string &module_name) {
   }
   else if (strcmpCased(module_name, "&restraint", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = restraintInput(tf, &start_line, nullptr);
+    t_nml.printHelp();
+    return true;
+  }
+  else if (strcmpCased(module_name, "&solvent", CaseSensitivity::YES)) {
+    const NamelistEmulator t_nml = solventInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }

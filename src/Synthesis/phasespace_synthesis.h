@@ -463,6 +463,13 @@ public:
   ///
   /// \param index  Index of the system of interest within the synthesis
   const AtomGraph* getSystemTopologyPointer(int index) const;
+
+  /// \brief Get a list of unique topology pointers from this coordinate synthesis, const-casted
+  ///        for accessibility to other functions.
+  std::vector<AtomGraph*> getUniqueTopologies() const;
+
+  /// \brief Get a list of the unique indices of all systems in this coordinate synthesis.
+  std::vector<int> getUniqueTopologyIndices() const;
   
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
   ///
@@ -803,7 +810,7 @@ private:
                                ///<   image a particle or move it between honeycomb pencils these
                                ///<   can be useful.
 
-  // Pointer to the topology that describes this system
+  // Pointer to the topology that describes each system
   const std::vector<AtomGraph*> topologies;
 
   /// \brief Allocate private array data

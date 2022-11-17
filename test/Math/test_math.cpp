@@ -11,9 +11,11 @@
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/tickcounter.h"
+#include "../../src/Math/tricubic_cell.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
@@ -131,6 +133,310 @@ void testDialCounter(TickCounter *dials, const int ncyc) {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Evaluate different polynomial functions of three dimensions at a specific point in space.  The
+// functions in question include a separable example, evaluated by default, which can be stated:
+//
+//      F(x, y, z) = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
+//
+// There is also the option to include a list of coefficients for all combinations of powers of
+// the variables x, y, and z.  If supplied, this form will be evalauted instead.
+//
+// Arguments:
+//   x:     The Cartesian X coordinate
+//   y:     The Cartesian Y coordinate
+//   z:     The Cartesian Z coordinate
+//   kind:  The type of function derivative (or the primary value) to return
+//-------------------------------------------------------------------------------------------------
+double triPolynomial(const double x, const double y, const double z, const TricubicBound kind,
+                     const std::vector<double> coeffs = {}) {
+  const bool do_separable_case = (coeffs.size() != 64LLU);
+  int imin = 0;
+  int jmin = 0;
+  int kmin = 0;
+  switch (kind) {
+  case TricubicBound::VALUE:
+    if (do_separable_case) {
+
+      // Horner's rule would make these computations more efficient, but write expressions in a
+      // format that uses fewer parentheses for clarity.
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
+             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+    }
+    break;
+  case TricubicBound::DX:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
+             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+    }
+    else {
+      imin = 1;
+    }
+    break;
+  case TricubicBound::DY:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
+             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
+             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+    }
+    else {
+      jmin = 1;
+    }
+    break;
+  case TricubicBound::DZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
+             (                    (18.0 * z * z)             - 9.0);
+    }
+    else {
+      kmin = 1;
+    }
+    break;
+  case TricubicBound::DXY:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
+             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
+             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+    }
+    else {
+      imin = 1;
+      jmin = 1;
+    }
+    break;
+  case TricubicBound::DXZ:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
+             (                    (18.0 * z * z)             - 9.0);
+    }
+    else {
+      imin = 1;
+      kmin = 1;
+    }
+    break;
+  case TricubicBound::DYZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
+             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
+             (                    (18.0 * z * z)             - 9.0);
+    }
+    else {
+      jmin = 1;
+      kmin = 1;
+    }
+    break;
+  case TricubicBound::DXYZ:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
+             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
+             (                    (18.0 * z * z)             - 9.0);
+    }
+    else {
+      imin = 1;
+      jmin = 1;
+      kmin = 1;
+    }
+    break;
+  }
+
+  // If this point is reached, the function is evaluating the general case with a vector of
+  // input coefficients.
+  double dxinc = (imin == 0) ? 0.0 : 1.0;
+  double dyinc = (jmin == 0) ? 0.0 : 1.0;
+  double dzinc = (kmin == 0) ? 0.0 : 1.0;
+  double result = 0.0;
+  double difac = 1.0;
+  double xv = 1.0;
+  for (int i = imin; i < 4; i++) {
+    double djfac = 1.0;
+    double yv = 1.0;
+    for (int j = jmin; j < 4; j++) {
+      double dkfac = 1.0;
+      double zv = 1.0;
+      for (int k = kmin; k < 4; k++) {
+        result += coeffs[(4 * ((4 * k) + j)) + i] * difac * xv * djfac * yv * dkfac * zv;
+        zv *= z;
+        dkfac += dzinc;
+      }
+      yv *= y;
+      djfac += dyinc;
+    }
+    xv *= x;
+    difac += dxinc;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Use the finite difference method to check that the derivatives for the triPolynomial function
+// are being computed correctly.  Descriptions of the formal arguments follow from triPolynomial()
+// above.
+//-------------------------------------------------------------------------------------------------
+void finiteDifferenceDisparity(const double x, const double y, const double z,
+                               const std::vector<double> coeffs = {}) {
+  const double incr = 0.000005;
+  const double step = 2.0 * incr;
+  const double v = triPolynomial(x, y, z, TricubicBound::VALUE, coeffs);
+  const double vpx = triPolynomial(x + incr, y, z, TricubicBound::VALUE, coeffs);
+  const double vpy = triPolynomial(x, y + incr, z, TricubicBound::VALUE, coeffs);
+  const double vpz = triPolynomial(x, y, z + incr, TricubicBound::VALUE, coeffs);
+  const double vpxy = triPolynomial(x, y + incr, z, TricubicBound::DX, coeffs);
+  const double vpxz = triPolynomial(x, y, z + incr, TricubicBound::DX, coeffs);
+  const double vpyz = triPolynomial(x, y, z + incr, TricubicBound::DY, coeffs);
+  const double vpxyz = triPolynomial(x, y, z + incr, TricubicBound::DXY, coeffs);
+  const double vnx = triPolynomial(x - incr, y, z, TricubicBound::VALUE, coeffs);
+  const double vny = triPolynomial(x, y - incr, z, TricubicBound::VALUE, coeffs);
+  const double vnz = triPolynomial(x, y, z - incr, TricubicBound::VALUE, coeffs);
+  const double vnxy = triPolynomial(x, y - incr, z, TricubicBound::DX, coeffs);
+  const double vnxz = triPolynomial(x, y, z - incr, TricubicBound::DX, coeffs);
+  const double vnyz = triPolynomial(x, y, z - incr, TricubicBound::DY, coeffs);
+  const double vnxyz = triPolynomial(x, y, z - incr, TricubicBound::DXY, coeffs);
+  const std::vector<double> fdv = { v, (vpx - vnx) / step, (vpy - vny) / step, (vpz - vnz) / step,
+                                    (vpxy - vnxy) / step, (vpxz - vnxz) / step,
+                                    (vpyz - vnyz) / step, (vpxyz - vnxyz) / step };
+  const std::vector<double> dv = { triPolynomial(x, y, z, TricubicBound::VALUE, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DX, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DY, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DZ, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DXY, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DXZ, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DYZ, coeffs),
+                                   triPolynomial(x, y, z, TricubicBound::DXYZ, coeffs) };
+  check(dv, RelationalOperator::EQUAL, Approx(fdv).margin(1.0e-6), "Analytic derivatives of the "
+        "tricubic polynomial do not agree with results computed by the finite difference "
+        "approximation.  Subsequent tests of the TricubicCell object may be unreliable.");
+  const std::vector<double> fdv2 = { v, (vpx - vnx) / step, (vpy - vny) / step, (vpz - vnz) / step,
+                                     (triPolynomial(x + incr, y, z, TricubicBound::DY, coeffs) -
+                                      triPolynomial(x - incr, y, z, TricubicBound::DY, coeffs)) /
+                                     step,
+                                     (triPolynomial(x + incr, y, z, TricubicBound::DZ, coeffs) -
+                                      triPolynomial(x - incr, y, z, TricubicBound::DZ, coeffs)) /
+                                     step,
+                                     (triPolynomial(x, y + incr, z, TricubicBound::DZ, coeffs) -
+                                      triPolynomial(x, y - incr, z, TricubicBound::DZ, coeffs)) /
+                                     step,
+                                     (triPolynomial(x, y + incr, z, TricubicBound::DXZ, coeffs) -
+                                      triPolynomial(x, y - incr, z, TricubicBound::DXZ, coeffs)) /
+                                     step };
+  check(fdv, RelationalOperator::EQUAL, fdv2, "Mixed partial derivatives of the tricubic "
+        "polynomial do not show equivalence.  Subsequent tests of the TricubicCell object may be "
+        "unreliable.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Run a series of tests on a grid of TricubicCell objects.
+//
+// Arguments:
+//   tcmat:   Standard Template Library copy of the tricubic spline weights matrix
+//   coeffs:  [Optional] Vector of coefficients for individual terms in the polynomial
+//-------------------------------------------------------------------------------------------------
+void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<double> coeffs = {}) {
+
+  // Begin by testing the polynomial's analytic evaluation, to ensure subsequent tests are valid.
+  finiteDifferenceDisparity( 0.5,  0.9,  0.4, coeffs);
+  finiteDifferenceDisparity(-1.7,  2.6, -1.8, coeffs);
+  finiteDifferenceDisparity( 2.3,  1.1, -2.0, coeffs);
+  std::vector<TricubicCell<double>> grid;
+  grid.reserve(343);
+  for (int k = -3; k < 4; k++) {
+    for (int j = -3; j < 4; j++) {
+      for (int i = -3; i < 4; i++) {
+
+        // Map the function U = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
+        // to a grid.  The function is encoded in triPolynomial() above.
+        std::vector<double> f(8), dx(8), dy(8), dz(8), dxy(8), dxz(8), dyz(8), dxyz(8);
+        for (int pi = 0; pi < 2; pi++) {
+          for (int pj = 0; pj < 2; pj++) {
+            for (int pk = 0; pk < 2; pk++) {
+              const int m = (2 * ((2 * pk) + pj)) + pi;
+              f[m]    = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::VALUE, coeffs);
+              dx[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DX, coeffs);
+              dy[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DY, coeffs);
+              dz[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DZ, coeffs);
+              dxy[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXY, coeffs);
+              dxz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXZ, coeffs);
+              dyz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DYZ, coeffs);
+              dxyz[m] = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXYZ, coeffs);
+            }
+          }
+        }
+        const std::vector<double> anchor = { static_cast<double>(i), static_cast<double>(j),
+                                             static_cast<double>(k), 1.0, 1.0, 1.0 };
+        grid.emplace_back(tcmat, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
+      }
+    }
+  }
+  const std::vector<double> test_points = {  0.10,  0.50, -0.40,
+                                            -0.80,  1.20, -1.30,
+                                             1.80,  2.20, -0.70,
+                                             0.01,  0.01,  0.01,
+                                             1.00,  1.00,  1.00,
+                                             1.01,  1.01,  1.01,
+                                             1.50,  1.20,  1.40,
+                                            -2.00,  1.00,  2.00,
+                                            -0.01,  1.01,  0.41 };
+  const int npts = static_cast<int>(test_points.size()) / 3;
+  std::vector<double> analytic_tc(npts), spline_tc(npts);
+  std::vector<double> analytic_tc_dx(npts), spline_tc_dx(npts);
+  std::vector<double> analytic_tc_dy(npts), spline_tc_dy(npts);
+  std::vector<double> analytic_tc_dz(npts), spline_tc_dz(npts);
+  std::vector<double> analytic_tc_dxy(npts), spline_tc_dxy(npts);
+  std::vector<double> analytic_tc_dxz(npts), spline_tc_dxz(npts);
+  std::vector<double> analytic_tc_dyz(npts), spline_tc_dyz(npts);
+  std::vector<double> analytic_tc_dxyz(npts), spline_tc_dxyz(npts);
+  for (int i = 0; i < npts; i++) {
+    const double ptx = test_points[(3 * i)    ];
+    const double pty = test_points[(3 * i) + 1];
+    const double ptz = test_points[(3 * i) + 2];
+    analytic_tc[i] = triPolynomial(ptx, pty, ptz, TricubicBound::VALUE, coeffs);
+    const int gcell_x = ptx - grid[0].getCellOrigin(CartesianDimension::X);
+    const int gcell_y = pty - grid[0].getCellOrigin(CartesianDimension::Y);
+    const int gcell_z = ptz - grid[0].getCellOrigin(CartesianDimension::Z);
+    const int gcell = (7 * ((7 * gcell_z) + gcell_y)) + gcell_x;
+    spline_tc[i] = grid[gcell].evaluate(ptx, pty, ptz);
+    analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DX, coeffs);
+    analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DY, coeffs);
+    analytic_tc_dz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DZ, coeffs);
+    analytic_tc_dxy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXY, coeffs);
+    analytic_tc_dxz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXZ, coeffs);
+    analytic_tc_dyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DYZ, coeffs);
+    analytic_tc_dxyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXYZ, coeffs);
+    spline_tc_dx[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DX);
+    spline_tc_dy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DY);
+    spline_tc_dz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DZ);
+    spline_tc_dxy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXY);
+    spline_tc_dxz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXZ);
+    spline_tc_dyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DYZ);
+    spline_tc_dxyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXYZ);
+  }
+  check(spline_tc, RelationalOperator::EQUAL, Approx(analytic_tc).margin(1.0e-6), "Spline-based "
+        "computations for a tricubic function do not match the analytic results.");
+  check(spline_tc_dx, RelationalOperator::EQUAL, Approx(analytic_tc_dx).margin(1.0e-6),
+        "Spline-based computations for d/dx partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dy, RelationalOperator::EQUAL, Approx(analytic_tc_dy).margin(1.0e-6),
+        "Spline-based computations for d/dy partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dz, RelationalOperator::EQUAL, Approx(analytic_tc_dz).margin(1.0e-6),
+        "Spline-based computations for d/dz partial derivatives of a tricubic function do not "
+        "match the analytic results.");
+  check(spline_tc_dxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxy).margin(1.0e-6),
+        "Spline-based computations for d2/dxdy mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxz).margin(1.0e-6),
+        "Spline-based computations for d2/dxdz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyz).margin(1.0e-6),
+        "Spline-based computations for d2/dydz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxyz, RelationalOperator::EQUAL, Approx(analytic_tc_dxyz).margin(1.0e-6),
+        "Spline-based computations for d3/dxdydz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -152,7 +458,10 @@ int main(const int argc, const char* argv[]) {
 
   // Section 5
   section("Test the TickCounter object");
-  
+
+  // Section 6
+  section("Test tricubic interpolation methods");
+
   // Check vector processing capabilities
   section(1);
   const std::vector<double> dv_i = { 0.1, 0.5, 0.9, 0.7, 0.8 };
@@ -740,6 +1049,32 @@ int main(const int argc, const char* argv[]) {
   CHECK_THROWS(dials.set({ 0, 0, -1, 1, 5, 3, 0, 0}), "A TickCounter allowed a negative number to "
                "enter its state settings.");
 
+  // Check tricubic interpolation mechanics
+  section(6);
+  const Hybrid<double> tcmat = getTricubicMatrix();
+  bool all_integer = true;
+  const double* tcmat_ptr = tcmat.data();
+  for (int i = 0; i < 4096; i++) {
+    all_integer = (all_integer && Approx(tcmat_ptr[i]).test(round(tcmat_ptr[i])));
+  }
+  check(all_integer, "The tricubic spline coefficients matrix contains non-integral elements.");
+  std::vector<double> tccol_sums(64, 0.0);
+  std::vector<double> tccol_sums_ans(64, 0.0);
+  tccol_sums_ans[7] = 1.0;
+  for (int i = 0; i < 64; i++) {
+    for (int j = 0; j < 64; j++) {
+      tccol_sums[i] += tcmat_ptr[(64 * i) + j];
+    }
+  }
+  check(tccol_sums, RelationalOperator::EQUAL, tccol_sums_ans, "The column sums of the tricubic "
+        "spline coefficients matrix do not meet expectations.");
+  tricubicTestBundle(tcmat.readHost());
+  std::vector<double> random_coefficients(64);
+  for (int i = 0; i < 64; i++) {
+    random_coefficients[i] = xrs256pp.gaussianRandomNumber();
+  }
+  tricubicTestBundle(tcmat.readHost(), random_coefficients);
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

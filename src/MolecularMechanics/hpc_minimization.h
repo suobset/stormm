@@ -122,7 +122,7 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         const std::string &task_name = std::string(""));
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
-                             const StaticExclusionMaskSynthesis poly_se,
+                             const StaticExclusionMaskSynthesis &poly_se,
                              PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                              const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE,
                              StopWatch *timer = nullptr,

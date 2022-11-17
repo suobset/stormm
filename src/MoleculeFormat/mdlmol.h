@@ -103,15 +103,26 @@ public:
   /// \param line_end        Last relevant line of the TextFile object at which reading will stop
   /// \param capitalization  Indicate whether atomic symbol capitalization can be ignored when
   ///                        assigning elements to each atom
-  /// \param policy          Course of action to take if errors are encountered when inferring
-  ///                        atomic elements
+  /// \param policy_in       Course of action to take if errors are encountered when inferring
+  ///                        atomic elements or other critical features of the structure
+  /// \param dimod_policy    Preferred course of action if the names of some data items are found
+  ///                        to break the strict Biovia standard: should they be repaired
+  ///                        (modified) or left as they are?
+  /// \param dimod_notify    Indicate whether to alert the user if modifications are made to data
+  ///                        items.
   /// \{
   MdlMol(ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
-  MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN);
+  MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
+  MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   MdlMol(const TextFile &tf, int line_start = 0, int line_end = -1,
          CaseSensitivity capitalization = CaseSensitivity::YES,
-         ExceptionResponse policy_in = ExceptionResponse::WARN);
+         ExceptionResponse policy_in = ExceptionResponse::WARN,
+         ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
+         ExceptionResponse dimod_notify = ExceptionResponse::WARN);
   /// \}
 
   /// \brief Default copy and move constructors, as well as assignment operators, are appropriate
@@ -123,6 +134,9 @@ public:
   MdlMol& operator=(const MdlMol &original) = default;
   MdlMol& operator=(MdlMol &&original) = default;
   /// \}
+
+  /// \brief Get the title of the MDL MOL entry (for its first three lines)
+  const std::string& getTitle() const;
   
   /// \brief Get the system's atom count.
   int getAtomCount() const;
@@ -283,7 +297,38 @@ public:
   /// \param text        The text to append
   /// \param item_index  Index of the data item to update
   void addLineToDataItem(const std::string &text, int item_index);
+
+  /// \brief Get the name of a data item based on its number
+  ///
+  /// \param item_index  Index of the data item of interest
+  const std::string& getDataItemName(int item_index) const;
+
+  /// \brief Get the name of a data item based on its number, fit for output in the proper Biovia
+  ///        SD file format standard.
+  ///
+  /// \param item_index  Index of the data item of interest
+  const std::string& getDataItemOutputName(int item_index) const;
+
+  /// \brief Get the index of a data item based on a name.
+  ///
+  /// \param item_name   Name of the data item of interest
+  int getDataItemIndex(const std::string &item_name) const;
   
+  /// \brief Get the lines from a data item as an array of strings.
+  ///
+  /// Overloaded:
+  ///   - Accept the index of the data item and return a const reference to its content (this is
+  ///     possible because a data item with a valid index will have content to reference)
+  ///   - Accept the name of the data item and return a copy of the content, if any data item is
+  ///     found (if the search fails, a const reference to a temporary would be dangerous)
+  ///
+  /// \param item_index  Index of the data item of interest
+  /// \param item_name   Name of the data item of interest
+  /// \{
+  const std::vector<std::string>& getDataItemContent(int item_index) const;
+  std::vector<std::string> getDataItemContent(const std::string &item_name) const;
+  /// \}
+
   /// \brief Write a set of molecular coordinates, bonds, and their annotations in MDL MOL format.
   ///        Apply all properties already stored in the object, such that the result is not an
   ///        exact reversal of the operations for reading such a file but correctly conveys the

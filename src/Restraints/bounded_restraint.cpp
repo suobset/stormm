@@ -37,7 +37,7 @@ BoundedRestraint::BoundedRestraint(const AtomGraph *ag_in) :
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
                                    const std::string &mask_k_in, const std::string &mask_l_in,
-                                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                                   const AtomGraph *ag_in, const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const int init_step_in,
                                    const int final_step_in, const double init_k2_in,
                                    const double init_k3_in, const double init_r1_in,
@@ -116,7 +116,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
                                    const std::string &mask_k_in, const AtomGraph *ag_in,
-                                   const ChemicalFeatures *chemfe,
+                                   const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const int init_step_in,
                                    const int final_step_in, const double init_k2_in,
                                    const double init_k3_in, const double init_r1_in,
@@ -133,7 +133,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
-                                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                                   const AtomGraph *ag_in, const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const int init_step_in,
                                    const int final_step_in, const double init_k2_in,
                                    const double init_k3_in, const double init_r1_in,
@@ -150,7 +150,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const AtomGraph *ag_in,
-                                   const ChemicalFeatures *chemfe,
+                                   const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const int init_step_in,
                                    const int final_step_in, const double init_k2_in,
                                    const double init_k3_in, const double init_r1_in,
@@ -169,7 +169,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const AtomGraph
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
                                    const std::string &mask_k_in, const std::string &mask_l_in,
-                                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                                   const AtomGraph *ag_in, const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const double k2_in,
                                    const double k3_in, const double r1_in, const double r2_in,
                                    const double r3_in, const double r4_in) :
@@ -181,7 +181,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
                                    const std::string &mask_k_in, const AtomGraph *ag_in,
-                                   const ChemicalFeatures *chemfe,
+                                   const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const double k2_in,
                                    const double k3_in, const double r1_in, const double r2_in,
                                    const double r3_in, const double r4_in) :
@@ -192,7 +192,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
-                                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                                   const AtomGraph *ag_in, const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const double k2_in,
                                    const double k3_in, const double r1_in, const double r2_in,
                                    const double r3_in, const double r4_in) :
@@ -203,7 +203,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const AtomGraph *ag_in,
-                                   const ChemicalFeatures *chemfe,
+                                   const ChemicalFeatures &chemfe,
                                    const CoordinateFrameReader &cfr, const double k2_in,
                                    const double k3_in, const double r1_in, const double r2_in,
                                    const double r3_in, const double r4_in,

@@ -3,6 +3,7 @@
 #define STORMM_IMPLICIT_SOLVENT_WORKSPACE_H
 
 #include <cmath>
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"

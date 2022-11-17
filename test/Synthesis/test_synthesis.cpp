@@ -1113,15 +1113,16 @@ int main(const int argc, const char* argv[]) {
   check(scaling_result, RelationalOperator::EQUAL,
         Approx(scaling_answer, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
-        "not meet expectations.");
+        "not meet expectations.", do_tests);
   check(scaling_result_f, RelationalOperator::EQUAL,
         Approx(scaling_answer, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
-        "not meet expectations.");
+        "not meet expectations.", do_tests);
   check(scale_bits_result, RelationalOperator::EQUAL, scale_bits_answer, "Fixed-precision bit "
-        "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
+        "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.",
+        do_tests);
   check(psynth_w.time_step, RelationalOperator::EQUAL, 1.0, "The time step was not correctly "
-        "copied into a PhaseSpaceSynthesis writeable abstract.");
+        "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
   PhaseSpaceSynthesis psynth2(psv, agv, std::vector<Thermostat>(1), std::vector<Barostat>(1),
                               2.5, 24, 25, 40, 28);
   PsSynthesisWriter psynth_w2 = psynth2.data();
@@ -1146,15 +1147,15 @@ int main(const int argc, const char* argv[]) {
   check(scaling_result2, RelationalOperator::EQUAL,
         Approx(scaling_answer2, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
-        "not meet expectations.");
+        "not meet expectations.", do_tests);
   check(scaling_result2_f, RelationalOperator::EQUAL,
         Approx(scaling_answer2, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
-        "not meet expectations.");
+        "not meet expectations.", do_tests);
   check(scale_bits_result2, RelationalOperator::EQUAL, scale_bits_answer2, "Fixed-precision bit "
         "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
   check(psynth_w2.time_step, RelationalOperator::EQUAL, 2.5, "The time step was not correctly "
-        "copied into a PhaseSpaceSynthesis writeable abstract.");
+        "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
   psynth2.extractSystem(&tip3p_ps_copy, 3);
   for (int i = 0; i < tip3p_orig_writer.natom; i++) {
     y_orig[i] = tip3p_orig_writer.ycrd[i];
@@ -1167,6 +1168,17 @@ int main(const int argc, const char* argv[]) {
   check(y_muta, RelationalOperator::NOT_EQUAL, Approx(y_copy).margin(1.0e-8),
         "The PhaseSpaceSynthesis object returns an image of one of its systems with higher "
         "fidelity to the original than expected.", do_tests);
+
+  // Try extracting the unique topologies and unique topology indices from a PhaseSpaceSynthesis
+  const std::vector<AtomGraph*> psv_tops = psynth.getUniqueTopologies();
+  const std::vector<int> psv_top_idx = psynth.getUniqueTopologyIndices();
+  const std::vector<int> psv_top_idx_ans = { 0, 1, 2, 0, 1, 0, 0, 1, 2 };
+  const bool top_ordered = (psv_tops[0] == &tip3p_ag && psv_tops[1] == &tip4p_ag &&
+                            psv_tops[2] == &trpcage_ag);
+  check(top_ordered, "The order of unique topologies produced by a PhaseSpaceSynthesis object is "
+        "not as expected.", do_tests);
+  check(psv_top_idx, RelationalOperator::EQUAL, psv_top_idx_ans, "The sequence of unique topology "
+        "indices produced by a PhaseSpaceSynthesis object is not as expected.", do_tests);
 
   // Check the high-precision modes of a phase-space synthesis: are the extended coordinate,
   // velocity, and force arrays reporting the correct results?
@@ -1234,7 +1246,7 @@ int main(const int argc, const char* argv[]) {
     const PhaseSpace &ps_i = sysc.getCoordinateReference(example_system_idx);
     const CoordinateFrameReader cfr_i(ps_i);
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
-    const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
+    const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, chemfe_i, cfr_i);
     ra_vec.emplace_back(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
     ra_vec[i].addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }

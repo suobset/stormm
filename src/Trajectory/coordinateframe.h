@@ -85,7 +85,7 @@ struct CoordinateFrameReader {
   const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
 };
 
-/// \brief Store the coordinates and box information for a frame, only.  This abrdiged struct can
+/// \brief Store the coordinates and box information for a frame, only.  This abridged struct can
 ///        serve when the full PhaseSpace object would allocate too much memory.  It also comes
 ///        with its own POINTER mode, such that it allocates no memory of its own and merely points
 ///        to another CoordinateFrame object or PhaseSpace object that does have memory allocated.

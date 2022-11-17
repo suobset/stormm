@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/textfile.h"
 #include "Potential/energy_enumerators.h"
@@ -14,6 +15,8 @@
 namespace stormm {
 namespace structure {
 
+using constants::ExceptionResponse;
+using constants::ModificationPolicy;
 using parse::TextFile;
   
 /// \brief Store a data item from within an SD file.  Data items begin with a line of the form
@@ -52,17 +55,26 @@ public:
   /// \param compound_line_end   Index of the last line of the compound within the SD file (the
   ///                            line contains $$$$)
   /// \param title               The title of the structure, if known, for error tracing purposes
+  /// \param mpol                Policy about modifying details of the data items that may not
+  ///                            conform to the Biovia standard
+  /// \param notify              Policy on whether to notify the user if modifications to certain
+  ///                            details of the data item take place
   /// \{
-  MdlMolDataItem(const TextFile &tf, int line_number, int *line_advance,
-                 int compound_line_end = -1,
-                 const std::string &title = std::string(""));
-
   MdlMolDataItem(const std::string &item_name_in = std::string(""),
                  const std::string &external_regno_in = std::string(""),
                  int internal_regno_in = -1, int maccs_ii_number_in = -1, uint header_info = 0U,
-                 const std::vector<std::string> &body_in = {});
+                 const std::vector<std::string> &body_in = {},
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
+                 ExceptionResponse notify = ExceptionResponse::WARN);
 
-  MdlMolDataItem(const MdlMolDataRequest &ask, const std::vector<std::string> &body_in);
+  MdlMolDataItem(const TextFile &tf, int line_number, int *line_advance,
+                 int compound_line_end = -1, const std::string &title = std::string(""),
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
+                 ExceptionResponse notify = ExceptionResponse::WARN);
+
+  MdlMolDataItem(const MdlMolDataRequest &ask, const std::vector<std::string> &body_in,
+                 ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
+                 ExceptionResponse notify = ExceptionResponse::WARN);
   /// \}
 
   /// \brief The default copy and move constructors, as well as copy and move assignment operators,
@@ -95,6 +107,10 @@ public:
   /// \brief Get a const reference to the item name, if it exists.  If there is no item name, a
   ///        const reference to a blank string will be returned.
   const std::string& getItemName() const;
+
+  /// \brief Get a const reference to the output item name, if it exists.  If there is no item
+  ///        name, a const reference to a blank string will be returned.
+  const std::string& getOutputItemName() const;
 
   /// \brief Get the external registry number.
   const std::string& getExternalRegistryNumber() const;
@@ -193,7 +209,12 @@ public:
   /// \brief Set the item name and apply checks to the result.
   ///
   /// \param item_name_in  The item name to assign
-  void setItemName(const std::string &item_name_in);
+  /// \param mpol          Indicate what to do if the proposed name does not meet strict Biovia
+  ///                      SD file standards but is otherwise salvageable.
+  /// \param notify        Indicate what to do if modifications are made to the proposed name.
+  void setItemName(const std::string &item_name_in,
+                   ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
+                   ExceptionResponse notify = ExceptionResponse::WARN);
 
   /// \brief Add a line to the data item.
   ///
@@ -202,30 +223,35 @@ public:
   void addDataLine(const std::string &text);
   
 private:
-  MdlMolDataItemKind kind;     ///< Classifies the data item.  All data items found in the original
-                               ///<   SD file are considered "NATIVE", whereas each custom data
-                               ///<   item falls under one of the other classifications.
-  StateVariable tracked_state; ///< The type of energy term to track if the kind is STATE_VARIABLE.
-                               ///<   If the kind is anything else, this member variable is set to
-                               ///<   ALL_STATES and ignored.
-  std::string item_name;       ///< Name of the data item (optional, but an effective means of
-                               ///<   distiction)
-  std::string external_regno;  ///< External registry number
-  int internal_regno;          ///< Internal registry number, based on the structure index within
-                               ///<   the SD file and a pure integer
-  int maccs_ii_number;         ///< MACCS-II database field number
-  bool use_internal_regno;     ///< Flag to have the header line use the SD file's internal
-                               ///<   structure numbering in the data item header line
-  bool use_external_regno;     ///< Flag to have the header line use the external registry number
-  bool use_item_name;          ///< Flag to use the item name in the header between < > marks
-  bool use_maccs_ii_number;    ///< Flag to use the MACCS-II field number in the header after "DT"
-  bool note_archives;          ///< Flag to have the header line note "FROM ARCHIVES"
+  MdlMolDataItemKind kind;       ///< Classifies the data item.  All data items found in the
+                                 ///<   original SD file are considered "NATIVE", whereas each
+                                 ///<   custom data item falls under one of the other
+                                 ///<   classifications.
+  StateVariable tracked_state;   ///< The type of energy term to track if the kind is
+                                 ///<   STATE_VARIABLE.  If the kind is anything else, this member
+                                 ///<   variable is set to ALL_STATES and ignored.
+  std::string item_name;         ///< Name of the data item (optional, but an effective means of
+                                 ///<   distiction)
+  std::string output_item_name;  ///< Name of the data item (optional, but an effective means of
+                                 ///<   distiction)
+  std::string external_regno;    ///< External registry number
+  int internal_regno;            ///< Internal registry number, based on the structure index within
+                                 ///<   the SD file and a pure integer
+  int maccs_ii_number;           ///< MACCS-II database field number
+  bool use_internal_regno;       ///< Flag to have the header line use the SD file's internal
+                                 ///<   structure numbering in the data item header line
+  bool use_external_regno;       ///< Flag to have the header line use the external registry number
+  bool use_item_name;            ///< Flag to use the item name in the header between < > marks
+  bool use_maccs_ii_number;      ///< Flag to use the MACCS-II field number in the header after
+                                 ///<   the prefix "DT"
+  bool note_archives;            ///< Flag to have the header line note "FROM ARCHIVES"
 
   /// Data lines from the item, one per array element
   std::vector<std::string> body;
   
   /// \brief Validate the choice of item name.
-  void validateItemName();
+  void validateItemName(ModificationPolicy mpol = ModificationPolicy::DO_NOT_MODIFY,
+                        ExceptionResponse notify = ExceptionResponse::WARN);
 };
 
 /// \brief Get the unsigned integer bit-packed code expressing various aspects of the data item

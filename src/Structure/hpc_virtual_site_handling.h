@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_VIRTUAL_SITE_HANDLING_H
 #define STORMM_HPC_VIRTUAL_SITE_HANDLING_H
 
+#include "copyright.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Potential/cacheresource.h"

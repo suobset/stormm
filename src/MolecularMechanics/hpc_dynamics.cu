@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "hpc_dynamics.h"
 
 namespace stormm {

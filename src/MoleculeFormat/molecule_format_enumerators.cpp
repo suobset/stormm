@@ -76,6 +76,7 @@ std::string getEnumerationName(const DataRequestKind input) {
   case DataRequestKind::ALL_KINDS:
     return std::string("ALL_KINDS");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

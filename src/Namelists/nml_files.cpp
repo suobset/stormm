@@ -200,7 +200,9 @@ FilesControls::FilesControls(const ExceptionResponse policy_in,
     topology_file_names{}, coordinate_file_names{}, systems{},
     report_file{std::string(default_filecon_report_name)},
     coordinate_output_name{std::string(default_filecon_trajectory_name)},
-    checkpoint_name{std::string(default_filecon_checkpoint_name)}
+    checkpoint_name{std::string(default_filecon_checkpoint_name)},
+    sdf_mod_policy{ModificationPolicy::DO_NOT_MODIFY},
+    sdf_mod_alert{ExceptionResponse::WARN}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -461,6 +463,67 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
   else if (strcmpCased(fusion_cmd, std::string("AUTO"))) {
     fuse_files = TrajectoryFusion::AUTO;
   }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("An invalid setting \"" + fusion_cmd + "\" was supplied to the \"fusion\" keyword.",
+            "FilesControls");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid setting \"" + fusion_cmd + "\" was supplied to the \"fusion\" keyword.  "
+             "The default setting will remain in place.", "FilesControls");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  const std::string& sdf_mod_cmd = t_nml.getStringValue("correct_sdf");
+  if (strcmpCased(sdf_mod_cmd, std::string("NO"))) {
+    sdf_mod_policy = ModificationPolicy::DO_NOT_MODIFY;
+  }
+  else if (strcmpCased(sdf_mod_cmd, std::string("YES")) ||
+           strcmpCased(sdf_mod_cmd, std::string("CORRECT")) ||
+           strcmpCased(sdf_mod_cmd, std::string("MODIFY"))) {
+    sdf_mod_policy = ModificationPolicy::MODIFY;
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("An invalid setting \"" + sdf_mod_cmd + "\" was supplied to the \"correct_sdf\" "
+            "keyword.", "FilesControls");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid setting \"" + sdf_mod_cmd + "\" was supplied to the \"correct_sdf\" "
+             "keyword.  The default setting of \"" + std::string(default_filecon_sdf_mod_policy) +
+             "\" will remain in place.", "FilesControls");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  const std::string& sdf_alert_cmd = t_nml.getStringValue("sdf_correction_alert");
+  if (strcmpCased(sdf_alert_cmd, std::string("NO")) ||
+      strcmpCased(sdf_alert_cmd, std::string("SILENT"))) {
+    sdf_mod_alert = ExceptionResponse::SILENT;
+  }
+  else if (strcmpCased(sdf_alert_cmd, std::string("YES")) ||
+           strcmpCased(sdf_alert_cmd, std::string("WARN")) ||
+           strcmpCased(sdf_alert_cmd, std::string("ALERT"))) {
+    sdf_mod_alert = ExceptionResponse::WARN;
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("An invalid setting \"" + sdf_alert_cmd + "\" was supplied to the "
+            "\"sdf_correction_alert\" keyword.", "FilesControls");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid setting \"" + sdf_alert_cmd + "\" was supplied to the "
+             "\"sdf_correction_alert\" keyword.  The default setting of \"" +
+             std::string(default_filecon_sdf_notification) + "\" will remain in place.",
+             "FilesControls");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -547,6 +610,16 @@ std::string FilesControls::getCheckpointFileName() const {
 //-------------------------------------------------------------------------------------------------
 std::string FilesControls::getWarningFileName() const {
   return warning_file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+ModificationPolicy FilesControls::getSdfModificationPolicy() const {
+  return sdf_mod_policy;
+}
+
+//-------------------------------------------------------------------------------------------------
+ExceptionResponse FilesControls::getSdfNotifications() const {
+  return sdf_mod_alert;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -684,6 +757,16 @@ void FilesControls::setWarningFileName(const std::string &file_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void FilesControls::setSdfModficiationPolicy(const ModificationPolicy policy_in) {
+  sdf_mod_policy = policy_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setSdfNotifications(const ExceptionResponse policy_in) {
+  sdf_mod_alert = policy_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                             const std::vector<SubkeyRequirement> &sys_keyword_reqs,
                             const ExceptionResponse policy, const WrapTextSearch wrap,
@@ -742,6 +825,10 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                                    std::string(default_filecon_warnings_name)));
   t_nml.addKeyword(NamelistElement("fusion", NamelistType::STRING,
                                    std::string(default_filecon_result_fusion)));
+  t_nml.addKeyword(NamelistElement("correct_sdf", NamelistType::STRING,
+                                   std::string(default_filecon_sdf_mod_policy)));
+  t_nml.addKeyword(NamelistElement("sdf_correction_alert", NamelistType::STRING,
+                                   std::string(default_filecon_sdf_notification)));  
   t_nml.addHelp("-p", "System topology file.  Repeatable for multiple systems.  Also accepts "
                 "regular expressions.");
   t_nml.addHelp("-c", "Input coordinates file.  Repeatable for multiple systems.  Also accepts "
@@ -778,7 +865,15 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                 "A, B, C, and D are the individual systems grouped under a single label and 1, 2, "
                 "... represent the frame numbers.  Set this to OFF to de-activate fusion of "
                 "checkpoint files and keep trajectories from becoming fused as well.");
-
+  t_nml.addHelp("correct_sdf", "Correct minor issues in the naming conventions of .sdf file "
+                "data items.  Set to one of \"modify\", \"correct\", or \"yes\" to activate this "
+                "behavior (input is case-insensitive).  By default, .sdf file details will not be "
+                "modified (a setting of \"no\").");
+  t_nml.addHelp("sdf_correction_alert", "By default, when modifying .sdf files to correct errors "
+                "in data item names on output, a warning will be emitted.  This behavior can also "
+                "be triggered by supplying one of \"warn\", \"alert\", or \"yes\".  To suppress "
+                "warnings, enter \"no\" or \"silent\".");
+  
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
   *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());

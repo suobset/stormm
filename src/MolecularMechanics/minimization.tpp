@@ -175,11 +175,28 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
                    Tforce* zfrc, Tforce* xprv_move, Tforce* yprv_move, Tforce* zprv_move,
                    Tcalc* x_cg_temp, Tcalc* y_cg_temp, Tcalc* z_cg_temp,
                    const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                   const ImplicitSolventKit<Tcalc> &isk, const NeckGeneralizedBornKit<Tcalc> &ngbk,
                    const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar,
                    const VirtualSiteKit<Tcalc> &vsk, const StaticExclusionMaskReader &ser,
                    const MinimizeControls &mincon, const int nrg_scale_bits,
                    const Tcalc gpos_factor, const Tcalc force_factor) {
 
+  // Pre-allocate the Generalized Born buffers, if necessary
+  std::vector<double> effective_gb_radii, psi, sumdeijda;
+  switch (isk.igb) {
+  case ImplicitSolventModel::NONE:
+    break;
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    effective_gb_radii.resize(vk.natom);
+    psi.resize(vk.natom);
+    sumdeijda.resize(vk.natom);
+    break;
+  }
+  
   // Loop for the requested number of cycles
   ScoreCard sc(1, mincon.getTotalCycles() + 1, nrg_scale_bits), sc_temp(1);
   Tcalc move_scale = mincon.getInitialStep();
@@ -200,10 +217,26 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       yfrc[i] = 0.0;
       zfrc[i] = 0.0;
     }
-    evalNonbValeRestMM<Tcoord, Tforce,
-                       Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                              UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                                              ser, rar, EvaluateForce::YES, 0, step);
+    switch (isk.igb) {
+    case ImplicitSolventModel::NONE:
+      evalNonbValeRestMM<Tcoord, Tforce,
+                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
+                                                ser, rar, EvaluateForce::YES, 0, step);
+      break;
+    case ImplicitSolventModel::HCT_GB:
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      evalRestrainedMMGB<Tcoord, Tforce,
+                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
+                                                ser, isk, ngbk, effective_gb_radii.data(),
+                                                psi.data(), sumdeijda.data(), rar,
+                                                EvaluateForce::YES, 0, step);
+      break;
+    }
     transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                             UnitCellType::NONE, vsk);
     sc.commit(StateVariable::ALL_STATES);
@@ -222,10 +255,27 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       moveParticles<Tcoord, Tforce, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                            UnitCellType::NONE, vsk, vk.natom, move_scale,
                                            force_factor);
-      evalNonbValeRestMM<Tcoord, Tforce,
-                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp, vk,
-                                                nbk, ser, rar, EvaluateForce::NO, 0, step);
+      switch (isk.igb) {
+      case ImplicitSolventModel::NONE:
+        evalNonbValeRestMM<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                  vk, nbk, ser, rar, EvaluateForce::NO, 0, step);
+        break;
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        evalRestrainedMMGB<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                  vk, nbk, ser, isk, ngbk,
+                                                  effective_gb_radii.data(), psi.data(),
+                                                  sumdeijda.data(), rar, EvaluateForce::NO, 0,
+                                                  step);
+        break;
+      }
       evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
@@ -310,11 +360,26 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       }
     }
   }
-  evalNonbValeRestMM<Tcoord, Tforce,
-                     Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                            UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                                            ser, rar, EvaluateForce::YES, 0,
-                                            mincon.getTotalCycles());
+  switch (isk.igb) {
+  case ImplicitSolventModel::NONE:
+    evalNonbValeRestMM<Tcoord, Tforce,
+                       Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                              UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
+                                              ser, rar, EvaluateForce::YES, 0,
+                                              mincon.getTotalCycles());
+    break;
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    evalRestrainedMMGB<Tcoord, Tforce,
+                       Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                              UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
+                                              ser, isk, ngbk, effective_gb_radii.data(),
+                                              psi.data(), sumdeijda.data(), rar,
+                                              EvaluateForce::YES, 0, mincon.getTotalCycles());
+  }
   transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                           UnitCellType::NONE, vsk);
   sc.commit(StateVariable::ALL_STATES);

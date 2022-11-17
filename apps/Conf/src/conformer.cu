@@ -1,7 +1,13 @@
+// -*-c++-*-
+#include "../../../src/Accelerator/hpc_config.h"
+#include "../../../src/Accelerator/kernel_manager.h"
+#include "../../../src/Accelerator/gpu_details.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
+#include "../../../src/Constants/behavior.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/MolecularMechanics/minimization.h"
+#include "../../../src/MolecularMechanics/hpc_minimization.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
 #include "../../../src/Namelists/user_settings.h"
@@ -11,6 +17,8 @@
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
+#include "../../../src/Synthesis/static_mask_synthesis.h"
+#include "../../../src/Synthesis/synthesis_enumerators.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
 #include "../../../src/UnitTesting/stopwatch.h"
@@ -21,7 +29,9 @@ using stormm::random::Xoshiro256ppGenerator;
 using stormm::testing::StopWatch;
 using conf_app::setup::expandConformers;
 
+using namespace stormm::card;
 using namespace stormm::chemistry;
+using namespace stormm::constants;
 using namespace stormm::diskutil;
 using namespace stormm::display;
 using namespace stormm::energy;
@@ -73,6 +83,11 @@ int main(int argc, const char* argv[]) {
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::CONFORMER);
 
+  // Get details of the GPU to use
+  const HpcConfig gpu_config(ExceptionResponse::WARN);
+  const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
+  const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+  
   // Boot up the master random number generator
   const RandomControls rngcon = ui.getRandomNamelistInfo();
   Xoshiro256ppGenerator xrs(rngcon.getRandomSeed(), rngcon.getWarmupCycleCount());
@@ -96,9 +111,34 @@ int main(int argc, const char* argv[]) {
   const std::vector<int> conformer_topology_indices =
     conformer_population.getUniqueTopologyIndices();
   AtomGraphSynthesis conf_poly_ag(unique_topologies, conformer_topology_indices);
+  StaticExclusionMaskSynthesis conformer_masks(conf_poly_ag.getTopologyPointers(),
+                                               conf_poly_ag.getTopologyIndices());
+  InitializationTask init_task;
+  switch (conf_poly_ag.getImplicitSolventModel()) {
+  case ImplicitSolventModel::NONE:
+    init_task = InitializationTask::GENERAL_MINIMIZATION;
+    break;
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    init_task = InitializationTask::GB_MINIMIZATION;
+    break;
+  }
+  conf_poly_ag.loadNonbondedWorkUnits(conformer_masks, init_task, 0, gpu);
   master_timer.assignTime(3);
 
+  // Upload all components and launch minimizations on the GPU
+  conf_poly_ag.upload();
+  conformer_masks.upload();
+  conformer_population.upload();
+  launchMinimization(conf_poly_ag, conformer_masks, &conformer_population,
+                     ui.getMinimizeNamelistInfo(), gpu);
+  master_timer.assignTime(4);
+
   // CHECK
+  printf("There are %5d systems in total.\n", conformer_population.getSystemCount());
   std::vector<bool> is_printed(conformer_population.getSystemCount(), false);
   const int nconf = conformer_population.getSystemCount();
   for (int i = 0; i < nconf; i++) {
@@ -118,24 +158,9 @@ int main(int argc, const char* argv[]) {
     const std::string fname = substituteNameExtension("bloom_" +
                                                       getBaseName(iag_ptr->getFileName()), "crd");
     conformer_population.printTrajectory(like_confs, fname, 0.0, CoordinateFileKind::AMBER_CRD,
-                                         PrintSituation::OVERWRITE);
+                                         PrintSituation::OVERWRITE, gpu);
   }
   // END CHECK
-
-  // Loop over all systems and perform energy minimizations
-  std::vector<StaticExclusionMask> conformer_masks;
-  conformer_masks.reserve(unique_topologies.size());
-  for (int i = 0; i < unique_topologies.size(); i++) {
-    conformer_masks.emplace_back(unique_topologies[i]);
-  }
-  const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
-  for (int i = 0; i < nconf; i++) {
-    PhaseSpace psi = conformer_population.exportSystem(i);
-    AtomGraph *agi = conf_poly_ag.getSystemTopologyPointer(i);
-    const ScoreCard emin = minimize(&psi, agi, conformer_masks[conformer_topology_indices[i]],
-                                    mincon);
-  }
-  master_timer.assignTime(4);
 
   // Print timings results
   master_timer.printResults();

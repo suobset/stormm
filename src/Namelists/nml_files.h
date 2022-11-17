@@ -7,12 +7,15 @@
 #include "copyright.h"
 #include "input.h"
 #include "namelist_emulator.h"
+#include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "Trajectory/trajectory_enumerators.h"
 
 namespace stormm {
 namespace namelist {
 
+using constants::ExceptionResponse;
+using constants::ModificationPolicy;
 using parse::WrapTextSearch;
 using trajectory::CoordinateFileKind;
 using trajectory::TrajectoryFusion;
@@ -29,6 +32,8 @@ constexpr char default_filecon_checkpoint_name[] = "md.rst";
 constexpr char default_filecon_warnings_name[] = "warn.out";
 constexpr char default_filecon_errors_name[] = "err.out";
 constexpr char default_filecon_result_fusion[] = "AUTO";
+constexpr char default_filecon_sdf_mod_policy[] = "NO";
+constexpr char default_filecon_sdf_notification[] = "WARN";
 constexpr CoordinateFileKind default_filecon_inpcrd_type = CoordinateFileKind::UNKNOWN;
 constexpr CoordinateFileKind default_filecon_outcrd_type = CoordinateFileKind::AMBER_CRD;
 constexpr CoordinateFileKind default_filecon_chkcrd_type = CoordinateFileKind::AMBER_ASCII_RST;
@@ -318,6 +323,13 @@ public:
   /// \brief Get the name of the file containing warnings printed by the program
   std::string getWarningFileName() const;
 
+  /// \brief Get the policy on modifying .sdf file outputs to conform to the Biovia standard
+  ModificationPolicy getSdfModificationPolicy() const;
+
+  /// \brief Get an indication of whether to alert the user when correcting minor mistakes in .sdf
+  ///        files.
+  ExceptionResponse getSdfNotifications() const;
+  
   /// \brief Set whether to read all frames from each free trajectory (true), or just the first
   ///        (false).
   ///
@@ -414,6 +426,16 @@ public:
   ///
   /// \param file_name  New name for the warnings file
   void setWarningFileName(const std::string &file_name);
+
+  /// \brief Set the .sdf output file modification policy.
+  ///
+  /// \param policy_in  The new policy to follow when encountering minor issues in .sdf file data
+  void setSdfModficiationPolicy(ModificationPolicy policy_in);
+  
+  /// \brief Set whether to emit notifications about .sdf output file modifications.
+  ///
+  /// \param policy_in  The policy to follow on making alerts
+  void setSdfNotifications(ExceptionResponse policy_in);
   
 private:
 
@@ -483,6 +505,14 @@ private:
 
   /// Warnings output file name
   std::string warning_file_name;
+
+  /// Indication of whether to correct minor errors of input .sdf files, e.g. syntax mistakes in
+  /// the names of data items (".sdf properties") when printing output .sdf files
+  ModificationPolicy sdf_mod_policy;
+
+  /// Indication of whether to warn the user when minor corrections are made to bring .sdf file
+  /// outputs back into alignment with the Biovia standard.
+  ExceptionResponse sdf_mod_alert;
 };
   
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place

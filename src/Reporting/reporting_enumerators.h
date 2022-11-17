@@ -3,6 +3,7 @@
 #define STORMM_REPORTING_ENUMERATORS_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace display {

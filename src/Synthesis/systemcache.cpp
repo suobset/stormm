@@ -807,15 +807,15 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   for (int i = 0; i < system_count; i++) {
     RestraintApparatus ra(&topology_cache[topology_indices[i]]);
     const AtomGraph *iag_ptr = &topology_cache[topology_indices[i]];
-    const ChemicalFeatures *ichemfe_ptr = &features_cache[topology_indices[i]];
     const CoordinateFrameReader cfr(coordinates_cache[i]);
     for (int j = 0; j < nrst_groups; j++) {
       if (rst_group_labels[j] != system_labels[i]) {
         continue;
       }
       const int nrst_applicable = rst_group_namelists[j].size();
+      const int m = topology_indices[i];
       for (int k = 0; k < nrst_applicable; k++) {
-        ra.addRestraints(rstcon[rst_group_namelists[j][k]].getRestraint(iag_ptr, ichemfe_ptr,
+        ra.addRestraints(rstcon[rst_group_namelists[j][k]].getRestraint(iag_ptr, features_cache[m],
                                                                         cfr));
       }
     }

@@ -39,7 +39,8 @@ MdlMol::MdlMol(const ExceptionResponse policy_in):
 
 //-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
-               const CaseSensitivity capitalization, const ExceptionResponse policy_in):
+               const CaseSensitivity capitalization, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
   MdlMol(policy_in)
 {
   const TextFileReader tfr = tf.data();
@@ -280,7 +281,8 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
   for (int pos = mdl_section_end; pos < sd_compound_end; pos++) {
     if (tf.getLineLength(pos) >= 2 && tf.getChar(tf.getLineLimits(pos)) == '>') {
       int adv_pos;
-      data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title);
+      data_items.emplace_back(tf, pos, &adv_pos, sd_compound_end, title, dimod_policy,
+                              dimod_notify);
       compareExternalRegistryNumbers(data_items.back().getExternalRegistryNumber());
       pos = adv_pos;
     }
@@ -315,14 +317,21 @@ MdlMol::MdlMol(const TextFile &tf, const int line_start, const int line_end_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-MdlMol::MdlMol(const std::string &filename, const ExceptionResponse policy_in):
-    MdlMol(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in)
+MdlMol::MdlMol(const std::string &filename, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
+  MdlMol(TextFile(filename), 0, -1, CaseSensitivity::YES, policy_in, dimod_policy, dimod_notify)
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in):
-    MdlMol(std::string(filename), policy_in)
+MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in,
+               const ModificationPolicy dimod_policy, const ExceptionResponse dimod_notify):
+    MdlMol(std::string(filename), policy_in, dimod_policy, dimod_notify)
 {}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getTitle() const {
+  return title;
+}
 
 //-------------------------------------------------------------------------------------------------
 int MdlMol::getAtomCount() const {
@@ -840,6 +849,45 @@ void MdlMol::addLineToDataItem(const std::string &text, int item_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getDataItemName(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemName");
+  return data_items[item_index].getItemName();
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MdlMol::getDataItemOutputName(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemOutputName");
+  return data_items[item_index].getOutputItemName();
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMol::getDataItemIndex(const std::string &item_name) const {
+  for (int i = 0; i < data_item_count; i++) {
+    if (item_name == data_items[i].getItemName()) {
+      return i;
+    }
+  }
+  return data_item_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<std::string>& MdlMol::getDataItemContent(const int item_index) const {
+  checkDataItemIndex(item_index, "getDataItemContent");
+  return data_items[item_index].getBody();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<std::string> MdlMol::getDataItemContent(const std::string &item_name) const {
+  std::vector<std::string> result;
+  for (int i = 0; i < data_item_count; i++) {
+    if (item_name == data_items[i].getItemName()) {
+      result = data_items[i].getBody();
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMol::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
   const TextFile result(writeMdl(vformat), TextOrigin::RAM);
   writeFrame(foutp, result);
@@ -967,7 +1015,7 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
       header_line += '(' + data_items[i].getExternalRegistryNumber() + ')';
     }
     if (data_items[i].placeTitleInHeader()) {
-      header_line += '<' + data_items[i].getItemName() + '>';
+      header_line += '<' + data_items[i].getOutputItemName() + '>';
       required_id = true;
     }
     if (data_items[i].placeMaccsIIFieldInHeader()) {

@@ -280,8 +280,8 @@ std::vector<int> AtomGraph::getMoleculeContents(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<char4> AtomGraph::getAtomName() const {
-  return atom_names.readHost(0, atom_count);
+const Hybrid<char4>& AtomGraph::getAtomName() const {
+  return atom_names;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -296,8 +296,8 @@ char4 AtomGraph::getAtomName(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<char4> AtomGraph::getAtomType() const {
-  return atom_types.readHost(0, atom_count);
+const Hybrid<char4>& AtomGraph::getAtomType() const {
+  return atom_types;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -312,8 +312,8 @@ char4 AtomGraph::getAtomType(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<char4> AtomGraph::getResidueName() const {
-  return residue_names.readHost(0, residue_count);
+const Hybrid<char4>& AtomGraph::getResidueName() const {
+  return residue_names;
 }
 
 //-------------------------------------------------------------------------------------------------

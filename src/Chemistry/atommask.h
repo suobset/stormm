@@ -6,6 +6,7 @@
 #include <vector>
 #include <climits>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
@@ -14,6 +15,7 @@
 namespace stormm {
 namespace chemistry {
 
+using constants::ExceptionResponse;
 using parse::WildCardKind;
 using topology::AtomGraph;
 using trajectory::CoordinateFrame;
@@ -113,7 +115,7 @@ public:
   MaskComponent(MaskOperator op_in, double range, const std::string &basis_in, int start_idx,
                 int end_idx);
   MaskComponent(const std::vector<SelectionItem> &parts_in, const AtomGraph *ag,
-                const ChemicalFeatures *chemfe, const std::string &basis_in, int start_idx,
+                const ChemicalFeatures &chemfe, const std::string &basis_in, int start_idx,
                 int end_idx);
   MaskComponent(const std::vector<uint> &primitive_mask_in, const std::string &basis_in,
                 int start_idx, int end_idx);
@@ -212,28 +214,37 @@ public:
   ///
   /// \param input_text_in  The mask string
   /// \param ag_in          System topology
+  /// \param chemfe         Chemical features computed for the topology
   /// \param crd            Coordinates obtained from a CoordinateFrame object
   /// \param xcrd           Cartesian X coordinates of all atoms
   /// \param ycrd           Cartesian Y coordinates of all atoms
   /// \param zcrd           Cartesian Z coordinates of all atoms
   /// \param description    [Optional] description of the mask and its purpose
   /// \{
-  AtomMask();
+  AtomMask(const AtomGraph *ag_in = nullptr);
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const CoordinateFrameReader &cfr,
+           const ChemicalFeatures &chemfe, const CoordinateFrameReader &cfr,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const CoordinateFrame &cf,
+           const ChemicalFeatures &chemfe, const CoordinateFrame &cf,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
 
   AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
-           const ChemicalFeatures *chemfe_in, const PhaseSpace &ps,
+           const ChemicalFeatures &chemfe, const PhaseSpace &ps,
            MaskInputMode mode = MaskInputMode::AMBMASK,
            const std::string &description_in = std::string("No description provided"));
+  /// \}
+
+  /// The standard copy and move constructors will be effective for this object, which has no
+  /// pointers to repair.  Because there is a const member, the copy and move assignment operators
+  /// will be implicitly deleted.
+  /// \{
+  AtomMask(const AtomMask &original) = default;
+  AtomMask(AtomMask &&original) = default;
   /// \}
   
   /// \brief Get the recommendation for scanning this mask
@@ -241,7 +252,7 @@ public:
 
   /// \brief Get the raw mask as a vector of unsigned long integers (bit strings storing whether
   ///        each atom is masked at one atom per bit)
-  std::vector<uint> getRawMask() const;
+  const std::vector<uint>& getRawMask() const;
 
   /// \brief Get a count of the number of masked atoms
   int getMaskedAtomCount() const;
@@ -260,11 +271,47 @@ public:
   /// \brief Get the input text used to generate this atom mask
   std::string getInputText() const;
 
+  /// \brief Get the input text mode, e.g. AMBMASK to indicate that an Amber-style atom mask
+  ///        string was used to make this mask.
+  MaskInputMode getInputKind() const;
+  
   /// \brief Get the description of the mask, if provided
   std::string getDescription() const;
 
   /// \brief Get a pointer to the topology that this mask describes
-  const AtomGraph* getAtomGraphPointer() const;
+  const AtomGraph* getTopologyPointer() const;
+
+  /// \brief Add atoms to the atom mask.
+  ///
+  /// Overloaded:
+  ///   - Add a series of atom indices, with indexing beginning at 0.
+  ///   - Add a series of atom names.  All examples of any supplied name will be matched and added
+  ///     to the mask (an O(NM) operation for N atom names and a topology of M atoms)
+  ///   - Add the atoms of another mask (the topologies will be checked for a reasonable degree of
+  ///     congruity)
+  ///   - Add atoms implied by another mask string.
+  ///   - Supply the system's pre-computed chemical features, or have it constructed temporarily.
+  ///
+  /// \param new_indices  The atom indices to add to the current mask
+  /// \param new_names    The names of atoms to add to the current mask
+  /// \param new_mask     Another atom mask (or mask string) to add to the current mask
+  /// \param policy       The policy to take in the event that an error is encountered
+  /// \{
+  void addAtoms(const std::vector<int> &new_indices,
+                ExceptionResponse policy = ExceptionResponse::DIE);
+
+  void addAtoms(const std::vector<char4> &new_names);
+
+  void addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf,
+                const ChemicalFeatures &chemfe);
+
+  void addAtoms(const std::string &new_mask, const CoordinateFrame &cf,
+		const ChemicalFeatures &chemfe);
+
+  void addAtoms(const AtomMask &new_mask, const CoordinateFrame &cf);
+  
+  void addAtoms(const std::string &new_mask, const CoordinateFrame &cf);
+  /// \}
   
 private:
   MaskTraversalMode recommended_scan;      ///< Indicates the most efficient way to read this mask
@@ -277,8 +324,6 @@ private:
   std::string description;                 ///< Description of this AtomMask object, indicating its
                                            ///<   place in a program
   const AtomGraph *ag_pointer;             ///< Pointer to the topology this mask is based on
-  const ChemicalFeatures *chemfe_pointer;  ///< Pointer to the chemical features that helped create
-                                           ///<   this mask
 
   /// \brief Function to extract a ranged value when prompted by range operators in an atom mask
   ///
@@ -303,7 +348,7 @@ private:
   /// \param position      Used to return the position of the last character used in finding the
   ///                      range value of interest
   std::vector<uint> parseMask(const std::vector<int> &scope_levels, int *position,
-                              const CoordinateFrameReader &cfr);
+                              const CoordinateFrameReader &cfr, const ChemicalFeatures &chemfe);
 };
 
 } // namespace chemistry

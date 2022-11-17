@@ -1,5 +1,4 @@
 #include "copyright.h"
-#include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
 #include "mdlmol_dataitem.h"
@@ -20,21 +19,24 @@ using parse::verifyContents;
 MdlMolDataItem::MdlMolDataItem(const std::string &item_name_in,
                                const std::string &external_regno_in,
                                const int internal_regno_in, const int maccs_ii_number_in,
-                               const uint header_info, const std::vector<std::string> &body_in) :
+                               const uint header_info, const std::vector<std::string> &body_in,
+                               const ModificationPolicy mpol, const ExceptionResponse notify) :
     kind{MdlMolDataItemKind::NONE}, tracked_state{StateVariable::ALL_STATES},
-    item_name{item_name_in}, external_regno{external_regno_in}, internal_regno{internal_regno_in},
-    maccs_ii_number{maccs_ii_number_in}, use_internal_regno{((header_info & 0x1) == 1U)},
+    item_name{item_name_in}, output_item_name{item_name_in}, external_regno{external_regno_in},
+    internal_regno{internal_regno_in}, maccs_ii_number{maccs_ii_number_in},
+    use_internal_regno{((header_info & 0x1) == 1U)},
     use_external_regno{((header_info & 0x2) == 2U)}, use_item_name{((header_info & 0x4) == 4U)},
     use_maccs_ii_number{((header_info & 0x8) == 8U)}, note_archives{((header_info & 0x10) == 16U)},
     body{body_in}
 {
-  // Check the sanity of the new object
-  validateItemName();
+  // Check the sanity of the new object and update the output name, if needed
+  validateItemName(mpol, notify);
 }
 
 //-------------------------------------------------------------------------------------------------
 MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *line_advance,
-                               const int compound_line_end, const std::string &title) :
+                               const int compound_line_end, const std::string &title,
+                               const ModificationPolicy mpol, const ExceptionResponse notify) :
     MdlMolDataItem()
 {
   // Find an item name in the header line
@@ -121,8 +123,8 @@ MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *l
   kind = MdlMolDataItemKind::NATIVE;
 
   // Validate the header line information
-  validateItemName();
-
+  validateItemName(mpol, notify);
+  
   // Read the data lines
   int tmp_advance = line_number + 1;
   bool search_on = true;
@@ -154,9 +156,10 @@ MdlMolDataItem::MdlMolDataItem(const TextFile &tf, const int line_number, int *l
 
 //-------------------------------------------------------------------------------------------------
 MdlMolDataItem::MdlMolDataItem(const MdlMolDataRequest &ask,
-                               const std::vector<std::string> &body_in) :
+                               const std::vector<std::string> &body_in,
+                               const ModificationPolicy mpol, const ExceptionResponse notify) :
     MdlMolDataItem(ask.getTitle(), ask.getExternalRegistryNumber(), -1, ask.getMaccsFieldNumber(),
-                   getDataItemHeaderCode(ask), body_in)
+                   getDataItemHeaderCode(ask), body_in, mpol, notify)
 {
   // The request may incorporate one or more values that are not yet known, e.g. details of the
   // energy evaluation.  Place indications in the data item so that a post-analysis can add the
@@ -209,6 +212,11 @@ bool MdlMolDataItem::noteArchivesInHeader() const {
 //-------------------------------------------------------------------------------------------------
 const std::string& MdlMolDataItem::getItemName() const {
   return item_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& MdlMolDataItem::getOutputItemName() const {
+  return output_item_name;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -447,9 +455,10 @@ bool MdlMolDataItem::matchMaccsField(const int maccs_ii_no_comp) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolDataItem::setItemName(const std::string &item_name_in) {
+void MdlMolDataItem::setItemName(const std::string &item_name_in,
+                                 const ModificationPolicy mpol, const ExceptionResponse notify) {
   item_name = item_name_in;
-  validateItemName();
+  validateItemName(mpol, notify);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -458,36 +467,50 @@ void MdlMolDataItem::addDataLine(const std::string &text) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMolDataItem::validateItemName() {
+void MdlMolDataItem::validateItemName(const ModificationPolicy mpol,
+                                      const ExceptionResponse notify) {
   bool problem = false;
   bool modified = false;
-  const std::string original_item_name = item_name;
-  int nchar = item_name.size();
-  if (nchar > 0) {
-    if (item_name[0] == '_' || (item_name[0] >= '0' && item_name[0] <= '9')) {
-      item_name = 'x' + item_name;
-      nchar++;
-      modified = true;
-    }
-    if ((item_name[0] >= 'a' && item_name[0] <= 'z') ||
-        (item_name[0] >= 'A' && item_name[0] <= 'Z')) {
-      for (int i = 1; i < nchar; i++) {
-        problem = (problem || item_name[i] == '>' || item_name[i] == '<');
-        if (item_name[i] == '-' || item_name[i] == '.' || item_name[i] == '=' ||
-            item_name[i] == '%' || item_name[i] == ' ') {
-          item_name[i] = '_';
+  output_item_name = item_name;
+  const int nchar_in = item_name.size();
+  if (nchar_in > 0) {
+    switch (mpol) {
+    case ModificationPolicy::MODIFY:
+      {
+        if (output_item_name[0] == '_' ||
+            (output_item_name[0] >= '0' && output_item_name[0] <= '9')) {
+          output_item_name = 'x' + output_item_name;
           modified = true;
         }
+        const int nchar_oin = output_item_name.size();
+        for (int i = 0; i < nchar_oin; i++) {
+          if (output_item_name[i] == '-' || output_item_name[i] == '.' ||
+              output_item_name[i] == '=' || output_item_name[i] == '%' ||
+              output_item_name[i] == ' ') {
+            output_item_name[i] = '_';
+            modified = true;
+          }
+        }
       }
+      break;
+    case ModificationPolicy::DO_NOT_MODIFY:
+      break;
     }
-    else {
-      problem = true;
+    for (int i = 0; i < nchar_in; i++) {
+      problem = (problem || item_name[i] == '>' || item_name[i] == '<');
     }
   }
   if (modified) {
-    rtWarn("Data item <" + original_item_name + "> will be interpreted as <" + item_name +
-           "> in analyses and any output to remain in compliance with Biovia SD file formatting "
-           "requirements.", "MdlMolDataItem", "validateItemName");
+    switch (notify) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("Data item <" + item_name + "> will be interpreted as <" + output_item_name +
+             "> in any output to remain in compliance with Biovia SD file formatting "
+             "requirements.", "MdlMolDataItem", "validateItemName");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
   }
   if (problem) {
     rtErr("Data item name " + item_name + " is invalid.  An item name must begin with an "

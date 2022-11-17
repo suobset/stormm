@@ -316,7 +316,7 @@ int main(const int argc, const char* argv[]) {
     const CoordinateFrame cf_i = tsm.exportCoordinateFrame(i);
     const ChemicalFeatures chemfe_i(tsm.getTopologyPointer(i), cf_i);
     const std::vector<BoundedRestraint> r_i = rst_ctrl_a.getRestraint(tsm.getTopologyPointer(i),
-                                                                      &chemfe_i, cf_i);
+                                                                      chemfe_i, cf_i);
     rst_count[i] = r_i.size();
     ra_vec.emplace_back(r_i, tsm.getTopologyPointer(i));
     std::vector<double>k_vals(r_i.size());
