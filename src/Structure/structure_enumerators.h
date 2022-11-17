@@ -33,7 +33,21 @@ enum class VirtualSiteActivity {
   PLACEMENT,       ///< Place virtual sites after motion of the underlying frame atoms
   TRANSMIT_FORCES  ///< Transmit forces accumulated on virtual sites to their frame atoms
 };
-  
+
+/// \brief Enumerate the various levels of grid detail by which a receptor may be mapped.
+enum class GridDetail {
+  OCCLUSION,        ///< The grid contains only an occlusion mask, with one bit per grid point
+                    ///<   stored in a manner like std::vector<bool>.
+  NONBONDED_FIELD,  ///< The grid stores electrostatic, Generalized Born radial derivatives,
+                    ///<   Generalized Born pairwise energy, and van-der Waals potentials with
+                    ///<   tricibic interpolation.
+  NONBONDED_ATOMIC  ///< The grid stores all of the potentials found in the NONBONDED_FIELD case,
+                    ///<   but only from atom contributions of rigid components of the receptor
+                    ///<   which lie far enough from the bin that tricubic interpolation is a sound
+                    ///<   approximation.  Other rigid atoms will be represented in a list of
+                    ///<   explicit particles with unique segments for each bin.
+};
+
 } // namespace structure
 } // namespace stormm
 
