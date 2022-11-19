@@ -105,7 +105,7 @@ std::vector<int> integerAGProp(const std::vector<AtomGraph*> &topols, const bool
       result[i] = topols[i]->getFirstSolventAtom();
       break;
     case IntInfoCode::FIRST_RESIDUE_UPPER_LIMIT:
-      result[i] = topols[i]->getResidueLimits()[1];
+      result[i] = topols[i]->getResidueLimits().readHost(1);
       break;
     case IntInfoCode::SUM_ATOMIC_NUMBERS:
       result[i] = sum<int>(topols[i]->getAtomicNumber());

@@ -369,6 +369,7 @@ ChemicalFeatures::ChemicalFeatures() :
     bond_orders{HybridKind::POINTER, "chemfe_bond_orders"},
     free_electrons{HybridKind::POINTER, "chemfe_free_e"},
     int_data{HybridKind::ARRAY, "chemfe_int"},
+    mutable_group_data{HybridKind::ARRAY, "chemfe_muta_int"},
     double_data{HybridKind::ARRAY, "chemfe_double"},
     ag_pointer{nullptr},
     timer{nullptr}
@@ -408,6 +409,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     bond_orders{HybridKind::POINTER, "chemfe_bond_orders"},
     free_electrons{HybridKind::POINTER, "chemfe_free_e"},
     int_data{HybridKind::ARRAY, "chemfe_int"},
+    mutable_group_data{HybridKind::ARRAY, "chemfe_muta_int"},
     double_data{HybridKind::ARRAY, "chemfe_double"},
     ag_pointer{ag_in},
     timer{timer_in}
@@ -421,9 +423,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     ring_trace_timing = timer->addCategory("[ChemicalFeatures] Ring tracing");
     lewis_timing = timer->addCategory("[ChemicalFeatures] Lewis structure drawing");
     aromatic_group_timing = timer->addCategory("[ChemicalFeatures] Aromaticity detection");
-    rotatable_bond_timing = timer->addCategory("[ChemicalFeatures] Rotatable bond mapping");
     chiral_center_timing = timer->addCategory("[ChemicalFeatures] Chiral center detection");
-    chiral_branch_timing = timer->addCategory("[ChemicalFeatures] Chiral branch mapping");
   }  
   
   // Obtain abstracts from the topology
@@ -488,29 +488,6 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                                                               tmp_ring_atom_bounds);
   if (timer != nullptr) timer->assignTime(chiral_center_timing);
 
-  // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
-  // flip the chirality of already detected chiral centers.
-  std::vector<int> tmp_rotatable_groups, tmp_rotatable_group_bounds;
-  std::vector<int> tmp_cis_trans_groups, tmp_cis_trans_group_bounds;
-  std::vector<int> tmp_invertible_groups, tmp_invertible_group_bounds;  
-  std::vector<int> tmp_anchor_a_branches, tmp_anchor_b_branches;
-  switch (map_group_in) {
-  case MapRotatableGroups::YES:
-    findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_rotatable_groups,
-                       &tmp_rotatable_group_bounds, &tmp_cis_trans_groups,
-                       &tmp_cis_trans_group_bounds);
-    if (timer != nullptr) timer->assignTime(rotatable_bond_timing);
-    rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
-    cis_trans_bond_count = static_cast<int>(tmp_cis_trans_group_bounds.size()) - 1;
-    findInvertibleGroups(tmp_chiral_centers, tmp_chiral_inversion_methods, &tmp_anchor_a_branches,
-                         &tmp_anchor_b_branches, &tmp_invertible_groups,
-                         &tmp_invertible_group_bounds);
-    if (timer != nullptr) timer->assignTime(chiral_branch_timing);
-    break;
-  case MapRotatableGroups::NO:
-    break;
-  }
-  
   // Store the integer results
   const size_t nint = roundUp(tmp_planar_centers.size(), warp_size_zu) +
                       roundUp(tmp_ring_atom_bounds.size(), warp_size_zu) +
@@ -518,13 +495,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                       roundUp(tmp_aromatic_group_bounds.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_pi_electrons.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_groups.size(), warp_size_zu) +
-                      4 * roundUp(tmp_chiral_centers.size(), warp_size_zu) +
-                      roundUp(tmp_rotatable_groups.size(), warp_size_zu) +
-                      roundUp(tmp_rotatable_group_bounds.size(), warp_size_zu) +
-                      roundUp(tmp_cis_trans_groups.size(), warp_size_zu) +
-                      roundUp(tmp_cis_trans_group_bounds.size(), warp_size_zu) +
-                      roundUp(tmp_invertible_groups.size(), warp_size_zu) +
-                      roundUp(tmp_invertible_group_bounds.size(), warp_size_zu) +
+                      (2 * roundUp(static_cast<size_t>(chiral_center_count), warp_size_zu)) +
                       roundUp(tmp_polar_hydrogens.size(), warp_size_zu) +
                       roundUp(tmp_hydrogen_bond_donors.size(), warp_size_zu) +
                       roundUp(tmp_hydrogen_bond_acceptors.size(), warp_size_zu);
@@ -540,19 +511,22 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = hydrogen_bond_acceptors.putHost(&int_data, tmp_hydrogen_bond_acceptors, ic, warp_size_zu);
   ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, ic, warp_size_zu);
   ic = chiral_inversion_methods.putHost(&int_data, tmp_chiral_inversion_methods, ic, warp_size_zu);
-  ic = rotatable_groups.putHost(&int_data, tmp_rotatable_groups, ic, warp_size_zu);
-  ic = rotatable_group_bounds.putHost(&int_data, tmp_rotatable_group_bounds, ic, warp_size_zu);
-  ic = cis_trans_groups.putHost(&int_data, tmp_cis_trans_groups, ic, warp_size_zu);
-  ic = cis_trans_group_bounds.putHost(&int_data, tmp_cis_trans_group_bounds, ic, warp_size_zu);
-  ic = invertible_groups.putHost(&int_data, tmp_invertible_groups, ic, warp_size_zu);
-  ic = invertible_group_bounds.putHost(&int_data, tmp_invertible_group_bounds, ic, warp_size_zu);
-  ic = anchor_a_branches.putHost(&int_data, tmp_anchor_a_branches, ic, warp_size_zu);
-  ic = anchor_b_branches.putHost(&int_data, tmp_anchor_b_branches, ic, warp_size_zu);  
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
 
   // Correct the chiral centers' orientations
   findChiralOrientations(cfr);
   if (timer != nullptr) timer->assignTime(chiral_center_timing);
+
+  // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
+  // flip the chirality of already detected chiral centers.
+  switch (map_group_in) {
+  case MapRotatableGroups::YES:
+    findRotatableBondGroups(timer);
+    break;
+  case MapRotatableGroups::NO:
+    allocateMutableData({}, {}, {}, {}, {}, {}, {}, {});
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -614,6 +588,7 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     bond_orders{original.bond_orders},
     free_electrons{original.free_electrons},
     int_data{original.int_data},
+    mutable_group_data{original.mutable_group_data},
     double_data{original.double_data},
     ag_pointer{original.ag_pointer}
 {
@@ -665,6 +640,7 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     bond_orders{std::move(original.bond_orders)},
     free_electrons{std::move(original.free_electrons)},
     int_data{std::move(original.int_data)},
+    mutable_group_data{std::move(original.mutable_group_data)},
     double_data{std::move(original.double_data)},
     ag_pointer{std::move(original.ag_pointer)}
 {}
@@ -721,6 +697,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   bond_orders = other.bond_orders;
   free_electrons = other.free_electrons;
   int_data = other.int_data;
+  mutable_group_data = other.mutable_group_data;
   double_data = other.double_data;
   ag_pointer = other.ag_pointer;
   repairPointers();
@@ -779,6 +756,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
   bond_orders = std::move(other.bond_orders);
   free_electrons = std::move(other.free_electrons);
   int_data = std::move(other.int_data);
+  mutable_group_data = std::move(other.mutable_group_data);
   double_data = std::move(other.double_data);
   ag_pointer = std::move(other.ag_pointer);
   return *this;
@@ -2111,7 +2089,17 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
     // Store the rotating atoms.
     const std::vector<int> ifirst = selectRotatingAtoms(ag_pointer, atom_i, atom_j);
     const std::vector<int> jfirst = selectRotatingAtoms(ag_pointer, atom_j, atom_i);
-    if (ifirst.size() >= jfirst.size()) {
+    bool i_is_fixed = false;
+    bool j_is_fixed = false;
+    const int n_iatom = ifirst.size();
+    const int n_jatom = jfirst.size();
+    for (int pos = 0; pos < n_iatom; pos++) {
+      i_is_fixed = (i_is_fixed || ag_pointer->getAtomMobility(ifirst[pos]) == false);
+    }
+    for (int pos = 0; pos < n_jatom; pos++) {
+      j_is_fixed = (j_is_fixed || ag_pointer->getAtomMobility(jfirst[pos]) == false);
+    }
+    if (i_is_fixed == false && (ifirst.size() >= jfirst.size() || j_is_fixed)) {
       if (is_standard_rotator) {
         rotators.push_back({atom_j, atom_i});
         rot_moving_lists.push_back(jfirst);
@@ -2121,7 +2109,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
         ctx_moving_lists.push_back(jfirst);
       }
     }
-    else {
+    else if (j_is_fixed == false) {
       if (is_standard_rotator) {
         rotators.push_back({atom_i, atom_j});
         rot_moving_lists.push_back(ifirst);
@@ -2387,6 +2375,36 @@ void ChemicalFeatures::findHydrogenBondElements(const NonbondedKit<double> &nbk,
 }
 
 //-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::allocateMutableData(const std::vector<int> &tmp_rotatable_groups,
+                                           const std::vector<int> &tmp_rotatable_group_bounds,
+                                           const std::vector<int> &tmp_cis_trans_groups,
+                                           const std::vector<int> &tmp_cis_trans_group_bounds,
+                                           const std::vector<int> &tmp_invertible_groups,
+                                           const std::vector<int> &tmp_invertible_group_bounds,
+                                           const std::vector<int> &tmp_anchor_a_branches,
+                                           const std::vector<int> &tmp_anchor_b_branches) {
+  const size_t nmuta = roundUp(tmp_rotatable_groups.size(), warp_size_zu) +
+                       roundUp(tmp_rotatable_group_bounds.size(), warp_size_zu) +
+                       roundUp(tmp_cis_trans_groups.size(), warp_size_zu) +
+                       roundUp(tmp_cis_trans_group_bounds.size(), warp_size_zu) +
+                       roundUp(tmp_invertible_groups.size(), warp_size_zu) +
+                       roundUp(tmp_invertible_group_bounds.size(), warp_size_zu) +
+                       (2 * roundUp(static_cast<size_t>(chiral_center_count), warp_size_zu));
+  mutable_group_data.resize(nmuta);
+  size_t ic = rotatable_groups.putHost(&mutable_group_data, tmp_rotatable_groups, 0, warp_size_zu);
+  ic = rotatable_group_bounds.putHost(&mutable_group_data, tmp_rotatable_group_bounds, ic,
+                                      warp_size_zu);
+  ic = cis_trans_groups.putHost(&mutable_group_data, tmp_cis_trans_groups, ic, warp_size_zu);
+  ic = cis_trans_group_bounds.putHost(&mutable_group_data, tmp_cis_trans_group_bounds, ic,
+                                      warp_size_zu);
+  ic = invertible_groups.putHost(&mutable_group_data, tmp_invertible_groups, ic, warp_size_zu);
+  ic = invertible_group_bounds.putHost(&mutable_group_data, tmp_invertible_group_bounds, ic,
+                                       warp_size_zu);
+  ic = anchor_a_branches.putHost(&mutable_group_data, tmp_anchor_a_branches, ic, warp_size_zu);
+  ic = anchor_b_branches.putHost(&mutable_group_data, tmp_anchor_b_branches, ic, warp_size_zu);
+}
+
+//-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::repairPointers() {
   formal_charges.swapTarget(&double_data);
   free_electrons.swapTarget(&double_data);
@@ -2402,12 +2420,14 @@ void ChemicalFeatures::repairPointers() {
   hydrogen_bond_acceptors.swapTarget(&int_data);
   chiral_centers.swapTarget(&int_data);
   chiral_inversion_methods.swapTarget(&int_data);
-  rotatable_groups.swapTarget(&int_data);
-  rotatable_group_bounds.swapTarget(&int_data);
-  invertible_groups.swapTarget(&int_data);
-  invertible_group_bounds.swapTarget(&int_data);
-  anchor_a_branches.swapTarget(&int_data);
-  anchor_b_branches.swapTarget(&int_data);
+  rotatable_groups.swapTarget(&mutable_group_data);
+  rotatable_group_bounds.swapTarget(&mutable_group_data);
+  cis_trans_groups.swapTarget(&mutable_group_data);
+  cis_trans_group_bounds.swapTarget(&mutable_group_data);
+  invertible_groups.swapTarget(&mutable_group_data);
+  invertible_group_bounds.swapTarget(&mutable_group_data);
+  anchor_a_branches.swapTarget(&mutable_group_data);
+  anchor_b_branches.swapTarget(&mutable_group_data);
 }
 
 #ifdef STORMM_USE_HPC
@@ -2415,7 +2435,16 @@ void ChemicalFeatures::repairPointers() {
 void ChemicalFeatures::upload() {
   ring_inclusion.upload();
   int_data.upload();
+  mutable_group_data.upload();
   double_data.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::download() {
+  ring_inclusion.download();
+  int_data.download();
+  mutable_group_data.download();
+  double_data.download();
 }
 #endif
 
@@ -2801,6 +2830,36 @@ void ChemicalFeatures::findChiralOrientations(const CoordinateFrameReader &cfr) 
     // abiguity of zero and -zero), then contribute the result.
     chiral_centers.putHost(chiral_direction * (chatom + 1), i);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::findRotatableBondGroups(StopWatch *timer) {
+  std::vector<int> tmp_rotatable_groups, tmp_rotatable_group_bounds;
+  std::vector<int> tmp_cis_trans_groups, tmp_cis_trans_group_bounds;
+  std::vector<int> tmp_invertible_groups, tmp_invertible_group_bounds;
+  std::vector<int> tmp_anchor_a_branches, tmp_anchor_b_branches;
+
+  // Obtain abstracts from the topology
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+  int rotatable_bond_timing;
+  if (timer != nullptr) {
+    rotatable_bond_timing = timer->addCategory("[ChemicalFeatures] Rotatable bond mapping");
+  }
+  findRotatableBonds(vk, cdk, nbk, ring_atoms.readHost(), ring_atom_bounds.readHost(),
+                     &tmp_rotatable_groups, &tmp_rotatable_group_bounds, &tmp_cis_trans_groups,
+                     &tmp_cis_trans_group_bounds);
+  rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
+  cis_trans_bond_count = static_cast<int>(tmp_cis_trans_group_bounds.size()) - 1;
+  findInvertibleGroups(chiral_centers.readHost(), chiral_inversion_methods.readHost(),
+                       &tmp_anchor_a_branches, &tmp_anchor_b_branches, &tmp_invertible_groups,
+                       &tmp_invertible_group_bounds);
+  if (timer != nullptr) timer->assignTime(rotatable_bond_timing);
+  allocateMutableData(tmp_rotatable_groups, tmp_rotatable_group_bounds, tmp_cis_trans_groups,
+                      tmp_cis_trans_group_bounds, tmp_invertible_groups,
+                      tmp_invertible_group_bounds, tmp_anchor_a_branches, tmp_anchor_b_branches);
+  if (timer != nullptr) timer->assignTime(0);
 }
 
 //-------------------------------------------------------------------------------------------------

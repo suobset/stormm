@@ -2,6 +2,7 @@
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/MolecularMechanics/minimization.h"
+#include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
 #include "../../../src/Namelists/user_settings.h"
@@ -78,13 +79,15 @@ int main(int argc, const char* argv[]) {
   Xoshiro256ppGenerator xrs(rngcon.getRandomSeed(), rngcon.getWarmupCycleCount());
   
   // Read topologies and coordinate files
-  SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::YES,
-                 ui.getPrintingPolicy(), &master_timer);
+  std::vector<MdlMol> sdf_recovery;
+  SystemCache sc(ui.getFilesNamelistInfo(), &sdf_recovery, ui.getExceptionBehavior(),
+                 MapRotatableGroups::NO, ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
 
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
   // a much larger list of all the possible conformers that each system might be able to access.
-  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, &xrs, &master_timer);
+  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, sdf_recovery, &xrs,
+                                                              &master_timer);
   std::vector<AtomGraph*> unique_topologies = conformer_population.getUniqueTopologies();
   const int n_unique_topologies = unique_topologies.size();
   const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();

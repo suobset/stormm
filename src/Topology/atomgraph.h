@@ -254,7 +254,7 @@ public:
   ///
   /// \param index  Index of a specific residue
   /// \{
-  std::vector<int> getResidueLimits() const;
+  const Hybrid<int>& getResidueLimits() const;
   int2 getResidueLimits(int index) const;
   /// \}
 
@@ -380,9 +380,10 @@ public:
   /// \brief Change an atom's mobility in the topology.
   ///
   /// Overloaded:
-  ///   - Change all atoms to become mobile or not, or toggle mobility
-  ///   - Change a specific stretch of atoms to become mobile or not, or toggle mobility
-  ///   - Make a specific atom mobile or not, or toggle mobility
+  ///   - Change all atoms to become mobile or not, or toggle mobility.
+  ///   - Change a specific stretch of atoms to become mobile or not, or toggle mobility.
+  ///   - Make a specific atom mobile or not, or toggle mobility.
+  ///   - Make a scattered selection of atoms mask mobile or not, or toggle the mobility.
   ///
   /// \param movement    The desired atom mobility (OFF, ON, or TOGGLE)
   /// \param low_index   The start of a stretch of atoms
@@ -392,6 +393,7 @@ public:
   void modifyAtomMobility(MobilitySetting movement);
   void modifyAtomMobility(int low_index, int high_index, MobilitySetting movement);
   void modifyAtomMobility(int index, MobilitySetting movement);
+  void modifyAtomMobility(const std::vector<int> &mask, MobilitySetting movement);
   /// \}
 
   /// \brief Get molecule membership for atoms within the system

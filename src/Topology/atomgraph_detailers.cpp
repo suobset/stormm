@@ -1219,7 +1219,8 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   
   // Mobile atoms are not stated in the topology, but they are an essential part of the information
   // on how the system will move.  Allocate a bitmask for all atoms to be mobile by default.
-  const int mobile_atom_mask_size = roundUp<int>(atom_count / (sizeof(int) * 8), warp_size_int);
+  const int mobile_atom_mask_size =
+    roundUp<int>(std::max(1, atom_count / (static_cast<int>(sizeof(int)) * 8)), warp_size_int);
   const std::vector<int> tmp_mobile_atoms(mobile_atom_mask_size, -1);
   
   // Constraints are not yet known, but allocate space for any foreseeable constraint model (up to

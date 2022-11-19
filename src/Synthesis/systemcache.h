@@ -147,11 +147,15 @@ public:
   /// Overloaded:
   ///   - Get a pointer to one topology
   ///   - Get a vector of pointers to all unique topologies in the SystemCache.
+  ///   - Return const pointers to topologies in a const SystemCache object, or non-const pointers
+  ///     to topologies in a non-const SystemCache.
   ///
   /// \param topology_index  Index of the topology of interest
   /// \{
   const AtomGraph* getTopologyPointer(int topology_index) const;
+  AtomGraph* getTopologyPointer(int topology_index);
   std::vector<const AtomGraph*> getTopologyPointer() const;
+  std::vector<AtomGraph*> getTopologyPointer();
   /// \}
 
   /// \brief Get a reference to one of the unique topologies from within the topology cache, based
@@ -227,7 +231,7 @@ public:
   std::vector<PhaseSpace>& getCoordinateReference();
   /// \}
 
-  /// \brief Get a pointer to the chemical features for a particular system.
+  /// \brief Get a pointer to the chemical features for a particular topology in the cache.
   ///
   /// Overloaded:
   ///   - Return a const pointer to an object in a const SystemCache
@@ -239,7 +243,7 @@ public:
   ChemicalFeatures* getFeaturesPointer(int index);
   /// \}  
 
-  /// \brief Get a reference to the chemical features for a particular system.
+  /// \brief Get a reference to the chemical features for a particular topology in the cache.
   ///
   /// Overloaded:
   ///   - Return a const reference to an object in a const SystemCache

@@ -50,7 +50,7 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
     if (t_nml.getKeywordStatus("core_mask", "rk2") != InputStatus::MISSING) {
       core_rk2 = t_nml.getRealValue("core_mask", "rk2");
     }
-    else if (t_nml.getKeywordStatus("core_mask", "replusion") != InputStatus::MISSING) {
+    else if (t_nml.getKeywordStatus("core_mask", "repulsion") != InputStatus::MISSING) {
       core_rk2 = t_nml.getRealValue("core_mask", "repulsion");
     }
     else if (t_nml.getKeywordStatus("core_mask", "stiffness") != InputStatus::MISSING) {

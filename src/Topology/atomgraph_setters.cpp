@@ -66,7 +66,7 @@ void AtomGraph::modifyAtomMobility(const int low_index, const int high_index,
 void AtomGraph::modifyAtomMobility(const int index, const MobilitySetting movement) {
   const int int_bits = sizeof(int) * 8;
   const int access_index = index / int_bits;
-  const int m_val = mobile_atoms.readHost(access_index);
+  const uint m_val = mobile_atoms.readHost(access_index);
   const int bshift = index - (access_index * int_bits);
   switch (movement) {
   case MobilitySetting::OFF:
@@ -78,6 +78,14 @@ void AtomGraph::modifyAtomMobility(const int index, const MobilitySetting moveme
   case MobilitySetting::TOGGLE:
     mobile_atoms.putHost(access_index, m_val ^ (0x1 << bshift));
     break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::modifyAtomMobility(const std::vector<int> &mask, const MobilitySetting movement) {
+  const size_t n_atoms = mask.size();
+  for (size_t i = 0LLU; i < n_atoms; i++) {
+    modifyAtomMobility(mask[i], movement);
   }
 }
 

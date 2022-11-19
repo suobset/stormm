@@ -45,11 +45,13 @@ std::string condenseSdfItemDataLines(const std::string &item_name, const MdlMol 
 /// \param chemfe     Chemical features detected for the topology of interest
 /// \{
 AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecule,
-                             const AtomGraph *ag, const ChemicalFeatures *chemfe,
-                             const CoordinateFrame &cf);
+                             const AtomGraph *ag, const ChemicalFeatures &chemfe,
+                             const CoordinateFrame &cf,
+                             ExceptionResponse policy = ExceptionResponse::DIE);
 
 AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecule,
-                             const AtomGraph *ag);
+                             const AtomGraph *ag,
+                             ExceptionResponse policy = ExceptionResponse::DIE);
 /// \}
 
 /// \brief Return a set of values from an SD file data item's content.  The values will be assumed
@@ -59,10 +61,10 @@ AtomMask maskFromSdfDataItem(const std::string &item_name, const MdlMol &molecul
 ///        in the ecumenical PolyNumeric data type, but subsequent functions will translate it
 ///        directly into other numeric or character formats.
 ///
-/// \param item_name  
-/// \param molecule
-/// \param fmt
-/// \param policy
+/// \param item_name  Name of the data item
+/// \param molecule   The MDL MOL entry with appended data items
+/// \param fmt        Format of the numerical (or char4 tuple) data expected
+/// \param policy     What to do if problems are encountered
 std::vector<PolyNumeric> valuesFromSdfDataItem(const std::string &item_name,
                                                const MdlMol &molecule, const NumberFormat fmt,
                                                ExceptionResponse policy = ExceptionResponse::DIE);

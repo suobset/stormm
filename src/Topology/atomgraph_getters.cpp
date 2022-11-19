@@ -83,8 +83,8 @@ int AtomGraph::getDescriptor(const SanderDescriptor choice) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> AtomGraph::getResidueLimits() const {
-  return residue_limits.readHost(0, residue_count + 1);
+const Hybrid<int>& AtomGraph::getResidueLimits() const {
+  return residue_limits;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -217,7 +217,7 @@ bool AtomGraph::getAtomMobility(const int index) const {
   const int int_bits = sizeof(int) * 8;
   const int access_index = index / int_bits;
   const uint m_val = static_cast<uint>(mobile_atoms.readHost(access_index));
-  return ((m_val << (index - (access_index * int_bits))) & 0x1);
+  return ((m_val >> (index - (access_index * int_bits))) & 0x1);
 }
 
 //-------------------------------------------------------------------------------------------------

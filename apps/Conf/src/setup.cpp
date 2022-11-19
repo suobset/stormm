@@ -5,34 +5,101 @@
 #include "../../../src/Chemistry/chemical_features.h"
 #include "../../../src/Math/rounding.h"
 #include "../../../src/Math/tickcounter.h"
+#include "../../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../../src/Structure/isomerization.h"
 #include "../../../src/Structure/rmsd.h"
 #include "../../../src/Topology/topology_util.h"
 #include "../../../src/Trajectory/coordinate_series.h"
 #include "setup.h"
 
+// CHECK
+#include "../../../src/DataTypes/stormm_vector_types.h"
+// END CHECK
+
 namespace conf_app {
 namespace setup {
 
-using stormm::chemistry::ChemicalFeatures;
 using stormm::chemistry::ConformationEdit;
 using stormm::chemistry::MapRotatableGroups;
 using stormm::constants::warp_size_int;
 using stormm::math::roundUp;
 using stormm::math::TickCounter;
 using stormm::namelist::ConformerControls;
+using stormm::structure::maskFromSdfDataItem;
 using stormm::structure::rmsd;
 using stormm::structure::RmsdMethod;
 using stormm::structure::rotateAboutBond;
 using stormm::structure::flipChiralCenter;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::isBonded;
-using stormm::trajectory::PhaseSpace;
 using stormm::trajectory::CoordinateFrame;
 using stormm::trajectory::CoordinateFrameReader;
 using stormm::trajectory::CoordinateSeries;
 using stormm::trajectory::CoordinateSeriesWriter;
 
+//-------------------------------------------------------------------------------------------------
+AtomMask getCoreMask(const ConformerControls &conf_input, const MdlMol &sdf_example,
+                     const PhaseSpace &ps, const AtomGraph *ag, const ChemicalFeatures &chemfe,
+                     const ExceptionResponse policy) {
+  AtomMask result(ag);
+  bool core_found = false;
+  if (conf_input.getCoreDataItemName().size() > 0LLU && sdf_example.getAtomCount() > 0) {
+    result.addAtoms(maskFromSdfDataItem(conf_input.getCoreDataItemName(), sdf_example, ag, chemfe,
+                                        sdf_example.exportCoordinateFrame(), policy),
+                    sdf_example.exportCoordinateFrame(), chemfe);
+    core_found = (result.getMaskedAtomCount() > 0);
+  }
+  if (core_found == false && conf_input.getCoreAtomMask().size() > 0LLU) {
+
+    // If present, a core atom mask common to all systems will fill in for situations in which a
+    // list of core atoms is not defined in an SD file entry.
+    result.addAtoms(conf_input.getCoreAtomMask(), CoordinateFrame(ps), chemfe);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<AtomMask> setGenerativeConditions(const UserSettings &ui, SystemCache *sc,
+                                              const std::vector<MdlMol> &sdf_recovery,
+                                              StopWatch *tm) {
+
+  // Establish a category for this function and stash time up to this point in the "miscellaneous"
+  // category.
+  const int cat_no = tm->addCategory("Set generative conditions");
+  tm->assignTime(0);
+  
+  // Add implicit solvent conditions.
+  std::vector<AtomGraph*> all_topologies = sc->getTopologyPointer();
+  const size_t ntop = all_topoligies.size();
+  const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();
+  if (igb != ImplicitSolventModel::NONE) {
+    for (size_t i = 0LLU; i < ntop; i++) {
+      all_topologies[i]->setImplicitSolventModel(igb);
+    }
+  }
+
+  // Create the core masks for all topologies.  Build a list of chemical features for each unique
+  // topology in the systems cache.
+  const ConformerControls& conf_input = ui.getConformerNamelistInfo();  
+  std::vector<AtomMask> result;
+  result.reserve(ntop);
+  for (size_t i = 0LLU; i < ntop; i++) {
+    AtomGraph* iag_ptr = sc->getTopologyPointer(i);
+    const int example_system_idx = sc.getCoordinateExample(i);
+    result.push_back(getCoreMask(conf_input, sdf_recovery[example_system_idx],
+                                 sc->getCoordinateReference(example_system_idx),
+                                 iag_ptr, sc->getFeaturesReference(i), ui.getExceptionBehavior()));
+    iag_ptr->modifyAtomMobility(result.back(), MobilitySetting::OFF);
+
+    // With the topology's core atoms now frozen, compute the rotatable bond groups.
+    sc->getFeaturesPointer(i)->
+  }
+
+  // Record the time needed for this procedure.
+  tm->assignTime(cat_no);
+  return result;
+}
+  
 //-------------------------------------------------------------------------------------------------
 bool permutationsAreLinked(const std::vector<IsomerPlan> &isomerizers, const int permi,
                            const int permj, const NonbondedKit<double> &nbk) {
@@ -131,8 +198,9 @@ void forgeConformation(CoordinateSeries<double> *cseries, const int fc,
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc, 
+                                     const std::vector<MdlMol> &sdf_recovery,
                                      Xoshiro256ppGenerator *xrs, StopWatch *tm) {
-  const ConformerControls conf_input = ui.getConformerNamelistInfo();
+  const ConformerControls& conf_input = ui.getConformerNamelistInfo();
 
   // Count the expanded number of systems
   const int ntop = sc.getTopologyCount();
@@ -141,15 +209,36 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   const std::vector<const PhaseSpace*> system_coords    = sc.getCoordinatePointer();
   const std::vector<const AtomGraph*> unique_topologies = sc.getTopologyPointer();
   std::vector<ChemicalFeatures> chemfe_list;
+  std::vector<AtomMask> core_masks;
   chemfe_list.reserve(ntop);
   for (int i = 0; i < ntop; i++) {
     const int example_system_idx = sc.getCoordinateExample(i);
+    const ChemicalFeatures tmp_chemfe(sc.getTopologyPointer(i),
+                                      sc.getCoordinateReference(example_system_idx),
+                                      MapRotatableGroups::NO);
+    core_masks.push_back(getCoreMask(conf_input, sdf_recovery[example_system_idx],
+                                     sc.getCoordinateReference(example_system_idx),
+                                     sc.getTopologyPointer(i), tmp_chemfe,
+                                     ui.getExceptionBehavior()));
     chemfe_list.emplace_back(sc.getTopologyPointer(i),
-                             sc.getCoordinateReference(example_system_idx),
-                             MapRotatableGroups::YES);
+                                sc.getCoordinateReference(example_system_idx),
+                                MapRotatableGroups::NO)
   }
   tm->assignTime(2);
 
+  // CHECK
+  for (int i = 0; i < ntop; i++) {
+    const AtomGraph *iag_ptr = sc.getTopologyPointer(i);
+    printf("Topology: %s\n", iag_ptr->getFileName().c_str());
+    const std::vector<int> masked_atoms = core_masks[i].getMaskedAtomList();
+    for (int j = 0; j < core_masks[i].getMaskedAtomCount(); j++) {
+      const stormm::char4 atom_name = iag_ptr->getAtomName(masked_atoms[j]);
+      printf("  %c%c%c%c [ %2d ]\n", atom_name.x, atom_name.y, atom_name.z, atom_name.w,
+             masked_atoms[j]);
+    }
+  }
+  // END CHECK
+  
   // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
   std::vector<PhaseSpace> ps_list; 
   std::vector<AtomGraph*> ag_list;

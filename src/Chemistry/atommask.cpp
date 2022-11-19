@@ -413,7 +413,7 @@ MaskComponent MaskComponent::applyRangeOperator(const std::vector<uint> &other,
   if (op == MaskOperator::RESIDUE_LT || op == MaskOperator::RESIDUE_LE ||
       op == MaskOperator::RESIDUE_GT || op == MaskOperator::RESIDUE_GE) {
     const int nres = ag->getResidueCount();
-    const std::vector<int> tmp_residue_limits = ag->getResidueLimits();
+    const int* tmp_residue_limits = ag->getResidueLimits().data();
     for (int i = 0; i < nres; i++) {
       bool res_works;
       if (op == MaskOperator::RESIDUE_LT || op == MaskOperator::RESIDUE_GT) {
@@ -596,6 +596,45 @@ std::string AtomMask::getDescription() const {
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* AtomMask::getTopologyPointer() const {
   return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool AtomMask::isAtomInMask(const char4 atom_name) const {
+  const Hybrid<char4>& ag_atom_names = ag_pointer->getResidueName();
+  const char4* ag_atom_names_ptr = ag_atom_names.data();
+  const size_t natom = ag_atom_names.size();
+  for (size_t i = 0; i < natom; i++) {
+    if (ag_atom_names_ptr[i] == atom_name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool AtomMask::isAtomInMask(const char4 res_name, const char4 atom_name) const {
+  const Hybrid<int>& ag_res_lims = ag_pointer->getResidueLimits();
+  const Hybrid<char4>& ag_res_names = ag_pointer->getResidueName();
+  const Hybrid<char4>& ag_atom_names = ag_pointer->getAtomName();
+  const int* ag_res_lims_ptr = ag_res_lims.data();
+  const char4* ag_res_names_ptr = ag_res_names.data();
+  const char4* ag_atom_names_ptr = ag_atom_names.data();
+  const size_t nres = ag_res_lims.size();
+  for (size_t i = 0; i < nres; i++) {
+    if (ag_res_names_ptr[i] == res_name) {
+      for (size_t j = ag_res_lims_ptr[i]; j < ag_res_lims_ptr[i + 1]; j++) {
+        if (ag_atom_names_ptr[j] == atom_name) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool AtomMask::isAtomInMask(int atom_index) const {
+  return readBitFromMask(raw_mask, atom_index);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -11,7 +11,7 @@ cat >> cgen.in << EOF
 
 &conformer
   rotation_samples 6,
-  max_system_trials 1024,
+  max_system_trials 64,
   core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
@@ -20,7 +20,7 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 50, maxcyc 500
+  ncyc 5, maxcyc 10
 &end
 EOF
 
@@ -28,4 +28,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-${STORMM_HOME}/apps/bin/conformer.stormm.cuda -i cgen.in -warn
+${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn

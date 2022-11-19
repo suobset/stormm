@@ -378,6 +378,9 @@ public:
 #ifdef STORMM_USE_HPC
   /// \brief Upload data to the GPU.
   void upload();
+
+  /// \brief Download data from the GPU.
+  void download();
 #endif
 
   /// \brief Get the number of planar atoms.
@@ -540,6 +543,13 @@ public:
   ///
   /// \param cfr  Present coordinates of the system
   void findChiralOrientations(const CoordinateFrameReader &cfr);
+
+  /// \brief Find the rotatable (and cis-trans invertible, and chiral invertible) atom groups in
+  ///        the topology based on rotatable bonds or chiral centers found by the rest of the
+  ///        chemical perception calculations.
+  ///
+  /// \param timer  Timekeeping object for performance profiling
+  void findRotatableBondGroups(StopWatch *timer = nullptr);
   
 private:
   int atom_count;              ///< Number of atoms in the system
@@ -676,9 +686,14 @@ private:
 
   /// Free electron content of each atom in the molecule, averaged over resonance states
   Hybrid<double> free_electrons;
-
+  
   /// Integer data (the Hybrid<int> arrays above are POINTER-kind and will targer this storage)
-  Hybrid<int> int_data;  
+  Hybrid<int> int_data;
+
+  /// Mutable group data.  This is also integer data, targeted by arrays that pertain to moving
+  /// groups of atoms.  The presence of this array, separate from other integer data, makes it
+  /// feasible to remap the rotatable bond groups and inversion centers.
+  Hybrid<int> mutable_group_data;
 
   /// Double-precision data, targeted by the POINTER-kind Hybrid<double> objects above
   Hybrid<double> double_data;
@@ -858,6 +873,29 @@ private:
   void findHydrogenBondElements(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
                                 std::vector<int> *tmp_polar_h, std::vector<int> *tmp_hb_don,
                                 std::vector<int> *tmp_hb_acc);
+
+  /// \brief Allocate and assign POINTER-kind Hybrid objects to the mutable groups data array.  The
+  ///        function accepts various concatenated lists of atom groups (plus their respective
+  ///        bounds arrays), allocates the appropriate amount of Hybrid int data, then stores the
+  ///        arrays in eponymous POINTER-kind Hybrid members of the ChemicalFeatures object
+  ///        targeting the newly allocated storage array.
+  ///
+  /// \param tmp_rotatable_groups         List of atoms involved in rotating groups
+  /// \param tmp_rotatable_group_bounds   Bounds array for tmp_rotatable_groups
+  /// \param tmp_cis_trans_groups         List of atoms involved in cis-trans flips
+  /// \param tmp_cis_trans_group_bounds   Bounds array for tmp_cis_trans_groups
+  /// \param tmp_invertible_groups        List of atoms involve din chiral inversions
+  /// \param tmp_invertible_group_bounds  Bounds array for tmp_invertible_groups
+  /// \param tmp_anchor_a_branches        List of chiral centers' highest-priority branches
+  /// \param tmp_anchor_b_branches        List of chiral centers' second-highest branches
+  void allocateMutableData(const std::vector<int> &tmp_rotatable_groups,
+                           const std::vector<int> &tmp_rotatable_group_bounds,
+                           const std::vector<int> &tmp_cis_trans_groups,
+                           const std::vector<int> &tmp_cis_trans_group_bounds,
+                           const std::vector<int> &tmp_cis_invertible_groups,
+                           const std::vector<int> &tmp_cis_invertible_group_bounds,
+                           const std::vector<int> &tmp_anchor_a_branches,
+                           const std::vector<int> &tmp_anchor_b_branches);
 
   /// \brief Reset POINTER-kind Hybrid objects to target the appropriate ARRAY-kind object in
   ///        the copy constructor and copy assignment operator.

@@ -281,6 +281,24 @@ public:
   /// \brief Get a pointer to the topology that this mask describes
   const AtomGraph* getTopologyPointer() const;
 
+  /// \brief Answer whether an atom is in the mask.
+  ///
+  /// Overloaded:
+  ///   - Provide the atom name only (any instance of the atom name found in the mask will suffice
+  ///     to say that an atom with the specified name is present in the mask)
+  ///   - Provide the atom residue name and atom name (any instance of an atom conforming to this
+  ///     pair of names will result in the function returning TRUE)
+  ///   - Provide the atom index number (indexing starting at zero)
+  ///
+  /// \param atom_name   Name of the atom of interest
+  /// \param res_name    Name of the residue of interest
+  /// \param atom_index  Topological index number of the atom of interest
+  /// \{
+  bool isAtomInMask(const char4 atom_name) const;
+  bool isAtomInMask(const char4 res_name, const char4 atom_name) const;
+  bool isAtomInMask(int atom_index) const;
+  /// \}
+  
   /// \brief Add atoms to the atom mask.
   ///
   /// Overloaded:

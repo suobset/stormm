@@ -40,6 +40,15 @@ int main(const int argc, const char* argv[]) {
   TestEnvironment oe(argc, argv);
   StopWatch timer;
 
+  // Section 1: chemical bonding structures
+  section("Chemical bonding patterns");
+
+  // Section 2: formal charges and bond orders
+  section("Resonance structures");
+
+  // Section 3: object manipulation
+  section("A first-class C++ object");
+  
   // Test the existence of topology and coordinate files
   const char osc = osSeparator();
   const std::string base_chem_name = oe.getStormmSourcePath() + osc + "test" + osc + "Chemistry";
@@ -178,6 +187,7 @@ int main(const int argc, const char* argv[]) {
       trp_cage_lchir_ans.push_back(i);
     }
   }
+  section(1);
   check(ring_counts, RelationalOperator::EQUAL, ring_cnt_ans, "Overall counts of ring systems do "
         "not meet expectations.", do_tests);
   check(fused_ring_counts, RelationalOperator::EQUAL, fused_ring_cnt_ans, "Counts of fused ring "
@@ -217,6 +227,7 @@ int main(const int argc, const char* argv[]) {
            "Subsequent tests will be skipped.", "test_chemical_features");
   }
   bool ch_unwritten = true;
+  section(2);
   for (size_t i = 0; i < nsys; i++) {
     snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
              std::to_string(i), 1.0e-6, "Formal charges computed for the system described by " +
@@ -349,6 +360,27 @@ int main(const int argc, const char* argv[]) {
   check(polycyclic_cistrans_counts, RelationalOperator::EQUAL, polycyclic_cistrans_counts_answer,
         "The number of cis-trans isomerization sites detected in polycyclic systems does not meet "
         "expectations. (There should be no bonds capable of cis-trans isomerization.)", do_rings);
+
+  // Try creating a chemical features object, then mapping rotatable groups post-facto
+  std::vector<ChemicalFeatures> sys_chem_pf;
+  for (int i = 0; i < nsys; i++) {
+    sys_chem_pf.emplace_back(&sys_ag[i], CoordinateFrameReader(sys_ps[i]), mapg_no, 300.0,
+                             &timer);
+  }
+  int j = 0;
+  std::vector<int> rotatable_bond_counts_pf(nsys, 0), cis_trans_bond_counts_pf(nsys, 0);
+  for (int i = 0; i < nsys; i++) {
+    if (first_mol_size[i] < 120) {
+      sys_chem_pf[i].findRotatableBondGroups(&timer);
+    }
+    rotatable_bond_counts_pf[i] = sys_chem_pf[i].getRotatableBondCount();
+    cis_trans_bond_counts_pf[i] = sys_chem_pf[i].getCisTransBondCount();
+  }
+  section(3);
+  check(rotatable_bond_counts_pf, RelationalOperator::EQUAL, rotatable_bond_cnt_ans, "Counts of "
+        "rotatable bonds do not meet expectations.", do_tests);
+  check(cis_trans_bond_counts_pf, RelationalOperator::EQUAL, cis_trans_bond_cnt_ans, "Counts of "
+        "cis-trans bonds do not meet expectations.", do_tests);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
