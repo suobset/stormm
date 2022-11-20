@@ -11,7 +11,7 @@ cat >> cgen.in << EOF
 
 &conformer
   rotation_samples 6,
-  max_system_trials 64,
+  max_system_trials 128,
   core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
@@ -20,7 +20,7 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 5, maxcyc 10
+  ncyc 50, maxcyc 500
 &end
 EOF
 

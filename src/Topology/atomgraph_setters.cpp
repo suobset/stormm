@@ -70,13 +70,13 @@ void AtomGraph::modifyAtomMobility(const int index, const MobilitySetting moveme
   const int bshift = index - (access_index * int_bits);
   switch (movement) {
   case MobilitySetting::OFF:
-    mobile_atoms.putHost(access_index, m_val & (~(0x1 << bshift)));
+    mobile_atoms.putHost(m_val & (~(0x1 << bshift)), access_index);
     break;
   case MobilitySetting::ON:
-    mobile_atoms.putHost(access_index, m_val | (0x1 << bshift));
+    mobile_atoms.putHost(m_val | (0x1 << bshift), access_index);
     break;
   case MobilitySetting::TOGGLE:
-    mobile_atoms.putHost(access_index, m_val ^ (0x1 << bshift));
+    mobile_atoms.putHost(m_val ^ (0x1 << bshift), access_index);
     break;
   }
 }

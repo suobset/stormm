@@ -114,6 +114,7 @@ double computeLocalPermutations(const std::vector<int> &limits,
 /// \param tm            Timer to record the wall time spent on various setup procedures
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
                                      const std::vector<MdlMol> &sdf_recovery,
+                                     const std::vector<AtomMask> &core_masks,
                                      Xoshiro256ppGenerator *xrs, StopWatch *tm);
 
 } // namespace setup

@@ -405,6 +405,10 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpaceWriter *psw, const int index,
   kPsyCopySystem<<<gpu.getSMPCount(), large_block_size>>>(*psw, poly_psr, index);
   cudaDeviceSynchronize();
 }
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyImportSystem(
   
 } // namespace synthesis
 } // namespace stormm

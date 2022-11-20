@@ -673,6 +673,74 @@ public:
                        double current_time, CoordinateFileKind output_kind,
                        PrintSituation expectation);
 #endif
+
+  /// \brief Import a system from one of the other coordinate objects, or from a series of C-style
+  ///        arrays with trusted lengths.  The imported system's size must correspond to that
+  ///        expected by the atom count of the system it will replace.
+  ///
+  /// Overloaded:
+  ///   - Provide a PhaseSpace object (all coordinates, velocities, and forces of the input object
+  ///     will be transferred from the PRESENT stage of the time cycle in the PhaseSpace object,
+  ///     into the specified stage of the time cycle in this synthesis, and other stages of the
+  ///     time cycle will be transferred accordingly).
+  ///   - Provide three arrays of Cartesian X, Y, and Z coordinates, a scaling factor if the
+  ///     data type is fixed-precision integral, plus indications of whether the data is for
+  ///     positions, velocities, or forces, and at what stage of the time cycle the data is to
+  ///     enter the PhaseSpace object.
+  ///   - Provide a CoordinateFrame or CoordinateSeries object with a frame number, plus
+  ///     indications of whether the object truly contains positions, velocities, or forces, and
+  ///     what stage of the time cycle the data is to enter the PhaseSpaceSynthesis.
+  ///
+  /// \param ps                 Complete phase space and time cycle data intended to replace one
+  ///                           of the systems in the synthesis
+  /// \param system_index       Index of the system within this synthesis that the imported
+  ///                           coordinates shall replace
+  /// \param orientation        Stage of the time cycle at which the PRESENT stage of an input
+  ///                           PhaseSpace object is to enter the synthesis, or at which the data
+  ///                           in raw arrays, a CoordinateFrame, or a CoordinateSeries object is
+  ///                           to enter the synthesis
+  /// \param tier               The level (host or device) at which to perform the transfer
+  /// \param x_coordinates      Input Cartesian X coordinates (these could be positions,
+  ///                           velocities, or forces)
+  /// \param y_coordinates      Input Cartesian Y coordinates
+  /// \param z_coordinates      Input Cartesian Z coordinates
+  /// \param box_transform      Transformation matrix to take coordinates into fractional space
+  ///                           (for positions only--provide nullptr for velocities or forces)
+  /// \param inverse_transform  Transformation matrix to take coordinates back to real space
+  /// \param kind               Specifies whether the Cartesian X, Y, and Z data are positions,
+  ///                           velocities, or forces
+  /// \param scaling_factor     Scaling factor to take the input X, Y, and Z data into internal
+  ///                           units of Angstroms, Angstroms per femtosecond, or kcal/mol-A^2
+  /// \param cf                 Input coordinate frame object containing X, Y, and Z data as
+  ///                           double-precision objects
+  /// \param cs                 Input coordinate series object with X, Y, and Z data for many
+  ///                           frames, one of which will be copied over.  This object contains
+  ///                           its own scaling factor.
+  /// \param frame_index        Index of a CoordinateSeries object to be transferred
+  /// \{
+  void import(const PhaseSpace &ps, int system_index,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const T* x_coordinates, const T* y_coordinates, const T* z_coordinates,
+              const double* box_transform, const double* inverse_transform,
+              const double* box_dimensions, int system_index, double inverse_scaling_factor = 1.0,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void import(const CoordinateFrame &cf, int system_index,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  
+  template <typename T>
+  void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
   
 private:
   int system_count;               ///< The number of systems to tend at once

@@ -20,6 +20,7 @@
 
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::testing::StopWatch;
+using conf_app::setup::setGenerativeConditions;
 using conf_app::setup::expandConformers;
 
 using namespace stormm::chemistry;
@@ -84,18 +85,15 @@ int main(int argc, const char* argv[]) {
                  MapRotatableGroups::NO, ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
 
+  // Establish the conditions for generative modeling
+  const std::vector<AtomMask> core_masks = setGenerativeConditions(ui, &sc, sdf_recovery,
+                                                                   &master_timer);
+
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
   // a much larger list of all the possible conformers that each system might be able to access.
-  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, sdf_recovery, &xrs,
-                                                              &master_timer);
-  std::vector<AtomGraph*> unique_topologies = conformer_population.getUniqueTopologies();
-  const int n_unique_topologies = unique_topologies.size();
-  const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();
-  if (igb != ImplicitSolventModel::NONE) {
-    for (int i = 0; i < n_unique_topologies; i++) {
-      unique_topologies[i]->setImplicitSolventModel(igb);
-    }
-  }
+  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, sdf_recovery, core_masks,
+                                                              &xrs, &master_timer);
+  const std::vector<AtomGraph*> unique_topologies = conformer_population.getUniqueTopologies();
   const std::vector<int> conformer_topology_indices =
     conformer_population.getUniqueTopologyIndices();
   AtomGraphSynthesis conf_poly_ag(unique_topologies, conformer_topology_indices);

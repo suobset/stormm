@@ -2406,6 +2406,20 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
 }
 
 //-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const PhaseSpace &ps, const int system_index,
+                                 const CoordinateCycle orientation,
+                                 const HybridTargetLevel tier) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const CoordinateFrame &ps, const int system_index,
+                                 const TrajectoryKind kind, const CoordinateCycle orientation,
+                                 const HybridTargetLevel tier) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   const size_t system_stride = roundUp<size_t>(system_count, warp_size_zu);
   const size_t xfrm_stride = system_count * roundUp<size_t>(9, warp_size_zu);

@@ -8,6 +8,7 @@
 #include "../../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../../src/Structure/isomerization.h"
 #include "../../../src/Structure/rmsd.h"
+#include "../../../src/Topology/atomgraph_abstracts.h"
 #include "../../../src/Topology/topology_util.h"
 #include "../../../src/Trajectory/coordinate_series.h"
 #include "setup.h"
@@ -31,6 +32,8 @@ using stormm::structure::RmsdMethod;
 using stormm::structure::rotateAboutBond;
 using stormm::structure::flipChiralCenter;
 using stormm::topology::ChemicalDetailsKit;
+using stormm::topology::ImplicitSolventModel;
+using stormm::topology::MobilitySetting;
 using stormm::topology::isBonded;
 using stormm::trajectory::CoordinateFrame;
 using stormm::trajectory::CoordinateFrameReader;
@@ -70,7 +73,7 @@ std::vector<AtomMask> setGenerativeConditions(const UserSettings &ui, SystemCach
   
   // Add implicit solvent conditions.
   std::vector<AtomGraph*> all_topologies = sc->getTopologyPointer();
-  const size_t ntop = all_topoligies.size();
+  const size_t ntop = all_topologies.size();
   const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();
   if (igb != ImplicitSolventModel::NONE) {
     for (size_t i = 0LLU; i < ntop; i++) {
@@ -85,14 +88,27 @@ std::vector<AtomMask> setGenerativeConditions(const UserSettings &ui, SystemCach
   result.reserve(ntop);
   for (size_t i = 0LLU; i < ntop; i++) {
     AtomGraph* iag_ptr = sc->getTopologyPointer(i);
-    const int example_system_idx = sc.getCoordinateExample(i);
+    const int example_system_idx = sc->getCoordinateExample(i);
     result.push_back(getCoreMask(conf_input, sdf_recovery[example_system_idx],
                                  sc->getCoordinateReference(example_system_idx),
                                  iag_ptr, sc->getFeaturesReference(i), ui.getExceptionBehavior()));
-    iag_ptr->modifyAtomMobility(result.back(), MobilitySetting::OFF);
+    const std::vector<int> icore_atoms = result.back().getMaskedAtomList();
+    const size_t n_core_atoms = icore_atoms.size();
+    std::vector<bool> icore_mobility(icore_atoms.size());
+    for (size_t i = 0LLU; i < n_core_atoms; i++) {
+      icore_mobility[i] = iag_ptr->getAtomMobility(icore_atoms[i]);
+    }
+    iag_ptr->modifyAtomMobility(icore_atoms, MobilitySetting::OFF);
 
     // With the topology's core atoms now frozen, compute the rotatable bond groups.
-    sc->getFeaturesPointer(i)->
+    sc->getFeaturesPointer(i)->findRotatableBondGroups(tm);
+
+    // Restore the core atoms' original mobility settings (henceforth, they will be restrained to
+    // their original positions using harmonic restraints).
+    for (size_t i = 0LLU; i < n_core_atoms; i++) {
+      const MobilitySetting imb = (icore_mobility[i]) ? MobilitySetting::ON : MobilitySetting::OFF;
+      iag_ptr->modifyAtomMobility(icore_atoms[i], imb);
+    }
   }
 
   // Record the time needed for this procedure.
@@ -199,6 +215,7 @@ void forgeConformation(CoordinateSeries<double> *cseries, const int fc,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc, 
                                      const std::vector<MdlMol> &sdf_recovery,
+                                     const std::vector<AtomMask> &core_masks,
                                      Xoshiro256ppGenerator *xrs, StopWatch *tm) {
   const ConformerControls& conf_input = ui.getConformerNamelistInfo();
 
@@ -208,36 +225,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   const std::vector<const AtomGraph*> system_topologies = sc.getSystemTopologyPointer();
   const std::vector<const PhaseSpace*> system_coords    = sc.getCoordinatePointer();
   const std::vector<const AtomGraph*> unique_topologies = sc.getTopologyPointer();
-  std::vector<ChemicalFeatures> chemfe_list;
-  std::vector<AtomMask> core_masks;
-  chemfe_list.reserve(ntop);
-  for (int i = 0; i < ntop; i++) {
-    const int example_system_idx = sc.getCoordinateExample(i);
-    const ChemicalFeatures tmp_chemfe(sc.getTopologyPointer(i),
-                                      sc.getCoordinateReference(example_system_idx),
-                                      MapRotatableGroups::NO);
-    core_masks.push_back(getCoreMask(conf_input, sdf_recovery[example_system_idx],
-                                     sc.getCoordinateReference(example_system_idx),
-                                     sc.getTopologyPointer(i), tmp_chemfe,
-                                     ui.getExceptionBehavior()));
-    chemfe_list.emplace_back(sc.getTopologyPointer(i),
-                                sc.getCoordinateReference(example_system_idx),
-                                MapRotatableGroups::NO)
-  }
   tm->assignTime(2);
-
-  // CHECK
-  for (int i = 0; i < ntop; i++) {
-    const AtomGraph *iag_ptr = sc.getTopologyPointer(i);
-    printf("Topology: %s\n", iag_ptr->getFileName().c_str());
-    const std::vector<int> masked_atoms = core_masks[i].getMaskedAtomList();
-    for (int j = 0; j < core_masks[i].getMaskedAtomCount(); j++) {
-      const stormm::char4 atom_name = iag_ptr->getAtomName(masked_atoms[j]);
-      printf("  %c%c%c%c [ %2d ]\n", atom_name.x, atom_name.y, atom_name.z, atom_name.w,
-             masked_atoms[j]);
-    }
-  }
-  // END CHECK
   
   // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
   std::vector<PhaseSpace> ps_list; 
@@ -252,12 +240,12 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
 
     // Obtain the topology pointer for possible use later
     const AtomGraph *iag_ptr = sc.getTopologyPointer(i);
+    const ChemicalFeatures& ichemfe = sc.getFeaturesReference(i);
     
     // Create a list of ways to change the conformation
-    const std::vector<IsomerPlan> rotatable_groups  = chemfe_list[i].getRotatableBondGroups();
-    const std::vector<IsomerPlan> cis_trans_groups  =
-      chemfe_list[i].getCisTransIsomerizationGroups();
-    const std::vector<IsomerPlan> invertible_groups = chemfe_list[i].getChiralInversionGroups();
+    const std::vector<IsomerPlan> rotatable_groups  = ichemfe.getRotatableBondGroups();
+    const std::vector<IsomerPlan> cis_trans_groups  = ichemfe.getCisTransIsomerizationGroups();
+    const std::vector<IsomerPlan> invertible_groups = ichemfe.getChiralInversionGroups();
     std::vector<IsomerPlan> isomerizers;
     const int nrot_bond = rotatable_groups.size();
     const int nctx_bond = cis_trans_groups.size();
@@ -323,9 +311,9 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     }
     
     // Get the vectors of chiral centers and inversion plans for all centers in this molecule
-    const std::vector<int> chiral_centers = chemfe_list[i].getChiralCenters();
+    const std::vector<int> chiral_centers = ichemfe.getChiralCenters();
     const std::vector<ChiralInversionProtocol> chiral_center_plans =
-      chemfe_list[i].getChiralInversionMethods();
+      ichemfe.getChiralInversionMethods();
     std::vector<int> chiral_variable_indices(n_variables, -1);
     int ncen_found = 0;
     for (int j = 0; j < n_variables; j++) {

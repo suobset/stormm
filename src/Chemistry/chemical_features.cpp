@@ -2099,7 +2099,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
     for (int pos = 0; pos < n_jatom; pos++) {
       j_is_fixed = (j_is_fixed || ag_pointer->getAtomMobility(jfirst[pos]) == false);
     }
-    if (i_is_fixed == false && (ifirst.size() >= jfirst.size() || j_is_fixed)) {
+    if (j_is_fixed == false && (ifirst.size() >= jfirst.size() || i_is_fixed)) {
       if (is_standard_rotator) {
         rotators.push_back({atom_j, atom_i});
         rot_moving_lists.push_back(jfirst);
@@ -2109,7 +2109,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
         ctx_moving_lists.push_back(jfirst);
       }
     }
-    else if (j_is_fixed == false) {
+    else if (i_is_fixed == false) {
       if (is_standard_rotator) {
         rotators.push_back({atom_i, atom_j});
         rot_moving_lists.push_back(ifirst);

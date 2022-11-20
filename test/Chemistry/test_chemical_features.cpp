@@ -1,3 +1,4 @@
+#include "../../src/Chemistry/atommask.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
@@ -8,12 +9,12 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
+#include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using stormm::chemistry::ChiralOrientation;
 using stormm::constants::ExceptionResponse;
 using stormm::symbols::amber_ancient_bioq;
 using stormm::data_types::int2;
@@ -28,6 +29,7 @@ using stormm::parse::operator!=;
 using stormm::parse::operator==;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
+using stormm::topology::MobilitySetting;
 using stormm::trajectory::CoordinateFileKind;
 using stormm::trajectory::PhaseSpace;
 
@@ -381,6 +383,41 @@ int main(const int argc, const char* argv[]) {
         "rotatable bonds do not meet expectations.", do_tests);
   check(cis_trans_bond_counts_pf, RelationalOperator::EQUAL, cis_trans_bond_cnt_ans, "Counts of "
         "cis-trans bonds do not meet expectations.", do_tests);
+
+  // Immobilize some atoms in the Phe topology at the side chain, then inspect whether the
+  // rest of the molecule becomes mobile as a result.
+  AtomMask phe_side_chain(":PHE & @CB,CG,CD1,CD2,CE1,CE2,CZ", &sys_ag[7], sys_chem_pf[7],
+                          sys_ps[7]);
+  const std::vector<int> phe_side_chain_heavy = phe_side_chain.getMaskedAtomList();
+  sys_ag[7].modifyAtomMobility(phe_side_chain_heavy, MobilitySetting::OFF);
+  sys_chem_pf[7].findRotatableBondGroups(&timer);
+  check(sys_chem_pf[7].getRotatableBondCount(), RelationalOperator::EQUAL,
+        rotatable_bond_cnt_ans[7], "The number of rotatable bonds was reduced as a consequence "
+        "of immobilizing some atoms, despite the fact that rotation is still possible.", do_tests);
+  const std::vector<IsomerPlan> free_phe_rotors = sys_chem[7].getRotatableBondGroups();
+  const std::vector<IsomerPlan> cnst_phe_rotors = sys_chem_pf[7].getRotatableBondGroups();
+  const int nrotor = free_phe_rotors.size();
+  std::vector<int> free_phe_moving_atoms(nrotor);
+  std::vector<int> cnst_phe_moving_atoms(nrotor);
+  for (int i = 0; i < nrotor; i++) {
+    free_phe_moving_atoms[i] = free_phe_rotors[i].getMovingAtomCount();
+    cnst_phe_moving_atoms[i] = cnst_phe_rotors[i].getMovingAtomCount();
+  }
+  const std::vector<int> free_phe_moving_atoms_ans = { 5, 5, 10, 13, 7, 7 };
+  const std::vector<int> cnst_phe_moving_atoms_ans = { 5, 5, 20, 17, 7, 7 };
+  check(free_phe_moving_atoms, RelationalOperator::EQUAL, free_phe_moving_atoms_ans, "The number "
+        "of moving atoms in each Ace-Phe-Nme rotating group does not meet expectations.",
+        do_tests);
+  check(cnst_phe_moving_atoms, RelationalOperator::EQUAL, cnst_phe_moving_atoms_ans, "The number "
+        "of moving atoms in each constrained Ace-Phe-Nme rotating group does not meet "
+        "expectations.", do_tests);
+  phe_side_chain.addAtoms(":PHE & @CA", CoordinateFrame(sys_ps[7]));
+  const std::vector<int> phe_ca_sc_heavy = phe_side_chain.getMaskedAtomList();  
+  sys_ag[7].modifyAtomMobility(phe_ca_sc_heavy, MobilitySetting::OFF);
+  sys_chem_pf[7].findRotatableBondGroups(&timer);
+  check(sys_chem_pf[7].getRotatableBondCount(), RelationalOperator::EQUAL,
+        rotatable_bond_cnt_ans[7] - 1, "The number of rotatable bonds was not reduced as a "
+        "consequence of immobilizing even the CA atom.", do_tests);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
