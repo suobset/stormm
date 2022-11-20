@@ -7,20 +7,21 @@ namespace synthesis {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* z_import,
-                                 const double* box_transform, const double* inverse_transform,
-                                 const double* box_dimensions, const int system_index,
+                                 const double* box_xform_in, const double* inverse_xform_in,
+                                 const double* box_dimensions_in, const int system_index,
                                  const double inverse_scaling_factor, const TrajectoryKind kind,
                                  const CoordinateCycle orientation, const HybridTargetLevel tier) {
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
-      llint *x_recv, *y_recv, *z_recv, *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
+      llint *x_recv, *y_recv, *z_recv;
+      int *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
       const int pos_start   = atom_starts.readHost(system_index);
       const int pos_end     = pos_start + atom_counts.readHost(system_index);
       const int box_offset  = roundUp(9, warp_size_int) * system_index;
       const int dim_offset  = roundUp(6, warp_size_int) * system_index;
       double conv_factor;
-      switch (trajkind) {
+      switch (kind) {
       case TrajectoryKind::POSITIONS:
         conv_factor = inverse_scaling_factor * globalpos_scale;
         switch (orientation) {
@@ -40,12 +41,12 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
           y_recv_ovrf = y_coordinate_overflow.data();
           z_recv_ovrf = z_coordinate_overflow.data();
           for (int i = 0; i < 9; i++) {
-            box_space_transforms.putHost(box_transform[i], box_offset + i);
-            inverse_transforms.putHost(inverse_transform[i], box_offset + i);
-            box_dimensions.putHost(inverse_transform[i], dim_offset + i);
-            const int95_t fpbv = doubleToint95(inverse_transform[i] * globalpos_scale);
+            box_space_transforms.putHost(box_xform_in[i], box_offset + i);
+            inverse_transforms.putHost(inverse_xform_in[i], box_offset + i);
+            box_dimensions.putHost(box_dimensions_in[i], dim_offset + i);
+            const int95_t fpbv = doubleToInt95(inverse_xform_in[i] * globalpos_scale);
             box_vectors.putHost(fpbv.x, box_offset + i);
-            box_vectors_overflow.putHost(fpbv.y, box_offset + i);
+            box_vector_overflow.putHost(fpbv.y, box_offset + i);
           }
           break;
         case CoordinateCycle::FUTURE:
@@ -141,10 +142,32 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void PhaseSpaceSynthesis::import(const CoordinateSeriesReader<T> &csr, const int frame_index,
+                                 const int system_index, const TrajectoryKind kind,
+                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
+  const size_t xfrm_offset = frame_index * roundUp(9, warp_size_int);
+  const size_t bdim_offset = frame_index * roundUp(6, warp_size_int);
+  const size_t atom_offset = static_cast<size_t>(frame_index) *
+                             static_cast<size_t>(roundUp(csr.natom, warp_size_int));
+  import(&csr.xcrd[atom_offset], &csr.ycrd[atom_offset], &csr.zcrd[atom_offset],
+         &csr.umat[xfrm_offset], &csr.invu[xfrm_offset], &csr.boxdim[bdim_offset], system_index,
+         csr.inv_gpos_scale, kind, orientation, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void PhaseSpaceSynthesis::import(const CoordinateSeriesWriter<T> &csw, const int frame_index,
+                                 const int system_index, const TrajectoryKind kind,
+                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
+  import(csw, frame_index, system_index, kind, orientation, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void PhaseSpaceSynthesis::import(const CoordinateSeries<T> &cs, const int frame_index,
                                  const int system_index, const TrajectoryKind kind,
                                  const CoordinateCycle orientation, const HybridTargetLevel tier) {
-
+  import(cs.data(), frame_index, system_index, kind, orientation, tier);
 }
   
 } // namespace synthesis

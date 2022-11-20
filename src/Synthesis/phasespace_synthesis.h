@@ -7,9 +7,14 @@
 #include "Accelerator/hybrid.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "FileManagement/file_util.h"
+#include "Math/rounding.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/barostat.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/thermostat.h"
 #include "Trajectory/trajectory_enumerators.h"
@@ -22,19 +27,27 @@ using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using diskutil::PrintSituation;
+using data_types::int95_t;
+using math::roundUp;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
+using numerics::doubleToInt95;
 using topology::UnitCellType;
 using trajectory::Barostat;
 using trajectory::BarostatKind;
 using trajectory::CoordinateCycle;
 using trajectory::CoordinateFileKind;
+using trajectory::CoordinateFrame;
+using trajectory::CoordinateFrameReader;
+using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesReader;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
-#ifdef STORMM_USE_HPC
+using trajectory::PhaseSpaceReader;
 using trajectory::PhaseSpaceWriter;
-#endif
 using trajectory::Thermostat;
 using trajectory::ThermostatKind;
 using trajectory::TrajectoryKind;
@@ -690,6 +703,8 @@ public:
   ///   - Provide a CoordinateFrame or CoordinateSeries object with a frame number, plus
   ///     indications of whether the object truly contains positions, velocities, or forces, and
   ///     what stage of the time cycle the data is to enter the PhaseSpaceSynthesis.
+  ///   - Provide an abstract of any of the major coordinate objects, plus the other information to
+  ///     target the import to the correct system, HPC tier, and place in the time cycle.
   ///
   /// \param ps                 Complete phase space and time cycle data intended to replace one
   ///                           of the systems in the synthesis
@@ -718,23 +733,53 @@ public:
   ///                           its own scaling factor.
   /// \param frame_index        Index of a CoordinateSeries object to be transferred
   /// \{
+  void import(const PhaseSpaceReader &psr, int system_index,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void import(const PhaseSpaceWriter &psw, int system_index,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   void import(const PhaseSpace &ps, int system_index,
               CoordinateCycle orientation = CoordinateCycle::PRESENT,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  template <typename T>
-  void import(const T* x_coordinates, const T* y_coordinates, const T* z_coordinates,
-              const double* box_transform, const double* inverse_transform,
-              const double* box_dimensions, int system_index, double inverse_scaling_factor = 1.0,
+  void import(const CoordinateFrameReader &cfr, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
               CoordinateCycle orientation = CoordinateCycle::PRESENT,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
-
+  
+  void import(const CoordinateFrameWriter &cfw, int system_index,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  
   void import(const CoordinateFrame &cf, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
               CoordinateCycle orientation = CoordinateCycle::PRESENT,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
   
+  template <typename T>
+  void import(const T* x_coordinates, const T* y_coordinates, const T* z_coordinates,
+              const double* box_xform_in, const double* inverse_xform_in,
+              const double* box_dimensions_in, int system_index,
+              double inverse_scaling_factor = 1.0, TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRESENT,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   template <typename T>
   void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
@@ -904,5 +949,7 @@ private:
 
 } // namespace trajectory
 } // namespace stormm
+
+#include "phasespace_synthesis.tpp"
 
 #endif
