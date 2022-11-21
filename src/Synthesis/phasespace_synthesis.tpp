@@ -11,111 +11,124 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
                                  const double* box_dimensions_in, const int system_index,
                                  const double inverse_scaling_factor, const TrajectoryKind kind,
                                  const CoordinateCycle orientation, const HybridTargetLevel tier) {
+  llint *x_recv, *y_recv, *z_recv;
+  int *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
+  double *box_xform_ptr, *inverse_xform_ptr, *box_dim_ptr;
+  double conv_factor;
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    conv_factor = inverse_scaling_factor * globalpos_scale;
+    switch (orientation) {
+    case CoordinateCycle::PAST:
+      x_recv      = x_prior_coordinates.data(tier);
+      y_recv      = y_prior_coordinates.data(tier);
+      z_recv      = z_prior_coordinates.data(tier);
+      x_recv_ovrf = x_prior_coord_overflow.data(tier);
+      y_recv_ovrf = y_prior_coord_overflow.data(tier);
+      z_recv_ovrf = z_prior_coord_overflow.data(tier);
+      break;
+    case CoordinateCycle::PRESENT:
+      x_recv      = x_coordinates.data(tier);
+      y_recv      = y_coordinates.data(tier);
+      z_recv      = z_coordinates.data(tier);
+      x_recv_ovrf = x_coordinate_overflow.data(tier);
+      y_recv_ovrf = y_coordinate_overflow.data(tier);
+      z_recv_ovrf = z_coordinate_overflow.data(tier);
+      box_xform_ptr = box_space_transforms.data(tier);
+      inverse_xform_ptr = inverse_transforms.data(tier);
+      box_dim_ptr = box_dimensions.data(tier);
+      break;
+    case CoordinateCycle::FUTURE:
+      x_recv      = x_future_coordinates.data(tier);
+      y_recv      = y_future_coordinates.data(tier);
+      z_recv      = z_future_coordinates.data(tier);
+      x_recv_ovrf = x_future_coord_overflow.data(tier);
+      y_recv_ovrf = y_future_coord_overflow.data(tier);
+      z_recv_ovrf = z_future_coord_overflow.data(tier);
+      break;
+    }
+    break;
+  case TrajectoryKind::VELOCITIES:
+    conv_factor = inverse_scaling_factor * velocity_scale;
+    switch (orientation) {
+    case CoordinateCycle::PAST:
+      x_recv      = x_prior_velocities.data(tier);
+      y_recv      = y_prior_velocities.data(tier);
+      z_recv      = z_prior_velocities.data(tier);
+      x_recv_ovrf = x_prior_velocity_overflow.data(tier);
+      y_recv_ovrf = y_prior_velocity_overflow.data(tier);
+      z_recv_ovrf = z_prior_velocity_overflow.data(tier);
+      break;
+    case CoordinateCycle::PRESENT:
+      x_recv      = x_velocities.data(tier);
+      y_recv      = y_velocities.data(tier);
+      z_recv      = z_velocities.data(tier);
+      x_recv_ovrf = x_velocity_overflow.data(tier);
+      y_recv_ovrf = y_velocity_overflow.data(tier);
+      z_recv_ovrf = z_velocity_overflow.data(tier);
+      break;
+    case CoordinateCycle::FUTURE:
+      x_recv      = x_future_velocities.data(tier);
+      y_recv      = y_future_velocities.data(tier);
+      z_recv      = z_future_velocities.data(tier);
+      x_recv_ovrf = x_future_velocity_overflow.data(tier);
+      y_recv_ovrf = y_future_velocity_overflow.data(tier);
+      z_recv_ovrf = z_future_velocity_overflow.data(tier);
+      break;
+    }
+    break;
+  case TrajectoryKind::FORCES:
+    conv_factor = inverse_scaling_factor * force_scale;
+    switch (orientation) {
+    case CoordinateCycle::PAST:
+      x_recv      = x_prior_forces.data(tier);
+      y_recv      = y_prior_forces.data(tier);
+      z_recv      = z_prior_forces.data(tier);
+      x_recv_ovrf = x_prior_force_overflow.data(tier);
+      y_recv_ovrf = y_prior_force_overflow.data(tier);
+      z_recv_ovrf = z_prior_force_overflow.data(tier);
+      break;
+    case CoordinateCycle::PRESENT:
+      x_recv      = x_forces.data(tier);
+      y_recv      = y_forces.data(tier);
+      z_recv      = z_forces.data(tier);
+      x_recv_ovrf = x_force_overflow.data(tier);
+      y_recv_ovrf = y_force_overflow.data(tier);
+      z_recv_ovrf = z_force_overflow.data(tier);
+      break;
+    case CoordinateCycle::FUTURE:
+      x_recv      = x_future_forces.data(tier);
+      y_recv      = y_future_forces.data(tier);
+      z_recv      = z_future_forces.data(tier);
+      x_recv_ovrf = x_future_force_overflow.data(tier);
+      y_recv_ovrf = y_future_force_overflow.data(tier);
+      z_recv_ovrf = z_future_force_overflow.data(tier);
+      break;
+    }
+    break;
+  }
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
-      llint *x_recv, *y_recv, *z_recv;
-      int *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
       const int pos_start   = atom_starts.readHost(system_index);
       const int pos_end     = pos_start + atom_counts.readHost(system_index);
       const int box_offset  = roundUp(9, warp_size_int) * system_index;
       const int dim_offset  = roundUp(6, warp_size_int) * system_index;
-      double conv_factor;
       switch (kind) {
       case TrajectoryKind::POSITIONS:
-        conv_factor = inverse_scaling_factor * globalpos_scale;
-        switch (orientation) {
-        case CoordinateCycle::PAST:
-          x_recv      = x_prior_coordinates.data();
-          y_recv      = y_prior_coordinates.data();
-          z_recv      = z_prior_coordinates.data();
-          x_recv_ovrf = x_prior_coord_overflow.data();
-          y_recv_ovrf = y_prior_coord_overflow.data();
-          z_recv_ovrf = z_prior_coord_overflow.data();
-          break;
-        case CoordinateCycle::PRESENT:
-          x_recv      = x_coordinates.data();
-          y_recv      = y_coordinates.data();
-          z_recv      = z_coordinates.data();
-          x_recv_ovrf = x_coordinate_overflow.data();
-          y_recv_ovrf = y_coordinate_overflow.data();
-          z_recv_ovrf = z_coordinate_overflow.data();
-          for (int i = 0; i < 9; i++) {
-            box_space_transforms.putHost(box_xform_in[i], box_offset + i);
-            inverse_transforms.putHost(inverse_xform_in[i], box_offset + i);
-            box_dimensions.putHost(box_dimensions_in[i], dim_offset + i);
-            const int95_t fpbv = doubleToInt95(inverse_xform_in[i] * globalpos_scale);
-            box_vectors.putHost(fpbv.x, box_offset + i);
-            box_vector_overflow.putHost(fpbv.y, box_offset + i);
-          }
-          break;
-        case CoordinateCycle::FUTURE:
-          x_recv      = x_future_coordinates.data();
-          y_recv      = y_future_coordinates.data();
-          z_recv      = z_future_coordinates.data();
-          x_recv_ovrf = x_future_coord_overflow.data();
-          y_recv_ovrf = y_future_coord_overflow.data();
-          z_recv_ovrf = z_future_coord_overflow.data();
-          break;
+        for (size_t i = 0; i < 9LLU; i++) {
+          box_xform_ptr[box_offset + i] = box_xform_in[i];
+          inverse_xform_ptr[box_offset + i] = inverse_xform_in[i];
+          const int95_t fpbv = doubleToInt95(inverse_xform_in[i] * globalpos_scale);
+          box_vectors.putHost(fpbv.x, box_offset + i);
+          box_vector_overflow.putHost(fpbv.y, box_offset + i);
+        }
+        for (size_t i = 0; i < 6LLU; i++) {
+          box_dim_ptr[dim_offset + i] = box_dimensions_in[i];
         }
         break;
       case TrajectoryKind::VELOCITIES:
-        conv_factor = inverse_scaling_factor * velocity_scale;
-        switch (orientation) {
-        case CoordinateCycle::PAST:
-          x_recv      = x_prior_velocities.data();
-          y_recv      = y_prior_velocities.data();
-          z_recv      = z_prior_velocities.data();
-          x_recv_ovrf = x_prior_velocity_overflow.data();
-          y_recv_ovrf = y_prior_velocity_overflow.data();
-          z_recv_ovrf = z_prior_velocity_overflow.data();
-          break;
-        case CoordinateCycle::PRESENT:
-          x_recv      = x_velocities.data();
-          y_recv      = y_velocities.data();
-          z_recv      = z_velocities.data();
-          x_recv_ovrf = x_velocity_overflow.data();
-          y_recv_ovrf = y_velocity_overflow.data();
-          z_recv_ovrf = z_velocity_overflow.data();
-          break;
-        case CoordinateCycle::FUTURE:
-          x_recv      = x_future_velocities.data();
-          y_recv      = y_future_velocities.data();
-          z_recv      = z_future_velocities.data();
-          x_recv_ovrf = x_future_velocity_overflow.data();
-          y_recv_ovrf = y_future_velocity_overflow.data();
-          z_recv_ovrf = z_future_velocity_overflow.data();
-          break;
-        }
-        break;
       case TrajectoryKind::FORCES:
-        conv_factor = inverse_scaling_factor * force_scale;
-        switch (orientation) {
-        case CoordinateCycle::PAST:
-          x_recv      = x_prior_forces.data();
-          y_recv      = y_prior_forces.data();
-          z_recv      = z_prior_forces.data();
-          x_recv_ovrf = x_prior_force_overflow.data();
-          y_recv_ovrf = y_prior_force_overflow.data();
-          z_recv_ovrf = z_prior_force_overflow.data();
-          break;
-        case CoordinateCycle::PRESENT:
-          x_recv      = x_forces.data();
-          y_recv      = y_forces.data();
-          z_recv      = z_forces.data();
-          x_recv_ovrf = x_force_overflow.data();
-          y_recv_ovrf = y_force_overflow.data();
-          z_recv_ovrf = z_force_overflow.data();
-          break;
-        case CoordinateCycle::FUTURE:
-          x_recv      = x_future_forces.data();
-          y_recv      = y_future_forces.data();
-          z_recv      = z_future_forces.data();
-          x_recv_ovrf = x_future_force_overflow.data();
-          y_recv_ovrf = y_future_force_overflow.data();
-          z_recv_ovrf = z_future_force_overflow.data();
-          break;
-        }
         break;
       }
       for (int i = pos_start; i < pos_end; i++) {
@@ -134,7 +147,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-
+    
     break;
 #endif
   }

@@ -715,13 +715,18 @@ public:
   ///                           in raw arrays, a CoordinateFrame, or a CoordinateSeries object is
   ///                           to enter the synthesis
   /// \param tier               The level (host or device) at which to perform the transfer
-  /// \param x_coordinates      Input Cartesian X coordinates (these could be positions,
+  /// \param x_import           Input Cartesian X coordinates (these could be positions,
   ///                           velocities, or forces)
-  /// \param y_coordinates      Input Cartesian Y coordinates
-  /// \param z_coordinates      Input Cartesian Z coordinates
-  /// \param box_transform      Transformation matrix to take coordinates into fractional space
+  /// \param y_import           Input Cartesian Y coordinates
+  /// \param z_import           Input Cartesian Z coordinates
+  /// \param box_xform_in       Transformation matrix to take coordinates into fractional space
   ///                           (for positions only--provide nullptr for velocities or forces)
-  /// \param inverse_transform  Transformation matrix to take coordinates back to real space
+  /// \param inverse_xform_in   Transformation matrix to take coordinates back to real space.  The
+  ///                           units of elements in this matrix are Angstroms.
+  /// \param box_dimensions_in  Dimensions of the box (redundant with the information stored in
+  ///                           either of the transformation matrices, but convenient and perhaps
+  ///                           best able to preserve bitwise information to pass it directly).
+  ///                           The units of this array are Angstroms.
   /// \param kind               Specifies whether the Cartesian X, Y, and Z data are positions,
   ///                           velocities, or forces
   /// \param scaling_factor     Scaling factor to take the input X, Y, and Z data into internal
@@ -761,9 +766,8 @@ public:
               HybridTargetLevel tier = HybridTargetLevel::HOST);
   
   template <typename T>
-  void import(const T* x_coordinates, const T* y_coordinates, const T* z_coordinates,
-              const double* box_xform_in, const double* inverse_xform_in,
-              const double* box_dimensions_in, int system_index,
+  void import(const T* x_import, const T* y_import, const T* z_import, const double* box_xform_in,
+              const double* inverse_xform_in, const double* box_dimensions_in, int system_index,
               double inverse_scaling_factor = 1.0, TrajectoryKind kind = TrajectoryKind::POSITIONS,
               CoordinateCycle orientation = CoordinateCycle::PRESENT,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
