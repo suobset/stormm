@@ -321,6 +321,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.tpp \
 		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.tpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.tpp \
+		   $(SRCDIR)/Synthesis/phasespace_synthesis.tpp \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.tpp \
 		   $(SRCDIR)/Topology/atomgraph.tpp \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
