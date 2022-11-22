@@ -5,10 +5,10 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord> Tcoord[] MeshParameters::getMeshOrigin() const {
+template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
   const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
   if (isFloatingPointScalarType<Tcoord>()) {
-    Tcoord result[3];
+    std::vector<Tcoord> result(3);
     result[0] = int95ToDouble(origin_x) * inverse_scale_factor;
     result[1] = int95ToDouble(origin_y) * inverse_scale_factor;
     result[2] = int95ToDouble(origin_z) * inverse_scale_factor;
@@ -50,21 +50,86 @@ template <typename Tcoord> Tcoord MeshParameters::getMeshOriginAsTuple() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord>
-Tcoord[] MeshParameters::getMeshElementVector(const UnitCellAxis dim) const {
-  Tcoord result[3];
+std::vector<Tcoord> MeshParameters::getMeshElementVector(const UnitCellAxis dim) const {
+  std::vector<Tcoord> result(3);
   const int icol = static_cast<int>(dim);
-  for (int i = 0; i < 3; i++) {
-    result[i] = element_invu[i + (3 * icol)];
+  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
+  if (ct == double_type_index) {
+    for (int i = 0; i < 3; i++) {
+      result[i] = element_invu[i + (3 * icol)];
+    }
   }
+  else if (ct == float_type_index) {
+    for (int i = 0; i < 3; i++) {
+      result[i] = sp_element_invu[i + (3 * icol)];
+    }
+  }
+  else if (ct == int95t_type_index) {
+    for (int i = 0; i < 3; i++) {
+      result[i] = fp_element_invu[i + (3 * icol)];
+    }
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord>
-Tcoord[] MeshParameters::getMeshElementVector(const CartesianDimension dim) const {
-  Tcoord result[3];
-  const int icol = static_cast<int>(dim);
-  for (int i = 0; i < 3; i++) {
-    result[i] = element_invu[i + (3 * icol)];
+std::vector<Tcoord> MeshParameters::getMeshElementVector(const CartesianDimension dim) const {
+  switch (dim) {
+  case CartesianDimension::X:
+    return getMeshElementVector(UnitCellAxis::A);
+  case CartesianDimension::Y:
+    return getMeshElementVector(UnitCellAxis::B);
+  case CartesianDimension::Z:
+    return getMeshElementVector(UnitCellAxis::C);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshTransform() const {
+  std::vector<Tcoord> result(9);
+  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
+  if (ct == double_type_index) {
+    for (size_t i = 0; i < 9LLU; i++) {
+      result[i] = element_umat[i];
+    }
+  }
+  else if (ct == float_type_index) {
+    for (size_t i = 0; i < 9LLU; i++) {
+      result[i] = sp_element_umat[i];
+    }
+  }
+  else {
+    rtErr("The transformation matrix into element space is only available in single- or double-"
+          "precision floating point numbers.", "MeshParameters", "getMeshTransform");
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTransform() const {
+  std::vector<Tcoord> result(9);
+  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
+  if (ct == double_type_index) {
+    for (size_t i = 0; i < 9LLU; i++) {
+      result[i] = element_invu[i];
+    }
+  }
+  else if (ct == float_type_index) {
+    for (size_t i = 0; i < 9LLU; i++) {
+      result[i] = sp_element_invu[i];
+    }
+  }
+  else if (ct == int95t_type_index) {
+    for (size_t i = 0; i < 9LLU; i++) {
+      result[i] = fp_element_invu[i];
+    }
+  }
+  else {
+    rtErr("The inverse transformation matrix (the column matrix of element vectors) is only "
+          "available in fixed-precision format or single- or double-precision floating point "
+          "numbers.", "MeshParameters", "getMeshTransform");
   }
 }
 

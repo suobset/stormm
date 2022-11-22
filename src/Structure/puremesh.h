@@ -12,7 +12,7 @@
 #include "Numerics/split_fixed_precision.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
-#include "Trajectory/coordinate_seriesh"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 
 namespace stormm {
@@ -28,7 +28,11 @@ using topology::AtomGraph;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateSeries;
 using trajectory::PhaseSpace;
-  
+
+/// \brief The default mesh fixed-precision scaling factor is higher than a typical simulation due
+///        to the way the mesh occupies a confined region of space.
+const int default_mesh_scaling_bits = 40;
+
 /// \brief Encode the critical dimensions of a regular, rectilinear mesh.  The locations of mesh
 ///        points as well as spacings are stored as fixed-precision integers to ensure consistency
 ///        and high performance on architectures with deficient 64-bit floating point arithmetic.
@@ -38,13 +42,17 @@ public:
   /// \brief The constructor takes formal arguments for all member variables.  Variants support
   ///        triclinic and orthorhombic meshes.
   /// \{
+  MeshParameters(int na_in = 1, int nb_in = 1, int nc_in = 1, double origin_x_in = 0.0,
+                 double origin_y_in = 0.0, double origin_z_in = 0.0,
+                 int scale_bits_in = default_mesh_scaling_bits);
+
   MeshParameters(int na_in, int nb_in, int nc_in, double origin_x_in, double origin_y_in,
                  double origin_z_in, const std::vector<double> &element_vectors,
-                 int scale_bits_in);
+                 int scale_bits_in = default_mesh_scaling_bits);
 
   MeshParameters(int na_in, int nb_in, int nc_in, double origin_x_in, double origin_y_in,
                  double origin_z_in, double element_x, double element_y, double element_z,
-                 int scale_bits_in);
+                 int scale_bits_in = default_mesh_scaling_bits);
   /// \}
 
   /// \brief Get the number of points along one of the mesh axes
@@ -69,7 +77,7 @@ public:
   ///
   /// \param dim  The specific Cartesian axis of interest
   /// \{
-  template <typename Tcoord> Tcoord[] getMeshOrigin() const;
+  template <typename Tcoord> std::vector<Tcoord> getMeshOrigin() const;
   double getMeshOrigin(CartesianDimension dim) const;
   /// \}
 
@@ -84,7 +92,7 @@ public:
   ///
   /// \param dim  The specific Cartesian axis of interest
   /// \{
-  int95_t[] getMeshOriginAsFixedPrecision() const;
+  std::vector<int95_t> getMeshOriginAsFixedPrecision() const;
   int95_t getMeshOriginAsFixedPrecision(CartesianDimension dim) const;
   /// \}
 
@@ -98,24 +106,42 @@ public:
   ///
   /// \param dim  The axis of interest
   /// \{
-  template <typename Tcoord> Tcoord[] getMeshElementVector(UnitCellAxis dim) const;
-  template <typename Tcoord> Tcoord[] getMeshElementVector(CartesianDimension dim) const;
+  template <typename Tcoord> std::vector<Tcoord> getMeshElementVector(UnitCellAxis dim) const;
+  template <typename Tcoord>
+  std::vector<Tcoord> getMeshElementVector(CartesianDimension dim) const;
   /// \}
 
   /// \brief Get the entire element space matrix in any format.  Real formats will have units of
   ///        inverse Angstroms.
-  template <typename Tcoord> Tcoord[] getMeshTransform() const;
+  template <typename Tcoord> std::vector<Tcoord> getMeshTransform() const;
 
   /// \brief Get the inverse element transformation matrix in any format.  Real formats will have
   ///        units of inverse Angstroms.
-  template <typename Tcoord> Tcoord[] getMeshInverseTransform() const;
+  template <typename Tcoord> std::vector<Tcoord> getMeshInverseTransform() const;
 
+  /// \brief Get the number of bits after the decimal in this mesh's fixed-precision coordinate
+  ///        representations.
+  int getScalingBits() const;
+  
   /// \brief Get the scaling factor for this mesh's fixed-precision format
   double getScalingFactor() const;
 
   /// \brief Get the inverse scaling factor for this mesh's fixed-precision format
   double getInverseScalingFactor() const;
-    
+
+  /// \brief Get a vector of fixed-precision format coordinates of the line of grid points starting
+  ///        at the origin and proceeding along one of the mesh axes.  One additional point is
+  ///        provided to put an upper bound on the final element in whatever dimension.  There are
+  ///        nine possible outputs: Cartesian X, Y, or Z coordinates of the mesh's "a", "b", or "c"
+  ///        vectors.
+  ///
+  /// \param mesh_axis  The mesh axis of interest
+  /// \param cart_axis  The Cartesian axis of interest
+  /// \{
+  std::vector<int95_t> getAxisCoordinates(UnitCellAxis mesh_axis,
+                                          CartesianDimension cart_axis) const;
+  /// \}
+
 private:
   int na;                       ///< Mesh dimension along the unit cell "a" vector
   int nb;                       ///< Mesh dimension along the unit cell "b" vector
@@ -155,8 +181,6 @@ private:
   /// coordinate representation.  Representing the grid origin and grid points in this manner
   /// ensures high-precision computations of the relative particle and mesh positions.
   int95_t fp_element_invu[9];
-
-  friend PureMesh;
 };
 
 /// \brief A workspace for constructing a pure potential mesh based on the frozen atoms of a
@@ -219,17 +243,29 @@ private:
   /// [ 0, 0, k = 0...nz ] (the "c" box vector).  Storing these values obviates the need to do
   /// expensive and complicated multiplications of fixed-precision numbers.
   /// \{
-  Hybrid<llint> fp_a_line;
-  Hybrid<llint> fp_b_line;
-  Hybrid<llint> fp_c_line;
+  Hybrid<llint> fp_a_line_x;
+  Hybrid<llint> fp_a_line_y;
+  Hybrid<llint> fp_a_line_z;
+  Hybrid<llint> fp_b_line_x;
+  Hybrid<llint> fp_b_line_y;
+  Hybrid<llint> fp_b_line_z;
+  Hybrid<llint> fp_c_line_x;
+  Hybrid<llint> fp_c_line_y;
+  Hybrid<llint> fp_c_line_z;
   /// \}
 
   /// Overflow for fixed-precision Cartesian coordinates of the mesh grid points stepping along
   /// the a, b, and c box vectors.
   /// \{
-  Hybrid<int> fp_a_line_overflow;
-  Hybrid<int> fp_b_line_overflow;
-  Hybrid<int> fp_c_line_overflow;
+  Hybrid<int> fp_a_line_overflow_x;
+  Hybrid<int> fp_a_line_overflow_y;
+  Hybrid<int> fp_a_line_overflow_z;
+  Hybrid<int> fp_b_line_overflow_x;
+  Hybrid<int> fp_b_line_overflow_y;
+  Hybrid<int> fp_b_line_overflow_z;
+  Hybrid<int> fp_c_line_overflow_x;
+  Hybrid<int> fp_c_line_overflow_y;
+  Hybrid<int> fp_c_line_overflow_z;
   /// \}
 
   /// Coefficients for tricubic spline functions spanning each grid element.  Coefficients for
