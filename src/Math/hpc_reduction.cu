@@ -16,7 +16,6 @@ using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
-using data_types::int95_t;
 
 #include "Numerics/accumulation.cui"
 

@@ -10,8 +10,6 @@
 namespace stormm {
 namespace structure {
 
-using data_types::int95_t;
-  
 //-------------------------------------------------------------------------------------------------
 void rotateAboutBond(CoordinateFrame *cf, const int atom_i, const int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle) {

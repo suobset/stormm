@@ -27,7 +27,6 @@ using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using diskutil::PrintSituation;
-using data_types::int95_t;
 using math::roundUp;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;

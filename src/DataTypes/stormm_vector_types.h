@@ -239,7 +239,7 @@ static const size_t short4_type_index = std::type_index(typeid(short4)).hash_cod
 static const size_t ushort2_type_index = std::type_index(typeid(ushort2)).hash_code();
 static const size_t ushort3_type_index = std::type_index(typeid(ushort3)).hash_code();
 static const size_t ushort4_type_index = std::type_index(typeid(ushort4)).hash_code();
-
+  
 /// \brief Test whether some data type is a recognized HPC (CUDA or HIP) vector type.
 template <typename T> bool isHpcVectorType();
 
@@ -267,7 +267,10 @@ struct int95_t {
                     ///<   information in a 64-bit floating point number in the range +/-256.
   int y;            ///< Overflow accumulator, used when the primary value would be exceeded
 };
-  
+
+// Also define the fixed-precision type for 95-bit storage of double-precision numbers.
+static const size_t int95t_type_index = std::type_index(typeid(int95_t)).hash_code();
+
 /// \brief A template-compatible class for implementing vectorized two-tuples in C++ code, based
 ///        on a single scalar type.
 template <typename T> struct Vec2 {
@@ -389,6 +392,9 @@ using data_types::ullint2;
 using data_types::ullint3;
 using data_types::ullint4;
 
+// Also make the int95_t data type generally available by including this header file.
+using data_types::int95_t;
+  
 // Make type index identifiers available in all STORMM namespaces
 using data_types::int2_type_index;
 using data_types::int3_type_index;
@@ -420,7 +426,8 @@ using data_types::short4_type_index;
 using data_types::ushort2_type_index;
 using data_types::ushort3_type_index;
 using data_types::ushort4_type_index;
-
+using data_types::int95t_type_index;
+  
 // Template-compatible vector types for C++ code
 using data_types::Vec2;
 using data_types::Vec3;

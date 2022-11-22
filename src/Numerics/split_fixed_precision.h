@@ -15,7 +15,6 @@ namespace numerics {
 using card::Hybrid;
 using constants::ExceptionResponse;
 using constants::PrecisionModel;
-using data_types::int95_t;
   
 /// \brief Enumerate the choices for carrying out fixed-precision accumulation
 enum class AccumulationMethod {

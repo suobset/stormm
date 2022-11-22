@@ -17,7 +17,6 @@ using stormm::constants::PrecisionModel;
 using stormm::constants::tiny;
 using stormm::data_types::llint;
 using stormm::data_types::float2;
-using stormm::data_types::int95_t;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;

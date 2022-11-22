@@ -24,7 +24,6 @@ namespace stormm {
 namespace mm {
 
 using constants::verytiny;
-using data_types::int95_t;
 using energy::CacheResourceKit;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;

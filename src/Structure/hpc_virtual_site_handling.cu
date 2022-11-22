@@ -12,7 +12,6 @@ namespace stormm {
 namespace structure {
 
 using card::HybridTargetLevel;
-using data_types::int95_t;
 using numerics::max_llint_accumulation;
 using numerics::max_int_accumulation_f;
 using synthesis::maximum_valence_work_unit_atoms;

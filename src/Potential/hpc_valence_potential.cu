@@ -29,7 +29,6 @@ using constants::twice_warp_size_int;
 using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
-using data_types::int95_t;
 using math::roundUp;
 using numerics::chooseAccumulationMethod;
 using numerics::AccumulationMethod;

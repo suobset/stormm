@@ -38,7 +38,12 @@ enum class PrecisionModel {
 
 /// \brief Enumerate the Cartesian dimensions
 enum class CartesianDimension {
-  X, Y, Z
+  X = 0, Y, Z
+};
+
+/// \brief Enumerate the unit cell axes
+enum class UnitCellAxis {
+  A = 0, B, C
 };
 
 /// \brief Convert a string object, possibly supplied by the user, into an ExceptionResponse
