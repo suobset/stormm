@@ -239,11 +239,11 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Restraints/restraint_builder.h \
 		     $(SRCDIR)/Restraints/restraint_enumerators.h \
 		     $(SRCDIR)/Restraints/restraint_util.h \
+		     $(SRCDIR)/Structure/background_mesh.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
 		     $(SRCDIR)/Structure/mesh_parameters.h \
-		     $(SRCDIR)/Structure/puremesh.h \
 		     $(SRCDIR)/Structure/rmsd.h \
 		     $(SRCDIR)/Structure/structure_enumerators.h \
 		     $(SRCDIR)/Structure/structure_ops.h \
@@ -320,8 +320,8 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Structure/global_manipulation.tpp \
 		   $(SRCDIR)/Structure/isomerization.tpp \
 		   $(SRCDIR)/Structure/local_arrangement.tpp \
+		   $(SRCDIR)/Structure/background_mesh.tpp \
 		   $(SRCDIR)/Structure/mesh_parameters.tpp \
-		   $(SRCDIR)/Structure/puremesh.tpp \
 		   $(SRCDIR)/Structure/rmsd.tpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.tpp \
 		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.tpp \

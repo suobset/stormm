@@ -29,13 +29,16 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateSeries;
 using trajectory::PhaseSpace;
 
+/// \brief The templated, writeable abstract of a BackgroundMesh object.
+
+  
 /// \brief A workspace for constructing a pure potential mesh based on the frozen atoms of a
 ///        large molecule.  If the large molecule has nonrigid components, they must be excluded
 ///        from contributing to the grid.  In addition, any atoms up to 1:4 (connected by three
 ///        bonds or less) must also be excluded from the grid-based potential.  Computations on
 ///        these atoms will not be accurate off the grid, but since they are frozen the
 ///        consequences are mitigated.
-template <typename T> class PureMesh {
+template <typename T> class BackgroundMesh {
 public:
 
   /// \brief The constructor takes all dimension parameters plus an indication of what type of
@@ -60,25 +63,27 @@ public:
   ///                         define non-orthorhombic meshes.
   /// \param gpu              Details of the available GPU
   /// \{
-  PureMesh(const AtomGraph *ag_in = nullptr,
-           const MeshParameters &measurements_in = MeshParameters());
+  BackgroundMesh(GridDetail kind_in = GridDetail::NONBONDED_FIELD,
+                 const AtomGraph *ag_in = nullptr,
+                 const MeshParameters &measurements_in = MeshParameters());
   
-  PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf,
-           const MeshParameters &measurements_in, const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 const MeshParameters &measurements_in, const GpuDetails &gpu = null_gpu);
 
-  PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf, int scale_bits, double buffer,
-           double spacing, const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 int scale_bits, double buffer, double spacing, const GpuDetails &gpu = null_gpu);
 
-  PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf, int scale_bits, double buffer,
-           const std::vector<double> &spacing, const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 int scale_bits, double buffer, const std::vector<double> &spacing,
+                 const GpuDetails &gpu = null_gpu);
 
-  PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf, int scale_bits,
-           const std::vector<double> &mesh_bounds, double spacing,
-           const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 int scale_bits, const std::vector<double> &mesh_bounds, double spacing,
+                 const GpuDetails &gpu = null_gpu);
 
-  PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf, int scale_bits,
-           const std::vector<double> &mesh_bounds, const std::vector<double> &spacing,
-           const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 int scale_bits, const std::vector<double> &mesh_bounds,
+                 const std::vector<double> &spacing, const GpuDetails &gpu = null_gpu);
   /// \}
 
   /// \brief Copy and move constructors must be defined explicitly to accommodate POINTER-kind
@@ -86,8 +91,8 @@ public:
   ///
   /// \param original  The original object to copy or move
   /// \{
-  PureMesh(const PureMesh &original);
-  PureMesh(PureMesh &&original);
+  BackgroundMesh(const BackgroundMesh<T> &original);
+  BackgroundMesh(BackgroundMesh<T> &&original);
   /// \}
 
   /// \brief Copy and move assignment operators must be defined explicitly to accommodate
@@ -95,8 +100,8 @@ public:
   ///
   /// \param other  Assignments are made based on this pre-existing object.
   /// \{
-  PureMesh& operator=(const PureMesh &original);
-  PureMesh& operator=(PureMesh &&original);
+  BackgroundMesh& operator=(const BackgroundMesh<T> &original);
+  BackgroundMesh& operator=(BackgroundMesh<T> &&original);
   /// \}
   
   /// \brief Get a const pointer to the topology responsible for creating this mesh.
@@ -108,6 +113,23 @@ private:
   /// representations.
   MeshParameters measurements;
 
+  /// The detail level of the mesh--this carries implications for the allowed data types.  An
+  /// "OCCLUSION" mesh must be of type ullint (64-bit unsigned integer, to encode 4 x 4 x 4
+  /// cubelets of bitwise information for "occluded" or "non-occluded." Such meshes can be very
+  /// dense, as every mesh element constitutes 4 x 4 x 4 cubelets, or a total of 512 bytes of
+  /// information, as much as 20k mesh points on each side.  In contrast, a "NONBONDED_FIELD" type
+  /// grid must have data type float or double to encode the appropriate non-bonded potential or
+  /// influence field (each Lennard-Jones type and Generalized Born parameter combination will get
+  /// its own field).  A "NONBONDED_ATOMIC" type mesh stores field data in floating-point scalar
+  /// data as well as local neighbor lists in an additional array of integer data, with a bounds
+  /// array.
+  GridDetail kind;
+
+  /// The type of non-bonded potential to map to the mesh.  This is irrelevant for "OCCLUSION"-kind
+  /// meshes (the effective potential is a clash based on the Lennard-Jones sigma radii and a probe
+  /// width).
+  NonbondedPotential field;
+  
   /// Fixed-precision Cartesian coordinates of the mesh grid points stepping along the lines
   /// [ i = 0...nx, 0, 0 ] (the "a" box vector), [ 0, j = 0...ny, 0 ] (the "b" box vector), and
   /// [ 0, 0, k = 0...nz ] (the "c" box vector).  Storing these values obviates the need to do
@@ -127,15 +149,15 @@ private:
   /// Overflow for fixed-precision Cartesian coordinates of the mesh grid points stepping along
   /// the a, b, and c box vectors.
   /// \{
-  Hybrid<int> a_line_overflow_x;
-  Hybrid<int> a_line_overflow_y;
-  Hybrid<int> a_line_overflow_z;
-  Hybrid<int> b_line_overflow_x;
-  Hybrid<int> b_line_overflow_y;
-  Hybrid<int> b_line_overflow_z;
-  Hybrid<int> c_line_overflow_x;
-  Hybrid<int> c_line_overflow_y;
-  Hybrid<int> c_line_overflow_z;
+  Hybrid<int> a_line_x_overflow;
+  Hybrid<int> a_line_y_overflow;
+  Hybrid<int> a_line_z_overflow;
+  Hybrid<int> b_line_x_overflow;
+  Hybrid<int> b_line_y_overflow;
+  Hybrid<int> b_line_z_overflow;
+  Hybrid<int> c_line_x_overflow;
+  Hybrid<int> c_line_y_overflow;
+  Hybrid<int> c_line_z_overflow;
   /// \}
 
   /// Coefficients for tricubic spline functions spanning each grid element.  Coefficients for
@@ -152,6 +174,12 @@ private:
   /// Snapshot of the frozen atoms in the topology (in case the topology is modified later)
   Hybrid<uint> frozen_atoms;
 
+  /// Element-wise neighbor listts for nearby frozen atoms
+  Hybrid<int> neighbor_list;
+
+  /// Bounds array for the neighbor list atoms array above
+  Hybrid<int> neighbor_list_bounds;
+  
   /// Data storage for the POINTER-kind Hybrid<int> objects above
   Hybrid<int> int_data;
 
@@ -160,11 +188,14 @@ private:
 
   /// \brief Allocate memory for the mesh coefficients, axis coordinates, and frozen atoms mask.
   void allocate();
+
+  /// \brief Repair the POINTER-kind Hybrid objects in a newly copied or moved object.
+  void rebase_pointers();
 };
 
 } // namespace structure
 } // namespace stormm
 
-#include "puremesh.tpp"
+#include "background_mesh.tpp"
 
 #endif

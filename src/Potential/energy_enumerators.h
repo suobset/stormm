@@ -75,6 +75,14 @@ enum class StateVariable {
                           ///<   not define its own index in the subsequent tracking arrays).
 };
 
+/// \brief Enumerate the specific kinds of non-bonded potentials.
+enum class NonbondedPotential {
+  ELECTROSTATIC,  ///< Interactions between charges
+  VAN_DER_WAALS,  ///< Dispersion iteractions between particles, likely a Lennard-Jones potential
+  CLASH           ///< Zero (no clash) or one (clash) based on the van-der Waals radii and the
+                  ///<   width of some probe sphere representing heavy atoms in the ligand
+};
+  
 /// \brief Get a human-readable name for the enumerations detailed above.
 /// \{
 std::string getEnumerationName(StateVariable DihedralStyle);
