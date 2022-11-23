@@ -5,134 +5,75 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (isFloatingPointScalarType<Tcoord>()) {
-    std::vector<Tcoord> result(3);
-    result[0] = int95ToDouble(origin_x) * inverse_scale_factor;
-    result[1] = int95ToDouble(origin_y) * inverse_scale_factor;
-    result[2] = int95ToDouble(origin_z) * inverse_scale_factor;
-    return result;
-  }
-  else if (isFloatingPointHpcVectorType<Tcoord>()) {
-    rtErr("The mesh coordinate origin is available as an HPC vector type through the "
-          "getMeshOriginAsTuple() function.", "MeshParameter", "getMeshOrigin");
-  }
-  else {
-    rtErr("In order to get the mesh coordinate origin as a vector of fixed-precision numbers, use "
-          "the getMeshOriginAsFixedPrecision() function.", "MeshParameter", "getMeshOrigin");
-  }
-  __builtin_unreachable();
+template <typename T>
+PureMesh<T>::PureMesh(const AtomGraph *ag_in, const MeshParameters &measurements_in) :
+    measurements{measurements_in},
+    a_line_x{HybridKind::POINTER, "mesh_avector_x"},
+    a_line_y{HybridKind::POINTER, "mesh_avector_y"},
+    a_line_z{HybridKind::POINTER, "mesh_avector_z"},
+    b_line_x{HybridKind::POINTER, "mesh_bvector_x"},
+    b_line_y{HybridKind::POINTER, "mesh_bvector_y"},
+    b_line_z{HybridKind::POINTER, "mesh_bvector_z"},
+    c_line_x{HybridKind::POINTER, "mesh_cvector_x"},
+    c_line_y{HybridKind::POINTER, "mesh_cvector_y"},
+    c_line_z{HybridKind::POINTER, "mesh_cvector_z"},
+    a_line_x_overflow{HybridKind::POINTER, "mesh_avector_x_ovrf"},
+    a_line_y_overflow{HybridKind::POINTER, "mesh_avector_y_ovrf"},
+    a_line_z_overflow{HybridKind::POINTER, "mesh_avector_z_ovrf"},
+    b_line_x_overflow{HybridKind::POINTER, "mesh_bvector_x_ovrf"},
+    b_line_y_overflow{HybridKind::POINTER, "mesh_bvector_y_ovrf"},
+    b_line_z_overflow{HybridKind::POINTER, "mesh_bvector_z_ovrf"},
+    c_line_x_overflow{HybridKind::POINTER, "mesh_cvector_x_ovrf"},
+    c_line_y_overflow{HybridKind::POINTER, "mesh_cvector_y_ovrf"},
+    c_line_z_overflow{HybridKind::POINTER, "mesh_cvector_z_ovrf"},
+    coefficients{HybridKind::ARRAY, "mesh_tricubic_coef"},
+    ag_pointer{const_cast<AtomGraph*>(ag_in)},
+    frozen_atoms{HybridKind::ARRAY, "mesh_frozen_atoms"},
+    int_data{HybridKind::ARRAY, "mesh_int_data"},
+    llint_data{HybridKind::ARRAY, "mesh_llint_data"}
+{}
+
+//-------------------------------------------------------------------------------------------------
+PureMesh::PureMesh(const AtomGraph *ag_in, const CoordinateFrame &cf,
+                   const MeshParameters &measurements_in, const GpuDetails &gpu) :
+    PureMesh(ag_in, measurements_in)
+{
+  allocate();
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord> Tcoord MeshParameters::getMeshOriginAsTuple() const {
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (isFloatingPointScalarType<Tcoord>()) {
-    rtErr("The mesh coordinate origin is available as a 3-element array of the desired floating "
-          "point type through the getMeshOrigin() function.", "MeshParameter",
-          "getMeshOriginAsTuple");
-  }
-  else if (isFloatingPointHpcVectorType<Tcoord>()) {
-    Tcoord result;
-    result.x = int95ToDouble(origin_x) * inverse_scale_factor;
-    result.y = int95ToDouble(origin_y) * inverse_scale_factor;
-    result.z = int95ToDouble(origin_z) * inverse_scale_factor;
-    return result;
-  }
-  else {
-    rtErr("In order to get the mesh coordinate origin as a vector of fixed-precision numbers, use "
-          "the getMeshOriginAsFixedPrecision() function.  The fixed-precision representation is "
-          "not available as a tuple.", "MeshParameter", "getMeshOriginAsTuple");
-  }
-  __builtin_unreachable();
+void PureMesh::allocate() {
+  const int padded_na = roundUp(na, warp_size_int);
+  const int padded_nb = roundUp(nb, warp_size_int);
+  const int padded_nc = roundUp(nc, warp_size_int);
+  llint_data.resize(3 * (padded_na + padded_nb + padded_nc));
+  int_data.resize(3 * (padded_na + padded_nb + padded_nc));
+  a_line_x.setPointer(&llint_data,             0, na);
+  a_line_y.setPointer(&llint_data,     padded_na, na);
+  a_line_z.setPointer(&llint_data, 2 * padded_na, na);
+  a_line_x_overflow.setPointer(&int_data,             0, na);
+  a_line_y_overflow.setPointer(&int_data,     padded_na, na);
+  a_line_z_overflow.setPointer(&int_data, 2 * padded_na, na);
+  int thus_far = 3 * padded_na;
+  b_line_x.setPointer(&llint_data,                   thus_far, nb);
+  b_line_y.setPointer(&llint_data,       padded_nb + thus_far, nb);
+  b_line_z.setPointer(&llint_data, (2 * padded_nb) + thus_far, nb);
+  b_line_x_overflow.setPointer(&int_data,                   thus_far, nb);
+  b_line_y_overflow.setPointer(&int_data,       padded_nb + thus_far, nb);
+  b_line_z_overflow.setPointer(&int_data, (2 * padded_nb) + thus_far, nb);
+  thus_far += 3 * padded_nb;
+  c_line_x.setPointer(&llint_data,                   thus_far, nc);
+  c_line_y.setPointer(&llint_data,       padded_nc + thus_far, nc);
+  c_line_z.setPointer(&llint_data, (2 * padded_nc) + thus_far, nc);
+  c_line_x_overflow.setPointer(&int_data,                   thus_far, nc);
+  c_line_y_overflow.setPointer(&int_data,       padded_nc + thus_far, nc);
+  c_line_z_overflow.setPointer(&int_data, (2 * padded_nc) + thus_far, nc);
+  const int nbits = static_cast<int>(sizeof(uint)) * 8;
+  coefficients.resize(64LLU * static_cast<size_t>(na * nb * nc));
+  frozen_atoms.resize((ag_pointer->getAtomCount() + nbits - 1) / nbits);
 }
 
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord>
-std::vector<Tcoord> MeshParameters::getMeshElementVector(const UnitCellAxis dim) const {
-  std::vector<Tcoord> result(3);
-  const int icol = static_cast<int>(dim);
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (ct == double_type_index) {
-    for (int i = 0; i < 3; i++) {
-      result[i] = element_invu[i + (3 * icol)];
-    }
-  }
-  else if (ct == float_type_index) {
-    for (int i = 0; i < 3; i++) {
-      result[i] = sp_element_invu[i + (3 * icol)];
-    }
-  }
-  else if (ct == int95t_type_index) {
-    for (int i = 0; i < 3; i++) {
-      result[i] = fp_element_invu[i + (3 * icol)];
-    }
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord>
-std::vector<Tcoord> MeshParameters::getMeshElementVector(const CartesianDimension dim) const {
-  switch (dim) {
-  case CartesianDimension::X:
-    return getMeshElementVector(UnitCellAxis::A);
-  case CartesianDimension::Y:
-    return getMeshElementVector(UnitCellAxis::B);
-  case CartesianDimension::Z:
-    return getMeshElementVector(UnitCellAxis::C);
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshTransform() const {
-  std::vector<Tcoord> result(9);
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (ct == double_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = element_umat[i];
-    }
-  }
-  else if (ct == float_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = sp_element_umat[i];
-    }
-  }
-  else {
-    rtErr("The transformation matrix into element space is only available in single- or double-"
-          "precision floating point numbers.", "MeshParameters", "getMeshTransform");
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTransform() const {
-  std::vector<Tcoord> result(9);
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (ct == double_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = element_invu[i];
-    }
-  }
-  else if (ct == float_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = sp_element_invu[i];
-    }
-  }
-  else if (ct == int95t_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = fp_element_invu[i];
-    }
-  }
-  else {
-    rtErr("The inverse transformation matrix (the column matrix of element vectors) is only "
-          "available in fixed-precision format or single- or double-precision floating point "
-          "numbers.", "MeshParameters", "getMeshTransform");
-  }
-}
-
+#if 0
 //-------------------------------------------------------------------------------------------------
 template <typename T> PureMeshReader<T> PureMesh<T>::data() const {
   return PureMeshReader<T>(measurements, values, dx, dy, dz, dxy, dxz, dyz, dxyz);
@@ -180,6 +121,7 @@ template <typename T>
 T PureMesh<T>::at(const size_t i, const size_t j, const size_t k, const HybridTargetLevel tier) {
 
 }
+#endif
 
 } // namespace structure
 } // namespace stormm

@@ -94,7 +94,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/global_manipulation.cpp \
 		   $(SRCDIR)/Structure/isomerization.cpp \
 		   $(SRCDIR)/Structure/local_arrangement.cpp \
-		   $(SRCDIR)/Structure/puremesh.cpp \
+		   $(SRCDIR)/Structure/mesh_parameters.cpp \
 		   $(SRCDIR)/Structure/rmsd.cpp \
 		   $(SRCDIR)/Structure/structure_ops.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
@@ -242,6 +242,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
+		     $(SRCDIR)/Structure/mesh_parameters.h \
 		     $(SRCDIR)/Structure/puremesh.h \
 		     $(SRCDIR)/Structure/rmsd.h \
 		     $(SRCDIR)/Structure/structure_enumerators.h \
@@ -319,6 +320,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Structure/global_manipulation.tpp \
 		   $(SRCDIR)/Structure/isomerization.tpp \
 		   $(SRCDIR)/Structure/local_arrangement.tpp \
+		   $(SRCDIR)/Structure/mesh_parameters.tpp \
 		   $(SRCDIR)/Structure/puremesh.tpp \
 		   $(SRCDIR)/Structure/rmsd.tpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.tpp \
@@ -423,7 +425,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/global_manipulation.o \
 		  $(SRCDIR)/Structure/isomerization.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \
-		  $(SRCDIR)/Structure/puremesh.o \
+		  $(SRCDIR)/Structure/mesh_parameters.o \
 		  $(SRCDIR)/Structure/rmsd.o \
 		  $(SRCDIR)/Structure/structure_ops.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
