@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "CMake should not be called from the root directory.")
 endif()
 
@@ -26,7 +26,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
 
-if(STORMM_ENABLE_CUDA)
+if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
 
     enable_language(CUDA)
@@ -48,8 +48,8 @@ if(STORMM_ENABLE_CUDA)
 
 endif()
 
-if(STORMM_ENABLE_TEST_COVERAGE)
-    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
+if (STORMM_ENABLE_TEST_COVERAGE)
+    if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
     elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
@@ -79,7 +79,7 @@ target_include_directories(${PROJECT_NAME}
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 
-if(STORMM_ENABLE_CUDA)
+if (STORMM_ENABLE_CUDA)
     target_sources(${PROJECT_NAME} PRIVATE ${STORMM_CUDA_FILES} ${STORMM_CUDA_HEADERS} ${STORMM_CUDA_INCLUDED_FILES})
     target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     target_link_libraries(${PROJECT_NAME} ${STORMM_CUDA_LIBS})
