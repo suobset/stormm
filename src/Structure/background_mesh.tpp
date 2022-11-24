@@ -250,7 +250,122 @@ BackgroundMesh<T>::BackgroundMesh(const BackgroundMesh<T> &original) :
 {
   rebase_pointers();
 }
-    
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(BackgroundMesh<T> &&original) :
+  measurements{std::move(original.measurements)},
+    kind{original.kind},
+    field{original.field},
+    a_line_x{std::move(original.a_line_x)},
+    a_line_y{std::move(original.a_line_y)},
+    a_line_z{std::move(original.a_line_z)},
+    b_line_x{std::move(original.b_line_x)},
+    b_line_y{std::move(original.b_line_y)},
+    b_line_z{std::move(original.b_line_z)},
+    c_line_x{std::move(original.c_line_x)},
+    c_line_y{std::move(original.c_line_y)},
+    c_line_z{std::move(original.c_line_z)},
+    a_line_x_overflow{std::move(original.a_line_x_overflow)},
+    a_line_y_overflow{std::move(original.a_line_y_overflow)},
+    a_line_z_overflow{std::move(original.a_line_z_overflow)},
+    b_line_x_overflow{std::move(original.b_line_x_overflow)},
+    b_line_y_overflow{std::move(original.b_line_y_overflow)},
+    b_line_z_overflow{std::move(original.b_line_z_overflow)},
+    c_line_x_overflow{std::move(original.c_line_x_overflow)},
+    c_line_y_overflow{std::move(original.c_line_y_overflow)},
+    c_line_z_overflow{std::move(original.c_line_z_overflow)},
+    coefficients{std::move(original.coefficients)},
+    ag_pointer{original.ag_pointer},
+    frozen_atoms{std::move(original.frozen_atoms)},
+    neighbor_list{std::move(original.neighbor_list)},
+    neighbor_list_bounds{std::move(original.neighbor_list_bounds)},
+    int_data{std::move(original.int_data)},
+    llint_data{std::move(original.llint_data)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::operator=(const BackgroundMesh<T> &other)  {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+  measurements = other.measurements;
+  kind = other.kind;
+  field = other.field;
+  a_line_x = other.a_line_x;
+  a_line_y = other.a_line_y;
+  a_line_z = other.a_line_z;
+  b_line_x = other.b_line_x;
+  b_line_y = other.b_line_y;
+  b_line_z = other.b_line_z;
+  c_line_x = other.c_line_x;
+  c_line_y = other.c_line_y;
+  c_line_z = other.c_line_z;
+  a_line_x_overflow = other.a_line_x_overflow;
+  a_line_y_overflow = other.a_line_y_overflow;
+  a_line_z_overflow = other.a_line_z_overflow;
+  b_line_x_overflow = other.b_line_x_overflow;
+  b_line_y_overflow = other.b_line_y_overflow;
+  b_line_z_overflow = other.b_line_z_overflow;
+  c_line_x_overflow = other.c_line_x_overflow;
+  c_line_y_overflow = other.c_line_y_overflow;
+  c_line_z_overflow = other.c_line_z_overflow;
+  coefficients = other.coefficients;
+  ag_pointer = other.ag_pointer;
+  frozen_atoms = other.frozen_atoms;
+  neighbor_list = other.neighbor_list;
+  neighbor_list_bounds = other.neighbor_list_bounds;
+  int_data = other.int_data;
+  llint_data = other.llint_data;
+
+  // Repair pointers
+  rebase_pointers();
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::operator=(BackgroundMesh<T> &&other)  {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+  measurements = std::move(other.measurements);
+  kind = other.kind;
+  field = other.field;
+  a_line_x = std::move(other.a_line_x);
+  a_line_y = std::move(other.a_line_y);
+  a_line_z = std::move(other.a_line_z);
+  b_line_x = std::move(other.b_line_x);
+  b_line_y = std::move(other.b_line_y);
+  b_line_z = std::move(other.b_line_z);
+  c_line_x = std::move(other.c_line_x);
+  c_line_y = std::move(other.c_line_y);
+  c_line_z = std::move(other.c_line_z);
+  a_line_x_overflow = std::move(other.a_line_x_overflow);
+  a_line_y_overflow = std::move(other.a_line_y_overflow);
+  a_line_z_overflow = std::move(other.a_line_z_overflow);
+  b_line_x_overflow = std::move(other.b_line_x_overflow);
+  b_line_y_overflow = std::move(other.b_line_y_overflow);
+  b_line_z_overflow = std::move(other.b_line_z_overflow);
+  c_line_x_overflow = std::move(other.c_line_x_overflow);
+  c_line_y_overflow = std::move(other.c_line_y_overflow);
+  c_line_z_overflow = std::move(other.c_line_z_overflow);
+  coefficients = std::move(other.coefficients);
+  ag_pointer = std::move(other.ag_pointer);
+  frozen_atoms = std::move(other.frozen_atoms);
+  neighbor_list = std::move(other.neighbor_list);
+  neighbor_list_bounds = std::move(other.neighbor_list_bounds);
+  int_data = std::move(other.int_data);
+  llint_data = std::move(other.llint_data);
+
+  return *this;
+}
+
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::allocate() {
