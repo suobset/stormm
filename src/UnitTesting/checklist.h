@@ -80,6 +80,9 @@ public:
   /// \param verbosity  The level of verboseness at which to report
   void printSummary(TestVerbosity verbosity = TestVerbosity::COMPACT) const;
 
+  /// \brief Get the total number of failures across all sections.
+  int getOverallFailureCount() const;
+  
 private:
   int current_section;                ///< Index of the current section, for which successes and
                                       ///<   failures can be tabulated

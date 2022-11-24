@@ -230,6 +230,16 @@ int CheckList::getIgnoredFailureCount(const int section_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int CheckList::getOverallFailureCount() const {
+  const size_t n_sections = sections.size();
+  int nfail = 0;
+  for (size_t i = 0; i < n_sections; i++) {
+    nfail += failures[i];
+  }
+  return nfail;
+}
+
+//-------------------------------------------------------------------------------------------------
 void CheckList::printSummary(const TestVerbosity verbosity) const {
 
   // Pre-determine the number of sections containing actual tests

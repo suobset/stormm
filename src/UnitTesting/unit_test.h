@@ -229,6 +229,9 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
 /// \param tv  The verboseness with which to report results
 void printTestSummary(TestVerbosity tv);
 
+/// \brief Count the overall number of failures in the global test result struct.
+int countGlobalTestFailures();
+  
 /// \brief Get a string representing the type of numerical relationship, i.e. "==" or ">".
 ///
 /// \param relationship  The operator in question

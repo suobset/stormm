@@ -549,6 +549,11 @@ void printTestSummary(const TestVerbosity tv) {
 }
 
 //-------------------------------------------------------------------------------------------------
+int countGlobalTestFailures() {
+  return gbl_test_results.getOverallFailureCount();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getRelationalOperatorString(const RelationalOperator ro) {
   switch (ro) {
   case RelationalOperator::EQUAL:

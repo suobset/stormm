@@ -1085,5 +1085,5 @@ int main(const int argc, const char* argv[]) {
   // Summary evaluation
   printTestSummary(oe.getVerbosity());  
 
-  return 0;
+  return countGlobalTestFailures();
 }

@@ -425,4 +425,6 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
+
+  return countGlobalTestFailures();
 }

@@ -24,7 +24,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+if (DEBUG)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
 
 if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
@@ -58,9 +62,9 @@ endif()
 
 # --- Define any source files ---
 
-## Using GLOB is not considered a 'best practice' as new files aren't always detected by CMakes
+## Using GLOB is not considered a 'best practice' as new files aren't always detected by CMake's
 ## incremental build system, and it may also include any extra source files in the tree that you
-## may not want to have included... but is still a very widely used pattern to avoid needed to
+## may not want to have included... but is still a very widely used pattern to avoid the need to
 ## manually list all files associated with the library making it much easier to use and maintain.
 file(GLOB_RECURSE STORMM_CPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 file(GLOB_RECURSE STORMM_TPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.tpp")

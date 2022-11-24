@@ -132,5 +132,5 @@ int main(const int argc, const char* argv[]) {
   // Print a summary of tests run
   printTestSummary(oe.getVerbosity());
 
-  return 0;
+  return countGlobalTestFailures();
 }

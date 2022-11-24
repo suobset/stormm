@@ -350,4 +350,6 @@ int main(const int argc, const char* argv[]) {
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
+
+  return countGlobalTestFailures();
 }
