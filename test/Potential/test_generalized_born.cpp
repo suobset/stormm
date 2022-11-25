@@ -8,6 +8,7 @@
 #include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
@@ -29,6 +30,7 @@ using stormm::errors::rtWarn;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
+using stormm::review::stormmSplash;
 using stormm::topology::amber_coulomb_constant;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
@@ -151,6 +153,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   StopWatch timer;
   const int input_timings =  timer.addCategory("Input file parsing");
   const int gb_timings    =  timer.addCategory("Generalized born");

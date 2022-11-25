@@ -9,6 +9,7 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Structure/global_manipulation.h"
 #include "../../src/Structure/isomerization.h"
 #include "../../src/Structure/local_arrangement.h"
@@ -27,11 +28,12 @@ using stormm::constants::tiny;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
-using stormm::errors::rtWarn;
-using stormm::math::computeBoxTransform;
 using stormm::energy::evaluateBondTerms;
 using stormm::energy::evaluateAngleTerms;
 using stormm::energy::ScoreCard;
+using stormm::errors::rtWarn;
+using stormm::math::computeBoxTransform;
+using stormm::review::stormmSplash;
 using stormm::structure::rotateCoordinates;
 using stormm::structure::rmsd;
 using stormm::structure::RmsdMethod;
@@ -223,6 +225,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Rotation about a bond");

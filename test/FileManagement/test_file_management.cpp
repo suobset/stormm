@@ -5,16 +5,24 @@
 #include "../../src/FileManagement/directory_util.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/FileManagement/file_util.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::errors::rtWarn;
+using stormm::review::stormmSplash;
 using namespace stormm::diskutil;
 using namespace stormm::testing;
 
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv, TmpdirStatus::REQUIRED);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   const char osc = osSeparator();
 
   // Section 1

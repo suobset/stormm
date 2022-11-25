@@ -15,6 +15,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
@@ -37,6 +38,7 @@ using stormm::random::Ran2Generator;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::RandomNumberMill;
 using stormm::random::Xoshiro256ppGenerator;
+using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using namespace stormm::math;
 using namespace stormm::testing;
@@ -443,6 +445,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Vector processing capabilities");
@@ -894,6 +899,24 @@ int main(const int argc, const char* argv[]) {
         "The inverse transformation matrix is incorrect.");
   check(linear_xfrm_prod, RelationalOperator::EQUAL, linear_ident, "The product of box "
         "transformation and inverse transformation matrices is not the identity matrix.");
+
+  // Check the computation of unit cell widths: computing the Hessian normal form
+  const std::vector<double> invu_s1 = { 2.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0 };
+  std::vector<double> s1_widths(3);
+  const std::vector<double> s1_widths_ans = { 2.0, 3.0, 4.0 };
+  double* s1_ptr = s1_widths.data();
+  hessianNormalWidths(invu_s1.data(), &s1_ptr[0], &s1_ptr[1], &s1_ptr[2]);
+  check(s1_widths, RelationalOperator::EQUAL, s1_widths_ans, "The Hessian normal form is not "
+        "correctly computed for an orthorhombic unit cell.");
+  const std::vector<double> invu_s2 = { 100.000000000000,   0.000000000000,   0.000000000000,
+                                        -33.333333276578,  94.280904178272,   0.000000000000,
+                                        -33.333333276578, -47.140451968741,  81.649658179660 };
+  std::vector<double> s2_widths(3);
+  const std::vector<double> s2_widths_ans = { invu_s2[8], invu_s2[8], invu_s2[8] };
+  double* s2_ptr = s2_widths.data();
+  hessianNormalWidths(invu_s2.data(), &s2_ptr[0], &s2_ptr[1], &s2_ptr[2]);
+  check(s2_widths, RelationalOperator::EQUAL, Approx(s2_widths_ans).margin(1.0e-7), "The Hessian "
+        "normal form is not correctly computed for an orthorhombic unit cell.");  
 
   // Further checks on the mean, standard deviation, variance, correlation, dot product,
   // magnitude, and projection operations

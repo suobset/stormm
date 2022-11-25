@@ -7,6 +7,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/structure_ops.h"
@@ -43,6 +44,7 @@ using stormm::math::normalize;
 using stormm::math::perpendicularComponent;
 using stormm::math::pointPlaneDistance;
 using stormm::math::sum;
+using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using stormm::topology::AtomGraph;
 using stormm::topology::listVirtualSiteFrameTypes;
@@ -420,6 +422,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Basic checks on re-imaging calculations");

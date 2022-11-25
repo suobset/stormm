@@ -21,6 +21,45 @@ using data_types::isFloatingPointHpcVectorType;
 ///        to the way the mesh occupies a confined region of space.
 const int default_mesh_scaling_bits = 40;
 
+/// \brief The abstract of a MeshParameters object is read-only (modify the original to get a new
+///        abstract if the dimensions change), but templated to prune the information present.
+template <typename T> struct MeshParamAbstract {
+
+  /// \brief The constructor takes arguments for all member variables.
+  MeshParamAbstract(int na_in, int nb_in, int nc_in, int95_t orig_x_in, int95_t orig_y_in,
+                    int95_t orig_z_in, T scale_in, T inv_scale_in, const T* umat_in,
+                    const T* invu_in, const T* widths_in, const int95_t* fp_invu_in);
+
+  /// \brief The default copy and move constructors will be valid for this object.  Const members
+  ///        negate the use of default copy and move assignment operators.
+  ///
+  /// \param original  The object to copy or move
+  /// \{
+  MeshParamAbstract(const MeshParamAbstract &original) = default;
+  MeshParamAbstract(MeshParamAbstract &&original) = default;
+  /// \}
+  
+  const int na;              ///< Number of mesh elements along the "a" (~x) axis
+  const int nb;              ///< Number of mesh elements along the "b" (~y) axis
+  const int nc;              ///< Number of mesh elements along the "c" (~z) axis
+  const int95_t orig_x;      ///< Cartesian X origin of the mesh in fixed-precision format
+  const int95_t orig_y;      ///< Cartesian Y origin of the mesh in fixed-precision format
+  const int95_t orig_z;      ///< Cartesian Z origin of the mesh in fixed-precision format
+  const T scale;             ///< Scaling factor for taking coordinates with units of Angstroms
+                             ///<   into the fixed-percision format of the mesh
+  const T inv_scale;         ///< Inverse scaling factor for taking fixed-precision coordinates
+                             ///<   back into STORMM's internal units of Angstroms
+  const T umat[9];           ///< Transformation matrix to take coordinates into element space
+  const T invu[9];           ///< Inverse transformation matrix for each element, or the vectors
+                             ///<   defining each side of the element.
+  const T widths[3];         ///< Widths of the mesh element between faces defining vectors roughly
+                             ///<   associated with the Cartesian X, Y, and Z axes (of these, the
+                             ///<   X and Y axes do not exactly line up, but the normals between
+                             ///<   faces defined by the element's "b" and "c" vectors and its "a"
+                             ///<   and "c" vectors are close).
+  const int95_t fp_invu[9];  ///< Fixed-precision inverse transformation matrix for each element
+};
+  
 /// \brief Encode the critical dimensions of a regular, rectilinear mesh.  The locations of mesh
 ///        points as well as spacings are stored as fixed-precision integers to ensure consistency
 ///        and high performance on architectures with deficient 64-bit floating point arithmetic.
@@ -139,6 +178,54 @@ public:
                                           CartesianDimension cart_axis) const;
   /// \}
 
+  /// \brief Obtain a double-precision abstract for this object.
+  MeshParamAbstract<double> dpData() const;
+
+  /// \brief Obtain a single-precision abstract for this object.
+  MeshParamAbstract<float> spData() const;
+
+  /// \brief Set the number of mesh elements along the "a", "b", or "c" axes.
+  ///
+  /// Overloaded::
+  ///   - Set one dimension or all three
+  ///
+  /// \param n_in       The dimension or dimensions to set
+  /// \param mesh_axis  The mesh axis to define
+  /// \{
+  void setMeshDimension(int n_in, UnitCellAxis mesh_axis);
+  void setMeshDimension(const std::vector<int> &n_in);
+  /// \}
+  
+  /// \brief Set the origin's Cartesian X, Y, or Z coordinates.
+  ///
+  /// Overloaded::
+  ///   - Provide a real-valued number in Angstroms
+  ///   - Provide a fixed-precision value
+  ///   - Set one coordinate or all three
+  ///
+  /// \param v          The origin coordinate
+  /// \param cart_axis  The axis to set the origin along
+  /// \{
+  void setOrigin(double v, CartesianDimension cart_axis);
+  void setOrigin(int95_t v, CartesianDimension cart_axis);
+  void setOrigin(const std::vector<double> &v);
+  void setOrigin(const std::vector<int95_t> &v);
+  /// \}
+
+  /// \brief Set the scaling bits.  This will also update the scaling factors.
+  ///
+  /// \param scale_bits_in  The number of bis after the decimal
+  void setScalingBits(int scale_bits_in);
+
+  /// \brief Define the basic element coordinates using three vectors in three-dimensional space.
+  void defineElement(const std::vector<double> &element_vectors);
+  
+  /// \brief Validate the choice of mesh dimensions.
+  void validateMeshDimensions() const;
+
+  /// \brief Validate the mesh's fixed-precision representation.
+  void validateFixedPrecisionBits() const;
+  
 private:
   int na;                       ///< Mesh dimension along the unit cell "a" vector
   int nb;                       ///< Mesh dimension along the unit cell "b" vector
@@ -170,9 +257,18 @@ private:
   /// element-space coordinates back into real space.
   double element_invu[9];
 
-  /// Single-precision variant of element_invu.
+  /// Single-precision variant of element_invu
   float sp_element_invu[9];
-  
+
+  /// Widths of the mesh element between faces defining vectors roughly associated with the
+  /// Cartesian X, Y, and Z axes (of these, the X and Y axes do not exactly line up, but the
+  /// normals between faces defined by the element's "b" and "c" vectors and its "a" and "c"
+  /// vectors are close).
+  double widths[3];
+
+  /// Single-precision variant of the element widths
+  float sp_widths[3];
+
   /// The inverse element transformation matrix, represented in fixed precision.  The number of
   /// bits after the decimal in this representation should match that of the fixed precision
   /// coordinate representation.  Representing the grid origin and grid points in this manner

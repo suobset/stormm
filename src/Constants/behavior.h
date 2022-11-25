@@ -67,6 +67,16 @@ PrecisionModel translatePrecisionModel(const std::string &choice, ExceptionRespo
 /// \param pmodel  The precision model to name
 std::string getPrecisionModelName(PrecisionModel pmodel);
 
+/// \brief Translate the name of a Cartesian axis.
+///
+/// \param axis  The axis of interest
+std::string getEnumerationName(CartesianDimension axis);
+
+/// \brief Translate the name of a unit cell axis.
+///
+/// \param axis  The axis of interest
+std::string getEnumerationName(UnitCellAxis axis);
+
 } // namespace constants
 } // namespace stormm
 

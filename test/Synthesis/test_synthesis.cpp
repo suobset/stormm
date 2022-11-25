@@ -29,6 +29,7 @@
 #include "../../src/Potential/eval_valence_workunit.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Structure/local_arrangement.h"
@@ -67,6 +68,7 @@ using stormm::restraints::applyPositionalRestraints;
 using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
 using stormm::restraints::RestraintKit;
+using stormm::review::stormmSplash;
 using stormm::structure::distance;
 using stormm::structure::angle;
 using stormm::structure::dihedral_angle;
@@ -876,6 +878,9 @@ int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("SystemCache construction");

@@ -1,10 +1,14 @@
+#include <climits>
 #include "copyright.h"
+#include "Constants/fixed_precision.h"
 #include "Math/matrix_ops.h"
 #include "mesh_parameters.h"
 
 namespace stormm {
 namespace structure {
 
+using numerics::min_localpos_scale_bits;
+using math::hessianNormalWidths;
 using math::invertSquareMatrix;
 
 //-------------------------------------------------------------------------------------------------
@@ -16,7 +20,10 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
     scale_bits{scale_bits_in}, scale_factor{pow(2.0, scale_bits)},
     inverse_scale_factor{1.0 / scale_factor}, element_umat{}, sp_element_umat{}, element_invu{},
     sp_element_invu{}, fp_element_invu{}
-{}
+{
+  validateMeshDimensions();
+  validateFixedPrecisionBits();
+}
 
 //-------------------------------------------------------------------------------------------------
 MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
@@ -26,37 +33,7 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
                                const int scale_bits_in) :
     MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in, scale_bits_in)
 {
-  if (element_vectors.size() == 9LLU) {
-    for (int i = 0; i < 9; i++) {
-      element_invu[i] = element_vectors[i];
-      sp_element_invu[i] = element_vectors[i];
-      fp_element_invu[i] = doubleToInt95(element_vectors[i] * scale_factor);
-    }
-    invertSquareMatrix(element_invu, element_umat, 3);
-    for (int i = 0; i < 9; i++) {
-      sp_element_umat[i] = element_umat[i];
-    }
-  }
-  else if (element_vectors.size() == 3LLU) {
-    for (int i = 0; i < 9; i++) {
-      element_umat[i] = 0.0;
-      sp_element_umat[i] = 0.0;
-      element_invu[i] = 0.0;
-      sp_element_invu[i] = 0.0;
-      fp_element_invu[i] = { 0LL, 0 };
-    }
-    for (int i = 0; i < 3; i++) {
-      element_umat[4 * i] = 1.0 / element_vectors[i];
-      sp_element_umat[4 * i] = element_umat[4 * i];
-      element_invu[4 * i] = element_vectors[i];
-      sp_element_invu[4 * i] = element_invu[4 * i];
-      fp_element_invu[4 * i] = doubleToInt95(element_vectors[i] * scale_factor);
-    }
-  }
-  else {
-    rtErr("The mesh element is defined by a 3x3 matrix.  A total of " +
-          std::to_string(element_vectors.size()) + " elements were provided.", "MeshParameters");
-  }
+  defineElement(element_vectors);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -65,8 +42,8 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
                                const double origin_z_in, const double element_x,
                                const double element_y, const double element_z,
                                const int scale_bits_in) :
-  MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in,
-                 { element_x, element_y, element_z }, scale_bits_in)
+    MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in,
+                   { element_x, element_y, element_z }, scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -175,6 +152,158 @@ std::vector<int95_t> MeshParameters::getAxisCoordinates(const UnitCellAxis mesh_
   }
   return result;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+MeshParamAbstract<double> MeshParameters::dpData() const {
+  return MeshParamAbstract<double>(na, nb, nc, origin_x, origin_y, origin_z, scale_factor,
+                                   inverse_scale_factor, element_umat, element_invu, widths,
+                                   fp_element_invu);
+}
+
+//-------------------------------------------------------------------------------------------------
+MeshParamAbstract<float> MeshParameters::spData() const {
+  return MeshParamAbstract<float>(na, nb, nc, origin_x, origin_y, origin_z, scale_factor,
+                                  inverse_scale_factor, sp_element_umat, sp_element_invu,
+                                  sp_widths, fp_element_invu);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setMeshDimension(const int n_in, const UnitCellAxis mesh_axis) {
+  if (n_in < 0) {
+    rtErr("A mesh dimension of " + std::to_string(n_in) + " along the " +
+          getEnumerationName(mesh_axis) + " is invalid.", "MeshParameters", "setMeshDimension");
+  }
+  switch (mesh_axis) {
+  case UnitCellAxis::A:
+    na = n_in;
+  case UnitCellAxis::B:
+    nb = n_in;
+  case UnitCellAxis::C:
+    nc = n_in;
+  }
+  validateMeshDimensions();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setMeshDimension(const std::vector<int> &n_in) {
+  if (n_in.size() != 3LLU) {
+    rtErr("A vector of three elements is required (" + std::to_string(n_in.size()) + " provided).",
+          "MeshParameters", "setMeshDimension");
+  }
+  na = n_in[0];
+  nb = n_in[1];
+  nc = n_in[2];
+  validateMeshDimensions();  
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setOrigin(const double v, CartesianDimension cart_axis) {
+  setOrigin(doubleToInt95(v), cart_axis);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setOrigin(const int95_t v, CartesianDimension cart_axis) {
+  switch (cart_axis) {
+  case CartesianDimension::X:
+    origin_x = v;
+    break;
+  case CartesianDimension::Y:
+    origin_y = v;
+    break;
+  case CartesianDimension::Z:
+    origin_z = v;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setOrigin(const std::vector<double> &v) {
+  if (v.size() != 3LLU) {
+    rtErr("A vector of three elements is required (" + std::to_string(v.size()) + " provided).",
+          "MeshParameters", "setOrigin");
+  }
+  std::vector<int95_t> vfp = { doubleToInt95(v[0]), doubleToInt95(v[1]), doubleToInt95(v[2]) };
+  setOrigin(vfp);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setOrigin(const std::vector<int95_t> &v) {
+  if (v.size() != 3LLU) {
+    rtErr("A vector of three elements is required (" + std::to_string(v.size()) + " provided).",
+          "MeshParameters", "setOrigin");
+  }
+  origin_x = v[0];
+  origin_y = v[1];
+  origin_z = v[2];
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::setScalingBits(const int scale_bits_in) {
+  scale_bits = scale_bits_in;
+  validateFixedPrecisionBits();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::defineElement(const std::vector<double> &element_vectors) {
+  if (element_vectors.size() == 9LLU) {
+    for (int i = 0; i < 9; i++) {
+      element_invu[i] = element_vectors[i];
+      sp_element_invu[i] = element_vectors[i];
+      fp_element_invu[i] = doubleToInt95(element_vectors[i] * scale_factor);
+    }
+    invertSquareMatrix(element_invu, element_umat, 3);
+    for (int i = 0; i < 9; i++) {
+      sp_element_umat[i] = element_umat[i];
+    }
+  }
+  else if (element_vectors.size() == 3LLU) {
+    for (int i = 0; i < 9; i++) {
+      element_umat[i] = 0.0;
+      sp_element_umat[i] = 0.0;
+      element_invu[i] = 0.0;
+      sp_element_invu[i] = 0.0;
+      fp_element_invu[i] = { 0LL, 0 };
+    }
+    for (int i = 0; i < 3; i++) {
+      element_umat[4 * i] = 1.0 / element_vectors[i];
+      sp_element_umat[4 * i] = element_umat[4 * i];
+      element_invu[4 * i] = element_vectors[i];
+      sp_element_invu[4 * i] = element_invu[4 * i];
+      fp_element_invu[4 * i] = doubleToInt95(element_vectors[i] * scale_factor);
+    }
+  }
+  else {
+    rtErr("The mesh element is defined by a 3x3 matrix.  A total of " +
+          std::to_string(element_vectors.size()) + " elements were provided.", "MeshParameters");
+  }
+
+  // Use the Hessian Normal form to compute the number of mesh elements to search in each direction
+  // and color all of the necessary elements around each atom.
+  hessianNormalWidths(element_invu, &widths[0], &widths[1], &widths[2]);
+  for (int i = 0; i < 3; i++) {
+    sp_widths[i] = widths[i];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::validateMeshDimensions() const {
+  const llint total_elements = static_cast<llint>(na) * static_cast<llint>(nb) *
+                               static_cast<llint>(nc);
+  if (total_elements > INT_MAX) {
+    rtErr("The total number of elements on the mesh cannot exceed " + std::to_string(INT_MAX) +
+          " (currently " + std::to_string(total_elements) + ").", "MeshParameters",
+          "validateMeshDimensions");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MeshParameters::validateFixedPrecisionBits() const {
+  if (scale_bits < min_localpos_scale_bits) {
+    rtErr("A minimum of " + std::to_string(min_localpos_scale_bits) + " must be stored after the "
+          "decimal in fixed-precision mesh representations (" + std::to_string(scale_bits) +
+          " specified).", "MeshParameters", "validateFixedPrecisionBits");
+  }
+}
+ 
 } // namespace structure
 } // namespace stormm

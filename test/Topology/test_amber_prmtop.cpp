@@ -4,6 +4,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph_refinement.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
@@ -22,6 +23,7 @@ using stormm::parse::polyNumericVector;
 using stormm::parse::stringToChar4;
 using stormm::parse::TextFile;
 using stormm::parse::operator==;
+using stormm::review::stormmSplash;
 using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
@@ -440,6 +442,9 @@ int main(const int argc, const char* argv[]) {
 
   // The temporary directory will not be needed.  Results will be compared against snapshots.
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   
   // Section 1
   section("Atomic details");

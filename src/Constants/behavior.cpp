@@ -62,5 +62,31 @@ std::string getPrecisionModelName(const PrecisionModel plevel) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(CartesianDimension axis) {
+  switch (axis) {
+  case CartesianDimension::X:
+    return std::string("X");
+  case CartesianDimension::Y:
+    return std::string("Y");
+  case CartesianDimension::Z:
+    return std::string("Z");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(UnitCellAxis axis) {
+  switch (axis) {
+  case UnitCellAxis::A:
+    return std::string("a");
+  case UnitCellAxis::B:
+    return std::string("b");
+  case UnitCellAxis::C:
+    return std::string("c");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace constants
 } // namespace stormm

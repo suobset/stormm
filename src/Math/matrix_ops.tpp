@@ -634,6 +634,47 @@ void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, cons
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> hessianNormalWidths(const T* invu) {
+  T x, y, z;
+  hessianNormalWidths(invu, &x, &y, &z);
+  return { x, y, z };
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> hessianNormalWidths(const std::vector<T> &invu) {
+  T x, y, z;
+  hessianNormalWidths(invu.data(), &x, &y, &z);
+  return { x, y, z };
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void hessianNormalWidths(const std::vector<T> &invu, T *x, T *y, T *z) {
+  hessianNormalWidths(invu.data(), x, y, z);
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> void hessianNormalWidths(const T* invu, T *x, T *y, T *z) {
+  double xyz_n[3], thx[3], thy[3], thz[3], column_a[3], column_b[3], column_c[3];
+  xyz_n[0] = invu[0] + invu[3] + invu[6];
+  xyz_n[1] = invu[4] + invu[7];
+  xyz_n[2] = invu[8];
+  for (int i = 0; i < 3; i++) {
+    column_a[i] = invu[i    ];
+    column_b[i] = invu[i + 3];
+    column_c[i] = invu[i + 6];
+  }
+  crossProduct(column_b, column_c, thx);
+  crossProduct(column_a, column_c, thy);
+  crossProduct(column_a, column_b, thz);
+  normalize(thx, 3);
+  normalize(thy, 3);
+  normalize(thz, 3);
+  *x = fabs(dot(thx, xyz_n, 3));
+  *y = fabs(dot(thy, xyz_n, 3));
+  *z = fabs(dot(thz, xyz_n, 3));
+}
+  
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 void printMatrix(const T* matrix, const int rows, const int cols, const std::string &varname,
                  const std::string &file_name, const PrintSituation expectation) {

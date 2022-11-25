@@ -3,23 +3,31 @@
 #include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/amber_prmtop_util.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::math::sum;
-using stormm::diskutil::osSeparator;
+using stormm::review::stormmSplash;
 using stormm::topology::amberPrmtopData;
 
 using namespace stormm::parse;
 using namespace stormm::testing;
 
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1 (this illustrates "forward declaration" of test sections)
   section("TextFile manipulation and abstraction");

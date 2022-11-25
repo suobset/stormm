@@ -8,6 +8,7 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
@@ -21,14 +22,21 @@ using namespace stormm::mm;
 using namespace stormm::modeling;
 using namespace stormm::namelist;
 using namespace stormm::parse;
+using namespace stormm::review;
 using namespace stormm::topology;
 using namespace stormm::trajectory;
 using namespace stormm::testing;
 
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Initialize the test environment
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1: test bond modifications
   section("Test bond parameter modifications");

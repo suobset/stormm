@@ -8,11 +8,13 @@
 #include "../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::constants;
 using namespace stormm::diskutil;
 using namespace stormm::errors;
+using namespace stormm::review;
 using namespace stormm::structure;
 using namespace stormm::testing;
 
@@ -23,6 +25,9 @@ int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv, TmpdirStatus::REQUIRED);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   const char osc = osSeparator();
 
   // Section 1

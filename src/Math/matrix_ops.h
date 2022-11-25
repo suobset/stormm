@@ -14,6 +14,7 @@
 #include "Reporting/error_format.h"
 #include "UnitTesting/file_snapshot.h"
 #include "matrix.h"
+#include "vector_ops.h"
 
 namespace stormm {
 namespace math {
@@ -206,6 +207,30 @@ template <typename T> void computeBoxTransform(const T* dims, T* umat, T* invu);
 template <typename T>
 void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, const T* invu);
 
+/// \brief Compute Hessian normal form to obtain the thickness of a unit cell (or mesh element)
+///        based on its "a", "b", and "c" box vectors.  The thicknesses between planes defined by
+///        the "b" and "c" vectors (x in an orthorhombic unit cell), "a" and "c" vectors (y in an
+///        orthorhombic unit cell) and "a" and "b" vectors (z in an orthorhombic unit cell) are
+///        returned.
+///
+/// Overloaded:
+///   - Accept inputs as a C-style array or as a Standard Template Library object
+///   - Return the result as a vector in the data type used for computations
+///   - Return the result in three mutable pointers for each thickness
+///
+/// \param invu  The 3x3 inverse transformation matrix taking coordinates in unit cell (box) space
+///              back to real space.  Given in Fortran order (first three elements are the first
+///              column, second three are the second column...).
+/// \{
+template <typename T> std::vector<T> hessianNormalWidths(const T* invu);
+
+template <typename T> std::vector<T> hessianNormalWidths(const std::vector<T> &invu);
+
+template <typename T> void hessianNormalWidths(const T* invu, T *xw, T *yw, T *zw);
+
+template <typename T> void hessianNormalWidths(const std::vector<T> &invu, T *xw, T *yw, T *zw);
+/// \}
+  
 /// \brief Print a matrix, either to the screen (if no file name is supplied) or to a file.  This
 ///        makes use of the writeSnapshot() function in 
 ///

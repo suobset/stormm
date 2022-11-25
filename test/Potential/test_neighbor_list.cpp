@@ -6,6 +6,7 @@
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Trajectory/phasespace.h"
@@ -20,6 +21,7 @@ using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
+using stormm::review::stormmSplash;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
 using stormm::trajectory::CoordinateFileKind;
@@ -66,10 +68,15 @@ std::vector<bool> checkForwardMaskExcl(const int natom, const int* bounds, const
 }
 
 //-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Forward exclusion list analysis");

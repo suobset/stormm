@@ -7,6 +7,7 @@
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
@@ -23,6 +24,7 @@ using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
+using stormm::review::stormmSplash;
 using stormm::topology::AtomGraph;
 using stormm::trajectory::CoordinateFileKind;
 using stormm::trajectory::CoordinateSeries;
@@ -286,6 +288,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Valence energy evaluation");
