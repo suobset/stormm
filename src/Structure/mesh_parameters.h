@@ -19,7 +19,7 @@ using data_types::isFloatingPointHpcVectorType;
 
 /// \brief The default mesh fixed-precision scaling factor is higher than a typical simulation due
 ///        to the way the mesh occupies a confined region of space.
-const int default_mesh_scaling_bits = 40;
+constexpr int default_mesh_scaling_bits = 40;
 
 /// \brief The abstract of a MeshParameters object is read-only (modify the original to get a new
 ///        abstract if the dimensions change), but templated to prune the information present.

@@ -347,6 +347,14 @@ template <typename T> double magnitude(const std::vector<T> &va);
 template <typename T> double magnitude(const Hybrid<T> &va);
 /// \}
 
+/// \brief Compute the length of the hypotenuse from two lengths (assumed to be the lengths of
+///        vectors at a right angle to one another) in a manner resistan to catastrophic
+///        cancellation.
+///
+/// \param a  Length of one vector
+/// \param b  Length of the other vector
+template <typename T> T hypotenuse(const T a, const T b);
+  
 /// \brief Normalize a vector, storing the unit normal vector in its place and returning the
 ///        original magnitude.
 ///

@@ -821,6 +821,7 @@ int main(const int argc, const char* argv[]) {
   }
   matrixMultiply(dbase, rank, rank, dbase, rank, rank, dposdef, 1.0, 1.0, 0.0,
                  TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  std::vector<double> posdef_mat_b = posdef_matrix.readHost();
   jacobiEigensolver(&posdef_matrix, &eigenvectors, &eigenvalues, rank);
   snapshot(matrices_snp, polyNumericVector(eigenvectors.readHost()), "eigvec", 1.0e-5,
            "Eigenvectors for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
@@ -828,6 +829,49 @@ int main(const int argc, const char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(eigenvalues.readHost()), "eigval", 1.0e-5,
            "Eigenvalues for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+  std::vector<double> rsym_diag(8, 0.0);
+  std::vector<double> rsym_eigv(8, 0.0);
+
+  // CHECK
+  std::vector<double> posdef_mat_c = posdef_mat_b;
+  std::vector<double> rsym_diag_c(8, 0.0);
+  std::vector<double> rsym_eigv_c(8, 0.0);
+  double **matc_2d;
+  matc_2d = (double**)malloc(8 * sizeof(double*));
+  for (int i = 0; i < 8; i++) {
+    matc_2d[i] = &posdef_mat_c.data()[8 * i];
+  }
+  TRED2(matc_2d, rank, rsym_diag_c.data(), rsym_eigv_c.data());
+  printf("TRED2 result = [\n");
+  for (size_t i = 0; i < rank; i++) {
+    for (size_t j = 0; j < rank; j++) {
+      printf("  %9.4lf", posdef_mat_c[(rank * j) + i]);
+    }
+    printf("  %12.7lf %12.7lf\n", rsym_diag_c[i], rsym_eigv_c[i]);
+  }
+  printf("];\n");  
+  // END CHECK
+  
+  realSymmEigensolver(posdef_mat_b.data(), rank, rsym_diag.data(), rsym_eigv.data());
+
+  // CHECK
+  printf("Jacobi result = [\n");
+  for (size_t i = 0; i < rank; i++) {
+    for (size_t j = 0; j < rank; j++) {
+      printf("  %9.4lf", eigenvectors.readHost((rank * j) + i));
+    }
+    printf("\n");
+  }
+  printf("];\n");
+  printf("realSymm result = [\n");
+  for (size_t i = 0; i < rank; i++) {
+    for (size_t j = 0; j < rank; j++) {
+      printf("  %9.4lf", posdef_mat_b[(rank * j) + i]);
+    }
+    printf("  %12.7lf %12.7lf\n", rsym_diag_c[i], rsym_eigv_c[i]);
+  }
+  printf("];\n");
+  // END CHECK
 
   // Try a much bigger eigenvalue problem and check its results
   const size_t big_rank = 95;

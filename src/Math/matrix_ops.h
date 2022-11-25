@@ -28,6 +28,10 @@ using parse::PolyNumeric;
 using parse::realToString;
 using testing::writeSnapshot;
 
+/// \brief The maximum number of QL iterations that will be allowed before the algorithm is
+///        declared non-convergent.
+  constexpr int maximum_ql_iterations = 30;
+  
 /// \brief A twin pointer, useful for performing partial-pivoting Gaussian elimination on
 ///        row-major matrices.
 template <typename T> struct TwinPointer {
@@ -166,8 +170,38 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
                        ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
 
+/// \brief Solve the eigenvalues (and, optionally) eigenvectors of a symmetric, real matrix.
+///
+/// Overloaded:
+///   - Provide C-style arrays for the matrix, diagonal, and proto-eigenvalue storage
+///   - Provide Standard Template Library vectors for all of the above
+///   - Provide Hybrid objects for all of the above
+///
+/// \param amat  The matrix from which to obtain eigenvalues and eigenvectors.  If eigenvectors are
+///              requested and amat is all that is supplied, they will replace the contents of
+///              amat on output.
+/// \param vmat  Optional matrix for out-of-place eigenvector computation.  The original matrix
+///              amat will be preserved if this is provided.
+/// \param rank  Rank of the matrix
+/// \param diag  Storage space for the matrix diagonal
+/// \param eigv  Storage space for computed eigenvalues
+/// \{
+template <typename T>
+void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv);
+
+template <typename T>
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *diag, std::vector<T> *eigv);
+
+template <typename T>
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* diag, T* eigv);
+
+template <typename T>
+void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *diag,
+                         std::vector<T> *eigv);
+/// \}
+  
 /// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
-///        The matrix shall be presented in column major format
+///        The matrix shall be presented in column-major format.
 
   
 /// \brief Compute the box space transformation matrix given a sequence of six real numbers.
@@ -266,6 +300,11 @@ void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
                  const std::string &file_name = std::string(""),
                  const PrintSituation expectation = PrintSituation::APPEND);
 /// \}
+
+// CHECK
+void TRED2(double** A, int n, double* d, double* e);
+void TQLI(double* d, double* e, int n, double** z);
+// END CHECK
 
 } // namespace math
 } // namespace stormm

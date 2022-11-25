@@ -396,14 +396,18 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
     const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
                                          1.0 / 6.0);
     const double color_radius = atom_radius + probe_radius;
-    const int ixmin = std::max(floor((xcrd[pos] - color_radius - mps.orig_x) / mps.widths[0]), 0);
-    const int iymin = std::max(floor((ycrd[pos] - color_radius - mps.orig_y) / mps.widths[1]), 0);
-    const int izmin = std::max(floor((zcrd[pos] - color_radius - mps.orig_z) / mps.widths[2]), 0);
-    const int ixmax = std::min(ceil((xcrd[pos] + color_radius - mps.orig_x) / mps.widths[0]),
+    const double color_radius_sq = color_radius * color_radius;
+    const double atom_x = xcrd[pos];
+    const double atom_y = ycrd[pos];
+    const double atom_z = zcrd[pos];
+    const int ixmin = std::max(floor((atom_x - color_radius - mps.orig_x) / mps.widths[0]), 0);
+    const int iymin = std::max(floor((atom_y - color_radius - mps.orig_y) / mps.widths[1]), 0);
+    const int izmin = std::max(floor((atom_z - color_radius - mps.orig_z) / mps.widths[2]), 0);
+    const int ixmax = std::min(ceil((atom_x + color_radius - mps.orig_x) / mps.widths[0]),
                                mps.na - 1);
-    const int iymax = std::min(ceil((ycrd[pos] + color_radius - mps.orig_y) / mps.widths[1]),
+    const int iymax = std::min(ceil((atom_y + color_radius - mps.orig_y) / mps.widths[1]),
                                mps.nb - 1);
-    const int izmax = std::min(ceil((zcrd[pos] + color_radius - mps.orig_z) / mps.widths[2]),
+    const int izmax = std::min(ceil((atom_z + color_radius - mps.orig_z) / mps.widths[2]),
                                mps.nc - 1);
     const int mesh_supercube_x_dim = exclusion_mesh_nx / 16;
     const int mesh_supercube_y_dim = exclusion_mesh_ny / 16;
@@ -414,6 +418,8 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
     for (int i = ixmin; i < ixmax; i++) {
       for (int j = iymin; j < iymax; j++) {
         for (int k = izmin; k < izmax; k++) {
+
+          // Color the buffer for this atom and this element
           const double base_x = avx[ixmin] + bvx[iymin] + cvx[izmin];
           const double base_y = avy[ixmin] + bvy[iymin] + cvy[izmin];
           const double base_z = avz[ixmin] + bvz[iymin] + cvz[izmin];
@@ -429,15 +435,20 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
                 const double xpt = base_x + (di * de_ax) + (dj * de_bx) + (dk * de_cx);
                 const double ypt = base_y + (di * de_ay) + (dj * de_by) + (dk * de_cy);
                 const double zpt = base_z + (di * de_az) + (dj * de_bz) + (dk * de_cz);
-                const int cubelet_i = grid_i / 4;
-                const int cubelet_j = grid_j / 4;
-                const int cubelet_k = grid_k / 4;
-                const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
-                const int bit_i = grid_i - cubelet_i;
-                const int bit_j = grid_j - cubelet_j;
-                const int bit_k = grid_k - cubelet_k;
-                const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
-                cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
+                const double dx = xpt - atom_x;
+                const double dy = ypt - atom_y;
+                const double dz = zpt - atom_z;
+                if ((dx * dx) + (dy * dy) + (dz * dz) < color_radius_sq) {
+                  const int cubelet_i = grid_i / 4;
+                  const int cubelet_j = grid_j / 4;
+                  const int cubelet_k = grid_k / 4;
+                  const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
+                  const int bit_i = grid_i - (4 * cubelet_i);
+                  const int bit_j = grid_j - (4 * cubelet_j);
+                  const int bit_k = grid_k - (4 * cubelet_k);
+                  const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
+                  cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
+                }
                 grid_k++;
               }
               grid_j++;
