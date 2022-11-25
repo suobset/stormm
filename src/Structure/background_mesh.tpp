@@ -353,10 +353,42 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
     return;
   }
 #endif
-  
+
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
   const MeshParameters mps = measurements.dpData();
+
+  // Replicate the mesh's grid vectors.  Subtract the origin coordinates from the "b" and "c"
+  // vectors so that a[i] + b[j] + c[k] = the Cartesian coordinates of any grid point (i,j,k).
+  std::vector<double> avx(na + 1), avy(na + 1), avz(na + 1), bvx(nb + 1), bvy(nb + 1), bvz(nb + 1);
+  std::vector<double> cvx(na + 1), cvy(na + 1), cvz(na + 1);
+  int95ToDouble(&avx, &avy, &avz, a_line_x, a_line_x_overflow, a_line_y, a_line_y_overflow,
+                a_line_z, a_line_z_overflow, na, inverse_scaling_factor);
+  int95ToDouble(&bvx, &bvy, &bvz, b_line_x, b_line_x_overflow, b_line_y, b_line_y_overflow,
+                b_line_z, b_line_z_overflow, nb, inverse_scaling_factor);
+  int95ToDouble(&cvx, &cvy, &cvz, c_line_x, c_line_x_overflow, c_line_y, c_line_y_overflow,
+                c_line_z, c_line_z_overflow, nc, inverse_scaling_factor);
+  addScalarToVector(bvx, nb, -mps.orig_x);
+  addScalarToVector(bvy, nb, -mps.orig_y);
+  addScalarToVector(bvz, nb, -mps.orig_z);
+  addScalarToVector(cvx, nc, -mps.orig_x);
+  addScalarToVector(cvy, nc, -mps.orig_y);
+  addScalarToVector(cvz, nc, -mps.orig_z);
+
+  // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
+  const double de_ax = 0.0625 * (avx[1] - avx[0]);
+  const double de_ay = 0.0625 * (avy[1] - avy[0]);
+  const double de_az = 0.0625 * (avz[1] - avz[0]);
+  const double de_bx = 0.0625 * (bvx[1] - bvx[0]);
+  const double de_by = 0.0625 * (bvy[1] - bvy[0]);
+  const double de_bz = 0.0625 * (bvz[1] - bvz[0]);
+  const double de_cx = 0.0625 * (cvx[1] - cvx[0]);
+  const double de_cy = 0.0625 * (cvy[1] - cvy[0]);
+  const double de_cz = 0.0625 * (cvz[1] - cvz[0]);
+
+  // Prepare a buffer to hold subgrid results
+  std::vector<ullint> cube_buffer(64, 0LLU);
+  
   const int lj_idx_offset = nbk.n_lj_types + 1;
   const ullint* excl_mesh_ptr = exclusion_mesh.data();
   for (int pos = 0; pos < nbk.natom; pos++) {
@@ -364,19 +396,15 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
     const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
                                          1.0 / 6.0);
     const double color_radius = atom_radius + probe_radius;
-    const int ixmin = std::max(floor((xcrd[pos] - color_radius - mps.orig_x) /
-                                     mps.orig), 0);
-    const int iymin = std::max(floor((ycrd[pos] - color_radius - exclusion_mesh_y_origin) /
-                                     exclusion_mesh_spacing), 0);
-    const int izmin = std::max(floor((zcrd[pos] - color_radius - exclusion_mesh_z_origin) /
-                                     exclusion_mesh_spacing), 0);
-    const int ixmax = std::min(ceil((xcrd[pos] + color_radius - exclusion_mesh_x_origin) /
-                                    exclusion_mesh_spacing), exclusion_mesh_nx);
-    const int iymax = std::min(ceil((ycrd[pos] + color_radius - exclusion_mesh_y_origin) /
-                                    exclusion_mesh_spacing), exclusion_mesh_ny);
-    const int izmax = std::min(ceil((zcrd[pos] + color_radius - exclusion_mesh_z_origin) /
-                                    exclusion_mesh_spacing), exclusion_mesh_nz);
-    double dx = exclusion_mesh_x_origin + (exclusion_mesh_spacing * ixmin);
+    const int ixmin = std::max(floor((xcrd[pos] - color_radius - mps.orig_x) / mps.widths[0]), 0);
+    const int iymin = std::max(floor((ycrd[pos] - color_radius - mps.orig_y) / mps.widths[1]), 0);
+    const int izmin = std::max(floor((zcrd[pos] - color_radius - mps.orig_z) / mps.widths[2]), 0);
+    const int ixmax = std::min(ceil((xcrd[pos] + color_radius - mps.orig_x) / mps.widths[0]),
+                               mps.na - 1);
+    const int iymax = std::min(ceil((ycrd[pos] + color_radius - mps.orig_y) / mps.widths[1]),
+                               mps.nb - 1);
+    const int izmax = std::min(ceil((zcrd[pos] + color_radius - mps.orig_z) / mps.widths[2]),
+                               mps.nc - 1);
     const int mesh_supercube_x_dim = exclusion_mesh_nx / 16;
     const int mesh_supercube_y_dim = exclusion_mesh_ny / 16;
     const int mesh_supercube_z_dim = exclusion_mesh_nz / 16;
@@ -384,34 +412,46 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf) {
     const int mesh_cubelet_y_dim = exclusion_mesh_ny / 4;
     const int mesh_cubelet_z_dim = exclusion_mesh_nz / 4;
     for (int i = ixmin; i < ixmax; i++) {
-      double dy = exclusion_mesh_y_origin + (exclusion_mesh_spacing * iymin);
       for (int j = iymin; j < iymax; j++) {
-        double dz = exclusion_mesh_z_origin + (exclusion_mesh_spacing * izmin);
         for (int k = izmin; k < izmax; k++) {
-          if ((dx * dx) + (dy * dy) + (dz * dz)) {
-
-            // Determine the supercube, then the cubelet to which this bit belongs, then
-            // the number of the bit within the cubelet.
-            const int supercube_ix = i / 16;
-            const int supercube_iy = j / 16;
-            const int supercube_iz = k / 16;
-            const size_t supercube_idx = (((supercube_ix * mesh_supercube_y_dim) + supercube_iy) *
-                                          mesh_supercube_z_dim) + supercube_iz;
-            const int cubelet_ix = (i - (supercube_ix * 16)) / 4;
-            const int cubelet_iy = (j - (supercube_iy * 16)) / 4;
-            const int cubelet_iz = (k - (supercube_iz * 16)) / 4;
-            const size_t cubelet_idx = (((cubelet_ix * 4) + cubelet_iy) * 4) + cubelet_iz;
-            const int bit_ix = i - (supercube_ix * 16) - (cubelet_ix * 4);
-            const int bit_iy = j - (supercube_iy * 16) - (cubelet_iy * 4);
-            const int bit_iz = k - (supercube_iz * 16) - (cubelet_iz * 4);
-            const int bit_idx = (((bit_ix * 4) + bit_iy) * 4) + bit_iz;
-            excl_mesh_ptr[(supercube_idx * 64LLU) + cubelet_idx] |= (0x1 << bit_idx);
+          const double base_x = avx[ixmin] + bvx[iymin] + cvx[izmin];
+          const double base_y = avy[ixmin] + bvy[iymin] + cvy[izmin];
+          const double base_z = avz[ixmin] + bvz[iymin] + cvz[izmin];
+          for (size_t m = 0LLU; m < 64LLU; m++) {
+            cube_buffer[m] = 0LLU;
           }
-          dz += exclusion_mesh_spacing;
+          int grid_i = 0;
+          for (double di = 0.5; di < 16.0; di += 1.0) {
+            int grid_j = 0;
+            for (double dj = 0.5; dj < 16.0; dj += 1.0) {
+              int grid_k = 0;
+              for (double dk = 0.5; dk < 16.0; dk += 1.0) {
+                const double xpt = base_x + (di * de_ax) + (dj * de_bx) + (dk * de_cx);
+                const double ypt = base_y + (di * de_ay) + (dj * de_by) + (dk * de_cy);
+                const double zpt = base_z + (di * de_az) + (dj * de_bz) + (dk * de_cz);
+                const int cubelet_i = grid_i / 4;
+                const int cubelet_j = grid_j / 4;
+                const int cubelet_k = grid_k / 4;
+                const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
+                const int bit_i = grid_i - cubelet_i;
+                const int bit_j = grid_j - cubelet_j;
+                const int bit_k = grid_k - cubelet_k;
+                const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
+                cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
+                grid_k++;
+              }
+              grid_j++;
+            }
+            grid_i++;
+          }
+
+          // Accumulate the atom's mapping onto the grid
+          const size_t coef_base_idx = 64LLU * static_cast<size_t>((((i * nb) + j) * nc) + k);
+          for (size_t m = 0LLU; m < 64LLU; m++) {
+            coefficients[coef_base_idx + m] |= cube_buffer[m];
+          }
         }
-        dy += exclusion_mesh_spacing;
       }
-      dx += exclusion_mesh_spacing;
     }
   }
 }
