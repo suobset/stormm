@@ -301,11 +301,6 @@ void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
                  const PrintSituation expectation = PrintSituation::APPEND);
 /// \}
 
-// CHECK
-void TRED2(double** A, int n, double* d, double* e);
-void TQLI(double* d, double* e, int n, double** z);
-// END CHECK
-
 } // namespace math
 } // namespace stormm
 

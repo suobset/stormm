@@ -579,7 +579,7 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
+void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   const bool t_is_double = (ct == double_type_index);
   const T zero = 0.0;
@@ -594,7 +594,7 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
         scale += std::abs(amat[(k * rank) + i]);
       }
       if (scale == zero) {
-        eigv[i] = amat[(l * rank) + i];
+        sdiag[i] = amat[(l * rank) + i];
       }
       else {
         for (int k = 0; k <= l; k++) {
@@ -610,7 +610,7 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
         else {
           g = (f >= zero ? -sqrtf(h) : sqrtf(h));
         }
-        eigv[i] = scale * g;
+        sdiag[i] = scale * g;
 	h -= f * g;
         amat[(l * rank) + i] = f - g;
         f = 0.0;
@@ -623,32 +623,32 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
           for (int k = j+1; k <=l; k++) {
             g += amat[(j * rank) + k] * amat[(k * rank) + i];
           }
-          eigv[j] = g / h;
-          f += eigv[j] * amat[(j * rank) + i];
+          sdiag[j] = g / h;
+          f += sdiag[j] * amat[(j * rank) + i];
         }
         const T hh = f / (h + h);
 	for (int j = 0; j <= l; j++) {
           f = amat[(j * rank) + i];
-          g = eigv[j] - (hh * f);
-          eigv[j] = g;
+          g = sdiag[j] - (hh * f);
+          sdiag[j] = g;
           for (int k = 0; k <= j; k++) {
-            amat[(k * rank) + j] -= (f * eigv[k]) + (g * amat[(k * rank) + i]);
+            amat[(k * rank) + j] -= (f * sdiag[k]) + (g * amat[(k * rank) + i]);
           }
         }
       }
     }
     else {
-      eigv[i] = amat[(l * rank) + i];
+      sdiag[i] = amat[(l * rank) + i];
     }
-    diag[i] = h;
+    eigv[i] = h;
   }
 
   // Accumulate the eigenvalues.
-  diag[0] = zero;
   eigv[0] = zero;
+  sdiag[0] = zero;
   for (int i = 0; i < rank; i++) {
     int l = i - 1;
-    if (diag[i]) {
+    if (eigv[i]) {
       for (int j = 0; j <= l; j++) {
         T g = zero;
         for (int k = 0; k <= l; k++) {
@@ -659,35 +659,24 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
         }
       }
     }
-    diag[i] = amat[(i * rank) + i];
+    eigv[i] = amat[(i * rank) + i];
     amat[(i * rank) + i] = one;
     for (int j = 0; j <= l; j++) {
       amat[(j * rank) + i] = zero;
       amat[(i * rank) + j] = zero;
     }
   }
-
-  // CHECK
-  printf("Amat_midway = [\n");
-  for (int i = 0; i < rank; i++) {
-    for (int j = 0; j < rank; j++) {
-      printf("  %9.4lf", amat[(j * rank) + i]);
-    }
-    printf("  %12.7lf %12.7lf\n", diag[i], eigv[i]);
-  }
-  // END CHECK
-  
   for (int i = 1; i < rank; i++) {
-    eigv[i - 1] = eigv[i];
+    sdiag[i - 1] = sdiag[i];
   }
-  eigv[rank - 1] = zero;
+  sdiag[rank - 1] = zero;
   for (int l = 0; l < rank; l++) {
     int iter = 0;
     int m = l - 1;
     while (m != l) {
-      for (int m = l; m < rank - 1; m++) {
-        T dd = std::abs(diag[m]) + std::abs(diag[m + 1]);
-        if (std::abs(eigv[m] + dd) == dd) {
+      for (m = l; m < rank - 1; m++) {
+        T dd = std::abs(eigv[m]) + std::abs(eigv[m + 1]);
+        if (std::abs(sdiag[m] + dd) == dd) {
           break;
         }
       }
@@ -695,30 +684,30 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
         if (iter++ == maximum_ql_iterations) {
           rtErr("Too many iterations in the QL solver.", "realSymmEigensolver");
         }
-        T g = (diag[l + 1] - diag[l]) / (two * eigv[l]);
+        T g = (eigv[l + 1] - eigv[l]) / (two * sdiag[l]);
         T r = hypotenuse<T>(g, one);
         T sign_result;
-        sign_result = (g >= zero) ? std::abs(r) : std::abs(-r);
-        g = diag[m] - diag[l] + (eigv[l] / (g + sign_result));
+        sign_result = (g >= zero) ? std::abs(r) : -std::abs(r);
+        g = eigv[m] - eigv[l] + (sdiag[l] / (g + sign_result));
         T c = one;
         T s = one;
         T p = zero;
         bool early_finish = false;
         for (int i = m - 1; i >= l; i--) {
-          T f = s * eigv[i];
-          T b = c * eigv[i];
-          eigv[i + 1] = (r = hypotenuse<T>(f, g));
+          T f = s * sdiag[i];
+          T b = c * sdiag[i];
+          sdiag[i + 1] = (r = hypotenuse<T>(f, g));
           if (r == zero) {
-            diag[i + 1] -= p;
-            eigv[m] = zero;
+            eigv[i + 1] -= p;
+            sdiag[m] = zero;
             early_finish = true;
             break;
           }
           s = f / r;
           c = g / r;
-          g = diag[i + 1] - p;
-          r = ((diag[i] - g) * s) + (two * c * b);
-          diag[i + 1] = g + (p = s * r);
+          g = eigv[i + 1] - p;
+          r = ((eigv[i] - g) * s) + (two * c * b);
+          eigv[i + 1] = g + (p = s * r);
           g = (c * r) - b;
           for (int k = 0; k < rank; k++) {
             f = amat[((i + 1) * rank) + k];
@@ -729,9 +718,9 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
         if (r == zero && early_finish) {
           continue;
         }
-        diag[l] -= p;
-        eigv[l] = g;
-        eigv[m] = zero;
+        eigv[l] -= p;
+        sdiag[l] = g;
+        sdiag[m] = zero;
       }
     }
   }
@@ -739,29 +728,29 @@ void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *diag, std::vector<T> *eigv) {
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *eigv, std::vector<T> *sdiag) {
   const size_t rank = eigv->size();
   if (amat->size() != rank * rank) {
     rtErr("Eigenvalue storage is ready for a matrix of rank " + std::to_string(rank) +
           ", but the matrix rank does not appear to match.", "realSymmEigensolver");
   }
-  realSymmEigensolver(amat->data(), rank, diag->data(), eigv->data());
+  realSymmEigensolver(amat->data(), rank, eigv->data(), sdiag->data());
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* diag, T* eigv) {
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* eigv, T* sdiag) {
   const size_t rank2 = rank * rank;
   for (size_t i = 0LLU; i < rank2; i++) {
     vmat[i] = amat[i];
   }
-  realSymmEigensolver(vmat, rank, diag, eigv);
+  realSymmEigensolver(vmat, rank, eigv, sdiag);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *diag,
-                         std::vector<T> *eigv) {
+void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *eigv,
+                         std::vector<T> *sdiag) {
   const size_t rank = eigv->size();
   const size_t rank2 = rank * rank;
   if (amat.size() != rank2) {
@@ -772,7 +761,7 @@ void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::
   for (size_t i = 0LLU; i < rank2; i++) {
     vmat_ptr[i] = amat[i];
   }
-  realSymmEigensolver(vmat->data(), rank, diag->data(), eigv->data());
+  realSymmEigensolver(vmat->data(), rank, eigv->data(), sdiag->data());
 }
 
 //-------------------------------------------------------------------------------------------------
