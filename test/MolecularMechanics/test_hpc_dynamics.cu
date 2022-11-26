@@ -64,8 +64,7 @@ int main(const int argc, const char* argv[]) {
   const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   bool files_ok;
-  AtomGraph trpi_ag = loadTopology(trpi_top_name, ExceptionResponse::WARN, TopologyKind::AMBER,
-                                   &files_ok);
+  AtomGraph trpi_ag = loadTopology(trpi_top_name, &files_ok);
   const ImplicitSolventModel born_model = ImplicitSolventModel::HCT_GB;
   trpi_ag.setImplicitSolventModel(born_model);
   
@@ -76,8 +75,7 @@ int main(const int argc, const char* argv[]) {
 
   // Try a rather weird means of initializing a vector of PhaseSpace objects, to test the
   // first-classness of the PhaseSpace object itself.
-  std::vector<PhaseSpace> trpi_ps_vec(1, loadPhaseSpace(trpi_crd_name, ExceptionResponse::WARN,
-                                      CoordinateFileKind::AMBER_ASCII_RST, &files_ok));
+  std::vector<PhaseSpace> trpi_ps_vec(1, loadPhaseSpace(trpi_crd_name, &files_ok));
   const std::vector<AtomGraph*> trpi_ag_vec(1, &trpi_ag);
   const std::vector<int> trpi_tiling(1, 0);
   AtomGraphSynthesis trpi_poly_ag(trpi_ag_vec, trpi_tiling, ExceptionResponse::WARN, gpu, &timer);

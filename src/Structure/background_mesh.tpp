@@ -8,7 +8,8 @@ namespace structure {
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const double probe_radius_in, const int vdw_type_in,
-                                  const AtomGraph *ag_in, const MeshParameters &measurements_in) :
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                  const MeshParameters &measurements_in) :
     measurements{measurements_in}, kind{kind_in}, field{field_in}, probe_radius{probe_radius_in},
     a_line_x{HybridKind::POINTER, "mesh_avector_x"},
     a_line_y{HybridKind::POINTER, "mesh_avector_y"},
@@ -30,6 +31,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
     c_line_z_overflow{HybridKind::POINTER, "mesh_cvector_z_ovrf"},
     coefficients{HybridKind::ARRAY, "mesh_tricubic_coef"},
     ag_pointer{const_cast<AtomGraph*>(ag_in)},
+    cf_pointer{const_cast<CoordinateFrame*>(cf_in)},
     frozen_atoms{HybridKind::ARRAY, "mesh_frozen_atoms"},
     neighbor_list{HybridKind::ARRAY, "mesh_neighbor_list"},
     neighbor_list_bounds{HybridKind::ARRAY, "mesh_nl_bounds"},
@@ -43,16 +45,16 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const double probe_radius_in, const int vdw_type_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const MeshParameters &measurements_in, const GpuDetails &gpu) :
-    BackgroundMesh(kind_in, field_in, probe_radius_in, vdw_type_in, ag_in, measurements_in)
+    BackgroundMesh(kind_in, field_in, probe_radius_in, vdw_type_in, ag_in, cf_in, measurements_in)
 {
   allocate();
 
   // Loop over all atoms and apply the potential
   switch (kind) {
   case GridDetail::OCCLUSION:
-    colorExclusionMesh(cf, gpu);
+    colorExclusionMesh(gpu);
     break;
   case GridDetail::NONBONDED_FIELD:
   case GridDetail::NONBONDED_ATOMIC:
@@ -73,11 +75,11 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame &cf, const double buffer,
+                                  const CoordinateFrame *cf_in, const double buffer,
                                   const double spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {}
 
@@ -85,22 +87,22 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame &cf, const double buffer,
+                                  const CoordinateFrame *cf_in, const double buffer,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame &cf,
+                                  const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {}
 
@@ -108,22 +110,22 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame &cf,
+                                  const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -133,11 +135,11 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
@@ -146,11 +148,11 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -160,12 +162,12 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
@@ -174,11 +176,11 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -188,11 +190,11 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, buffer, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -201,12 +203,12 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const double spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, std::vector<double>(3, spacing),
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -216,12 +218,12 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf,
-                 getMeasurements(ag_in, cf, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -384,6 +386,11 @@ template <typename T> const AtomGraph* BackgroundMesh<T>::getTopologyPointer() c
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> const CoordinateFrame* BackgroundMesh<T>::getCoordinatePointer() const {
+  return cf_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMeshReader<double, T> BackgroundMesh<T>::dpData(const HybridTargetLevel tier) const {
   return BackgroundMeshReader<double, T>(measurements.dpData(), kind, field, a_line_x.data(tier),
@@ -465,8 +472,75 @@ template <typename T> void BackgroundMesh<T>::setTopologyPointer(const AtomGraph
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::setCoordinatePointer(const CoordinateFrame *cf_in) {
+  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf, const GpuDetails &gpu) {
+void BackgroundMesh<T>::setMeshParameters(const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                          const double padding, const double spacing,
+                                          const int scale_bits_in) {
+  ag_pointer = const_cast<AtomGraph*>(ag_in);
+  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setMeshParameters(const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                          const double padding,
+                                          const std::vector<double> &spacing,
+                                          const int scale_bits_in) {
+  ag_pointer = const_cast<AtomGraph*>(ag_in);
+  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setMeshParameters(const double padding, const double spacing,
+                                          const int scale_bits_in) {
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setMeshParameters(const double padding, const std::vector<double> &spacing,
+                                          const int scale_bits_in) {
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setMeshParameters(const std::vector<double> &mesh_bounds,
+                                          const double spacing, const int scale_bits_in) {
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(mesh_bounds, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setMeshParameters(const std::vector<double> &mesh_bounds,
+                                          const std::vector<double> &spacing,
+                                          const int scale_bits_in) {
+  const int actual_scale_bits = (scale_bits_in == -100) ?
+                                measurements.getScalingBits() : scale_bits_in;
+  measurements = getMeasurements(mesh_bounds, spacing, actual_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Use the HPC kernel to color the mesh if a GPU is available
 #ifdef STORMM_USE_HPC
@@ -479,7 +553,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf, const GpuD
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
   const MeshParamAbstract<double> mps = measurements.dpData();
-  const CoordinateFrameReader cfr = cf.data();
+  const CoordinateFrameReader cfr = cf_pointer->data();
   
   // Initialize the mesh in CPU memory.
   const int n_elem = mps.na * mps.nb * mps.nc;
@@ -601,29 +675,35 @@ void BackgroundMesh<T>::colorExclusionMesh(const CoordinateFrame &cf, const GpuD
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf,
+MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
                                                   const double padding, const double spacing,
                                                   const int scale_bits_in) const {
-  return getMeasurements(ag, cf, padding, std::vector<double>(3, spacing));
+  return getMeasurements(ag, cf, padding, std::vector<double>(3, spacing), scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf,
+MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
                                                   const std::vector<double> &mesh_bounds,
                                                   const double spacing,
                                                   const int scale_bits_in) const {
-  return getMeasurements(ag, cf, mesh_bounds, std::vector<double>(3, spacing));
+  return getMeasurements(ag, cf, mesh_bounds, std::vector<double>(3, spacing), scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf,
+MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
                                                   const double padding,
                                                   const std::vector<double> &spacing,
                                                   const int scale_bits_in) const {
+  if (cf == nullptr || ag == nullptr) {
+    rtErr("When creating a mesh based on a zone surrounding a system of interest, the topology "
+          "and coordinates must be defined.  Supply the mesh boundaries explicitly to avoid "
+          "relying on pre-defined coordinates, or submit the system to the mesh prior to calling "
+          "this function.", "BackgroundMesh", "getMeasurements");
+  }
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  const CoordinateFrameReader cfr = cf.data();
+  const CoordinateFrameReader cfr = cf->data();
   double xmin, ymin, zmin, xmax, ymax, zmax;
   bool points_unset = true;
   const int lj_idx_offset = nbk.n_lj_types + 1;
@@ -658,7 +738,7 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const Coo
   zmin -= padding;
   zmax += padding;
   const std::vector<double> limits = { xmin, ymin, zmin, xmax, ymax, zmax };
-  return getMeasurements(ag, cf, limits, spacing, scale_bits_in);
+  return getMeasurements(limits, spacing, scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -671,9 +751,10 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const std::vector<double> &mes
           "the maximum coordinates, is required.  " + std::to_string(mesh_bounds.size()) +
           " elements were provided.", "BackgroundMesh", "getMeasurements");
   }
-  if (spacing.size() != 3LLU) {
+  if (spacing.size() != 3LLU && spacing.size() != 9LLU) {
     rtErr("An array of three elements, the length, width, and height (Cartesian X, Y, and Z "
-          "dimensions) of a a rectilinear mesh element, is required.  " +
+          "dimensions) of a rectilinear mesh element, or nine elements defining the bounding "
+          "vectors of a triclininc element, is required.  " +
           std::to_string(spacing.size()) + " elements were provided.", "BackgroundMesh",
           "getMeasurements");
   }

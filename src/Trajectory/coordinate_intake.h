@@ -27,15 +27,14 @@ namespace trajectory {
 /// \param files_found  Indicator of whether the files were found (modified and returned if not
 ///                     the null pointer)
 /// \{
-PhaseSpace loadPhaseSpace(const std::string &file_name,
+PhaseSpace loadPhaseSpace(const std::string &file_name, bool *files_found = nullptr,
                           ExceptionResponse priority = ExceptionResponse::WARN,
-                          CoordinateFileKind crd_format = CoordinateFileKind::UNKNOWN,
-                          bool *files_found = nullptr);
+                          CoordinateFileKind crd_format = CoordinateFileKind::UNKNOWN);
 
-std::vector<PhaseSpace> loadPhaseSpace(const std::vector<std::string> &file_names,
-                                       ExceptionResponse priority = ExceptionResponse::WARN,
-                                       CoordinateFileKind crd_format = CoordinateFileKind::UNKNOWN,
-                                       bool *files_found = nullptr);
+std::vector<PhaseSpace>
+loadPhaseSpace(const std::vector<std::string> &file_names, bool *files_found = nullptr,
+               ExceptionResponse priority = ExceptionResponse::WARN,
+               CoordinateFileKind crd_format = CoordinateFileKind::UNKNOWN);
 /// \}
   
 } // namespace trajectory

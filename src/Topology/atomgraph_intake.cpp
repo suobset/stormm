@@ -7,10 +7,10 @@ namespace topology {
 
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-  
+
 //-------------------------------------------------------------------------------------------------
-AtomGraph loadTopology(const std::string &file_name, const ExceptionResponse priority,
-                       const TopologyKind engine_format, bool *files_found) {
+AtomGraph loadTopology(const std::string &file_name, bool *files_found,
+                       const ExceptionResponse priority, const TopologyKind engine_format) {
   if (getDrivePathType(file_name) == DrivePathType::FILE) {
     AtomGraph result(file_name, priority, engine_format);
     if (files_found != nullptr) {
@@ -39,9 +39,9 @@ AtomGraph loadTopology(const std::string &file_name, const ExceptionResponse pri
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<AtomGraph> loadTopology(const std::vector<std::string> &file_names,
+std::vector<AtomGraph> loadTopology(const std::vector<std::string> &file_names, bool *files_found,
                                     const TopologyKind engine_format,
-                                    const ExceptionResponse priority, bool *files_found) {
+                                    const ExceptionResponse priority) {
   std::vector<AtomGraph> result;
   result.reserve(file_names.size());
   if (files_found != nullptr) {

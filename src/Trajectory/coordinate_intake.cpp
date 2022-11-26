@@ -9,8 +9,8 @@ using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
   
 //-------------------------------------------------------------------------------------------------
-PhaseSpace loadPhaseSpace(const std::string &file_name, const ExceptionResponse priority,
-                          const CoordinateFileKind crd_format, bool *files_found) {
+PhaseSpace loadPhaseSpace(const std::string &file_name, bool *files_found,
+                          const ExceptionResponse priority, const CoordinateFileKind crd_format) {
   if (getDrivePathType(file_name) == DrivePathType::FILE) {
     PhaseSpace result(file_name, crd_format);
     if (files_found != nullptr) {
@@ -25,7 +25,7 @@ PhaseSpace loadPhaseSpace(const std::string &file_name, const ExceptionResponse 
       break;
     case ExceptionResponse::WARN: 
       rtErr("Coordinate file " + file_name + " was not found.  A blank topology will be returned "
-            "in its place.", "loadCoordinate");
+            "in its place.", "loadPhaseSpace");
       break;
     case ExceptionResponse::SILENT:
       break;
@@ -40,8 +40,8 @@ PhaseSpace loadPhaseSpace(const std::string &file_name, const ExceptionResponse 
 
 //-------------------------------------------------------------------------------------------------
 std::vector<PhaseSpace> loadPhaseSpace(const std::vector<std::string> &file_names,
-                                       const ExceptionResponse priority,
-                                       const CoordinateFileKind crd_format, bool *files_found) {
+                                       bool *files_found, const ExceptionResponse priority,
+                                       const CoordinateFileKind crd_format) {
   std::vector<PhaseSpace> result;
   result.reserve(file_names.size());
   if (files_found != nullptr) {

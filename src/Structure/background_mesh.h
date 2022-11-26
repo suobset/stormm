@@ -192,76 +192,76 @@ public:
   BackgroundMesh(GridDetail kind_in = GridDetail::NONBONDED_FIELD,
                  NonbondedPotential field_in = NonbondedPotential::ELECTROSTATIC,
                  double probe_radius_in = 0.0, int vdw_type_in = -1, 
-                 const AtomGraph *ag_in = nullptr,
+                 const AtomGraph *ag_in = nullptr, const CoordinateFrame *cf_in = nullptr,
                  const MeshParameters &measurements_in = MeshParameters());
   
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
-                 int vdw_type_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 int vdw_type_in, const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                  const MeshParameters &measurements_in, const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame &cf, double buffer,
+                 const AtomGraph *ag_in, const CoordinateFrame *cf_in, double buffer,
                  double spacing, int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame &cf, double buffer,
+                 const AtomGraph *ag_in, const CoordinateFrame *cf_in, double buffer,
                  const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                  const std::vector<double> &mesh_bounds, double spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                  const std::vector<double> &mesh_bounds, const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, double buffer, double spacing,
+                 const CoordinateFrame *cf_in, double buffer, double spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, double buffer,
+                 const CoordinateFrame *cf_in, double buffer,
                  const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  double spacing, int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, double buffer, double spacing,
+                 const CoordinateFrame *cf_in, double buffer, double spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, double buffer,
+                 const CoordinateFrame *cf_in, double buffer,
                  const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  double spacing, int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
-                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
@@ -287,6 +287,9 @@ public:
   
   /// \brief Get a const pointer to the topology responsible for creating this mesh.
   const AtomGraph* getTopologyPointer() const;
+
+  /// \brief Get a const pointer to the coordinates responsible for creating this mesh.
+  const CoordinateFrame* getCoordinatePointer() const;
 
   /// \brief Get an abstract of the mesh for performing calculations in double-precision.
   ///
@@ -316,13 +319,64 @@ public:
   ///
   /// \param ag_in  Pointer to the topology of interest
   void setTopologyPointer(const AtomGraph *ag_in);
-  
+
+  /// \brief Set the coordinates that the mesh shall use.
+  ///
+  /// \param ag_in  Pointer to the coordinates of interest
+  void setCoordinatePointer(const CoordinateFrame *ag_in);
+
+  /// \brief Set the dimensions of the mesh.  Variants of this member function that do not include
+  ///        a coordinate pointer or topology may assume that one has already been set.  Variants
+  ///        that do accept a coordinate pointer will set that as the mesh's coordinate set.
+  ///
+  /// Overloaded:
+  ///   - Take coordinate and topology pointers with a single parameter to define the mesh limits.
+  ///   - Take a single parameter to define the mesh limits around a set of coordinates defined by
+  ///     a particular topology, and assume that the mesh already has these things.
+  ///   - Take the minimum and maximum Cartesian X, Y, and Z limits of a rectilinear mesh (this
+  ///     will not require a system to implement)
+  ///   - Take a single parameter to define isotropic mesh elements
+  ///   - Take three or nine parameters to define anisotropic rectilinear or triclinic mesh
+  ///     elements
+  ///   - Indicate the scaling bits to be used in fixed-precision arithmetic when determining
+  ///     positions on the mesh, or leave that parameter unchanged
+  ///
+  /// \param ag_in          New topology to build the mesh around (this will be incorporated into
+  ///                       the object)
+  /// \param cf_in          New coordinate set to build the mesh around (this will be incorporated
+  ///                       into the object)
+  /// \param padding        Region around the molecule of interest to spread the mesh
+  /// \param mesh_bounds    Minimum and maximum Cartesian limits of the mesh
+  /// \param spacing        Width (and length, and height, or bounding vectors) of mesh elements
+  /// \param scale_bits_in  The number of bis after the decimal to use in fixed-precision
+  ///                       computations of particle positions on the grid.  The default value of
+  ///                       -100 is nonsensical and will be interpreted as "leave the current
+  ///                       setting as it is." Limiting the number of function overloads in this
+  ///                       way is a step towards controlling code bloat due to this large,
+  ///                       templated class.
+  /// \{
+  void setMeshParameters(const AtomGraph *ag_in, const CoordinateFrame *cf_in, double padding,
+                         double spacing, int scale_bits_in = -100);
+
+  void setMeshParameters(const AtomGraph *ag_in, const CoordinateFrame *cf_in, double padding,
+                         const std::vector<double> &spacing, int scale_bits_in = -100);
+
+  void setMeshParameters(double padding, double spacing, int scale_bits_in = -100);
+
+  void setMeshParameters(double padding, const std::vector<double> &spacing,
+                         int scale_bits_in = -100);
+
+  void setMeshParameters(const std::vector<double> &mesh_bounds, double spacing,
+                         int scale_bits_in = -100);
+
+  void setMeshParameters(const std::vector<double> &mesh_bounds,
+                         const std::vector<double> &spacing, int scale_bits_in = -100);
+  /// \}
+
   /// \brief Color the exclusion mesh based on a particular set of coordinates.
   ///
-  /// \param cf   The coordinates of the system, including all rigid atoms (the topology referenced
-  ///             by the BackgroundMesh object will keep a list of which atoms are mobile)
   /// \param gpu  Details of any available GPU
-  void colorExclusionMesh(const CoordinateFrame &cf, const GpuDetails &gpu);
+  void colorExclusionMesh(const GpuDetails &gpu);
   
 private:
 
@@ -390,7 +444,10 @@ private:
 
   /// Pointer to the original topology
   AtomGraph *ag_pointer;
-
+  
+  /// Pointer to the coordinates responsible for creating the potential
+  CoordinateFrame *cf_pointer;
+  
   /// Snapshot of the frozen atoms in the topology (in case the topology is modified later)
   Hybrid<uint> frozen_atoms;
 
@@ -427,14 +484,14 @@ private:
   /// \param spacing      The length, width, and height of the mesh element (a real-valued scalar,
   ///                     or a three-element vector).  Units of Angstroms.
   /// \{
-  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf, double padding,
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf, double padding,
                                  double spacing, int scale_bits_in) const;
 
-  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf,
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
                                  const std::vector<double> &mesh_bounds, double spacing,
                                  int scale_bits_in) const;
 
-  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf, double padding,
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf, double padding,
                                  const std::vector<double> &spacing, int scale_bits_in) const;
 
   MeshParameters getMeasurements(const std::vector<double> &mesh_bounds,

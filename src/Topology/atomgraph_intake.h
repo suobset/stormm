@@ -26,15 +26,14 @@ namespace topology {
 /// \param files_found  Indicator of whether the files were found (modified and returned if not
 ///                     the null pointer)
 /// \{
-AtomGraph loadTopology(const std::string &file_name,
+AtomGraph loadTopology(const std::string &file_name, bool *files_found = nullptr,
                        ExceptionResponse priority = ExceptionResponse::WARN,
-                       TopologyKind engine_format = TopologyKind::AMBER,
-                       bool *files_found = nullptr);
+                       TopologyKind engine_format = TopologyKind::AMBER);
 
 std::vector<AtomGraph> loadTopology(const std::vector<std::string> &file_names,
+                                    bool *files_found = nullptr,
                                     ExceptionResponse priority = ExceptionResponse::WARN,
-                                    TopologyKind engine_format = TopologyKind::AMBER,
-                                    bool *files_found = nullptr);
+                                    TopologyKind engine_format = TopologyKind::AMBER);
 /// \}
   
 } // namespace topology
