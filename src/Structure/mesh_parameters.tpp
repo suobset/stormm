@@ -5,6 +5,25 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+MeshParamAbstract<T>::MeshParamAbstract(const int na_in, const int nb_in, const int nc_in,
+                                        const int95_t orig_x_in, const int95_t orig_y_in,
+                                        const int95_t orig_z_in, const T scale_in,
+                                        const T inv_scale_in, const T* umat_in,
+                                        const T* invu_in, const T* widths_in,
+                                        const int95_t* fp_invu_in) :
+    na{na_in}, nb{nb_in}, nc{nc_in}, orig_x{orig_x_in}, orig_y{orig_y_in}, orig_z{orig_z_in},
+    scale{scale_in}, inv_scale{inv_scale_in},
+    umat{ umat_in[0], umat_in[1], umat_in[2], umat_in[3], umat_in[4], umat_in[5], umat_in[6],
+          umat_in[7], umat_in[8] },
+    invu{ invu_in[0], invu_in[1], invu_in[2], invu_in[3], invu_in[4], invu_in[5], invu_in[6],
+          invu_in[7], invu_in[8] },
+    widths{ widths_in[0], widths_in[1], widths_in[2] },
+    fp_invu{ fp_invu_in[0], fp_invu_in[1], fp_invu_in[2], fp_invu_in[3], fp_invu_in[4],
+             fp_invu_in[5], fp_invu_in[6], fp_invu_in[7], fp_invu_in[8] }
+{}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
   const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
   if (isFloatingPointScalarType<Tcoord>()) {
@@ -132,6 +151,6 @@ template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTra
           "numbers.", "MeshParameters", "getMeshTransform");
   }
 }
-  
+
 } // namespace structure
 } // namespace stormm

@@ -56,6 +56,6 @@ void checkArraySizeToMatrixRank(const size_t actual_rank, const size_t rank, con
     }
   }
 }
-
+  
 } // namespace math
 } // namespace stormm

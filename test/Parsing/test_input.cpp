@@ -2,14 +2,16 @@
 #include "../../src/Namelists/input.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using stormm::constants::ExceptionResponse;
 using stormm::diskutil::osSeparator;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::errors::rtWarn;
-using stormm::constants::ExceptionResponse;
 using stormm::parse::separateText;
+using stormm::review::stormmSplash;
 using namespace stormm::namelist;
 using namespace stormm::testing;
 
@@ -61,6 +63,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Namelist creation and default initialization");

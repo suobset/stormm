@@ -7,6 +7,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
@@ -27,6 +28,7 @@ using stormm::parse::polyNumericVector;
 using stormm::parse::NumberFormat;
 using stormm::parse::operator!=;
 using stormm::parse::operator==;
+using stormm::review::stormmSplash;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::MobilitySetting;
@@ -36,10 +38,16 @@ using stormm::trajectory::PhaseSpace;
 using namespace stormm::chemistry;
 using namespace stormm::testing;
 
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Lay out the testing environment
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   StopWatch timer;
 
   // Section 1: chemical bonding structures

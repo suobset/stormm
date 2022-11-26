@@ -2,6 +2,8 @@
 #ifndef STORMM_PUREMESH_H
 #define STORMM_PUREMESH_H
 
+#include <algorithm>
+#include <string>
 #include <vector>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
@@ -30,7 +32,116 @@ using trajectory::CoordinateSeries;
 using trajectory::PhaseSpace;
 
 /// \brief The templated, writeable abstract of a BackgroundMesh object.
+template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
 
+  /// \brief The constructor takes arguments for all member variables.
+  BackgroundMeshReader(const MeshParamAbstract<Txfrm> &measurements, GridDetail kind_in,
+                       NonbondedPotential field_in, const llint* avec_x, const llint* avec_y,
+                       const llint* avec_z, const llint* bvec_x, const llint* bvec_y,
+                       const llint* bvec_z, const llint* cvec_x, const llint* cvec_y,
+                       const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
+                       const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
+                       const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
+                       const int* cvec_z_ovrf, T* coeffs_in, int* ngbr, int* ngbr_bounds);
+
+  /// \brief The default copy and move constructors will be valid for this object.  Const members
+  ///        negate the use of default copy and move assignment operators.
+  ///
+  /// \param original  The object to copy or move
+  /// \{
+  BackgroundMeshReader(const BackgroundMeshWriter<Txfrm, Tdata> &original) = default;
+  BackgroundMeshReader(BackgroundMeshWriter<Txfrm, Tdata> &&original) = default;
+  /// \}
+
+  const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
+  const GridDetail kind;                ///< The type of mesh, also pre-established.
+  const NonbondedPotential field_in;    ///< The field described by the mesh, also pre-established.
+
+  // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
+  const llint* avec_x;     ///< Cartesian X coordinates of grid element origins stepping along the
+                           ///<   mesh's "a" axis
+  const llint* avec_y;     ///< Cartesian Y coordinates of "a" axis grid element origins
+  const llint* avec_z;     ///< Cartesian Z coordinates of "a" axis grid element origins
+  const llint* bvec_x;     ///< Cartesian X coordinates of "b" axis grid element origins
+  const llint* bvec_y;     ///< Cartesian Y coordinates of "b" axis grid element origins
+  const llint* bvec_z;     ///< Cartesian Z coordinates of "b" axis grid element origins
+  const llint* cvec_x;     ///< Cartesian X coordinates of "c" axis grid element origins
+  const llint* cvec_y;     ///< Cartesian Y coordinates of "c" axis grid element origins
+  const llint* cvec_z;     ///< Cartesian Z coordinates of "c" axis grid element origins
+  const int* avec_x_ovrf;  ///< Cartesian X overflow bits for "a" axis grid element origins
+  const int* avec_y_ovrf;  ///< Cartesian Y overflow bits for "a" axis grid element origins
+  const int* avec_z_ovrf;  ///< Cartesian Z overflow bits for "a" axis grid element origins
+  const int* bvec_x_ovrf;  ///< Cartesian X overflow bits for "b" axis grid element origins
+  const int* bvec_y_ovrf;  ///< Cartesian Y overflow bits for "b" axis grid element origins
+  const int* bvec_z_ovrf;  ///< Cartesian Z overflow bits for "b" axis grid element origins
+  const int* cvec_x_ovrf;  ///< Cartesian X overflow bits for "c" axis grid element origins
+  const int* cvec_y_ovrf;  ///< Cartesian Y overflow bits for "c" axis grid element origins
+  const int* cvec_z_ovrf;  ///< Cartesian Z overflow bits for "c" axis grid element origins
+
+  // The content of the mesh is what is actually writeable.
+  const Tdata* coeffs;        ///< Coefficients for all mesh elements.  In an OCCLUSION mesh, these
+                              ///<   are the bit-packed masks for each cubelet, 64 cubelets making
+                              ///<   one element.  In a NONBONDED_FIELD or NONBONDED_ATOMIC mesh,
+                              ///<   the coefficients are tricubic splines for each element.
+  const int* ngbr;            ///< Concatenated lists of neighbor atoms
+  const size_t* ngbr_bounds;  ///< Bounds array for the neighbor lists in ngbr
+}
+  
+/// \brief The templated, writeable abstract of a BackgroundMesh object.
+template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
+
+  /// \brief The constructor takes arguments for all member variables.
+  BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &measurements, GridDetail kind_in,
+                       NonbondedPotential field_in, const llint* avec_x, const llint* avec_y,
+                       const llint* avec_z, const llint* bvec_x, const llint* bvec_y,
+                       const llint* bvec_z, const llint* cvec_x, const llint* cvec_y,
+                       const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
+                       const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
+                       const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
+                       const int* cvec_z_ovrf, T* coeffs_in, int* ngbr, int* ngbr_bounds);
+
+  /// \brief The default copy and move constructors will be valid for this object.  Const members
+  ///        negate the use of default copy and move assignment operators.
+  ///
+  /// \param original  The object to copy or move
+  /// \{
+  BackgroundMeshWriter(const BackgroundMeshWriter<Txfrm, Tdata> &original) = default;
+  BackgroundMeshWriter(BackgroundMeshWriter<Txfrm, Tdata> &&original) = default;
+  /// \}
+
+  const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
+  const GridDetail kind;                ///< The type of mesh, also pre-established.
+  const NonbondedPotential field_in;    ///< The field described by the mesh, also pre-established.
+
+  // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
+  const llint* avec_x;     ///< Cartesian X coordinates of grid element origins stepping along the
+                           ///<   mesh's "a" axis
+  const llint* avec_y;     ///< Cartesian Y coordinates of "a" axis grid element origins
+  const llint* avec_z;     ///< Cartesian Z coordinates of "a" axis grid element origins
+  const llint* bvec_x;     ///< Cartesian X coordinates of "b" axis grid element origins
+  const llint* bvec_y;     ///< Cartesian Y coordinates of "b" axis grid element origins
+  const llint* bvec_z;     ///< Cartesian Z coordinates of "b" axis grid element origins
+  const llint* cvec_x;     ///< Cartesian X coordinates of "c" axis grid element origins
+  const llint* cvec_y;     ///< Cartesian Y coordinates of "c" axis grid element origins
+  const llint* cvec_z;     ///< Cartesian Z coordinates of "c" axis grid element origins
+  const int* avec_x_ovrf;  ///< Cartesian X overflow bits for "a" axis grid element origins
+  const int* avec_y_ovrf;  ///< Cartesian Y overflow bits for "a" axis grid element origins
+  const int* avec_z_ovrf;  ///< Cartesian Z overflow bits for "a" axis grid element origins
+  const int* bvec_x_ovrf;  ///< Cartesian X overflow bits for "b" axis grid element origins
+  const int* bvec_y_ovrf;  ///< Cartesian Y overflow bits for "b" axis grid element origins
+  const int* bvec_z_ovrf;  ///< Cartesian Z overflow bits for "b" axis grid element origins
+  const int* cvec_x_ovrf;  ///< Cartesian X overflow bits for "c" axis grid element origins
+  const int* cvec_y_ovrf;  ///< Cartesian Y overflow bits for "c" axis grid element origins
+  const int* cvec_z_ovrf;  ///< Cartesian Z overflow bits for "c" axis grid element origins
+
+  // The content of the mesh is what is actually writeable.
+  Tdata* coeffs;        ///< Coefficients for all mesh elements.  In an OCCLUSION mesh, these are
+                        ///<   the bit-packed masks for each cubelet, 64 cubelets making one
+                        ///<   element.  In a NONBONDED_FIELD or NONBONDED_ATOMIC mesh, the
+                        ///<   coefficients are tricubic splines for each element.
+  int* ngbr;            ///< Concatenated lists of neighbor atoms
+  size_t* ngbr_bounds;  ///< Bounds array for the neighbor lists in ngbr
+}
   
 /// \brief A workspace for constructing a pure potential mesh based on the frozen atoms of a
 ///        large molecule.  If the large molecule has nonrigid components, they must be excluded
@@ -64,26 +175,81 @@ public:
   /// \param gpu              Details of the available GPU
   /// \{
   BackgroundMesh(GridDetail kind_in = GridDetail::NONBONDED_FIELD,
+                 NonbondedPotential field_in = NonbondedPotential::ELECTROSTATIC,
+                 double probe_radius_in = 0.0, int vdw_type_in = -1, 
                  const AtomGraph *ag_in = nullptr,
                  const MeshParameters &measurements_in = MeshParameters());
   
-  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
+                 int vdw_type_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
                  const MeshParameters &measurements_in, const GpuDetails &gpu = null_gpu);
 
-  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
-                 int scale_bits, double buffer, double spacing, const GpuDetails &gpu = null_gpu);
-
-  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
-                 int scale_bits, double buffer, const std::vector<double> &spacing,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
+                 const AtomGraph *ag_in, const CoordinateFrame &cf, double buffer,
+                 double spacing, int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
-  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
-                 int scale_bits, const std::vector<double> &mesh_bounds, double spacing,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
+                 const AtomGraph *ag_in, const CoordinateFrame &cf, double buffer,
+                 const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
-  BackgroundMesh(GridDetail kind_in, const AtomGraph *ag_in, const CoordinateFrame &cf,
-                 int scale_bits, const std::vector<double> &mesh_bounds,
-                 const std::vector<double> &spacing, const GpuDetails &gpu = null_gpu);
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
+                 const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 const std::vector<double> &mesh_bounds, double spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
+                 const AtomGraph *ag_in, const CoordinateFrame &cf,
+                 const std::vector<double> &mesh_bounds, const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, double buffer, double spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, double buffer,
+                 const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 double spacing, int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, double buffer, double spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, double buffer,
+                 const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 double spacing, int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, double probe_radius_in, const AtomGraph *ag_in,
+                 const CoordinateFrame &cf, const std::vector<double> &mesh_bounds,
+                 const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
   /// \}
 
   /// \brief Copy and move constructors must be defined explicitly to accommodate POINTER-kind
@@ -105,7 +271,31 @@ public:
   /// \}
   
   /// \brief Get a const pointer to the topology responsible for creating this mesh.
-  const AtomGraph* getTopologyPointer();
+  const AtomGraph* getTopologyPointer() const;
+
+  /// \brief Get an abstract of the mesh for performing calculations in double-precision.
+  ///
+  /// Overloaded:
+  ///   - Get the reader for a const object
+  ///   - Get the writer for a mutable object
+  ///
+  /// \param tier  Obtain the data at the level of the CPU host or GPU device
+  /// \{
+  BackgroundMeshReader<double, T> dpData(const HybridTargetLevel tier) const;
+  BackgroundMeshWriter<double, T> dpData(const HybridTargetLevel tier);
+  /// \}
+
+  /// \brief Get an abstract of the mesh for performing calculations in single-precision.
+  ///
+  /// Overloaded:
+  ///   - Get the reader for a const object
+  ///   - Get the writer for a const object
+  ///
+  /// \param tier  Obtain the data at the level of the CPU host or GPU device
+  /// \{
+  BackgroundMeshReader<float, T> spData(const HybridTargetLevel tier) const;
+  BackgroundMeshWriter<float, T> spData(const HybridTargetLevel tier);
+  /// \}
   
 private:
 
@@ -129,6 +319,9 @@ private:
   /// meshes (the effective potential is a clash based on the Lennard-Jones sigma radii and a probe
   /// width).
   NonbondedPotential field;
+
+  /// The probe radius to use in computing clashes for an OCCLUSION-type mesh.
+  T probe_radius;
   
   /// Fixed-precision Cartesian coordinates of the mesh grid points stepping along the lines
   /// [ i = 0...nx, 0, 0 ] (the "a" box vector), [ 0, j = 0...ny, 0 ] (the "b" box vector), and
@@ -186,11 +379,50 @@ private:
   /// Data storage for the POINTER-kind Hybrid<int> objects above
   Hybrid<int> llint_data;
 
+  /// \brief Obtain bounds for the mesh based on coordinates of frozen atoms.
+  ///
+  /// Overloaded:
+  ///   - Provide a single buffer argument (in Angstroms), indicating the region to map around all
+  ///     frozen atoms
+  ///   - Provide explicit Cartesian minimum and maximum limits for the mapping (a different
+  ///     overload of the constructor, one which does not call any form of getMeasurements(), must
+  ///     be used to create a triclinic mesh for something like a crystallographic unit cell)
+  ///   - Provide a single number for the length, width, and height of a rectilinear (orthorhombic)
+  ///     mesh element.
+  ///   - Provide three values for the length, width, and height of an anisotropic (but still
+  ///     rectilinear) mesh element.
+  ///
+  /// \param ag           System topology, containing the list of frozen atoms
+  /// \param cf           Coordinates of the system
+  /// \param padding      Length to extend the mesh outside the extrema of the frozen atoms
+  /// \param mesh_bounds  Six-element vector of minimum and maximum Cartesian X, Y, and Z limits
+  ///                     for the mesh
+  /// \param spacing      The length, width, and height of the mesh element (a real-valued scalar,
+  ///                     or a three-element vector).  Units of Angstroms.
+  /// \{
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf, double padding,
+                                 double spacing, int scale_bits_in) const;
+
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf,
+                                 const std::vector<double> &mesh_bounds, double spacing,
+                                 int scale_bits_in) const;
+
+  MeshParameters getMeasurements(const AtomGraph *ag, const CoordinateFrame &cf, double padding,
+                                 const std::vector<double> &spacing, int scale_bits_in) const;
+
+  MeshParameters getMeasurements(const std::vector<double> &mesh_bounds,
+                                 const std::vector<double> &spacing, int scale_bits_in) const;
+  /// \}
+  
   /// \brief Allocate memory for the mesh coefficients, axis coordinates, and frozen atoms mask.
   void allocate();
 
   /// \brief Repair the POINTER-kind Hybrid objects in a newly copied or moved object.
   void rebase_pointers();
+
+  /// \brief Certain types of meshes are restricted to certain data types.  This function will
+  ///        ensure the correct relationships.
+  void validateMeshKind() const;
 };
 
 } // namespace structure

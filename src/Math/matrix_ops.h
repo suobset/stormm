@@ -14,6 +14,7 @@
 #include "Reporting/error_format.h"
 #include "UnitTesting/file_snapshot.h"
 #include "matrix.h"
+#include "vector_ops.h"
 
 namespace stormm {
 namespace math {
@@ -27,6 +28,10 @@ using parse::PolyNumeric;
 using parse::realToString;
 using testing::writeSnapshot;
 
+/// \brief The maximum number of QL iterations that will be allowed before the algorithm is
+///        declared non-convergent.
+  constexpr int maximum_ql_iterations = 30;
+  
 /// \brief A twin pointer, useful for performing partial-pivoting Gaussian elimination on
 ///        row-major matrices.
 template <typename T> struct TwinPointer {
@@ -165,8 +170,38 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
                        ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
 
+/// \brief Solve the eigenvalues (and, optionally) eigenvectors of a symmetric, real matrix.
+///
+/// Overloaded:
+///   - Provide C-style arrays for the matrix, diagonal, and proto-eigenvalue storage
+///   - Provide Standard Template Library vectors for all of the above
+///   - Provide Hybrid objects for all of the above
+///
+/// \param amat  The matrix from which to obtain eigenvalues and eigenvectors.  If eigenvectors are
+///              requested and amat is all that is supplied, they will replace the contents of
+///              amat on output.
+/// \param vmat  Optional matrix for out-of-place eigenvector computation.  The original matrix
+///              amat will be preserved if this is provided.
+/// \param rank  Rank of the matrix
+/// \param diag  Storage space for the matrix diagonal
+/// \param eigv  Storage space for computed eigenvalues
+/// \{
+template <typename T>
+void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv);
+
+template <typename T>
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *diag, std::vector<T> *eigv);
+
+template <typename T>
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* diag, T* eigv);
+
+template <typename T>
+void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *diag,
+                         std::vector<T> *eigv);
+/// \}
+  
 /// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
-///        The matrix shall be presented in column major format
+///        The matrix shall be presented in column-major format.
 
   
 /// \brief Compute the box space transformation matrix given a sequence of six real numbers.
@@ -206,6 +241,30 @@ template <typename T> void computeBoxTransform(const T* dims, T* umat, T* invu);
 template <typename T>
 void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, const T* invu);
 
+/// \brief Compute Hessian normal form to obtain the thickness of a unit cell (or mesh element)
+///        based on its "a", "b", and "c" box vectors.  The thicknesses between planes defined by
+///        the "b" and "c" vectors (x in an orthorhombic unit cell), "a" and "c" vectors (y in an
+///        orthorhombic unit cell) and "a" and "b" vectors (z in an orthorhombic unit cell) are
+///        returned.
+///
+/// Overloaded:
+///   - Accept inputs as a C-style array or as a Standard Template Library object
+///   - Return the result as a vector in the data type used for computations
+///   - Return the result in three mutable pointers for each thickness
+///
+/// \param invu  The 3x3 inverse transformation matrix taking coordinates in unit cell (box) space
+///              back to real space.  Given in Fortran order (first three elements are the first
+///              column, second three are the second column...).
+/// \{
+template <typename T> std::vector<T> hessianNormalWidths(const T* invu);
+
+template <typename T> std::vector<T> hessianNormalWidths(const std::vector<T> &invu);
+
+template <typename T> void hessianNormalWidths(const T* invu, T *xw, T *yw, T *zw);
+
+template <typename T> void hessianNormalWidths(const std::vector<T> &invu, T *xw, T *yw, T *zw);
+/// \}
+  
 /// \brief Print a matrix, either to the screen (if no file name is supplied) or to a file.  This
 ///        makes use of the writeSnapshot() function in 
 ///

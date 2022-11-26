@@ -2,12 +2,14 @@
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Random/random.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::data_types::int4;
 using stormm::data_types::ushort2;
 using stormm::math::sum;
 using stormm::random::Ran2Generator;
+using stormm::review::stormmSplash;
 using namespace stormm::card;
 using namespace stormm::testing;
 
@@ -63,6 +65,28 @@ Hybrid<double> makeDoubleHybrid(int length) {
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
+  // Obtain environment variables or command-line input, if available
+  TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
+
+  // "Forward declaration" of test sections: section 1
+  section("Basic Hybrid object functionality, spanning getter functions as well as data entry "
+	  "and retrieval");
+
+  // Section 2
+  section("Hybrid object failsafes, exception handling for definite code errors");
+
+  // Section 3
+  section("Global memory ledger features");
+
+  // Section 4
+  section("Hybrid POINTER-kind object veracity");
+
+  // Section 5
+  section("Hybrid copy and move constructors");
+
   // Fill two Hybrid objects, one with integers and the other with near integer values
   const int n_pts = 100;
   Hybrid<int>    ihybrid_a(n_pts, "ihybrid_a", HybridFormat::HOST_ONLY, HybridKind::ARRAY);
@@ -80,25 +104,6 @@ int main(const int argc, const char* argv[]) {
     }
     perturb += delta;
   }
-
-  // Obtain environment variables or command-line input, if available
-  TestEnvironment oe(argc, argv);
-
-  // "Forward declaration" of test sections: section 1
-  section("Basic Hybrid object functionality, spanning getter functions as well as data entry "
-	  "and retrieval");
-
-  // Section 2
-  section("Hybrid object failsafes, exception handling for definite code errors");
-
-  // Section 3
-  section("Global memory ledger features");
-
-  // Section 4
-  section("Hybrid POINTER-kind object veracity");
-
-  // Section 5
-  section("Hybrid copy and move constructors");
 
   // Basic comparisons of the two vectors
   section(1);

@@ -3,6 +3,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -14,12 +15,19 @@ using stormm::diskutil::PrintSituation;
 using stormm::errors::rtWarn;
 using stormm::parse::polyNumericVector;
 using stormm::random::Ran2Generator;
+using stormm::review::stormmSplash;
 using namespace stormm::testing;
 
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv, TmpdirStatus::REQUIRED);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Structs and methods");

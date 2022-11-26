@@ -10,6 +10,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
@@ -24,6 +25,7 @@ using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Ran2Generator;
+using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using namespace stormm::math;
 using namespace stormm::numerics;
@@ -144,6 +146,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Long long int <=> float2 conversion");

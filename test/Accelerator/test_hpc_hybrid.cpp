@@ -5,11 +5,13 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Random/random.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::tiny;
 using stormm::constants::ExceptionResponse;
 using stormm::random::Ran2Generator;
+using stormm::review::stormmSplash;
 using namespace stormm::card;
 using namespace stormm::testing;
 
@@ -51,6 +53,9 @@ int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Basic hybrid functionality, with an emphasis on the HPC components");

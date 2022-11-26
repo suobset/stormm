@@ -9,6 +9,7 @@
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Restraints/bounded_restraint.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
@@ -41,6 +42,7 @@ using stormm::parse::separateText;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
+using stormm::review::stormmSplash;
 using stormm::structure::distance;
 using stormm::structure::angle;
 using stormm::structure::dihedral_angle;
@@ -279,6 +281,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Test the restraint builders");

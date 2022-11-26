@@ -23,6 +23,7 @@
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/reporting_enumerators.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/test_system_manager.h"
@@ -50,6 +51,7 @@ using stormm::parse::strcmpCased;
 using stormm::parse::TextOrigin;
 using stormm::review::OutputScope;
 using stormm::review::OutputSyntax;
+using stormm::review::stormmSplash;
 using stormm::restraints::RestraintApparatus;
 using stormm::structure::DataRequestKind;
 using stormm::topology::AtomGraph;
@@ -119,6 +121,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Test the &files namelist");

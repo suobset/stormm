@@ -8,6 +8,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Restraints/bounded_restraint.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Restraints/restraint_apparatus.h"
@@ -26,6 +27,7 @@ using namespace stormm::errors;
 using namespace stormm::mm;
 using namespace stormm::namelist;
 using namespace stormm::restraints;
+using namespace stormm::review;
 using namespace stormm::structure;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -112,6 +114,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv, TmpdirStatus::REQUIRED);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   StopWatch timer;
 
   // Section 1

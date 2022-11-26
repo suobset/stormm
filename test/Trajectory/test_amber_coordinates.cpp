@@ -7,6 +7,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/phasespace.h"
@@ -30,6 +31,7 @@ using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Ran2Generator;
+using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using stormm::topology::UnitCellType;
 using namespace stormm::testing;
@@ -65,6 +67,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Coordinate reading");

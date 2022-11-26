@@ -598,6 +598,30 @@ template <typename T> T crossProduct(const T va, const T vb) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> T hypotenuse(const T a, const T b) {
+  const size_t ct = std::type_index(typeid(T)).hash_code();
+  const T absa = std::abs(a);
+  const T absb = std::abs(b);
+  if (ct == double_type_index) {
+    if (absa > absb) {
+      return absa * sqrt(1.0 + ((absb / absa) * (absb / absa)));
+    }
+    else {
+      return absb * sqrt(1.0 + ((absa / absb) * (absa / absb)));
+    }
+  }
+  else {
+    if (absa > absb) {
+      return absa * sqrtf(1.0f + ((absb / absa) * (absb / absa)));
+    }
+    else {
+      return absb * sqrtf(1.0f + ((absa / absb) * (absa / absb)));
+    }
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 template <typename T> double magnitude(const T* va, const size_t length) {
   double result = 0.0;
   for (size_t i = 0; i < length; i++) {

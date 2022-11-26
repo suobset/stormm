@@ -432,7 +432,7 @@ void jacobiEigensolver(T* a, T* v, T* d, const size_t rank, const ExceptionRespo
   }
   
   // Iteratively solve the eigenvalue problem
-  for (size_t i = 1LLU; i <= 50LLU; i++) {
+  for (int i = 1; i <= 50; i++) {
     sm = 0.0;
     for (size_t ip = 0; ip < rank - 1LLU; ip++) {
       for (size_t iq = ip + 1LLU; iq < rank; iq++) {
@@ -440,6 +440,12 @@ void jacobiEigensolver(T* a, T* v, T* d, const size_t rank, const ExceptionRespo
       }
     }
     if (sm == 0.0) {
+
+      // CHECK
+      if (rank == 4LLU) {
+        printf("Rank 4 matrix took %d iterations to solve.\n", i);
+      }
+      // END CHECK
 
       // The eigenvalues were computed successfully
       return;
@@ -517,7 +523,7 @@ void jacobiEigensolver(T* a, T* v, T* d, const size_t rank, const ExceptionRespo
       z[ip] = 0.0;
     }
   }
-
+  
   switch (policy) {
   case ExceptionResponse::DIE:
     rtErr("Jacobi iterations on a " + std::to_string(rank) + "-rank matrix did not converge.",
@@ -569,6 +575,193 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
           "jacobiEigensolver");
   }
   jacobiEigensolver(a->memptr(), v->memptr(), d->data(), a->n_rows, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
+  const size_t ct = std::type_index(typeid(T)).hash_code();
+  const bool t_is_double = (ct == double_type_index);
+  const T zero = 0.0;
+  const T one = 1.0;
+  const T two = 2.0;
+  for (int i = rank - 1; i >= 1; i--) {
+    int l = i - 1;
+    T h = zero;
+    T scale = zero;
+    if (l > 0) {
+      for (int k = 0; k <= l; k++) {
+        scale += std::abs(amat[(k * rank) + i]);
+      }
+      if (scale == zero) {
+        sdiag[i] = amat[(l * rank) + i];
+      }
+      else {
+        for (int k = 0; k <= l; k++) {
+          const T aik = amat[(k * rank) + i] / scale;
+          h += aik * aik;
+          amat[(k * rank) + i] = aik;
+        }
+        T f = amat[(l * rank) + i];
+        T g;
+        if (t_is_double) {
+          g = (f >= zero ? -sqrt(h) : sqrt(h));
+        }
+        else {
+          g = (f >= zero ? -sqrtf(h) : sqrtf(h));
+        }
+        sdiag[i] = scale * g;
+	h -= f * g;
+        amat[(l * rank) + i] = f - g;
+        f = 0.0;
+        for (int j = 0; j <= l; j++) {
+          amat[(i * rank) + j] = amat[(j * rank) + i]/h;
+          g = 0.0;
+          for (int k = 0; k <= j; k++) {
+            g += amat[(k * rank) + j] * amat[(k * rank) + i];
+          }
+          for (int k = j+1; k <=l; k++) {
+            g += amat[(j * rank) + k] * amat[(k * rank) + i];
+          }
+          sdiag[j] = g / h;
+          f += sdiag[j] * amat[(j * rank) + i];
+        }
+        const T hh = f / (h + h);
+	for (int j = 0; j <= l; j++) {
+          f = amat[(j * rank) + i];
+          g = sdiag[j] - (hh * f);
+          sdiag[j] = g;
+          for (int k = 0; k <= j; k++) {
+            amat[(k * rank) + j] -= (f * sdiag[k]) + (g * amat[(k * rank) + i]);
+          }
+        }
+      }
+    }
+    else {
+      sdiag[i] = amat[(l * rank) + i];
+    }
+    eigv[i] = h;
+  }
+
+  // Accumulate the eigenvalues.
+  eigv[0] = zero;
+  sdiag[0] = zero;
+  for (int i = 0; i < rank; i++) {
+    int l = i - 1;
+    if (eigv[i]) {
+      for (int j = 0; j <= l; j++) {
+        T g = zero;
+        for (int k = 0; k <= l; k++) {
+          g += amat[(k * rank) + i] * amat[(j * rank) + k];
+        }
+        for (int k = 0; k <= l; k++) {
+          amat[(j * rank) + k] -= g * amat[(i * rank) + k];
+        }
+      }
+    }
+    eigv[i] = amat[(i * rank) + i];
+    amat[(i * rank) + i] = one;
+    for (int j = 0; j <= l; j++) {
+      amat[(j * rank) + i] = zero;
+      amat[(i * rank) + j] = zero;
+    }
+  }
+  for (int i = 1; i < rank; i++) {
+    sdiag[i - 1] = sdiag[i];
+  }
+  sdiag[rank - 1] = zero;
+  for (int l = 0; l < rank; l++) {
+    int iter = 0;
+    int m = l - 1;
+    while (m != l) {
+      for (m = l; m < rank - 1; m++) {
+        T dd = std::abs(eigv[m]) + std::abs(eigv[m + 1]);
+        if (std::abs(sdiag[m] + dd) == dd) {
+          break;
+        }
+      }
+      if (m != l) {
+        if (iter++ == maximum_ql_iterations) {
+          rtErr("Too many iterations in the QL solver.", "realSymmEigensolver");
+        }
+        T g = (eigv[l + 1] - eigv[l]) / (two * sdiag[l]);
+        T r = hypotenuse<T>(g, one);
+        T sign_result;
+        sign_result = (g >= zero) ? std::abs(r) : -std::abs(r);
+        g = eigv[m] - eigv[l] + (sdiag[l] / (g + sign_result));
+        T c = one;
+        T s = one;
+        T p = zero;
+        bool early_finish = false;
+        for (int i = m - 1; i >= l; i--) {
+          T f = s * sdiag[i];
+          T b = c * sdiag[i];
+          sdiag[i + 1] = (r = hypotenuse<T>(f, g));
+          if (r == zero) {
+            eigv[i + 1] -= p;
+            sdiag[m] = zero;
+            early_finish = true;
+            break;
+          }
+          s = f / r;
+          c = g / r;
+          g = eigv[i + 1] - p;
+          r = ((eigv[i] - g) * s) + (two * c * b);
+          eigv[i + 1] = g + (p = s * r);
+          g = (c * r) - b;
+          for (int k = 0; k < rank; k++) {
+            f = amat[((i + 1) * rank) + k];
+            amat[((i + 1) * rank) + k] = (s * amat[(i * rank) + k]) + (c * f);
+            amat[(i * rank) + k] = (c * amat[(i * rank) + k]) - (s * f);
+          }
+        }
+        if (r == zero && early_finish) {
+          continue;
+        }
+        eigv[l] -= p;
+        sdiag[l] = g;
+        sdiag[m] = zero;
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *eigv, std::vector<T> *sdiag) {
+  const size_t rank = eigv->size();
+  if (amat->size() != rank * rank) {
+    rtErr("Eigenvalue storage is ready for a matrix of rank " + std::to_string(rank) +
+          ", but the matrix rank does not appear to match.", "realSymmEigensolver");
+  }
+  realSymmEigensolver(amat->data(), rank, eigv->data(), sdiag->data());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* eigv, T* sdiag) {
+  const size_t rank2 = rank * rank;
+  for (size_t i = 0LLU; i < rank2; i++) {
+    vmat[i] = amat[i];
+  }
+  realSymmEigensolver(vmat, rank, eigv, sdiag);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *eigv,
+                         std::vector<T> *sdiag) {
+  const size_t rank = eigv->size();
+  const size_t rank2 = rank * rank;
+  if (amat.size() != rank2) {
+    rtErr("Eigenvalue storage is ready for a matrix of rank " + std::to_string(rank) +
+          ", but the matrix rank does not appear to match.", "realSymmEigensolver");
+  }
+  T* vmat_ptr = vmat->data();
+  for (size_t i = 0LLU; i < rank2; i++) {
+    vmat_ptr[i] = amat[i];
+  }
+  realSymmEigensolver(vmat->data(), rank, eigv->data(), sdiag->data());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -633,6 +826,47 @@ void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, cons
   *alpha = acos((cos(*beta) * cos(*gamma)) - (dx * sin(*beta) * sin(*gamma)));
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> hessianNormalWidths(const T* invu) {
+  T x, y, z;
+  hessianNormalWidths(invu, &x, &y, &z);
+  return { x, y, z };
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> hessianNormalWidths(const std::vector<T> &invu) {
+  T x, y, z;
+  hessianNormalWidths(invu.data(), &x, &y, &z);
+  return { x, y, z };
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void hessianNormalWidths(const std::vector<T> &invu, T *x, T *y, T *z) {
+  hessianNormalWidths(invu.data(), x, y, z);
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> void hessianNormalWidths(const T* invu, T *x, T *y, T *z) {
+  double xyz_n[3], thx[3], thy[3], thz[3], column_a[3], column_b[3], column_c[3];
+  xyz_n[0] = invu[0] + invu[3] + invu[6];
+  xyz_n[1] = invu[4] + invu[7];
+  xyz_n[2] = invu[8];
+  for (int i = 0; i < 3; i++) {
+    column_a[i] = invu[i    ];
+    column_b[i] = invu[i + 3];
+    column_c[i] = invu[i + 6];
+  }
+  crossProduct(column_b, column_c, thx);
+  crossProduct(column_a, column_c, thy);
+  crossProduct(column_a, column_b, thz);
+  normalize(thx, 3);
+  normalize(thy, 3);
+  normalize(thz, 3);
+  *x = fabs(dot(thx, xyz_n, 3));
+  *y = fabs(dot(thy, xyz_n, 3));
+  *z = fabs(dot(thz, xyz_n, 3));
+}
+  
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void printMatrix(const T* matrix, const int rows, const int cols, const std::string &varname,

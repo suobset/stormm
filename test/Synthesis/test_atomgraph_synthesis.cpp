@@ -11,6 +11,7 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Restraints/bounded_restraint.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -37,6 +38,7 @@ using stormm::errors::rtWarn;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
+using stormm::review::stormmSplash;
 using namespace stormm::energy;
 using namespace stormm::generalized_born_defaults;
 using namespace stormm::synthesis;
@@ -301,6 +303,9 @@ int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   StopWatch timer;
 
   // Section 1

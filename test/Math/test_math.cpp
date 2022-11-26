@@ -12,9 +12,11 @@
 #include "../../src/Math/summation.h"
 #include "../../src/Math/tickcounter.h"
 #include "../../src/Math/tricubic_cell.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
@@ -37,6 +39,7 @@ using stormm::random::Ran2Generator;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::RandomNumberMill;
 using stormm::random::Xoshiro256ppGenerator;
+using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using namespace stormm::math;
 using namespace stormm::testing;
@@ -443,6 +446,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
 
   // Section 1
   section("Vector processing capabilities");
@@ -816,6 +822,7 @@ int main(const int argc, const char* argv[]) {
   }
   matrixMultiply(dbase, rank, rank, dbase, rank, rank, dposdef, 1.0, 1.0, 0.0,
                  TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  std::vector<double> posdef_mat_b = posdef_matrix.readHost();
   jacobiEigensolver(&posdef_matrix, &eigenvectors, &eigenvalues, rank);
   snapshot(matrices_snp, polyNumericVector(eigenvectors.readHost()), "eigvec", 1.0e-5,
            "Eigenvectors for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
@@ -823,6 +830,38 @@ int main(const int argc, const char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(eigenvalues.readHost()), "eigval", 1.0e-5,
            "Eigenvalues for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+  std::vector<double> rsym_diag(8, 0.0);
+  std::vector<double> rsym_eigv(8, 0.0);
+  realSymmEigensolver(posdef_mat_b.data(), rank, rsym_eigv.data(), rsym_diag.data());
+  bool eigval_match = true;
+  bool eigvec_match = true;
+  std::vector<bool> eig_taken(rank, false);
+  std::vector<double> eigvec_mults(rank);
+  const double* evec_ptr = eigenvectors.data();
+  for (int i = 0; i < rank; i++) {
+    bool val_found = false;
+    bool vec_found = false;
+    for (int j = 0; j < rank; j++) {
+      if (eig_taken[j]) {
+        continue;
+      }
+      if (fabs(rsym_eigv[i] - eigenvalues.readHost(j)) < 1.0e-7) {
+        eig_taken[j] = true;
+        val_found = true;
+        for (int k = 0; k < rank; k++) {
+          eigvec_mults[k] = eigenvectors.readHost((rank * j) + k) / posdef_mat_b[(rank * i) + k];
+        }
+        vec_found = (variance(eigvec_mults,
+                              VarianceMethod::ROOT_MEAN_SQUARED_DEVIATION) < 1.0e-6);
+      }
+    }
+    eigval_match = (eigval_match && val_found);
+    eigvec_match = (eigvec_match && vec_found);
+  }
+  check(eigval_match, "Eigenvalues computed by the symmetric real eigensolver do not agree with "
+        "those computed using the Jacobi solver.");
+  check(eigvec_match, "Eigenvectors computed by the symmetric real eigensolver do not agree with "
+        "those computed using the Jacobi solver.");
 
   // Try a much bigger eigenvalue problem and check its results
   const size_t big_rank = 95;
@@ -894,6 +933,24 @@ int main(const int argc, const char* argv[]) {
         "The inverse transformation matrix is incorrect.");
   check(linear_xfrm_prod, RelationalOperator::EQUAL, linear_ident, "The product of box "
         "transformation and inverse transformation matrices is not the identity matrix.");
+
+  // Check the computation of unit cell widths: computing the Hessian normal form
+  const std::vector<double> invu_s1 = { 2.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0 };
+  std::vector<double> s1_widths(3);
+  const std::vector<double> s1_widths_ans = { 2.0, 3.0, 4.0 };
+  double* s1_ptr = s1_widths.data();
+  hessianNormalWidths(invu_s1.data(), &s1_ptr[0], &s1_ptr[1], &s1_ptr[2]);
+  check(s1_widths, RelationalOperator::EQUAL, s1_widths_ans, "The Hessian normal form is not "
+        "correctly computed for an orthorhombic unit cell.");
+  const std::vector<double> invu_s2 = { 100.000000000000,   0.000000000000,   0.000000000000,
+                                        -33.333333276578,  94.280904178272,   0.000000000000,
+                                        -33.333333276578, -47.140451968741,  81.649658179660 };
+  std::vector<double> s2_widths(3);
+  const std::vector<double> s2_widths_ans = { invu_s2[8], invu_s2[8], invu_s2[8] };
+  double* s2_ptr = s2_widths.data();
+  hessianNormalWidths(invu_s2.data(), &s2_ptr[0], &s2_ptr[1], &s2_ptr[2]);
+  check(s2_widths, RelationalOperator::EQUAL, Approx(s2_widths_ans).margin(1.0e-7), "The Hessian "
+        "normal form is not correctly computed for an orthorhombic unit cell.");  
 
   // Further checks on the mean, standard deviation, variance, correlation, dot product,
   // magnitude, and projection operations
