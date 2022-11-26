@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/ForceField/forcefield_element.h"
 #include "../../src/ForceField/forcefield_enumerators.h"

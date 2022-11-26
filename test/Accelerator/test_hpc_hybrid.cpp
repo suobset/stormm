@@ -1,6 +1,7 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"

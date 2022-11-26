@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"

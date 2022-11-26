@@ -18,9 +18,11 @@ namespace stormm {
 namespace structure {
 
 using data_types::isSignedIntegralScalarType;
+using math::EigenWork;
+using math::jacobiEigensolver;
+using math::realSymmEigensolver;
 using math::roundUp;
 using math::sum;
-using math::jacobiEigensolver;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using trajectory::CoordinateFrame;

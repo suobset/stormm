@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Random/random.h"
 #include "../../src/Topology/atomgraph_abstracts.h"

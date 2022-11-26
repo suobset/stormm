@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/Chemistry/atommask.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"

@@ -135,8 +135,8 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       for (int i = 0; i < 16; i++) {
         rmat[i] *= inv_mass_divisor;
       }
-      std::vector<Tcalc> vmat(16, 0.0), eigval(4, 0.0);
-      jacobiEigensolver(&rmat, &vmat, &eigval, 4);
+      std::vector<Tcalc> eigval(4, 0.0), sdiag(4, 0.0);
+      realSymmEigensolver(&rmat, &eigval, &sdiag, EigenWork::EIGENVALUES);
       int max_eig_loc = 0;
       for (int i = 1; i < 4; i++) {
         if (eigval[i] > eigval[max_eig_loc]) {
@@ -145,10 +145,10 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       }
 
       // Form the rotation matrix
-      const Tcalc a = vmat[(4 * max_eig_loc)    ];
-      const Tcalc x = vmat[(4 * max_eig_loc) + 1];
-      const Tcalc y = vmat[(4 * max_eig_loc) + 2];
-      const Tcalc z = vmat[(4 * max_eig_loc) + 3];
+      const Tcalc a = rmat[(4 * max_eig_loc)    ];
+      const Tcalc x = rmat[(4 * max_eig_loc) + 1];
+      const Tcalc y = rmat[(4 * max_eig_loc) + 2];
+      const Tcalc z = rmat[(4 * max_eig_loc) + 3];
       std::vector<Tcalc> umat(9);
       umat[0] = (a * a) + (x * x) - (y * y) - (z * z);
       umat[3] = 2.0 * ((x * y) + (a * z));

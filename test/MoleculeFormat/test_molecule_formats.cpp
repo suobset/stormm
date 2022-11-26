@@ -1,5 +1,5 @@
-#include "copyright.h"
 #include <vector>
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"

@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"

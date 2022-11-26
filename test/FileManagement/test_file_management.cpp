@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/FileManagement/directory_util.h"

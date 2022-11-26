@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_util.h"
 #include "../../src/FileManagement/file_listing.h"

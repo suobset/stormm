@@ -1,4 +1,5 @@
 #include <vector>
+#include "copyright.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"

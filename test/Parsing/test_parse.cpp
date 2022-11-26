@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/ascii_numbers.h"
 #include "../../src/Parsing/parse.h"

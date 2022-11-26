@@ -9,13 +9,18 @@
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Math/vector_ops.h"
+#include "Math/rounding.h"
 #include "Numerics/split_fixed_precision.h"
+#include "Potential/energy_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
+#include "structure_enumerators.h"
 #include "mesh_parameters.h"
 
 namespace stormm {
@@ -24,10 +29,20 @@ namespace structure {
 using card::GpuDetails;
 using card::Hybrid;
 using card::HybridKind;
+using card::HybridTargetLevel;
+using data_types::getStormmScalarTypeName;
+using data_types::isScalarType;
+using data_types::isFloatingPointScalarType;
 using constants::CartesianDimension;
 using constants::UnitCellAxis;
+using energy::NonbondedPotential;
+using math::addScalarToVector;
+using math::roundUp;
+using numerics::default_globalpos_scale_bits;
 using topology::AtomGraph;
+using topology::NonbondedKit;
 using trajectory::CoordinateFrame;
+using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateSeries;
 using trajectory::PhaseSpace;
 
@@ -42,15 +57,15 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
                        const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
                        const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
                        const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
-                       const int* cvec_z_ovrf, T* coeffs_in, int* ngbr, int* ngbr_bounds);
+                       const int* cvec_z_ovrf, Tdata* coeffs_in, int* ngbr, int* ngbr_bounds);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
   ///
   /// \param original  The object to copy or move
   /// \{
-  BackgroundMeshReader(const BackgroundMeshWriter<Txfrm, Tdata> &original) = default;
-  BackgroundMeshReader(BackgroundMeshWriter<Txfrm, Tdata> &&original) = default;
+  BackgroundMeshReader(const BackgroundMeshReader<Txfrm, Tdata> &original) = default;
+  BackgroundMeshReader(BackgroundMeshReader<Txfrm, Tdata> &&original) = default;
   /// \}
 
   const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
@@ -85,7 +100,7 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
                               ///<   the coefficients are tricubic splines for each element.
   const int* ngbr;            ///< Concatenated lists of neighbor atoms
   const size_t* ngbr_bounds;  ///< Bounds array for the neighbor lists in ngbr
-}
+};
   
 /// \brief The templated, writeable abstract of a BackgroundMesh object.
 template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
@@ -98,7 +113,7 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
                        const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
                        const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
                        const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
-                       const int* cvec_z_ovrf, T* coeffs_in, int* ngbr, int* ngbr_bounds);
+                       const int* cvec_z_ovrf, Tdata* coeffs_in, int* ngbr, int* ngbr_bounds);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
@@ -141,7 +156,7 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
                         ///<   coefficients are tricubic splines for each element.
   int* ngbr;            ///< Concatenated lists of neighbor atoms
   size_t* ngbr_bounds;  ///< Bounds array for the neighbor lists in ngbr
-}
+};
   
 /// \brief A workspace for constructing a pure potential mesh based on the frozen atoms of a
 ///        large molecule.  If the large molecule has nonrigid components, they must be excluded
@@ -296,6 +311,18 @@ public:
   BackgroundMeshReader<float, T> spData(const HybridTargetLevel tier) const;
   BackgroundMeshWriter<float, T> spData(const HybridTargetLevel tier);
   /// \}
+
+  /// \brief Set the topology that the mesh shall use.
+  ///
+  /// \param ag_in  Pointer to the topology of interest
+  void setTopologyPointer(const AtomGraph *ag_in);
+  
+  /// \brief Color the exclusion mesh based on a particular set of coordinates.
+  ///
+  /// \param cf   The coordinates of the system, including all rigid atoms (the topology referenced
+  ///             by the BackgroundMesh object will keep a list of which atoms are mobile)
+  /// \param gpu  Details of any available GPU
+  void colorExclusionMesh(const CoordinateFrame &cf, const GpuDetails &gpu);
   
 private:
 

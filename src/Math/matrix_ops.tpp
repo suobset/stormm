@@ -573,7 +573,7 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
+void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag, const EigenWork process) {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   const bool t_is_double = (ct == double_type_index);
   const T zero = 0.0;
@@ -609,7 +609,13 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
         amat[(l * rank) + i] = f - g;
         f = 0.0;
         for (int j = 0; j <= l; j++) {
-          amat[(i * rank) + j] = amat[(j * rank) + i]/h;
+          switch (process) {
+          case EigenWork::EIGENVALUES:
+            break;
+          case EigenWork::EIGENVECTORS:
+            amat[(i * rank) + j] = amat[(j * rank) + i] / h;
+            break;
+          }
           g = 0.0;
           for (int k = 0; k <= j; k++) {
             g += amat[(k * rank) + j] * amat[(k * rank) + i];
@@ -638,27 +644,36 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
   }
 
   // Accumulate the eigenvalues.
-  eigv[0] = zero;
   sdiag[0] = zero;
-  for (int i = 0; i < rank; i++) {
-    int l = i - 1;
-    if (eigv[i]) {
-      for (int j = 0; j <= l; j++) {
-        T g = zero;
-        for (int k = 0; k <= l; k++) {
-          g += amat[(k * rank) + i] * amat[(j * rank) + k];
-        }
-        for (int k = 0; k <= l; k++) {
-          amat[(j * rank) + k] -= g * amat[(i * rank) + k];
+  switch (process) {
+  case EigenWork::EIGENVALUES:
+    for (int i = 0; i < rank; i++) {
+      eigv[i] = amat[(i * rank) + i];
+    }
+    break;
+  case EigenWork::EIGENVECTORS:
+    eigv[0] = zero;
+    for (int i = 0; i < rank; i++) {
+      int l = i - 1;
+      if (eigv[i]) {
+        for (int j = 0; j <= l; j++) {
+          T g = zero;
+          for (int k = 0; k <= l; k++) {
+            g += amat[(k * rank) + i] * amat[(j * rank) + k];
+          }
+          for (int k = 0; k <= l; k++) {
+            amat[(j * rank) + k] -= g * amat[(i * rank) + k];
+          }
         }
       }
+      eigv[i] = amat[(i * rank) + i];
+      amat[(i * rank) + i] = one;
+      for (int j = 0; j <= l; j++) {
+        amat[(j * rank) + i] = zero;
+        amat[(i * rank) + j] = zero;
+      }
     }
-    eigv[i] = amat[(i * rank) + i];
-    amat[(i * rank) + i] = one;
-    for (int j = 0; j <= l; j++) {
-      amat[(j * rank) + i] = zero;
-      amat[(i * rank) + j] = zero;
-    }
+    break;
   }
   for (int i = 1; i < rank; i++) {
     sdiag[i - 1] = sdiag[i];
@@ -690,7 +705,8 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
         for (int i = m - 1; i >= l; i--) {
           T f = s * sdiag[i];
           T b = c * sdiag[i];
-          sdiag[i + 1] = (r = hypotenuse<T>(f, g));
+          r = hypotenuse<T>(f, g);
+          sdiag[i + 1] = r;
           if (r == zero) {
             eigv[i + 1] -= p;
             sdiag[m] = zero;
@@ -703,10 +719,16 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
           r = ((eigv[i] - g) * s) + (two * c * b);
           eigv[i + 1] = g + (p = s * r);
           g = (c * r) - b;
-          for (int k = 0; k < rank; k++) {
-            f = amat[((i + 1) * rank) + k];
-            amat[((i + 1) * rank) + k] = (s * amat[(i * rank) + k]) + (c * f);
-            amat[(i * rank) + k] = (c * amat[(i * rank) + k]) - (s * f);
+          switch (process) {
+          case EigenWork::EIGENVALUES:
+            break;
+          case EigenWork::EIGENVECTORS:
+            for (int k = 0; k < rank; k++) {
+              f = amat[((i + 1) * rank) + k];
+              amat[((i + 1) * rank) + k] = (s * amat[(i * rank) + k]) + (c * f);
+              amat[(i * rank) + k] = (c * amat[(i * rank) + k]) - (s * f);
+            }
+            break;
           }
         }
         if (r == zero && early_finish) {
@@ -722,7 +744,8 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *eigv, std::vector<T> *sdiag) {
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *eigv, std::vector<T> *sdiag,
+                         const EigenWork process) {
   const size_t rank = eigv->size();
   if (amat->size() != rank * rank) {
     rtErr("Eigenvalue storage is ready for a matrix of rank " + std::to_string(rank) +
@@ -733,7 +756,8 @@ void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *eigv, std::vector
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* eigv, T* sdiag) {
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* eigv, T* sdiag,
+                         const EigenWork process) {
   const size_t rank2 = rank * rank;
   for (size_t i = 0LLU; i < rank2; i++) {
     vmat[i] = amat[i];
@@ -744,7 +768,7 @@ void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* eigv, T* sdi
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *eigv,
-                         std::vector<T> *sdiag) {
+                         std::vector<T> *sdiag, const EigenWork process) {
   const size_t rank = eigv->size();
   const size_t rank2 = rank * rank;
   if (amat.size() != rank2) {

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
@@ -823,6 +824,7 @@ int main(const int argc, const char* argv[]) {
   matrixMultiply(dbase, rank, rank, dbase, rank, rank, dposdef, 1.0, 1.0, 0.0,
                  TransposeState::TRANSPOSE, TransposeState::AS_IS);
   std::vector<double> posdef_mat_b = posdef_matrix.readHost();
+  std::vector<double> posdef_mat_c = posdef_matrix.readHost();
   jacobiEigensolver(&posdef_matrix, &eigenvectors, &eigenvalues, rank);
   snapshot(matrices_snp, polyNumericVector(eigenvectors.readHost()), "eigvec", 1.0e-5,
            "Eigenvectors for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
@@ -830,9 +832,9 @@ int main(const int argc, const char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(eigenvalues.readHost()), "eigval", 1.0e-5,
            "Eigenvalues for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
-  std::vector<double> rsym_diag(8, 0.0);
-  std::vector<double> rsym_eigv(8, 0.0);
-  realSymmEigensolver(posdef_mat_b.data(), rank, rsym_eigv.data(), rsym_diag.data());
+  std::vector<double> rsym_diag_b(8, 0.0);
+  std::vector<double> rsym_eigv_b(8, 0.0);
+  realSymmEigensolver(posdef_mat_b.data(), rank, rsym_eigv_b.data(), rsym_diag_b.data());
   bool eigval_match = true;
   bool eigvec_match = true;
   std::vector<bool> eig_taken(rank, false);
@@ -845,7 +847,7 @@ int main(const int argc, const char* argv[]) {
       if (eig_taken[j]) {
         continue;
       }
-      if (fabs(rsym_eigv[i] - eigenvalues.readHost(j)) < 1.0e-7) {
+      if (fabs(rsym_eigv_b[i] - eigenvalues.readHost(j)) < 1.0e-7) {
         eig_taken[j] = true;
         val_found = true;
         for (int k = 0; k < rank; k++) {
@@ -862,7 +864,14 @@ int main(const int argc, const char* argv[]) {
         "those computed using the Jacobi solver.");
   check(eigvec_match, "Eigenvectors computed by the symmetric real eigensolver do not agree with "
         "those computed using the Jacobi solver.");
-
+  std::vector<double> rsym_diag_c(8, 0.0);
+  std::vector<double> rsym_eigv_c(8, 0.0);
+  realSymmEigensolver(posdef_mat_c.data(), rank, rsym_eigv_c.data(), rsym_diag_c.data(),
+                      EigenWork::EIGENVALUES);
+  check(rsym_eigv_b, RelationalOperator::EQUAL, Approx(rsym_eigv_c).margin(1.0e-8), "Eigenvalues "
+        "obtained from the real symmetric solver are not the same when computed in the absence of "
+        "eigenvectors.h");
+  
   // Try a much bigger eigenvalue problem and check its results
   const size_t big_rank = 95;
   HpcMatrix<double> mtrx_base(big_rank, big_rank, MatrixFillMode::RANDN, &prng_c);

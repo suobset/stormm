@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"

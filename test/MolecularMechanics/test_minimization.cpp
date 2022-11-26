@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/FileManagement/file_util.h"

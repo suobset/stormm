@@ -39,6 +39,12 @@ template <typename T> struct TwinPointer {
   T* ptr_b;  ///< Pointer to the second stretch of data
 };
 
+/// \brief The enumerator makes the production of eigenvectors optional.
+enum class EigenWork {
+  EIGENVALUES,   ///< Compute eigenvalues only
+  EIGENVECTORS,  ///< Compute both eigenvalues and eigenvectors
+};
+  
 /// \brief Enumerate the transpose states of a matrix, for some basic matrix operations
 enum class TransposeState {
   AS_IS,     ///< The matrix shall be taken as it is found
@@ -177,27 +183,31 @@ void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
 ///   - Provide Standard Template Library vectors for all of the above
 ///   - Provide Hybrid objects for all of the above
 ///
-/// \param amat  The matrix from which to obtain eigenvalues and eigenvectors.  If eigenvectors are
-///              requested and amat is all that is supplied, they will replace the contents of
-///              amat on output.
-/// \param vmat  Optional matrix for out-of-place eigenvector computation.  The original matrix
-///              amat will be preserved if this is provided.
-/// \param rank  Rank of the matrix
-/// \param diag  Storage space for the matrix diagonal
-/// \param eigv  Storage space for computed eigenvalues
+/// \param amat     The matrix from which to obtain eigenvalues and eigenvectors.  If eigenvectors
+///                 are requested and amat is all that is supplied, they will replace the contents
+///                 of amat on output.
+/// \param vmat     Optional matrix for out-of-place eigenvector computation.  The original matrix
+///                 amat will be preserved if this is provided.
+/// \param rank     Rank of the matrix
+/// \param diag     Storage space for the matrix diagonal
+/// \param eigv     Storage space for computed eigenvalues
+/// \param process  Toggle the computation of eigenvectors (active by default)
 /// \{
 template <typename T>
-void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv);
+void realSymmEigensolver(T* amat, const int rank, T* diag, T* eigv,
+                         EigenWork process = EigenWork::EIGENVECTORS);
 
 template <typename T>
-void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *diag, std::vector<T> *eigv);
+void realSymmEigensolver(std::vector<T> *amat, std::vector<T> *diag, std::vector<T> *eigv,
+                         EigenWork process = EigenWork::EIGENVECTORS);
 
 template <typename T>
-void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* diag, T* eigv);
+void realSymmEigensolver(const T* amat, T* vmat, const int rank, T* diag, T* eigv,
+                         EigenWork process = EigenWork::EIGENVECTORS);
 
 template <typename T>
 void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *diag,
-                         std::vector<T> *eigv);
+                         std::vector<T> *eigv, EigenWork process = EigenWork::EIGENVECTORS);
 /// \}
   
 /// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
@@ -241,7 +251,7 @@ template <typename T> void computeBoxTransform(const T* dims, T* umat, T* invu);
 template <typename T>
 void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, const T* invu);
 
-/// \brief Compute Hessian normal form to obtain the thickness of a unit cell (or mesh element)
+/// \brief Compute the Hessian normal form to obtain the thickness of a unit cell (or mesh element)
 ///        based on its "a", "b", and "c" box vectors.  The thicknesses between planes defined by
 ///        the "b" and "c" vectors (x in an orthorhombic unit cell), "a" and "c" vectors (y in an
 ///        orthorhombic unit cell) and "a" and "b" vectors (z in an orthorhombic unit cell) are

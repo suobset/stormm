@@ -1,4 +1,5 @@
 #include <vector>
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/generalized_born.h"
 #include "../../src/Constants/scaling.h"

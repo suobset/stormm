@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "copyright.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Chemistry/atommask.h"
