@@ -441,12 +441,6 @@ void jacobiEigensolver(T* a, T* v, T* d, const size_t rank, const ExceptionRespo
     }
     if (sm == 0.0) {
 
-      // CHECK
-      if (rank == 4LLU) {
-        printf("Rank 4 matrix took %d iterations to solve.\n", i);
-      }
-      // END CHECK
-
       // The eigenvalues were computed successfully
       return;
     }
