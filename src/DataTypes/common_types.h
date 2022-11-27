@@ -36,6 +36,7 @@ static const size_t ullint_type_index = std::type_index(typeid(ullint)).hash_cod
 static const size_t short_type_index = std::type_index(typeid(short int)).hash_code();
 static const size_t ushort_type_index = std::type_index(typeid(short unsigned int)).hash_code();
 static const size_t bool_type_index = std::type_index(typeid(bool)).hash_code();
+static const size_t size_t_type_index = std::type_index(typeid(size_t)).hash_code();
 /// \}
   
 /// \brief Test whether some data type is a recognized scalar.
@@ -75,6 +76,7 @@ using data_types::ullint_type_index;
 using data_types::short_type_index;
 using data_types::ushort_type_index;
 using data_types::bool_type_index;
+using data_types::size_t_type_index;
 } // namespace stormm
 
 #endif

@@ -14,12 +14,17 @@ namespace structure {
 
 using constants::CartesianDimension;
 using constants::UnitCellAxis;
+using data_types::getStormmScalarTypeName;
 using data_types::isFloatingPointScalarType;
 using data_types::isFloatingPointHpcVectorType;
 
 /// \brief The default mesh fixed-precision scaling factor is higher than a typical simulation due
 ///        to the way the mesh occupies a confined region of space.
 constexpr int default_mesh_scaling_bits = 40;
+
+/// \brief The maximum number of fixed-precision bits that can be used in certain situations when
+///        particle position overflow bits will be assumed to not be in use.
+constexpr int mesh_nonoverflow_bits = 48;
 
 /// \brief The abstract of a MeshParameters object is read-only (modify the original to get a new
 ///        abstract if the dimensions change), but templated to prune the information present.
@@ -118,7 +123,7 @@ public:
   /// \}
 
   /// \brief Get the Cartesian origin of the mesh as a tuple of floating-point numbers.
-  template <typename Tcoord> Tcoord getMeshOriginAsTuple() const;
+  template <typename T3> T3 getMeshOriginAsTuple() const;
 
   /// \brief Get the Cartesian origin of the mesh in fixed-precision numbers.
   ///
@@ -128,11 +133,11 @@ public:
   ///
   /// \param dim  The specific Cartesian axis of interest
   /// \{
-  std::vector<int95_t> getMeshOriginAsFixedPrecision() const;
-  int95_t getMeshOriginAsFixedPrecision(CartesianDimension dim) const;
+  std::vector<int95_t> getMeshOriginAsFP() const;
+  int95_t getMeshOriginAsFP(CartesianDimension dim) const;
   /// \}
 
-  /// \brief Get the element vector along one of the unit cell axes.
+  /// \brief Get the element vector along one of the unit cell axes in floating-point numbers.
   ///
   /// Overloaded:
   ///   - Accept a unit cell axis ('a', 'b', or 'c')
@@ -147,13 +152,46 @@ public:
   std::vector<Tcoord> getMeshElementVector(CartesianDimension dim) const;
   /// \}
 
+  /// \brief Get the element vector along one of the unit cell axes as a tuple of floating-point
+  ///        numbers.
+  ///
+  /// Overloaded:
+  ///   - Accept a unit cell axis ('a', 'b', or 'c')
+  ///   - Accept a Cartesian dimension ('x', 'y', or 'z'), with x ~ a, y ~ b, z ~ c.  This variant
+  ///     is specific to orthorhombic unit cells, but will be accepted in general cases for
+  ///     convenience.
+  ///
+  /// \param dim  The axis of interest
+  /// \{
+  template <typename T3> T3 getMeshElementVectorAsTuple(UnitCellAxis dim) const;
+  template <typename T3> T3 getMeshElementVectorAsTuple(CartesianDimension dim) const;
+  /// \}
+  
+  /// \brief Get the element vector along one of the unit cell axes in fixed precision.
+  ///
+  /// Overloaded:
+  ///   - Accept a unit cell axis ('a', 'b', or 'c')
+  ///   - Accept a Cartesian dimension ('x', 'y', or 'z'), with x ~ a, y ~ b, z ~ c.  This variant
+  ///     is specific to orthorhombic unit cells, but will be accepted in general cases for
+  ///     convenience.
+  ///
+  /// \param dim  The axis of interest
+  /// \{
+  std::vector<int95_t> getMeshElementVectorAsFP(UnitCellAxis dim) const;
+  std::vector<int95_t> getMeshElementVectorAsFP(CartesianDimension dim) const;
+  /// \}
+
   /// \brief Get the entire element space matrix in any format.  Real formats will have units of
   ///        inverse Angstroms.
   template <typename Tcoord> std::vector<Tcoord> getMeshTransform() const;
 
-  /// \brief Get the inverse element transformation matrix in any format.  Real formats will have
-  ///        units of inverse Angstroms.
+  /// \brief Get the inverse element transformation matrix in real-number format, with units of
+  ///        inverse Angstroms.
   template <typename Tcoord> std::vector<Tcoord> getMeshInverseTransform() const;
+
+  /// \brief Get the inverse element transformation matrix in (authoritative) fixed-precision
+  ///        format.
+  std::vector<int95_t> getMeshInverseTransformAsFP() const;
 
   /// \brief Get the number of bits after the decimal in this mesh's fixed-precision coordinate
   ///        representations.

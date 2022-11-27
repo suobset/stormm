@@ -5,11 +5,65 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata>
+BackgroundMeshReader<Txfrm, Tdata>::
+BackgroundMeshReader(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+                     NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
+                     const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
+                     const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
+                     const llint* cvec_z_in, const llint* avec_abs_x_in,
+                     const llint* avec_abs_y_in, const llint* avec_abs_z_in,
+                     const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
+                     const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
+                     const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
+                     const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
+                     const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
+                     const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
+                     const Tdata* coeffs_in, const int* ngbr_in, const size_t* ngbr_bounds_in) :
+    dims{dims_in}, kind{kind_in}, field{field_in}, avec_x{avec_x_in}, avec_y{avec_y_in},
+    avec_z{avec_z_in}, bvec_x{bvec_x_in}, bvec_y{bvec_y_in}, bvec_z{bvec_z_in}, cvec_x{cvec_x_in},
+    cvec_y{cvec_y_in}, cvec_z{cvec_z_in}, avec_abs_x{avec_abs_x_in}, avec_abs_y{avec_abs_y_in},
+    avec_abs_z{avec_abs_z_in}, avec_x_ovrf{avec_x_ovrf_in}, avec_y_ovrf{avec_y_ovrf_in},
+    avec_z_ovrf{avec_z_ovrf_in}, bvec_x_ovrf{bvec_x_ovrf_in}, bvec_y_ovrf{bvec_y_ovrf_in},
+    bvec_z_ovrf{bvec_z_ovrf_in}, cvec_x_ovrf{cvec_x_ovrf_in}, cvec_y_ovrf{cvec_y_ovrf_in},
+    cvec_z_ovrf{cvec_z_ovrf_in}, avec_abs_x_ovrf{avec_abs_x_ovrf_in},
+    avec_abs_y_ovrf{avec_abs_y_ovrf_in}, avec_abs_z_ovrf{avec_abs_z_ovrf_in}, coeffs{coeffs_in},
+    ngbr{ngbr_in}, ngbr_bounds{ngbr_bounds_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata>
+BackgroundMeshWriter<Txfrm, Tdata>::
+BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+                     NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
+                     const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
+                     const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
+                     const llint* cvec_z_in, const llint* avec_abs_x_in,
+                     const llint* avec_abs_y_in, const llint* avec_abs_z_in,
+                     const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
+                     const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
+                     const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
+                     const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
+                     const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
+                     const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
+                     Tdata* coeffs_in, int* ngbr_in, size_t* ngbr_bounds_in) :
+    dims{dims_in}, kind{kind_in}, field{field_in}, avec_x{avec_x_in}, avec_y{avec_y_in},
+    avec_z{avec_z_in}, bvec_x{bvec_x_in}, bvec_y{bvec_y_in}, bvec_z{bvec_z_in}, cvec_x{cvec_x_in},
+    cvec_y{cvec_y_in}, cvec_z{cvec_z_in}, avec_abs_x{avec_abs_x_in}, avec_abs_y{avec_abs_y_in},
+    avec_abs_z{avec_abs_z_in}, avec_x_ovrf{avec_x_ovrf_in}, avec_y_ovrf{avec_y_ovrf_in},
+    avec_z_ovrf{avec_z_ovrf_in}, bvec_x_ovrf{bvec_x_ovrf_in}, bvec_y_ovrf{bvec_y_ovrf_in},
+    bvec_z_ovrf{bvec_z_ovrf_in}, cvec_x_ovrf{cvec_x_ovrf_in}, cvec_y_ovrf{cvec_y_ovrf_in},
+    cvec_z_ovrf{cvec_z_ovrf_in}, avec_abs_x_ovrf{avec_abs_x_ovrf_in},
+    avec_abs_y_ovrf{avec_abs_y_ovrf_in}, avec_abs_z_ovrf{avec_abs_z_ovrf_in}, coeffs{coeffs_in},
+    ngbr{ngbr_in}, ngbr_bounds{ngbr_bounds_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const double probe_radius_in, const int vdw_type_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                                  const MeshParameters &measurements_in) :
+                                  const MeshParameters &measurements_in, const GpuDetails &gpu) :
     measurements{measurements_in}, kind{kind_in}, field{field_in}, probe_radius{probe_radius_in},
     a_line_x{HybridKind::POINTER, "mesh_avector_x"},
     a_line_y{HybridKind::POINTER, "mesh_avector_y"},
@@ -20,15 +74,21 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
     c_line_x{HybridKind::POINTER, "mesh_cvector_x"},
     c_line_y{HybridKind::POINTER, "mesh_cvector_y"},
     c_line_z{HybridKind::POINTER, "mesh_cvector_z"},
-    a_line_x_overflow{HybridKind::POINTER, "mesh_avector_x_ovrf"},
-    a_line_y_overflow{HybridKind::POINTER, "mesh_avector_y_ovrf"},
-    a_line_z_overflow{HybridKind::POINTER, "mesh_avector_z_ovrf"},
-    b_line_x_overflow{HybridKind::POINTER, "mesh_bvector_x_ovrf"},
-    b_line_y_overflow{HybridKind::POINTER, "mesh_bvector_y_ovrf"},
-    b_line_z_overflow{HybridKind::POINTER, "mesh_bvector_z_ovrf"},
-    c_line_x_overflow{HybridKind::POINTER, "mesh_cvector_x_ovrf"},
-    c_line_y_overflow{HybridKind::POINTER, "mesh_cvector_y_ovrf"},
-    c_line_z_overflow{HybridKind::POINTER, "mesh_cvector_z_ovrf"},
+    a_abs_line_x{HybridKind::POINTER, "mesh_avector_abs_x"},
+    a_abs_line_y{HybridKind::POINTER, "mesh_avector_abs_y"},
+    a_abs_line_z{HybridKind::POINTER, "mesh_avector_abs_z"},
+    a_line_x_overflow{HybridKind::POINTER, "mesh_avec_x_ovrf"},
+    a_line_y_overflow{HybridKind::POINTER, "mesh_avec_y_ovrf"},
+    a_line_z_overflow{HybridKind::POINTER, "mesh_avec_z_ovrf"},
+    b_line_x_overflow{HybridKind::POINTER, "mesh_bvec_x_ovrf"},
+    b_line_y_overflow{HybridKind::POINTER, "mesh_bvec_y_ovrf"},
+    b_line_z_overflow{HybridKind::POINTER, "mesh_bvec_z_ovrf"},
+    c_line_x_overflow{HybridKind::POINTER, "mesh_cvec_x_ovrf"},
+    c_line_y_overflow{HybridKind::POINTER, "mesh_cvec_y_ovrf"},
+    c_line_z_overflow{HybridKind::POINTER, "mesh_cvec_z_ovrf"},
+    a_abs_line_x_overflow{HybridKind::POINTER, "mesh_avec_abs_x_ovrf"},
+    a_abs_line_y_overflow{HybridKind::POINTER, "mesh_avec_abs_y_ovrf"},
+    a_abs_line_z_overflow{HybridKind::POINTER, "mesh_avec_abs_z_ovrf"},
     coefficients{HybridKind::ARRAY, "mesh_tricubic_coef"},
     ag_pointer{const_cast<AtomGraph*>(ag_in)},
     cf_pointer{const_cast<CoordinateFrame*>(cf_in)},
@@ -38,17 +98,9 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
     int_data{HybridKind::ARRAY, "mesh_int_data"},
     llint_data{HybridKind::ARRAY, "mesh_llint_data"}
 {
+  // Validate the mesh dimensions, then allocate memory
   validateMeshKind();
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const double probe_radius_in, const int vdw_type_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                                  const MeshParameters &measurements_in, const GpuDetails &gpu) :
-    BackgroundMesh(kind_in, field_in, probe_radius_in, vdw_type_in, ag_in, cf_in, measurements_in)
-{
+  validateScalingBits();
   allocate();
 
   // Loop over all atoms and apply the potential
@@ -244,6 +296,9 @@ BackgroundMesh<T>::BackgroundMesh(const BackgroundMesh<T> &original) :
     c_line_x{original.c_line_x},
     c_line_y{original.c_line_y},
     c_line_z{original.c_line_z},
+    a_abs_line_x{original.a_abs_line_x},
+    a_abs_line_y{original.a_abs_line_y},
+    a_abs_line_z{original.a_abs_line_z},
     a_line_x_overflow{original.a_line_x_overflow},
     a_line_y_overflow{original.a_line_y_overflow},
     a_line_z_overflow{original.a_line_z_overflow},
@@ -253,6 +308,9 @@ BackgroundMesh<T>::BackgroundMesh(const BackgroundMesh<T> &original) :
     c_line_x_overflow{original.c_line_x_overflow},
     c_line_y_overflow{original.c_line_y_overflow},
     c_line_z_overflow{original.c_line_z_overflow},
+    a_abs_line_x_overflow{original.a_abs_line_x_overflow},
+    a_abs_line_y_overflow{original.a_abs_line_y_overflow},
+    a_abs_line_z_overflow{original.a_abs_line_z_overflow},
     coefficients{original.coefficients},
     ag_pointer{original.ag_pointer},
     frozen_atoms{original.frozen_atoms},
@@ -279,6 +337,9 @@ BackgroundMesh<T>::BackgroundMesh(BackgroundMesh<T> &&original) :
     c_line_x{std::move(original.c_line_x)},
     c_line_y{std::move(original.c_line_y)},
     c_line_z{std::move(original.c_line_z)},
+    a_abs_line_x{std::move(original.a_abs_line_x)},
+    a_abs_line_y{std::move(original.a_abs_line_y)},
+    a_abs_line_z{std::move(original.a_abs_line_z)},
     a_line_x_overflow{std::move(original.a_line_x_overflow)},
     a_line_y_overflow{std::move(original.a_line_y_overflow)},
     a_line_z_overflow{std::move(original.a_line_z_overflow)},
@@ -288,6 +349,9 @@ BackgroundMesh<T>::BackgroundMesh(BackgroundMesh<T> &&original) :
     c_line_x_overflow{std::move(original.c_line_x_overflow)},
     c_line_y_overflow{std::move(original.c_line_y_overflow)},
     c_line_z_overflow{std::move(original.c_line_z_overflow)},
+    a_abs_line_x_overflow{std::move(original.a_abs_line_x_overflow)},
+    a_abs_line_y_overflow{std::move(original.a_abs_line_y_overflow)},
+    a_abs_line_z_overflow{std::move(original.a_abs_line_z_overflow)},
     coefficients{std::move(original.coefficients)},
     ag_pointer{original.ag_pointer},
     frozen_atoms{std::move(original.frozen_atoms)},
@@ -317,6 +381,9 @@ BackgroundMesh<T>& BackgroundMesh<T>::operator=(const BackgroundMesh<T> &other) 
   c_line_x = other.c_line_x;
   c_line_y = other.c_line_y;
   c_line_z = other.c_line_z;
+  a_abs_line_x = other.a_abs_line_x;
+  a_abs_line_y = other.a_abs_line_y;
+  a_abs_line_z = other.a_abs_line_z;
   a_line_x_overflow = other.a_line_x_overflow;
   a_line_y_overflow = other.a_line_y_overflow;
   a_line_z_overflow = other.a_line_z_overflow;
@@ -326,6 +393,9 @@ BackgroundMesh<T>& BackgroundMesh<T>::operator=(const BackgroundMesh<T> &other) 
   c_line_x_overflow = other.c_line_x_overflow;
   c_line_y_overflow = other.c_line_y_overflow;
   c_line_z_overflow = other.c_line_z_overflow;
+  a_abs_line_x_overflow = other.a_abs_line_x_overflow;
+  a_abs_line_y_overflow = other.a_abs_line_y_overflow;
+  a_abs_line_z_overflow = other.a_abs_line_z_overflow;
   coefficients = other.coefficients;
   ag_pointer = other.ag_pointer;
   frozen_atoms = other.frozen_atoms;
@@ -359,6 +429,9 @@ BackgroundMesh<T>& BackgroundMesh<T>::operator=(BackgroundMesh<T> &&other)  {
   c_line_x = std::move(other.c_line_x);
   c_line_y = std::move(other.c_line_y);
   c_line_z = std::move(other.c_line_z);
+  a_abs_line_x = std::move(other.a_abs_line_x);
+  a_abs_line_y = std::move(other.a_abs_line_y);
+  a_abs_line_z = std::move(other.a_abs_line_z);
   a_line_x_overflow = std::move(other.a_line_x_overflow);
   a_line_y_overflow = std::move(other.a_line_y_overflow);
   a_line_z_overflow = std::move(other.a_line_z_overflow);
@@ -368,6 +441,9 @@ BackgroundMesh<T>& BackgroundMesh<T>::operator=(BackgroundMesh<T> &&other)  {
   c_line_x_overflow = std::move(other.c_line_x_overflow);
   c_line_y_overflow = std::move(other.c_line_y_overflow);
   c_line_z_overflow = std::move(other.c_line_z_overflow);
+  a_abs_line_x_overflow = std::move(other.a_abs_line_x_overflow);
+  a_abs_line_y_overflow = std::move(other.a_abs_line_y_overflow);
+  a_abs_line_z_overflow = std::move(other.a_abs_line_z_overflow);
   coefficients = std::move(other.coefficients);
   ag_pointer = other.ag_pointer;
   frozen_atoms = std::move(other.frozen_atoms);
@@ -398,7 +474,8 @@ BackgroundMeshReader<double, T> BackgroundMesh<T>::dpData(const HybridTargetLeve
                                          b_line_x.data(tier), b_line_y.data(tier),
                                          b_line_z.data(tier), c_line_x.data(tier),
                                          c_line_y.data(tier), c_line_z.data(tier),
-                                         a_line_x_overflow.data(tier),
+                                         a_abs_line_x.data(tier), a_abs_line_y.data(tier),
+                                         a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
                                          a_line_y_overflow.data(tier),
                                          a_line_z_overflow.data(tier),
                                          b_line_x_overflow.data(tier),
@@ -406,7 +483,10 @@ BackgroundMeshReader<double, T> BackgroundMesh<T>::dpData(const HybridTargetLeve
                                          b_line_z_overflow.data(tier),
                                          c_line_x_overflow.data(tier),
                                          c_line_y_overflow.data(tier),
-                                         c_line_z_overflow.data(tier), coefficients.data(tier),
+                                         c_line_z_overflow.data(tier),
+                                         a_abs_line_x_overflow.data(tier),
+                                         a_abs_line_y_overflow.data(tier),
+                                         a_abs_line_z_overflow.data(tier), coefficients.data(tier),
                                          neighbor_list.data(tier),
                                          neighbor_list_bounds.data(tier));
 }
@@ -419,7 +499,8 @@ BackgroundMeshWriter<double, T> BackgroundMesh<T>::dpData(const HybridTargetLeve
                                          b_line_x.data(tier), b_line_y.data(tier),
                                          b_line_z.data(tier), c_line_x.data(tier),
                                          c_line_y.data(tier), c_line_z.data(tier),
-                                         a_line_x_overflow.data(tier),
+                                         a_abs_line_x.data(tier), a_abs_line_y.data(tier),
+                                         a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
                                          a_line_y_overflow.data(tier),
                                          a_line_z_overflow.data(tier),
                                          b_line_x_overflow.data(tier),
@@ -427,7 +508,10 @@ BackgroundMeshWriter<double, T> BackgroundMesh<T>::dpData(const HybridTargetLeve
                                          b_line_z_overflow.data(tier),
                                          c_line_x_overflow.data(tier),
                                          c_line_y_overflow.data(tier),
-                                         c_line_z_overflow.data(tier), coefficients.data(tier),
+                                         c_line_z_overflow.data(tier),
+                                         a_abs_line_x_overflow.data(tier),
+                                         a_abs_line_y_overflow.data(tier),
+                                         a_abs_line_z_overflow.data(tier), coefficients.data(tier),
                                          neighbor_list.data(tier),
                                          neighbor_list_bounds.data(tier));
 }
@@ -440,13 +524,16 @@ BackgroundMeshReader<float, T> BackgroundMesh<T>::spData(const HybridTargetLevel
                                         b_line_x.data(tier), b_line_y.data(tier),
                                         b_line_z.data(tier), c_line_x.data(tier),
                                         c_line_y.data(tier), c_line_z.data(tier),
-                                        a_line_x_overflow.data(tier), a_line_y_overflow.data(tier),
-                                        a_line_z_overflow.data(tier), b_line_x_overflow.data(tier),
-                                        b_line_y_overflow.data(tier), b_line_z_overflow.data(tier),
-                                        c_line_x_overflow.data(tier), c_line_y_overflow.data(tier),
-                                        c_line_z_overflow.data(tier), coefficients.data(tier),
-                                        neighbor_list.data(tier),
-                                        neighbor_list_bounds.data(tier));
+                                        a_abs_line_x.data(tier), a_abs_line_y.data(tier),
+                                        a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
+                                        a_line_y_overflow.data(tier), a_line_z_overflow.data(tier),
+                                        b_line_x_overflow.data(tier), b_line_y_overflow.data(tier),
+                                        b_line_z_overflow.data(tier), c_line_x_overflow.data(tier),
+                                        c_line_y_overflow.data(tier), c_line_z_overflow.data(tier),
+                                        a_abs_line_x_overflow.data(tier),
+                                        a_abs_line_y_overflow.data(tier),
+                                        a_abs_line_z_overflow.data(tier), coefficients.data(tier),
+                                        neighbor_list.data(tier), neighbor_list_bounds.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -457,13 +544,16 @@ BackgroundMeshWriter<float, T> BackgroundMesh<T>::spData(const HybridTargetLevel
                                         b_line_x.data(tier), b_line_y.data(tier),
                                         b_line_z.data(tier), c_line_x.data(tier),
                                         c_line_y.data(tier), c_line_z.data(tier),
-                                        a_line_x_overflow.data(tier), a_line_y_overflow.data(tier),
-                                        a_line_z_overflow.data(tier), b_line_x_overflow.data(tier),
-                                        b_line_y_overflow.data(tier), b_line_z_overflow.data(tier),
-                                        c_line_x_overflow.data(tier), c_line_y_overflow.data(tier),
-                                        c_line_z_overflow.data(tier), coefficients.data(tier),
-                                        neighbor_list.data(tier),
-                                        neighbor_list_bounds.data(tier));
+                                        a_abs_line_x.data(tier), a_abs_line_y.data(tier),
+                                        a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
+                                        a_line_y_overflow.data(tier), a_line_z_overflow.data(tier),
+                                        b_line_x_overflow.data(tier), b_line_y_overflow.data(tier),
+                                        b_line_z_overflow.data(tier), c_line_x_overflow.data(tier),
+                                        c_line_y_overflow.data(tier), c_line_z_overflow.data(tier),
+                                        a_abs_line_x_overflow.data(tier),
+                                        a_abs_line_y_overflow.data(tier),
+                                        a_abs_line_z_overflow.data(tier), coefficients.data(tier),
+                                        neighbor_list.data(tier), neighbor_list_bounds.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -564,24 +654,22 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Replicate the mesh's grid vectors.  Subtract the origin coordinates from the "b" and "c"
   // vectors so that a[i] + b[j] + c[k] = the Cartesian coordinates of any grid point (i,j,k).
+
   std::vector<double> avx(mps.na + 1), avy(mps.na + 1), avz(mps.na + 1);
   std::vector<double> bvx(mps.nb + 1), bvy(mps.nb + 1), bvz(mps.nb + 1);
   std::vector<double> cvx(mps.nc + 1), cvy(mps.nc + 1), cvz(mps.nc + 1);
-  int95ToDouble(&avx, &avy, &avz, a_line_x, a_line_x_overflow, a_line_y, a_line_y_overflow,
-                a_line_z, a_line_z_overflow, mps.na, mps.inv_scale);
-  int95ToDouble(&bvx, &bvy, &bvz, b_line_x, b_line_x_overflow, b_line_y, b_line_y_overflow,
-                b_line_z, b_line_z_overflow, mps.nb, mps.inv_scale);
-  int95ToDouble(&cvx, &cvy, &cvz, c_line_x, c_line_x_overflow, c_line_y, c_line_y_overflow,
-                c_line_z, c_line_z_overflow, mps.nc, mps.inv_scale);
+  int95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
+                a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
+                a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.na, mps.inv_scale);
+  int95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
+                b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
+                b_line_z_overflow.readHost(), mps.nb, mps.inv_scale);
+  int95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
+                c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
+                c_line_z_overflow.readHost(), mps.nc, mps.inv_scale);
   const double dorig_x = int95ToDouble(mps.orig_x);
   const double dorig_y = int95ToDouble(mps.orig_y);
   const double dorig_z = int95ToDouble(mps.orig_z);
-  addScalarToVector(&bvx, -dorig_x);
-  addScalarToVector(&bvy, -dorig_y);
-  addScalarToVector(&bvz, -dorig_z);
-  addScalarToVector(&cvx, -dorig_x);
-  addScalarToVector(&cvy, -dorig_y);
-  addScalarToVector(&cvz, -dorig_z);
 
   // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
   const double de_ax = 0.0625 * (avx[1] - avx[0]);
@@ -665,12 +753,24 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
           const size_t coef_base_idx = 64LLU *
                                        static_cast<size_t>((((i * mps.nb) + j) * mps.nc) + k);
           for (size_t m = 0LLU; m < 64LLU; m++) {
-            coefficients[coef_base_idx + m] |= cube_buffer[m];
+
+            // This is necessary due to the templated nature of the BackgroundMesh object.  In
+            // practice, the only way to get here is to have the coefficients array already be of
+            // type ullint.
+            ullint tcoef = coeff_ptr[coef_base_idx + m];
+            tcoef |= cube_buffer[m];
+            coeff_ptr[coef_base_idx + m] = tcoef;
           }
         }
       }
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -782,8 +882,8 @@ template <typename T> void BackgroundMesh<T>::allocate() {
   const int padded_na = roundUp(mps.na, warp_size_int);
   const int padded_nb = roundUp(mps.nb, warp_size_int);
   const int padded_nc = roundUp(mps.nc, warp_size_int);
-  llint_data.resize(3 * (padded_na + padded_nb + padded_nc));
-  int_data.resize(3 * (padded_na + padded_nb + padded_nc));
+  llint_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
+  int_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
   a_line_x.setPointer(&llint_data,             0, mps.na);
   a_line_y.setPointer(&llint_data,     padded_na, mps.na);
   a_line_z.setPointer(&llint_data, 2 * padded_na, mps.na);
@@ -804,6 +904,13 @@ template <typename T> void BackgroundMesh<T>::allocate() {
   c_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nc);
   c_line_y_overflow.setPointer(&int_data,       padded_nc + thus_far, mps.nc);
   c_line_z_overflow.setPointer(&int_data, (2 * padded_nc) + thus_far, mps.nc);
+  thus_far += 3 * padded_nc;
+  a_abs_line_x.setPointer(&llint_data,                   thus_far, mps.na);
+  a_abs_line_y.setPointer(&llint_data,       padded_na + thus_far, mps.na);
+  a_abs_line_z.setPointer(&llint_data, (2 * padded_na) + thus_far, mps.na);
+  a_abs_line_x_overflow.setPointer(&int_data,                   thus_far, mps.na);
+  a_abs_line_y_overflow.setPointer(&int_data,       padded_na + thus_far, mps.na);
+  a_abs_line_z_overflow.setPointer(&int_data, (2 * padded_na) + thus_far, mps.na);
   const int nbits = static_cast<int>(sizeof(uint)) * 8;
   coefficients.resize(64LLU * static_cast<size_t>(mps.na * mps.nb * mps.nc));
   frozen_atoms.resize((ag_pointer->getAtomCount() + nbits - 1) / nbits);
@@ -820,6 +927,9 @@ template <typename T> void BackgroundMesh<T>::rebase_pointers() {
   c_line_x.swapTarget(&llint_data);
   c_line_y.swapTarget(&llint_data);
   c_line_z.swapTarget(&llint_data);
+  a_abs_line_x.swapTarget(&llint_data);
+  a_abs_line_y.swapTarget(&llint_data);
+  a_abs_line_z.swapTarget(&llint_data);
   a_line_x_overflow.swapTarget(&int_data);
   a_line_y_overflow.swapTarget(&int_data);
   a_line_z_overflow.swapTarget(&int_data);
@@ -829,6 +939,9 @@ template <typename T> void BackgroundMesh<T>::rebase_pointers() {
   c_line_x_overflow.swapTarget(&int_data);
   c_line_y_overflow.swapTarget(&int_data);
   c_line_z_overflow.swapTarget(&int_data);
+  a_abs_line_x_overflow.swapTarget(&int_data);
+  a_abs_line_y_overflow.swapTarget(&int_data);
+  a_abs_line_z_overflow.swapTarget(&int_data);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -855,6 +968,63 @@ template <typename T> void BackgroundMesh<T>::validateMeshKind() const {
     }
     break;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::validateScalingBits() const {
+  const size_t ct = std::type_index(typeid(T)).hash_code();  
+  if (ct == ullint_type_index || ct == float_type_index) {
+    const std::vector<double> mesh_origin = measurements.getMeshOrigin<double>();
+    std::vector<double> side_a = measurements.getMeshElementVector<double>(UnitCellAxis::A);
+    std::vector<double> side_b = measurements.getMeshElementVector<double>(UnitCellAxis::B);
+    std::vector<double> side_c = measurements.getMeshElementVector<double>(UnitCellAxis::C);
+    elementwiseMultiply<double>(&side_a, measurements.getAxisElementCount(UnitCellAxis::A));
+    elementwiseMultiply<double>(&side_b, measurements.getAxisElementCount(UnitCellAxis::B));
+    elementwiseMultiply<double>(&side_c, measurements.getAxisElementCount(UnitCellAxis::C));
+    double max_log_bound = 0.0;
+    for (int i = 0; i < 2; i++) {
+      const double dix = static_cast<double>(i) * side_a[0];
+      const double diy = static_cast<double>(i) * side_a[1];
+      const double diz = static_cast<double>(i) * side_a[2];
+      for (int j = 0; j < 2; j++) {
+        const double djx = static_cast<double>(j) * side_b[0];
+        const double djy = static_cast<double>(j) * side_b[1];
+        const double djz = static_cast<double>(j) * side_b[2];
+        for (int k = 0; k < 2; k++) {
+          const double dkx = static_cast<double>(k) * side_c[0];
+          const double dky = static_cast<double>(k) * side_c[1];
+          const double dkz = static_cast<double>(k) * side_c[2];
+          const std::vector<double> mesh_corner = { mesh_origin[0] + dix + djx + dkx,
+                                                    mesh_origin[1] + diy + djy + dky,
+                                                    mesh_origin[2] + diz + djz + dkz };
+          for (int m = 0; m < 3; m++) {
+            if (fabs(mesh_corner[m]) > 0.0) {
+              max_log_bound = std::max(max_log_bound, log2(fabs(mesh_corner[m])));
+            }
+          }
+        }
+      }
+    }
+    if (max_log_bound + measurements.getScalingBits() >= 63) {
+      rtErr("Occlusion meshes, and non-bonded field meshes using single-precision coefficients, "
+            "must keep all elements in the range +/- 32768.0.", "BackgroundMesh",
+            "validateScalingBits");
+    }
+    if (measurements.getScalingBits() > mesh_nonoverflow_bits) {
+      rtErr("Occlusion meshes, and non-bonded field meshes using single-precision coefficients, "
+            "are assumed to not need positional representations in the extended fixed-precision "
+            "model (the overflow bits).  A maximum of " + std::to_string(mesh_nonoverflow_bits) +
+            " bits can be used in the represenation (this will rival or exceed the precision of "
+            " 64-bit floating point representations for most of space).  A setting of " +
+            std::to_string(measurements.getScalingBits()) + " is not acceptable.",
+            "BackgroundMesh", "validateScalingBits");
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::computeMeshAxisCoordinates() {
+
 }
 
 } // namespace structure

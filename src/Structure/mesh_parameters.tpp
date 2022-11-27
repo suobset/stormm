@@ -25,7 +25,6 @@ MeshParamAbstract<T>::MeshParamAbstract(const int na_in, const int nb_in, const 
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
   if (isFloatingPointScalarType<Tcoord>()) {
     std::vector<Tcoord> result(3);
     result[0] = int95ToDouble(origin_x) * inverse_scale_factor;
@@ -45,15 +44,14 @@ template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() c
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord> Tcoord MeshParameters::getMeshOriginAsTuple() const {
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (isFloatingPointScalarType<Tcoord>()) {
+template <typename T3> T3 MeshParameters::getMeshOriginAsTuple() const {
+  if (isFloatingPointScalarType<T3>()) {
     rtErr("The mesh coordinate origin is available as a 3-element array of the desired floating "
           "point type through the getMeshOrigin() function.", "MeshParameter",
           "getMeshOriginAsTuple");
   }
-  else if (isFloatingPointHpcVectorType<Tcoord>()) {
-    Tcoord result;
+  else if (isFloatingPointHpcVectorType<T3>()) {
+    T3 result;
     result.x = int95ToDouble(origin_x) * inverse_scale_factor;
     result.y = int95ToDouble(origin_y) * inverse_scale_factor;
     result.z = int95ToDouble(origin_z) * inverse_scale_factor;
@@ -72,21 +70,16 @@ template <typename Tcoord>
 std::vector<Tcoord> MeshParameters::getMeshElementVector(const UnitCellAxis dim) const {
   std::vector<Tcoord> result(3);
   const int icol = static_cast<int>(dim);
-  const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (ct == double_type_index) {
+  if (isFloatingPointScalarType<Tcoord>()) {
     for (int i = 0; i < 3; i++) {
-      result[i] = element_invu[i + (3 * icol)];
+      result[i] = int95ToDouble(fp_element_invu[i + (3 * icol)]) * inverse_scale_factor;
     }
   }
-  else if (ct == float_type_index) {
-    for (int i = 0; i < 3; i++) {
-      result[i] = sp_element_invu[i + (3 * icol)];
-    }
-  }
-  else if (ct == int95t_type_index) {
-    for (int i = 0; i < 3; i++) {
-      result[i] = fp_element_invu[i + (3 * icol)];
-    }
+  else {
+    rtErr("Mesh element vectors can only be returned as " + getStormmScalarTypeName<float>() +
+          " or " + getStormmScalarTypeName<double>() + ".  For the fixed-precision "
+          "representation, use getMeshElementVectorFP().", "MeshParameters",
+          "getMeshElementVector");
   }
   return result;
 }
@@ -101,6 +94,40 @@ std::vector<Tcoord> MeshParameters::getMeshElementVector(const CartesianDimensio
     return getMeshElementVector<Tcoord>(UnitCellAxis::B);
   case CartesianDimension::Z:
     return getMeshElementVector<Tcoord>(UnitCellAxis::C);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T3>
+T3 MeshParameters::getMeshElementVectorAsTuple(const UnitCellAxis dim) const {
+  T3 result;
+  const int icol = static_cast<int>(dim);
+  if (isFloatingPointHpcVectorType<T3>()) {
+    result.x = int95ToDouble(fp_element_invu[(3 * icol)    ]) * inverse_scale_factor;
+    result.y = int95ToDouble(fp_element_invu[(3 * icol) + 1]) * inverse_scale_factor;
+    result.z = int95ToDouble(fp_element_invu[(3 * icol) + 2]) * inverse_scale_factor;
+  }
+  else {
+    rtErr("Mesh element vectors can only be returned as " + getStormmScalarTypeName<float3>() +
+          " or " + getStormmScalarTypeName<double3>() + " tuples.  To get one of the vectors as "
+          "a real-valued vector, use getMeshElementVector().  For the fixed-precision "
+          "representation, use getMeshElementVectorFP().", "MeshParameters",
+          "getMeshElementVector");
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T3>
+T3 MeshParameters::getMeshElementVectorAsTuple(const CartesianDimension dim) const {
+  switch (dim) {
+  case CartesianDimension::X:
+    return getMeshElementVectorAsTuple<T3>(UnitCellAxis::A);
+  case CartesianDimension::Y:
+    return getMeshElementVectorAsTuple<T3>(UnitCellAxis::B);
+  case CartesianDimension::Z:
+    return getMeshElementVectorAsTuple<T3>(UnitCellAxis::C);
   }
   __builtin_unreachable();
 }
@@ -130,26 +157,18 @@ template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshTransform(
 template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTransform() const {
   std::vector<Tcoord> result(9);
   const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
-  if (ct == double_type_index) {
+  if (isFloatingPointScalarType<Tcoord>()) {
     for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = element_invu[i];
-    }
-  }
-  else if (ct == float_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = sp_element_invu[i];
-    }
-  }
-  else if (ct == int95t_type_index) {
-    for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = fp_element_invu[i];
+      result[i] = int95ToDouble(fp_element_invu[i]) * inverse_scale_factor;
     }
   }
   else {
     rtErr("The inverse transformation matrix (the column matrix of element vectors) is only "
           "available in fixed-precision format or single- or double-precision floating point "
-          "numbers.", "MeshParameters", "getMeshTransform");
+          "numbers.  To get the fixed-precision format, use getMeshInverseTransformAsFP().",
+          "MeshParameters", "getMeshTransform");
   }
+  return result;
 }
 
 } // namespace structure

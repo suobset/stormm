@@ -10,7 +10,8 @@ template <typename T> bool isScalarType() {
   return (ct == int_type_index || ct == uint_type_index || ct == double_type_index ||
           ct == float_type_index || ct == char_type_index || ct == uchar_type_index ||
           ct == llint_type_index || ct == ullint_type_index || ct == short_type_index ||
-          ct == ushort_type_index || ct == ulint_type_index || ct == bool_type_index);
+          ct == ushort_type_index || ct == ulint_type_index || ct == bool_type_index ||
+          ct == size_t_type_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -24,7 +25,8 @@ template <typename T> bool isSignedIntegralScalarType() {
 template <typename T> bool isUnsignedIntegralScalarType() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   return (ct == uint_type_index || ct == ulint_type_index || ct == uchar_type_index ||
-          ct == ullint_type_index || ct == ushort_type_index || ct == bool_type_index);
+          ct == ullint_type_index || ct == ushort_type_index || ct == bool_type_index ||
+          ct == size_t_type_index);
 }
 
 //-------------------------------------------------------------------------------------------------

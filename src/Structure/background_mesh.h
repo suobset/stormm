@@ -37,6 +37,7 @@ using constants::CartesianDimension;
 using constants::UnitCellAxis;
 using energy::NonbondedPotential;
 using math::addScalarToVector;
+using math::elementwiseMultiply;
 using math::roundUp;
 using numerics::default_globalpos_scale_bits;
 using topology::AtomGraph;
@@ -50,14 +51,19 @@ using trajectory::PhaseSpace;
 template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
 
   /// \brief The constructor takes arguments for all member variables.
-  BackgroundMeshReader(const MeshParamAbstract<Txfrm> &measurements, GridDetail kind_in,
-                       NonbondedPotential field_in, const llint* avec_x, const llint* avec_y,
-                       const llint* avec_z, const llint* bvec_x, const llint* bvec_y,
-                       const llint* bvec_z, const llint* cvec_x, const llint* cvec_y,
-                       const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
-                       const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
-                       const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
-                       const int* cvec_z_ovrf, Tdata* coeffs_in, int* ngbr, int* ngbr_bounds);
+  BackgroundMeshReader(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+                       NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
+                       const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
+                       const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
+                       const llint* cvec_z_in, const llint* avec_abs_x_in,
+                       const llint* avec_abs_y_in, const llint* avec_abs_z_in,
+                       const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
+                       const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
+                       const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
+                       const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
+                       const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
+                       const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
+                       const Tdata* coeffs_in, const int* ngbr_in, const size_t* ngbr_bounds_in);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
@@ -70,28 +76,34 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
 
   const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
   const GridDetail kind;                ///< The type of mesh, also pre-established.
-  const NonbondedPotential field_in;    ///< The field described by the mesh, also pre-established.
+  const NonbondedPotential field;       ///< The field described by the mesh, also pre-established.
 
   // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
-  const llint* avec_x;     ///< Cartesian X coordinates of grid element origins stepping along the
-                           ///<   mesh's "a" axis
-  const llint* avec_y;     ///< Cartesian Y coordinates of "a" axis grid element origins
-  const llint* avec_z;     ///< Cartesian Z coordinates of "a" axis grid element origins
-  const llint* bvec_x;     ///< Cartesian X coordinates of "b" axis grid element origins
-  const llint* bvec_y;     ///< Cartesian Y coordinates of "b" axis grid element origins
-  const llint* bvec_z;     ///< Cartesian Z coordinates of "b" axis grid element origins
-  const llint* cvec_x;     ///< Cartesian X coordinates of "c" axis grid element origins
-  const llint* cvec_y;     ///< Cartesian Y coordinates of "c" axis grid element origins
-  const llint* cvec_z;     ///< Cartesian Z coordinates of "c" axis grid element origins
-  const int* avec_x_ovrf;  ///< Cartesian X overflow bits for "a" axis grid element origins
-  const int* avec_y_ovrf;  ///< Cartesian Y overflow bits for "a" axis grid element origins
-  const int* avec_z_ovrf;  ///< Cartesian Z overflow bits for "a" axis grid element origins
-  const int* bvec_x_ovrf;  ///< Cartesian X overflow bits for "b" axis grid element origins
-  const int* bvec_y_ovrf;  ///< Cartesian Y overflow bits for "b" axis grid element origins
-  const int* bvec_z_ovrf;  ///< Cartesian Z overflow bits for "b" axis grid element origins
-  const int* cvec_x_ovrf;  ///< Cartesian X overflow bits for "c" axis grid element origins
-  const int* cvec_y_ovrf;  ///< Cartesian Y overflow bits for "c" axis grid element origins
-  const int* cvec_z_ovrf;  ///< Cartesian Z overflow bits for "c" axis grid element origins
+  const llint* avec_x;         ///< Relative X coordinates of grid element origins stepping along
+                               ///<   the mesh's "a" axis
+  const llint* avec_y;         ///< Relative Y coordinates of "a" axis grid element origins
+  const llint* avec_z;         ///< Relative Z coordinates of "a" axis grid element origins
+  const llint* bvec_x;         ///< Relative X coordinates of "b" axis grid element origins
+  const llint* bvec_y;         ///< Relative Y coordinates of "b" axis grid element origins
+  const llint* bvec_z;         ///< Relative Z coordinates of "b" axis grid element origins
+  const llint* cvec_x;         ///< Relative X coordinates of "c" axis grid element origins
+  const llint* cvec_y;         ///< Relative Y coordinates of "c" axis grid element origins
+  const llint* cvec_z;         ///< Relative Z coordinates of "c" axis grid element origins
+  const llint* avec_abs_x;     ///< Absolute X coordinates of "a" axis grid element origins
+  const llint* avec_abs_y;     ///< Absolute Y coordinates of "a" axis grid element origins
+  const llint* avec_abs_z;     ///< Absolute Z coordinates of "a" axis grid element origins
+  const int* avec_x_ovrf;      ///< Relative X overflow bits for "a" axis grid element origins
+  const int* avec_y_ovrf;      ///< Relative Y overflow bits for "a" axis grid element origins
+  const int* avec_z_ovrf;      ///< Relative Z overflow bits for "a" axis grid element origins
+  const int* bvec_x_ovrf;      ///< Relative X overflow bits for "b" axis grid element origins
+  const int* bvec_y_ovrf;      ///< Relative Y overflow bits for "b" axis grid element origins
+  const int* bvec_z_ovrf;      ///< Relative Z overflow bits for "b" axis grid element origins
+  const int* cvec_x_ovrf;      ///< Relative X overflow bits for "c" axis grid element origins
+  const int* cvec_y_ovrf;      ///< Relative Y overflow bits for "c" axis grid element origins
+  const int* cvec_z_ovrf;      ///< Relative Z overflow bits for "c" axis grid element origins
+  const int* avec_abs_x_ovrf;  ///< Absolute X overflow bits for "a" axis grid element origins
+  const int* avec_abs_y_ovrf;  ///< Absolute Y overflow bits for "a" axis grid element origins
+  const int* avec_abs_z_ovrf;  ///< Absolute Z overflow bits for "a" axis grid element origins
 
   // The content of the mesh is what is actually writeable.
   const Tdata* coeffs;        ///< Coefficients for all mesh elements.  In an OCCLUSION mesh, these
@@ -107,13 +119,18 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
 
   /// \brief The constructor takes arguments for all member variables.
   BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &measurements, GridDetail kind_in,
-                       NonbondedPotential field_in, const llint* avec_x, const llint* avec_y,
-                       const llint* avec_z, const llint* bvec_x, const llint* bvec_y,
-                       const llint* bvec_z, const llint* cvec_x, const llint* cvec_y,
-                       const llint* cvec_z, const int* avec_x_ovrf, const int* avec_y_ovrf,
-                       const int* avec_z_ovrf, const int* bvec_x_ovrf, const int* bvec_y_ovrf,
-                       const int* bvec_z_ovrf, const int* cvec_x_ovrf, const int* cvec_y_ovrf,
-                       const int* cvec_z_ovrf, Tdata* coeffs_in, int* ngbr, int* ngbr_bounds);
+                       NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
+                       const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
+                       const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
+                       const llint* cvec_z_in, const llint* avec_abs_x_in,
+                       const llint* avec_abs_y_in, const llint* avec_abs_z_in,
+                       const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
+                       const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
+                       const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
+                       const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
+                       const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
+                       const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
+                       Tdata* coeffs_in, int* ngbr_in, size_t* ngbr_bounds_in);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
@@ -126,28 +143,34 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
 
   const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
   const GridDetail kind;                ///< The type of mesh, also pre-established.
-  const NonbondedPotential field_in;    ///< The field described by the mesh, also pre-established.
+  const NonbondedPotential field;       ///< The field described by the mesh, also pre-established.
 
   // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
-  const llint* avec_x;     ///< Cartesian X coordinates of grid element origins stepping along the
-                           ///<   mesh's "a" axis
-  const llint* avec_y;     ///< Cartesian Y coordinates of "a" axis grid element origins
-  const llint* avec_z;     ///< Cartesian Z coordinates of "a" axis grid element origins
-  const llint* bvec_x;     ///< Cartesian X coordinates of "b" axis grid element origins
-  const llint* bvec_y;     ///< Cartesian Y coordinates of "b" axis grid element origins
-  const llint* bvec_z;     ///< Cartesian Z coordinates of "b" axis grid element origins
-  const llint* cvec_x;     ///< Cartesian X coordinates of "c" axis grid element origins
-  const llint* cvec_y;     ///< Cartesian Y coordinates of "c" axis grid element origins
-  const llint* cvec_z;     ///< Cartesian Z coordinates of "c" axis grid element origins
-  const int* avec_x_ovrf;  ///< Cartesian X overflow bits for "a" axis grid element origins
-  const int* avec_y_ovrf;  ///< Cartesian Y overflow bits for "a" axis grid element origins
-  const int* avec_z_ovrf;  ///< Cartesian Z overflow bits for "a" axis grid element origins
-  const int* bvec_x_ovrf;  ///< Cartesian X overflow bits for "b" axis grid element origins
-  const int* bvec_y_ovrf;  ///< Cartesian Y overflow bits for "b" axis grid element origins
-  const int* bvec_z_ovrf;  ///< Cartesian Z overflow bits for "b" axis grid element origins
-  const int* cvec_x_ovrf;  ///< Cartesian X overflow bits for "c" axis grid element origins
-  const int* cvec_y_ovrf;  ///< Cartesian Y overflow bits for "c" axis grid element origins
-  const int* cvec_z_ovrf;  ///< Cartesian Z overflow bits for "c" axis grid element origins
+  const llint* avec_x;         ///< Relative X coordinates of grid element origins stepping along
+                               ///<   the mesh's "a" axis
+  const llint* avec_y;         ///< Relative Y coordinates of "a" axis grid element origins
+  const llint* avec_z;         ///< Relative Z coordinates of "a" axis grid element origins
+  const llint* bvec_x;         ///< Relative X coordinates of "b" axis grid element origins
+  const llint* bvec_y;         ///< Relative Y coordinates of "b" axis grid element origins
+  const llint* bvec_z;         ///< Relative Z coordinates of "b" axis grid element origins
+  const llint* cvec_x;         ///< Relative X coordinates of "c" axis grid element origins
+  const llint* cvec_y;         ///< Relative Y coordinates of "c" axis grid element origins
+  const llint* cvec_z;         ///< Relative Z coordinates of "c" axis grid element origins
+  const llint* avec_abs_x;     ///< Absolute X coordinates of "a" axis grid element origins
+  const llint* avec_abs_y;     ///< Absolute Y coordinates of "a" axis grid element origins
+  const llint* avec_abs_z;     ///< Absolute Z coordinates of "a" axis grid element origins
+  const int* avec_x_ovrf;      ///< Relative X overflow bits for "a" axis grid element origins
+  const int* avec_y_ovrf;      ///< Relative Y overflow bits for "a" axis grid element origins
+  const int* avec_z_ovrf;      ///< Relative Z overflow bits for "a" axis grid element origins
+  const int* bvec_x_ovrf;      ///< Relative X overflow bits for "b" axis grid element origins
+  const int* bvec_y_ovrf;      ///< Relative Y overflow bits for "b" axis grid element origins
+  const int* bvec_z_ovrf;      ///< Relative Z overflow bits for "b" axis grid element origins
+  const int* cvec_x_ovrf;      ///< Relative X overflow bits for "c" axis grid element origins
+  const int* cvec_y_ovrf;      ///< Relative Y overflow bits for "c" axis grid element origins
+  const int* cvec_z_ovrf;      ///< Relative Z overflow bits for "c" axis grid element origins
+  const int* avec_abs_x_ovrf;  ///< Absolute X overflow bits for "a" axis grid element origins
+  const int* avec_abs_y_ovrf;  ///< Absolute Y overflow bits for "a" axis grid element origins
+  const int* avec_abs_z_ovrf;  ///< Absolute Z overflow bits for "a" axis grid element origins
 
   // The content of the mesh is what is actually writeable.
   Tdata* coeffs;        ///< Coefficients for all mesh elements.  In an OCCLUSION mesh, these are
@@ -193,11 +216,8 @@ public:
                  NonbondedPotential field_in = NonbondedPotential::ELECTROSTATIC,
                  double probe_radius_in = 0.0, int vdw_type_in = -1, 
                  const AtomGraph *ag_in = nullptr, const CoordinateFrame *cf_in = nullptr,
-                 const MeshParameters &measurements_in = MeshParameters());
-  
-  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
-                 int vdw_type_in, const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                 const MeshParameters &measurements_in, const GpuDetails &gpu = null_gpu);
+                 const MeshParameters &measurements_in = MeshParameters(),
+                 const GpuDetails &gpu = null_gpu);
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
                  const AtomGraph *ag_in, const CoordinateFrame *cf_in, double buffer,
@@ -377,6 +397,11 @@ public:
   ///
   /// \param gpu  Details of any available GPU
   void colorExclusionMesh(const GpuDetails &gpu);
+
+  /// \brief Map the electrostatics of the receptor's rigid atoms.
+  ///
+  /// \param gpu  Details of any available GPU
+  void mapElectrostatics(const GpuDetails &gpu);
   
 private:
 
@@ -405,33 +430,41 @@ private:
   T probe_radius;
   
   /// Fixed-precision Cartesian coordinates of the mesh grid points stepping along the lines
-  /// [ i = 0...nx, 0, 0 ] (the "a" box vector), [ 0, j = 0...ny, 0 ] (the "b" box vector), and
-  /// [ 0, 0, k = 0...nz ] (the "c" box vector).  Storing these values obviates the need to do
-  /// expensive and complicated multiplications of fixed-precision numbers.
+  /// [ i = 0...nx, 0, 0 ] (the "a" box vector), [ 0, j = 0...ny, 0 ] (the "b" box vector),
+  /// [ 0, 0, k = 0...nz ] (the "c" box vector), and a fourth vector with absolute coordinates of
+  /// the "a" bo vector points, [ i = 0...nx, 0, 0 ] + [ orig_x, orig_y, orig_z ].  Storing these
+  /// values obviates the need to do expensive and complicated multiplications of fixed-precision
+  /// numbers during grid-based particle calculations.
   /// \{
-  Hybrid<llint> a_line_x;
-  Hybrid<llint> a_line_y;
-  Hybrid<llint> a_line_z;
-  Hybrid<llint> b_line_x;
-  Hybrid<llint> b_line_y;
-  Hybrid<llint> b_line_z;
-  Hybrid<llint> c_line_x;
-  Hybrid<llint> c_line_y;
-  Hybrid<llint> c_line_z;
+  Hybrid<llint> a_line_x;      //
+  Hybrid<llint> a_line_y;      // Positions of "a" vector tick marks relative to the mesh origin
+  Hybrid<llint> a_line_z;      //
+  Hybrid<llint> b_line_x;      //
+  Hybrid<llint> b_line_y;      // Positions of "b" vector tick marks relative to the mesh origin
+  Hybrid<llint> b_line_z;      //
+  Hybrid<llint> c_line_x;      //
+  Hybrid<llint> c_line_y;      // Positions of "c" vector tick marks relative to the mesh origin
+  Hybrid<llint> c_line_z;      //
+  Hybrid<llint> a_abs_line_x;  //
+  Hybrid<llint> a_abs_line_y;  // Absolute positions of the "a" vector tick marks
+  Hybrid<llint> a_abs_line_z;  //
   /// \}
 
   /// Overflow for fixed-precision Cartesian coordinates of the mesh grid points stepping along
   /// the a, b, and c box vectors.
   /// \{
-  Hybrid<int> a_line_x_overflow;
-  Hybrid<int> a_line_y_overflow;
-  Hybrid<int> a_line_z_overflow;
-  Hybrid<int> b_line_x_overflow;
-  Hybrid<int> b_line_y_overflow;
-  Hybrid<int> b_line_z_overflow;
-  Hybrid<int> c_line_x_overflow;
-  Hybrid<int> c_line_y_overflow;
-  Hybrid<int> c_line_z_overflow;
+  Hybrid<int> a_line_x_overflow;      // Overflow bits for positions of the "a" vector tick marks
+  Hybrid<int> a_line_y_overflow;      //   relative to the mesh origin.  These engage when the mesh
+  Hybrid<int> a_line_z_overflow;      //   serves double-precision coefficients and calculatons.
+  Hybrid<int> b_line_x_overflow;      //
+  Hybrid<int> b_line_y_overflow;      // Overflow bits for "b" vector tick mark relative positions
+  Hybrid<int> b_line_z_overflow;      //
+  Hybrid<int> c_line_x_overflow;      //
+  Hybrid<int> c_line_y_overflow;      // Overflow bits for "c" vector tick mark relative positions
+  Hybrid<int> c_line_z_overflow;      //
+  Hybrid<int> a_abs_line_x_overflow;  //
+  Hybrid<int> a_abs_line_y_overflow;  // Overflow bits for "a" vector tick mark absolute positions
+  Hybrid<int> a_abs_line_z_overflow;  //
   /// \}
 
   /// Coefficients for tricubic spline functions spanning each grid element.  Coefficients for
@@ -455,13 +488,13 @@ private:
   Hybrid<int> neighbor_list;
 
   /// Bounds array for the neighbor list atoms array above
-  Hybrid<int> neighbor_list_bounds;
+  Hybrid<size_t> neighbor_list_bounds;
   
   /// Data storage for the POINTER-kind Hybrid<int> objects above
   Hybrid<int> int_data;
 
   /// Data storage for the POINTER-kind Hybrid<int> objects above
-  Hybrid<int> llint_data;
+  Hybrid<llint> llint_data;
 
   /// \brief Obtain bounds for the mesh based on coordinates of frozen atoms.
   ///
@@ -499,6 +532,8 @@ private:
   /// \}
   
   /// \brief Allocate memory for the mesh coefficients, axis coordinates, and frozen atoms mask.
+  ///        This does not allocate space for the concatenated mesh element neighbor lists or their
+  ///        bounds array.
   void allocate();
 
   /// \brief Repair the POINTER-kind Hybrid objects in a newly copied or moved object.
@@ -507,6 +542,25 @@ private:
   /// \brief Certain types of meshes are restricted to certain data types.  This function will
   ///        ensure the correct relationships.
   void validateMeshKind() const;
+
+  /// \brief Validate the fixed-precision scaling based on the mesh's data type.  Single-precision
+  ///        nonbonded field meshes and clash maps must not overflow 64-bit positional
+  ///        representations.
+  void validateScalingBits() const;
+  
+  /// \brief Map out the axes of the mesh, drawing three lines radiating from the mesh origin along
+  ///        its "a", "b", and "c" axes and marking the Cartesian coordinates of tick marks for the
+  ///        origins of each grid point in lines [ i_a, 0, 0 ], [ 0, j_b, 0 ], or [ 0, 0, k_c ] on
+  ///        these axes.  All locations are given relative to the origin, such that adding the
+  ///        coordinates of the origin to the coordinates of point i_a from the "a" axis line, the
+  ///        coordinates of point j_b from the "b" axis line, and point k_c from the "c" axis line
+  ///        will give the location of the origin for grid element { i_a, j_b, k_c }.  A fourth
+  ///        axis, the "a" axis points with the origin coordinates "baked in", is provided for
+  ///        convenience.  Given that that the majority of transactions with the mesh will involve
+  ///        a whole warp computing the 64-term tricubic polynomial for one particle after just one
+  ///        thread computes the proper element and broadcasts the relative displacments within
+  ///        that element, this savings may be significant.
+  void computeMeshAxisCoordinates();
 };
 
 } // namespace structure

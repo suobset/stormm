@@ -86,7 +86,7 @@ double MeshParameters::getMeshOrigin(const CartesianDimension dim) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int95_t> MeshParameters::getMeshOriginAsFixedPrecision() const {
+std::vector<int95_t> MeshParameters::getMeshOriginAsFP() const {
   std::vector<int95_t> result(3);
   result[0] = origin_x;
   result[1] = origin_y;
@@ -95,7 +95,7 @@ std::vector<int95_t> MeshParameters::getMeshOriginAsFixedPrecision() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t MeshParameters::getMeshOriginAsFixedPrecision(const CartesianDimension dim) const {
+int95_t MeshParameters::getMeshOriginAsFP(const CartesianDimension dim) const {
   switch (dim) {
   case CartesianDimension::X:
     return origin_x;
@@ -105,6 +105,25 @@ int95_t MeshParameters::getMeshOriginAsFixedPrecision(const CartesianDimension d
     return origin_z;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int95_t> MeshParameters::getMeshElementVectorAsFP(const UnitCellAxis dim) const {
+  std::vector<int95_t> result(3);
+  const int icol = static_cast<int>(dim);
+  for (int i = 0; i < 3; i++) {
+    result[i] = fp_element_invu[i + (3 * icol)];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int95_t> MeshParameters::getMeshInverseTransformAsFP() const {
+  std::vector<int95_t> result(9);
+  for (int i = 0; i < 9; i++) {
+    result[i] = fp_element_invu[i];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
