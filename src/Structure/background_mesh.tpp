@@ -913,7 +913,9 @@ template <typename T> void BackgroundMesh<T>::allocate() {
   a_abs_line_z_overflow.setPointer(&int_data, (2 * padded_na) + thus_far, mps.na);
   const int nbits = static_cast<int>(sizeof(uint)) * 8;
   coefficients.resize(64LLU * static_cast<size_t>(mps.na * mps.nb * mps.nc));
-  frozen_atoms.resize((ag_pointer->getAtomCount() + nbits - 1) / nbits);
+  if (ag_pointer != nullptr) {
+    frozen_atoms.resize((ag_pointer->getAtomCount() + nbits - 1) / nbits);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
