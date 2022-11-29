@@ -6,12 +6,11 @@ namespace structure {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-MeshParamAbstract<T>::MeshParamAbstract(const int na_in, const int nb_in, const int nc_in,
-                                        const int95_t orig_x_in, const int95_t orig_y_in,
-                                        const int95_t orig_z_in, const T scale_in,
-                                        const T inv_scale_in, const T* umat_in,
-                                        const T* invu_in, const T* widths_in,
-                                        const int95_t* fp_invu_in) :
+MeshParamKit<T>::MeshParamKit(const int na_in, const int nb_in, const int nc_in,
+                              const int95_t orig_x_in, const int95_t orig_y_in,
+                              const int95_t orig_z_in, const T scale_in, const T inv_scale_in,
+                              const T* umat_in, const T* invu_in, const T* widths_in,
+                              const int95_t* fp_invu_in) :
     na{na_in}, nb{nb_in}, nc{nc_in}, orig_x{orig_x_in}, orig_y{orig_y_in}, orig_z{orig_z_in},
     scale{scale_in}, inv_scale{inv_scale_in},
     umat{ umat_in[0], umat_in[1], umat_in[2], umat_in[3], umat_in[4], umat_in[5], umat_in[6],

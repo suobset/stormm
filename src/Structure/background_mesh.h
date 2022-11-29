@@ -15,6 +15,7 @@
 #include "Math/vector_ops.h"
 #include "Math/rounding.h"
 #include "Numerics/split_fixed_precision.h"
+#include "Parsing/polynumeric.h"
 #include "Potential/energy_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
@@ -36,10 +37,13 @@ using data_types::isFloatingPointScalarType;
 using constants::CartesianDimension;
 using constants::UnitCellAxis;
 using energy::NonbondedPotential;
+using energy::VdwCombiningRule;
 using math::addScalarToVector;
 using math::elementwiseMultiply;
 using math::roundUp;
+using parse::NumberFormat;
 using numerics::default_globalpos_scale_bits;
+using numerics::fixedPrecisionGrid;
 using topology::AtomGraph;
 using topology::NonbondedKit;
 using trajectory::CoordinateFrame;
@@ -51,7 +55,7 @@ using trajectory::PhaseSpace;
 template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
 
   /// \brief The constructor takes arguments for all member variables.
-  BackgroundMeshReader(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+  BackgroundMeshReader(const MeshParamKit<Txfrm> &dims_in, GridDetail kind_in,
                        NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
                        const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
                        const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
@@ -74,9 +78,9 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
   BackgroundMeshReader(BackgroundMeshReader<Txfrm, Tdata> &&original) = default;
   /// \}
 
-  const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
-  const GridDetail kind;                ///< The type of mesh, also pre-established.
-  const NonbondedPotential field;       ///< The field described by the mesh, also pre-established.
+  const MeshParamKit<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
+  const GridDetail kind;           ///< The type of mesh, also pre-established.
+  const NonbondedPotential field;  ///< The field described by the mesh, also pre-established.
 
   // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
   const llint* avec_x;         ///< Relative X coordinates of grid element origins stepping along
@@ -118,7 +122,7 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshReader {
 template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
 
   /// \brief The constructor takes arguments for all member variables.
-  BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &measurements, GridDetail kind_in,
+  BackgroundMeshWriter(const MeshParamKit<Txfrm> &measurements, GridDetail kind_in,
                        NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
                        const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
                        const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
@@ -141,9 +145,9 @@ template <typename Txfrm, typename Tdata> struct BackgroundMeshWriter {
   BackgroundMeshWriter(BackgroundMeshWriter<Txfrm, Tdata> &&original) = default;
   /// \}
 
-  const MeshParamAbstract<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
-  const GridDetail kind;                ///< The type of mesh, also pre-established.
-  const NonbondedPotential field;       ///< The field described by the mesh, also pre-established.
+  const MeshParamKit<Txfrm> dims;  ///< Dimensions of the mesh.  These are pre-established.
+  const GridDetail kind;           ///< The type of mesh, also pre-established.
+  const NonbondedPotential field;  ///< The field described by the mesh, also pre-established.
 
   // The following are Cartesian X, Y, or Z fixed-precision coordinates of grid element origins.
   const llint* avec_x;         ///< Relative X coordinates of grid element origins stepping along
@@ -212,33 +216,38 @@ public:
   ///                         define non-orthorhombic meshes.
   /// \param gpu              Details of the available GPU
   /// \{
-  BackgroundMesh(GridDetail kind_in = GridDetail::NONBONDED_FIELD,
-                 NonbondedPotential field_in = NonbondedPotential::ELECTROSTATIC,
-                 double probe_radius_in = 0.0, int vdw_type_in = -1, 
-                 const AtomGraph *ag_in = nullptr, const CoordinateFrame *cf_in = nullptr,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in,
+                 const MeshParameters &measurements_in = MeshParameters());
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in,
+                 const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                 double probe_radius_in = 0.0, double well_depth_in = 0.0,
+                 VdwCombiningRule mixing_protocol_in = VdwCombiningRule::LORENTZ_BERTHELOT,
                  const MeshParameters &measurements_in = MeshParameters(),
                  const GpuDetails &gpu = null_gpu);
 
-  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame *cf_in, double buffer,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
+                 double well_depth_in, VdwCombiningRule mixing_protocol_in, const AtomGraph *ag_in,
+                 const CoordinateFrame *cf_in, double buffer, double spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
+                 double well_depth_in, VdwCombiningRule mixing_protocol_in, const AtomGraph *ag_in,
+                 const CoordinateFrame *cf_in, double buffer, const std::vector<double> &spacing,
+                 int scale_bits_in = default_globalpos_scale_bits,
+                 const GpuDetails &gpu = null_gpu);
+
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
+                 double well_depth_in, VdwCombiningRule mixing_protocol_in, const AtomGraph *ag_in,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  double spacing, int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
-  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame *cf_in, double buffer,
+  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, double probe_radius_in,
+                 double well_depth_in, VdwCombiningRule mixing_protocol_in, const AtomGraph *ag_in,
+                 const CoordinateFrame *cf_in, const std::vector<double> &mesh_bounds,
                  const std::vector<double> &spacing,
-                 int scale_bits_in = default_globalpos_scale_bits,
-                 const GpuDetails &gpu = null_gpu);
-
-  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                 const std::vector<double> &mesh_bounds, double spacing,
-                 int scale_bits_in = default_globalpos_scale_bits,
-                 const GpuDetails &gpu = null_gpu);
-
-  BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in, int vdw_type_in,
-                 const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                 const std::vector<double> &mesh_bounds, const std::vector<double> &spacing,
                  int scale_bits_in = default_globalpos_scale_bits,
                  const GpuDetails &gpu = null_gpu);
 
@@ -319,8 +328,10 @@ public:
   ///
   /// \param tier  Obtain the data at the level of the CPU host or GPU device
   /// \{
-  BackgroundMeshReader<double, T> dpData(const HybridTargetLevel tier) const;
-  BackgroundMeshWriter<double, T> dpData(const HybridTargetLevel tier);
+  BackgroundMeshReader<double, T>
+  dpData(const HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  BackgroundMeshWriter<double, T> dpData(const HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Get an abstract of the mesh for performing calculations in single-precision.
@@ -331,8 +342,10 @@ public:
   ///
   /// \param tier  Obtain the data at the level of the CPU host or GPU device
   /// \{
-  BackgroundMeshReader<float, T> spData(const HybridTargetLevel tier) const;
-  BackgroundMeshWriter<float, T> spData(const HybridTargetLevel tier);
+  BackgroundMeshReader<float, T>
+  spData(const HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  BackgroundMeshWriter<float, T> spData(const HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Set the topology that the mesh shall use.
@@ -393,15 +406,39 @@ public:
                          const std::vector<double> &spacing, int scale_bits_in = -100);
   /// \}
 
-  /// \brief Color the exclusion mesh based on a particular set of coordinates.
+  /// \brief Set the probe radius, meaning either the Lennard-Jones potential sigma radius or
+  ///        the clash probe radius, depending on the mesh type.  This includes a validity check.
   ///
-  /// \param gpu  Details of any available GPU
-  void colorExclusionMesh(const GpuDetails &gpu);
+  /// \param probe_radius_in  The probe radius to set
+  void setProbeRadius(double probe_radius_in);
 
-  /// \brief Map the electrostatics of the receptor's rigid atoms.
+  /// \brief Set the Lennard-Jones well depth for the probe that will generate the potential.  This
+  ///        includes a validity check.
+  ///
+  /// \param well_depth_in  The well depth to set
+  void setWellDepth(double well_depth_in);
+
+  /// \brief Set the combining rule that will be used to make the probe interact with the receptor
+  ///        on any mesh (with the exception of an electrostatic field).  With geometric combining
+  ///        rules, it is possible to tailor a single mesh for all particles that might interact
+  ///        with the receptor.  However, with Lorentz-Berthelot rules or any case of
+  ///        non-conformant pair rules, new grids are required for each particle type that might
+  ///        interact with the mesh potential.
+  ///
+  /// \param mixing_protocol_in  The method to use
+  void setCombiningRule(VdwCombiningRule mixing_protocol_in);
+
+  /// \brief Compute the appropriate field for the mesh.  This is called automatically by the
+  ///        constructor if enough information is provided.
   ///
   /// \param gpu  Details of any available GPU
-  void mapElectrostatics(const GpuDetails &gpu);
+  /// 
+  void computeField(const GpuDetails &gpu = null_gpu);
+
+  /// \brief Compute neighbor lists for each mesh element, if appropriate for the mesh type.
+  ///
+  /// \param gpu  Details of any available GPU
+  void computeNeighborLists(const GpuDetails &gpu = null_gpu);
   
 private:
 
@@ -427,7 +464,16 @@ private:
   NonbondedPotential field;
 
   /// The probe radius to use in computing clashes for an OCCLUSION-type mesh.
-  T probe_radius;
+  double probe_radius;
+
+  /// Lennard-Jones well depth of the probe particle's self interaction.  If the mesh is of type
+  /// NONBONDED_FIELD or NONBONDED_ATOMIC, the probe_radius will be taken to mean the particle's
+  /// self-interacting sigma parameter, and this is its epsilon.  For electrostatic fields, neither
+  /// this number nor probe_radius has any relevance.
+  double well_depth;
+  
+  /// The combining rule used (or to use) in computing clashes and Lennard-Jones interactions.
+  VdwCombiningRule mixing_protocol;
   
   /// Fixed-precision Cartesian coordinates of the mesh grid points stepping along the lines
   /// [ i = 0...nx, 0, 0 ] (the "a" box vector), [ 0, j = 0...ny, 0 ] (the "b" box vector),
@@ -561,6 +607,16 @@ private:
   ///        thread computes the proper element and broadcasts the relative displacments within
   ///        that element, this savings may be significant.
   void computeMeshAxisCoordinates();
+
+  /// \brief Color the exclusion mesh based on a particular set of coordinates.
+  ///
+  /// \param gpu  Details of any available GPU
+  void colorExclusionMesh(const GpuDetails &gpu);
+
+  /// \brief Map the electrostatics of the receptor's rigid atoms.
+  ///
+  /// \param gpu  Details of any available GPU
+  void mapElectrostatics(const GpuDetails &gpu);
 };
 
 } // namespace structure

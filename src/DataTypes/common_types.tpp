@@ -50,6 +50,7 @@ template <typename T> std::string getStormmScalarTypeName() {
   else if (ct == short_type_index) return "short_int";
   else if (ct == ushort_type_index) return "unsigned_short_int";
   else if (ct == bool_type_index) return "bool";
+  else if (ct == size_t_type_index) return "size_t";
   else {
     rtErr("Data type " + std::string(std::type_index(typeid(T)).name()) + " is not a recognized "
           "scalar type.", "getStormmScalarTypeName");

@@ -453,8 +453,7 @@ void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
                    std::vector<double> *result_z, const std::vector<llint> &primary_x,
                    const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
                    const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
-                   const std::vector<int> &overflow_z, const size_t n_values,
-                   const double descale) {
+                   const std::vector<int> &overflow_z, const double descale) {
   int95ToDouble(result_x, primary_x, overflow_x, descale);
   int95ToDouble(result_y, primary_y, overflow_y, descale);
   int95ToDouble(result_z, primary_z, overflow_z, descale);
@@ -465,7 +464,7 @@ void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<do
                    const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
                    const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
                    const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z,
-                   const size_t n_values, const double descale) {
+                   const double descale) {
   int95ToDouble(result_x, primary_x, overflow_x, descale);
   int95ToDouble(result_y, primary_y, overflow_y, descale);
   int95ToDouble(result_z, primary_z, overflow_z, descale);
@@ -581,6 +580,52 @@ int2 int63Sum(const int a_x, const int a_y, const float breal) {
   int2 result = { a_x + b.x, a_y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a_x ^ result.x) < 0 && (a_x ^ b.x) >= 0) * 2;
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
+                        const int95_t increment) {
+  const size_t grid_size = coordinates->size();
+  int95_t marker = origin;
+  int95_t* coord_ptr = coordinates->data();
+  for (size_t i = 0LLU; i < grid_size; i++) {
+    coord_ptr[i] = marker;
+    marker = splitFPSum(marker, increment);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void fixedPrecisionGrid(std::vector<llint> *primary, std::vector<int> *overflow,
+                        const int95_t origin, const int95_t increment) {
+  if (primary->size() != overflow->size()) {
+    rtErr("Both primary and overflow vectors must be pre-allocated to the same size.  Lengths "
+          "are " + std::to_string(primary->size()) + " and " + std::to_string(overflow->size()) +
+          ".", "fixedPrecisionGrid");
+  }
+  fixedPrecisionGrid(primary->data(), overflow->data(), origin, increment, primary->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void fixedPrecisionGrid(Hybrid<llint> *primary, Hybrid<int> *overflow,
+                        const int95_t origin, const int95_t increment) {
+  if (primary->size() != overflow->size()) {
+    rtErr("Both primary and overflow vectors must be pre-allocated to the same size.  Lengths "
+          " are " + std::to_string(primary->size()) + "(" + std::string(primary->getLabel().name) +
+          ") and " + std::to_string(overflow->size()) + "(" +
+          std::string(overflow->getLabel().name) + ").", "fixedPrecisionGrid");
+  }
+  fixedPrecisionGrid(primary->data(), overflow->data(), origin, increment, primary->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
+                        const int95_t increment, const size_t grid_size) {
+  int95_t marker = origin;
+  for (size_t i = 0LLU; i < grid_size; i++) {
+    primary[i] = marker.x;
+    overflow[i] = marker.y;
+    marker = splitFPSum(marker, increment);
+  }
 }
 
 } // namespace numerics

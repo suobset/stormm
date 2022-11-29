@@ -256,12 +256,12 @@ void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
                    std::vector<double> *result_z, const std::vector<llint> &primary_x,
                    const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
                    const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
-                   const std::vector<int> &overflow_z, size_t n_values, double descale = 1.0);
+                   const std::vector<int> &overflow_z, double descale = 1.0);
 
 void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
                    const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
                    const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
-                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
+                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z,
                    double descale = 1.0);
 /// \}
 
@@ -317,6 +317,36 @@ int2 int63Sum(int a_x, int a_y, int b_x, int b_y);
 int95_t int95Sum(llint a_x, int a_y, double breal);
 
 int2 int63Sum(int a_x, int a_y, float breal);
+/// \}
+
+/// \brief Compute a one-dimensional grid of points, beginning at some arbitrary origin and
+///        marking at uniform increments as the grid line evolves in the Cartesian X, Y, and Z
+///        dimensions.
+///
+/// Overloaded:
+///   - Populate an Standard Template Library vectorof int95_t data
+///   - Populate an llint (primary) vector and an int (overflow) vector
+///   - Populate the HOST data of llint (primary) and int (overflow) Hybrid objects
+///   - Populate llint (primary) and int (overflow) C-style arrays
+///
+/// \param coordinates  The array on which to accumulate the grid.  Filled and returned.
+/// \param primary      Primary bits for the fixed-precision accumulators.  Filled and returned.
+/// \param overflow     Overflow bits for the fixed-precision accumulators.  Filled and returned.
+/// \param origin       The origin of the mesh and location of is first point
+/// \param increment    The spacing between grid points
+/// \param grid_size    Provided for C-style arrays, defining their trusted length
+/// \{
+void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
+                        const int95_t increment);
+
+void fixedPrecisionGrid(std::vector<llint> *primary, std::vector<int> *overflow,
+                        const int95_t origin, const int95_t increment);
+
+void fixedPrecisionGrid(Hybrid<llint> *primary, Hybrid<int> *overflow, const int95_t origin,
+                        const int95_t increment);
+
+void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
+                        const int95_t increment, const size_t grid_size);
 /// \}
 
 } // namespace numerics

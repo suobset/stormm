@@ -7,7 +7,7 @@ namespace structure {
 //-------------------------------------------------------------------------------------------------
 template <typename Txfrm, typename Tdata>
 BackgroundMeshReader<Txfrm, Tdata>::
-BackgroundMeshReader(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+BackgroundMeshReader(const MeshParamKit<Txfrm> &dims_in, GridDetail kind_in,
                      NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
                      const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
                      const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
@@ -34,7 +34,7 @@ BackgroundMeshReader(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in
 //-------------------------------------------------------------------------------------------------
 template <typename Txfrm, typename Tdata>
 BackgroundMeshWriter<Txfrm, Tdata>::
-BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in,
+BackgroundMeshWriter(const MeshParamKit<Txfrm> &dims_in, GridDetail kind_in,
                      NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
                      const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
                      const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
@@ -61,10 +61,9 @@ BackgroundMeshWriter(const MeshParamAbstract<Txfrm> &dims_in, GridDetail kind_in
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const double probe_radius_in, const int vdw_type_in,
-                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                                  const MeshParameters &measurements_in, const GpuDetails &gpu) :
-    measurements{measurements_in}, kind{kind_in}, field{field_in}, probe_radius{probe_radius_in},
+                                  const MeshParameters &measurements_in) :
+    measurements{measurements_in}, kind{kind_in}, field{field_in}, probe_radius{0.0},
+    well_depth{0.0}, mixing_protocol{VdwCombiningRule::LORENTZ_BERTHELOT},
     a_line_x{HybridKind::POINTER, "mesh_avector_x"},
     a_line_y{HybridKind::POINTER, "mesh_avector_y"},
     a_line_z{HybridKind::POINTER, "mesh_avector_z"},
@@ -90,84 +89,93 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
     a_abs_line_y_overflow{HybridKind::POINTER, "mesh_avec_abs_y_ovrf"},
     a_abs_line_z_overflow{HybridKind::POINTER, "mesh_avec_abs_z_ovrf"},
     coefficients{HybridKind::ARRAY, "mesh_tricubic_coef"},
-    ag_pointer{const_cast<AtomGraph*>(ag_in)},
-    cf_pointer{const_cast<CoordinateFrame*>(cf_in)},
+    ag_pointer{nullptr},
+    cf_pointer{nullptr},
     frozen_atoms{HybridKind::ARRAY, "mesh_frozen_atoms"},
     neighbor_list{HybridKind::ARRAY, "mesh_neighbor_list"},
     neighbor_list_bounds{HybridKind::ARRAY, "mesh_nl_bounds"},
     int_data{HybridKind::ARRAY, "mesh_int_data"},
     llint_data{HybridKind::ARRAY, "mesh_llint_data"}
 {
-  // Validate the mesh dimensions, then allocate memory
   validateMeshKind();
+  allocate();
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const MeshParameters &measurements_in, const GpuDetails &gpu) :
+    BackgroundMesh(kind_in, field_in, measurements_in)
+{
+  // Set the system
+  setTopologyPointer(ag_in);
+  setCoordinatePointer(cf_in);
+  
+  // Validate the mesh dimensions, then allocate memory
   validateScalingBits();
   allocate();
+  computeMeshAxisCoordinates();
 
-  // Loop over all atoms and apply the potential
-  switch (kind) {
-  case GridDetail::OCCLUSION:
-    colorExclusionMesh(gpu);
-    break;
-  case GridDetail::NONBONDED_FIELD:
-  case GridDetail::NONBONDED_ATOMIC:
-    break;
-  }
-
-  // Loop over all elements and create neighbor lists
-  switch (kind) {
-  case GridDetail::OCCLUSION:
-  case GridDetail::NONBONDED_FIELD:
-    break;
-  case GridDetail::NONBONDED_ATOMIC:
-    break;
-  }
+  // Map the potential and atomic near-neighbor interactions
+  setProbeRadius(probe_radius_in);
+  setWellDepth(well_depth_in);
+  setCombiningRule(mixing_protocol_in);
+  computeField(gpu);
+  computeNeighborLists(gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame *cf_in, const double buffer,
-                                  const double spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
-                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const GpuDetails &gpu) :
+  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
+                 cf_in, getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
+                                        scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame *cf_in, const double buffer,
-                                  const std::vector<double> &spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
-                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const GpuDetails &gpu) :
+  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
+                 cf_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame *cf_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
+                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
+                                        scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const int vdw_type_in, const AtomGraph *ag_in,
-                                  const CoordinateFrame *cf_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, vdw_type_in, ag_in, cf_in,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
+                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -176,7 +184,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -190,7 +198,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -203,7 +211,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -218,7 +226,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -231,7 +239,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -245,7 +254,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -259,7 +269,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const double spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -274,7 +285,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, -1, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -494,7 +506,7 @@ BackgroundMeshReader<double, T> BackgroundMesh<T>::dpData(const HybridTargetLeve
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMeshWriter<double, T> BackgroundMesh<T>::dpData(const HybridTargetLevel tier) {
-  return BackgroundMeshReader<double, T>(measurements.dpData(), kind, field, a_line_x.data(tier),
+  return BackgroundMeshWriter<double, T>(measurements.dpData(), kind, field, a_line_x.data(tier),
                                          a_line_y.data(tier), a_line_z.data(tier),
                                          b_line_x.data(tier), b_line_y.data(tier),
                                          b_line_z.data(tier), c_line_x.data(tier),
@@ -571,11 +583,7 @@ template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                           const double padding, const double spacing,
                                           const int scale_bits_in) {
-  ag_pointer = const_cast<AtomGraph*>(ag_in);
-  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
-  const int actual_scale_bits = (scale_bits_in == -100) ?
-                                measurements.getScalingBits() : scale_bits_in;
-  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+  setMeshParameters(ag_in, cf_in, padding, std::vector<double>(3, spacing), scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -584,38 +592,36 @@ void BackgroundMesh<T>::setMeshParameters(const AtomGraph *ag_in, const Coordina
                                           const double padding,
                                           const std::vector<double> &spacing,
                                           const int scale_bits_in) {
-  ag_pointer = const_cast<AtomGraph*>(ag_in);
-  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
+  ag_pointer = (ag_in == nullptr) ? ag_pointer : const_cast<AtomGraph*>(ag_in);
+  cf_pointer = (cf_in == nullptr) ? cf_pointer : const_cast<CoordinateFrame*>(cf_in);
   const int actual_scale_bits = (scale_bits_in == -100) ?
                                 measurements.getScalingBits() : scale_bits_in;
   measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+  validateScalingBits();
+  allocate();
+  computeMeshAxisCoordinates();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const double padding, const double spacing,
                                           const int scale_bits_in) {
-  const int actual_scale_bits = (scale_bits_in == -100) ?
-                                measurements.getScalingBits() : scale_bits_in;
-  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+  setMeshParameters(ag_pointer, cf_pointer, padding, std::vector<double>(3, spacing),
+                    scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const double padding, const std::vector<double> &spacing,
                                           const int scale_bits_in) {
-  const int actual_scale_bits = (scale_bits_in == -100) ?
-                                measurements.getScalingBits() : scale_bits_in;
-  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+  setMeshParameters(ag_pointer, cf_pointer, padding, spacing, scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const std::vector<double> &mesh_bounds,
                                           const double spacing, const int scale_bits_in) {
-  const int actual_scale_bits = (scale_bits_in == -100) ?
-                                measurements.getScalingBits() : scale_bits_in;
-  measurements = getMeasurements(mesh_bounds, spacing, actual_scale_bits);
+  setMeshParameters(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -626,151 +632,64 @@ void BackgroundMesh<T>::setMeshParameters(const std::vector<double> &mesh_bounds
   const int actual_scale_bits = (scale_bits_in == -100) ?
                                 measurements.getScalingBits() : scale_bits_in;
   measurements = getMeasurements(mesh_bounds, spacing, actual_scale_bits);
+  validateScalingBits();
+  allocate();
+  computeMeshAxisCoordinates();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
-
-  // Use the HPC kernel to color the mesh if a GPU is available
-#ifdef STORMM_USE_HPC
-  if (gpu != null_gpu) {
-    coefficients.download();
-    return;
+void BackgroundMesh<T>::setProbeRadius(const double probe_radius_in) {
+  if (probe_radius_in < 0.0) {
+    rtErr("A probe radius of " + realToString(probe_radius, 7, 4, NumberFormat::STANDARD_REAL) +
+          " Angstroms is invalid.", "BackgroundMesh", "setProbeRadius");
   }
-#endif
+  probe_radius = probe_radius_in;
+}
 
-  // Color the mesh on the CPU
-  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const MeshParamAbstract<double> mps = measurements.dpData();
-  const CoordinateFrameReader cfr = cf_pointer->data();
-  
-  // Initialize the mesh in CPU memory.
-  const int n_elem = mps.na * mps.nb * mps.nc;
-  T* coeff_ptr = coefficients.data();
-  for (int pos = 0; pos < n_elem; pos++) {
-    coeff_ptr[pos] = 0LLU;
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setWellDepth(const double well_depth_in) {
+  if (well_depth_in < 0.0) {
+    rtErr("A negative well depth of " +
+          realToString(probe_radius, 7, 4, NumberFormat::STANDARD_REAL) + " kcal/mol is invalid.  "
+          "Use positive numbers to define the depth of a potential energy minimum.",
+          "BackgroundMesh", "setWellDepth");
   }
+  well_depth = well_depth_in;
+}
 
-  // Replicate the mesh's grid vectors.  Subtract the origin coordinates from the "b" and "c"
-  // vectors so that a[i] + b[j] + c[k] = the Cartesian coordinates of any grid point (i,j,k).
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setCombiningRule(const VdwCombiningRule mixing_protocol_in) {
+  mixing_protocol = mixing_protocol_in;
+}
 
-  std::vector<double> avx(mps.na + 1), avy(mps.na + 1), avz(mps.na + 1);
-  std::vector<double> bvx(mps.nb + 1), bvy(mps.nb + 1), bvz(mps.nb + 1);
-  std::vector<double> cvx(mps.nc + 1), cvy(mps.nc + 1), cvz(mps.nc + 1);
-  int95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
-                a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
-                a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.na, mps.inv_scale);
-  int95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
-                b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
-                b_line_z_overflow.readHost(), mps.nb, mps.inv_scale);
-  int95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
-                c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
-                c_line_z_overflow.readHost(), mps.nc, mps.inv_scale);
-  const double dorig_x = int95ToDouble(mps.orig_x);
-  const double dorig_y = int95ToDouble(mps.orig_y);
-  const double dorig_z = int95ToDouble(mps.orig_z);
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::computeField(const GpuDetails &gpu) {
 
-  // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
-  const double de_ax = 0.0625 * (avx[1] - avx[0]);
-  const double de_ay = 0.0625 * (avy[1] - avy[0]);
-  const double de_az = 0.0625 * (avz[1] - avz[0]);
-  const double de_bx = 0.0625 * (bvx[1] - bvx[0]);
-  const double de_by = 0.0625 * (bvy[1] - bvy[0]);
-  const double de_bz = 0.0625 * (bvz[1] - bvz[0]);
-  const double de_cx = 0.0625 * (cvx[1] - cvx[0]);
-  const double de_cy = 0.0625 * (cvy[1] - cvy[0]);
-  const double de_cz = 0.0625 * (cvz[1] - cvz[0]);
-
-  // Prepare a buffer to hold subgrid results
-  std::vector<ullint> cube_buffer(64, 0LLU);
-
-  // Loop over all atoms in the system
-  const int lj_idx_offset = nbk.n_lj_types + 1;
-  for (int pos = 0; pos < nbk.natom; pos++) {
-    const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
-    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
-                                         1.0 / 6.0);
-    const double color_radius = atom_radius + probe_radius;
-    const double color_radius_sq = color_radius * color_radius;
-    const double atom_x = cfr.xcrd[pos];
-    const double atom_y = cfr.ycrd[pos];
-    const double atom_z = cfr.zcrd[pos];
-    const int ixmin = std::max(static_cast<int>(floor((atom_x - color_radius - dorig_x) /
-                                                      mps.widths[0])), 0);
-    const int iymin = std::max(static_cast<int>(floor((atom_y - color_radius - dorig_y) /
-                                                      mps.widths[1])), 0);
-    const int izmin = std::max(static_cast<int>(floor((atom_z - color_radius - dorig_z) /
-                                                      mps.widths[2])), 0);
-    const int ixmax = std::min(static_cast<int>(ceil((atom_x + color_radius - dorig_x) /
-                                                     mps.widths[0])), mps.na - 1);
-    const int iymax = std::min(static_cast<int>(ceil((atom_y + color_radius - dorig_y) /
-                                                     mps.widths[1])), mps.nb - 1);
-    const int izmax = std::min(static_cast<int>(ceil((atom_z + color_radius - dorig_z) /
-                                                     mps.widths[2])), mps.nc - 1);
-    for (int i = ixmin; i < ixmax; i++) {
-      for (int j = iymin; j < iymax; j++) {
-        for (int k = izmin; k < izmax; k++) {
-
-          // Color the buffer for this atom and this element
-          const double base_x = avx[ixmin] + bvx[iymin] + cvx[izmin];
-          const double base_y = avy[ixmin] + bvy[iymin] + cvy[izmin];
-          const double base_z = avz[ixmin] + bvz[iymin] + cvz[izmin];
-          for (size_t m = 0LLU; m < 64LLU; m++) {
-            cube_buffer[m] = 0LLU;
-          }
-          int grid_i = 0;
-          for (double di = 0.5; di < 16.0; di += 1.0) {
-            int grid_j = 0;
-            for (double dj = 0.5; dj < 16.0; dj += 1.0) {
-              int grid_k = 0;
-              for (double dk = 0.5; dk < 16.0; dk += 1.0) {
-                const double xpt = base_x + (di * de_ax) + (dj * de_bx) + (dk * de_cx);
-                const double ypt = base_y + (di * de_ay) + (dj * de_by) + (dk * de_cy);
-                const double zpt = base_z + (di * de_az) + (dj * de_bz) + (dk * de_cz);
-                const double dx = xpt - atom_x;
-                const double dy = ypt - atom_y;
-                const double dz = zpt - atom_z;
-                if ((dx * dx) + (dy * dy) + (dz * dz) < color_radius_sq) {
-                  const int cubelet_i = grid_i / 4;
-                  const int cubelet_j = grid_j / 4;
-                  const int cubelet_k = grid_k / 4;
-                  const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
-                  const int bit_i = grid_i - (4 * cubelet_i);
-                  const int bit_j = grid_j - (4 * cubelet_j);
-                  const int bit_k = grid_k - (4 * cubelet_k);
-                  const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
-                  cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
-                }
-                grid_k++;
-              }
-              grid_j++;
-            }
-            grid_i++;
-          }
-
-          // Accumulate the atom's mapping onto the grid
-          const size_t coef_base_idx = 64LLU *
-                                       static_cast<size_t>((((i * mps.nb) + j) * mps.nc) + k);
-          for (size_t m = 0LLU; m < 64LLU; m++) {
-
-            // This is necessary due to the templated nature of the BackgroundMesh object.  In
-            // practice, the only way to get here is to have the coefficients array already be of
-            // type ullint.
-            ullint tcoef = coeff_ptr[coef_base_idx + m];
-            tcoef |= cube_buffer[m];
-            coeff_ptr[coef_base_idx + m] = tcoef;
-          }
-        }
-      }
-    }
+  // Loop over all atoms and apply the potential
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+    colorExclusionMesh(gpu);
+    break;
+  case GridDetail::NONBONDED_FIELD:
+  case GridDetail::NONBONDED_ATOMIC:
+    break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
-
+void BackgroundMesh<T>::computeNeighborLists(const GpuDetails &gpu) {
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+  case GridDetail::NONBONDED_FIELD:
+    break;
+  case GridDetail::NONBONDED_ATOMIC:
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -859,9 +778,9 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const std::vector<double> &mes
           "getMeasurements");
   }
   const std::vector<double> mesh_limits = {
-    std::min(mesh_bounds[0], mesh_bounds[3]), std::max(mesh_bounds[0], mesh_bounds[3]),
-    std::min(mesh_bounds[1], mesh_bounds[4]), std::max(mesh_bounds[1], mesh_bounds[4]),
-    std::min(mesh_bounds[2], mesh_bounds[5]), std::max(mesh_bounds[2], mesh_bounds[5]) };  
+    std::min(mesh_bounds[0], mesh_bounds[3]), std::min(mesh_bounds[1], mesh_bounds[4]),
+    std::min(mesh_bounds[2], mesh_bounds[5]), std::max(mesh_bounds[0], mesh_bounds[3]),
+    std::max(mesh_bounds[1], mesh_bounds[4]), std::max(mesh_bounds[2], mesh_bounds[5]) };  
   const int pna = ceil((mesh_limits[3] - mesh_limits[0]) / spacing[0]);
   const int pnb = ceil((mesh_limits[4] - mesh_limits[1]) / spacing[1]);
   const int pnc = ceil((mesh_limits[5] - mesh_limits[2]) / spacing[2]);
@@ -878,39 +797,39 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const std::vector<double> &mes
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void BackgroundMesh<T>::allocate() {
-  MeshParamAbstract<double> mps = measurements.dpData();
-  const int padded_na = roundUp(mps.na, warp_size_int);
-  const int padded_nb = roundUp(mps.nb, warp_size_int);
-  const int padded_nc = roundUp(mps.nc, warp_size_int);
+  MeshParamKit<double> mps = measurements.dpData();
+  const int padded_na = roundUp(mps.na + 1, warp_size_int);
+  const int padded_nb = roundUp(mps.nb + 1, warp_size_int);
+  const int padded_nc = roundUp(mps.nc + 1, warp_size_int);
   llint_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
   int_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
-  a_line_x.setPointer(&llint_data,             0, mps.na);
-  a_line_y.setPointer(&llint_data,     padded_na, mps.na);
-  a_line_z.setPointer(&llint_data, 2 * padded_na, mps.na);
-  a_line_x_overflow.setPointer(&int_data,             0, mps.na);
-  a_line_y_overflow.setPointer(&int_data,     padded_na, mps.na);
-  a_line_z_overflow.setPointer(&int_data, 2 * padded_na, mps.na);
+  a_line_x.setPointer(&llint_data,             0, mps.na + 1);
+  a_line_y.setPointer(&llint_data,     padded_na, mps.na + 1);
+  a_line_z.setPointer(&llint_data, 2 * padded_na, mps.na + 1);
+  a_line_x_overflow.setPointer(&int_data,             0, mps.na + 1);
+  a_line_y_overflow.setPointer(&int_data,     padded_na, mps.na + 1);
+  a_line_z_overflow.setPointer(&int_data, 2 * padded_na, mps.na + 1);
   int thus_far = 3 * padded_na;
-  b_line_x.setPointer(&llint_data,                   thus_far, mps.nb);
-  b_line_y.setPointer(&llint_data,       padded_nb + thus_far, mps.nb);
-  b_line_z.setPointer(&llint_data, (2 * padded_nb) + thus_far, mps.nb);
-  b_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nb);
-  b_line_y_overflow.setPointer(&int_data,       padded_nb + thus_far, mps.nb);
-  b_line_z_overflow.setPointer(&int_data, (2 * padded_nb) + thus_far, mps.nb);
+  b_line_x.setPointer(&llint_data,                   thus_far, mps.nb + 1);
+  b_line_y.setPointer(&llint_data,       padded_nb + thus_far, mps.nb + 1);
+  b_line_z.setPointer(&llint_data, (2 * padded_nb) + thus_far, mps.nb + 1);
+  b_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nb + 1);
+  b_line_y_overflow.setPointer(&int_data,       padded_nb + thus_far, mps.nb + 1);
+  b_line_z_overflow.setPointer(&int_data, (2 * padded_nb) + thus_far, mps.nb + 1);
   thus_far += 3 * padded_nb;
-  c_line_x.setPointer(&llint_data,                   thus_far, mps.nc);
-  c_line_y.setPointer(&llint_data,       padded_nc + thus_far, mps.nc);
-  c_line_z.setPointer(&llint_data, (2 * padded_nc) + thus_far, mps.nc);
-  c_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nc);
-  c_line_y_overflow.setPointer(&int_data,       padded_nc + thus_far, mps.nc);
-  c_line_z_overflow.setPointer(&int_data, (2 * padded_nc) + thus_far, mps.nc);
+  c_line_x.setPointer(&llint_data,                   thus_far, mps.nc + 1);
+  c_line_y.setPointer(&llint_data,       padded_nc + thus_far, mps.nc + 1);
+  c_line_z.setPointer(&llint_data, (2 * padded_nc) + thus_far, mps.nc + 1);
+  c_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nc + 1);
+  c_line_y_overflow.setPointer(&int_data,       padded_nc + thus_far, mps.nc + 1);
+  c_line_z_overflow.setPointer(&int_data, (2 * padded_nc) + thus_far, mps.nc + 1);
   thus_far += 3 * padded_nc;
-  a_abs_line_x.setPointer(&llint_data,                   thus_far, mps.na);
-  a_abs_line_y.setPointer(&llint_data,       padded_na + thus_far, mps.na);
-  a_abs_line_z.setPointer(&llint_data, (2 * padded_na) + thus_far, mps.na);
-  a_abs_line_x_overflow.setPointer(&int_data,                   thus_far, mps.na);
-  a_abs_line_y_overflow.setPointer(&int_data,       padded_na + thus_far, mps.na);
-  a_abs_line_z_overflow.setPointer(&int_data, (2 * padded_na) + thus_far, mps.na);
+  a_abs_line_x.setPointer(&llint_data,                   thus_far, mps.na + 1);
+  a_abs_line_y.setPointer(&llint_data,       padded_na + thus_far, mps.na + 1);
+  a_abs_line_z.setPointer(&llint_data, (2 * padded_na) + thus_far, mps.na + 1);
+  a_abs_line_x_overflow.setPointer(&int_data,                   thus_far, mps.na + 1);
+  a_abs_line_y_overflow.setPointer(&int_data,       padded_na + thus_far, mps.na + 1);
+  a_abs_line_z_overflow.setPointer(&int_data, (2 * padded_na) + thus_far, mps.na + 1);
   const int nbits = static_cast<int>(sizeof(uint)) * 8;
   coefficients.resize(64LLU * static_cast<size_t>(mps.na * mps.nb * mps.nc));
   if (ag_pointer != nullptr) {
@@ -1026,6 +945,162 @@ template <typename T> void BackgroundMesh<T>::validateScalingBits() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void BackgroundMesh<T>::computeMeshAxisCoordinates() {
+  const MeshParamKit<double> mps = measurements.dpData();
+  fixedPrecisionGrid(&a_line_x, &a_line_x_overflow, { 0LL, 0 }, mps.fp_invu[0]);
+  fixedPrecisionGrid(&a_line_y, &a_line_y_overflow, { 0LL, 0 }, mps.fp_invu[1]);
+  fixedPrecisionGrid(&a_line_z, &a_line_z_overflow, { 0LL, 0 }, mps.fp_invu[2]);
+  fixedPrecisionGrid(&b_line_x, &b_line_x_overflow, { 0LL, 0 }, mps.fp_invu[3]);
+  fixedPrecisionGrid(&b_line_y, &b_line_y_overflow, { 0LL, 0 }, mps.fp_invu[4]);
+  fixedPrecisionGrid(&b_line_z, &b_line_z_overflow, { 0LL, 0 }, mps.fp_invu[5]);
+  fixedPrecisionGrid(&c_line_x, &c_line_x_overflow, { 0LL, 0 }, mps.fp_invu[6]);
+  fixedPrecisionGrid(&c_line_y, &c_line_y_overflow, { 0LL, 0 }, mps.fp_invu[7]);
+  fixedPrecisionGrid(&c_line_z, &c_line_z_overflow, { 0LL, 0 }, mps.fp_invu[8]);
+  fixedPrecisionGrid(&a_abs_line_x, &a_abs_line_x_overflow, mps.orig_x, mps.fp_invu[0]);
+  fixedPrecisionGrid(&a_abs_line_y, &a_abs_line_y_overflow, mps.orig_y, mps.fp_invu[1]);
+  fixedPrecisionGrid(&a_abs_line_z, &a_abs_line_z_overflow, mps.orig_z, mps.fp_invu[2]);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
+
+  // Use the HPC kernel to color the mesh if a GPU is available
+#ifdef STORMM_USE_HPC
+  if (gpu != null_gpu) {
+    coefficients.download();
+    return;
+  }
+#endif
+
+  // Color the mesh on the CPU
+  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  const MeshParamKit<double> mps = measurements.dpData();
+  const CoordinateFrameReader cfr = cf_pointer->data();
+  
+  // Initialize the mesh in CPU memory.
+  const int n_elem = mps.na * mps.nb * mps.nc;
+  T* coeff_ptr = coefficients.data();
+  for (int pos = 0; pos < n_elem; pos++) {
+    coeff_ptr[pos] = 0LLU;
+  }
+
+  // Replicate the mesh's grid vectors.  Subtract the origin coordinates from the "b" and "c"
+  // vectors so that a[i] + b[j] + c[k] = the Cartesian coordinates of any grid point (i,j,k).
+  std::vector<double> avx(mps.na + 1), avy(mps.na + 1), avz(mps.na + 1);
+  std::vector<double> bvx(mps.nb + 1), bvy(mps.nb + 1), bvz(mps.nb + 1);
+  std::vector<double> cvx(mps.nc + 1), cvy(mps.nc + 1), cvz(mps.nc + 1);
+  int95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
+                a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
+                a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.inv_scale);
+  int95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
+                b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
+                b_line_z_overflow.readHost(), mps.inv_scale);
+  int95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
+                c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
+                c_line_z_overflow.readHost(), mps.inv_scale);
+  const double dorig_x = int95ToDouble(mps.orig_x);
+  const double dorig_y = int95ToDouble(mps.orig_y);
+  const double dorig_z = int95ToDouble(mps.orig_z);
+
+  // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
+  const double de_ax = 0.0625 * (avx[1] - avx[0]);
+  const double de_ay = 0.0625 * (avy[1] - avy[0]);
+  const double de_az = 0.0625 * (avz[1] - avz[0]);
+  const double de_bx = 0.0625 * (bvx[1] - bvx[0]);
+  const double de_by = 0.0625 * (bvy[1] - bvy[0]);
+  const double de_bz = 0.0625 * (bvz[1] - bvz[0]);
+  const double de_cx = 0.0625 * (cvx[1] - cvx[0]);
+  const double de_cy = 0.0625 * (cvy[1] - cvy[0]);
+  const double de_cz = 0.0625 * (cvz[1] - cvz[0]);
+
+  // Prepare a buffer to hold subgrid results
+  std::vector<ullint> cube_buffer(64, 0LLU);
+
+  // Loop over all atoms in the system
+  const int lj_idx_offset = nbk.n_lj_types + 1;
+  for (int pos = 0; pos < nbk.natom; pos++) {
+    const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
+    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
+                                         1.0 / 6.0);
+    const double color_radius = atom_radius + probe_radius;
+    const double color_radius_sq = color_radius * color_radius;
+    const double atom_x = cfr.xcrd[pos];
+    const double atom_y = cfr.ycrd[pos];
+    const double atom_z = cfr.zcrd[pos];
+    const int ixmin = std::max(static_cast<int>(floor((atom_x - color_radius - dorig_x) /
+                                                      mps.widths[0])), 0);
+    const int iymin = std::max(static_cast<int>(floor((atom_y - color_radius - dorig_y) /
+                                                      mps.widths[1])), 0);
+    const int izmin = std::max(static_cast<int>(floor((atom_z - color_radius - dorig_z) /
+                                                      mps.widths[2])), 0);
+    const int ixmax = std::min(static_cast<int>(ceil((atom_x + color_radius - dorig_x) /
+                                                     mps.widths[0])), mps.na - 1);
+    const int iymax = std::min(static_cast<int>(ceil((atom_y + color_radius - dorig_y) /
+                                                     mps.widths[1])), mps.nb - 1);
+    const int izmax = std::min(static_cast<int>(ceil((atom_z + color_radius - dorig_z) /
+                                                     mps.widths[2])), mps.nc - 1);
+    for (int i = ixmin; i < ixmax; i++) {
+      for (int j = iymin; j < iymax; j++) {
+        for (int k = izmin; k < izmax; k++) {
+
+          // Color the buffer for this atom and this element
+          const double base_x = avx[ixmin] + bvx[iymin] + cvx[izmin];
+          const double base_y = avy[ixmin] + bvy[iymin] + cvy[izmin];
+          const double base_z = avz[ixmin] + bvz[iymin] + cvz[izmin];
+          for (size_t m = 0LLU; m < 64LLU; m++) {
+            cube_buffer[m] = 0LLU;
+          }
+          int grid_i = 0;
+          for (double di = 0.5; di < 16.0; di += 1.0) {
+            int grid_j = 0;
+            for (double dj = 0.5; dj < 16.0; dj += 1.0) {
+              int grid_k = 0;
+              for (double dk = 0.5; dk < 16.0; dk += 1.0) {
+                const double xpt = base_x + (di * de_ax) + (dj * de_bx) + (dk * de_cx);
+                const double ypt = base_y + (di * de_ay) + (dj * de_by) + (dk * de_cy);
+                const double zpt = base_z + (di * de_az) + (dj * de_bz) + (dk * de_cz);
+                const double dx = xpt - atom_x;
+                const double dy = ypt - atom_y;
+                const double dz = zpt - atom_z;
+                if ((dx * dx) + (dy * dy) + (dz * dz) < color_radius_sq) {
+                  const int cubelet_i = grid_i / 4;
+                  const int cubelet_j = grid_j / 4;
+                  const int cubelet_k = grid_k / 4;
+                  const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
+                  const int bit_i = grid_i - (4 * cubelet_i);
+                  const int bit_j = grid_j - (4 * cubelet_j);
+                  const int bit_k = grid_k - (4 * cubelet_k);
+                  const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
+                  cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
+                }
+                grid_k++;
+              }
+              grid_j++;
+            }
+            grid_i++;
+          }
+
+          // Accumulate the atom's mapping onto the grid
+          const size_t coef_base_idx = 64LLU *
+                                       static_cast<size_t>((((i * mps.nb) + j) * mps.nc) + k);
+          for (size_t m = 0LLU; m < 64LLU; m++) {
+
+            // This is necessary due to the templated nature of the BackgroundMesh object.  In
+            // practice, the only way to get here is to have the coefficients array already be of
+            // type ullint.
+            ullint tcoef = coeff_ptr[coef_base_idx + m];
+            tcoef |= cube_buffer[m];
+            coeff_ptr[coef_base_idx + m] = tcoef;
+          }
+        }
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
 }
 

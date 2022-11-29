@@ -86,6 +86,32 @@ std::string getEnumerationName(const StateVariable input) {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NonbondedPotential input) {
+  switch (input) {
+  case NonbondedPotential::ELECTROSTATIC:
+    return std::string("ELECTROSTATIC");
+  case NonbondedPotential::VAN_DER_WAALS:
+    return std::string("VAN_DER_WAALS");
+  case NonbondedPotential::CLASH:
+    return std::string("CLASH");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const VdwCombiningRule input) {
+  switch (input) {
+  case VdwCombiningRule::LORENTZ_BERTHELOT:
+    return std::string("LORENTZ_BERTHELOT");
+  case VdwCombiningRule::GEOMETRIC:
+    return std::string("GEOMETRIC");
+  case VdwCombiningRule::NBFIX:
+    return std::string("NBFIX");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace energy
 } // namespace stormm

@@ -82,11 +82,25 @@ enum class NonbondedPotential {
   CLASH           ///< Zero (no clash) or one (clash) based on the van-der Waals radii and the
                   ///<   width of some probe sphere representing heavy atoms in the ligand
 };
+
+/// \brief List the methods for combining Lennard-Jones (or other van-der Waals potential)
+///        parameters in pairs of interacting atoms.
+enum class VdwCombiningRule {
+  LORENTZ_BERTHELOT,  ///< Sigma parameters s_i and s_j are combined by taking (s_i + s_j) / 2.
+                      ///<   Epsilon parameters are always combined by taking sqrt(E_i * E_j).
+  GEOMETRIC,          ///< Sigma parameters s_i and s_j are combined by taking sqrt(s_i * s_j)
+  NBFIX               ///< Pair-specific combinations, with some off-diagonal terms not conforming
+                      ///<   to either of the other rules
+};
   
 /// \brief Get a human-readable name for the enumerations detailed above.
+///
+/// \param input  The enumeration of interest
 /// \{
-std::string getEnumerationName(StateVariable DihedralStyle);
+std::string getEnumerationName(DihedralStyle input);
 std::string getEnumerationName(StateVariable input);
+std::string getEnumerationName(NonbondedPotential input);
+std::string getEnumerationName(VdwCombiningRule input);
 /// \}
 
 } // namespace energy

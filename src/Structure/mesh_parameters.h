@@ -28,20 +28,20 @@ constexpr int mesh_nonoverflow_bits = 48;
 
 /// \brief The abstract of a MeshParameters object is read-only (modify the original to get a new
 ///        abstract if the dimensions change), but templated to prune the information present.
-template <typename T> struct MeshParamAbstract {
+template <typename T> struct MeshParamKit {
 
   /// \brief The constructor takes arguments for all member variables.
-  MeshParamAbstract(int na_in, int nb_in, int nc_in, int95_t orig_x_in, int95_t orig_y_in,
-                    int95_t orig_z_in, T scale_in, T inv_scale_in, const T* umat_in,
-                    const T* invu_in, const T* widths_in, const int95_t* fp_invu_in);
+  MeshParamKit(int na_in, int nb_in, int nc_in, int95_t orig_x_in, int95_t orig_y_in,
+               int95_t orig_z_in, T scale_in, T inv_scale_in, const T* umat_in, const T* invu_in,
+               const T* widths_in, const int95_t* fp_invu_in);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
   ///
   /// \param original  The object to copy or move
   /// \{
-  MeshParamAbstract(const MeshParamAbstract &original) = default;
-  MeshParamAbstract(MeshParamAbstract &&original) = default;
+  MeshParamKit(const MeshParamKit &original) = default;
+  MeshParamKit(MeshParamKit &&original) = default;
   /// \}
   
   const int na;              ///< Number of mesh elements along the "a" (~x) axis
@@ -217,10 +217,10 @@ public:
   /// \}
 
   /// \brief Obtain a double-precision abstract for this object.
-  MeshParamAbstract<double> dpData() const;
+  MeshParamKit<double> dpData() const;
 
   /// \brief Obtain a single-precision abstract for this object.
-  MeshParamAbstract<float> spData() const;
+  MeshParamKit<float> spData() const;
 
   /// \brief Set the number of mesh elements along the "a", "b", or "c" axes.
   ///
