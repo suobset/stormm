@@ -336,38 +336,56 @@ void finiteDifferenceDisparity(const double x, const double y, const double z,
 //   tcmat:   Standard Template Library copy of the tricubic spline weights matrix
 //   coeffs:  [Optional] Vector of coefficients for individual terms in the polynomial
 //-------------------------------------------------------------------------------------------------
-void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<double> coeffs = {}) {
+void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<double> coeffs = {},
+                        const std::vector<double> &cell_dimensions_in = {}) {
 
+  // Prepare the cell dimensions
+  std::vector<double> cell_dimensions(9, 0.0);
+  cell_dimensions[0] = 1.0;
+  cell_dimensions[4] = 1.0;
+  cell_dimensions[8] = 1.0;
+  if (cell_dimensions_in.size() == 3LLU) {
+    cell_dimensions[0] = cell_dimensions_in[0];
+    cell_dimensions[4] = cell_dimensions_in[1];
+    cell_dimensions[8] = cell_dimensions_in[2];
+  }
+  
   // Begin by testing the polynomial's analytic evaluation, to ensure subsequent tests are valid.
   finiteDifferenceDisparity( 0.5,  0.9,  0.4, coeffs);
   finiteDifferenceDisparity(-1.7,  2.6, -1.8, coeffs);
   finiteDifferenceDisparity( 2.3,  1.1, -2.0, coeffs);
   std::vector<TricubicCell<double>> grid;
-  grid.reserve(343);
-  for (int k = -3; k < 4; k++) {
-    for (int j = -3; j < 4; j++) {
-      for (int i = -3; i < 4; i++) {
+  grid.reserve(729);
+  for (int k = -4; k < 5; k++) {
+    for (int j = -4; j < 5; j++) {
+      for (int i = -4; i < 5; i++) {
 
         // Map the function U = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
         // to a grid.  The function is encoded in triPolynomial() above.
         std::vector<double> f(8), dx(8), dy(8), dz(8), dxy(8), dxz(8), dyz(8), dxyz(8);
         for (int pi = 0; pi < 2; pi++) {
+          const double xloc = cell_dimensions[0] * static_cast<double>(i + pi);
           for (int pj = 0; pj < 2; pj++) {
+            const double yloc = cell_dimensions[4] * static_cast<double>(j + pj);
             for (int pk = 0; pk < 2; pk++) {
+              const double zloc = cell_dimensions[8] * static_cast<double>(k + pk);
               const int m = (2 * ((2 * pk) + pj)) + pi;
-              f[m]    = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::VALUE, coeffs);
-              dx[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DX, coeffs);
-              dy[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DY, coeffs);
-              dz[m]   = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DZ, coeffs);
-              dxy[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXY, coeffs);
-              dxz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXZ, coeffs);
-              dyz[m]  = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DYZ, coeffs);
-              dxyz[m] = triPolynomial(i + pi, j + pj, k + pk, TricubicBound::DXYZ, coeffs);
+              f[m]    = triPolynomial(xloc, yloc, zloc, TricubicBound::VALUE, coeffs);
+              dx[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DX, coeffs);
+              dy[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DY, coeffs);
+              dz[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DZ, coeffs);
+              dxy[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DXY, coeffs);
+              dxz[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DXZ, coeffs);
+              dyz[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DYZ, coeffs);
+              dxyz[m] = triPolynomial(xloc, yloc, zloc, TricubicBound::DXYZ, coeffs);
             }
           }
         }
-        const std::vector<double> anchor = { static_cast<double>(i), static_cast<double>(j),
-                                             static_cast<double>(k), 1.0, 1.0, 1.0 };
+        const std::vector<double> anchor = { static_cast<double>(i) * cell_dimensions[0],
+                                             static_cast<double>(j) * cell_dimensions[4],
+                                             static_cast<double>(k) * cell_dimensions[8],
+                                             cell_dimensions[0], cell_dimensions[4],
+                                             cell_dimensions[8] };
         grid.emplace_back(tcmat, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
       }
     }
@@ -395,10 +413,10 @@ void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<doub
     const double pty = test_points[(3 * i) + 1];
     const double ptz = test_points[(3 * i) + 2];
     analytic_tc[i] = triPolynomial(ptx, pty, ptz, TricubicBound::VALUE, coeffs);
-    const int gcell_x = ptx - grid[0].getCellOrigin(CartesianDimension::X);
-    const int gcell_y = pty - grid[0].getCellOrigin(CartesianDimension::Y);
-    const int gcell_z = ptz - grid[0].getCellOrigin(CartesianDimension::Z);
-    const int gcell = (7 * ((7 * gcell_z) + gcell_y)) + gcell_x;
+    const int gcell_x = (ptx - grid[0].getCellOrigin(CartesianDimension::X)) / cell_dimensions[0];
+    const int gcell_y = (pty - grid[0].getCellOrigin(CartesianDimension::Y)) / cell_dimensions[4];
+    const int gcell_z = (ptz - grid[0].getCellOrigin(CartesianDimension::Z)) / cell_dimensions[8];
+    const int gcell = (9 * ((9 * gcell_z) + gcell_y)) + gcell_x;
     spline_tc[i] = grid[gcell].evaluate(ptx, pty, ptz);
     analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DX, coeffs);
     analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DY, coeffs);
@@ -1140,7 +1158,13 @@ int main(const int argc, const char* argv[]) {
     random_coefficients[i] = xrs256pp.gaussianRandomNumber();
   }
   tricubicTestBundle(tcmat.readHost(), random_coefficients);
-  
+  std::vector<double> x_only_coefficients(64, 0.0);
+  for (int i = 0; i < 4; i++) {
+    x_only_coefficients[i] = xrs256pp.gaussianRandomNumber();
+  }
+  tricubicTestBundle(tcmat.readHost(), x_only_coefficients, { 0.5, 1.0, 1.0 });
+  tricubicTestBundle(tcmat.readHost(), random_coefficients, { 0.7, 0.9, 1.1 });
+
   // Print results
   printTestSummary(oe.getVerbosity());
 

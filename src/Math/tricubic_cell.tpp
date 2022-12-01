@@ -41,24 +41,6 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
           dxyz_in[7] }, origin_x{0.0}, origin_y{0.0}, origin_z{0.0}, length_x{1.0}, length_y{1.0},
     length_z{1.0}
 {
-  // Fill out the coefficients matrix
-  std::vector<double> b(64);
-  for (int i = 0; i < 8; i++) {
-    b[i     ] = f[i];
-    b[i +  8] = dx[i];
-    b[i + 16] = dy[i];
-    b[i + 24] = dz[i];
-    b[i + 32] = dxy[i];
-    b[i + 40] = dxz[i];
-    b[i + 48] = dyz[i];
-    b[i + 56] = dxyz[i];
-  }
-  std::vector<double> dcoeffs(64);
-  matrixVectorMultiply(weights_matrix.data(), b.data(), dcoeffs.data(), 64, 64);
-  for (int i = 0; i < 64; i++) {
-    coefficients[i] = dcoeffs[i];
-  }
-
   // Fill out the grid cell's dimensions
   if (bounds.size() == 4LLU) {
     origin_x = bounds[0];
@@ -80,12 +62,30 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
     rtErr("Invalid dimesion " + std::to_string(bounds.size()) + " on the bounds array.  There "
           "must be four or six entries.", "TricubicCell");
   }
-  
+
   // Check the cell lengths
   if (length_x < 0.0 || length_y < 0.0 || length_z < 0.0) {
     rtErr("Invalid cell lengths " + realToString(length_x, 7, 4, NumberFormat::STANDARD_REAL) +
           " x " + realToString(length_y, 7, 4, NumberFormat::STANDARD_REAL) + " x " +
           realToString(length_z, 7, 4, NumberFormat::STANDARD_REAL) + ".", "TricubicCell");
+  }
+  
+  // Fill out the coefficients matrix
+  std::vector<double> b(64);
+  for (int i = 0; i < 8; i++) {
+    b[i     ] = f[i];
+    b[i +  8] = dx[i] * length_x;
+    b[i + 16] = dy[i] * length_y;
+    b[i + 24] = dz[i] * length_z;
+    b[i + 32] = dxy[i] * length_x * length_y;
+    b[i + 40] = dxz[i] * length_x * length_z;
+    b[i + 48] = dyz[i] * length_y * length_z;
+    b[i + 56] = dxyz[i] * length_x * length_y * length_z;
+  }
+  std::vector<double> dcoeffs(64);
+  matrixVectorMultiply(weights_matrix.data(), b.data(), dcoeffs.data(), 64, 64);
+  for (int i = 0; i < 64; i++) {
+    coefficients[i] = dcoeffs[i];
   }
 }
 
@@ -202,6 +202,15 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
   const T x_frac = (x - origin_x) / length_x;
   const T y_frac = (y - origin_y) / length_y;
   const T z_frac = (z - origin_z) / length_z;
+
+  // CHECK
+  bool report = false;
+  if (fabs(length_x - 0.5) < 1.0e-6 && fabs(x - 1.01) < 1.0e-6 && fabs(y - 1.01) < 1.0e-6 &&
+      fabs(z - 1.01) < 1.0e-6) {
+    report = true;
+  }
+  // END CHECK
+  
   T result = 0.0;
   const T v_one = 1.0; 
   T xv = v_one;
@@ -234,6 +243,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_x;
     break;
   case TricubicBound::DY:
     for (int i = 0; i < 4; i++) {
@@ -250,6 +260,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_y;
     break;
   case TricubicBound::DZ:
     for (int i = 0; i < 4; i++) {
@@ -266,6 +277,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_z;
     break;
   case TricubicBound::DXY:
     for (int i = 1; i < 4; i++) {
@@ -283,6 +295,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_x * length_y;
     break;
   case TricubicBound::DXZ:
     for (int i = 1; i < 4; i++) {
@@ -300,6 +313,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_x * length_z;
     break;
   case TricubicBound::DYZ:
     for (int i = 0; i < 4; i++) {
@@ -318,6 +332,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_y * length_z;
     break;
   case TricubicBound::DXYZ:
     for (int i = 1; i < 4; i++) {
@@ -337,6 +352,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
+    result /= length_x * length_y * length_z;
     break;
   }
   return result;

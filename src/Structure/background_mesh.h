@@ -12,6 +12,7 @@
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Math/tricubic_cell.h"
 #include "Math/vector_ops.h"
 #include "Math/rounding.h"
 #include "Numerics/split_fixed_precision.h"
@@ -41,6 +42,7 @@ using energy::VdwCombiningRule;
 using math::addScalarToVector;
 using math::elementwiseMultiply;
 using math::roundUp;
+using math::getTricubicMatrix;
 using parse::NumberFormat;
 using numerics::default_globalpos_scale_bits;
 using numerics::fixedPrecisionGrid;

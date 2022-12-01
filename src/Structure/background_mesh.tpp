@@ -967,6 +967,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
   // Use the HPC kernel to color the mesh if a GPU is available
 #ifdef STORMM_USE_HPC
   if (gpu != null_gpu) {
+    
     coefficients.download();
     return;
   }
@@ -974,6 +975,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
   const MeshParamKit<double> mps = measurements.dpData();
   const CoordinateFrameReader cfr = cf_pointer->data();
   
@@ -1019,6 +1021,9 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
   // Loop over all atoms in the system
   const int lj_idx_offset = nbk.n_lj_types + 1;
   for (int pos = 0; pos < nbk.natom; pos++) {
+    if (frozen_atom[pos] == false) {
+      continue;
+    }
     const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
     const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
                                          1.0 / 6.0);
@@ -1066,11 +1071,11 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
                   const int cubelet_i = grid_i / 4;
                   const int cubelet_j = grid_j / 4;
                   const int cubelet_k = grid_k / 4;
-                  const int cubelet_idx = (((cubelet_i * 4) + cubelet_j) * 4) + cubelet_k;
+                  const int cubelet_idx = (((cubelet_k * 4) + cubelet_j) * 4) + cubelet_i;
                   const int bit_i = grid_i - (4 * cubelet_i);
                   const int bit_j = grid_j - (4 * cubelet_j);
                   const int bit_k = grid_k - (4 * cubelet_k);
-                  const int bit_idx = (((bit_i * 4) + bit_j) * 4) + bit_k;
+                  const int bit_idx = (((bit_k * 4) + bit_j) * 4) + bit_i;
                   cube_buffer[cubelet_idx] |= (0x1LLU << bit_idx);
                 }
                 grid_k++;
@@ -1082,7 +1087,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
           // Accumulate the atom's mapping onto the grid
           const size_t coef_base_idx = 64LLU *
-                                       static_cast<size_t>((((i * mps.nb) + j) * mps.nc) + k);
+                                       static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i);
           for (size_t m = 0LLU; m < 64LLU; m++) {
 
             // This is necessary due to the templated nature of the BackgroundMesh object.  In
@@ -1102,6 +1107,154 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 template <typename T>
 void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
+  // Use the HPC kernel to color the mesh if a GPU is available
+#ifdef STORMM_USE_HPC
+  if (gpu != null_gpu) {
+    
+    coefficients.download();
+    return;
+  }
+#endif
+
+  // Color the mesh on the CPU
+  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
+  const MeshParamKit<double> mps = measurements.dpData();
+  const CoordinateFrameReader cfr = cf_pointer->data();
+  
+  // Initialize the mesh in CPU memory.
+  const int n_elem = mps.na * mps.nb * mps.nc;
+  T* coeff_ptr = coefficients.data();
+  const T zero = 0.0;
+  for (int pos = 0; pos < n_elem; pos++) {
+    coeff_ptr[pos] = zero;
+  }
+
+  // Set pointers to mesh lines for more rapid access
+  const llint* bvec_x_ptr = b_line_x.data();
+  const llint* bvec_y_ptr = b_line_y.data();
+  const llint* bvec_z_ptr = b_line_z.data();
+  const llint* cvec_x_ptr = c_line_x.data();
+  const llint* cvec_y_ptr = c_line_y.data();
+  const llint* cvec_z_ptr = c_line_z.data();
+  const llint* bvec_x_overflow_ptr = b_line_x.data();
+  const llint* bvec_y_overflow_ptr = b_line_y.data();
+  const llint* bvec_z_overflow_ptr = b_line_z.data();
+  const llint* cvec_x_overflow_ptr = c_line_x.data();
+  const llint* cvec_y_overflow_ptr = c_line_y.data();
+  const llint* cvec_z_overflow_ptr = c_line_z.data();
+
+  // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
+  // each element.  This allocates a small amount of additional memory, relative to the mesh that
+  // will be produced, but reduces the pre-computations for getting those elements by a factor
+  // approaching eight.  Since this is all being done on the CPU, use std::vector<double> objects
+  // and compute the coefficients in double-precision (64-bit), even if they will be used in
+  // 32-bit representations.  Here, "grid" will refer to the three-dimensional series of regular
+  // points on which the electrostatic potential U, dU/dx, dU/dy, ..., d2U/dxdy, ..., d3U/dxdydz
+  // are computed, while "mesh" will refer to the collection of coefficients for each corresponding
+  // element.
+  const size_t ngrid_a = mps.na + 1;
+  const size_t ngrid_b = mps.nb + 1;
+  const size_t ngrid_c = mps.nc + 1;
+  const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
+  std::vector<double> u_grid(ngabc), dudx_grid(ngabc), dudy_grid(ngabc), dudz_grid(ngabc);
+  std::vector<double> dudxy_grid(ngabc), dudxz_grid(ngabc), dudyz_grid(ngabc), dudxyz_grid(ngabc);
+  for (int pos = 0; pos < nbk.natom; pos++) {
+    if (frozen_atoms[pos] == false) {
+      continue;
+    }
+
+    // Compute the particle position in the mesh's native fixed-precision format
+    const int95_t atom_x = doubleToInt95(cfr.xcrd[pos] * mps.scale);
+    const int95_t atom_y = doubleToInt95(cfr.ycrd[pos] * mps.scale);
+    const int95_t atom_z = doubleToInt95(cfr.zcrd[pos] * mps.scale);
+
+    // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
+    // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
+    const double atom_q = nbk.charge[pos];
+
+    // Loop over all grid points
+    for (size_t i = 0LLU; i < ngrid_a; i++) {
+      const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
+      const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
+      const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
+      for (size_t j = 0LLU; j < ngrid_b; j++) {
+        const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
+        const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
+        const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+        for (size_t k = 0LLU; k < ngrid_c; k++) {
+          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
+          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
+          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+
+          // Compute the displacements using the mesh's fixed-precision representation, then
+          // immediately convert to double for real-valued computations.
+          const int95_t fp_disp_x = splitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
+          const int95_t fp_disp_y = splitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
+          const int95_t fp_disp_z = splitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
+          const double disp_x = int95ToDouble(fp_disp_x);
+          const double disp_y = int95ToDouble(fp_disp_y);
+          const double disp_z = int95ToDouble(fp_disp_z);
+          const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
+          const double r  = sqrt(r2);
+
+          // Compute the potential
+          const double u = atom_q / r;
+          const double du_dx = -u * disp_x / r2;
+          const double du_dy = -u * disp_y / r2;
+          const double du_dz = -u * disp_z / r2;
+          const double du_dxy = -3.0 * du_dx * disp_y / r2;
+          const double du_dxz = -3.0 * du_dx * disp_z / r2;
+          const double du_dyz = -3.0 * du_dy * disp_z / r2;
+          const double du_dxyz = -5.0 * du_dxy * disp_z / r2;
+          const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
+          u_grid[nijk] = u;
+          dudx_grid[nijk] = du_dx;
+          dudy_grid[nijk] = du_dy;
+          dudz_grid[nijk] = du_dz;
+          dudxy_grid[nijk] = du_dxy;
+          dudxz_grid[nijk] = du_dxz;
+          dudyz_grid[nijk] = du_dyz;
+          dudxyz_grid[nijk] = du_dxyz;
+        }
+      }
+    }
+  }
+
+  // Compute the weights matrix
+  std::vector<double> tc_weights = getTricubicMatrix().readHost();  
+  
+  // Compute coefficeints
+  std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
+  std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
+  for (int i = 0; i < mps.na; i++) {
+    for (int j = 0; j < mps.nb; j++) {
+      for (int k = 0; k < mps.nc; k++) {
+
+        // Compose the input vectors
+        for (int ci = 0; ci < 2; ci++) {
+          const size_t ici = i + ci;
+          for (int cj = 0; cj < 2; cj++) {
+            const size_t jcj = j + cj;
+            for (int ck = 0; ck < 2; ck++) {
+              const size_t nv = (((ck * 2) + cj) * 2) + ci;
+              const size_t kck = k + ck;
+              const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+              u_elem[nv] = u_grid[nijk];
+              dudx_elem[nv] = dudx_grid[nijk];
+              dudy_elem[nv] = dudy_grid[nijk];
+              dudz_elem[nv] = dudz_grid[nijk];
+              dudxy_elem[nv] = dudxy_grid[nijk];
+              dudxz_elem[nv] = dudxz_grid[nijk];
+              dudyz_elem[nv] = dudyz_grid[nijk];
+              dudxyz_elem[nv] = dudxyz_grid[nijk];
+
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace structure
