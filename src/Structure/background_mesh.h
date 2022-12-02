@@ -614,12 +614,19 @@ private:
   /// \brief Color the exclusion mesh based on a particular set of coordinates.
   ///
   /// \param gpu  Details of any available GPU
-  void colorExclusionMesh(const GpuDetails &gpu);
+  void colorExclusionMesh(const GpuDetails &gpu = null_gpu);
 
-  /// \brief Map the electrostatics of the receptor's rigid atoms.
+  /// \brief Map the non-bonded potential due to the receptor's rigid atoms, without any neighbor
+  ///        lists (which implies element-specific mesh exclusions).
   ///
-  /// \param gpu  Details of any available GPU
-  void mapElectrostatics(const GpuDetails &gpu);
+  /// \param gpu          Details of any available GPU
+  /// \param eps_table    A table of well depth values by which the probe interacts with the atoms
+  ///                     of the mesh-mapped receptor
+  /// \param sigma_table  A table of sigma radii by which the probe interacts with the atoms of
+  ///                     the mesh-mapped receptor
+  void mapPureNonbondedPotential(const GpuDetails &gpu = null_gpu,
+                                 const std::vector<double> &eps_table = {},
+                                 const std::vector<double> &sigma_table = {});
 
   /// \brief Common function for various NONBONDED_FIELD meshes making use of a series of grids
   ///        for the function values plus partial and mixed partial derivatives.  This works for

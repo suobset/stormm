@@ -675,6 +675,7 @@ void BackgroundMesh<T>::computeField(const GpuDetails &gpu) {
     colorExclusionMesh(gpu);
     break;
   case GridDetail::NONBONDED_FIELD:
+    mapPureNonbondedPotential(gpu);
   case GridDetail::NONBONDED_ATOMIC:
     break;
   }
@@ -1156,6 +1157,7 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
   const llint* cvec_x_overflow_ptr = c_line_x.data();
   const llint* cvec_y_overflow_ptr = c_line_y.data();
   const llint* cvec_z_overflow_ptr = c_line_z.data();
+  T* coeff_ptr = coefficients.data();
 
   // Compute coefficeints
   std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
@@ -1213,7 +1215,7 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
         const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
         const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
         for (size_t i = 0LLU; i < 64LLU; i++) {
-          coefficients[tc_offset + i] = tc_coeffs[i];
+          coeff_ptr[tc_offset + i] = tc_coeffs[i];
         }
       }
     }
@@ -1222,8 +1224,34 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
+void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
+                                                  const std::vector<double> &eps_table,
+                                                  const std::vector<double> &sigma_table) {
 
+  // Check for problematic input cases
+  switch (field) {
+  case NonbondedPotential::ELECTROSTATIC:
+    break;
+  case NonbondedPotential::VAN_DER_WAALS:
+    if (mixing_protocol == VdwCombiningRule::NBFIX &&
+        (static_cast<int>(eps_table.size())   != ag_pointer->getAtomTypeCount() ||
+         static_cast<int>(sigma_table.size()) != ag_pointer->getAtomTypeCount())) {
+      rtErr("In order to map a van-der Waals potential using the " +
+            getEnumerationName(mixing_protocol) + " method, tables of the particle-particle well "
+            "depth and interaction sigma values must be provided for the probe interacting with "
+            "all types present in the receptor's topology.  Number of atom types in the "
+            "topology: " + std::to_string(ag_pointer->getAtomTypeCount()) + ".  Number of atom "
+            "types present in each table provided: " + std::to_string(eps_table.size()) +
+            " (epsilon) and " + std::to_string(sigma_table.size()) + " (sigma).", "BackgroundMesh",
+            "mapPureNonbondedPotential");
+    }
+    break;
+  case NonbondedPotential::CLASH:
+
+    // This would have to be an occlusion mask and would not have an associated potential field.
+    break;
+  }
+  
   // Use the HPC kernel to color the mesh if a GPU is available
 #ifdef STORMM_USE_HPC
   if (gpu != null_gpu) {
@@ -1277,7 +1305,7 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
   std::vector<double> u_grid(ngabc), dudx_grid(ngabc), dudy_grid(ngabc), dudz_grid(ngabc);
   std::vector<double> dudxy_grid(ngabc), dudxz_grid(ngabc), dudyz_grid(ngabc), dudxyz_grid(ngabc);
   for (int pos = 0; pos < nbk.natom; pos++) {
-    if (frozen_atoms[pos] == false) {
+    if (frozen_atom[pos] == false) {
       continue;
     }
 
@@ -1289,6 +1317,30 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
     // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
     // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
     const double atom_q = nbk.charge[pos];
+    const int atom_lj_idx = nbk.lj_idx[pos];
+    const double atom_lja = nbk.lja_coeff[(atom_lj_idx + 1) * nbk.n_lj_types];
+    const double atom_ljb = nbk.ljb_coeff[(atom_lj_idx + 1) * nbk.n_lj_types];
+    const double atom_sigma = (atom_lja >= 1.0e-6 && atom_ljb >= 1.0e-6) ?
+                              pow(atom_lja / atom_ljb, 1.0 / 6.0) : 0.0;
+    const double atom_eps = (atom_sigma > 0.0) ? 0.25 * pow(atom_ljb / atom_sigma, 1.0 / 6.0) :
+                                                 0.0;
+    double pair_eps, pair_sigma;
+    switch (mixing_protocol) {
+    case VdwCombiningRule::LORENTZ_BERTHELOT:
+      pair_eps = sqrt(atom_eps * well_depth);
+      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+      break;
+    case VdwCombiningRule::GEOMETRIC:
+      pair_eps = sqrt(atom_eps * well_depth);
+      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+      break;
+    case VdwCombiningRule::NBFIX:
+      pair_eps   = eps_table[atom_lj_idx];
+      pair_sigma = sigma_table[atom_lj_idx];
+      break;
+    }
+    const double pair_lja = 4.0 * pair_eps * pow(pair_sigma, 12.0);
+    const double pair_ljb = 4.0 * pair_eps * pow(pair_sigma, 6.0);
 
     // Loop over all grid points
     for (size_t i = 0LLU; i < ngrid_a; i++) {
@@ -1314,17 +1366,29 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
           const double disp_z = int95ToDouble(fp_disp_z);
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
-
-          // Compute the potential
-          const double u = atom_q / r;
-          const double du_dx = -u * disp_x / r2;
-          const double du_dy = -u * disp_y / r2;
-          const double du_dz = -u * disp_z / r2;
-          const double du_dxy = -3.0 * du_dx * disp_y / r2;
-          const double du_dxz = -3.0 * du_dx * disp_z / r2;
-          const double du_dyz = -3.0 * du_dy * disp_z / r2;
-          const double du_dxyz = -5.0 * du_dxy * disp_z / r2;
           const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
+
+          // Compute one of a variety of potentials
+          double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz;
+          switch (field) {
+          case NonbondedPotential::ELECTROSTATIC:
+            u = atom_q / r;
+            du_dx = -u * disp_x / r2;
+            du_dy = -u * disp_y / r2;
+            du_dz = -u * disp_z / r2;
+            du_dxy = -3.0 * du_dx * disp_y / r2;
+            du_dxz = -3.0 * du_dx * disp_z / r2;
+            du_dyz = -3.0 * du_dy * disp_z / r2;
+            du_dxyz = -5.0 * du_dxy * disp_z / r2;
+            break;
+          case NonbondedPotential::VAN_DER_WAALS:
+
+            break;
+          case NonbondedPotential::CLASH:
+            break;
+          }
+
+          // Log the results
           u_grid[nijk] = u;
           dudx_grid[nijk] = du_dx;
           dudy_grid[nijk] = du_dy;
