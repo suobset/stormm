@@ -35,6 +35,7 @@ using card::HybridTargetLevel;
 using data_types::getStormmScalarTypeName;
 using data_types::isScalarType;
 using data_types::isFloatingPointScalarType;
+using data_types::isSignedIntegralScalarType;
 using constants::CartesianDimension;
 using constants::UnitCellAxis;
 using energy::NonbondedPotential;
@@ -224,8 +225,7 @@ public:
 
   BackgroundMesh(GridDetail kind_in, NonbondedPotential field_in,
                  const AtomGraph *ag_in, const CoordinateFrame *cf_in,
-                 double probe_radius_in = 0.0, double well_depth_in = 0.0,
-                 VdwCombiningRule mixing_protocol_in = VdwCombiningRule::LORENTZ_BERTHELOT,
+                 double probe_radius_in, double well_depth_in, VdwCombiningRule mixing_protocol_in,
                  const MeshParameters &measurements_in = MeshParameters(),
                  const GpuDetails &gpu = null_gpu);
 
@@ -614,12 +614,7 @@ private:
   /// \brief Color the exclusion mesh based on a particular set of coordinates.
   ///
   /// \param gpu  Details of any available GPU
-  void colorExclusionMesh(const GpuDetails &gpu);
-
-  /// \brief Map the electrostatics of the receptor's rigid atoms.
-  ///
-  /// \param gpu  Details of any available GPU
-  void mapElectrostatics(const GpuDetails &gpu);
+  void colorExclusionMesh(const GpuDetails &gpu = null_gpu);
 
   /// \brief Common function for various NONBONDED_FIELD meshes making use of a series of grids
   ///        for the function values plus partial and mixed partial derivatives.  This works for
@@ -642,9 +637,33 @@ private:
                            const std::vector<double> &dudxy_grid,
                            const std::vector<double> &dudxz_grid,
                            const std::vector<double> &dudyz_grid,
-                           const std::vector<double> &dudxyz_grid);
+                           const std::vector<double> &dudxyz_grid,
+                           const std::vector<double> &dudxx_grid = {},
+                           const std::vector<double> &dudyy_grid = {},
+                           const std::vector<double> &dudzz_grid = {});
+
+  /// \brief Map the non-bonded potential due to the receptor's rigid atoms, without any neighbor
+  ///        lists (which implies element-specific mesh exclusions).
+  ///
+  /// \param gpu          Details of any available GPU
+  /// \param eps_table    A table of well depth values by which the probe interacts with the atoms
+  ///                     of the mesh-mapped receptor
+  /// \param sigma_table  A table of sigma radii by which the probe interacts with the atoms of
+  ///                     the mesh-mapped receptor
+  void mapPureNonbondedPotential(const GpuDetails &gpu = null_gpu,
+                                 const std::vector<double> &eps_table = {},
+                                 const std::vector<double> &sigma_table = {});
 };
 
+/// \brief Interpolate the mesh-based potential (or, for an occlusion mesh, simply read the
+///        bitmask) for a collection of Cartesian coordinates.  This works for a single mesh
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
+                               const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
+                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
+                               const int* ycrd_ovrf, const int* zcrd_ovrf,
+                               int coord_scaling_bits);
+  
 } // namespace structure
 } // namespace stormm
 

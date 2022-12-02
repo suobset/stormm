@@ -2,6 +2,25 @@
 #include "reporting_enumerators.h"
 
 namespace stormm {
+namespace display {
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const HelpSignalKind input) {
+  switch (input) {
+  case HelpSignalKind::NO_ARGS:
+    return std::string("NO_ARGS");
+  case HelpSignalKind::NO_ARGS_ONLY:
+    return std::string("NO_ARGS_ONLY");
+  case HelpSignalKind::KEYWORD:
+    return std::string("KEYWORD");
+  case HelpSignalKind::KEYWORD_ONLY:
+    return std::string("KEYWORD_ONLY");
+  }
+  __builtin_unreachable();
+}
+
+} // namespace display
+  
 namespace review {
 
 //-------------------------------------------------------------------------------------------------

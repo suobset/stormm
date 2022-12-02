@@ -781,12 +781,14 @@ public:
   /// Overloaded:
   ///   - Get a single atom's self-interaction sigma
   ///   - Get the sigma for a pair of atoms (may not obey combining rules, e.g. CHARMM NB-Fix)
+  ///   - Get a table for the self-interaction sigma values of all types present in the topology
   ///
   /// \param index_a   Index for the first atom
   /// \param index_b   Index for the second atom
   /// \{
   template <typename T> T getLennardJonesSigma(int index_a, int index_b) const;
   template <typename T> T getLennardJonesSigma(int index_a) const;
+  template <typename T> std::vector<T> getLennardJonesSigma() const;
   /// \}
 
   /// \brief Get the Lennard-Jones interaction epsilon value.  The quantity is derived from tables
@@ -796,12 +798,14 @@ public:
   /// Overloaded:
   ///   - Get a single atom's self-interaction epsilon
   ///   - Get the epsilon for a pair of atoms (may not obey combining rules, e.g. CHARMM NB-Fix)
+  ///   - Get a table for the self-interaction epsilon values of all types present in the topology
   ///
   /// \param index_a   Index for the first atom
   /// \param index_b   Index for the second atom
   /// \{
   template <typename T> T getLennardJonesEpsilon(int index_a, int index_b) const;
   template <typename T> T getLennardJonesEpsilon(int index_a) const;
+  template <typename T> std::vector<T> getLennardJonesEpsilon() const;
   /// \}
 
   /// \brief Get the Poisson-Boltzmann radius of a particular atom

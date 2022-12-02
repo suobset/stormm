@@ -1,0 +1,36 @@
+image: condaforge/mambaforge
+
+before_script:
+  - mamba install --yes "gxx =8.5" "cmake >=3.18" make gcovr
+
+test:
+  stage: test
+
+  script:
+    - rm -rf build && mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=NO -DSTORMM_ENABLE_TEST_COVERAGE=YES ..
+    - make -j 4
+
+    - make test -j 4
+    - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
+
+    - make install
+
+    # Sanity check that our installed apps run
+    - conformer.stormm --help
+    - ffrefine.stormm --help
+    # TODO: Uncomment if `dynamics.stormm` gets a help message
+    # - dynamics.stormm --help
+
+  coverage: /^\s*lines:\s*\d+.\d+\%/
+
+  artifacts:
+    name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    expire_in: 2 days
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
+
+  tags:
+    - saas-linux-large-amd64

@@ -78,7 +78,19 @@ public:
                const std::vector<T> &dxyz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
                                                  static_cast<T>(0.0), static_cast<T>(0.0),
                                                  static_cast<T>(0.0), static_cast<T>(0.0),
-                                                 static_cast<T>(0.0), static_cast<T>(0.0) });
+                                                 static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dxx_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dyy_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) },
+               const std::vector<T> &dzz_in = { static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0),
+                                                static_cast<T>(0.0), static_cast<T>(0.0) });
   /// \}
 
   /// \brief Retrieve one of the 64 coefficients Aijk for the tricubic spline.
@@ -139,6 +151,9 @@ private:
   T dx[8];     ///< Cartesian X derivatives of the function at the bounding grid points
   T dy[8];     ///< Cartesian Y derivatives of the function at the bounding grid points
   T dz[8];     ///< Cartesian Z derivatives of the function at the bounding grid points
+  T dxx[8];    ///< Cartesian X second derivatives of the function at the bounding grid points
+  T dyy[8];    ///< Cartesian Y second derivatives of the function at the bounding grid points
+  T dzz[8];    ///< Cartesian Z second derivatives of the function at the bounding grid points
   T dxy[8];    ///< Cartesian X/Y cross-derivatives of the function at the bounding grid points
   T dxz[8];    ///< Cartesian X/Z cross-derivatives of the function at the bounding grid points
   T dyz[8];    ///< Cartesian Y/Z cross-derivatives of the function at the bounding grid points

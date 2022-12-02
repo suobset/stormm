@@ -32,20 +32,28 @@ using parse::TextOrigin;
 bool detectHelpSignal(const int argc, const char* argv[], const HelpSignalKind kind,
                       const std::vector<std::string> &help_words) {
   const int nh_words = help_words.size();
+
+  // If the only way to get help is by supplying no arguments, return TRUE or FALSE based on
+  // whether there are no command line arguments.  If the help is triggered by a keyword, but not
+  // keyword only, assume that running the program with no arguments is also intended to trigger
+  // the help messages.
   switch (kind) {
-  case HelpSignalKind::NO_ARGS:
   case HelpSignalKind::NO_ARGS_ONLY:
+    return (argc == 1);
+  case HelpSignalKind::NO_ARGS:    
   case HelpSignalKind::KEYWORD:
     if (argc == 1) {
       return true;
-    }
-    else {
-      return false;
     }
     break;
   case HelpSignalKind::KEYWORD_ONLY:
     break;
   }
+
+  // If there are keywords to parse, cases where the program is supposed to print help messages
+  // only in the case that no command line arguments are supplied would already have receive a
+  // signal of FALSE.  However, if the program is set to provide help messages with a particular
+  // command line argument, parse each argument here.
   switch (kind) {
   case HelpSignalKind::NO_ARGS_ONLY:
     break;

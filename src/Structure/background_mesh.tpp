@@ -135,9 +135,10 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                        scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
+                                 scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -148,8 +149,9 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in),
+                 gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -160,9 +162,10 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                        scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
+                                 scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -174,8 +177,9 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -184,7 +188,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in,  ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -198,7 +202,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -211,7 +215,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -226,7 +230,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -239,8 +243,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -254,8 +258,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -269,8 +273,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const double spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -285,8 +289,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -675,6 +679,8 @@ void BackgroundMesh<T>::computeField(const GpuDetails &gpu) {
     colorExclusionMesh(gpu);
     break;
   case GridDetail::NONBONDED_FIELD:
+    mapPureNonbondedPotential(gpu);
+    break;
   case GridDetail::NONBONDED_ATOMIC:
     break;
   }
@@ -728,26 +734,27 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const Coo
   const int lj_idx_offset = nbk.n_lj_types + 1;
   for (int pos = 0; pos < nbk.natom; pos++) {
     if (ag->getAtomMobility(pos)) {
-      const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
-      const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
-                                           1.0 / 6.0);
-      if (points_unset) {
-        xmin = cfr.xcrd[pos] - atom_radius;
-        xmax = cfr.xcrd[pos] + atom_radius;
-        ymin = cfr.ycrd[pos] - atom_radius;
-        ymax = cfr.ycrd[pos] + atom_radius;
-        zmin = cfr.zcrd[pos] - atom_radius;
-        zmax = cfr.zcrd[pos] + atom_radius;
-        points_unset = false;
-      }
-      else {
-        xmin = std::min(xmin, cfr.xcrd[pos] - atom_radius);
-        xmax = std::max(xmax, cfr.xcrd[pos] + atom_radius);
-        ymin = std::min(ymin, cfr.ycrd[pos] - atom_radius);
-        ymax = std::max(ymax, cfr.ycrd[pos] + atom_radius);
-        zmin = std::min(zmin, cfr.zcrd[pos] - atom_radius);
-        zmax = std::max(zmax, cfr.zcrd[pos] + atom_radius);
-      }
+      continue;
+    }
+    const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
+    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
+                                         1.0 / 6.0);
+    if (points_unset) {
+      xmin = cfr.xcrd[pos] - atom_radius;
+      xmax = cfr.xcrd[pos] + atom_radius;
+      ymin = cfr.ycrd[pos] - atom_radius;
+      ymax = cfr.ycrd[pos] + atom_radius;
+      zmin = cfr.zcrd[pos] - atom_radius;
+      zmax = cfr.zcrd[pos] + atom_radius;
+      points_unset = false;
+    }
+    else {
+      xmin = std::min(xmin, cfr.xcrd[pos] - atom_radius);
+      xmax = std::max(xmax, cfr.xcrd[pos] + atom_radius);
+      ymin = std::min(ymin, cfr.ycrd[pos] - atom_radius);
+      ymax = std::max(ymax, cfr.ycrd[pos] + atom_radius);
+      zmin = std::min(zmin, cfr.zcrd[pos] - atom_radius);
+      zmax = std::max(zmax, cfr.zcrd[pos] + atom_radius);
     }
   }
   xmin -= padding;
@@ -975,7 +982,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
+  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
   const MeshParamKit<double> mps = measurements.dpData();
   const CoordinateFrameReader cfr = cf_pointer->data();
   
@@ -1021,7 +1028,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
   // Loop over all atoms in the system
   const int lj_idx_offset = nbk.n_lj_types + 1;
   for (int pos = 0; pos < nbk.natom; pos++) {
-    if (frozen_atom[pos] == false) {
+    if (mobile_atom[pos]) {
       continue;
     }
     const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
@@ -1112,8 +1119,11 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
                                             const std::vector<double> &dudxy_grid,
                                             const std::vector<double> &dudxz_grid,
                                             const std::vector<double> &dudyz_grid,
-                                            const std::vector<double> &dudxyz_grid) {
-
+                                            const std::vector<double> &dudxyz_grid,
+                                            const std::vector<double> &dudxx_grid,
+                                            const std::vector<double> &dudyy_grid,
+                                            const std::vector<double> &dudzz_grid) {
+  
   // Get the measurements abstract locally--better than passing a reference of the same size
   // and then having to de-reference it many times.
   const MeshParamKit<double> mps = measurements.dpData();
@@ -1123,7 +1133,8 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
   // Lay out the mesh cell bounds
   std::vector<double> tc_bounds;
-  switch (measurements.getMeshCellType()) {
+  const UnitCellType unit_cell = measurements.getMeshCellType();
+  switch (unit_cell) {
   case UnitCellType::NONE:
     break;
   case UnitCellType::ORTHORHOMBIC:
@@ -1156,10 +1167,12 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
   const llint* cvec_x_overflow_ptr = c_line_x.data();
   const llint* cvec_y_overflow_ptr = c_line_y.data();
   const llint* cvec_z_overflow_ptr = c_line_z.data();
-
+  T* coeff_ptr = coefficients.data();
+  
   // Compute coefficeints
   std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
   std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
+  std::vector<double> dudxx_elem(8), dudyy_elem(8), dudzz_elem(8);
   for (int i = 0; i < mps.na; i++) {
     const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
     const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
@@ -1169,37 +1182,34 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
       const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
       const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
       for (int k = 0; k < mps.nc; k++) {
-        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
-        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
-        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
+        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
+        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
 
         // Compose the input vectors
-        switch (measurements.getMeshCellType()) {
-        case UnitCellType::NONE:
-          break;
-        case UnitCellType::ORTHORHOMBIC:
-          for (int ci = 0; ci < 2; ci++) {
-            const size_t ici = i + ci;
-            for (int cj = 0; cj < 2; cj++) {
-              const size_t jcj = j + cj;
-              for (int ck = 0; ck < 2; ck++) {
-                const size_t nv = (((ck * 2) + cj) * 2) + ci;
-                const size_t kck = k + ck;
-                const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
-                u_elem[nv] = u_grid[nijk];
-                dudx_elem[nv] = dudx_grid[nijk];
-                dudy_elem[nv] = dudy_grid[nijk];
-                dudz_elem[nv] = dudz_grid[nijk];
-                dudxy_elem[nv] = dudxy_grid[nijk];
-                dudxz_elem[nv] = dudxz_grid[nijk];
-                dudyz_elem[nv] = dudyz_grid[nijk];
-                dudxyz_elem[nv] = dudxyz_grid[nijk];
+        for (int ci = 0; ci < 2; ci++) {
+          const size_t ici = i + ci;
+          for (int cj = 0; cj < 2; cj++) {
+            const size_t jcj = j + cj;
+            for (int ck = 0; ck < 2; ck++) {
+              const size_t nv = (((ck * 2) + cj) * 2) + ci;
+              const size_t kck = k + ck;
+              const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+              u_elem[nv] = u_grid[nijk];
+              dudx_elem[nv] = dudx_grid[nijk];
+              dudy_elem[nv] = dudy_grid[nijk];
+              dudz_elem[nv] = dudz_grid[nijk];
+              dudxy_elem[nv] = dudxy_grid[nijk];
+              dudxz_elem[nv] = dudxz_grid[nijk];
+              dudyz_elem[nv] = dudyz_grid[nijk];
+              dudxyz_elem[nv] = dudxyz_grid[nijk];
+              if (unit_cell == UnitCellType::TRICLINIC) {
+                dudxx_elem[nv] = dudxx_grid[nijk];
+                dudyy_elem[nv] = dudyy_grid[nijk];
+                dudzz_elem[nv] = dudzz_grid[nijk];
               }
             }
           }
-          break;
-        case UnitCellType::TRICLINIC:
-          break;
         }
 
         // Compose the mesh element.  Complete the bounds array by adding the origin, then
@@ -1209,11 +1219,11 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
         tc_bounds[2] = int95ToDouble(mesh_abcz);
         const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
                                            dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
-                                           dudxyz_elem);
+                                           dudxyz_elem, dudxx_elem, dudyy_elem, dudzz_elem);
         const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
         const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
-        for (size_t i = 0LLU; i < 64LLU; i++) {
-          coefficients[tc_offset + i] = tc_coeffs[i];
+        for (size_t cpos = 0; cpos < 64; cpos++) {
+          coeff_ptr[tc_offset + cpos] = tc_coeffs[cpos];
         }
       }
     }
@@ -1222,8 +1232,34 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
+void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
+                                                  const std::vector<double> &eps_table,
+                                                  const std::vector<double> &sigma_table) {
 
+  // Check for problematic input cases
+  switch (field) {
+  case NonbondedPotential::ELECTROSTATIC:
+    break;
+  case NonbondedPotential::VAN_DER_WAALS:
+    if (mixing_protocol == VdwCombiningRule::NBFIX &&
+        (static_cast<int>(eps_table.size())   != ag_pointer->getAtomTypeCount() ||
+         static_cast<int>(sigma_table.size()) != ag_pointer->getAtomTypeCount())) {
+      rtErr("In order to map a van-der Waals potential using the " +
+            getEnumerationName(mixing_protocol) + " method, tables of the particle-particle well "
+            "depth and interaction sigma values must be provided for the probe interacting with "
+            "all types present in the receptor's topology.  Number of atom types in the "
+            "topology: " + std::to_string(ag_pointer->getAtomTypeCount()) + ".  Number of atom "
+            "types present in each table provided: " + std::to_string(eps_table.size()) +
+            " (epsilon) and " + std::to_string(sigma_table.size()) + " (sigma).", "BackgroundMesh",
+            "mapPureNonbondedPotential");
+    }
+    break;
+  case NonbondedPotential::CLASH:
+
+    // This would have to be an occlusion mask and would not have an associated potential field.
+    break;
+  }
+  
   // Use the HPC kernel to color the mesh if a GPU is available
 #ifdef STORMM_USE_HPC
   if (gpu != null_gpu) {
@@ -1235,7 +1271,7 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
+  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
   const MeshParamKit<double> mps = measurements.dpData();
   const CoordinateFrameReader cfr = cf_pointer->data();
   
@@ -1254,13 +1290,13 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
   const llint* cvec_x_ptr = c_line_x.data();
   const llint* cvec_y_ptr = c_line_y.data();
   const llint* cvec_z_ptr = c_line_z.data();
-  const llint* bvec_x_overflow_ptr = b_line_x.data();
-  const llint* bvec_y_overflow_ptr = b_line_y.data();
-  const llint* bvec_z_overflow_ptr = b_line_z.data();
-  const llint* cvec_x_overflow_ptr = c_line_x.data();
-  const llint* cvec_y_overflow_ptr = c_line_y.data();
-  const llint* cvec_z_overflow_ptr = c_line_z.data();
-
+  const int* bvec_x_overflow_ptr = b_line_x_overflow.data();
+  const int* bvec_y_overflow_ptr = b_line_y_overflow.data();
+  const int* bvec_z_overflow_ptr = b_line_z_overflow.data();
+  const int* cvec_x_overflow_ptr = c_line_x_overflow.data();
+  const int* cvec_y_overflow_ptr = c_line_y_overflow.data();
+  const int* cvec_z_overflow_ptr = c_line_z_overflow.data();
+  
   // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
   // each element.  This allocates a small amount of additional memory, relative to the mesh that
   // will be produced, but reduces the pre-computations for getting those elements by a factor
@@ -1274,13 +1310,21 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
   const size_t ngrid_b = mps.nb + 1;
   const size_t ngrid_c = mps.nc + 1;
   const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
-  std::vector<double> u_grid(ngabc), dudx_grid(ngabc), dudy_grid(ngabc), dudz_grid(ngabc);
-  std::vector<double> dudxy_grid(ngabc), dudxz_grid(ngabc), dudyz_grid(ngabc), dudxyz_grid(ngabc);
+  std::vector<double> u_grid(ngabc, 0.0), dudx_grid(ngabc, 0.0), dudy_grid(ngabc, 0.0);
+  std::vector<double> dudz_grid(ngabc, 0.0), dudxy_grid(ngabc, 0.0), dudxz_grid(ngabc, 0.0);
+  std::vector<double> dudyz_grid(ngabc, 0.0), dudxyz_grid(ngabc, 0.0);
+  std::vector<double> dudxx_grid, dudyy_grid, dudzz_grid;
+  const UnitCellType unit_cell = measurements.getMeshCellType();
+  if (unit_cell == UnitCellType::TRICLINIC) {
+    dudxx_grid.resize(ngabc, 0.0);
+    dudyy_grid.resize(ngabc, 0.0);
+    dudzz_grid.resize(ngabc, 0.0);
+  }
   for (int pos = 0; pos < nbk.natom; pos++) {
-    if (frozen_atoms[pos] == false) {
+    if (mobile_atom[pos]) {
       continue;
     }
-
+    
     // Compute the particle position in the mesh's native fixed-precision format
     const int95_t atom_x = doubleToInt95(cfr.xcrd[pos] * mps.scale);
     const int95_t atom_y = doubleToInt95(cfr.ycrd[pos] * mps.scale);
@@ -1288,51 +1332,133 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
     // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
     // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
-    const double atom_q = nbk.charge[pos];
-
+    const double atom_q = nbk.charge[pos] * nbk.coulomb_constant;
+    const int atom_lj_idx = nbk.lj_idx[pos];
+    const double atom_lja = nbk.lja_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
+    const double atom_ljb = nbk.ljb_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
+    const double atom_sigma = (atom_lja >= 1.0e-6 && atom_ljb >= 1.0e-6) ?
+                              pow(atom_lja / atom_ljb, 1.0 / 6.0) : 0.0;
+    const double atom_eps = (atom_sigma > 0.0) ? 0.25 * atom_ljb / pow(atom_sigma, 6.0) :
+                                                 0.0;
+    double pair_eps, pair_sigma;
+    switch (mixing_protocol) {
+    case VdwCombiningRule::LORENTZ_BERTHELOT:
+      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
+      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+      break;
+    case VdwCombiningRule::GEOMETRIC:
+      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
+      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+      break;
+    case VdwCombiningRule::NBFIX:
+      pair_eps   = eps_table[atom_lj_idx];
+      pair_sigma = sigma_table[atom_lj_idx];
+      break;
+    }
+    const double pair_lja = 4.0 * pair_eps * pow(pair_sigma, 12.0);
+    const double pair_ljb = 4.0 * pair_eps * pow(pair_sigma, 6.0);
+    
     // Loop over all grid points
-    for (size_t i = 0LLU; i < ngrid_a; i++) {
+    for (size_t i = 0; i < ngrid_a; i++) {
       const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
       const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
       const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
-      for (size_t j = 0LLU; j < ngrid_b; j++) {
+      for (size_t j = 0; j < ngrid_b; j++) {
         const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
         const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
         const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
-        for (size_t k = 0LLU; k < ngrid_c; k++) {
-          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
-          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
-          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+        for (size_t k = 0; k < ngrid_c; k++) {
+          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
+          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
+          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
 
           // Compute the displacements using the mesh's fixed-precision representation, then
           // immediately convert to double for real-valued computations.
           const int95_t fp_disp_x = splitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
           const int95_t fp_disp_y = splitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
           const int95_t fp_disp_z = splitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
-          const double disp_x = int95ToDouble(fp_disp_x);
-          const double disp_y = int95ToDouble(fp_disp_y);
-          const double disp_z = int95ToDouble(fp_disp_z);
+          const double disp_x = int95ToDouble(fp_disp_x) * mps.inv_scale;
+          const double disp_y = int95ToDouble(fp_disp_y) * mps.inv_scale;
+          const double disp_z = int95ToDouble(fp_disp_z) * mps.inv_scale;
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
+          const double invr2 = 1.0 / r2;
 
-          // Compute the potential
-          const double u = atom_q / r;
-          const double du_dx = -u * disp_x / r2;
-          const double du_dy = -u * disp_y / r2;
-          const double du_dz = -u * disp_z / r2;
-          const double du_dxy = -3.0 * du_dx * disp_y / r2;
-          const double du_dxz = -3.0 * du_dx * disp_z / r2;
-          const double du_dyz = -3.0 * du_dy * disp_z / r2;
-          const double du_dxyz = -5.0 * du_dxy * disp_z / r2;
+          // Compute one of a variety of potentials
+          double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz, du_dxx, du_dyy, du_dzz;
+          switch (field) {
+          case NonbondedPotential::ELECTROSTATIC:
+            u = atom_q / r;
+            du_dx = -u * disp_x * invr2;
+            du_dy = -u * disp_y * invr2;
+            du_dz = -u * disp_z * invr2;
+            du_dxy = -3.0 * du_dx * disp_y * invr2;
+            du_dxz = -3.0 * du_dx * disp_z * invr2;
+            du_dyz = -3.0 * du_dy * disp_z * invr2;
+            du_dxyz = -5.0 * du_dxy * disp_z * invr2;
+            if (unit_cell == UnitCellType::TRICLINIC) {
+              du_dxx = -3.0 * du_dx * disp_x * invr2;
+              du_dyy = -3.0 * du_dy * disp_y * invr2;
+              du_dzz = -3.0 * du_dz * disp_z * invr2;
+            }
+            break;
+          case NonbondedPotential::VAN_DER_WAALS:
+            {
+              const double invr6 = invr2 * invr2 * invr2;
+              const double invr8 = invr6 * invr2;
+              const double invr10 = invr8 * invr2;
+              const double d_factor = ((6.0 * pair_ljb) - (12.0 * pair_lja * invr6)) * invr8;
+              const double d2_factor = ((168.0 * pair_lja * invr6) - (48.0 * pair_ljb)) * invr10;
+              const double d3_factor = ((480.0 * pair_ljb) - (2688.0 * pair_lja * invr6)) *
+                                       invr6 * invr6;
+              u = ((pair_lja * invr6) - pair_ljb) * invr6;
+
+              // CHECK
+#if 0
+              if (r < 2.0) {
+                printf("Atom %4d : [ %9.4lf %9.4lf %9.4lf ] -> [ %2zu %2zu %2zu ] -> %9.4lf [ "
+                       "%9.4lf %9.4lf -> %10.2lf %9.2lf ] -> %9.4lf\n", pos,
+                       int95ToDouble(atom_x) * mps.inv_scale,
+                       int95ToDouble(atom_y) * mps.inv_scale,
+                       int95ToDouble(atom_z) * mps.inv_scale, i, j, k, r, atom_sigma, atom_eps,
+                       pair_lja, pair_ljb, u);
+              }
+#endif
+              // END CHECK
+              
+              du_dx = d_factor * disp_x;
+              du_dy = d_factor * disp_y;
+              du_dz = d_factor * disp_z;
+              du_dxy = d2_factor * disp_x * disp_y;
+              du_dxz = d2_factor * disp_x * disp_z;
+              du_dyz = d2_factor * disp_y * disp_z;
+              du_dxyz = d3_factor * disp_x * disp_y * disp_z;
+              if (unit_cell == UnitCellType::TRICLINIC) {
+                du_dxx = d2_factor * disp_x * disp_x;
+                du_dyy = d2_factor * disp_y * disp_y;
+                du_dzz = d2_factor * disp_z * disp_z;
+              }
+            }
+            break;
+          case NonbondedPotential::CLASH:
+            break;
+          }
+
+          // Log the results
           const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
-          u_grid[nijk] = u;
-          dudx_grid[nijk] = du_dx;
-          dudy_grid[nijk] = du_dy;
-          dudz_grid[nijk] = du_dz;
-          dudxy_grid[nijk] = du_dxy;
-          dudxz_grid[nijk] = du_dxz;
-          dudyz_grid[nijk] = du_dyz;
-          dudxyz_grid[nijk] = du_dxyz;
+          u_grid[nijk] += u;
+          dudx_grid[nijk] += du_dx;
+          dudy_grid[nijk] += du_dy;
+          dudz_grid[nijk] += du_dz;
+          dudxy_grid[nijk] += du_dxy;
+          dudxz_grid[nijk] += du_dxz;
+          dudyz_grid[nijk] += du_dyz;
+          dudxyz_grid[nijk] += du_dxyz;
+          if (unit_cell == UnitCellType::TRICLINIC) {
+            dudxx_grid[nijk] += du_dxx;
+            dudyy_grid[nijk] += du_dyy;
+            dudzz_grid[nijk] += du_dzz;
+          }
         }
       }
     }
@@ -1341,6 +1467,146 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
   // Convert the computed grid data into a functional mesh
   computeCoefficients(u_grid, dudx_grid, dudy_grid, dudz_grid, dudxy_grid, dudxz_grid,
                       dudyz_grid, dudxyz_grid);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
+                               const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
+                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
+                               const int* ycrd_ovrf, const int* zcrd_ovrf,
+                               const int coord_scaling_bits) {
+
+  // Check whether the grid works in a format that would restrict the fixed-precision math to just
+  // the first 64 bits of the representation.
+  const size_t data_ct = std::type_index(typeid(Tdata)).hash_code();
+  const bool mesh_data_is_double = (data_ct == double_type_index);  
+  const bool coord_is_integral = isSignedIntegralScalarType<Tcoord>();
+  const bool coordinate_overflow_active = (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr &&
+                                           zcrd_ovrf != nullptr);
+  std::vector<Txfrm> result;
+
+  // Loop over all particles
+  for (int pos = 0; pos < natom; pos++) {
+  
+    // Determine the grid bin using a transformation into mesh space followed by a local check and,
+    // if necessary, a correction.  The precision of the mesh coefficients will determine the
+    // precision of the fixed-precision coordinate representation, following the standard set forth
+    // in validateScalingBits() above.
+    if (mesh_data_is_double) {
+      int95_t ixcrd, iycrd, izcrd;
+      if (coord_is_integral) {
+
+        // The coordinates may not have the same precision as the positions expected by the mesh.
+        // Harmonize the representations.
+        if (coord_scaling_bits == bgmr.dims.scale_bits) {
+          ixcrd.x = xcrd[pos];
+          iycrd.x = ycrd[pos];
+          izcrd.x = zcrd[pos];
+          if (coordinate_overflow_active) {
+            ixcrd.y = xcrd[pos];
+            iycrd.y = ycrd[pos];
+            izcrd.y = zcrd[pos];          
+          }
+        }
+        else {
+          int95_t orep_xcrd, orep_ycrd, orep_zcrd;
+          if (coordinate_overflow_active) {
+            orep_xcrd = { xcrd[pos], xcrd_ovrf[pos] };
+            orep_ycrd = { ycrd[pos], ycrd_ovrf[pos] };
+            orep_zcrd = { zcrd[pos], zcrd_ovrf[pos] };
+          }
+          else {
+            orep_xcrd = { xcrd[pos], 0 };
+            orep_ycrd = { ycrd[pos], 0 };
+            orep_zcrd = { zcrd[pos], 0 };
+          }
+          ixcrd = changeFPBits(orep_xcrd, coord_scaling_bits, bgmr.dims.scale_bits);
+          iycrd = changeFPBits(orep_ycrd, coord_scaling_bits, bgmr.dims.scale_bits);
+          izcrd = changeFPBits(orep_zcrd, coord_scaling_bits, bgmr.dims.scale_bits);
+        }
+      }
+      else {
+        ixcrd = doubleToInt95(xcrd[pos]);
+        iycrd = doubleToInt95(ycrd[pos]);
+        izcrd = doubleToInt95(zcrd[pos]);
+      }
+
+      // Obtain the coordinates of the atom, relative to the mesh origin, in the precision of the
+      // transformation matrices.  Estimate the appropriate mesh element, then test by computing
+      // the location of the atom relative to the origin of this element.
+      const int95_t ipt_rel_x = splitFPSum(ixcrd, -bgmr.dims.orig_x.x, -bgmr.dims.orig_x.y);
+      const int95_t ipt_rel_y = splitFPSum(iycrd, -bgmr.dims.orig_y.x, -bgmr.dims.orig_y.y);
+      const int95_t ipt_rel_z = splitFPSum(izcrd, -bgmr.dims.orig_z.x, -bgmr.dims.orig_z.y);
+      const Txfrm pt_rel_x = int95ToDouble(ipt_rel_x);
+      const Txfrm pt_rel_y = int95ToDouble(ipt_rel_y);
+      const Txfrm pt_rel_z = int95ToDouble(ipt_rel_z);
+      const Txfrm pt_grid_a = (bgmr.dims.umat[0] * pt_rel_x) + (bgmr.dims.umat[3] * pt_rel_y) +
+                              (bgmr.dims.umat[6] * pt_rel_z);
+      const Txfrm pt_grid_b = (bgmr.dims.umat[1] * pt_rel_x) + (bgmr.dims.umat[4] * pt_rel_y) +
+                              (bgmr.dims.umat[7] * pt_rel_z);
+      const Txfrm pt_grid_c = (bgmr.dims.umat[2] * pt_rel_x) + (bgmr.dims.umat[5] * pt_rel_y) +
+                              (bgmr.dims.umat[8] * pt_rel_z);
+      int cell_a = floor(pt_grid_a);
+      int cell_b = floor(pt_grid_b);
+      int cell_c = floor(pt_grid_c);
+
+      // If the initial estimate is already off the grid, bail out
+      if (cell_a < 0 || cell_a >= bgmr.dims.na || cell_b < 0 || cell_b >= bgmr.dims.nb ||
+          cell_c < 0 || cell_c >= bgmr.dims.nc) {
+        result[pos] = 0.0;
+        continue;
+      }
+      int95_t element_origin_x = { bgmr.avec_abs_x[cell_a], bgmr.avec_abs_x_ovrf[cell_a] };
+      int95_t element_origin_y = { bgmr.avec_abs_y[cell_a], bgmr.avec_abs_y_ovrf[cell_a] };
+      int95_t element_origin_z = { bgmr.avec_abs_z[cell_a], bgmr.avec_abs_z_ovrf[cell_a] };
+      element_origin_x = splitFPSum(element_origin_x, bgmr.bvec_x[cell_b],
+                                    bgmr.bvec_x_ovrf[cell_b]);
+      element_origin_y = splitFPSum(element_origin_y, bgmr.bvec_y[cell_b],
+                                    bgmr.bvec_y_ovrf[cell_b]);
+      element_origin_z = splitFPSum(element_origin_z, bgmr.bvec_z[cell_b],
+                                    bgmr.bvec_z_ovrf[cell_b]);
+      element_origin_x = splitFPSum(element_origin_x, bgmr.cvec_x[cell_b],
+                                    bgmr.cvec_x_ovrf[cell_b]);
+      element_origin_y = splitFPSum(element_origin_y, bgmr.cvec_y[cell_b],
+                                    bgmr.cvec_y_ovrf[cell_b]);
+      element_origin_z = splitFPSum(element_origin_z, bgmr.cvec_z[cell_b],
+                                    bgmr.cvec_z_ovrf[cell_b]);
+      const int95_t idisp_x = splitFPSum(ixcrd, -element_origin_x.x, -element_origin_x.y);
+      const int95_t idisp_y = splitFPSum(iycrd, -element_origin_y.x, -element_origin_y.y);
+      const int95_t idisp_z = splitFPSum(izcrd, -element_origin_z.x, -element_origin_z.y);
+      const Txfrm disp_x = int95ToDouble(idisp_x);
+      const Txfrm disp_y = int95ToDouble(idisp_y);
+      const Txfrm disp_z = int95ToDouble(idisp_z);
+      Txfrm test_a = (bgmr.dims.umat[0] * disp_x) + (bgmr.dims.umat[3] * disp_y) +
+                     (bgmr.dims.umat[6] * disp_z);
+      Txfrm test_b = (bgmr.dims.umat[1] * disp_x) + (bgmr.dims.umat[4] * disp_y) +
+                     (bgmr.dims.umat[7] * disp_z);
+      Txfrm test_c = (bgmr.dims.umat[2] * disp_x) + (bgmr.dims.umat[5] * disp_y) +
+                     (bgmr.dims.umat[8] * disp_z);
+      cell_a += (test_a < 0.0) - (test_a >= 1.0);
+      cell_b += (test_b < 0.0) - (test_b >= 1.0);
+      cell_c += (test_c < 0.0) - (test_c >= 1.0);
+
+    }
+    else {
+    }
+  
+    switch (bgmr.kind) {
+    case GridDetail::OCCLUSION:
+      break;
+    case GridDetail::NONBONDED_FIELD:
+    case GridDetail::NONBONDED_ATOMIC:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const std::vector<Tcoord> &xcrd,
+                  const std::vector<Tcoord> &ycrd, const std::vector<Tcoord> &zcrd,
+                  const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b) {
 }
 
 } // namespace structure
