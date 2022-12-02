@@ -1105,6 +1105,123 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
+                                            const std::vector<double> &dudx_grid,
+                                            const std::vector<double> &dudy_grid,
+                                            const std::vector<double> &dudz_grid,
+                                            const std::vector<double> &dudxy_grid,
+                                            const std::vector<double> &dudxz_grid,
+                                            const std::vector<double> &dudyz_grid,
+                                            const std::vector<double> &dudxyz_grid) {
+
+  // Get the measurements abstract locally--better than passing a reference of the same size
+  // and then having to de-reference it many times.
+  const MeshParamKit<double> mps = measurements.dpData();
+
+  // Compute the weights matrix
+  std::vector<double> tc_weights = getTricubicMatrix().readHost();  
+
+  // Lay out the mesh cell bounds
+  std::vector<double> tc_bounds;
+  switch (measurements.getMeshCellType()) {
+  case UnitCellType::NONE:
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+    tc_bounds.resize(6);
+    tc_bounds[3] = int95ToDouble(mps.fp_invu[0]);
+    tc_bounds[4] = int95ToDouble(mps.fp_invu[4]);
+    tc_bounds[5] = int95ToDouble(mps.fp_invu[8]);
+    break;
+  case UnitCellType::TRICLINIC:
+    tc_bounds.resize(12);
+    for (int i = 0; i < 9; i++) {
+      tc_bounds[i + 3] = int95ToDouble(mps.fp_invu[i]);
+    }
+    break;
+  }
+
+  // Set constants and pointers to mesh lines for more rapid access
+  const size_t ngrid_a = mps.na + 1;
+  const size_t ngrid_b = mps.nb + 1;
+  const size_t ngrid_c = mps.nc + 1;
+  const llint* bvec_x_ptr = b_line_x.data();
+  const llint* bvec_y_ptr = b_line_y.data();
+  const llint* bvec_z_ptr = b_line_z.data();
+  const llint* cvec_x_ptr = c_line_x.data();
+  const llint* cvec_y_ptr = c_line_y.data();
+  const llint* cvec_z_ptr = c_line_z.data();
+  const llint* bvec_x_overflow_ptr = b_line_x.data();
+  const llint* bvec_y_overflow_ptr = b_line_y.data();
+  const llint* bvec_z_overflow_ptr = b_line_z.data();
+  const llint* cvec_x_overflow_ptr = c_line_x.data();
+  const llint* cvec_y_overflow_ptr = c_line_y.data();
+  const llint* cvec_z_overflow_ptr = c_line_z.data();
+
+  // Compute coefficeints
+  std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
+  std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
+  for (int i = 0; i < mps.na; i++) {
+    const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
+    const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
+    const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
+    for (int j = 0; j < mps.nb; j++) {
+      const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
+      const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
+      const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+      for (int k = 0; k < mps.nc; k++) {
+        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
+        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
+        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+
+        // Compose the input vectors
+        switch (measurements.getMeshCellType()) {
+        case UnitCellType::NONE:
+          break;
+        case UnitCellType::ORTHORHOMBIC:
+          for (int ci = 0; ci < 2; ci++) {
+            const size_t ici = i + ci;
+            for (int cj = 0; cj < 2; cj++) {
+              const size_t jcj = j + cj;
+              for (int ck = 0; ck < 2; ck++) {
+                const size_t nv = (((ck * 2) + cj) * 2) + ci;
+                const size_t kck = k + ck;
+                const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+                u_elem[nv] = u_grid[nijk];
+                dudx_elem[nv] = dudx_grid[nijk];
+                dudy_elem[nv] = dudy_grid[nijk];
+                dudz_elem[nv] = dudz_grid[nijk];
+                dudxy_elem[nv] = dudxy_grid[nijk];
+                dudxz_elem[nv] = dudxz_grid[nijk];
+                dudyz_elem[nv] = dudyz_grid[nijk];
+                dudxyz_elem[nv] = dudxyz_grid[nijk];
+              }
+            }
+          }
+          break;
+        case UnitCellType::TRICLINIC:
+          break;
+        }
+
+        // Compose the mesh element.  Complete the bounds array by adding the origin, then
+        // compute the tricubic coefficients.
+        tc_bounds[0] = int95ToDouble(mesh_abcx);
+        tc_bounds[1] = int95ToDouble(mesh_abcy);
+        tc_bounds[2] = int95ToDouble(mesh_abcz);
+        const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
+                                           dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
+                                           dudxyz_elem);
+        const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
+        const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
+        for (size_t i = 0LLU; i < 64LLU; i++) {
+          coefficients[tc_offset + i] = tc_coeffs[i];
+        }
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
   // Use the HPC kernel to color the mesh if a GPU is available
@@ -1221,72 +1338,9 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
     }
   }
 
-  // Compute the weights matrix
-  std::vector<double> tc_weights = getTricubicMatrix().readHost();  
-
-  // Lay out the mesh cell bounds
-  std::vector<double> tc_bounds;
-  switch (measurements.getMeshCellType()) {
-  case UnitCellType::NONE:
-    break;
-  case UnitCellType::ORTHORHOMBIC:
-    tc_bounds.resize(6);
-    tc_bounds[3] = int95ToDouble(mps.fp_invu[0]);
-    tc_bounds[4] = int95ToDouble(mps.fp_invu[4]);
-    tc_bounds[5] = int95ToDouble(mps.fp_invu[8]);
-    break;
-  case UnitCellType::TRICLINIC:
-    tc_bounds.resize(12);
-    for (int i = 0; i < 9; i++) {
-      tc_bounds[i + 3] = int95ToDouble(mps.fp_invu[i]);
-    }
-    break;
-  }
-
-  // Compute coefficeints
-  std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
-  std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
-  for (int i = 0; i < mps.na; i++) {
-    const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
-    const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
-    const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
-    for (int j = 0; j < mps.nb; j++) {
-      const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
-      const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
-      const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
-      for (int k = 0; k < mps.nc; k++) {
-        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
-        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
-        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
-
-        // Compose the input vectors
-        for (int ci = 0; ci < 2; ci++) {
-          const size_t ici = i + ci;
-          for (int cj = 0; cj < 2; cj++) {
-            const size_t jcj = j + cj;
-            for (int ck = 0; ck < 2; ck++) {
-              const size_t nv = (((ck * 2) + cj) * 2) + ci;
-              const size_t kck = k + ck;
-              const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
-              u_elem[nv] = u_grid[nijk];
-              dudx_elem[nv] = dudx_grid[nijk];
-              dudy_elem[nv] = dudy_grid[nijk];
-              dudz_elem[nv] = dudz_grid[nijk];
-              dudxy_elem[nv] = dudxy_grid[nijk];
-              dudxz_elem[nv] = dudxz_grid[nijk];
-              dudyz_elem[nv] = dudyz_grid[nijk];
-              dudxyz_elem[nv] = dudxyz_grid[nijk];
-            }
-          }
-        }
-
-        // Compose the mesh element
-        tc_bounds[0] = int95ToDouble(mesh_abcx);
-        tc_bounds[1] = int95ToDouble(mesh_abcy);
-        tc_bounds[2] = int95ToDouble(mesh_abcz);
-      }
-    }
-  }
+  // Convert the computed grid data into a functional mesh
+  computeCoefficients(u_grid, dudx_grid, dudy_grid, dudz_grid, dudxy_grid, dudxz_grid,
+                      dudyz_grid, dudxyz_grid);
 }
 
 } // namespace structure

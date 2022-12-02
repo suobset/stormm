@@ -41,8 +41,9 @@ using energy::NonbondedPotential;
 using energy::VdwCombiningRule;
 using math::addScalarToVector;
 using math::elementwiseMultiply;
-using math::roundUp;
 using math::getTricubicMatrix;
+using math::roundUp;
+using math::TricubicCell;
 using parse::NumberFormat;
 using numerics::default_globalpos_scale_bits;
 using numerics::fixedPrecisionGrid;
@@ -619,6 +620,29 @@ private:
   ///
   /// \param gpu  Details of any available GPU
   void mapElectrostatics(const GpuDetails &gpu);
+
+  /// \brief Common function for various NONBONDED_FIELD meshes making use of a series of grids
+  ///        for the function values plus partial and mixed partial derivatives.  This works for
+  ///        CPU-based code.  For an M x N x P mesh, annd grids measure (M + 1) x (N + 1) x (P + 1)
+  ///        points.  The grids are populated with Cartesian X, Y, and Z derivatives and will feed
+  ///        into functions for computing spline coefficients for any shape of mesh.
+  ///
+  /// \param u_grid       Grid of function values
+  /// \param dudx_grid    Grid of Cartesian X partial derivatives
+  /// \param dudy_grid    Grid of Cartesian Y partial derivatives
+  /// \param dudz_grid    Grid of Cartesian Z partial derivatives
+  /// \param dudxy_grid   Grid of Cartesian X and Y double derivatives
+  /// \param dudxz_grid   Grid of Cartesian X and Z double derivatives
+  /// \param dudyz_grid   Grid of Cartesian Y and Z double derivatives
+  /// \param dudxyz_grid  Grid of triple derivatives
+  void computeCoefficients(const std::vector<double> &u_grid,
+                           const std::vector<double> &dudx_grid,
+                           const std::vector<double> &dudy_grid,
+                           const std::vector<double> &dudz_grid,
+                           const std::vector<double> &dudxy_grid,
+                           const std::vector<double> &dudxz_grid,
+                           const std::vector<double> &dudyz_grid,
+                           const std::vector<double> &dudxyz_grid);
 };
 
 } // namespace structure
