@@ -43,8 +43,9 @@ public:
   /// \param bounds          Array containing the Cartesian x, y, and z coordinates of the grid
   ///                        cell origin plus its lengths along each axis (the grid cell is assumed
   ///                        to be orthorhombic).  This array can have four entries (in which case
-  ///                        the final entry is assumed to be the isotropic length parameter) or
-  ///                        six (for anisotropic cells).
+  ///                        the final entry is assumed to be the isotropic length parameter), six
+  ///                        (for anisotropic cells), or twelve entries, in which case the last
+  ///                        nine represent the column matrix of cell vectors.
   /// \{
   TricubicCell();
 
@@ -87,6 +88,12 @@ public:
   /// \param k  The kth coefficient relevant to the notation Aijk
   T getCoefficient(int i, int j, int k) const;
 
+  /// \brief Get a Standard Template Library vector containing all coefficients in the element.
+  ///        The order of coefficients is given in Fortran order: for the term Aijk x^i y^j z^k,
+  ///        the ith coefficient varies the most rapidly and the index for Aijk is given by
+  ///        (((k * 4) + j) * 4 + i.
+  std::vector<T> getCoefficients() const;
+  
   /// \brief Set one of the 64 coefficients Aijk for the tricubic spline.  Parameter descriptions
   ///        follow from above, with the addition of:
   ///
@@ -141,9 +148,15 @@ private:
   double origin_x;  ///< Cartesian X location of the grid cell origin
   double origin_y;  ///< Cartesian Y location of the grid cell origin
   double origin_z;  ///< Cartesian Z location of the grid cell origin
-  double length_x;  ///< Cartesian X length of the grid cell
-  double length_y;  ///< Cartesian Y length of the grid cell
-  double length_z;  ///< Cartesian Z length of the grid cell
+
+  /// Transformation matrix to take Cartesian coordinates, as displacements from the cell origin,
+  /// into the fractional space of the cell over which the tricubic spline is applicable.
+  double umat[9];
+  
+  /// Column matrix (given in Fortran order, first column being entries 0, 1, and 2, second column
+  /// 3, 4, and 5, ...) of the cell's bounding vectors.  For rectilinear (orthorhombic) cells, the
+  /// Cartesian X, Y, and Z lengths are given in entries 0, 4, and 8.
+  double invu[9];
 };
 
 /// \brief Construct a matrix for grinding out tricubic spline coefficients given the eight vectors

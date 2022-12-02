@@ -564,7 +564,17 @@ private:
 
 /// \brief Interpret the inverse transformation matrix to determine whether a unit cell exists, and
 ///        if it is rectilinear or not.
-UnitCellType determineUnitCellTypeByShape(const double* inv_ptr);
+///
+/// Overloaded:
+///   - Accept a C-style pointer to the array of matrix elements
+///   - Accept a Standard Template Library Vector or a Hybrid object
+///
+/// \param inverse_transform  The inverse transformation matrix
+/// \{
+UnitCellType determineUnitCellTypeByShape(const double* inverse_transform);
+UnitCellType determineUnitCellTypeByShape(const std::vector<double> &inverse_transform);
+UnitCellType determineUnitCellTypeByShape(const Hybrid<double> &inverse_transform);
+/// \}
 
 /// \brief Interlace three arrays of X, Y, and Z coordinates (i.e. positions, velocities, or
 ///        forces) into a result ordered { X(0), Y(0), Z(0), X(1), Y(1), ..., Y(N), Z(N) }.

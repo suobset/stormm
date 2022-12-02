@@ -8,6 +8,8 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Numerics/split_fixed_precision.h"
+#include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/phasespace.h"
 
 namespace stormm {
 namespace structure {
@@ -17,7 +19,9 @@ using constants::UnitCellAxis;
 using data_types::getStormmScalarTypeName;
 using data_types::isFloatingPointScalarType;
 using data_types::isFloatingPointHpcVectorType;
-
+using topology::UnitCellType;
+using trajectory::determineUnitCellTypeByShape;
+  
 /// \brief The default mesh fixed-precision scaling factor is higher than a typical simulation due
 ///        to the way the mesh occupies a confined region of space.
 constexpr int default_mesh_scaling_bits = 40;
@@ -137,6 +141,10 @@ public:
   int95_t getMeshOriginAsFP(CartesianDimension dim) const;
   /// \}
 
+  /// \brief Get the type of mesh cell to understand whether the cell vectors are orthogonal to
+  ///        one another.
+  UnitCellType getMeshCellType() const;
+  
   /// \brief Get the element vector along one of the unit cell axes in floating-point numbers.
   ///
   /// Overloaded:
@@ -277,6 +285,7 @@ private:
                                 ///<   into the fixed-precision representation
   double inverse_scale_factor;  ///< Scaling factor to take Cartesian coordinates of grid points
                                 ///<   into the fixed-precision representation
+  UnitCellType unit_cell;       ///< Identify whether the mesh is orthorhombic or triclinic
 
   /// Inverse spacings along all three grid cell vectors, each given by by three consecutive
   /// elements of the array (Fortran order).  The vectors pertain to a single grid element and are

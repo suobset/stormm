@@ -1279,8 +1279,8 @@ void PhaseSpace::allocate() {
 }
 
 //-------------------------------------------------------------------------------------------------
-UnitCellType determineUnitCellTypeByShape(const double* inv_ptr) {
-  if (inv_ptr[0] < 1.01 && inv_ptr[4] < 1.01 && inv_ptr[8] < 1.01) {
+UnitCellType determineUnitCellTypeByShape(const double* inverse_transform) {
+  if (inverse_transform[0] < 1.01 && inverse_transform[4] < 1.01 && inverse_transform[8] < 1.01) {
 
     // No unit cell could be this small, and the identity matrix is what the transforms are set to
     // when there are no boundary conditions.  It is an inocuous matrix that can be put through
@@ -1288,14 +1288,25 @@ UnitCellType determineUnitCellTypeByShape(const double* inv_ptr) {
     // member variable to avoid meaningless calculations.
     return UnitCellType::NONE;
   }
-  else if (fabs(inv_ptr[1]) + fabs(inv_ptr[2]) + fabs(inv_ptr[3]) + fabs(inv_ptr[5]) +
-           fabs(inv_ptr[6]) + fabs(inv_ptr[7]) < constants::small) {
+  else if (fabs(inverse_transform[1]) + fabs(inverse_transform[2]) +
+           fabs(inverse_transform[3]) + fabs(inverse_transform[5]) +
+           fabs(inverse_transform[6]) + fabs(inverse_transform[7]) < constants::small) {
     return UnitCellType::ORTHORHOMBIC;
   }
   else {
     return UnitCellType::TRICLINIC;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+UnitCellType determineUnitCellTypeByShape(const std::vector<double> &inverse_transform) {
+  return determineUnitCellTypeByShape(inverse_transform.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+UnitCellType determineUnitCellTypeByShape(const Hybrid<double> &inverse_transform) {
+  return determineUnitCellTypeByShape(inverse_transform.data());
 }
 
 //-------------------------------------------------------------------------------------------------

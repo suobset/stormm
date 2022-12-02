@@ -18,8 +18,8 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
     na{na_in}, nb{nb_in}, nc{nc_in}, origin_x{doubleToInt95(origin_x_in)},
     origin_y{doubleToInt95(origin_y_in)}, origin_z{doubleToInt95(origin_z_in)},
     scale_bits{scale_bits_in}, scale_factor{pow(2.0, scale_bits)},
-    inverse_scale_factor{1.0 / scale_factor}, element_umat{}, sp_element_umat{}, element_invu{},
-    sp_element_invu{}, fp_element_invu{}
+    inverse_scale_factor{1.0 / scale_factor}, unit_cell{UnitCellType::NONE}, element_umat{},
+    sp_element_umat{}, element_invu{}, sp_element_invu{}, fp_element_invu{}
 {
   validateMeshDimensions();
   validateFixedPrecisionBits();
@@ -107,6 +107,11 @@ int95_t MeshParameters::getMeshOriginAsFP(const CartesianDimension dim) const {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+UnitCellType MeshParameters::getMeshCellType() const {
+  return unit_cell;
+}
+  
 //-------------------------------------------------------------------------------------------------
 std::vector<int95_t> MeshParameters::getMeshElementVectorAsFP(const UnitCellAxis dim) const {
   std::vector<int95_t> result(3);
@@ -295,6 +300,7 @@ void MeshParameters::defineElement(const std::vector<double> &element_vectors) {
     rtErr("The mesh element is defined by a 3x3 matrix.  A total of " +
           std::to_string(element_vectors.size()) + " elements were provided.", "MeshParameters");
   }
+  unit_cell = determineUnitCellTypeByShape(element_vectors);
 
   // Use the Hessian Normal form to compute the number of mesh elements to search in each direction
   // and color all of the necessary elements around each atom.

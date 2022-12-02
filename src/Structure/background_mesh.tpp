@@ -1223,13 +1223,41 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
 
   // Compute the weights matrix
   std::vector<double> tc_weights = getTricubicMatrix().readHost();  
-  
+
+  // Lay out the mesh cell bounds
+  std::vector<double> tc_bounds;
+  switch (measurements.getMeshCellType()) {
+  case UnitCellType::NONE:
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+    tc_bounds.resize(6);
+    tc_bounds[3] = int95ToDouble(mps.fp_invu[0]);
+    tc_bounds[4] = int95ToDouble(mps.fp_invu[4]);
+    tc_bounds[5] = int95ToDouble(mps.fp_invu[8]);
+    break;
+  case UnitCellType::TRICLINIC:
+    tc_bounds.resize(12);
+    for (int i = 0; i < 9; i++) {
+      tc_bounds[i + 3] = int95ToDouble(mps.fp_invu[i]);
+    }
+    break;
+  }
+
   // Compute coefficeints
   std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
   std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
   for (int i = 0; i < mps.na; i++) {
+    const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
+    const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
+    const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
     for (int j = 0; j < mps.nb; j++) {
+      const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
+      const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
+      const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
       for (int k = 0; k < mps.nc; k++) {
+        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
+        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
+        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
 
         // Compose the input vectors
         for (int ci = 0; ci < 2; ci++) {
@@ -1248,10 +1276,14 @@ void BackgroundMesh<T>::mapElectrostatics(const GpuDetails &gpu) {
               dudxz_elem[nv] = dudxz_grid[nijk];
               dudyz_elem[nv] = dudyz_grid[nijk];
               dudxyz_elem[nv] = dudxyz_grid[nijk];
-
             }
           }
         }
+
+        // Compose the mesh element
+        tc_bounds[0] = int95ToDouble(mesh_abcx);
+        tc_bounds[1] = int95ToDouble(mesh_abcy);
+        tc_bounds[2] = int95ToDouble(mesh_abcz);
       }
     }
   }

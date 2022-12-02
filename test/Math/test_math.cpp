@@ -979,6 +979,28 @@ int main(const int argc, const char* argv[]) {
   check(s2_widths, RelationalOperator::EQUAL, Approx(s2_widths_ans).margin(1.0e-7), "The Hessian "
         "normal form is not correctly computed for an orthorhombic unit cell.");  
 
+  // Check Leibniz' formula for computing determinants
+  const std::vector<double> two_mat   = { -1.0, 0.5, 7.4, 8.3 };
+  const std::vector<double> three_mat = { 1.1, 0.8, 3.9, 5.6, 7.7, 9.4, 2.0, -4.3, -0.7 };
+  const std::vector<double> four_mat   = {  6.1,  7.9, -1.2, -5.5, -0.2,  5.4,  3.3,  9.1,
+                                            3.7,  2.0, -5.0, -8.3,  8.6,  1.9,  9.5,  0.4 };
+  std::vector<double> singular_five(25);
+  for (int i = 0; i < 20; i++) {
+    singular_five[i] = (xrs128p.uniformRandomNumber() * 10.0) - 5.0;
+  }
+  for (int i = 20; i < 25; i++) {
+    singular_five[i] = singular_five[i - 20];
+  }
+  check(leibnizDeterminant(two_mat), RelationalOperator::EQUAL, Approx(-12.0).margin(tiny),
+        "The determinant of a 2 x 2 matrix was not computed correctly.");
+  check(leibnizDeterminant(three_mat), RelationalOperator::EQUAL, Approx(-97.263).margin(tiny),
+        "The determinant of a 3 x 3 matrix was not computed correctly by the Leibniz formula.");
+  check(leibnizDeterminant(four_mat), RelationalOperator::EQUAL, Approx(-1767.2249).margin(tiny),
+        "The determinant of a 4 x 4 matrix was not computed correctly by the Leibniz formula.");
+  check(leibnizDeterminant(singular_five), RelationalOperator::EQUAL, Approx(0.0).margin(tiny),
+        "The determinant of a singular 5 x 5 matrix was not computed correctly by the Leibniz "
+        "formula.");
+
   // Further checks on the mean, standard deviation, variance, correlation, dot product,
   // magnitude, and projection operations
   section(1);

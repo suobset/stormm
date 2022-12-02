@@ -784,6 +784,74 @@ void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+double leibnizDeterminant(const T* amat, const size_t rank) {
+  if (rank == 1) {
+    return amat[0];
+  }
+  else if (rank == 2) {
+    return (amat[0] * amat[3]) - (amat[1] * amat[2]);
+  }
+  else if (rank == 3) {
+    return (amat[0] * ((amat[4] * amat[8]) - (amat[5] * amat[7]))) -
+           (amat[3] * ((amat[1] * amat[8]) - (amat[2] * amat[7]))) +
+           (amat[6] * ((amat[1] * amat[5]) - (amat[2] * amat[4])));
+  }
+  else if (rank <= 8) {
+    double detsum = 0.0;
+    double sgnfac = 1.0;
+    const int irank = rank;
+    const int subrank = rank - 1;
+    std::vector<T> submat(subrank * subrank);
+    for (int i = 0; i < irank; i++) {
+      int jcon = 0;
+      for (int j = 0; j < irank; j++) {
+        if (j == i) {
+          continue;
+        }
+        int kcon = 0;
+        for (int k = 1; k < rank; k++) {
+          submat[(jcon * subrank) + kcon] = amat[(j * rank) + k];
+          kcon++;
+        }
+        jcon++;
+      }
+      detsum += sgnfac * amat[i * rank] * leibnizDeterminant(submat.data(), subrank);
+      sgnfac = -sgnfac;
+    }
+    return detsum;
+  }
+  else {
+    rtErr("The Leibniz formula is numerically ill-conditioned and requires O(N! * N) operations.  "
+          "Choose a QR or LU decomposition to obtain the determinant of larger matrices.",
+          "leibNizDeterminant");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+double leibnizDeterminant(const std::vector<T> &amat) {
+  const size_t rank = sqrt(static_cast<double>(amat.size()));
+  if (rank * rank != amat.size()) {
+    rtErr("An array of length " + std::to_string(amat.size()) + " cannot represent a square "
+          "matrix.", "leibnizDeterminant");
+  }
+  return leibnizDeterminant(amat.data(), rank);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+double leibnizDeterminant(const Hybrid<T> &amat) {
+  const size_t rank = sqrt(static_cast<double>(amat.size()));
+  if (rank * rank != amat.size()) {
+    rtErr("An array of length " + std::to_string(amat.size()) + " cannot represent a square "
+          "matrix.", "leibnizDeterminant");
+  }
+  return leibnizDeterminant(amat.data(), rank);
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void computeBoxTransform(const T lx, const T ly, const T lz, const T alpha, const T beta,
                          const T gamma, T* umat, T* invu) {
   const T dx = ((cos(beta) * cos(gamma)) - cos(alpha)) / (sin(beta) * sin(gamma));

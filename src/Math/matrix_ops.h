@@ -213,7 +213,26 @@ void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::
 /// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
 ///        The matrix shall be presented in column-major format.
 
-  
+/// \brief Compute the determinant of a rank N matrix using the Leibniz formula.
+///
+/// Overloaded:
+///   - Provide a C-style array with N^2 elements (N > 5 will be trapped as inefficient)
+///   - Provide a Standard template library vector
+///   - Provide a Hybrid object
+///
+/// \param amat  The matrix of interest, presented in column-major (Fortran) format
+/// \param rank  Trusted square root of the length of amat
+/// \{
+template <typename T>
+double leibnizDeterminant(const T* amat, const size_t rank);
+
+template <typename T>
+double leibnizDeterminant(const std::vector<T> &amat);
+
+template <typename T>
+double leibnizDeterminant(const Hybrid<T> &amat);
+/// \}
+
 /// \brief Compute the box space transformation matrix given a sequence of six real numbers.
 ///        Templated for single- and double-precision real forms.
 ///

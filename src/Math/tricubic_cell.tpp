@@ -15,7 +15,9 @@ TricubicCell<T>::TricubicCell() :
     dy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
     dxy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dxz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
     dyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dxyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-    origin_x{0.0}, origin_y{0.0}, origin_z{0.0}, length_x{1.0}, length_y{1.0}, length_z{1.0}
+    origin_x{0.0}, origin_y{0.0}, origin_z{0.0},
+    umat{ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 },
+    invu{ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 }
 {}
     
 //-------------------------------------------------------------------------------------------------
@@ -38,25 +40,30 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
     dxz{ dxz_in[0], dxz_in[1], dxz_in[2], dxz_in[3], dxz_in[4], dxz_in[5], dxz_in[6], dxz_in[7] },
     dyz{ dyz_in[0], dyz_in[1], dyz_in[2], dyz_in[3], dyz_in[4], dyz_in[5], dyz_in[6], dyz_in[7] },
     dxyz{ dxyz_in[0], dxyz_in[1], dxyz_in[2], dxyz_in[3], dxyz_in[4], dxyz_in[5], dxyz_in[6],
-          dxyz_in[7] }, origin_x{0.0}, origin_y{0.0}, origin_z{0.0}, length_x{1.0}, length_y{1.0},
-    length_z{1.0}
+          dxyz_in[7] }, origin_x{0.0}, origin_y{0.0}, origin_z{0.0},
+    umat{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+    invu{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
 {
   // Fill out the grid cell's dimensions
-  if (bounds.size() == 4LLU) {
+  if (bounds.size() > 3) {
     origin_x = bounds[0];
     origin_y = bounds[1];
     origin_z = bounds[2];
-    length_x = bounds[3];
-    length_y = bounds[3];
-    length_z = bounds[3];
+  }
+  if (bounds.size() == 4LLU) {
+    invu[0] = bounds[3];
+    invu[4] = bounds[3];
+    invu[8] = bounds[3];
   }
   else if (bounds.size() == 6LLU) {
-    origin_x = bounds[0];
-    origin_y = bounds[1];
-    origin_z = bounds[2];
-    length_x = bounds[3];
-    length_y = bounds[4];
-    length_z = bounds[5];    
+    invu[0] = bounds[3];
+    invu[4] = bounds[4];
+    invu[8] = bounds[5];
+  }
+  else if (bounds.size() == 12LLU) {
+    for (int i = 0; i < 9; i++) {
+      invu[i] = bounds[i + 3];
+    }
   }
   else {
     rtErr("Invalid dimesion " + std::to_string(bounds.size()) + " on the bounds array.  There "
@@ -64,23 +71,41 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
   }
 
   // Check the cell lengths
-  if (length_x < 0.0 || length_y < 0.0 || length_z < 0.0) {
-    rtErr("Invalid cell lengths " + realToString(length_x, 7, 4, NumberFormat::STANDARD_REAL) +
-          " x " + realToString(length_y, 7, 4, NumberFormat::STANDARD_REAL) + " x " +
-          realToString(length_z, 7, 4, NumberFormat::STANDARD_REAL) + ".", "TricubicCell");
+  if (leibnizDeterminant(invu, 3) < 1.0e-8) {
+    rtErr("An invalid cell was defined with vectors [ " +
+          realToString(invu[0], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[1], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[2], 7, 4, NumberFormat::STANDARD_REAL) + "], [" +
+          realToString(invu[3], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[4], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[5], 7, 4, NumberFormat::STANDARD_REAL) + "], and [" +
+          realToString(invu[6], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[7], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[8], 7, 4, NumberFormat::STANDARD_REAL) + "].", "TricubicCell");
+  }
+  else {
+    const std::vector<T> invu_copy = { invu[0], invu[1], invu[2], invu[3], invu[4], invu[5],
+                                       invu[6], invu[7], invu[8] };
+    invertSquareMatrix(invu_copy.data(), umat, 3);
   }
   
   // Fill out the coefficients matrix
   std::vector<double> b(64);
   for (int i = 0; i < 8; i++) {
     b[i     ] = f[i];
-    b[i +  8] = dx[i] * length_x;
-    b[i + 16] = dy[i] * length_y;
-    b[i + 24] = dz[i] * length_z;
-    b[i + 32] = dxy[i] * length_x * length_y;
-    b[i + 40] = dxz[i] * length_x * length_z;
-    b[i + 48] = dyz[i] * length_y * length_z;
-    b[i + 56] = dxyz[i] * length_x * length_y * length_z;
+    b[i +  8] = (dx[i] * invu[0]) + (dy[i] * invu[3]) + (dz[i] * invu[6]);
+    b[i + 16] = (dx[i] * invu[1]) + (dy[i] * invu[4]) + (dz[i] * invu[7]);
+    b[i + 24] = (dx[i] * invu[2]) + (dy[i] * invu[5]) + (dz[i] * invu[8]);
+    if (bounds.size() <= 6) {
+      b[i + 32] = dxy[i] * invu[0] * invu[4];
+      b[i + 40] = dxz[i] * invu[0] * invu[8];
+      b[i + 48] = dyz[i] * invu[4] * invu[8];
+      b[i + 56] = dxyz[i] * invu[0] * invu[4] * invu[8];
+    }
+    else {
+
+      // The general, triclinic case
+    }
   }
   std::vector<double> dcoeffs(64);
   matrixVectorMultiply(weights_matrix.data(), b.data(), dcoeffs.data(), 64, 64);
@@ -97,6 +122,16 @@ T TricubicCell<T>::getCoefficient(const int i, const int j, const int k) const {
           ", and " + std::to_string(k) + " is not acceptable.", "TricubicCell", "getCoefficient");
   }
   return coefficients[(4 * ((4 * k) + j)) + i];
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> TricubicCell<T>::getCoefficients() const {
+  std::vector<T> result(64);
+  for (size_t i = 0; i < 64LLU; i++) {
+    result[i] = coefficients[i];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -174,11 +209,11 @@ template <typename T> T TricubicCell<T>::getCellOrigin(CartesianDimension dim) c
 template <typename T> T TricubicCell<T>::getCellLength(CartesianDimension dim) const {
   switch (dim) {
   case CartesianDimension::X:
-    return length_x;
+    return invu[0];
   case CartesianDimension::Y:
-    return length_y;
+    return invu[4];
   case CartesianDimension::Z:
-    return length_z;
+    return invu[8];
   }
   __builtin_unreachable();
 }
@@ -186,31 +221,33 @@ template <typename T> T TricubicCell<T>::getCellLength(CartesianDimension dim) c
 //-------------------------------------------------------------------------------------------------
 template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T z,
                                                   const TricubicBound kind) const {
-  if (x < origin_x || y < origin_y || z < origin_z ||
-      x >= origin_x + length_x || y >= origin_y + length_y || z >= origin_z + length_z) {
+  const T xrel = x - origin_x;
+  const T yrel = y - origin_y;
+  const T zrel = z - origin_z;
+  const T x_frac = (umat[0] * xrel) + (umat[3] * yrel) + (umat[6] * zrel);
+  const T y_frac = (umat[1] * xrel) + (umat[4] * yrel) + (umat[7] * zrel);
+  const T z_frac = (umat[2] * xrel) + (umat[5] * yrel) + (umat[8] * zrel);
+  const T zero = 0.0;
+  const T one  = 1.0;
+  if (x_frac < zero || x_frac >= one || y_frac < zero || y_frac >= one || z_frac < zero ||
+      z_frac >= one) {
     rtErr("Point (" + realToString(x, 7, 4, NumberFormat::STANDARD_REAL) + ", " +
           realToString(y, 7, 4, NumberFormat::STANDARD_REAL) + ", " +
           realToString(z, 7, 4, NumberFormat::STANDARD_REAL) + ") is out of bounds for a grid "
           "cell with origin (" + realToString(origin_x, 7, 4, NumberFormat::STANDARD_REAL) + ", " +
           realToString(origin_y, 7, 4, NumberFormat::STANDARD_REAL) + ", " +
-          realToString(origin_z, 7, 4, NumberFormat::STANDARD_REAL) + ") and dimensions " +
-          realToString(length_x, 7, 4, NumberFormat::STANDARD_REAL) + " x " +
-          realToString(length_y, 7, 4, NumberFormat::STANDARD_REAL) + " x " +
-          realToString(length_z, 7, 4, NumberFormat::STANDARD_REAL) + ".", "TricubicCell",
+          realToString(origin_z, 7, 4, NumberFormat::STANDARD_REAL) + ") and dimensions [ " +
+          realToString(invu[0], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[1], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[2], 7, 4, NumberFormat::STANDARD_REAL) + " ] x [ " +
+          realToString(invu[3], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[4], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[5], 7, 4, NumberFormat::STANDARD_REAL) + " ] x [ " +
+          realToString(invu[6], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[7], 7, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(invu[8], 7, 4, NumberFormat::STANDARD_REAL) + " ].", "TricubicCell",
           "evaluate");
   }
-  const T x_frac = (x - origin_x) / length_x;
-  const T y_frac = (y - origin_y) / length_y;
-  const T z_frac = (z - origin_z) / length_z;
-
-  // CHECK
-  bool report = false;
-  if (fabs(length_x - 0.5) < 1.0e-6 && fabs(x - 1.01) < 1.0e-6 && fabs(y - 1.01) < 1.0e-6 &&
-      fabs(z - 1.01) < 1.0e-6) {
-    report = true;
-  }
-  // END CHECK
-  
   T result = 0.0;
   const T v_one = 1.0; 
   T xv = v_one;
@@ -243,7 +280,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_x;
+    result *= umat[0];
     break;
   case TricubicBound::DY:
     for (int i = 0; i < 4; i++) {
@@ -260,7 +297,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_y;
+    result *= umat[4];
     break;
   case TricubicBound::DZ:
     for (int i = 0; i < 4; i++) {
@@ -277,7 +314,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_z;
+    result *= umat[8];
     break;
   case TricubicBound::DXY:
     for (int i = 1; i < 4; i++) {
@@ -295,7 +332,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_x * length_y;
+    result *= umat[0] * umat[4];
     break;
   case TricubicBound::DXZ:
     for (int i = 1; i < 4; i++) {
@@ -313,7 +350,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_x * length_z;
+    result *= umat[0] * umat[8];
     break;
   case TricubicBound::DYZ:
     for (int i = 0; i < 4; i++) {
@@ -332,7 +369,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_y * length_z;
+    result *= umat[4] * umat[8];
     break;
   case TricubicBound::DXYZ:
     for (int i = 1; i < 4; i++) {
@@ -352,7 +389,7 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
       }
       xv *= x_frac;
     }
-    result /= length_x * length_y * length_z;
+    result *= umat[0] * umat[4] * umat[8];
     break;
   }
   return result;
