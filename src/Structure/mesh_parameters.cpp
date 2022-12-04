@@ -18,7 +18,7 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
                                const double origin_z_in,
                                const std::vector<double> &element_vectors,
                                const int scale_bits_in) :
-  na{na_in}, nb{nb_in}, nc{nc_in}, origin_x{0LL, 0}, origin_y{0LL, 0}, origin_z{0LL, 0},
+    na{na_in}, nb{nb_in}, nc{nc_in}, origin_x{0LL, 0}, origin_y{0LL, 0}, origin_z{0LL, 0},
     scale_bits{scale_bits_in}, scale_factor{pow(2.0, scale_bits)},
     inverse_scale_factor{1.0 / scale_factor}, unit_cell{UnitCellType::NONE}, element_umat{},
     sp_element_umat{}, element_invu{}, sp_element_invu{}, fp_element_invu{}

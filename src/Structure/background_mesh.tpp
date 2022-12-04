@@ -135,9 +135,10 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                        scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
+                                 scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -148,8 +149,9 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in),
+                 gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -160,9 +162,10 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                        scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
+                                 scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -174,8 +177,9 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in, ag_in,
-                 cf_in, getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                 mixing_protocol_in,
+                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -184,7 +188,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in,  ag_in, cf_in,0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+  BackgroundMesh(kind_in, field_in,  ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -730,26 +734,27 @@ MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const Coo
   const int lj_idx_offset = nbk.n_lj_types + 1;
   for (int pos = 0; pos < nbk.natom; pos++) {
     if (ag->getAtomMobility(pos)) {
-      const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
-      const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
-                                           1.0 / 6.0);
-      if (points_unset) {
-        xmin = cfr.xcrd[pos] - atom_radius;
-        xmax = cfr.xcrd[pos] + atom_radius;
-        ymin = cfr.ycrd[pos] - atom_radius;
-        ymax = cfr.ycrd[pos] + atom_radius;
-        zmin = cfr.zcrd[pos] - atom_radius;
-        zmax = cfr.zcrd[pos] + atom_radius;
-        points_unset = false;
-      }
-      else {
-        xmin = std::min(xmin, cfr.xcrd[pos] - atom_radius);
-        xmax = std::max(xmax, cfr.xcrd[pos] + atom_radius);
-        ymin = std::min(ymin, cfr.ycrd[pos] - atom_radius);
-        ymax = std::max(ymax, cfr.ycrd[pos] + atom_radius);
-        zmin = std::min(zmin, cfr.zcrd[pos] - atom_radius);
-        zmax = std::max(zmax, cfr.zcrd[pos] + atom_radius);
-      }
+      continue;
+    }
+    const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
+    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
+                                         1.0 / 6.0);
+    if (points_unset) {
+      xmin = cfr.xcrd[pos] - atom_radius;
+      xmax = cfr.xcrd[pos] + atom_radius;
+      ymin = cfr.ycrd[pos] - atom_radius;
+      ymax = cfr.ycrd[pos] + atom_radius;
+      zmin = cfr.zcrd[pos] - atom_radius;
+      zmax = cfr.zcrd[pos] + atom_radius;
+      points_unset = false;
+    }
+    else {
+      xmin = std::min(xmin, cfr.xcrd[pos] - atom_radius);
+      xmax = std::max(xmax, cfr.xcrd[pos] + atom_radius);
+      ymin = std::min(ymin, cfr.ycrd[pos] - atom_radius);
+      ymax = std::max(ymax, cfr.ycrd[pos] + atom_radius);
+      zmin = std::min(zmin, cfr.zcrd[pos] - atom_radius);
+      zmax = std::max(zmax, cfr.zcrd[pos] + atom_radius);
     }
   }
   xmin -= padding;
@@ -948,18 +953,6 @@ template <typename T> void BackgroundMesh<T>::validateScalingBits() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T> void BackgroundMesh<T>::computeMeshAxisCoordinates() {
   const MeshParamKit<double> mps = measurements.dpData();
-
-  // CHECK
-  printf("FP = [\n");
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      printf("  %18.4lf", int95ToDouble(mps.fp_invu[(3 * j) + i]));
-    }
-    printf("\n");
-  }
-  printf("];\n");
-  // END CHECK
-  
   fixedPrecisionGrid(&a_line_x, &a_line_x_overflow, { 0LL, 0 }, mps.fp_invu[0]);
   fixedPrecisionGrid(&a_line_y, &a_line_y_overflow, { 0LL, 0 }, mps.fp_invu[1]);
   fixedPrecisionGrid(&a_line_z, &a_line_z_overflow, { 0LL, 0 }, mps.fp_invu[2]);
@@ -989,7 +982,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
+  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
   const MeshParamKit<double> mps = measurements.dpData();
   const CoordinateFrameReader cfr = cf_pointer->data();
   
@@ -1035,7 +1028,7 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
   // Loop over all atoms in the system
   const int lj_idx_offset = nbk.n_lj_types + 1;
   for (int pos = 0; pos < nbk.natom; pos++) {
-    if (frozen_atom[pos] == false) {
+    if (mobile_atom[pos]) {
       continue;
     }
     const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
@@ -1229,7 +1222,7 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
                                            dudxyz_elem, dudxx_elem, dudyy_elem, dudzz_elem);
         const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
         const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
-        for (size_t cpos = 0LLU; cpos < 64LLU; cpos++) {
+        for (size_t cpos = 0; cpos < 64; cpos++) {
           coeff_ptr[tc_offset + cpos] = tc_coeffs[cpos];
         }
       }
@@ -1278,7 +1271,7 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
 
   // Color the mesh on the CPU
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> frozen_atom = ag_pointer->getAtomMobility();
+  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
   const MeshParamKit<double> mps = measurements.dpData();
   const CoordinateFrameReader cfr = cf_pointer->data();
   
@@ -1297,17 +1290,12 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   const llint* cvec_x_ptr = c_line_x.data();
   const llint* cvec_y_ptr = c_line_y.data();
   const llint* cvec_z_ptr = c_line_z.data();
-  const llint* bvec_x_overflow_ptr = b_line_x.data();
-  const llint* bvec_y_overflow_ptr = b_line_y.data();
-  const llint* bvec_z_overflow_ptr = b_line_z.data();
-  const llint* cvec_x_overflow_ptr = c_line_x.data();
-  const llint* cvec_y_overflow_ptr = c_line_y.data();
-  const llint* cvec_z_overflow_ptr = c_line_z.data();
-
-  // CHECK
-  printf("mps.scale     = %18.4f\n", mps.scale);
-  printf("mps.inv_scale = %18.14f\n", mps.inv_scale);
-  // END CHECK
+  const int* bvec_x_overflow_ptr = b_line_x_overflow.data();
+  const int* bvec_y_overflow_ptr = b_line_y_overflow.data();
+  const int* bvec_z_overflow_ptr = b_line_z_overflow.data();
+  const int* cvec_x_overflow_ptr = c_line_x_overflow.data();
+  const int* cvec_y_overflow_ptr = c_line_y_overflow.data();
+  const int* cvec_z_overflow_ptr = c_line_z_overflow.data();
   
   // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
   // each element.  This allocates a small amount of additional memory, relative to the mesh that
@@ -1322,17 +1310,18 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   const size_t ngrid_b = mps.nb + 1;
   const size_t ngrid_c = mps.nc + 1;
   const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
-  std::vector<double> u_grid(ngabc), dudx_grid(ngabc), dudy_grid(ngabc), dudz_grid(ngabc);
-  std::vector<double> dudxy_grid(ngabc), dudxz_grid(ngabc), dudyz_grid(ngabc), dudxyz_grid(ngabc);
+  std::vector<double> u_grid(ngabc, 0.0), dudx_grid(ngabc, 0.0), dudy_grid(ngabc, 0.0);
+  std::vector<double> dudz_grid(ngabc, 0.0), dudxy_grid(ngabc, 0.0), dudxz_grid(ngabc, 0.0);
+  std::vector<double> dudyz_grid(ngabc, 0.0), dudxyz_grid(ngabc, 0.0);
   std::vector<double> dudxx_grid, dudyy_grid, dudzz_grid;
   const UnitCellType unit_cell = measurements.getMeshCellType();
   if (unit_cell == UnitCellType::TRICLINIC) {
-    dudxx_grid.resize(ngabc);
-    dudyy_grid.resize(ngabc);
-    dudzz_grid.resize(ngabc);
+    dudxx_grid.resize(ngabc, 0.0);
+    dudyy_grid.resize(ngabc, 0.0);
+    dudzz_grid.resize(ngabc, 0.0);
   }
   for (int pos = 0; pos < nbk.natom; pos++) {
-    if (frozen_atom[pos] == false) {
+    if (mobile_atom[pos]) {
       continue;
     }
     
@@ -1343,22 +1332,22 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
 
     // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
     // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
-    const double atom_q = nbk.charge[pos];
+    const double atom_q = nbk.charge[pos] * nbk.coulomb_constant;
     const int atom_lj_idx = nbk.lj_idx[pos];
-    const double atom_lja = nbk.lja_coeff[(atom_lj_idx + 1) * nbk.n_lj_types];
-    const double atom_ljb = nbk.ljb_coeff[(atom_lj_idx + 1) * nbk.n_lj_types];
+    const double atom_lja = nbk.lja_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
+    const double atom_ljb = nbk.ljb_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
     const double atom_sigma = (atom_lja >= 1.0e-6 && atom_ljb >= 1.0e-6) ?
                               pow(atom_lja / atom_ljb, 1.0 / 6.0) : 0.0;
-    const double atom_eps = (atom_sigma > 0.0) ? 0.25 * pow(atom_ljb / atom_sigma, 1.0 / 6.0) :
+    const double atom_eps = (atom_sigma > 0.0) ? 0.25 * atom_ljb / pow(atom_sigma, 6.0) :
                                                  0.0;
     double pair_eps, pair_sigma;
     switch (mixing_protocol) {
     case VdwCombiningRule::LORENTZ_BERTHELOT:
-      pair_eps = sqrt(atom_eps * well_depth);
+      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
       pair_sigma = 0.5 * (atom_sigma + probe_radius);
       break;
     case VdwCombiningRule::GEOMETRIC:
-      pair_eps = sqrt(atom_eps * well_depth);
+      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
       pair_sigma = 0.5 * (atom_sigma + probe_radius);
       break;
     case VdwCombiningRule::NBFIX:
@@ -1368,17 +1357,17 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
     }
     const double pair_lja = 4.0 * pair_eps * pow(pair_sigma, 12.0);
     const double pair_ljb = 4.0 * pair_eps * pow(pair_sigma, 6.0);
-
+    
     // Loop over all grid points
-    for (size_t i = 0LLU; i < ngrid_a; i++) {
+    for (size_t i = 0; i < ngrid_a; i++) {
       const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
       const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
       const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
-      for (size_t j = 0LLU; j < ngrid_b; j++) {
+      for (size_t j = 0; j < ngrid_b; j++) {
         const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
         const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
         const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
-        for (size_t k = 0LLU; k < ngrid_c; k++) {
+        for (size_t k = 0; k < ngrid_c; k++) {
           const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
           const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
           const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
@@ -1394,24 +1383,12 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
           const double invr2 = 1.0 / r2;
-          const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
 
           // Compute one of a variety of potentials
           double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz, du_dxx, du_dyy, du_dzz;
           switch (field) {
           case NonbondedPotential::ELECTROSTATIC:
             u = atom_q / r;
-
-            // CHECK
-            if (pos == 0 && j == ngrid_b / 2 && k == ngrid_c / 2) {
-              printf("Atom  = [ %18.4lf %18.4lf %18.4lf ];\n", int95ToDouble(atom_x),
-                     int95ToDouble(atom_y), int95ToDouble(atom_z));
-              printf("Point = [ %18.4lf %18.4lf %18.4lf ];\n", int95ToDouble(mesh_abcx),
-                     int95ToDouble(mesh_abcy), int95ToDouble(mesh_abcz));
-              printf("%zu -> %9.4lf / %9.4lf -> %9.4lf\n", i, atom_q, r, u);
-            }
-            // END CHECK
-            
             du_dx = -u * disp_x * invr2;
             du_dy = -u * disp_y * invr2;
             du_dz = -u * disp_z * invr2;
@@ -1435,6 +1412,20 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
               const double d3_factor = ((480.0 * pair_ljb) - (2688.0 * pair_lja * invr6)) *
                                        invr6 * invr6;
               u = ((pair_lja * invr6) - pair_ljb) * invr6;
+
+              // CHECK
+#if 0
+              if (r < 2.0) {
+                printf("Atom %4d : [ %9.4lf %9.4lf %9.4lf ] -> [ %2zu %2zu %2zu ] -> %9.4lf [ "
+                       "%9.4lf %9.4lf -> %10.2lf %9.2lf ] -> %9.4lf\n", pos,
+                       int95ToDouble(atom_x) * mps.inv_scale,
+                       int95ToDouble(atom_y) * mps.inv_scale,
+                       int95ToDouble(atom_z) * mps.inv_scale, i, j, k, r, atom_sigma, atom_eps,
+                       pair_lja, pair_ljb, u);
+              }
+#endif
+              // END CHECK
+              
               du_dx = d_factor * disp_x;
               du_dy = d_factor * disp_y;
               du_dz = d_factor * disp_z;
@@ -1454,18 +1445,19 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           }
 
           // Log the results
-          u_grid[nijk] = u;
-          dudx_grid[nijk] = du_dx;
-          dudy_grid[nijk] = du_dy;
-          dudz_grid[nijk] = du_dz;
-          dudxy_grid[nijk] = du_dxy;
-          dudxz_grid[nijk] = du_dxz;
-          dudyz_grid[nijk] = du_dyz;
-          dudxyz_grid[nijk] = du_dxyz;
+          const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
+          u_grid[nijk] += u;
+          dudx_grid[nijk] += du_dx;
+          dudy_grid[nijk] += du_dy;
+          dudz_grid[nijk] += du_dz;
+          dudxy_grid[nijk] += du_dxy;
+          dudxz_grid[nijk] += du_dxz;
+          dudyz_grid[nijk] += du_dyz;
+          dudxyz_grid[nijk] += du_dxyz;
           if (unit_cell == UnitCellType::TRICLINIC) {
-            dudxx_grid[nijk] = du_dxx;
-            dudyy_grid[nijk] = du_dyy;
-            dudzz_grid[nijk] = du_dzz;
+            dudxx_grid[nijk] += du_dxx;
+            dudyy_grid[nijk] += du_dyy;
+            dudzz_grid[nijk] += du_dzz;
           }
         }
       }
