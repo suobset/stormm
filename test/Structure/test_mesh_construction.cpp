@@ -44,20 +44,30 @@ int main(const int argc, const char* argv[]) {
   bgm_a.setMeshParameters(10.0, 1.0);
   bgm_a.setProbeRadius(1.4);
   bgm_a.computeField();
-  BackgroundMeshWriter<double, ullint> bgmw = bgm_a.dpData();
-  const std::vector<double> trpi_mesh_dims = { static_cast<double>(bgmw.dims.na),
-                                               static_cast<double>(bgmw.dims.nb),
-                                               static_cast<double>(bgmw.dims.nc),
-                                               bgmw.dims.invu[0], bgmw.dims.invu[1],
-                                               bgmw.dims.invu[2], bgmw.dims.invu[3],
-                                               bgmw.dims.invu[4], bgmw.dims.invu[5],
-                                               bgmw.dims.invu[6], bgmw.dims.invu[7],
-                                               bgmw.dims.invu[8] };
+  BackgroundMeshWriter<double, ullint> bgmw_a = bgm_a.dpData();
+  const std::vector<double> trpi_mesh_dims = { static_cast<double>(bgmw_a.dims.na),
+                                               static_cast<double>(bgmw_a.dims.nb),
+                                               static_cast<double>(bgmw_a.dims.nc),
+                                               bgmw_a.dims.invu[0], bgmw_a.dims.invu[1],
+                                               bgmw_a.dims.invu[2], bgmw_a.dims.invu[3],
+                                               bgmw_a.dims.invu[4], bgmw_a.dims.invu[5],
+                                               bgmw_a.dims.invu[6], bgmw_a.dims.invu[7],
+                                               bgmw_a.dims.invu[8] };
   const std::vector<double> trpi_mesh_dims_ans = { 45.0, 43.0, 37.0,  1.0,  0.0,  0.0,
                                                     0.0,  1.0,  0.0,  0.0,  0.0,  1.0 };
   check(trpi_mesh_dims, RelationalOperator::EQUAL, trpi_mesh_dims_ans, "The mesh dimensions "
         "computed for Trp-cage do not meet expectations.", tsm.getTestingStatus());
+  BackgroundMesh<double> bgm_b(GridDetail::NONBONDED_FIELD, NonbondedPotential::ELECTROSTATIC,
+                               tsm.getTopologyPointer(0), &trpi_cf, 10.0, 1.0);
+  BackgroundMeshWriter<double, double> bgmw_b = bgm_b.dpData();
   
+  // CHECK
+#if 0
+  for (int i = 0; i < 45; i++) {
+    printf("%12.4lf\n", bgmw_b.coeffs[64 * ((((23 * 43) + 22) * 45) + i)]);
+  }
+#endif
+  // END CHECK
 
   // Print results
   printTestSummary(oe.getVerbosity());

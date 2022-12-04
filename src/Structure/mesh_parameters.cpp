@@ -1,5 +1,6 @@
 #include <climits>
 #include "copyright.h"
+#include "Constants/scaling.h"
 #include "Constants/fixed_precision.h"
 #include "Math/matrix_ops.h"
 #include "mesh_parameters.h"
@@ -14,27 +15,24 @@ using math::invertSquareMatrix;
 //-------------------------------------------------------------------------------------------------
 MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
                                const double origin_x_in, const double origin_y_in,
-                               const double origin_z_in, const int scale_bits_in) :
+                               const double origin_z_in,
+                               const std::vector<double> &element_vectors,
+                               const int scale_bits_in) :
     na{na_in}, nb{nb_in}, nc{nc_in}, origin_x{doubleToInt95(origin_x_in)},
     origin_y{doubleToInt95(origin_y_in)}, origin_z{doubleToInt95(origin_z_in)},
     scale_bits{scale_bits_in}, scale_factor{pow(2.0, scale_bits)},
     inverse_scale_factor{1.0 / scale_factor}, unit_cell{UnitCellType::NONE}, element_umat{},
     sp_element_umat{}, element_invu{}, sp_element_invu{}, fp_element_invu{}
 {
+  defineElement(element_vectors);
   validateMeshDimensions();
   validateFixedPrecisionBits();
 }
 
 //-------------------------------------------------------------------------------------------------
-MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
-                               const double origin_x_in, const double origin_y_in,
-                               const double origin_z_in,
-                               const std::vector<double> &element_vectors,
-                               const int scale_bits_in) :
-    MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in, scale_bits_in)
-{
-  defineElement(element_vectors);
-}
+MeshParameters::MeshParameters() :
+    MeshParameters(1, 1, 1, 0.0, 0.0, 0.0, { 1.0, 1.0, 1.0 })
+{}
 
 //-------------------------------------------------------------------------------------------------
 MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
@@ -44,6 +42,15 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
                                const int scale_bits_in) :
     MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in,
                    { element_x, element_y, element_z }, scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
+                               const double origin_x_in, const double origin_y_in,
+                               const double origin_z_in, const double element_width,
+                               const int scale_bits_in) :
+    MeshParameters(na_in, nb_in, nc_in, origin_x_in, origin_y_in, origin_z_in,
+                   { element_width, element_width, element_width }, scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -300,7 +307,20 @@ void MeshParameters::defineElement(const std::vector<double> &element_vectors) {
     rtErr("The mesh element is defined by a 3x3 matrix.  A total of " +
           std::to_string(element_vectors.size()) + " elements were provided.", "MeshParameters");
   }
-  unit_cell = determineUnitCellTypeByShape(element_vectors);
+
+  // The determineUnitCellTypeByShape() function will define what would be very small unit cells,
+  // in particular 1 x 1 x 1 Angstrom, as "NONE" type.  This is because there must be a unit cell
+  // defined for some purposes, and such a unit cell would be an impossibly small simulation.
+  // However, for mesh elements, the default "NONE" type unit cell dimensions are quite common.
+  // Use a basic off-diagonal check instead.
+  if (fabs(element_invu[1]) > constants::tiny || fabs(element_invu[2]) > constants::tiny ||
+      fabs(element_invu[3]) > constants::tiny || fabs(element_invu[5]) > constants::tiny ||
+      fabs(element_invu[6]) > constants::tiny || fabs(element_invu[7]) > constants::tiny) {
+    unit_cell = UnitCellType::TRICLINIC;
+  }
+  else {
+    unit_cell = UnitCellType::ORTHORHOMBIC;
+  }
 
   // Use the Hessian Normal form to compute the number of mesh elements to search in each direction
   // and color all of the necessary elements around each atom.

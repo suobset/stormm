@@ -78,16 +78,18 @@ public:
   /// \brief The constructor takes formal arguments for all member variables.  Variants support
   ///        triclinic and orthorhombic meshes.
   /// \{
-  MeshParameters(int na_in = 1, int nb_in = 1, int nc_in = 1, double origin_x_in = 0.0,
-                 double origin_y_in = 0.0, double origin_z_in = 0.0,
-                 int scale_bits_in = default_mesh_scaling_bits);
-
   MeshParameters(int na_in, int nb_in, int nc_in, double origin_x_in, double origin_y_in,
                  double origin_z_in, const std::vector<double> &element_vectors,
                  int scale_bits_in = default_mesh_scaling_bits);
 
+  MeshParameters();
+
   MeshParameters(int na_in, int nb_in, int nc_in, double origin_x_in, double origin_y_in,
                  double origin_z_in, double element_x, double element_y, double element_z,
+                 int scale_bits_in = default_mesh_scaling_bits);
+
+  MeshParameters(int na_in, int nb_in, int nc_in, double origin_x_in, double origin_y_in,
+                 double origin_z_in, double element_width,
                  int scale_bits_in = default_mesh_scaling_bits);
   /// \}
 

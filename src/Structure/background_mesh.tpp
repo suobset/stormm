@@ -184,7 +184,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in,  ag_in, cf_in,0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -198,7 +198,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -211,7 +211,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -226,7 +226,7 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
@@ -239,8 +239,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -254,8 +254,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
                                   const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -269,8 +269,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const double spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
                                  scale_bits_in), gpu)
 {
@@ -285,8 +285,8 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
                                   const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT, ag_in, cf_in,
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
@@ -676,6 +676,7 @@ void BackgroundMesh<T>::computeField(const GpuDetails &gpu) {
     break;
   case GridDetail::NONBONDED_FIELD:
     mapPureNonbondedPotential(gpu);
+    break;
   case GridDetail::NONBONDED_ATOMIC:
     break;
   }
@@ -1113,8 +1114,11 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
                                             const std::vector<double> &dudxy_grid,
                                             const std::vector<double> &dudxz_grid,
                                             const std::vector<double> &dudyz_grid,
-                                            const std::vector<double> &dudxyz_grid) {
-
+                                            const std::vector<double> &dudxyz_grid,
+                                            const std::vector<double> &dudxx_grid,
+                                            const std::vector<double> &dudyy_grid,
+                                            const std::vector<double> &dudzz_grid) {
+  
   // Get the measurements abstract locally--better than passing a reference of the same size
   // and then having to de-reference it many times.
   const MeshParamKit<double> mps = measurements.dpData();
@@ -1124,7 +1128,8 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
   // Lay out the mesh cell bounds
   std::vector<double> tc_bounds;
-  switch (measurements.getMeshCellType()) {
+  const UnitCellType unit_cell = measurements.getMeshCellType();
+  switch (unit_cell) {
   case UnitCellType::NONE:
     break;
   case UnitCellType::ORTHORHOMBIC:
@@ -1158,10 +1163,11 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
   const llint* cvec_y_overflow_ptr = c_line_y.data();
   const llint* cvec_z_overflow_ptr = c_line_z.data();
   T* coeff_ptr = coefficients.data();
-
+  
   // Compute coefficeints
   std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
   std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
+  std::vector<double> dudxx_elem(8), dudyy_elem(8), dudzz_elem(8);
   for (int i = 0; i < mps.na; i++) {
     const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
     const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
@@ -1171,37 +1177,34 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
       const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
       const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
       for (int k = 0; k < mps.nc; k++) {
-        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
-        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
-        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
+        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
+        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
 
         // Compose the input vectors
-        switch (measurements.getMeshCellType()) {
-        case UnitCellType::NONE:
-          break;
-        case UnitCellType::ORTHORHOMBIC:
-          for (int ci = 0; ci < 2; ci++) {
-            const size_t ici = i + ci;
-            for (int cj = 0; cj < 2; cj++) {
-              const size_t jcj = j + cj;
-              for (int ck = 0; ck < 2; ck++) {
-                const size_t nv = (((ck * 2) + cj) * 2) + ci;
-                const size_t kck = k + ck;
-                const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
-                u_elem[nv] = u_grid[nijk];
-                dudx_elem[nv] = dudx_grid[nijk];
-                dudy_elem[nv] = dudy_grid[nijk];
-                dudz_elem[nv] = dudz_grid[nijk];
-                dudxy_elem[nv] = dudxy_grid[nijk];
-                dudxz_elem[nv] = dudxz_grid[nijk];
-                dudyz_elem[nv] = dudyz_grid[nijk];
-                dudxyz_elem[nv] = dudxyz_grid[nijk];
+        for (int ci = 0; ci < 2; ci++) {
+          const size_t ici = i + ci;
+          for (int cj = 0; cj < 2; cj++) {
+            const size_t jcj = j + cj;
+            for (int ck = 0; ck < 2; ck++) {
+              const size_t nv = (((ck * 2) + cj) * 2) + ci;
+              const size_t kck = k + ck;
+              const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+              u_elem[nv] = u_grid[nijk];
+              dudx_elem[nv] = dudx_grid[nijk];
+              dudy_elem[nv] = dudy_grid[nijk];
+              dudz_elem[nv] = dudz_grid[nijk];
+              dudxy_elem[nv] = dudxy_grid[nijk];
+              dudxz_elem[nv] = dudxz_grid[nijk];
+              dudyz_elem[nv] = dudyz_grid[nijk];
+              dudxyz_elem[nv] = dudxyz_grid[nijk];
+              if (unit_cell == UnitCellType::TRICLINIC) {
+                dudxx_elem[nv] = dudxx_grid[nijk];
+                dudyy_elem[nv] = dudyy_grid[nijk];
+                dudzz_elem[nv] = dudzz_grid[nijk];
               }
             }
           }
-          break;
-        case UnitCellType::TRICLINIC:
-          break;
         }
 
         // Compose the mesh element.  Complete the bounds array by adding the origin, then
@@ -1211,11 +1214,11 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
         tc_bounds[2] = int95ToDouble(mesh_abcz);
         const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
                                            dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
-                                           dudxyz_elem);
+                                           dudxyz_elem, dudxx_elem, dudyy_elem, dudzz_elem);
         const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
         const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
-        for (size_t i = 0LLU; i < 64LLU; i++) {
-          coeff_ptr[tc_offset + i] = tc_coeffs[i];
+        for (size_t cpos = 0LLU; cpos < 64LLU; cpos++) {
+          coeff_ptr[tc_offset + cpos] = tc_coeffs[cpos];
         }
       }
     }
@@ -1288,7 +1291,7 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   const llint* cvec_x_overflow_ptr = c_line_x.data();
   const llint* cvec_y_overflow_ptr = c_line_y.data();
   const llint* cvec_z_overflow_ptr = c_line_z.data();
-
+  
   // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
   // each element.  This allocates a small amount of additional memory, relative to the mesh that
   // will be produced, but reduces the pre-computations for getting those elements by a factor
@@ -1304,11 +1307,18 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
   std::vector<double> u_grid(ngabc), dudx_grid(ngabc), dudy_grid(ngabc), dudz_grid(ngabc);
   std::vector<double> dudxy_grid(ngabc), dudxz_grid(ngabc), dudyz_grid(ngabc), dudxyz_grid(ngabc);
+  std::vector<double> dudxx_grid, dudyy_grid, dudzz_grid;
+  const UnitCellType unit_cell = measurements.getMeshCellType();
+  if (unit_cell == UnitCellType::TRICLINIC) {
+    dudxx_grid.resize(ngabc);
+    dudyy_grid.resize(ngabc);
+    dudzz_grid.resize(ngabc);
+  }
   for (int pos = 0; pos < nbk.natom; pos++) {
     if (frozen_atom[pos] == false) {
       continue;
     }
-
+    
     // Compute the particle position in the mesh's native fixed-precision format
     const int95_t atom_x = doubleToInt95(cfr.xcrd[pos] * mps.scale);
     const int95_t atom_y = doubleToInt95(cfr.ycrd[pos] * mps.scale);
@@ -1352,9 +1362,9 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
         const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
         const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
         for (size_t k = 0LLU; k < ngrid_c; k++) {
-          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[j], cvec_x_overflow_ptr[j]);
-          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[j], cvec_y_overflow_ptr[j]);
-          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[j], cvec_z_overflow_ptr[j]);
+          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
+          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
+          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
 
           // Compute the displacements using the mesh's fixed-precision representation, then
           // immediately convert to double for real-valued computations.
@@ -1366,23 +1376,50 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           const double disp_z = int95ToDouble(fp_disp_z);
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
+          const double invr2 = 1.0 / r2;
           const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
 
           // Compute one of a variety of potentials
-          double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz;
+          double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz, du_dxx, du_dyy, du_dzz;
           switch (field) {
           case NonbondedPotential::ELECTROSTATIC:
             u = atom_q / r;
-            du_dx = -u * disp_x / r2;
-            du_dy = -u * disp_y / r2;
-            du_dz = -u * disp_z / r2;
-            du_dxy = -3.0 * du_dx * disp_y / r2;
-            du_dxz = -3.0 * du_dx * disp_z / r2;
-            du_dyz = -3.0 * du_dy * disp_z / r2;
-            du_dxyz = -5.0 * du_dxy * disp_z / r2;
+            du_dx = -u * disp_x * invr2;
+            du_dy = -u * disp_y * invr2;
+            du_dz = -u * disp_z * invr2;
+            du_dxy = -3.0 * du_dx * disp_y * invr2;
+            du_dxz = -3.0 * du_dx * disp_z * invr2;
+            du_dyz = -3.0 * du_dy * disp_z * invr2;
+            du_dxyz = -5.0 * du_dxy * disp_z * invr2;
+            if (unit_cell == UnitCellType::TRICLINIC) {
+              du_dxx = -3.0 * du_dx * disp_x * invr2;
+              du_dyy = -3.0 * du_dy * disp_y * invr2;
+              du_dzz = -3.0 * du_dz * disp_z * invr2;
+            }
             break;
           case NonbondedPotential::VAN_DER_WAALS:
-
+            {
+              const double invr6 = invr2 * invr2 * invr2;
+              const double invr8 = invr6 * invr2;
+              const double invr10 = invr8 * invr2;
+              const double d_factor = ((6.0 * pair_ljb) - (12.0 * pair_lja * invr6)) * invr8;
+              const double d2_factor = ((168.0 * pair_lja * invr6) - (48.0 * pair_ljb)) * invr10;
+              const double d3_factor = ((480.0 * pair_ljb) - (2688.0 * pair_lja * invr6)) *
+                                       invr6 * invr6;
+              u = ((pair_lja * invr6) - pair_ljb) * invr6;
+              du_dx = d_factor * disp_x;
+              du_dy = d_factor * disp_y;
+              du_dz = d_factor * disp_z;
+              du_dxy = d2_factor * disp_x * disp_y;
+              du_dxz = d2_factor * disp_x * disp_z;
+              du_dyz = d2_factor * disp_y * disp_z;
+              du_dxyz = d3_factor * disp_x * disp_y * disp_z;
+              if (unit_cell == UnitCellType::TRICLINIC) {
+                du_dxx = d2_factor * disp_x * disp_x;
+                du_dyy = d2_factor * disp_y * disp_y;
+                du_dzz = d2_factor * disp_z * disp_z;
+              }
+            }
             break;
           case NonbondedPotential::CLASH:
             break;
@@ -1397,6 +1434,11 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           dudxz_grid[nijk] = du_dxz;
           dudyz_grid[nijk] = du_dyz;
           dudxyz_grid[nijk] = du_dxyz;
+          if (unit_cell == UnitCellType::TRICLINIC) {
+            dudxx_grid[nijk] = du_dxx;
+            dudyy_grid[nijk] = du_dyy;
+            dudzz_grid[nijk] = du_dzz;
+          }
         }
       }
     }

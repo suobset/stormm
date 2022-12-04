@@ -13,9 +13,10 @@ TricubicCell<T>::TricubicCell() :
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
     f{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dx{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
     dy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-    dxy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dxz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-    dyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dxyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-    origin_x{0.0}, origin_y{0.0}, origin_z{0.0},
+    dxx{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dyy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+    dzz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dxy{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+    dxz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, dyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+    dxyz{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, origin_x{0.0}, origin_y{0.0}, origin_z{0.0},
     umat{ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 },
     invu{ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 }
 {}
@@ -27,7 +28,8 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
                               const std::vector<T> &dx_in, const std::vector<T> &dy_in,
                               const std::vector<T> &dz_in, const std::vector<T> &dxy_in,
                               const std::vector<T> &dxz_in, const std::vector<T> &dyz_in,
-                              const std::vector<T> &dxyz_in) :
+                              const std::vector<T> &dxyz_in, const std::vector<T> &dxx_in,
+                              const std::vector<T> &dyy_in, const std::vector<T> &dzz_in) :
     coefficients{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -36,6 +38,9 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
     dx{ dx_in[0], dx_in[1], dx_in[2], dx_in[3], dx_in[4], dx_in[5], dx_in[6], dx_in[7] },
     dy{ dy_in[0], dy_in[1], dy_in[2], dy_in[3], dy_in[4], dy_in[5], dy_in[6], dy_in[7] },
     dz{ dz_in[0], dz_in[1], dz_in[2], dz_in[3], dz_in[4], dz_in[5], dz_in[6], dz_in[7] },
+    dxx{ dxx_in[0], dxx_in[1], dxx_in[2], dxx_in[3], dxx_in[4], dxx_in[5], dxx_in[6], dxx_in[7] },
+    dyy{ dyy_in[0], dyy_in[1], dyy_in[2], dyy_in[3], dyy_in[4], dyy_in[5], dyy_in[6], dyy_in[7] },
+    dzz{ dzz_in[0], dzz_in[1], dzz_in[2], dzz_in[3], dzz_in[4], dzz_in[5], dzz_in[6], dzz_in[7] },
     dxy{ dxy_in[0], dxy_in[1], dxy_in[2], dxy_in[3], dxy_in[4], dxy_in[5], dxy_in[6], dxy_in[7] },
     dxz{ dxz_in[0], dxz_in[1], dxz_in[2], dxz_in[3], dxz_in[4], dxz_in[5], dxz_in[6], dxz_in[7] },
     dyz{ dyz_in[0], dyz_in[1], dyz_in[2], dyz_in[3], dyz_in[4], dyz_in[5], dyz_in[6], dyz_in[7] },
@@ -93,18 +98,21 @@ TricubicCell<T>::TricubicCell(const std::vector<double> weights_matrix,
   std::vector<double> b(64);
   for (int i = 0; i < 8; i++) {
     b[i     ] = f[i];
-    b[i +  8] = (dx[i] * invu[0]) + (dy[i] * invu[3]) + (dz[i] * invu[6]);
-    b[i + 16] = (dx[i] * invu[1]) + (dy[i] * invu[4]) + (dz[i] * invu[7]);
-    b[i + 24] = (dx[i] * invu[2]) + (dy[i] * invu[5]) + (dz[i] * invu[8]);
     if (bounds.size() <= 6) {
-      b[i + 32] = dxy[i] * invu[0] * invu[4];
-      b[i + 40] = dxz[i] * invu[0] * invu[8];
-      b[i + 48] = dyz[i] * invu[4] * invu[8];
-      b[i + 56] = dxyz[i] * invu[0] * invu[4] * invu[8];
+      b[i +  8] = dx_in[i] * invu[0];
+      b[i + 16] = dy_in[i] * invu[4];
+      b[i + 24] = dz_in[i] * invu[8];
+      b[i + 32] = dxy_in[i] * invu[0] * invu[4];
+      b[i + 40] = dxz_in[i] * invu[0] * invu[8];
+      b[i + 48] = dyz_in[i] * invu[4] * invu[8];
+      b[i + 56] = dxyz_in[i] * invu[0] * invu[4] * invu[8];
     }
     else {
 
       // The general, triclinic case
+      b[i +  8] = (dx_in[i] * invu[0]) + (dy_in[i] * invu[3]) + (dz_in[i] * invu[6]);
+      b[i + 16] = (dx_in[i] * invu[1]) + (dy_in[i] * invu[4]) + (dz_in[i] * invu[7]);
+      b[i + 24] = (dx_in[i] * invu[2]) + (dy_in[i] * invu[5]) + (dz_in[i] * invu[8]);
     }
   }
   std::vector<double> dcoeffs(64);

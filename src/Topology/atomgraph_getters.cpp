@@ -206,7 +206,7 @@ std::vector<bool> AtomGraph::getAtomMobility(const int low_index, const int high
   const int int_bits = sizeof(int) * 8;
   for (int i = low_index; i < high_index; i++) {
     const int access_index = i / int_bits;
-    mobiles[i - low_index] = ((static_cast<uint>(m_ptr[access_index]) <<
+    mobiles[i - low_index] = ((static_cast<uint>(m_ptr[access_index]) >>
                                (i - (access_index * int_bits))) & 0x1);
   }
   return mobiles;
