@@ -62,11 +62,9 @@ int main(const int argc, const char* argv[]) {
   BackgroundMeshWriter<double, double> bgmw_b = bgm_b.dpData();
   
   // CHECK
-#if 0
   for (int i = 0; i < 45; i++) {
     printf("%12.4lf\n", bgmw_b.coeffs[64 * ((((23 * 43) + 22) * 45) + i)]);
   }
-#endif
   // END CHECK
 
   // Print results

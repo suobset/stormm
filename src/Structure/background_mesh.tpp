@@ -948,6 +948,18 @@ template <typename T> void BackgroundMesh<T>::validateScalingBits() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T> void BackgroundMesh<T>::computeMeshAxisCoordinates() {
   const MeshParamKit<double> mps = measurements.dpData();
+
+  // CHECK
+  printf("FP = [\n");
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      printf("  %18.4lf", int95ToDouble(mps.fp_invu[(3 * j) + i]));
+    }
+    printf("\n");
+  }
+  printf("];\n");
+  // END CHECK
+  
   fixedPrecisionGrid(&a_line_x, &a_line_x_overflow, { 0LL, 0 }, mps.fp_invu[0]);
   fixedPrecisionGrid(&a_line_y, &a_line_y_overflow, { 0LL, 0 }, mps.fp_invu[1]);
   fixedPrecisionGrid(&a_line_z, &a_line_z_overflow, { 0LL, 0 }, mps.fp_invu[2]);
@@ -1291,6 +1303,11 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   const llint* cvec_x_overflow_ptr = c_line_x.data();
   const llint* cvec_y_overflow_ptr = c_line_y.data();
   const llint* cvec_z_overflow_ptr = c_line_z.data();
+
+  // CHECK
+  printf("mps.scale     = %18.4f\n", mps.scale);
+  printf("mps.inv_scale = %18.14f\n", mps.inv_scale);
+  // END CHECK
   
   // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
   // each element.  This allocates a small amount of additional memory, relative to the mesh that
@@ -1371,9 +1388,9 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           const int95_t fp_disp_x = splitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
           const int95_t fp_disp_y = splitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
           const int95_t fp_disp_z = splitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
-          const double disp_x = int95ToDouble(fp_disp_x);
-          const double disp_y = int95ToDouble(fp_disp_y);
-          const double disp_z = int95ToDouble(fp_disp_z);
+          const double disp_x = int95ToDouble(fp_disp_x) * mps.inv_scale;
+          const double disp_y = int95ToDouble(fp_disp_y) * mps.inv_scale;
+          const double disp_z = int95ToDouble(fp_disp_z) * mps.inv_scale;
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
           const double invr2 = 1.0 / r2;
@@ -1384,6 +1401,17 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
           switch (field) {
           case NonbondedPotential::ELECTROSTATIC:
             u = atom_q / r;
+
+            // CHECK
+            if (pos == 0 && j == ngrid_b / 2 && k == ngrid_c / 2) {
+              printf("Atom  = [ %18.4lf %18.4lf %18.4lf ];\n", int95ToDouble(atom_x),
+                     int95ToDouble(atom_y), int95ToDouble(atom_z));
+              printf("Point = [ %18.4lf %18.4lf %18.4lf ];\n", int95ToDouble(mesh_abcx),
+                     int95ToDouble(mesh_abcy), int95ToDouble(mesh_abcz));
+              printf("%zu -> %9.4lf / %9.4lf -> %9.4lf\n", i, atom_q, r, u);
+            }
+            // END CHECK
+            
             du_dx = -u * disp_x * invr2;
             du_dy = -u * disp_y * invr2;
             du_dz = -u * disp_z * invr2;
