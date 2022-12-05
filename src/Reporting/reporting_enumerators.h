@@ -17,6 +17,11 @@ enum class HelpSignalKind {
   KEYWORD_ONLY   ///< Help messages are triggered only by an explicit keyword on the command line
 };
 
+/// \brief Produce strings detailing each of the enumerations above.
+///
+/// \param input  The enumeration to describe
+std::string getEnumerationName(HelpSignalKind input);
+
 } // namespace display
 
 namespace review {
