@@ -24,11 +24,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
-if (DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
-else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-endif()
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -g")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3")
 
 if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
