@@ -10,6 +10,7 @@
 #include "../../../src/Random/random.h"
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
+#include "../../../src/Reporting/reporting_enumerators.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
