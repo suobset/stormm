@@ -655,6 +655,15 @@ private:
                                  const std::vector<double> &sigma_table = {});
 };
 
+/// \brief Interpolate the mesh-based potential (or, for an occlusion mesh, simply read the
+///        bitmask) for a collection of Cartesian coordinates.  This works for a single mesh
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
+                               const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
+                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
+                               const int* ycrd_ovrf, const int* zcrd_ovrf,
+                               int coord_scaling_bits);
+  
 } // namespace structure
 } // namespace stormm
 
