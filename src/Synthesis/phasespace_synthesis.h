@@ -32,7 +32,6 @@ using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
-using numerics::doubleToInt95;
 using topology::UnitCellType;
 using trajectory::Barostat;
 using trajectory::BarostatKind;

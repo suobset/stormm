@@ -11,7 +11,6 @@ namespace structure {
 using numerics::min_localpos_scale_bits;
 using math::hessianNormalWidths;
 using math::invertSquareMatrix;
-
 //-------------------------------------------------------------------------------------------------
 MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
                                const double origin_x_in, const double origin_y_in,
@@ -23,9 +22,9 @@ MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in
     inverse_scale_factor{1.0 / scale_factor}, unit_cell{UnitCellType::NONE}, element_umat{},
     sp_element_umat{}, element_invu{}, sp_element_invu{}, fp_element_invu{}
 {
-  origin_x = doubleToInt95(origin_x_in * scale_factor);
-  origin_y = doubleToInt95(origin_y_in * scale_factor);
-  origin_z = doubleToInt95(origin_z_in * scale_factor);
+  origin_x = hostDoubleToInt95(origin_x_in * scale_factor);
+  origin_y = hostDoubleToInt95(origin_y_in * scale_factor);
+  origin_z = hostDoubleToInt95(origin_z_in * scale_factor);
   defineElement(element_vectors);
   validateMeshDimensions();
   validateFixedPrecisionBits();
@@ -85,11 +84,11 @@ int MeshParameters::getAxisElementCount(const CartesianDimension dim) const {
 double MeshParameters::getMeshOrigin(const CartesianDimension dim) const {
   switch (dim) {
   case CartesianDimension::X:
-    return int95ToDouble(origin_x) * inverse_scale_factor;
+    return hostInt95ToDouble(origin_x) * inverse_scale_factor;
   case CartesianDimension::Y:
-    return int95ToDouble(origin_y) * inverse_scale_factor;
+    return hostInt95ToDouble(origin_y) * inverse_scale_factor;
   case CartesianDimension::Z:
-    return int95ToDouble(origin_z) * inverse_scale_factor;
+    return hostInt95ToDouble(origin_z) * inverse_scale_factor;
   }
   __builtin_unreachable();
 }
@@ -165,21 +164,21 @@ std::vector<int95_t> MeshParameters::getAxisCoordinates(const UnitCellAxis mesh_
     result.resize(na + 1);
     result[0] = origin_x;
     for (int i = 0; i < na; i++) {
-      result[i + 1] = splitFPSum(result[i], fp_element_invu[cdim]);
+      result[i + 1] = hostSplitFPSum(result[i], fp_element_invu[cdim]);
     }
     break;
   case UnitCellAxis::B:
     result.resize(nb + 1);
     result[0] = origin_y;
     for (int i = 0; i < na; i++) {
-      result[i + 1] = splitFPSum(result[i], fp_element_invu[3 + cdim]);
+      result[i + 1] = hostSplitFPSum(result[i], fp_element_invu[3 + cdim]);
     }
     break;
   case UnitCellAxis::C:
     result.resize(nc + 1);
     result[0] = origin_z;
     for (int i = 0; i < nc; i++) {
-      result[i + 1] = splitFPSum(result[i], fp_element_invu[6 + cdim]);
+      result[i + 1] = hostSplitFPSum(result[i], fp_element_invu[6 + cdim]);
     }
     break;
   }
@@ -231,7 +230,7 @@ void MeshParameters::setMeshDimension(const std::vector<int> &n_in) {
 
 //-------------------------------------------------------------------------------------------------
 void MeshParameters::setOrigin(const double v, CartesianDimension cart_axis) {
-  setOrigin(doubleToInt95(v), cart_axis);
+  setOrigin(hostDoubleToInt95(v), cart_axis);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -255,7 +254,8 @@ void MeshParameters::setOrigin(const std::vector<double> &v) {
     rtErr("A vector of three elements is required (" + std::to_string(v.size()) + " provided).",
           "MeshParameters", "setOrigin");
   }
-  std::vector<int95_t> vfp = { doubleToInt95(v[0]), doubleToInt95(v[1]), doubleToInt95(v[2]) };
+  std::vector<int95_t> vfp = { hostDoubleToInt95(v[0]), hostDoubleToInt95(v[1]),
+                               hostDoubleToInt95(v[2]) };
   setOrigin(vfp);
 }
 
@@ -282,7 +282,7 @@ void MeshParameters::defineElement(const std::vector<double> &element_vectors) {
     for (int i = 0; i < 9; i++) {
       element_invu[i] = element_vectors[i];
       sp_element_invu[i] = element_vectors[i];
-      fp_element_invu[i] = doubleToInt95(element_vectors[i] * scale_factor);
+      fp_element_invu[i] = hostDoubleToInt95(element_vectors[i] * scale_factor);
     }
     invertSquareMatrix(element_invu, element_umat, 3);
     for (int i = 0; i < 9; i++) {
@@ -302,7 +302,7 @@ void MeshParameters::defineElement(const std::vector<double> &element_vectors) {
       sp_element_umat[4 * i] = element_umat[4 * i];
       element_invu[4 * i] = element_vectors[i];
       sp_element_invu[4 * i] = element_invu[4 * i];
-      fp_element_invu[4 * i] = doubleToInt95(element_vectors[i] * scale_factor);
+      fp_element_invu[4 * i] = hostDoubleToInt95(element_vectors[i] * scale_factor);
     }
   }
   else {

@@ -131,65 +131,65 @@ void checkChargeMeshBits(int choice, PrecisionModel pmodel);
 /// \param n_values  The number of values in any of the original real-number arrays
 /// \param scale     When submitting arrays for conversion, this
 /// \{
-int2 floatToInt63(const float fval);
+int2 hostFloatToInt63(const float fval);
 
-void floatToInt63(const float fval, int *primary, int *overflow);
+void hostFloatToInt63(const float fval, int *primary, int *overflow);
 
-void floatToInt63(const float* fval, int* primary, int* overflow, size_t n_values,
-                  float scale = 1.0f);
+void hostFloatToInt63(const float* fval, int* primary, int* overflow, size_t n_values,
+                      float scale = 1.0f);
 
-void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
-                  int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
-                  int* overflow_z, size_t n_values, float scale = 1.0f);
+void hostFloatToInt63(const float* fval_x, const float* fval_y, const float* fval_z,
+                      int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                      int* primary_z, int* overflow_z, size_t n_values, float scale = 1.0f);
 
-void floatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
-                  std::vector<int> *overflow, float scale = 1.0f);
+void hostFloatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
+                      std::vector<int> *overflow, float scale = 1.0f);
 
-void floatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
-                  float scale = 1.0f);
+void hostFloatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
+                      float scale = 1.0f);
 
-void floatToInt63(const std::vector<float> &fval_x, const std::vector<float> &fval_y,
-                  const std::vector<float> &fval_z, std::vector<int> *primary_x,
-                  std::vector<int> *overflow_x, std::vector<int> *primary_y,
-                  std::vector<int> *overflow_y, std::vector<int> *primary_z,
-                  std::vector<int> *overflow_z, float scale = 1.0f);
+void hostFloatToInt63(const std::vector<float> &fval_x, const std::vector<float> &fval_y,
+                      const std::vector<float> &fval_z, std::vector<int> *primary_x,
+                      std::vector<int> *overflow_x, std::vector<int> *primary_y,
+                      std::vector<int> *overflow_y, std::vector<int> *primary_z,
+                      std::vector<int> *overflow_z, float scale = 1.0f);
 
-void floatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
-                  const Hybrid<float> &fval_z, Hybrid<int> *primary_x, Hybrid<int> *overflow_x,
-                  Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
-                  Hybrid<int> *overflow_z, float scale = 1.0f);
+void hostFloatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
+                      const Hybrid<float> &fval_z, Hybrid<int> *primary_x, Hybrid<int> *overflow_x,
+                      Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
+                      Hybrid<int> *overflow_z, float scale = 1.0f);
 
-int2 doubleToInt63(const double fval);
+int2 hostDoubleToInt63(const double fval);
 
-void doubleToInt63(const double fval, int *primary, int *overflow);
+void hostDoubleToInt63(const double fval, int *primary, int *overflow);
 
-int95_t doubleToInt95(const double fval);
+int95_t hostDoubleToInt95(const double fval);
 
-void doubleToInt95(const double fval, llint *primary, int *overflow);
+void hostDoubleToInt95(const double fval, llint *primary, int *overflow);
 
-void doubleToInt95(const double* dval, llint* primary, int* overflow, size_t n_values,
-                   double scale = 1.0);
+void hostDoubleToInt95(const double* dval, llint* primary, int* overflow, size_t n_values,
+                       double scale = 1.0);
 
-void doubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
-                   std::vector<int> *overflow, double scale = 1.0);
+void hostDoubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
+                       std::vector<int> *overflow, double scale = 1.0);
 
-void doubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
-                   double scale = 1.0);
+void hostDoubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
+                       double scale = 1.0);
   
-void doubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
-                   llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
-                   llint* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
+void hostDoubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
+                       llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
+                       llint* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
 
-void doubleToInt95(const std::vector<double> &dval_x, const std::vector<double> &dval_y,
-                   const std::vector<double> &dval_z, std::vector<llint> *primary_x,
-                   std::vector<int> *overflow_x, std::vector<llint> *primary_y,
-                   std::vector<int> *overflow_y, std::vector<llint> *primary_z,
-                   std::vector<int> *overflow_z, double scale = 1.0);
+void hostDoubleToInt95(const std::vector<double> &dval_x, const std::vector<double> &dval_y,
+                       const std::vector<double> &dval_z, std::vector<llint> *primary_x,
+                       std::vector<int> *overflow_x, std::vector<llint> *primary_y,
+                       std::vector<int> *overflow_y, std::vector<llint> *primary_z,
+                       std::vector<int> *overflow_z, double scale = 1.0);
 
-void doubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
-                   const Hybrid<double> &dval_z, Hybrid<llint> *primary_x, Hybrid<int> *overflow_x,
-                   Hybrid<llint> *primary_y, Hybrid<int> *overflow_y, Hybrid<llint> *primary_z,
-                   Hybrid<int> *overflow_z, double scale = 1.0);
+void hostDoubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
+                       const Hybrid<double> &dval_z, Hybrid<llint> *primary_x,
+                       Hybrid<int> *overflow_x, Hybrid<llint> *primary_y, Hybrid<int> *overflow_y,
+                       Hybrid<llint> *primary_z, Hybrid<int> *overflow_z, double scale = 1.0);
 /// \}
 
 /// \brief Convert numbers in split fixed precision to floating point reals.  Downscaling to the
@@ -212,95 +212,95 @@ void doubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
 /// \param n_values  Trusted length of result, as well as any primary and overflow arrays, when
 ///                  working with C-style arrays in the conversion
 /// \{
-double int63ToDouble(int primary, int overflow);
+double hostInt63ToDouble(int primary, int overflow);
 
-void int63ToDouble(double* result, const int* primary, const int* overflow, size_t n_values,
-                   double descale = 1.0);
+void hostInt63ToDouble(double* result, const int* primary, const int* overflow, size_t n_values,
+                       double descale = 1.0);
 
-void int63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
-                   const std::vector<int> &overflow, double descale = 1.0);
+void hostInt63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
+                       const std::vector<int> &overflow, double descale = 1.0);
 
-void int63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary,
-                   const Hybrid<int> &overflow, double descale = 1.0);
+void hostInt63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary,
+                       const Hybrid<int> &overflow, double descale = 1.0);
 
-float int63ToFloat(int primary, int overflow);
+float hostInt63ToFloat(int primary, int overflow);
 
-void int63ToFloat(float* result, const int* primary, const int* overflow, size_t n_values,
-                  float descale = 1.0f);
+void hostInt63ToFloat(float* result, const int* primary, const int* overflow, size_t n_values,
+                      float descale = 1.0f);
 
-void int63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
-                  const std::vector<int> &overflow, float descale = 1.0f);
+void hostInt63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
+                      const std::vector<int> &overflow, float descale = 1.0f);
 
-void int63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
-                  float descale = 1.0f);
+void hostInt63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary,
+                      const Hybrid<int> &overflow, float descale = 1.0f);
 
-void int63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
-                   const int* overflow_x, const int* primary_y, const int* overflow_y,
-                   const int* primary_z, const int* overflow_z, size_t n_values,
-                   double descale = 1.0);
+void hostInt63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
+                       const int* overflow_x, const int* primary_y, const int* overflow_y,
+                       const int* primary_z, const int* overflow_z, size_t n_values,
+                       double descale = 1.0);
 
-void int63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
-                   std::vector<double> *result_z, const std::vector<int> &primary_x,
-                   const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
-                   const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
-                   const std::vector<int> &overflow_z, size_t n_values, double descale = 1.0);
+void hostInt63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                       std::vector<double> *result_z, const std::vector<int> &primary_x,
+                       const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                       const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                       const std::vector<int> &overflow_z, size_t n_values, double descale = 1.0);
 
-void int63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
-                   const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
-                   const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
-                   const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
-                   double descale = 1.0);
+void hostInt63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
+                       Hybrid<double> *result_z, const Hybrid<int> &primary_x,
+                       const Hybrid<int> &overflow_x, const Hybrid<int> &primary_y,
+                       const Hybrid<int> &overflow_y, const Hybrid<int> &primary_z,
+                       const Hybrid<int> &overflow_z, size_t n_values, double descale = 1.0);
 
-void int63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
-                  const int* overflow_x, const int* primary_y, const int* overflow_y,
-                  const int* primary_z, const int* overflow_z, size_t n_values,
-                  float descale = 1.0f);
+void hostInt63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
+                      const int* overflow_x, const int* primary_y, const int* overflow_y,
+                      const int* primary_z, const int* overflow_z, size_t n_values,
+                      float descale = 1.0f);
 
-void int63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
-                  std::vector<float> *result_z, const std::vector<int> &primary_x,
-                  const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
-                  const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
-                  const std::vector<int> &overflow_z, float descale = 1.0f);
+void hostInt63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
+                      std::vector<float> *result_z, const std::vector<int> &primary_x,
+                      const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                      const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                      const std::vector<int> &overflow_z, float descale = 1.0f);
 
-void int63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
-                  const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
-                  const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
-                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
-                  float descale = 1.0f);
+void hostInt63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
+                      const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                      const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                      const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
+                      float descale = 1.0f);
 
-double int63ToDouble(int2 ival);
+double hostInt63ToDouble(int2 ival);
 
-float int63ToFloat(int2 ival);
+float hostInt63ToFloat(int2 ival);
 
-double int95ToDouble(const int95_t ival);
+double hostInt95ToDouble(const int95_t ival);
   
-double int95ToDouble(llint primary, int overflow);
+double hostInt95ToDouble(llint primary, int overflow);
 
-void int95ToDouble(double* result, const llint* primary, const int* overflow, size_t n_values,
-                   double descale = 1.0);
+void hostInt95ToDouble(double* result, const llint* primary, const int* overflow, size_t n_values,
+                       double descale = 1.0);
 
-void int95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
-                   const std::vector<int> &overflow, double descale = 1.0);
+void hostInt95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
+                       const std::vector<int> &overflow, double descale = 1.0);
 
-void int95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
-                   const Hybrid<int> &overflow, double descale = 1.0);
+void hostInt95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
+                       const Hybrid<int> &overflow, double descale = 1.0);
 
-void int95ToDouble(double* result_x, double* result_y, double* result_z, const llint* primary_x,
-                   const int* overflow_x, const llint* primary_y, const int* overflow_y,
-                   const llint* primary_z, const int* overflow_z, size_t n_values,
-                   double descale = 1.0);
+void hostInt95ToDouble(double* result_x, double* result_y, double* result_z,
+                       const llint* primary_x, const int* overflow_x, const llint* primary_y,
+                       const int* overflow_y, const llint* primary_z, const int* overflow_z,
+                       size_t n_values, double descale = 1.0);
 
-void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
-                   std::vector<double> *result_z, const std::vector<llint> &primary_x,
-                   const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
-                   const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
-                   const std::vector<int> &overflow_z, double descale = 1.0);
+void hostInt95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                       std::vector<double> *result_z, const std::vector<llint> &primary_x,
+                       const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
+                       const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
+                       const std::vector<int> &overflow_z, double descale = 1.0);
 
-void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
-                   const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
-                   const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
-                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z,
-                   double descale = 1.0);
+void hostInt95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
+                       Hybrid<double> *result_z, const Hybrid<llint> &primary_x,
+                       const Hybrid<int> &overflow_x, const Hybrid<llint> &primary_y,
+                       const Hybrid<int> &overflow_y, const Hybrid<llint> &primary_z,
+                       const Hybrid<int> &overflow_z, double descale = 1.0);
 /// \}
 
 /// \brief Accumulate floating point numbers into fixed-precision representations with two
@@ -316,9 +316,9 @@ void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<do
 /// \param primary   The primary accumulator (the low 32 bits)
 /// \param overflow  The secondary accumulator (the high 31 bits)
 /// \{
-void splitAccumulation(const float fval, int *primary, int *overflow);
+void hostSplitAccumulation(const float fval, int *primary, int *overflow);
 
-void splitAccumulation(const double fval, llint *primary, int *overflow);
+void hostSplitAccumulation(const double fval, llint *primary, int *overflow);
 /// \}
 
 /// \brief Accumulate two split fixed-precision integers.
@@ -336,25 +336,25 @@ void splitAccumulation(const double fval, llint *primary, int *overflow);
 /// \param breal  Real-valued form of the second number (this will be converted to the appropriate
 ///               split fixed-precision type before adding)
 /// \{
-int95_t splitFPSum(const int95_t a, const int95_t b);
+int95_t hostSplitFPSum(const int95_t a, const int95_t b);
 
-int2 splitFPSum(const int2 a, const int2 b);
+int2 hostSplitFPSum(const int2 a, const int2 b);
 
-int95_t splitFPSum(const int95_t a, double breal);
+int95_t hostSplitFPSum(const int95_t a, double breal);
 
-int2 splitFPSum(const int2 a, float breal);
+int2 hostSplitFPSum(const int2 a, float breal);
 
-int95_t splitFPSum(const int95_t a, llint b_x, int b_y);
+int95_t hostSplitFPSum(const int95_t a, llint b_x, int b_y);
 
-int2 splitFPSum(const int2 a, int b_x, int b_y);
+int2 hostSplitFPSum(const int2 a, int b_x, int b_y);
 
-int95_t int95Sum(llint a_x, int a_y, llint b_x, int b_y);
+int95_t hostInt95Sum(llint a_x, int a_y, llint b_x, int b_y);
 
-int2 int63Sum(int a_x, int a_y, int b_x, int b_y);
+int2 hostInt63Sum(int a_x, int a_y, int b_x, int b_y);
 
-int95_t int95Sum(llint a_x, int a_y, double breal);
+int95_t hostInt95Sum(llint a_x, int a_y, double breal);
 
-int2 int63Sum(int a_x, int a_y, float breal);
+int2 hostInt63Sum(int a_x, int a_y, float breal);
 /// \}
 
 /// \brief Convert a split fixed-precision number with one bit scaling into an equivalent data type
@@ -368,8 +368,8 @@ int2 int63Sum(int a_x, int a_y, float breal);
 /// \param native_bits  Original bit scaling of the fixed-precision format
 /// \param output_bits  Bit scaling of the output format
 /// \{
-int2 changeFPBits(const int2 fp, int native_bits, int output_bits);
-int95_t changeFPBits(const int95_t fp, int native_bits, int output_bits);
+int2 hostChangeFPBits(const int2 fp, int native_bits, int output_bits);
+int95_t hostChangeFPBits(const int95_t fp, int native_bits, int output_bits);
 /// \}
 
 /// \brief Compute a one-dimensional grid of points, beginning at some arbitrary origin and
@@ -407,15 +407,15 @@ void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
 
 // Make basic arithmetic functions native to the stormm namespace
 namespace stormm {
-  using numerics::floatToInt63;
-  using numerics::doubleToInt95;
-  using numerics::int63ToDouble;
-  using numerics::int63ToFloat;
-  using numerics::int95ToDouble;
-  using numerics::splitAccumulation;
-  using numerics::splitFPSum;
-  using numerics::int95Sum;
-  using numerics::int63Sum;
+  using numerics::hostFloatToInt63;
+  using numerics::hostDoubleToInt95;
+  using numerics::hostInt63ToDouble;
+  using numerics::hostInt63ToFloat;
+  using numerics::hostInt95ToDouble;
+  using numerics::hostSplitAccumulation;
+  using numerics::hostSplitFPSum;
+  using numerics::hostInt95Sum;
+  using numerics::hostInt63Sum;
 } // namespace stormm
 
 #endif

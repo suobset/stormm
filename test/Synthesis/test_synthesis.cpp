@@ -1205,18 +1205,18 @@ int main(const int argc, const char* argv[]) {
       sysi_psw.xfrc[jlocal] = tx_frc;
       sysi_psw.yfrc[jlocal] = ty_frc;
       sysi_psw.zfrc[jlocal] = tz_frc;
-      doubleToInt95(tx_frc * highres_w.frc_scale, &highres_w.xfrc[j], &highres_w.xfrc_ovrf[j]);
-      doubleToInt95(ty_frc * highres_w.frc_scale, &highres_w.yfrc[j], &highres_w.yfrc_ovrf[j]);
-      doubleToInt95(tz_frc * highres_w.frc_scale, &highres_w.zfrc[j], &highres_w.zfrc_ovrf[j]);
+      hostDoubleToInt95(tx_frc * highres_w.frc_scale, &highres_w.xfrc[j], &highres_w.xfrc_ovrf[j]);
+      hostDoubleToInt95(ty_frc * highres_w.frc_scale, &highres_w.yfrc[j], &highres_w.yfrc_ovrf[j]);
+      hostDoubleToInt95(tz_frc * highres_w.frc_scale, &highres_w.zfrc[j], &highres_w.zfrc_ovrf[j]);
       const double tx_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       const double ty_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       const double tz_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       sysi_psw.xvel[jlocal] = tx_vel;
       sysi_psw.yvel[jlocal] = ty_vel;
       sysi_psw.zvel[jlocal] = tz_vel;
-      doubleToInt95(tx_vel * highres_w.vel_scale, &highres_w.xvel[j], &highres_w.xvel_ovrf[j]);
-      doubleToInt95(ty_vel * highres_w.vel_scale, &highres_w.yvel[j], &highres_w.yvel_ovrf[j]);
-      doubleToInt95(tz_vel * highres_w.vel_scale, &highres_w.zvel[j], &highres_w.zvel_ovrf[j]);
+      hostDoubleToInt95(tx_vel * highres_w.vel_scale, &highres_w.xvel[j], &highres_w.xvel_ovrf[j]);
+      hostDoubleToInt95(ty_vel * highres_w.vel_scale, &highres_w.yvel[j], &highres_w.yvel_ovrf[j]);
+      hostDoubleToInt95(tz_vel * highres_w.vel_scale, &highres_w.zvel[j], &highres_w.zvel_ovrf[j]);
     }
     const PhaseSpace sysi_rb = highres.exportSystem(i);
     const TrajectoryKind tjpos = TrajectoryKind::POSITIONS;

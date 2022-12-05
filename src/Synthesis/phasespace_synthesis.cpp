@@ -38,8 +38,6 @@ using numerics::checkForceBits;
 using numerics::force_scale_nonoverflow_bits;
 using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::max_llint_accumulation;
-using numerics::doubleToInt95;
-using numerics::int95ToDouble;
 using numerics::velocity_scale_nonoverflow_bits;
 using topology::UnitCellType;
 using trajectory::PhaseSpaceWriter;
@@ -486,33 +484,33 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     // between the non-overflow bit counts for each coordinate (36-44 bits) and the point at
     // which the fixed-precision representation will capture all of the information in nearly
     // all numbers, where rounding towards zero will occur.
-    doubleToInt95(psr.xcrd, psr.ycrd, psr.zcrd, &xpos_ptr[asi], &xpos_ovrf_ptr[asi],
-                  &ypos_ptr[asi], &ypos_ovrf_ptr[asi], &zpos_ptr[asi], &zpos_ovrf_ptr[asi],
-                  psr.natom, globalpos_scale);
-    doubleToInt95(psr.xprv, psr.yprv, psr.zprv, &xpos_prv_ptr[asi], &xpos_prv_ovrf_ptr[asi],
-                  &ypos_prv_ptr[asi], &ypos_prv_ovrf_ptr[asi], &zpos_prv_ptr[asi],
-                  &zpos_prv_ovrf_ptr[asi], psr.natom, globalpos_scale);
-    doubleToInt95(psr.xnxt, psr.ynxt, psr.znxt, &xpos_nxt_ptr[asi], &xpos_nxt_ovrf_ptr[asi],
-                  &ypos_nxt_ptr[asi], &ypos_nxt_ovrf_ptr[asi], &zpos_nxt_ptr[asi],
-                  &zpos_prv_ovrf_ptr[asi], psr.natom, globalpos_scale);
-    doubleToInt95(psr.xvel, psr.yvel, psr.zvel, &xvel_ptr[asi], &xvel_ovrf_ptr[asi],
-                  &yvel_ptr[asi], &yvel_ovrf_ptr[asi], &zvel_ptr[asi], &zvel_ovrf_ptr[asi],
-                  psr.natom, velocity_scale);
-    doubleToInt95(psr.vxprv, psr.vyprv, psr.vzprv, &xvel_prv_ptr[asi], &xvel_prv_ovrf_ptr[asi],
-                  &yvel_prv_ptr[asi], &yvel_prv_ovrf_ptr[asi], &zvel_prv_ptr[asi],
-                  &zvel_prv_ovrf_ptr[asi], psr.natom, velocity_scale);
-    doubleToInt95(psr.vxnxt, psr.vynxt, psr.vznxt, &xvel_nxt_ptr[asi], &xvel_nxt_ovrf_ptr[asi],
-                  &yvel_nxt_ptr[asi], &yvel_nxt_ovrf_ptr[asi], &zvel_nxt_ptr[asi],
-                  &zvel_prv_ovrf_ptr[asi], psr.natom, velocity_scale);
-    doubleToInt95(psr.xfrc, psr.yfrc, psr.zfrc, &xfrc_ptr[asi], &xfrc_ovrf_ptr[asi],
-                  &yfrc_ptr[asi], &yfrc_ovrf_ptr[asi], &zfrc_ptr[asi], &zfrc_ovrf_ptr[asi],
-                  psr.natom, force_scale);
-    doubleToInt95(psr.fxprv, psr.fyprv, psr.fzprv, &xfrc_prv_ptr[asi], &xfrc_prv_ovrf_ptr[asi],
-                  &yfrc_prv_ptr[asi], &yfrc_prv_ovrf_ptr[asi], &zfrc_prv_ptr[asi],
-                  &zfrc_prv_ovrf_ptr[asi], psr.natom, force_scale);
-    doubleToInt95(psr.vxnxt, psr.vynxt, psr.vznxt, &xfrc_nxt_ptr[asi], &xfrc_nxt_ovrf_ptr[asi],
-                  &yfrc_nxt_ptr[asi], &yfrc_nxt_ovrf_ptr[asi], &zfrc_nxt_ptr[asi],
-                  &zfrc_prv_ovrf_ptr[asi], psr.natom, force_scale);
+    hostDoubleToInt95(psr.xcrd, psr.ycrd, psr.zcrd, &xpos_ptr[asi], &xpos_ovrf_ptr[asi],
+                      &ypos_ptr[asi], &ypos_ovrf_ptr[asi], &zpos_ptr[asi], &zpos_ovrf_ptr[asi],
+                      psr.natom, globalpos_scale);
+    hostDoubleToInt95(psr.xprv, psr.yprv, psr.zprv, &xpos_prv_ptr[asi], &xpos_prv_ovrf_ptr[asi],
+                      &ypos_prv_ptr[asi], &ypos_prv_ovrf_ptr[asi], &zpos_prv_ptr[asi],
+                      &zpos_prv_ovrf_ptr[asi], psr.natom, globalpos_scale);
+    hostDoubleToInt95(psr.xnxt, psr.ynxt, psr.znxt, &xpos_nxt_ptr[asi], &xpos_nxt_ovrf_ptr[asi],
+                      &ypos_nxt_ptr[asi], &ypos_nxt_ovrf_ptr[asi], &zpos_nxt_ptr[asi],
+                      &zpos_prv_ovrf_ptr[asi], psr.natom, globalpos_scale);
+    hostDoubleToInt95(psr.xvel, psr.yvel, psr.zvel, &xvel_ptr[asi], &xvel_ovrf_ptr[asi],
+                      &yvel_ptr[asi], &yvel_ovrf_ptr[asi], &zvel_ptr[asi], &zvel_ovrf_ptr[asi],
+                      psr.natom, velocity_scale);
+    hostDoubleToInt95(psr.vxprv, psr.vyprv, psr.vzprv, &xvel_prv_ptr[asi], &xvel_prv_ovrf_ptr[asi],
+                      &yvel_prv_ptr[asi], &yvel_prv_ovrf_ptr[asi], &zvel_prv_ptr[asi],
+                      &zvel_prv_ovrf_ptr[asi], psr.natom, velocity_scale);
+    hostDoubleToInt95(psr.vxnxt, psr.vynxt, psr.vznxt, &xvel_nxt_ptr[asi], &xvel_nxt_ovrf_ptr[asi],
+                      &yvel_nxt_ptr[asi], &yvel_nxt_ovrf_ptr[asi], &zvel_nxt_ptr[asi],
+                      &zvel_prv_ovrf_ptr[asi], psr.natom, velocity_scale);
+    hostDoubleToInt95(psr.xfrc, psr.yfrc, psr.zfrc, &xfrc_ptr[asi], &xfrc_ovrf_ptr[asi],
+                      &yfrc_ptr[asi], &yfrc_ovrf_ptr[asi], &zfrc_ptr[asi], &zfrc_ovrf_ptr[asi],
+                      psr.natom, force_scale);
+    hostDoubleToInt95(psr.fxprv, psr.fyprv, psr.fzprv, &xfrc_prv_ptr[asi], &xfrc_prv_ovrf_ptr[asi],
+                      &yfrc_prv_ptr[asi], &yfrc_prv_ovrf_ptr[asi], &zfrc_prv_ptr[asi],
+                      &zfrc_prv_ovrf_ptr[asi], psr.natom, force_scale);
+    hostDoubleToInt95(psr.vxnxt, psr.vynxt, psr.vznxt, &xfrc_nxt_ptr[asi], &xfrc_nxt_ovrf_ptr[asi],
+                      &yfrc_nxt_ptr[asi], &yfrc_nxt_ovrf_ptr[asi], &zfrc_nxt_ptr[asi],
+                      &zfrc_prv_ovrf_ptr[asi], psr.natom, force_scale);
 
     // Handle the box space transformation.  The transformation matrices of the labframe will
     // become slightly desynchronized from the original PhaseSpace object, but this is in the
@@ -520,11 +518,11 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     // coordinates with box vectors which are likewise multiples of the positional discretization.
     llint* bv_ptr = box_vectors.data();
     int* bv_ovrf_ptr = box_vector_overflow.data();
-    doubleToInt95(psr.invu, &bv_ptr[i * mtrx_stride], &bv_ovrf_ptr[i * mtrx_stride], 9,
-                  globalpos_scale);
+    hostDoubleToInt95(psr.invu, &bv_ptr[i * mtrx_stride], &bv_ovrf_ptr[i * mtrx_stride], 9,
+                      globalpos_scale);
     for (int j = 0; j < 9; j++) {
       const size_t imj = (i * mtrx_stride) + j;
-      const double d_invu = int95ToDouble(bv_ptr[imj], bv_ovrf_ptr[imj]);
+      const double d_invu = hostInt95ToDouble(bv_ptr[imj], bv_ovrf_ptr[imj]);
       inverse_transforms.putHost(d_invu, imj);
       sp_inverse_transforms.putHost(d_invu, imj);
     }
@@ -1623,42 +1621,42 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
         // towards the current coordinates from the phase space synthesis, wherever the larger
         // synthesis sits in its own cycle.
         const PsSynthesisReader tpsr = this->data(cycle_position, origin);
-        int95ToDouble(psw.xcrd, psw.ycrd, psw.zcrd, &tpsr.xcrd[atom_offset],
-                      &tpsr.xcrd_ovrf[atom_offset], &tpsr.ycrd[atom_offset],
-                      &tpsr.ycrd_ovrf[atom_offset], &tpsr.zcrd[atom_offset],
-                      &tpsr.zcrd_ovrf[atom_offset], psw.natom, crd_deflation);
-        int95ToDouble(psw.xprv, psw.yprv, psw.zprv, &tpsr.xprv[atom_offset],
-                      &tpsr.xprv_ovrf[atom_offset], &tpsr.yprv[atom_offset],
-                      &tpsr.yprv_ovrf[atom_offset], &tpsr.zprv[atom_offset],
-                      &tpsr.zprv_ovrf[atom_offset], psw.natom, crd_deflation);
-        int95ToDouble(psw.xnxt, psw.ynxt, psw.znxt, &tpsr.xnxt[atom_offset],
-                      &tpsr.xnxt_ovrf[atom_offset], &tpsr.ynxt[atom_offset],
-                      &tpsr.ynxt_ovrf[atom_offset], &tpsr.znxt[atom_offset],
-                      &tpsr.znxt_ovrf[atom_offset], psw.natom, crd_deflation);
-        int95ToDouble(psw.xvel, psw.yvel, psw.zvel, &tpsr.xvel[atom_offset],
-                      &tpsr.xvel_ovrf[atom_offset], &tpsr.yvel[atom_offset],
-                      &tpsr.yvel_ovrf[atom_offset], &tpsr.zvel[atom_offset],
-                      &tpsr.zvel_ovrf[atom_offset], psw.natom, vel_deflation);
-        int95ToDouble(psw.vxprv, psw.vyprv, psw.vzprv, &tpsr.vxprv[atom_offset],
-                      &tpsr.vxprv_ovrf[atom_offset], &tpsr.vyprv[atom_offset],
-                      &tpsr.vyprv_ovrf[atom_offset], &tpsr.vzprv[atom_offset],
-                      &tpsr.vzprv_ovrf[atom_offset], psw.natom, vel_deflation);
-        int95ToDouble(psw.vxnxt, psw.vynxt, psw.vznxt, &tpsr.vxnxt[atom_offset],
-                      &tpsr.vxnxt_ovrf[atom_offset], &tpsr.vynxt[atom_offset],
-                      &tpsr.vynxt_ovrf[atom_offset], &tpsr.vznxt[atom_offset],
-                      &tpsr.vznxt_ovrf[atom_offset], psw.natom, vel_deflation);
-        int95ToDouble(psw.xfrc, psw.yfrc, psw.zfrc, &tpsr.xfrc[atom_offset],
-                      &tpsr.xfrc_ovrf[atom_offset], &tpsr.yfrc[atom_offset],
-                      &tpsr.yfrc_ovrf[atom_offset], &tpsr.zfrc[atom_offset],
-                      &tpsr.zfrc_ovrf[atom_offset], psw.natom, frc_deflation);
-        int95ToDouble(psw.fxprv, psw.fyprv, psw.fzprv, &tpsr.fxprv[atom_offset],
-                      &tpsr.fxprv_ovrf[atom_offset], &tpsr.fyprv[atom_offset],
-                      &tpsr.fyprv_ovrf[atom_offset], &tpsr.fzprv[atom_offset],
-                      &tpsr.fzprv_ovrf[atom_offset], psw.natom, frc_deflation);
-        int95ToDouble(psw.fxnxt, psw.fynxt, psw.fznxt, &tpsr.fxnxt[atom_offset],
-                      &tpsr.fxnxt_ovrf[atom_offset], &tpsr.fynxt[atom_offset],
-                      &tpsr.fynxt_ovrf[atom_offset], &tpsr.fznxt[atom_offset],
-                      &tpsr.fznxt_ovrf[atom_offset], psw.natom, frc_deflation);
+        hostInt95ToDouble(psw.xcrd, psw.ycrd, psw.zcrd, &tpsr.xcrd[atom_offset],
+                          &tpsr.xcrd_ovrf[atom_offset], &tpsr.ycrd[atom_offset],
+                          &tpsr.ycrd_ovrf[atom_offset], &tpsr.zcrd[atom_offset],
+                          &tpsr.zcrd_ovrf[atom_offset], psw.natom, crd_deflation);
+        hostInt95ToDouble(psw.xprv, psw.yprv, psw.zprv, &tpsr.xprv[atom_offset],
+                          &tpsr.xprv_ovrf[atom_offset], &tpsr.yprv[atom_offset],
+                          &tpsr.yprv_ovrf[atom_offset], &tpsr.zprv[atom_offset],
+                          &tpsr.zprv_ovrf[atom_offset], psw.natom, crd_deflation);
+        hostInt95ToDouble(psw.xnxt, psw.ynxt, psw.znxt, &tpsr.xnxt[atom_offset],
+                          &tpsr.xnxt_ovrf[atom_offset], &tpsr.ynxt[atom_offset],
+                          &tpsr.ynxt_ovrf[atom_offset], &tpsr.znxt[atom_offset],
+                          &tpsr.znxt_ovrf[atom_offset], psw.natom, crd_deflation);
+        hostInt95ToDouble(psw.xvel, psw.yvel, psw.zvel, &tpsr.xvel[atom_offset],
+                          &tpsr.xvel_ovrf[atom_offset], &tpsr.yvel[atom_offset],
+                          &tpsr.yvel_ovrf[atom_offset], &tpsr.zvel[atom_offset],
+                          &tpsr.zvel_ovrf[atom_offset], psw.natom, vel_deflation);
+        hostInt95ToDouble(psw.vxprv, psw.vyprv, psw.vzprv, &tpsr.vxprv[atom_offset],
+                          &tpsr.vxprv_ovrf[atom_offset], &tpsr.vyprv[atom_offset],
+                          &tpsr.vyprv_ovrf[atom_offset], &tpsr.vzprv[atom_offset],
+                          &tpsr.vzprv_ovrf[atom_offset], psw.natom, vel_deflation);
+        hostInt95ToDouble(psw.vxnxt, psw.vynxt, psw.vznxt, &tpsr.vxnxt[atom_offset],
+                          &tpsr.vxnxt_ovrf[atom_offset], &tpsr.vynxt[atom_offset],
+                          &tpsr.vynxt_ovrf[atom_offset], &tpsr.vznxt[atom_offset],
+                          &tpsr.vznxt_ovrf[atom_offset], psw.natom, vel_deflation);
+        hostInt95ToDouble(psw.xfrc, psw.yfrc, psw.zfrc, &tpsr.xfrc[atom_offset],
+                          &tpsr.xfrc_ovrf[atom_offset], &tpsr.yfrc[atom_offset],
+                          &tpsr.yfrc_ovrf[atom_offset], &tpsr.zfrc[atom_offset],
+                          &tpsr.zfrc_ovrf[atom_offset], psw.natom, frc_deflation);
+        hostInt95ToDouble(psw.fxprv, psw.fyprv, psw.fzprv, &tpsr.fxprv[atom_offset],
+                          &tpsr.fxprv_ovrf[atom_offset], &tpsr.fyprv[atom_offset],
+                          &tpsr.fyprv_ovrf[atom_offset], &tpsr.fzprv[atom_offset],
+                          &tpsr.fzprv_ovrf[atom_offset], psw.natom, frc_deflation);
+        hostInt95ToDouble(psw.fxnxt, psw.fynxt, psw.fznxt, &tpsr.fxnxt[atom_offset],
+                          &tpsr.fxnxt_ovrf[atom_offset], &tpsr.fynxt[atom_offset],
+                          &tpsr.fynxt_ovrf[atom_offset], &tpsr.fznxt[atom_offset],
+                          &tpsr.fznxt_ovrf[atom_offset], psw.natom, frc_deflation);
         for (int i = 0; i < 9; i++) {
           psw.umat[i] = tpsr.umat[mtrx_offset + i];
           psw.invu[i] = tpsr.invu[mtrx_offset + i];

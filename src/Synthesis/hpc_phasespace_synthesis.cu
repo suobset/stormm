@@ -404,6 +404,94 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpaceWriter *psw, const int index,
   kPsyCopySystem<<<gpu.getSMPCount(), large_block_size>>>(*psw, poly_psr, index);
   cudaDeviceSynchronize();
 }
+
+#if 0
+//-------------------------------------------------------------------------------------------------
+_global__ void __launch_bounds__(large_block_size, 1)
+kPsyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_recv_ovrf,
+                     llint* z_recv, int* z_recv_ovrf, double* box_xform, double* inverse_xform,
+                     double* box_dimensions, llint* box_vectors, int* box_vector_ovrf,
+                     const int* atom_starts, const int* atom_counts, const double* x_import,
+                     const double* y_import, const double* z_import, const double* box_xform_in,
+                     const double* inverse_xform_in, const double* box_dimensions_in,
+                     const int system_index, const double conversion_factor) {
+
+  // Transfer the box information, if it exists
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    if (threadIdx.x < 9) {
+      box_xform[box_offset + threadIdx.x] = box_xform_in[threadIdx.x];
+      inverse_xform[box_offset + threadIdx.x] = inverse_xform_in[threadIdx.x];
+    }
+    if (threadIdx.x >= warp_size_int && threadIdx.x < warp_size_int + 9) {
+      const int95_t fpbv = doubleToInt95(inverse_xform_in[threadIdx.x] * globalpos_scale);
+      box_vectors[box_offset + threadIdx.x] = fpbv.x;
+      box_vector_ovrf[box_offset + threadIdx.x] = fpbv.y;
+    }
+    if (threadIdx.x >= twice_warp_size_int && threadIdx.x < twice_warp_size_int + 6) {
+      box_dim_ptr[dim_offset + threadIdx.x] = box_dimensions_in[threadIdx.x];
+    }
+    break;
+  case TrajectoryKind::VELOCITIES:
+  case TrajectoryKind::FORCES:
+    break;
+  }
+
+  // Transfer atomic data
+  const int pos_start = psyw.atom_starts[system_index];
+  const int pos_end   = pos_start + psyw.atom_counts[system_index];
+  const int stride = pos_end - pos_start;
+  const int padded_stride = devcRoundUp(stride, warp_size_int);
+  int pos = threadIdx.x;
+  while (pos < padded_stride) {
+    if (pos < stride) {
+      const int95_t fpx = doubleToInt95((double)(x_import[pos]) * conversion_factor);
+      const size_t ip = pos + pos_start;
+      x_recv[ip]      = fpx.x;
+      x_recv_ovrf[ip] = fpx.y;
+    }
+    pos += blockDim.x * gridDim.x;
+  }
+  while (pos < 2 * padded_stride) {
+    const int rel_pos = pos - padded_stride;
+    if (rel_pos < padded_stride) {
+      const int95_t fpy = doubleToInt95((double)(y_import[rel_pos]) * conversion_factor);
+      const size_t ip = rel_pos + pos_start;
+      y_recv[ip]      = fpy.x;
+      y_recv_ovrf[ip] = fpy.y;
+    }
+    pos += blockDim.x * gridDim.x;
+  }
+  while (pos < 3 * padded_stride) {
+    const int rel_pos = pos - (2 * padded_stride);
+    if (rel_pos < padded_stride) {
+      const int95_t fpz = doubleToInt95((double)(z_import[rel_pos]) * conversion_factor);
+      const size_t ip = rel_pos + pos_start;
+      z_recv[ip]      = fpz.x;
+      z_recv_ovrf[ip] = fpz.y;
+    }
+    pos += blockDim.x * gridDim.x;
+  }
+}
   
+//-------------------------------------------------------------------------------------------------
+void psyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_recv_ovrf,
+                         llint* z_recv, int* z_recv_ovrf, double* box_xform, double* inverse_xform,
+                         double* box_dimensions, llint* box_vectors, int* box_vector_ovrf,
+                         const int* atom_starts, const int* atom_counts, const double* x_import,
+                         const double* y_import, const double* z_import,
+                         const double* box_xform_in, const double* inverse_xform_in,
+                         const double* box_dimensions_in, const int system_index,
+                         const double conversion_factor, const GpuDetails &gpu) {
+  kPsyImportSystemData<<<large_block_size,
+                         gpu.getSMPCount()>>>(x_recv, x_recv_ovrf, y_recv, y_recv_ovrf, z_recv,
+                                              z_recv_ovrf, box_xform, inverse_xform,
+                                              box_dimensions, box_vectors, box_vector_ovrf,
+                                              atom_starts, atom_counts, x_import, y_import,
+                                              z_import, box_xform_in, inverse_xform_in,
+                                              box_dimensions_in, system_index, conversion_factor);
+}
+#endif
+
 } // namespace synthesis
 } // namespace stormm

@@ -16,7 +16,6 @@ namespace stormm {
 namespace math {
 
 using numerics::max_llint_accumulation;
-using numerics::splitAccumulation;
 
 /// \brief Perform gathering operations for a normalization reduction.
 ///
