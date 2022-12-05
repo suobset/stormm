@@ -1471,10 +1471,11 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
 
 //-------------------------------------------------------------------------------------------------
 template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
-Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
-                  const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
-                  const Tprop* prop_b, const int natom, const int* xcrd_ovrf, const int* ycrd_ovrf,
-                  const int* zcrd_ovrf, const int coord_scaling_bits) {
+std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
+                               const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
+                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
+                               const int* ycrd_ovrf, const int* zcrd_ovrf,
+                               const int coord_scaling_bits) {
 
   // Check whether the grid works in a format that would restrict the fixed-precision math to just
   // the first 64 bits of the representation.
@@ -1483,6 +1484,7 @@ Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* 
   const bool coord_is_integral = isSignedIntegralScalarType<Tcoord>();
   const bool coordinate_overflow_active = (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr &&
                                            zcrd_ovrf != nullptr);
+  std::vector<Txfrm> result;
 
   // Loop over all particles
   for (int pos = 0; pos < natom; pos++) {
@@ -1529,10 +1531,65 @@ Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* 
         iycrd = doubleToInt95(ycrd[pos]);
         izcrd = doubleToInt95(zcrd[pos]);
       }
-      
+
+      // Obtain the coordinates of the atom, relative to the mesh origin, in the precision of the
+      // transformation matrices.  Estimate the appropriate mesh element, then test by computing
+      // the location of the atom relative to the origin of this element.
+      const int95_t ipt_rel_x = splitFPSum(ixcrd, -bgmr.dims.orig_x.x, -bgmr.dims.orig_x.y);
+      const int95_t ipt_rel_y = splitFPSum(iycrd, -bgmr.dims.orig_y.x, -bgmr.dims.orig_y.y);
+      const int95_t ipt_rel_z = splitFPSum(izcrd, -bgmr.dims.orig_z.x, -bgmr.dims.orig_z.y);
+      const Txfrm pt_rel_x = int95ToDouble(ipt_rel_x);
+      const Txfrm pt_rel_y = int95ToDouble(ipt_rel_y);
+      const Txfrm pt_rel_z = int95ToDouble(ipt_rel_z);
+      const Txfrm pt_grid_a = (bgmr.dims.umat[0] * pt_rel_x) + (bgmr.dims.umat[3] * pt_rel_y) +
+                              (bgmr.dims.umat[6] * pt_rel_z);
+      const Txfrm pt_grid_b = (bgmr.dims.umat[1] * pt_rel_x) + (bgmr.dims.umat[4] * pt_rel_y) +
+                              (bgmr.dims.umat[7] * pt_rel_z);
+      const Txfrm pt_grid_c = (bgmr.dims.umat[2] * pt_rel_x) + (bgmr.dims.umat[5] * pt_rel_y) +
+                              (bgmr.dims.umat[8] * pt_rel_z);
+      int cell_a = floor(pt_grid_a);
+      int cell_b = floor(pt_grid_b);
+      int cell_c = floor(pt_grid_c);
+
+      // If the initial estimate is already off the grid, bail out
+      if (cell_a < 0 || cell_a >= bgmr.dims.na || cell_b < 0 || cell_b >= bgmr.dims.nb ||
+          cell_c < 0 || cell_c >= bgmr.dims.nc) {
+        result[pos] = 0.0;
+        continue;
+      }
+      int95_t element_origin_x = { bgmr.avec_abs_x[cell_a], bgmr.avec_abs_x_ovrf[cell_a] };
+      int95_t element_origin_y = { bgmr.avec_abs_y[cell_a], bgmr.avec_abs_y_ovrf[cell_a] };
+      int95_t element_origin_z = { bgmr.avec_abs_z[cell_a], bgmr.avec_abs_z_ovrf[cell_a] };
+      element_origin_x = splitFPSum(element_origin_x, bgmr.bvec_x[cell_b],
+                                    bgmr.bvec_x_ovrf[cell_b]);
+      element_origin_y = splitFPSum(element_origin_y, bgmr.bvec_y[cell_b],
+                                    bgmr.bvec_y_ovrf[cell_b]);
+      element_origin_z = splitFPSum(element_origin_z, bgmr.bvec_z[cell_b],
+                                    bgmr.bvec_z_ovrf[cell_b]);
+      element_origin_x = splitFPSum(element_origin_x, bgmr.cvec_x[cell_b],
+                                    bgmr.cvec_x_ovrf[cell_b]);
+      element_origin_y = splitFPSum(element_origin_y, bgmr.cvec_y[cell_b],
+                                    bgmr.cvec_y_ovrf[cell_b]);
+      element_origin_z = splitFPSum(element_origin_z, bgmr.cvec_z[cell_b],
+                                    bgmr.cvec_z_ovrf[cell_b]);
+      const int95_t idisp_x = splitFPSum(ixcrd, -element_origin_x.x, -element_origin_x.y);
+      const int95_t idisp_y = splitFPSum(iycrd, -element_origin_y.x, -element_origin_y.y);
+      const int95_t idisp_z = splitFPSum(izcrd, -element_origin_z.x, -element_origin_z.y);
+      const Txfrm disp_x = int95ToDouble(idisp_x);
+      const Txfrm disp_y = int95ToDouble(idisp_y);
+      const Txfrm disp_z = int95ToDouble(idisp_z);
+      Txfrm test_a = (bgmr.dims.umat[0] * disp_x) + (bgmr.dims.umat[3] * disp_y) +
+                     (bgmr.dims.umat[6] * disp_z);
+      Txfrm test_b = (bgmr.dims.umat[1] * disp_x) + (bgmr.dims.umat[4] * disp_y) +
+                     (bgmr.dims.umat[7] * disp_z);
+      Txfrm test_c = (bgmr.dims.umat[2] * disp_x) + (bgmr.dims.umat[5] * disp_y) +
+                     (bgmr.dims.umat[8] * disp_z);
+      cell_a += (test_a < 0.0) - (test_a >= 1.0);
+      cell_b += (test_b < 0.0) - (test_b >= 1.0);
+      cell_c += (test_c < 0.0) - (test_c >= 1.0);
+
     }
     else {
-
     }
   
     switch (bgmr.kind) {

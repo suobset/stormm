@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
@@ -25,7 +26,7 @@ using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
-using stormm::random::Ran2Generator;
+using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using namespace stormm::math;
@@ -157,6 +158,12 @@ int main(const int argc, const char* argv[]) {
   // Section 2
   section("Real to int2, 63-bit conversion");
 
+  // Section 3
+  section("Real to int95_t, 95-bit conversion");
+
+  // Section 4
+  section("Overloads of various conversion functions");
+
   // Make a series of prime numbers
   std::vector<llint> primes(1, 2);
   int p = 3;
@@ -248,6 +255,7 @@ int main(const int argc, const char* argv[]) {
   testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26, PrecisionModel::SINGLE);
   testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26, PrecisionModel::SINGLE);
   testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  section(3);
   testSplitAccumulation(-48.5, -47.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
   testSplitAccumulation(-32.5, -31.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
   testSplitAccumulation( -0.5,   0.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
@@ -256,6 +264,62 @@ int main(const int argc, const char* argv[]) {
   testSplitAccumulation(-64.5, -63.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
   testSplitAccumulation( 63.5,  64.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
 
+  // Test various overloads of the fixed-precision functions
+  const int npts = 16;
+  std::vector<float> fx(npts), fy(npts), fz(npts), rec_fx(npts), rec_fy(npts), rec_fz(npts);
+  std::vector<int> ifx(npts), ify(npts), ifz(npts), ifx_ovrf(npts), ify_ovrf(npts), ifz_ovrf(npts);
+  std::vector<double> dx(npts), dy(npts), dz(npts), rec_dx(npts), rec_dy(npts), rec_dz(npts);
+  std::vector<llint> idx(npts), idy(npts), idz(npts);
+  std::vector<int> idx_ovrf(npts), idy_ovrf(npts), idz_ovrf(npts);
+  Xoshiro256ppGenerator xrs;
+  const double dscale = pow(2.0, 68.0);
+  const float fscale  = pow(2.0, 48.0);
+  for (int i = 0; i < npts; i++) {
+    fx[i] = (xrs.uniformRandomNumber() - 0.5) * fscale;
+    fy[i] = (xrs.uniformRandomNumber() - 0.5) * fscale;
+    fz[i] = (xrs.uniformRandomNumber() - 0.5) * fscale;
+    dx[i] = (xrs.uniformRandomNumber() - 0.5) * dscale;
+    dy[i] = (xrs.uniformRandomNumber() - 0.5) * dscale;
+    dz[i] = (xrs.uniformRandomNumber() - 0.5) * dscale;
+  }
+  floatToInt63(fx, fy, fz, &ifx, &ifx_ovrf, &ify, &ify_ovrf, &ifz, &ifz_ovrf);
+  doubleToInt95(dx, dy, dz, &idx, &idx_ovrf, &idy, &idy_ovrf, &idz, &idz_ovrf);
+  int63ToFloat(&rec_fx, &rec_fy, &rec_fz, ifx, ifx_ovrf, ify, ify_ovrf, ifz, ifz_ovrf);
+  int95ToDouble(&rec_dx, &rec_dy, &rec_dz, idx, idx_ovrf, idy, idy_ovrf, idz, idz_ovrf);
+  check(fx, RelationalOperator::EQUAL, rec_fx, "Single-precision floating point numbers are not "
+        "recovered when passed through the int63_t (int2) fixed-precision representation (X).");
+  check(dx, RelationalOperator::EQUAL, rec_dx, "Double-precision floating point numbers are not "
+        "recovered when passed through the int95_t fixed-precision representation (X).");
+  check(fy, RelationalOperator::EQUAL, rec_fy, "Single-precision floating point numbers are not "
+        "recovered when passed through the int63_t (int2) fixed-precision representation (Y).");
+  check(dy, RelationalOperator::EQUAL, rec_dy, "Double-precision floating point numbers are not "
+        "recovered when passed through the int95_t fixed-precision representation (Y).");
+  check(fz, RelationalOperator::EQUAL, rec_fz, "Single-precision floating point numbers are not "
+        "recovered when passed through the int63_t (int2) fixed-precision representation (Z).");
+  check(dz, RelationalOperator::EQUAL, rec_dz, "Double-precision floating point numbers are not "
+        "recovered when passed through the int95_t fixed-precision representation (Z).");
+  Hybrid<float> hfx(npts), rec_hfx(npts);
+  Hybrid<double> hdx(npts), rec_hdx(npts);
+  Hybrid<int> ihfx(npts), ihfx_ovrf(npts), ihdx_ovrf(npts);
+  Hybrid<llint> ihdx(npts);
+  for (int i = 0; i < npts; i++) {
+    hfx.putHost((xrs.uniformRandomNumber() - 0.5) * fscale, i);
+    hdx.putHost((xrs.uniformRandomNumber() - 0.5) * dscale, i);
+  }
+  floatToInt63(hfx, &ihfx, &ihfx_ovrf);
+  doubleToInt95(hdx, &ihdx, &ihdx_ovrf);
+  int63ToFloat(&rec_hfx, ihfx, ihfx_ovrf);
+  int95ToDouble(&rec_hdx, ihdx, ihdx_ovrf);
+  check(hfx.readHost(), RelationalOperator::EQUAL, rec_hfx.readHost(), "Single-precision floating "
+        "point numbers are not recovered when passed through the int63_t (int2) fixed-precision "
+        "representation (X), when using a Hybrid object.");
+  check(hdx.readHost(), RelationalOperator::EQUAL, rec_hdx.readHost(), "Double-precision floating "
+        "point numbers are not recovered when passed through the int95_t fixed-precision "
+        "representation (X), when using a Hybrid object.");
+
+  // Test functions for changing the precision model
+  
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

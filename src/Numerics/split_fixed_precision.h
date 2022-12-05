@@ -136,22 +136,32 @@ int2 floatToInt63(const float fval);
 void floatToInt63(const float fval, int *primary, int *overflow);
 
 void floatToInt63(const float* fval, int* primary, int* overflow, size_t n_values,
-                  float scale = 1.0);
+                  float scale = 1.0f);
 
 void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
                   int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
-                  int* overflow_z, size_t n_values, float scale = 1.0);
+                  int* overflow_z, size_t n_values, float scale = 1.0f);
+
+void floatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
+                  std::vector<int> *overflow, float scale = 1.0f);
+
+void floatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
+                  float scale = 1.0f);
+
+void floatToInt63(const std::vector<float> &fval_x, const std::vector<float> &fval_y,
+                  const std::vector<float> &fval_z, std::vector<int> *primary_x,
+                  std::vector<int> *overflow_x, std::vector<int> *primary_y,
+                  std::vector<int> *overflow_y, std::vector<int> *primary_z,
+                  std::vector<int> *overflow_z, float scale = 1.0f);
+
+void floatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
+                  const Hybrid<float> &fval_z, Hybrid<int> *primary_x, Hybrid<int> *overflow_x,
+                  Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
+                  Hybrid<int> *overflow_z, float scale = 1.0f);
 
 int2 doubleToInt63(const double fval);
 
 void doubleToInt63(const double fval, int *primary, int *overflow);
-
-void doubleToInt63(const double* dval, int* primary, int* overflow, size_t n_values,
-                   double scale = 1.0);
-
-void doubleToInt63(const double* dval_x, const double* dval_y, const double* dval_z,
-                   int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
-                   int* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
 
 int95_t doubleToInt95(const double fval);
 
@@ -160,9 +170,26 @@ void doubleToInt95(const double fval, llint *primary, int *overflow);
 void doubleToInt95(const double* dval, llint* primary, int* overflow, size_t n_values,
                    double scale = 1.0);
 
+void doubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
+                   std::vector<int> *overflow, double scale = 1.0);
+
+void doubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
+                   double scale = 1.0);
+  
 void doubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
                    llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
                    llint* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
+
+void doubleToInt95(const std::vector<double> &dval_x, const std::vector<double> &dval_y,
+                   const std::vector<double> &dval_z, std::vector<llint> *primary_x,
+                   std::vector<int> *overflow_x, std::vector<llint> *primary_y,
+                   std::vector<int> *overflow_y, std::vector<llint> *primary_z,
+                   std::vector<int> *overflow_z, double scale = 1.0);
+
+void doubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
+                   const Hybrid<double> &dval_z, Hybrid<llint> *primary_x, Hybrid<int> *overflow_x,
+                   Hybrid<llint> *primary_y, Hybrid<int> *overflow_y, Hybrid<llint> *primary_z,
+                   Hybrid<int> *overflow_z, double scale = 1.0);
 /// \}
 
 /// \brief Convert numbers in split fixed precision to floating point reals.  Downscaling to the
@@ -233,12 +260,12 @@ void int63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
                   std::vector<float> *result_z, const std::vector<int> &primary_x,
                   const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
                   const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
-                  const std::vector<int> &overflow_z, size_t n_values, float descale = 1.0f);
+                  const std::vector<int> &overflow_z, float descale = 1.0f);
 
 void int63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
                   const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
                   const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
-                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
+                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
                   float descale = 1.0f);
 
 double int63ToDouble(int2 ival);
@@ -253,10 +280,10 @@ void int95ToDouble(double* result, const llint* primary, const int* overflow, si
                    double descale = 1.0);
 
 void int95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
-                   const std::vector<int> &overflow, size_t n_values, double descale = 1.0);
+                   const std::vector<int> &overflow, double descale = 1.0);
 
 void int95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
-                   const Hybrid<int> &overflow, size_t n_values, double descale = 1.0);
+                   const Hybrid<int> &overflow, double descale = 1.0);
 
 void int95ToDouble(double* result_x, double* result_y, double* result_z, const llint* primary_x,
                    const int* overflow_x, const llint* primary_y, const int* overflow_y,
