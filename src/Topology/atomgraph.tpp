@@ -383,6 +383,15 @@ template <typename T> T AtomGraph::getLennardJonesSigma(const int index_a) const
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> AtomGraph::getLennardJonesSigma() const {
+  std::vector<T> result(atom_type_count);
+  for (int i = 0; i < atom_type_count; i++) {
+    result[i] = getLennardJonesSigma<T>(i, i);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 T AtomGraph::getLennardJonesEpsilon(const int index_a, const int index_b) const {
   const size_t ct = std::type_index(typeid(T)).hash_code();
@@ -406,6 +415,15 @@ T AtomGraph::getLennardJonesEpsilon(const int index_a, const int index_b) const 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T AtomGraph::getLennardJonesEpsilon(const int index_a) const {
   return getLennardJonesEpsilon<T>(index_a, index_a);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> AtomGraph::getLennardJonesEpsilon() const {
+  std::vector<T> result(atom_type_count);
+  for (int i = 0; i < atom_type_count; i++) {
+    result[i] = getLennardJonesEpsilon<T>(i, i);
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -224,30 +224,30 @@ CoordinateFrame TestSystemManager::exportCoordinateFrame(const int index) const 
 }
 
 //-------------------------------------------------------------------------------------------------
-const PhaseSpace& TestSystemManager::viewCoordinates(const int index) const {
+PhaseSpace& TestSystemManager::viewCoordinates(const int index) {
   checkIndexing(index, "viewCoordinates");
   return all_coordinates[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph& TestSystemManager::getTopologyReference(const int index) const {
+AtomGraph& TestSystemManager::getTopologyReference(const int index) {
   checkIndexing(index, "viewTopology");
   return all_topologies[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph>& TestSystemManager::getTopologyReference() const {
+std::vector<AtomGraph>& TestSystemManager::getTopologyReference() {
   return all_topologies;
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph* TestSystemManager::getTopologyPointer(const int index) const {
+AtomGraph* TestSystemManager::getTopologyPointer(const int index) {
   checkIndexing(index, "viewTopology");
   return &all_topologies[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() {
+std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() {
   std::vector<AtomGraph*> result(system_count);
   for (int i = 0; i < system_count; i++) {
     result[i] = &all_topologies[i];

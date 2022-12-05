@@ -9,10 +9,10 @@ template <typename T>
 MeshParamKit<T>::MeshParamKit(const int na_in, const int nb_in, const int nc_in,
                               const int95_t orig_x_in, const int95_t orig_y_in,
                               const int95_t orig_z_in, const T scale_in, const T inv_scale_in,
-                              const T* umat_in, const T* invu_in, const T* widths_in,
-                              const int95_t* fp_invu_in) :
+                              const int scale_bits_in, const T* umat_in, const T* invu_in,
+                              const T* widths_in, const int95_t* fp_invu_in) :
     na{na_in}, nb{nb_in}, nc{nc_in}, orig_x{orig_x_in}, orig_y{orig_y_in}, orig_z{orig_z_in},
-    scale{scale_in}, inv_scale{inv_scale_in},
+    scale{scale_in}, inv_scale{inv_scale_in}, scale_bits{scale_bits_in},
     umat{ umat_in[0], umat_in[1], umat_in[2], umat_in[3], umat_in[4], umat_in[5], umat_in[6],
           umat_in[7], umat_in[8] },
     invu{ invu_in[0], invu_in[1], invu_in[2], invu_in[3], invu_in[4], invu_in[5], invu_in[6],

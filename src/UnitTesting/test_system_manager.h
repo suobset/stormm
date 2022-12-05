@@ -101,7 +101,7 @@ public:
   /// \brief Get a const reference to the coordinates for one system.
   ///
   /// \param index  The system of interest
-  const PhaseSpace& viewCoordinates(int index) const;
+  PhaseSpace& viewCoordinates(int index);
 
   /// \brief Get a const reference to the topology for one or more systems.
   ///
@@ -111,8 +111,8 @@ public:
   ///
   /// \param index  The system of interest
   /// \{
-  const AtomGraph& getTopologyReference(int index) const;
-  const std::vector<AtomGraph>& getTopologyReference() const;
+  AtomGraph& getTopologyReference(int index);
+  std::vector<AtomGraph>& getTopologyReference();
   /// \}
   
   /// \brief Get a pointer to one or more topologies
@@ -123,8 +123,8 @@ public:
   ///
   /// \param index  Identifier of a specific topology of interest
   /// \{
-  const AtomGraph* getTopologyPointer(int index) const;
-  const std::vector<AtomGraph*> getTopologyPointer();
+  AtomGraph* getTopologyPointer(int index);
+  std::vector<AtomGraph*> getTopologyPointer();
   /// \}
   
 private:
