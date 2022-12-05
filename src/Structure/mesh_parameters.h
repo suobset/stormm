@@ -36,8 +36,8 @@ template <typename T> struct MeshParamKit {
 
   /// \brief The constructor takes arguments for all member variables.
   MeshParamKit(int na_in, int nb_in, int nc_in, int95_t orig_x_in, int95_t orig_y_in,
-               int95_t orig_z_in, T scale_in, T inv_scale_in, const T* umat_in, const T* invu_in,
-               const T* widths_in, const int95_t* fp_invu_in);
+               int95_t orig_z_in, T scale_in, T inv_scale_in, int scale_bits_in, const T* umat_in,
+               const T* invu_in, const T* widths_in, const int95_t* fp_invu_in);
 
   /// \brief The default copy and move constructors will be valid for this object.  Const members
   ///        negate the use of default copy and move assignment operators.
@@ -58,6 +58,7 @@ template <typename T> struct MeshParamKit {
                              ///<   into the fixed-percision format of the mesh
   const T inv_scale;         ///< Inverse scaling factor for taking fixed-precision coordinates
                              ///<   back into STORMM's internal units of Angstroms
+  const int scale_bits;      ///< Bits after the decimal used in the fixed precision scaling 
   const T umat[9];           ///< Transformation matrix to take coordinates into element space
   const T invu[9];           ///< Inverse transformation matrix for each element, or the vectors
                              ///<   defining each side of the element.

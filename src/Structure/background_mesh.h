@@ -35,6 +35,7 @@ using card::HybridTargetLevel;
 using data_types::getStormmScalarTypeName;
 using data_types::isScalarType;
 using data_types::isFloatingPointScalarType;
+using data_types::isSignedIntegralScalarType;
 using constants::CartesianDimension;
 using constants::UnitCellAxis;
 using energy::NonbondedPotential;

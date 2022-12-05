@@ -189,15 +189,15 @@ std::vector<int95_t> MeshParameters::getAxisCoordinates(const UnitCellAxis mesh_
 //-------------------------------------------------------------------------------------------------
 MeshParamKit<double> MeshParameters::dpData() const {
   return MeshParamKit<double>(na, nb, nc, origin_x, origin_y, origin_z, scale_factor,
-                              inverse_scale_factor, element_umat, element_invu, widths,
+                              inverse_scale_factor, scale_bits, element_umat, element_invu, widths,
                               fp_element_invu);
 }
 
 //-------------------------------------------------------------------------------------------------
 MeshParamKit<float> MeshParameters::spData() const {
   return MeshParamKit<float>(na, nb, nc, origin_x, origin_y, origin_z, scale_factor,
-                             inverse_scale_factor, sp_element_umat, sp_element_invu, sp_widths,
-                             fp_element_invu);
+                             inverse_scale_factor, scale_bits, sp_element_umat, sp_element_invu,
+                             sp_widths, fp_element_invu);
 }
 
 //-------------------------------------------------------------------------------------------------

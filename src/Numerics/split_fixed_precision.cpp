@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "Constants/fixed_precision.h"
 #include "Parsing/parse.h"
+#include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 #include "split_fixed_precision.h"
 
@@ -9,6 +10,7 @@ namespace numerics {
 
 using constants::getPrecisionModelName;
 using parse::strcmpCased;
+using parse::PolyNumeric;
 
 //-------------------------------------------------------------------------------------------------
 AccumulationMethod translateAccumulationMethod(const std::string &choice,
@@ -173,7 +175,7 @@ void floatToInt63(const float fval, int *primary, int *overflow) {
 
 //-------------------------------------------------------------------------------------------------
 void floatToInt63(const float* fval, int* primary, int* overflow, const size_t n_values,
-                  const double scale) {
+                  const float scale) {
   for (size_t i = 0LLU; i < n_values; i++) {
     floatToInt63(fval[i] * scale, &primary[i], &overflow[i]);
   }
@@ -187,6 +189,47 @@ void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z,
     floatToInt63(fval_x[i] * scale, &primary_x[i], &overflow_x[i]);
     floatToInt63(fval_y[i] * scale, &primary_y[i], &overflow_y[i]);
     floatToInt63(fval_z[i] * scale, &primary_z[i], &overflow_z[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 doubleToInt63(const double dval) {
+  int2 result;
+  if (fabs(dval) >= max_int_accumulation) {
+    const int spillover = dval / max_int_accumulation;
+    result.x = dval - (static_cast<double>(spillover) * max_int_accumulation);
+    result.y = spillover;
+  }
+  else {
+    result.x = dval;
+    result.y = 0;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt63(const double dval, int *primary, int *overflow) {
+  const int2 result = doubleToInt63(dval);
+  *primary  = result.x;
+  *overflow = result.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt63(const double* dval, int* primary, int* overflow, const size_t n_values,
+                   const double scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    doubleToInt63(dval[i] * scale, &primary[i], &overflow[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt63(const double* dval_x, const double* dval_y, const double* dval_z,
+                   int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                   int* primary_z, int* overflow_z, const size_t n_values, const double scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    doubleToInt63(dval_x[i] * scale, &primary_x[i], &overflow_x[i]);
+    doubleToInt63(dval_y[i] * scale, &primary_y[i], &overflow_y[i]);
+    doubleToInt63(dval_z[i] * scale, &primary_z[i], &overflow_z[i]);
   }
 }
 
@@ -582,6 +625,48 @@ int2 int63Sum(const int a_x, const int a_y, const float breal) {
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+int2 changeFPBits(const int2 fp, const int native_bits, const int output_bits) {
+  if (native_bits == output_bits) {
+    return fp;
+  }
+
+  // Compute the conversion factor, relying on the fact that a double (64-bit floating point
+  // number) will align with a long long unsigned int.
+  PolyNumeric conv_factor;
+  conv_factor.ulli = 1023 + output_bits - native_bits;
+  conv_factor.ulli <<= 52;
+  const double xcomp = static_cast<double>(fp.x) * conv_factor.d;
+  const double ycomp = static_cast<double>(fp.y) * max_int_accumulation * conv_factor.d;
+  const int2 xnew = doubleToInt63(xcomp);
+  const int2 ynew = doubleToInt63(ycomp);
+  return splitFPSum(xnew, ynew);  
+}
+  
+//-------------------------------------------------------------------------------------------------
+int95_t changeFPBits(const int95_t fp, const int native_bits, const int output_bits) {
+  if (native_bits == output_bits) {
+    return fp;
+  }
+
+  // Break the 64-bit floating point number into two 32-bit components, each of which can be
+  // handled exactly by a 64-bit floating point number.
+  PolyNumeric conv_factor;
+  conv_factor.ulli = 1023 + output_bits - native_bits;
+  conv_factor.ulli <<= 52;
+  llint ilow_xcomp = (static_cast<ullint>(fp.x) & 0xffffffffLLU);
+  llint ihigh_xcomp = fp.x - ilow_xcomp;
+  const double xcomp_low  = static_cast<double>(ilow_xcomp) * conv_factor.d;
+  const double xcomp_high = static_cast<double>(ihigh_xcomp) * max_int_accumulation * 2.0 *
+                            conv_factor.d;
+  const double ycomp = static_cast<double>(fp.y) * max_llint_accumulation * conv_factor.d;
+  const int95_t xnew_low  = doubleToInt95(xcomp_low);
+  const int95_t xnew_high = doubleToInt95(xcomp_high);
+  const int95_t xnew      = splitFPSum(xnew_low, xnew_high);
+  const int95_t ynew      = doubleToInt95(ycomp);
+  return splitFPSum(xnew, ynew);
+}
+  
 //-------------------------------------------------------------------------------------------------
 void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
                         const int95_t increment) {

@@ -1469,5 +1469,88 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
                       dudyz_grid, dudxyz_grid);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
+                  const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
+                  const Tprop* prop_b, const int natom, const int* xcrd_ovrf, const int* ycrd_ovrf,
+                  const int* zcrd_ovrf, const int coord_scaling_bits) {
+
+  // Check whether the grid works in a format that would restrict the fixed-precision math to just
+  // the first 64 bits of the representation.
+  const size_t data_ct = std::type_index(typeid(Tdata)).hash_code();
+  const bool mesh_data_is_double = (data_ct == double_type_index);  
+  const bool coord_is_integral = isSignedIntegralScalarType<Tcoord>();
+  const bool coordinate_overflow_active = (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr &&
+                                           zcrd_ovrf != nullptr);
+
+  // Loop over all particles
+  for (int pos = 0; pos < natom; pos++) {
+  
+    // Determine the grid bin using a transformation into mesh space followed by a local check and,
+    // if necessary, a correction.  The precision of the mesh coefficients will determine the
+    // precision of the fixed-precision coordinate representation, following the standard set forth
+    // in validateScalingBits() above.
+    if (mesh_data_is_double) {
+      int95_t ixcrd, iycrd, izcrd;
+      if (coord_is_integral) {
+
+        // The coordinates may not have the same precision as the positions expected by the mesh.
+        // Harmonize the representations.
+        if (coord_scaling_bits == bgmr.dims.scale_bits) {
+          ixcrd.x = xcrd[pos];
+          iycrd.x = ycrd[pos];
+          izcrd.x = zcrd[pos];
+          if (coordinate_overflow_active) {
+            ixcrd.y = xcrd[pos];
+            iycrd.y = ycrd[pos];
+            izcrd.y = zcrd[pos];          
+          }
+        }
+        else {
+          int95_t orep_xcrd, orep_ycrd, orep_zcrd;
+          if (coordinate_overflow_active) {
+            orep_xcrd = { xcrd[pos], xcrd_ovrf[pos] };
+            orep_ycrd = { ycrd[pos], ycrd_ovrf[pos] };
+            orep_zcrd = { zcrd[pos], zcrd_ovrf[pos] };
+          }
+          else {
+            orep_xcrd = { xcrd[pos], 0 };
+            orep_ycrd = { ycrd[pos], 0 };
+            orep_zcrd = { zcrd[pos], 0 };
+          }
+          ixcrd = changeFPBits(orep_xcrd, coord_scaling_bits, bgmr.dims.scale_bits);
+          iycrd = changeFPBits(orep_ycrd, coord_scaling_bits, bgmr.dims.scale_bits);
+          izcrd = changeFPBits(orep_zcrd, coord_scaling_bits, bgmr.dims.scale_bits);
+        }
+      }
+      else {
+        ixcrd = doubleToInt95(xcrd[pos]);
+        iycrd = doubleToInt95(ycrd[pos]);
+        izcrd = doubleToInt95(zcrd[pos]);
+      }
+      
+    }
+    else {
+
+    }
+  
+    switch (bgmr.kind) {
+    case GridDetail::OCCLUSION:
+      break;
+    case GridDetail::NONBONDED_FIELD:
+    case GridDetail::NONBONDED_ATOMIC:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
+Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const std::vector<Tcoord> &xcrd,
+                  const std::vector<Tcoord> &ycrd, const std::vector<Tcoord> &zcrd,
+                  const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b) {
+}
+
 } // namespace structure
 } // namespace stormm

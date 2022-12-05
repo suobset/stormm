@@ -136,11 +136,22 @@ int2 floatToInt63(const float fval);
 void floatToInt63(const float fval, int *primary, int *overflow);
 
 void floatToInt63(const float* fval, int* primary, int* overflow, size_t n_values,
-                  double scale = 1.0);
+                  float scale = 1.0);
 
 void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
                   int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
-                  int* overflow_z, size_t n_values, double scale = 1.0);
+                  int* overflow_z, size_t n_values, float scale = 1.0);
+
+int2 doubleToInt63(const double fval);
+
+void doubleToInt63(const double fval, int *primary, int *overflow);
+
+void doubleToInt63(const double* dval, int* primary, int* overflow, size_t n_values,
+                   double scale = 1.0);
+
+void doubleToInt63(const double* dval_x, const double* dval_y, const double* dval_z,
+                   int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                   int* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
 
 int95_t doubleToInt95(const double fval);
 
@@ -317,6 +328,21 @@ int2 int63Sum(int a_x, int a_y, int b_x, int b_y);
 int95_t int95Sum(llint a_x, int a_y, double breal);
 
 int2 int63Sum(int a_x, int a_y, float breal);
+/// \}
+
+/// \brief Convert a split fixed-precision number with one bit scaling into an equivalent data type
+///        with a different bit scaling.
+///
+/// Overloaded:
+///   - Convert int63_t (int2) to another int63_t
+///   - Convert int95_t to another int95_t
+///
+/// \param fp           The fixed-precision number of interest
+/// \param native_bits  Original bit scaling of the fixed-precision format
+/// \param output_bits  Bit scaling of the output format
+/// \{
+int2 changeFPBits(const int2 fp, int native_bits, int output_bits);
+int95_t changeFPBits(const int95_t fp, int native_bits, int output_bits);
 /// \}
 
 /// \brief Compute a one-dimensional grid of points, beginning at some arbitrary origin and
