@@ -3,11 +3,14 @@ test:
 
   script:
     - module load cmake
+    - if [ "$CUDA" == "YES" ]; then module load cuda/11.4; fi
+
+    - CUDA_VISIBLE_DEVICES=$CI_RUNNER_ID
 
     - rm -rf deploy
     - rm -rf build && mkdir build && cd build
 
-    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=NO -DSTORMM_ENABLE_TEST_COVERAGE=YES -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
+    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=$CUDA -DSTORMM_ENABLE_TEST_COVERAGE=YES -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
     - make -j
 
     - make test -j
@@ -18,11 +21,17 @@ test:
     - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CI_PROJECT_DIR}/deploy/lib/
     - export PATH=$PATH:${CI_PROJECT_DIR}/deploy/bin/
 
+    - cd ${CI_PROJECT_DIR}
+
     # Sanity check that our installed apps run
-    - conformer.stormm --help
-    - ffrefine.stormm --help
+    - if [ "$CUDA" == "YES" ]; then conformer.stormm.cuda --help; else conformer.stormm --help; fi
+    - if [ "$CUDA" == "YES" ]; then ffrefine.stormm.cuda --help; else ffrefine.stormm --help; fi
     # TODO: Uncomment if `dynamics.stormm` gets a help message
-    # - dynamics.stormm --help
+    # - if [ "$CUDA" == "YES" ]; then dynamics.stormm.cuda --help; else dynamics.stormm --help; fi
+
+  parallel:
+    matrix:
+      - CUDA: ["NO", "YES"]
 
   coverage: /^\s*lines:\s*\d+.\d+\%/
 
