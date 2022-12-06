@@ -1,20 +1,22 @@
-image: condaforge/mambaforge
-
-before_script:
-  - mamba install --yes "gxx =8.5" "cmake >=3.18" make gcovr
-
 test:
   stage: test
 
   script:
-    - rm -rf build && mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=NO -DSTORMM_ENABLE_TEST_COVERAGE=YES ..
-    - make -j 4
+    - module load cmake
 
-    - make test -j 4
+    - rm -rf deploy
+    - rm -rf build && mkdir build && cd build
+
+    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=NO -DSTORMM_ENABLE_TEST_COVERAGE=YES -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
+    - make -j
+
+    - make test -j
     - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
 
     - make install
+
+    - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CI_PROJECT_DIR}/deploy/lib/
+    - export PATH=$PATH:${CI_PROJECT_DIR}/deploy/bin/
 
     # Sanity check that our installed apps run
     - conformer.stormm --help
@@ -33,4 +35,4 @@ test:
         path: build/coverage.xml
 
   tags:
-    - saas-linux-large-amd64
+    - intel
