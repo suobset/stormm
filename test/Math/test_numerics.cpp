@@ -19,7 +19,9 @@
 using stormm::constants::PrecisionModel;
 using stormm::constants::tiny;
 using stormm::data_types::llint;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::float2;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;

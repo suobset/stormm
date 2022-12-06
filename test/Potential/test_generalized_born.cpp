@@ -17,9 +17,11 @@
 
 using stormm::llint;
 using stormm::llint_type_index;
+#ifndef STORMM_USE_HPC
 using stormm::double2;
 using stormm::int2;
 using stormm::int3;
+#endif
 using stormm::constants::ExceptionResponse;
 using stormm::data_types::getStormmScalarTypeName;
 using stormm::diskutil::DrivePathType;

@@ -1,6 +1,7 @@
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
+#include "../../../src/Math/vector_ops.h"
 #include "../../../src/MolecularMechanics/minimization.h"
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_random.h"
@@ -29,6 +30,7 @@ using namespace stormm::diskutil;
 using namespace stormm::display;
 using namespace stormm::energy;
 using namespace stormm::errors;
+using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::namelist;
 using namespace stormm::synthesis;
@@ -117,6 +119,16 @@ int main(int argc, const char* argv[]) {
   master_timer.assignTime(4);
 
   // CHECK
+  printf("Total system count: %5d.\n", nconf);
+  std::vector<double> system_sizes(nconf);
+  for (int i = 0; i < nconf; i++) {
+    system_sizes[i] = conformer_population.getSystemTopologyPointer(i)->getAtomCount();
+  }
+  printf("  Average atom count: %9.4lf\n", mean(system_sizes));
+  printf("  Standard deviation: %9.4lf\n", variance(system_sizes,
+                                                    VarianceMethod::STANDARD_DEVIATION));
+  printf("  Minimum atom count: %9.4lf\n", minValue(system_sizes));
+  printf("  Maximum atom count: %9.4lf\n", maxValue(system_sizes));
   std::vector<bool> is_printed(conformer_population.getSystemCount(), false);
   for (int i = 0; i < nconf; i++) {
     if (is_printed[i]) {

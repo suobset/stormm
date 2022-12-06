@@ -580,8 +580,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O3
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \
@@ -889,11 +889,11 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 
 # Target: Conformer generation with CUDA
 $(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
-				      $(APPDIR)/Conf/src/conformer.cu \
+				      $(APPDIR)/Conf/src/hpc_conformer.cu \
 				      $(APPDIR)/Conf/src/setup.cpp
 	@echo "[STORMM]  Building conformer.stormm.cuda..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
-	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cu \
+	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/hpc_conformer.cu \
 	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so

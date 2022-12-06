@@ -10,7 +10,9 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/Random/random.h"
 
+#ifndef STORMM_USE_HPC
 using stormm::data_types::int4;
+#endif
 using stormm::diskutil::osSeparator;
 using stormm::diskutil::PrintSituation;
 using stormm::errors::rtWarn;

@@ -2001,8 +2001,8 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
 
 //-------------------------------------------------------------------------------------------------
 #ifdef STORMM_USE_HPC
-void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu,
-                                           const CoordinateCycle orientation,
+void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation,
+                                           const GpuDetails &gpu,
                                            const HybridTargetLevel tier, const int index)
 #else
 void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation, const int index)
@@ -2100,7 +2100,7 @@ void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation, co
 #ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu, const HybridTargetLevel tier,
                                            const int index) {
-  initializeForces(gpu, cycle_position, tier, index);
+  initializeForces(cycle_position, gpu, tier, index);
 }
 #else
 void PhaseSpaceSynthesis::initializeForces(const int index) {
@@ -2173,17 +2173,10 @@ void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
 }
 
 //-------------------------------------------------------------------------------------------------
-#ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
                                           const std::string &file_name, const double current_time,
                                           const CoordinateFileKind output_kind,
                                           const PrintSituation expectation, const GpuDetails &gpu)
-#else
-void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
-                                          const std::string &file_name, const double current_time,
-                                          const CoordinateFileKind output_kind,
-                                          const PrintSituation expectation)
-#endif
 {
   // Bail out if there are no frames to print
   const size_t nframe = system_indices.size();

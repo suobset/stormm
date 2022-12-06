@@ -19,8 +19,10 @@
 
 using stormm::constants::ExceptionResponse;
 using stormm::symbols::amber_ancient_bioq;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::int2;
 using stormm::data_types::char4;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;

@@ -14,7 +14,9 @@
 
 using stormm::card::HybridTargetLevel;
 using stormm::data_types::uint;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::char4;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;

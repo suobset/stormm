@@ -89,6 +89,14 @@ public:
   ///
   /// \param smp_count_in  The number of streaming multiprocessors
   void setSMPCount(int smp_count_in);
+
+  /// \brief Overload the == and != operators to compare GpuDetails objects.
+  ///
+  /// \param right  The other GPU to compare against
+  /// \{
+  bool operator==(const GpuDetails &right) const;
+  bool operator!=(const GpuDetails &right) const;
+  /// \}
   
 private:
   bool available;            ///< Flag to indicate whether a GPU is available for the program's use

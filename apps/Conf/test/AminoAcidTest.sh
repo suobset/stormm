@@ -11,16 +11,16 @@ cat >> cgen.in << EOF
 
 &conformer
   rotation_samples 6,
-  max_system_trials 24, final_states 24,
+  max_system_trials 10, final_states 10,
   core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
 &solvent
-  igb 5
+  igb 8
 &end
 
 &minimize
-  ncyc 2, maxcyc 5
+  ncyc 50, maxcyc 500
 &end
 EOF
 
@@ -28,4 +28,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn
+${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn

@@ -15,7 +15,9 @@
 #include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+#ifndef STORMM_USE_HPC
 using stormm::double2;
+#endif
 using stormm::llint;
 using stormm::constants::ExceptionResponse;
 using stormm::data_types::getStormmScalarTypeName;

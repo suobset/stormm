@@ -13,7 +13,9 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+#ifndef STORMM_USE_HPC
 using stormm::int2;
+#endif
 using stormm::constants::ExceptionResponse;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;

@@ -6,6 +6,7 @@
 #include "../../../src/Constants/behavior.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
+#include "../../../src/Math/vector_ops.h"
 #include "../../../src/MolecularMechanics/minimization.h"
 #include "../../../src/MolecularMechanics/hpc_minimization.h"
 #include "../../../src/Namelists/nml_random.h"
@@ -27,6 +28,7 @@
 
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::testing::StopWatch;
+using conf_app::setup::setGenerativeConditions;
 using conf_app::setup::expandConformers;
 
 using namespace stormm::card;
@@ -36,6 +38,7 @@ using namespace stormm::diskutil;
 using namespace stormm::display;
 using namespace stormm::energy;
 using namespace stormm::errors;
+using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::namelist;
 using namespace stormm::synthesis;
@@ -98,9 +101,14 @@ int main(int argc, const char* argv[]) {
                  MapRotatableGroups::YES, ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
 
+  // Establish the conditions for generative modeling
+  const std::vector<AtomMask> core_masks = setGenerativeConditions(ui, &sc, sdf_recovery,
+                                                                   &master_timer);
+  
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
   // a much larger list of all the possible conformers that each system might be able to access.
-  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, &xrs, &master_timer);
+  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, sdf_recovery, core_masks,
+                                                              &xrs, &master_timer);
   std::vector<AtomGraph*> unique_topologies = conformer_population.getUniqueTopologies();
   const int n_unique_topologies = unique_topologies.size();
   const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();
@@ -139,9 +147,18 @@ int main(int argc, const char* argv[]) {
   master_timer.assignTime(4);
 
   // CHECK
-  printf("There are %5d systems in total.\n", conformer_population.getSystemCount());
-  std::vector<bool> is_printed(conformer_population.getSystemCount(), false);
   const int nconf = conformer_population.getSystemCount();
+  printf("Total system count: %5d.\n", nconf);
+  std::vector<double> system_sizes(nconf);
+  for (int i = 0; i < nconf; i++) {
+    system_sizes[i] = conformer_population.getSystemTopologyPointer(i)->getAtomCount();
+  }
+  printf("  Average atom count: %9.4lf\n", mean(system_sizes));
+  printf("  Standard deviation: %9.4lf\n", variance(system_sizes,
+                                                    VarianceMethod::STANDARD_DEVIATION));
+  printf("  Minimum atom count: %9.4lf\n", minValue(system_sizes));
+  printf("  Maximum atom count: %9.4lf\n", maxValue(system_sizes));
+  std::vector<bool> is_printed(conformer_population.getSystemCount(), false);
   for (int i = 0; i < nconf; i++) {
     if (is_printed[i]) {
       continue;

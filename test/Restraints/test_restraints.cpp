@@ -24,11 +24,13 @@
 
 using stormm::constants::ExceptionResponse;
 using stormm::constants::tiny;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::char4;
 using stormm::data_types::double2;
 using stormm::data_types::double4;
 using stormm::data_types::float2;
 using stormm::data_types::float4;
+#endif
 using stormm::data_types::llint;
 using stormm::data_types::getStormmScalarTypeName;
 using stormm::diskutil::osSeparator;

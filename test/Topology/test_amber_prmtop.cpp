@@ -13,7 +13,9 @@
 using stormm::card::Hybrid;
 using stormm::constants::tiny;
 using stormm::data_types::ulint;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::char4;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;

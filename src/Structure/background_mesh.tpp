@@ -1415,20 +1415,6 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
               const double d3_factor = ((480.0 * pair_ljb) - (2688.0 * pair_lja * invr6)) *
                                        invr6 * invr6;
               u = ((pair_lja * invr6) - pair_ljb) * invr6;
-
-              // CHECK
-#if 0
-              if (r < 2.0) {
-                printf("Atom %4d : [ %9.4lf %9.4lf %9.4lf ] -> [ %2zu %2zu %2zu ] -> %9.4lf [ "
-                       "%9.4lf %9.4lf -> %10.2lf %9.2lf ] -> %9.4lf\n", pos,
-                       hostInt95ToDouble(atom_x) * mps.inv_scale,
-                       hostInt95ToDouble(atom_y) * mps.inv_scale,
-                       hostInt95ToDouble(atom_z) * mps.inv_scale, i, j, k, r, atom_sigma, atom_eps,
-                       pair_lja, pair_ljb, u);
-              }
-#endif
-              // END CHECK
-              
               du_dx = d_factor * disp_x;
               du_dy = d_factor * disp_y;
               du_dz = d_factor * disp_z;
@@ -1612,6 +1598,7 @@ Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const std::vec
                   const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b,
                   const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
                   const int coord_scaling_bits) {
+
 }
 
 } // namespace structure
