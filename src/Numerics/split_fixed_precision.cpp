@@ -152,7 +152,7 @@ void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 floatToInt63(const float fval) {
+int2 hostFloatToInt63(const float fval) {
   int2 result;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
@@ -167,76 +167,76 @@ int2 floatToInt63(const float fval) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const float fval, int *primary, int *overflow) {
-  const int2 result = floatToInt63(fval);
+void hostFloatToInt63(const float fval, int *primary, int *overflow) {
+  const int2 result = hostFloatToInt63(fval);
   *primary  = result.x;
   *overflow = result.y;
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const float* fval, int* primary, int* overflow, const size_t n_values,
-                  const float scale) {
+void hostFloatToInt63(const float* fval, int* primary, int* overflow, const size_t n_values,
+                      const float scale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    floatToInt63(fval[i] * scale, &primary[i], &overflow[i]);
+    hostFloatToInt63(fval[i] * scale, &primary[i], &overflow[i]);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
-                  std::vector<int> *overflow, const float scale) {
+void hostFloatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
+                      std::vector<int> *overflow, const float scale) {
   if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "floatToInt63");
+    rtErr("The primary and overflow vectors must have the same length.", "hostFloatToInt63");
   }
   if (primary->size() != fval.size()) {
     rtErr("The original data must have the same length as the integral result vectors.",
-          "floatToInt63");
+          "hostFloatToInt63");
   }
-  floatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
+  hostFloatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
-                  const float scale) {
+void hostFloatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
+                      const float scale) {
   if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "floatToInt63");
+    rtErr("The primary and overflow vectors must have the same length.", "hostFloatToInt63");
   }
   if (primary->size() != fval.size()) {
     rtErr("The original data must have the same length as the integral result vectors.",
-          "floatToInt63");
+          "hostFloatToInt63");
   }
-  floatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
+  hostFloatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
-                  int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
-                  int* overflow_z, const size_t n_values, const float scale) {
+void hostFloatToInt63(const float* fval_x, const float* fval_y, const float* fval_z,
+                      int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                      int* primary_z, int* overflow_z, const size_t n_values, const float scale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    floatToInt63(fval_x[i] * scale, &primary_x[i], &overflow_x[i]);
-    floatToInt63(fval_y[i] * scale, &primary_y[i], &overflow_y[i]);
-    floatToInt63(fval_z[i] * scale, &primary_z[i], &overflow_z[i]);
+    hostFloatToInt63(fval_x[i] * scale, &primary_x[i], &overflow_x[i]);
+    hostFloatToInt63(fval_y[i] * scale, &primary_y[i], &overflow_y[i]);
+    hostFloatToInt63(fval_z[i] * scale, &primary_z[i], &overflow_z[i]);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const std::vector<float> &fval_x, const std::vector<float> &fval_y,
-                  const std::vector<float> &fval_z, std::vector<int> *primary_x,
-                  std::vector<int> *overflow_x, std::vector<int> *primary_y,
-                  std::vector<int> *overflow_y, std::vector<int> *primary_z,
-                  std::vector<int> *overflow_z, const float scale) {
-  floatToInt63(fval_x, primary_x, overflow_x, scale);
-  floatToInt63(fval_y, primary_y, overflow_y, scale);
-  floatToInt63(fval_z, primary_z, overflow_z, scale);
+void hostFloatToInt63(const std::vector<float> &fval_x, const std::vector<float> &fval_y,
+                      const std::vector<float> &fval_z, std::vector<int> *primary_x,
+                      std::vector<int> *overflow_x, std::vector<int> *primary_y,
+                      std::vector<int> *overflow_y, std::vector<int> *primary_z,
+                      std::vector<int> *overflow_z, const float scale) {
+  hostFloatToInt63(fval_x, primary_x, overflow_x, scale);
+  hostFloatToInt63(fval_y, primary_y, overflow_y, scale);
+  hostFloatToInt63(fval_z, primary_z, overflow_z, scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void floatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
-                  const Hybrid<float> &fval_z, Hybrid<int> *primary_x, Hybrid<int> *overflow_x,
-                  Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
-                  Hybrid<int> *overflow_z, const float scale) {
-  floatToInt63(fval_x, primary_x, overflow_x, scale);
-  floatToInt63(fval_y, primary_y, overflow_y, scale);
-  floatToInt63(fval_z, primary_z, overflow_z, scale);
+void hostFloatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
+                      const Hybrid<float> &fval_z, Hybrid<int> *primary_x, Hybrid<int> *overflow_x,
+                      Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
+                      Hybrid<int> *overflow_z, const float scale) {
+  hostFloatToInt63(fval_x, primary_x, overflow_x, scale);
+  hostFloatToInt63(fval_y, primary_y, overflow_y, scale);
+  hostFloatToInt63(fval_z, primary_z, overflow_z, scale);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -262,7 +262,7 @@ void doubleToInt63(const double dval, int *primary, int *overflow) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t doubleToInt95(const double dval) {
+int95_t hostDoubleToInt95(const double dval) {
   int95_t result;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
@@ -277,318 +277,324 @@ int95_t doubleToInt95(const double dval) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const double dval, llint *primary, int *overflow) {
-  const int95_t result = doubleToInt95(dval);
+void hostDoubleToInt95(const double dval, llint *primary, int *overflow) {
+  const int95_t result = hostDoubleToInt95(dval);
   *primary  = result.x;
   *overflow = result.y;
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const double* dval, llint* primary, int* overflow, const size_t n_values,
-                   const double scale) {
+void hostDoubleToInt95(const double* dval, llint* primary, int* overflow, const size_t n_values,
+                       const double scale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    doubleToInt95(dval[i] * scale, &primary[i], &overflow[i]);
+    hostDoubleToInt95(dval[i] * scale, &primary[i], &overflow[i]);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
-                   std::vector<int> *overflow, const double scale) {
+void hostDoubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
+                       std::vector<int> *overflow, const double scale) {
   if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "doubleToInt95");
+    rtErr("The primary and overflow vectors must have the same length.", "hostDoubleToInt95");
   }
   if (primary->size() != dval.size()) {
     rtErr("The original data must have the same length as the integral result vectors.",
-          "doubleToInt95");
+          "hostDoubleToInt95");
   }
-  doubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
+  hostDoubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
+void hostDoubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
                    const double scale) {
   if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "doubleToInt95");
+    rtErr("The primary and overflow vectors must have the same length.", "hostDoubleToInt95");
   }
   if (primary->size() != dval.size()) {
     rtErr("The original data must have the same length as the integral result vectors.",
-          "doubleToInt95");
+          "hostDoubleToInt95");
   }
-  doubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
+  hostDoubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
-                   llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
-                   llint* primary_z, int* overflow_z, const size_t n_values, const double scale) {
+void hostDoubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
+                       llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
+                       llint* primary_z, int* overflow_z, const size_t n_values,
+                       const double scale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    doubleToInt95(dval_x[i] * scale, &primary_x[i], &overflow_x[i]);
-    doubleToInt95(dval_y[i] * scale, &primary_y[i], &overflow_y[i]);
-    doubleToInt95(dval_z[i] * scale, &primary_z[i], &overflow_z[i]);
+    hostDoubleToInt95(dval_x[i] * scale, &primary_x[i], &overflow_x[i]);
+    hostDoubleToInt95(dval_y[i] * scale, &primary_y[i], &overflow_y[i]);
+    hostDoubleToInt95(dval_z[i] * scale, &primary_z[i], &overflow_z[i]);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const std::vector<double> &dval_x, const std::vector<double> &dval_y,
-                   const std::vector<double> &dval_z, std::vector<llint> *primary_x,
-                   std::vector<int> *overflow_x, std::vector<llint> *primary_y,
-                   std::vector<int> *overflow_y, std::vector<llint> *primary_z,
-                   std::vector<int> *overflow_z, const double scale) {
-  doubleToInt95(dval_x, primary_x, overflow_x, scale);
-  doubleToInt95(dval_y, primary_y, overflow_y, scale);
-  doubleToInt95(dval_z, primary_z, overflow_z, scale);
+void hostDoubleToInt95(const std::vector<double> &dval_x, const std::vector<double> &dval_y,
+                       const std::vector<double> &dval_z, std::vector<llint> *primary_x,
+                       std::vector<int> *overflow_x, std::vector<llint> *primary_y,
+                       std::vector<int> *overflow_y, std::vector<llint> *primary_z,
+                       std::vector<int> *overflow_z, const double scale) {
+  hostDoubleToInt95(dval_x, primary_x, overflow_x, scale);
+  hostDoubleToInt95(dval_y, primary_y, overflow_y, scale);
+  hostDoubleToInt95(dval_z, primary_z, overflow_z, scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
-                   const Hybrid<double> &dval_z, Hybrid<llint> *primary_x, Hybrid<int> *overflow_x,
-                   Hybrid<llint> *primary_y, Hybrid<int> *overflow_y, Hybrid<llint> *primary_z,
-                   Hybrid<int> *overflow_z, const double scale) {
-  doubleToInt95(dval_x, primary_x, overflow_x, scale);
-  doubleToInt95(dval_y, primary_y, overflow_y, scale);
-  doubleToInt95(dval_z, primary_z, overflow_z, scale);
+void hostDoubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_y,
+                       const Hybrid<double> &dval_z, Hybrid<llint> *primary_x,
+                       Hybrid<int> *overflow_x, Hybrid<llint> *primary_y, Hybrid<int> *overflow_y,
+                       Hybrid<llint> *primary_z, Hybrid<int> *overflow_z, const double scale) {
+  hostDoubleToInt95(dval_x, primary_x, overflow_x, scale);
+  hostDoubleToInt95(dval_y, primary_y, overflow_y, scale);
+  hostDoubleToInt95(dval_z, primary_z, overflow_z, scale);
 }
 
 //-------------------------------------------------------------------------------------------------
-double int63ToDouble(const int primary, const int overflow) {
+double hostInt63ToDouble(const int primary, const int overflow) {
   return (static_cast<double>(overflow) * max_int_accumulation) + static_cast<double>(primary);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(double* result, const int* primary, const int* overflow,
+void hostInt63ToDouble(double* result, const int* primary, const int* overflow,
                    const size_t n_values, const double descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result[i] = int63ToDouble(primary[i], overflow[i]) * descale;
+    result[i] = hostInt63ToDouble(primary[i], overflow[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
+void hostInt63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
                    const std::vector<int> &overflow, const double descale) {
   if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "int63ToDouble");
+    rtErr("The primary and overflow vectors must have the same length.", "hostInt63ToDouble");
   }
   if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.", "int63ToDouble");
+    rtErr("The result must have the same length as the original, integral data.",
+          "hostInt63ToDouble");
   }
-  int63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
-                   const double descale) {
+void hostInt63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary,
+                       const Hybrid<int> &overflow, const double descale) {
   if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "int63ToDouble");
+    rtErr("The primary and overflow vectors must have the same length.", "hostInt63ToDouble");
   }
   if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.", "int63ToDouble");
+    rtErr("The result must have the same length as the original, integral data.",
+          "hostInt63ToDouble");
   }
-  int63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-float int63ToFloat(const int primary, const int overflow) {
+float hostInt63ToFloat(const int primary, const int overflow) {
   return (static_cast<float>(overflow) * max_int_accumulation_f) + static_cast<float>(primary);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(float* result, const int* primary, const int* overflow, const size_t n_values,
-                  const float descale) {
+void hostInt63ToFloat(float* result, const int* primary, const int* overflow,
+                      const size_t n_values, const float descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result[i] = int63ToFloat(primary[i], overflow[i]) * descale;
+    result[i] = hostInt63ToFloat(primary[i], overflow[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
+void hostInt63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
                   const std::vector<int> &overflow, const float descale) {
   if (primary.size() != overflow.size()) {
     rtErr("The primary and overflow vectors must have the same length.  " +
           std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
-          "int63ToFloat");
+          "hostInt63ToFloat");
   }
   if (primary.size() != result->size()) {
     rtErr("The result must have the same length as the original, integral data.  " +
           std::to_string(result->size()) + " != " + std::to_string(primary.size()) + ".",
-          "int63ToFloat");
+          "hostInt63ToFloat");
   }
-  int63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
-                  const float descale) {
+void hostInt63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary,
+                      const Hybrid<int> &overflow, const float descale) {
   if (primary.size() != overflow.size()) {
     rtErr("The primary and overflow vectors (" + std::string(primary.getLabel().name) + " and " +
           std::string(overflow.getLabel().name) + ") must have the same length.  " +
           std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
-          "int63ToFloat");
+          "hostInt63ToFloat");
   }
   if (primary.size() != result->size()) {
     rtErr("The result (" + std::string(result->getLabel().name) + ") must have the same length as "
           "the original, integral data.  " + std::to_string(result->size()) + " != " +
-          std::to_string(primary.size()) + ".", "int63ToFloat");
+          std::to_string(primary.size()) + ".", "hostInt63ToFloat");
   }
-  int63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
-                   const int* overflow_x, const int* primary_y, const int* overflow_y,
-                   const int* primary_z, const int* overflow_z, const size_t n_values,
-                   const double descale) {
+void hostInt63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
+                       const int* overflow_x, const int* primary_y, const int* overflow_y,
+                       const int* primary_z, const int* overflow_z, const size_t n_values,
+                       const double descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result_x[i] = int63ToDouble(primary_x[i], overflow_x[i]) * descale;
-    result_y[i] = int63ToDouble(primary_y[i], overflow_y[i]) * descale;
-    result_z[i] = int63ToDouble(primary_z[i], overflow_z[i]) * descale;
+    result_x[i] = hostInt63ToDouble(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = hostInt63ToDouble(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = hostInt63ToDouble(primary_z[i], overflow_z[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
-                   std::vector<double> *result_z, const std::vector<int> &primary_x,
-                   const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
-                   const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
-                   const std::vector<int> &overflow_z, const size_t n_values,
-                   const double descale) {
-  int63ToDouble(result_x, primary_x, overflow_x, descale);
-  int63ToDouble(result_y, primary_y, overflow_y, descale);
-  int63ToDouble(result_z, primary_z, overflow_z, descale);
+void hostInt63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                       std::vector<double> *result_z, const std::vector<int> &primary_x,
+                       const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                       const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                       const std::vector<int> &overflow_z, const size_t n_values,
+                       const double descale) {
+  hostInt63ToDouble(result_x, primary_x, overflow_x, descale);
+  hostInt63ToDouble(result_y, primary_y, overflow_y, descale);
+  hostInt63ToDouble(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
-                   const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
-                   const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
-                   const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
-                   const size_t n_values, const double descale) {
-  int63ToDouble(result_x, primary_x, overflow_x, descale);
-  int63ToDouble(result_y, primary_y, overflow_y, descale);
-  int63ToDouble(result_z, primary_z, overflow_z, descale);
+void hostInt63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
+                       Hybrid<double> *result_z, const Hybrid<int> &primary_x,
+                       const Hybrid<int> &overflow_x, const Hybrid<int> &primary_y,
+                       const Hybrid<int> &overflow_y, const Hybrid<int> &primary_z,
+                       const Hybrid<int> &overflow_z, const size_t n_values,
+                       const double descale) {
+  hostInt63ToDouble(result_x, primary_x, overflow_x, descale);
+  hostInt63ToDouble(result_y, primary_y, overflow_y, descale);
+  hostInt63ToDouble(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
-                  const int* overflow_x, const int* primary_y, const int* overflow_y,
-                  const int* primary_z, const int* overflow_z, const size_t n_values,
-                  const float descale) {
+void hostInt63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
+                      const int* overflow_x, const int* primary_y, const int* overflow_y,
+                      const int* primary_z, const int* overflow_z, const size_t n_values,
+                      const float descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result_x[i] = int63ToFloat(primary_x[i], overflow_x[i]) * descale;
-    result_y[i] = int63ToFloat(primary_y[i], overflow_y[i]) * descale;
-    result_z[i] = int63ToFloat(primary_z[i], overflow_z[i]) * descale;
+    result_x[i] = hostInt63ToFloat(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = hostInt63ToFloat(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = hostInt63ToFloat(primary_z[i], overflow_z[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
-                  std::vector<float> *result_z, const std::vector<int> &primary_x,
-                  const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
-                  const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
-                  const std::vector<int> &overflow_z, const float descale) {
-  int63ToFloat(result_x, primary_x, overflow_x, descale);
-  int63ToFloat(result_y, primary_y, overflow_y, descale);
-  int63ToFloat(result_z, primary_z, overflow_z, descale);
+void hostInt63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
+                      std::vector<float> *result_z, const std::vector<int> &primary_x,
+                      const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                      const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                      const std::vector<int> &overflow_z, const float descale) {
+  hostInt63ToFloat(result_x, primary_x, overflow_x, descale);
+  hostInt63ToFloat(result_y, primary_y, overflow_y, descale);
+  hostInt63ToFloat(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
-                  const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
-                  const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
-                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
-                  const float descale) {
-  int63ToFloat(result_x, primary_x, overflow_x, descale);
-  int63ToFloat(result_y, primary_y, overflow_y, descale);
-  int63ToFloat(result_z, primary_z, overflow_z, descale);
+void hostInt63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
+                      const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                      const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                      const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
+                      const float descale) {
+  hostInt63ToFloat(result_x, primary_x, overflow_x, descale);
+  hostInt63ToFloat(result_y, primary_y, overflow_y, descale);
+  hostInt63ToFloat(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-double int63ToDouble(const int2 ival) {
+double hostInt63ToDouble(const int2 ival) {
   return (static_cast<double>(ival.y) * max_int_accumulation) + static_cast<double>(ival.x);
 }
 
 //-------------------------------------------------------------------------------------------------
-float int63ToFloat(const int2 ival) {
+float hostInt63ToFloat(const int2 ival) {
   return (static_cast<float>(ival.y) * max_int_accumulation_f) + static_cast<float>(ival.x);
 }
 
 //-------------------------------------------------------------------------------------------------
-double int95ToDouble(const int95_t ival) {
+double hostInt95ToDouble(const int95_t ival) {
   return (static_cast<double>(ival.y) * max_llint_accumulation) + static_cast<double>(ival.x);
 }
 
 //-------------------------------------------------------------------------------------------------
-double int95ToDouble(const llint primary, const int overflow) {
+double hostInt95ToDouble(const llint primary, const int overflow) {
   return (static_cast<double>(overflow) * max_llint_accumulation) + static_cast<double>(primary);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(double* result, const llint* primary, const int* overflow,
+void hostInt95ToDouble(double* result, const llint* primary, const int* overflow,
                    const size_t n_values, const double descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result[i] = int95ToDouble(primary[i], overflow[i]) * descale;
+    result[i] = hostInt95ToDouble(primary[i], overflow[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
+void hostInt95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
                    const std::vector<int> &overflow, const double descale) {
   if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "int95ToDouble");
+    rtErr("The primary and overflow vectors must have the same length.", "hostInt95ToDouble");
   }
   if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.", "int95ToDouble");
+    rtErr("The result must have the same length as the original, integral data.",
+          "hostInt95ToDouble");
   }
-  int95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
+void hostInt95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
                    const Hybrid<int> &overflow, const double descale) {
   if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "int95ToDouble");
+    rtErr("The primary and overflow vectors must have the same length.", "hostInt95ToDouble");
   }
   if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.", "int95ToDouble");
+    rtErr("The result must have the same length as the original, integral data.",
+          "hostInt95ToDouble");
   }
-  int95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+  hostInt95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(double* result_x, double* result_y, double* result_z, const llint* primary_x,
-                   const int* overflow_x, const llint* primary_y, const int* overflow_y,
-                   const llint* primary_z, const int* overflow_z, const size_t n_values,
-                   const double descale) {
+void hostInt95ToDouble(double* result_x, double* result_y, double* result_z,
+                       const llint* primary_x, const int* overflow_x, const llint* primary_y,
+                       const int* overflow_y, const llint* primary_z, const int* overflow_z,
+                       const size_t n_values, const double descale) {
   for (size_t i = 0LLU; i < n_values; i++) {
-    result_x[i] = int95ToDouble(primary_x[i], overflow_x[i]) * descale;
-    result_y[i] = int95ToDouble(primary_y[i], overflow_y[i]) * descale;
-    result_z[i] = int95ToDouble(primary_z[i], overflow_z[i]) * descale;
+    result_x[i] = hostInt95ToDouble(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = hostInt95ToDouble(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = hostInt95ToDouble(primary_z[i], overflow_z[i]) * descale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+void hostInt95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
                    std::vector<double> *result_z, const std::vector<llint> &primary_x,
                    const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
                    const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
                    const std::vector<int> &overflow_z, const double descale) {
-  int95ToDouble(result_x, primary_x, overflow_x, descale);
-  int95ToDouble(result_y, primary_y, overflow_y, descale);
-  int95ToDouble(result_z, primary_z, overflow_z, descale);
+  hostInt95ToDouble(result_x, primary_x, overflow_x, descale);
+  hostInt95ToDouble(result_y, primary_y, overflow_y, descale);
+  hostInt95ToDouble(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
-                   const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
-                   const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
-                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z,
-                   const double descale) {
-  int95ToDouble(result_x, primary_x, overflow_x, descale);
-  int95ToDouble(result_y, primary_y, overflow_y, descale);
-  int95ToDouble(result_z, primary_z, overflow_z, descale);
+void hostInt95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
+                       Hybrid<double> *result_z, const Hybrid<llint> &primary_x,
+                       const Hybrid<int> &overflow_x, const Hybrid<llint> &primary_y,
+                       const Hybrid<int> &overflow_y, const Hybrid<llint> &primary_z,
+                       const Hybrid<int> &overflow_z, const double descale) {
+  hostInt95ToDouble(result_x, primary_x, overflow_x, descale);
+  hostInt95ToDouble(result_y, primary_y, overflow_y, descale);
+  hostInt95ToDouble(result_z, primary_z, overflow_z, descale);
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitAccumulation(const float fval, int *primary, int *overflow) {
+void hostSplitAccumulation(const float fval, int *primary, int *overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
@@ -607,7 +613,7 @@ void splitAccumulation(const float fval, int *primary, int *overflow) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitAccumulation(const double dval, llint *primary, int *overflow) {
+void hostSplitAccumulation(const double dval, llint *primary, int *overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
@@ -626,81 +632,81 @@ void splitAccumulation(const double dval, llint *primary, int *overflow) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t splitFPSum(const int95_t a, const int95_t b) {
+int95_t hostSplitFPSum(const int95_t a, const int95_t b) {
   int95_t result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 splitFPSum(const int2 a, const int2 b) {
+int2 hostSplitFPSum(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t splitFPSum(const int95_t a, const double breal) {
-  const int95_t b = doubleToInt95(breal);
+int95_t hostSplitFPSum(const int95_t a, const double breal) {
+  const int95_t b = hostDoubleToInt95(breal);
   int95_t result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 splitFPSum(const int2 a, const float breal) {
-  const int2 b = floatToInt63(breal);
+int2 hostSplitFPSum(const int2 a, const float breal) {
+  const int2 b = hostFloatToInt63(breal);
   int2 result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t splitFPSum(const int95_t a, const llint b_x, const int b_y) {
+int95_t hostSplitFPSum(const int95_t a, const llint b_x, const int b_y) {
   int95_t result = { a.x + b_x, a.y + b_y };
   result.y += (1 - (2 * (b_x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0LL) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 splitFPSum(const int2 a, const int b_x, const int b_y) {
+int2 hostSplitFPSum(const int2 a, const int b_x, const int b_y) {
   int2 result = { a.x + b_x, a.y + b_y };
   result.y += (1 - (2 * (b_x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t int95Sum(const llint a_x, const int a_y, const llint b_x, const int b_y) {
+int95_t hostInt95Sum(const llint a_x, const int a_y, const llint b_x, const int b_y) {
   int95_t result = { a_x + b_x, a_y + b_y };
   result.y += (1 - (2 * (b_x < 0LL))) * ((a_x ^ result.x) < 0 && (a_x ^ b_x) >= 0LL) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 int63Sum(const int a_x, const int a_y, const int b_x, const int b_y) {
+int2 hostInt63Sum(const int a_x, const int a_y, const int b_x, const int b_y) {
   int2 result = { a_x + b_x, a_y + b_y };
   result.y += (1 - (2 * (b_x < 0))) * ((a_x ^ result.x) < 0 && (a_x ^ b_x) >= 0) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int95_t int95Sum(const llint a_x, const int a_y, const double breal) {
-  const int95_t b = doubleToInt95(breal);
+int95_t hostInt95Sum(const llint a_x, const int a_y, const double breal) {
+  const int95_t b = hostDoubleToInt95(breal);
   int95_t result = { a_x + b.x, a_y + b.y };
   result.y += (1 - (2 * (b.x < 0LL))) * ((a_x ^ result.x) < 0 && (a_x ^ b.x) >= 0LL) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 int63Sum(const int a_x, const int a_y, const float breal) {
-  const int2 b = floatToInt63(breal);
+int2 hostInt63Sum(const int a_x, const int a_y, const float breal) {
+  const int2 b = hostFloatToInt63(breal);
   int2 result = { a_x + b.x, a_y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a_x ^ result.x) < 0 && (a_x ^ b.x) >= 0) * 2;
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 changeFPBits(const int2 fp, const int native_bits, const int output_bits) {
+int2 hostChangeFPBits(const int2 fp, const int native_bits, const int output_bits) {
   if (native_bits == output_bits) {
     return fp;
   }
@@ -714,11 +720,11 @@ int2 changeFPBits(const int2 fp, const int native_bits, const int output_bits) {
   const double ycomp = static_cast<double>(fp.y) * max_int_accumulation * conv_factor.d;
   const int2 xnew = doubleToInt63(xcomp);
   const int2 ynew = doubleToInt63(ycomp);
-  return splitFPSum(xnew, ynew);  
+  return hostSplitFPSum(xnew, ynew);  
 }
   
 //-------------------------------------------------------------------------------------------------
-int95_t changeFPBits(const int95_t fp, const int native_bits, const int output_bits) {
+int95_t hostChangeFPBits(const int95_t fp, const int native_bits, const int output_bits) {
   if (native_bits == output_bits) {
     return fp;
   }
@@ -734,11 +740,11 @@ int95_t changeFPBits(const int95_t fp, const int native_bits, const int output_b
   const double xcomp_high = static_cast<double>(ihigh_xcomp) * max_int_accumulation * 2.0 *
                             conv_factor.d;
   const double ycomp = static_cast<double>(fp.y) * max_llint_accumulation * conv_factor.d;
-  const int95_t xnew_low  = doubleToInt95(xcomp_low);
-  const int95_t xnew_high = doubleToInt95(xcomp_high);
-  const int95_t xnew      = splitFPSum(xnew_low, xnew_high);
-  const int95_t ynew      = doubleToInt95(ycomp);
-  return splitFPSum(xnew, ynew);
+  const int95_t xnew_low  = hostDoubleToInt95(xcomp_low);
+  const int95_t xnew_high = hostDoubleToInt95(xcomp_high);
+  const int95_t xnew      = hostSplitFPSum(xnew_low, xnew_high);
+  const int95_t ynew      = hostDoubleToInt95(ycomp);
+  return hostSplitFPSum(xnew, ynew);
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -749,7 +755,7 @@ void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
   int95_t* coord_ptr = coordinates->data();
   for (size_t i = 0LLU; i < grid_size; i++) {
     coord_ptr[i] = marker;
-    marker = splitFPSum(marker, increment);
+    marker = hostSplitFPSum(marker, increment);
   }
 }
 
@@ -783,7 +789,7 @@ void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
   for (size_t i = 0LLU; i < grid_size; i++) {
     primary[i] = marker.x;
     overflow[i] = marker.y;
-    marker = splitFPSum(marker, increment);
+    marker = hostSplitFPSum(marker, increment);
   }
 }
 

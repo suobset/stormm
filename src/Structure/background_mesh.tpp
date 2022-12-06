@@ -998,18 +998,18 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
   std::vector<double> avx(mps.na + 1), avy(mps.na + 1), avz(mps.na + 1);
   std::vector<double> bvx(mps.nb + 1), bvy(mps.nb + 1), bvz(mps.nb + 1);
   std::vector<double> cvx(mps.nc + 1), cvy(mps.nc + 1), cvz(mps.nc + 1);
-  int95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
-                a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
-                a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.inv_scale);
-  int95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
-                b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
-                b_line_z_overflow.readHost(), mps.inv_scale);
-  int95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
-                c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
-                c_line_z_overflow.readHost(), mps.inv_scale);
-  const double dorig_x = int95ToDouble(mps.orig_x);
-  const double dorig_y = int95ToDouble(mps.orig_y);
-  const double dorig_z = int95ToDouble(mps.orig_z);
+  hostInt95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
+                    a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
+                    a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.inv_scale);
+  hostInt95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
+                    b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
+                    b_line_z_overflow.readHost(), mps.inv_scale);
+  hostInt95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
+                    c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
+                    c_line_z_overflow.readHost(), mps.inv_scale);
+  const double dorig_x = hostInt95ToDouble(mps.orig_x);
+  const double dorig_y = hostInt95ToDouble(mps.orig_y);
+  const double dorig_z = hostInt95ToDouble(mps.orig_z);
 
   // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
   const double de_ax = 0.0625 * (avx[1] - avx[0]);
@@ -1139,14 +1139,14 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
     break;
   case UnitCellType::ORTHORHOMBIC:
     tc_bounds.resize(6);
-    tc_bounds[3] = int95ToDouble(mps.fp_invu[0]);
-    tc_bounds[4] = int95ToDouble(mps.fp_invu[4]);
-    tc_bounds[5] = int95ToDouble(mps.fp_invu[8]);
+    tc_bounds[3] = hostInt95ToDouble(mps.fp_invu[0]);
+    tc_bounds[4] = hostInt95ToDouble(mps.fp_invu[4]);
+    tc_bounds[5] = hostInt95ToDouble(mps.fp_invu[8]);
     break;
   case UnitCellType::TRICLINIC:
     tc_bounds.resize(12);
     for (int i = 0; i < 9; i++) {
-      tc_bounds[i + 3] = int95ToDouble(mps.fp_invu[i]);
+      tc_bounds[i + 3] = hostInt95ToDouble(mps.fp_invu[i]);
     }
     break;
   }
@@ -1178,13 +1178,13 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
     const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
     const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
     for (int j = 0; j < mps.nb; j++) {
-      const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
-      const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
-      const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+      const int95_t mesh_abx = hostSplitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
+      const int95_t mesh_aby = hostSplitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
+      const int95_t mesh_abz = hostSplitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
       for (int k = 0; k < mps.nc; k++) {
-        const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
-        const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
-        const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
+        const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
+        const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
+        const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
 
         // Compose the input vectors
         for (int ci = 0; ci < 2; ci++) {
@@ -1214,9 +1214,9 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
         // Compose the mesh element.  Complete the bounds array by adding the origin, then
         // compute the tricubic coefficients.
-        tc_bounds[0] = int95ToDouble(mesh_abcx);
-        tc_bounds[1] = int95ToDouble(mesh_abcy);
-        tc_bounds[2] = int95ToDouble(mesh_abcz);
+        tc_bounds[0] = hostInt95ToDouble(mesh_abcx);
+        tc_bounds[1] = hostInt95ToDouble(mesh_abcy);
+        tc_bounds[2] = hostInt95ToDouble(mesh_abcz);
         const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
                                            dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
                                            dudxyz_elem, dudxx_elem, dudyy_elem, dudzz_elem);
@@ -1326,9 +1326,9 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
     }
     
     // Compute the particle position in the mesh's native fixed-precision format
-    const int95_t atom_x = doubleToInt95(cfr.xcrd[pos] * mps.scale);
-    const int95_t atom_y = doubleToInt95(cfr.ycrd[pos] * mps.scale);
-    const int95_t atom_z = doubleToInt95(cfr.zcrd[pos] * mps.scale);
+    const int95_t atom_x = hostDoubleToInt95(cfr.xcrd[pos] * mps.scale);
+    const int95_t atom_y = hostDoubleToInt95(cfr.ycrd[pos] * mps.scale);
+    const int95_t atom_z = hostDoubleToInt95(cfr.zcrd[pos] * mps.scale);
 
     // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
     // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
@@ -1364,22 +1364,25 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
       const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
       const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
       for (size_t j = 0; j < ngrid_b; j++) {
-        const int95_t mesh_abx = splitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
-        const int95_t mesh_aby = splitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
-        const int95_t mesh_abz = splitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+        const int95_t mesh_abx = hostSplitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
+        const int95_t mesh_aby = hostSplitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
+        const int95_t mesh_abz = hostSplitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
         for (size_t k = 0; k < ngrid_c; k++) {
-          const int95_t mesh_abcx = splitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
-          const int95_t mesh_abcy = splitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
-          const int95_t mesh_abcz = splitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
+          const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, cvec_x_ptr[k],
+                                                   cvec_x_overflow_ptr[k]);
+          const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, cvec_y_ptr[k],
+                                                   cvec_y_overflow_ptr[k]);
+          const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, cvec_z_ptr[k],
+                                                   cvec_z_overflow_ptr[k]);
 
           // Compute the displacements using the mesh's fixed-precision representation, then
           // immediately convert to double for real-valued computations.
-          const int95_t fp_disp_x = splitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
-          const int95_t fp_disp_y = splitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
-          const int95_t fp_disp_z = splitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
-          const double disp_x = int95ToDouble(fp_disp_x) * mps.inv_scale;
-          const double disp_y = int95ToDouble(fp_disp_y) * mps.inv_scale;
-          const double disp_z = int95ToDouble(fp_disp_z) * mps.inv_scale;
+          const int95_t fp_disp_x = hostSplitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
+          const int95_t fp_disp_y = hostSplitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
+          const int95_t fp_disp_z = hostSplitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
+          const double disp_x = hostInt95ToDouble(fp_disp_x) * mps.inv_scale;
+          const double disp_y = hostInt95ToDouble(fp_disp_y) * mps.inv_scale;
+          const double disp_z = hostInt95ToDouble(fp_disp_z) * mps.inv_scale;
           const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
           const double r  = sqrt(r2);
           const double invr2 = 1.0 / r2;
@@ -1418,9 +1421,9 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
               if (r < 2.0) {
                 printf("Atom %4d : [ %9.4lf %9.4lf %9.4lf ] -> [ %2zu %2zu %2zu ] -> %9.4lf [ "
                        "%9.4lf %9.4lf -> %10.2lf %9.2lf ] -> %9.4lf\n", pos,
-                       int95ToDouble(atom_x) * mps.inv_scale,
-                       int95ToDouble(atom_y) * mps.inv_scale,
-                       int95ToDouble(atom_z) * mps.inv_scale, i, j, k, r, atom_sigma, atom_eps,
+                       hostInt95ToDouble(atom_x) * mps.inv_scale,
+                       hostInt95ToDouble(atom_y) * mps.inv_scale,
+                       hostInt95ToDouble(atom_z) * mps.inv_scale, i, j, k, r, atom_sigma, atom_eps,
                        pair_lja, pair_ljb, u);
               }
 #endif
@@ -1527,20 +1530,20 @@ std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, c
         }
       }
       else {
-        ixcrd = doubleToInt95(xcrd[pos]);
-        iycrd = doubleToInt95(ycrd[pos]);
-        izcrd = doubleToInt95(zcrd[pos]);
+        ixcrd = hostDoubleToInt95(xcrd[pos]);
+        iycrd = hostDoubleToInt95(ycrd[pos]);
+        izcrd = hostDoubleToInt95(zcrd[pos]);
       }
 
       // Obtain the coordinates of the atom, relative to the mesh origin, in the precision of the
       // transformation matrices.  Estimate the appropriate mesh element, then test by computing
       // the location of the atom relative to the origin of this element.
-      const int95_t ipt_rel_x = splitFPSum(ixcrd, -bgmr.dims.orig_x.x, -bgmr.dims.orig_x.y);
-      const int95_t ipt_rel_y = splitFPSum(iycrd, -bgmr.dims.orig_y.x, -bgmr.dims.orig_y.y);
-      const int95_t ipt_rel_z = splitFPSum(izcrd, -bgmr.dims.orig_z.x, -bgmr.dims.orig_z.y);
-      const Txfrm pt_rel_x = int95ToDouble(ipt_rel_x);
-      const Txfrm pt_rel_y = int95ToDouble(ipt_rel_y);
-      const Txfrm pt_rel_z = int95ToDouble(ipt_rel_z);
+      const int95_t ipt_rel_x = hostSplitFPSum(ixcrd, -bgmr.dims.orig_x.x, -bgmr.dims.orig_x.y);
+      const int95_t ipt_rel_y = hostSplitFPSum(iycrd, -bgmr.dims.orig_y.x, -bgmr.dims.orig_y.y);
+      const int95_t ipt_rel_z = hostSplitFPSum(izcrd, -bgmr.dims.orig_z.x, -bgmr.dims.orig_z.y);
+      const Txfrm pt_rel_x = hostInt95ToDouble(ipt_rel_x);
+      const Txfrm pt_rel_y = hostInt95ToDouble(ipt_rel_y);
+      const Txfrm pt_rel_z = hostInt95ToDouble(ipt_rel_z);
       const Txfrm pt_grid_a = (bgmr.dims.umat[0] * pt_rel_x) + (bgmr.dims.umat[3] * pt_rel_y) +
                               (bgmr.dims.umat[6] * pt_rel_z);
       const Txfrm pt_grid_b = (bgmr.dims.umat[1] * pt_rel_x) + (bgmr.dims.umat[4] * pt_rel_y) +
@@ -1560,24 +1563,24 @@ std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, c
       int95_t element_origin_x = { bgmr.avec_abs_x[cell_a], bgmr.avec_abs_x_ovrf[cell_a] };
       int95_t element_origin_y = { bgmr.avec_abs_y[cell_a], bgmr.avec_abs_y_ovrf[cell_a] };
       int95_t element_origin_z = { bgmr.avec_abs_z[cell_a], bgmr.avec_abs_z_ovrf[cell_a] };
-      element_origin_x = splitFPSum(element_origin_x, bgmr.bvec_x[cell_b],
-                                    bgmr.bvec_x_ovrf[cell_b]);
-      element_origin_y = splitFPSum(element_origin_y, bgmr.bvec_y[cell_b],
-                                    bgmr.bvec_y_ovrf[cell_b]);
-      element_origin_z = splitFPSum(element_origin_z, bgmr.bvec_z[cell_b],
-                                    bgmr.bvec_z_ovrf[cell_b]);
-      element_origin_x = splitFPSum(element_origin_x, bgmr.cvec_x[cell_b],
-                                    bgmr.cvec_x_ovrf[cell_b]);
-      element_origin_y = splitFPSum(element_origin_y, bgmr.cvec_y[cell_b],
-                                    bgmr.cvec_y_ovrf[cell_b]);
-      element_origin_z = splitFPSum(element_origin_z, bgmr.cvec_z[cell_b],
-                                    bgmr.cvec_z_ovrf[cell_b]);
-      const int95_t idisp_x = splitFPSum(ixcrd, -element_origin_x.x, -element_origin_x.y);
-      const int95_t idisp_y = splitFPSum(iycrd, -element_origin_y.x, -element_origin_y.y);
-      const int95_t idisp_z = splitFPSum(izcrd, -element_origin_z.x, -element_origin_z.y);
-      const Txfrm disp_x = int95ToDouble(idisp_x);
-      const Txfrm disp_y = int95ToDouble(idisp_y);
-      const Txfrm disp_z = int95ToDouble(idisp_z);
+      element_origin_x = hostSplitFPSum(element_origin_x, bgmr.bvec_x[cell_b],
+                                        bgmr.bvec_x_ovrf[cell_b]);
+      element_origin_y = hostSplitFPSum(element_origin_y, bgmr.bvec_y[cell_b],
+                                        bgmr.bvec_y_ovrf[cell_b]);
+      element_origin_z = hostSplitFPSum(element_origin_z, bgmr.bvec_z[cell_b],
+                                        bgmr.bvec_z_ovrf[cell_b]);
+      element_origin_x = hostSplitFPSum(element_origin_x, bgmr.cvec_x[cell_b],
+                                        bgmr.cvec_x_ovrf[cell_b]);
+      element_origin_y = hostSplitFPSum(element_origin_y, bgmr.cvec_y[cell_b],
+                                        bgmr.cvec_y_ovrf[cell_b]);
+      element_origin_z = hostSplitFPSum(element_origin_z, bgmr.cvec_z[cell_b],
+                                        bgmr.cvec_z_ovrf[cell_b]);
+      const int95_t idisp_x = hostSplitFPSum(ixcrd, -element_origin_x.x, -element_origin_x.y);
+      const int95_t idisp_y = hostSplitFPSum(iycrd, -element_origin_y.x, -element_origin_y.y);
+      const int95_t idisp_z = hostSplitFPSum(izcrd, -element_origin_z.x, -element_origin_z.y);
+      const Txfrm disp_x = hostInt95ToDouble(idisp_x);
+      const Txfrm disp_y = hostInt95ToDouble(idisp_y);
+      const Txfrm disp_z = hostInt95ToDouble(idisp_z);
       Txfrm test_a = (bgmr.dims.umat[0] * disp_x) + (bgmr.dims.umat[3] * disp_y) +
                      (bgmr.dims.umat[6] * disp_z);
       Txfrm test_b = (bgmr.dims.umat[1] * disp_x) + (bgmr.dims.umat[4] * disp_y) +
@@ -1606,7 +1609,9 @@ std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, c
 template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
 Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const std::vector<Tcoord> &xcrd,
                   const std::vector<Tcoord> &ycrd, const std::vector<Tcoord> &zcrd,
-                  const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b) {
+                  const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b,
+                  const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                  const int coord_scaling_bits) {
 }
 
 } // namespace structure

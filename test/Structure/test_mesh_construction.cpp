@@ -15,7 +15,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::data_types::ullint;
-using stormm::numerics::int95ToDouble;
+using stormm::numerics::hostInt95ToDouble;
 using stormm::review::stormmSplash;
 using namespace stormm::diskutil;
 using namespace stormm::structure;
@@ -75,14 +75,14 @@ int main(const int argc, const char* argv[]) {
                                tsm.getTopologyPointer(0), &trpi_cf, 2.5, 1.5);
   BackgroundMeshWriter<double, double> bgmw_c = bgm_c.dpData();
   std::vector<double> gpt_x(bgmw_b.dims.na), gpt_y(bgmw_b.dims.nb), gpt_z(bgmw_b.dims.nb);
-  int95ToDouble(gpt_x.data(), bgmw_b.avec_abs_x, bgmw_b.avec_abs_x_ovrf, bgmw_b.dims.na,
-                bgmw_b.dims.inv_scale);
-  int95ToDouble(gpt_y.data(), bgmw_b.bvec_y, bgmw_b.bvec_y_ovrf, bgmw_b.dims.nb,
-                bgmw_b.dims.inv_scale);
-  int95ToDouble(gpt_z.data(), bgmw_b.cvec_z, bgmw_b.cvec_z_ovrf, bgmw_b.dims.nc,
-                bgmw_b.dims.inv_scale);
-  addScalarToVector(&gpt_y, int95ToDouble(bgmw_b.dims.orig_y) * bgmw_b.dims.inv_scale);
-  addScalarToVector(&gpt_z, int95ToDouble(bgmw_b.dims.orig_z) * bgmw_b.dims.inv_scale);
+  hostInt95ToDouble(gpt_x.data(), bgmw_b.avec_abs_x, bgmw_b.avec_abs_x_ovrf, bgmw_b.dims.na,
+                    bgmw_b.dims.inv_scale);
+  hostInt95ToDouble(gpt_y.data(), bgmw_b.bvec_y, bgmw_b.bvec_y_ovrf, bgmw_b.dims.nb,
+                    bgmw_b.dims.inv_scale);
+  hostInt95ToDouble(gpt_z.data(), bgmw_b.cvec_z, bgmw_b.cvec_z_ovrf, bgmw_b.dims.nc,
+                    bgmw_b.dims.inv_scale);
+  addScalarToVector(&gpt_y, hostInt95ToDouble(bgmw_b.dims.orig_y) * bgmw_b.dims.inv_scale);
+  addScalarToVector(&gpt_z, hostInt95ToDouble(bgmw_b.dims.orig_z) * bgmw_b.dims.inv_scale);
   std::vector<double> lj_check, lj_check_ans, qq_check, qq_check_ans;
   const std::vector<double> trpi_sig = trpi_ag->getLennardJonesSigma<double>();
   const std::vector<double> trpi_eps = trpi_ag->getLennardJonesEpsilon<double>();

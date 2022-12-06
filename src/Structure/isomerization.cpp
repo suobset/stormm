@@ -142,19 +142,25 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       const int95_t tmp_ccen_x  = { psynthw.xcrd[chir_idx], psynthw.xcrd_ovrf[chir_idx] };
       const int95_t tmp_ccen_y  = { psynthw.ycrd[chir_idx], psynthw.ycrd_ovrf[chir_idx] };
       const int95_t tmp_ccen_z  = { psynthw.zcrd[chir_idx], psynthw.zcrd_ovrf[chir_idx] };
-      const double ccenx = int95ToDouble(tmp_ccen_x) * inv_scl;
-      const double cceny = int95ToDouble(tmp_ccen_y) * inv_scl;
-      const double ccenz = int95ToDouble(tmp_ccen_z) * inv_scl;
-      double dbx = int95ToDouble(splitFPSum(tmp_rootb_x, -tmp_ccen_x.x, -tmp_ccen_x.y)) * inv_scl;
-      double dby = int95ToDouble(splitFPSum(tmp_rootb_y, -tmp_ccen_y.x, -tmp_ccen_y.y)) * inv_scl;
-      double dbz = int95ToDouble(splitFPSum(tmp_rootb_z, -tmp_ccen_z.x, -tmp_ccen_z.y)) * inv_scl;
+      const double ccenx = hostInt95ToDouble(tmp_ccen_x) * inv_scl;
+      const double cceny = hostInt95ToDouble(tmp_ccen_y) * inv_scl;
+      const double ccenz = hostInt95ToDouble(tmp_ccen_z) * inv_scl;
+      double dbx = hostInt95ToDouble(hostSplitFPSum(tmp_rootb_x, -tmp_ccen_x.x, -tmp_ccen_x.y)) *
+                   inv_scl;
+      double dby = hostInt95ToDouble(hostSplitFPSum(tmp_rootb_y, -tmp_ccen_y.x, -tmp_ccen_y.y)) *
+                   inv_scl;
+      double dbz = hostInt95ToDouble(hostSplitFPSum(tmp_rootb_z, -tmp_ccen_z.x, -tmp_ccen_z.y)) *
+                   inv_scl;
       const double invrb = 1.0 / sqrt((dbx * dbx) + (dby * dby) + (dbz * dbz));
       dbx = ccenx + (dbx * invrb);
       dby = cceny + (dby * invrb);
       dbz = ccenz + (dbz * invrb);
-      double dax = int95ToDouble(splitFPSum(tmp_roota_x, -tmp_ccen_x.x, -tmp_ccen_x.y)) * inv_scl;
-      double day = int95ToDouble(splitFPSum(tmp_roota_y, -tmp_ccen_y.x, -tmp_ccen_y.y)) * inv_scl;
-      double daz = int95ToDouble(splitFPSum(tmp_roota_z, -tmp_ccen_z.x, -tmp_ccen_z.y)) * inv_scl;
+      double dax = hostInt95ToDouble(hostSplitFPSum(tmp_roota_x, -tmp_ccen_x.x, -tmp_ccen_x.y)) *
+                   inv_scl;
+      double day = hostInt95ToDouble(hostSplitFPSum(tmp_roota_y, -tmp_ccen_y.x, -tmp_ccen_y.y)) *
+                   inv_scl;
+      double daz = hostInt95ToDouble(hostSplitFPSum(tmp_roota_z, -tmp_ccen_z.x, -tmp_ccen_z.y)) *
+                   inv_scl;
       const double invra = 1.0 / sqrt((dax * dax) + (day * day) + (daz * daz));
       dax = ccenx + (dax * invra);
       day = cceny + (day * invra);
@@ -171,17 +177,20 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       const int* moving_atoms = inversion_groups[center_idx].getMovingAtoms().data();
       for (int i = 0; i < nmove; i++) {
         const int atom_idx = moving_atoms[i] + system_offset;
-        xcrd[i + 2] = int95ToDouble(psynthw.xcrd[atom_idx], psynthw.xcrd_ovrf[atom_idx]) * inv_scl;
-        ycrd[i + 2] = int95ToDouble(psynthw.ycrd[atom_idx], psynthw.ycrd_ovrf[atom_idx]) * inv_scl;
-        zcrd[i + 2] = int95ToDouble(psynthw.zcrd[atom_idx], psynthw.zcrd_ovrf[atom_idx]) * inv_scl;
+        xcrd[i + 2] = hostInt95ToDouble(psynthw.xcrd[atom_idx], psynthw.xcrd_ovrf[atom_idx]) *
+                      inv_scl;
+        ycrd[i + 2] = hostInt95ToDouble(psynthw.ycrd[atom_idx], psynthw.ycrd_ovrf[atom_idx]) *
+                      inv_scl;
+        zcrd[i + 2] = hostInt95ToDouble(psynthw.zcrd[atom_idx], psynthw.zcrd_ovrf[atom_idx]) *
+                      inv_scl;
       }
       rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, symbols::pi);
       const double pos_scl = psynthw.gpos_scale;
       for (int i = 0; i < nmove; i++) {
         const int ixyz_dest = moving_atoms[i] + system_offset;
-        const int95_t ixcrd = doubleToInt95(xcrd[i + 2] * pos_scl);
-        const int95_t iycrd = doubleToInt95(ycrd[i + 2] * pos_scl);
-        const int95_t izcrd = doubleToInt95(zcrd[i + 2] * pos_scl);
+        const int95_t ixcrd = hostDoubleToInt95(xcrd[i + 2] * pos_scl);
+        const int95_t iycrd = hostDoubleToInt95(ycrd[i + 2] * pos_scl);
+        const int95_t izcrd = hostDoubleToInt95(zcrd[i + 2] * pos_scl);
         psynthw.xcrd[ixyz_dest] = ixcrd.x;
         psynthw.ycrd[ixyz_dest] = iycrd.x;
         psynthw.zcrd[ixyz_dest] = izcrd.x;

@@ -660,9 +660,9 @@ private:
 template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
 std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
                                const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
-                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
-                               const int* ycrd_ovrf, const int* zcrd_ovrf,
-                               int coord_scaling_bits);
+                               const Tprop* prop_b, const int natom,
+                               const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                               const int* zcrd_ovrf = nullptr, int coord_scaling_bits = 0);
   
 } // namespace structure
 } // namespace stormm

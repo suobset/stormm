@@ -26,9 +26,9 @@ MeshParamKit<T>::MeshParamKit(const int na_in, const int nb_in, const int nc_in,
 template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
   if (isFloatingPointScalarType<Tcoord>()) {
     std::vector<Tcoord> result(3);
-    result[0] = int95ToDouble(origin_x) * inverse_scale_factor;
-    result[1] = int95ToDouble(origin_y) * inverse_scale_factor;
-    result[2] = int95ToDouble(origin_z) * inverse_scale_factor;
+    result[0] = hostInt95ToDouble(origin_x) * inverse_scale_factor;
+    result[1] = hostInt95ToDouble(origin_y) * inverse_scale_factor;
+    result[2] = hostInt95ToDouble(origin_z) * inverse_scale_factor;
     return result;
   }
   else if (isFloatingPointHpcVectorType<Tcoord>()) {
@@ -51,9 +51,9 @@ template <typename T3> T3 MeshParameters::getMeshOriginAsTuple() const {
   }
   else if (isFloatingPointHpcVectorType<T3>()) {
     T3 result;
-    result.x = int95ToDouble(origin_x) * inverse_scale_factor;
-    result.y = int95ToDouble(origin_y) * inverse_scale_factor;
-    result.z = int95ToDouble(origin_z) * inverse_scale_factor;
+    result.x = hostInt95ToDouble(origin_x) * inverse_scale_factor;
+    result.y = hostInt95ToDouble(origin_y) * inverse_scale_factor;
+    result.z = hostInt95ToDouble(origin_z) * inverse_scale_factor;
     return result;
   }
   else {
@@ -71,7 +71,7 @@ std::vector<Tcoord> MeshParameters::getMeshElementVector(const UnitCellAxis dim)
   const int icol = static_cast<int>(dim);
   if (isFloatingPointScalarType<Tcoord>()) {
     for (int i = 0; i < 3; i++) {
-      result[i] = int95ToDouble(fp_element_invu[i + (3 * icol)]) * inverse_scale_factor;
+      result[i] = hostInt95ToDouble(fp_element_invu[i + (3 * icol)]) * inverse_scale_factor;
     }
   }
   else {
@@ -103,9 +103,9 @@ T3 MeshParameters::getMeshElementVectorAsTuple(const UnitCellAxis dim) const {
   T3 result;
   const int icol = static_cast<int>(dim);
   if (isFloatingPointHpcVectorType<T3>()) {
-    result.x = int95ToDouble(fp_element_invu[(3 * icol)    ]) * inverse_scale_factor;
-    result.y = int95ToDouble(fp_element_invu[(3 * icol) + 1]) * inverse_scale_factor;
-    result.z = int95ToDouble(fp_element_invu[(3 * icol) + 2]) * inverse_scale_factor;
+    result.x = hostInt95ToDouble(fp_element_invu[(3 * icol)    ]) * inverse_scale_factor;
+    result.y = hostInt95ToDouble(fp_element_invu[(3 * icol) + 1]) * inverse_scale_factor;
+    result.z = hostInt95ToDouble(fp_element_invu[(3 * icol) + 2]) * inverse_scale_factor;
   }
   else {
     rtErr("Mesh element vectors can only be returned as " + getStormmScalarTypeName<float3>() +
@@ -158,7 +158,7 @@ template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTra
   const size_t ct = std::type_index(typeid(Tcoord)).hash_code();
   if (isFloatingPointScalarType<Tcoord>()) {
     for (size_t i = 0; i < 9LLU; i++) {
-      result[i] = int95ToDouble(fp_element_invu[i]) * inverse_scale_factor;
+      result[i] = hostInt95ToDouble(fp_element_invu[i]) * inverse_scale_factor;
     }
   }
   else {

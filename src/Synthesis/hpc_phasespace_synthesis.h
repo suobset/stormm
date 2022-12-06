@@ -45,6 +45,49 @@ void psyInitializeForces(PsSynthesisWriter *psyw, int index, const GpuDetails &g
 /// \param gpu   Details of the GPU available  
 void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails &gpu);
 
+#if 0
+/// \brief Import the Cartesian X, Y, and Z components of poositions, velocities, or forces of one
+///        system within the synthesis.
+///
+/// \param x_recv             Long-long integer component of the fixed-precision arrays that the
+///                           imported Cartesian X data shall replace
+/// \param x_recv_ovrf        Integer overflow component of the fixed-precision arrays that the
+///                           imported Cartesian X data shall replace
+/// \param y_recv             Long-long integer component of Y fixed-precision arrays
+/// \param y_recv_ovrf        Integer overflow component of Y fixed-precision arrays
+/// \param z_recv             Long-long integer component of Z fixed-precision arrays
+/// \param z_recv_ovrf        Integer overflow component of Z fixed-precision arrays
+/// \param box_xform          Box space transformation matrix series within the synthesis (the
+///                           matrices have units of inverse Angstroms)
+/// \param inverse_xform      Inverse transformation matrix series within the synthesis (the
+///                           matrices have units of Angstroms)
+/// \param box_dimension      Box dimension series within the synthesis (units of Angstroms)
+/// \param box_vectors        Primary bits for the fixed precision box vectors matrix
+/// \param box_vector_ovrf    Overflow bits for the fixed precision box vectors matrix
+/// \param atom_starts        Starting positions for the atoms of each system in the synthesis
+/// \param atom_counts        Counts of atoms in each system of the synthesis
+/// \param x_import           Input Cartesian X coordinates (positions, velocities, or forces)
+/// \param y_import           Input Cartesian Y coordinates
+/// \param z_import           Input Cartesian Z coordinates
+/// \param box_xform_in       Transformation matrix to take coordinates into fractional space
+///                           (for positions only--provide nullptr for velocities or forces)
+/// \param inverse_xform_in   Transformation matrix to take coordinates back to real space.  The
+///                           units of elements in this matrix are Angstroms.
+/// \param box_dimensions_in  Dimensions of the box, in internal units of Angstroms
+/// \param system_index       Index of the system within this synthesis that the imported
+///                           coordinates shall replace
+/// \param coversion_factor   Scaling factor to take the input X, Y, and Z data into the apprpriate
+///                           fixed-precision scale for incorporation into the synthesis
+void psyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_recv_ovrf,
+                         llint* z_recv, int* z_recv_ovrf, double* box_xform, double* inverse_xform,
+                         double* box_dimensions, llint* box_vectors, int* box_vector_ovrf,
+                         const int* atom_starts, const int* atom_counts, const double* x_import,
+                         const double* y_import, const double* z_import,
+                         const double* box_xform_in, const double* inverse_xform_in,
+                         const double* box_dimensions_in, const int system_index,
+                         const double conversion_factor, const GpuDetails &gpu);
+#endif
+
 } // namespace synthesis
 } // namespace stormm
 

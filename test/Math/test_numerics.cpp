@@ -59,7 +59,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         const float scaled_fr = fr * scale_factor;
         const llint fp_result = scaled_fr;
         int overflow, workbin;
-        floatToInt63(scaled_fr, &workbin, &overflow);
+        hostFloatToInt63(scaled_fr, &workbin, &overflow);
         const llint lloverflow = overflow;
         const llint llworkbin  = workbin;
         const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
@@ -72,7 +72,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
       {
         llint workbin;
         int overflow;
-        doubleToInt95(r * scale_factor, &workbin, &overflow);
+        hostDoubleToInt95(r * scale_factor, &workbin, &overflow);
         double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;
         dp_reconst += static_cast<double>(overflow) * inv_overflow_factor;
         if (fabs(dp_reconst - r) > tiny) {
@@ -98,7 +98,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
           float fr = r;
           double scaled_r = r * scale_factor;
           float scaled_fr = fr * scale_factorf;
-          splitAccumulation(scaled_fr, &workbin, &overflow);
+          hostSplitAccumulation(scaled_fr, &workbin, &overflow);
           dp_result += static_cast<llint>(scaled_r);
           fp_result += static_cast<llint>(scaled_fr);
         }
@@ -117,7 +117,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         llint workbin = 0LL;
         for (int i = 0; i < 9; i++) {
           double scaled_r = r * scale_factor;
-          splitAccumulation(scaled_r, &workbin, &overflow);
+          hostSplitAccumulation(scaled_r, &workbin, &overflow);
           dp_tracker += r;
         }
         double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;
@@ -282,10 +282,10 @@ int main(const int argc, const char* argv[]) {
     dy[i] = (xrs.uniformRandomNumber() - 0.5) * dscale;
     dz[i] = (xrs.uniformRandomNumber() - 0.5) * dscale;
   }
-  floatToInt63(fx, fy, fz, &ifx, &ifx_ovrf, &ify, &ify_ovrf, &ifz, &ifz_ovrf);
-  doubleToInt95(dx, dy, dz, &idx, &idx_ovrf, &idy, &idy_ovrf, &idz, &idz_ovrf);
-  int63ToFloat(&rec_fx, &rec_fy, &rec_fz, ifx, ifx_ovrf, ify, ify_ovrf, ifz, ifz_ovrf);
-  int95ToDouble(&rec_dx, &rec_dy, &rec_dz, idx, idx_ovrf, idy, idy_ovrf, idz, idz_ovrf);
+  hostFloatToInt63(fx, fy, fz, &ifx, &ifx_ovrf, &ify, &ify_ovrf, &ifz, &ifz_ovrf);
+  hostDoubleToInt95(dx, dy, dz, &idx, &idx_ovrf, &idy, &idy_ovrf, &idz, &idz_ovrf);
+  hostInt63ToFloat(&rec_fx, &rec_fy, &rec_fz, ifx, ifx_ovrf, ify, ify_ovrf, ifz, ifz_ovrf);
+  hostInt95ToDouble(&rec_dx, &rec_dy, &rec_dz, idx, idx_ovrf, idy, idy_ovrf, idz, idz_ovrf);
   check(fx, RelationalOperator::EQUAL, rec_fx, "Single-precision floating point numbers are not "
         "recovered when passed through the int63_t (int2) fixed-precision representation (X).");
   check(dx, RelationalOperator::EQUAL, rec_dx, "Double-precision floating point numbers are not "
@@ -306,10 +306,10 @@ int main(const int argc, const char* argv[]) {
     hfx.putHost((xrs.uniformRandomNumber() - 0.5) * fscale, i);
     hdx.putHost((xrs.uniformRandomNumber() - 0.5) * dscale, i);
   }
-  floatToInt63(hfx, &ihfx, &ihfx_ovrf);
-  doubleToInt95(hdx, &ihdx, &ihdx_ovrf);
-  int63ToFloat(&rec_hfx, ihfx, ihfx_ovrf);
-  int95ToDouble(&rec_hdx, ihdx, ihdx_ovrf);
+  hostFloatToInt63(hfx, &ihfx, &ihfx_ovrf);
+  hostDoubleToInt95(hdx, &ihdx, &ihdx_ovrf);
+  hostInt63ToFloat(&rec_hfx, ihfx, ihfx_ovrf);
+  hostInt95ToDouble(&rec_hdx, ihdx, ihdx_ovrf);
   check(hfx.readHost(), RelationalOperator::EQUAL, rec_hfx.readHost(), "Single-precision floating "
         "point numbers are not recovered when passed through the int63_t (int2) fixed-precision "
         "representation (X), when using a Hybrid object.");

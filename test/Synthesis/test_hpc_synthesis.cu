@@ -178,8 +178,8 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
         cpu_psi_values[gb_counter] = psi[j];
         switch (prec) {
         case PrecisionModel::DOUBLE:
-          gpu_psi_values[gb_counter] = int95ToDouble(ismr.psi[sys_ofs + j],
-                                                     ismr.psi_ovrf[sys_ofs + j]) *
+          gpu_psi_values[gb_counter] = hostInt95ToDouble(ismr.psi[sys_ofs + j],
+                                                         ismr.psi_ovrf[sys_ofs + j]) *
                                        ismr.inv_fp_scale;
           break;
         case PrecisionModel::SINGLE:
@@ -821,24 +821,30 @@ int main(const int argc, const char* argv[]) {
       if (icdk.z_numbers[j] == 0 || true) {
         const double pert_fac = (icdk.z_numbers[j] == 0) ? 1.0 : 0.05;
         const int synth_idx = ligand_psw.atom_starts[i] + j;
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
-                          &ligand_psw.xcrd[synth_idx], &ligand_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
-                          &ligand_psw.ycrd[synth_idx], &ligand_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
-                          &ligand_psw.zcrd[synth_idx], &ligand_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
-                          &ligand_dbl_psw.xcrd[synth_idx], &ligand_dbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
-                          &ligand_dbl_psw.ycrd[synth_idx], &ligand_dbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
-                          &ligand_dbl_psw.zcrd[synth_idx], &ligand_dbl_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
-                          &ligand_sdbl_psw.xcrd[synth_idx], &ligand_sdbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
-                          &ligand_sdbl_psw.ycrd[synth_idx], &ligand_sdbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
-                          &ligand_sdbl_psw.zcrd[synth_idx], &ligand_sdbl_psw.zcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
+                              &ligand_psw.xcrd[synth_idx], &ligand_psw.xcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
+                              &ligand_psw.ycrd[synth_idx], &ligand_psw.ycrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
+                              &ligand_psw.zcrd[synth_idx], &ligand_psw.zcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
+                              &ligand_dbl_psw.xcrd[synth_idx],
+                              &ligand_dbl_psw.xcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
+                              &ligand_dbl_psw.ycrd[synth_idx],
+                              &ligand_dbl_psw.ycrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
+                              &ligand_dbl_psw.zcrd[synth_idx],
+                              &ligand_dbl_psw.zcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
+                              &ligand_sdbl_psw.xcrd[synth_idx],
+                              &ligand_sdbl_psw.xcrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
+                              &ligand_sdbl_psw.ycrd[synth_idx],
+                              &ligand_sdbl_psw.ycrd_ovrf[synth_idx]);
+        hostSplitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
+                              &ligand_sdbl_psw.zcrd[synth_idx],
+                              &ligand_sdbl_psw.zcrd_ovrf[synth_idx]);
       }
     }
   }

@@ -119,7 +119,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
         for (size_t i = 0; i < 9LLU; i++) {
           box_xform_ptr[box_offset + i] = box_xform_in[i];
           inverse_xform_ptr[box_offset + i] = inverse_xform_in[i];
-          const int95_t fpbv = doubleToInt95(inverse_xform_in[i] * globalpos_scale);
+          const int95_t fpbv = hostDoubleToInt95(inverse_xform_in[i] * globalpos_scale);
           box_vectors.putHost(fpbv.x, box_offset + i);
           box_vector_overflow.putHost(fpbv.y, box_offset + i);
         }
@@ -133,9 +133,9 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
       }
       for (int i = pos_start; i < pos_end; i++) {
         const size_t ip = i - pos_start;
-        const int95_t fpx = doubleToInt95(static_cast<double>(x_import[ip]) * conv_factor);
-        const int95_t fpy = doubleToInt95(static_cast<double>(y_import[ip]) * conv_factor);
-        const int95_t fpz = doubleToInt95(static_cast<double>(z_import[ip]) * conv_factor);
+        const int95_t fpx = hostDoubleToInt95(static_cast<double>(x_import[ip]) * conv_factor);
+        const int95_t fpy = hostDoubleToInt95(static_cast<double>(y_import[ip]) * conv_factor);
+        const int95_t fpz = hostDoubleToInt95(static_cast<double>(z_import[ip]) * conv_factor);
         x_recv[i]      = fpx.x;
         x_recv_ovrf[i] = fpx.y;
         y_recv[i]      = fpy.x;
