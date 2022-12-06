@@ -6,8 +6,10 @@
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+#ifndef STORMM_USE_HPC
 using stormm::data_types::int4;
 using stormm::data_types::ushort2;
+#endif
 using stormm::math::sum;
 using stormm::random::Ran2Generator;
 using stormm::review::stormmSplash;

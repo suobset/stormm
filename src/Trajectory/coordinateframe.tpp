@@ -41,7 +41,7 @@ template <typename T>
 void CoordinateFrame::fill(const std::vector<T> &xcrd, const std::vector<T> &ycrd,
                            const std::vector<T> &zcrd, const int scale_bits,
                            const std::vector<double> &box_dims) {
-  fill(xcrd.data(), ycrd.data(), zcrd.data(), scale_bits, box_dims);
+  fill(xcrd.data(), ycrd.data(), zcrd.data(), scale_bits, box_dims.data());
 }
 
 } // namespace trajectory

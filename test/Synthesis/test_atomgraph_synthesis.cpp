@@ -28,10 +28,12 @@
 
 using stormm::constants::ExceptionResponse;
 using stormm::constants::verytiny;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::double2;
 using stormm::data_types::double3;
 using stormm::data_types::double4;
 using stormm::data_types::float2;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;

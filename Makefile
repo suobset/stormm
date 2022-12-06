@@ -889,11 +889,11 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 
 # Target: Conformer generation with CUDA
 $(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
-				      $(APPDIR)/Conf/src/conformer.cu \
+				      $(APPDIR)/Conf/src/hpc_conformer.cu \
 				      $(APPDIR)/Conf/src/setup.cpp
 	@echo "[STORMM]  Building conformer.stormm.cuda..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
-	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cu \
+	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/hpc_conformer.cu \
 	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so

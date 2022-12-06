@@ -22,10 +22,12 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
-using stormm::double3;
 using stormm::llint;
 using stormm::ulint;
 using stormm::ullint;
+#ifndef STORMM_USE_HPC
+using stormm::double3;
+#endif
 using stormm::ullint2;
 using stormm::constants::tiny;
 using stormm::card::Hybrid;

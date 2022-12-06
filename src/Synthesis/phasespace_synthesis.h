@@ -636,16 +636,17 @@ public:
   ///     compiled for HPC
   ///   - Initialize forces for a specific point in the time cycle, or the current point
   ///
-  /// \param gpu    Details of the GPU in use
-  /// \param tier   The level (host or device) at which to initialize forces
-  /// \param index  Index of the system of interest within the synthesis--if negative, all systems
-  ///               will have their forces initialized
+  /// \param orientation  Point in the time cycle at which to clear / initialize the forces
+  /// \param gpu          Details of the GPU in use
+  /// \param tier         The level (host or device) at which to initialize forces
+  /// \param index        Index of the system of interest within the synthesis--if negative, all
+  ///                     systems will have their forces initialized
   /// \{
 #ifdef STORMM_USE_HPC
-  void initializeForces(const GpuDetails &gpu, CoordinateCycle orientation,
+  void initializeForces(CoordinateCycle orientation, const GpuDetails &gpu,
                         HybridTargetLevel tier = HybridTargetLevel::HOST, int index = -1);
-  void initializeForces(const GpuDetails &gpu, HybridTargetLevel tier = HybridTargetLevel::HOST,
-                        int index = -1);
+  void initializeForces(const GpuDetails &gpu = null_gpu,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST, int index = -1);
 #else
   void initializeForces(CoordinateCycle orientation, int index = -1);
   void initializeForces(int index = -1);
@@ -675,15 +676,9 @@ public:
   /// \param output_kind     The type of trajectory file to write
   /// \param expectation     The state that the output trajectory file is expected to be found in
   /// \param gpu             Specs of the GPU in use for the calculation (HPC mode only)
-#ifdef STORMM_USE_HPC
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
                        double current_time, CoordinateFileKind output_kind,
-                       PrintSituation expectation, const GpuDetails &gpu);
-#else
-  void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
-                       double current_time, CoordinateFileKind output_kind,
-                       PrintSituation expectation);
-#endif
+                       PrintSituation expectation, const GpuDetails &gpu = null_gpu);
 
   /// \brief Import a system from one of the other coordinate objects, or from a series of C-style
   ///        arrays with trusted lengths.  The imported system's size must correspond to that

@@ -21,8 +21,10 @@
 
 using stormm::constants::small;
 using stormm::constants::tiny;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::double2;
 using stormm::data_types::double3;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
