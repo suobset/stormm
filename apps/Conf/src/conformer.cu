@@ -98,9 +98,14 @@ int main(int argc, const char* argv[]) {
                  MapRotatableGroups::YES, ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
 
+  // Establish the conditions for generative modeling
+  const std::vector<AtomMask> core_masks = setGenerativeConditions(ui, &sc, sdf_recovery,
+                                                                   &master_timer);
+  
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
   // a much larger list of all the possible conformers that each system might be able to access.
-  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, &xrs, &master_timer);
+  PhaseSpaceSynthesis conformer_population = expandConformers(ui, sc, sdf_recovery, core_masks,
+                                                              &xrs, &master_timer);
   std::vector<AtomGraph*> unique_topologies = conformer_population.getUniqueTopologies();
   const int n_unique_topologies = unique_topologies.size();
   const ImplicitSolventModel igb = ui.getSolventNamelistInfo().getImplicitSolventModel();
