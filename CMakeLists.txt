@@ -4,7 +4,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "CMake should not be called from the root directory.")
 endif()
 
-project(stormm VERSION 0.1 LANGUAGES CXX)
+project(stormm LANGUAGES CXX)
 
 #--- Include any extra utilities / modules required to build ---
 

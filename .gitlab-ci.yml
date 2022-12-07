@@ -1,3 +1,8 @@
+stages:
+  - test
+  - prepare-deployment
+  - deploy
+
 test:
   stage: test
 
@@ -31,7 +36,10 @@ test:
 
   parallel:
     matrix:
-      - CUDA: ["NO", "YES"]
+      - CUDA: ["NO"]
+        NEO_TAG: ["intel"]
+      - CUDA: ["YES"]
+        NEO_TAG: ["gpu"]
 
   coverage: /^\s*lines:\s*\d+.\d+\%/
 
@@ -44,4 +52,54 @@ test:
         path: build/coverage.xml
 
   tags:
-    - intel
+    - $NEO_TAG
+
+prepare-deployment:
+  stage: prepare-deployment
+  image: condaforge/mambaforge
+  script:
+    - mamba install --yes conda-smithy
+
+    - git config --global user.email "ci@gitlab.com"
+    - git config --global user.name "GitLab CI"
+
+    # Use the conda-forge machinery to generate the relevant docker build files / environment
+    - cp -a conda recipe && mv recipe/recipe.yaml recipe/meta.yaml
+
+    - conda smithy init recipe
+    - conda smithy rerender --feedstock_directory stormm-recipe-feedstock
+
+    - git clone . stormm-recipe-feedstock/recipe/repo
+
+  artifacts:
+    paths:
+      # Pass the build files / environment into the next step
+      - ./stormm-recipe-feedstock
+    expire_in: 1 hour
+  only:
+    - tags
+
+deploy-linux:
+  stage: deploy
+  image: docker
+  services:
+    - docker:dind
+  script:
+    - apk add bash py3-pip
+
+    - cd stormm-recipe-feedstock
+    - CPU_COUNT=4 CI="gitlab" UPLOAD_PACKAGES="False" ./.scripts/run_docker_build.sh
+
+    - pip install --upgrade cloudsmith-cli
+    - find build_artifacts/linux-64 -name "*.conda" | xargs -n 1 cloudsmith push conda roivant/psivant
+  parallel:
+    matrix:
+      - CONFIG:
+          - "linux_64_cuda_compiler_versionNonecxx_compiler_version11"
+          - "linux_64_cuda_compiler_version11.0cxx_compiler_version9"
+        CLOUDSMITH_API_KEY: $CLOUDSMITH_API_KEY
+        CLOUDSMITH_API_USER: $CLOUDSMITH_API_USER
+  only:
+    - tags
+  tags:
+    - saas-linux-large-amd64
