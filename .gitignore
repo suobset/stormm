@@ -1,0 +1,8 @@
+build
+
+# Common IDE files
+.vscode
+.idea
+
+# Local conda environments
+.conda

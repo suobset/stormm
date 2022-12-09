@@ -5,17 +5,17 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 project(stormm LANGUAGES CXX)
+string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 
-#--- Include any extra utilities / modules required to build ---
+#--- Define any options the user can set ---
 
 option(STORMM_BUILD_APPS "Build the apps" ON)
 option(STORMM_BUILD_TESTS "Build the tests" ON)
 
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
+option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
+
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
-
-#--- Define any options the user can set ---
-
 
 #--- Define any global settings / flags ---
 
@@ -26,6 +26,15 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3")
+
+if (STORMM_ENABLE_RDKIT) 
+    message("-- RDKit support will be enabled")
+
+    find_package(RDKit REQUIRED)
+
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
+endif()
 
 if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
@@ -86,6 +95,10 @@ if (STORMM_ENABLE_CUDA)
     target_link_libraries(${PROJECT_NAME} ${STORMM_CUDA_LIBS})
 endif()
 
+if (STORMM_ENABLE_RDKIT)
+    target_link_libraries(${PROJECT_NAME} RDKit::SmilesParse)
+endif()
+
 # --- Create an installable target ---
 
 include(GNUInstallDirs)   # Define 'sensible' defaults for installation directories on UNIX
@@ -95,11 +108,16 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
         FILES_MATCHING PATTERN "*.h")
 
 install(TARGETS ${PROJECT_NAME}
-        EXPORT  ${PROJECT_NAME}Targets
+        EXPORT  ${PROJECT_NAME_UPPER}Targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         BUNDLE  DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(EXPORT ${PROJECT_NAME_UPPER}Targets
+        FILE   ${PROJECT_NAME_UPPER}Targets.cmake
+        NAMESPACE STORMM::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})        
 
 #--- Build the tests ---
 

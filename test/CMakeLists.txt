@@ -27,6 +27,13 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/MolecularMechanics/test_minimization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/MoleculeFormat/test_molecule_formats.cpp)
 
+if (STORMM_ENABLE_RDKIT)
+
+    list(APPEND STORMM_TEST_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/RDKit/test_rdkit.cpp)
+
+endif()
+
 if(STORMM_ENABLE_CUDA)
 
     list(APPEND STORMM_TEST_SOURCES
@@ -54,6 +61,9 @@ foreach (STORMM_TEST_SOURCE ${STORMM_TEST_SOURCES})
                 ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/assemble_restraints.h)
     endif()
 
+    if (STORMM_ENABLE_RDKIT)
+        target_link_libraries(${STORMM_TEST_NAME} RDKit::SmilesParse)
+    endif()
     if(STORMM_ENABLE_CUDA)
         target_include_directories(${STORMM_TEST_NAME} PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
         target_link_libraries(${STORMM_TEST_NAME} ${STORMM_CUDA_LIBS})

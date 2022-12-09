@@ -7,15 +7,29 @@ test:
   stage: test
 
   script:
-    - module load cmake
+
+    - rm -rf build deploy .conda
+
     - if [ "$CUDA" == "YES" ]; then module load cuda/11.4; fi
+
+    - export CONDA=/projects2/common/SOFTWARE/mambaforge/bin/conda
+    - $CONDA create --prefix=${CI_PROJECT_DIR}/.conda cmake
+
+    - if [ "$RDKIT" == "YES" ]; then
+         $CONDA install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen;
+      fi
 
     - CUDA_VISIBLE_DEVICES=$CI_RUNNER_ID
 
-    - rm -rf deploy
-    - rm -rf build && mkdir build && cd build
+    - mkdir build && cd build
 
-    - cmake -DCMAKE_BUILD_TYPE=DEBUG -DSTORMM_ENABLE_CUDA=$CUDA -DSTORMM_ENABLE_TEST_COVERAGE=YES -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
+    - $CONDA run --no-capture-output --prefix ${CI_PROJECT_DIR}/.conda
+      cmake -DCMAKE_BUILD_TYPE=DEBUG 
+            -DSTORMM_ENABLE_CUDA=$CUDA 
+            -DSTORMM_ENABLE_RDKIT=$RDKIT
+            -DCMAKE_PREFIX_PATH=${CI_PROJECT_DIR}/.conda/
+            -DSTORMM_ENABLE_TEST_COVERAGE=YES 
+            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
     - make -j
 
     - make test -j
@@ -25,6 +39,10 @@ test:
 
     - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CI_PROJECT_DIR}/deploy/lib/
     - export PATH=$PATH:${CI_PROJECT_DIR}/deploy/bin/
+
+    # Make sure the CMake file that will let other libraries find and compile
+    # against STORMM was created
+    - test -f ${CI_PROJECT_DIR}/deploy/lib/cmake/stormm/STORMMTargets.cmake
 
     - cd ${CI_PROJECT_DIR}
 
@@ -37,8 +55,10 @@ test:
   parallel:
     matrix:
       - CUDA: ["NO"]
+        RDKIT: ["NO", "YES"]
         NEO_TAG: ["intel"]
       - CUDA: ["YES"]
+        RDKIT: ["NO"]
         NEO_TAG: ["gpu"]
 
   coverage: /^\s*lines:\s*\d+.\d+\%/
