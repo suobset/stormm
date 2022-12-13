@@ -13,6 +13,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Accelerator/kernel_manager.cpp \
 		   $(SRCDIR)/Chemistry/atommask.cpp \
+		   $(SRCDIR)/Chemistry/atom_equivalence.cpp \
 		   $(SRCDIR)/Chemistry/chemical_features.cpp \
 		   $(SRCDIR)/Chemistry/indigo.cpp \
 		   $(SRCDIR)/Chemistry/znumber.cpp \
@@ -96,6 +97,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/local_arrangement.cpp \
 		   $(SRCDIR)/Structure/mesh_parameters.cpp \
 		   $(SRCDIR)/Structure/rmsd.cpp \
+		   $(SRCDIR)/Structure/rmsd_plan.cpp \
 		   $(SRCDIR)/Structure/structure_ops.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.cpp \
@@ -145,6 +147,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Accelerator/gpu_details.h \
 		     $(SRCDIR)/Accelerator/kernel_manager.h \
 		     $(SRCDIR)/Chemistry/atommask.h \
+		     $(SRCDIR)/Chemistry/atom_equivalence.h \
 		     $(SRCDIR)/Chemistry/chemical_features.h \
 		     $(SRCDIR)/Chemistry/indigo.h \
 		     $(SRCDIR)/Constants/behavior.h \
@@ -244,7 +247,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
 		     $(SRCDIR)/Structure/mesh_parameters.h \
-		     $(SRCDIR)/Structure/rmsd.h \
+		     $(SRCDIR)/Structure/rmsd_plan.h \
 		     $(SRCDIR)/Structure/structure_enumerators.h \
 		     $(SRCDIR)/Structure/structure_ops.h \
 		     $(SRCDIR)/Structure/structure_utils.h \
@@ -344,6 +347,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Accelerator/kernel_manager.o \
 		  $(SRCDIR)/Chemistry/atommask.o \
+		  $(SRCDIR)/Chemistry/atom_equivalence.o \
 		  $(SRCDIR)/Chemistry/chemical_features.o \
 		  $(SRCDIR)/Chemistry/indigo.o \
 		  $(SRCDIR)/Chemistry/znumber.o \
@@ -427,6 +431,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \
 		  $(SRCDIR)/Structure/mesh_parameters.o \
 		  $(SRCDIR)/Structure/rmsd.o \
+		  $(SRCDIR)/Structure/rmsd_plan.o \
 		  $(SRCDIR)/Structure/structure_ops.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
 		  $(SRCDIR)/Structure/virtual_site_handling.o \
@@ -580,15 +585,15 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \
 	     -gencode arch=compute_70,code=sm_70 \
 	     -gencode arch=compute_75,code=sm_75 \
 	     -gencode arch=compute_80,code=sm_80 \
-	     -gencode arch=compute_80,code=sm_86
+	     -gencode arch=compute_86,code=sm_86
 
 # Target: compile a C++ source file into a C++ object file
 %.o : %.cpp $(STORMM_CPP_HEADERS) $(STORMM_TPP_FILES)
@@ -889,11 +894,11 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 
 # Target: Conformer generation with CUDA
 $(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
-				      $(APPDIR)/Conf/src/hpc_conformer.cu \
+				      $(APPDIR)/Conf/src/conformer.cpp \
 				      $(APPDIR)/Conf/src/setup.cpp
 	@echo "[STORMM]  Building conformer.stormm.cuda..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
-	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/hpc_conformer.cu \
+	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cpp \
 	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so

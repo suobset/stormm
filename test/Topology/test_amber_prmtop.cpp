@@ -665,7 +665,6 @@ int main(const int argc, const char* argv[]) {
   const std::vector<WaterModel> dry_water_answers = { WaterModel::NONE, WaterModel::NONE,
                                                       WaterModel::NONE, WaterModel::NONE,
                                                       WaterModel::NONE, WaterModel::NONE };
-  std::vector<WaterModel> dry_atom_counts_answer;
   bool dryness_check = true;
   for (size_t i = 0; i < dry_topologies_pb.size(); i++) {
     if (all_top_exist) {
@@ -698,6 +697,24 @@ int main(const int argc, const char* argv[]) {
   check(clones.size(), RelationalOperator::EQUAL, 4, "The Standard Template Library erase() "
         "method does not work as intended.  This may indicate a problem with the AtomGraph move "
         "assignment operator, or another move assignment operator at a deeper level.", top_check);
+
+  // Test the self pointers and their resilience against various copy and move operations.
+  const AtomGraph *tip3p_self_ptr = tip3p.getSelfPointer();
+  const WaterModel should_be_tip3p = identifyWaterModel(*tip3p_self_ptr);
+  const AtomGraph& tip4p_ref = tip4p;
+  check(tip4p_ref.getSelfPointer() == tip4p.getSelfPointer(), "A reference to a topology does not return "
+        "the same self pointer as the original object.", top_check);
+  check(should_be_tip3p == WaterModel::TIP3P, "The self-pointer of a TIP3P water system's topology does "
+        "not correctly identify the water model.", top_check);
+  const std::vector<int> clone_system_sizes_ans = { 12, 304, 2489, 632 };
+  std::vector<int> clone_system_sizes(clones.size());
+  for (size_t i = 0; i < clones.size(); i++) {
+    const AtomGraph *iclone_ptr = clones[i].getSelfPointer();
+    clone_system_sizes[i] = iclone_ptr->getAtomCount();
+  }
+  check(clone_system_sizes, RelationalOperator::EQUAL, clone_system_sizes_ans, "AtomGraph self-pointers "
+        "are no longer reporting accurate atom counts after going through an STL vector manipulation that "
+        "invokes the move assignment operator.", top_check);
   
   // Create a vector of many topologies for subsequent analyses.  This will implicitly test copy
   // and move constructors, as the vector of all topologies will be created based on a product of

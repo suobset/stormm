@@ -28,6 +28,23 @@ enum class RmsdMethod {
                   ///<   mass weighting
 };
 
+/// \brief List the strategies by which RMSD can be computed.  Depending on the mass of equivalent
+///        atom groups, it may be necessary to do a combinatorial search of all symmetry-related
+///        atoms until enough of the molecule's mass is placed, then test the minutiae of smaller
+///        symmetric groups.  On the other end of the spectrum, there may be no symmetric atom
+///        groups, which would allow the RMSD to be computed in a single pass.  If no alignment is
+///        necessary, then it is possible to sample any symmetry-related groups in order of their
+///        dependence on one another, in any order.
+enum class RmsdAlignmentProtocol {
+  BUILD_CORE,  ///< Sample the possible arrangements of the largest symmetry-related groups until
+               ///<   enough mass has been placed, then proceed to...
+  ALIGN_CORE,  ///< Align the molecule's massive core (starting with asymmetric atoms) and
+               ///<   afterwards test the various arrangements of each symmetry-related group in
+               ///<   the order of their dependencies.
+  ALIGN_ALL    ///< With no symmetry-related groups, perform a standard RMSD calculation according
+               ///<   to the RmsdMethod indicated.
+};
+  
 /// \brief Virtual site standalone functiosn and kernels call into two categories.
 enum class VirtualSiteActivity {
   PLACEMENT,       ///< Place virtual sites after motion of the underlying frame atoms

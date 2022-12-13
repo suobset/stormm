@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef STORMM_HPC_CONFIG_CUH
-#define STORMM_HPC_CONFIG_CUH
+#ifndef STORMM_HPC_CONFIG_H
+#define STORMM_HPC_CONFIG_H
 
 #ifdef STORMM_USE_CUDA
 #include <cusolverDn.h>
@@ -48,19 +48,23 @@ public:
   /// \param requested_count  The number of available GPUs sought for this program's runtime
   std::vector<int> getGpuDevice(int requested_count) const;
 
+#ifdef STORMM_USE_HPC
   /// \brief Return the cuBLAS handle, stored for the lifetime of this HpcConfig object
   cublasHandle_t getCuBlasHandle() const;
 
   /// \brief Return the cuSolver handle, stored for the lifetime of this HpcConfig object
   cusolverDnHandle_t getCuSolverHandle() const;
-
+#endif
+  
 private:
   int overall_gpu_count;              ///< The physical number of GPUs detected in the server
   int available_gpu_count;            ///< The number of available GPUs
   int supported_gpu_count;            ///< The number of supported GPUs  
   std::vector<GpuDetails> gpu_list;   ///< Details an availability of each GPU in the system
+#ifdef STORMM_USE_HPC
   cublasHandle_t cublas_handle;       ///< The cuBLAS handle, initialized during construction
   cusolverDnHandle_t cusolver_handle; ///< The cuSolver handle, initialized during construction
+#endif
 };
 
 /// \brief Return a list of all viable GPUs which will support STORMM's code and are not occupied

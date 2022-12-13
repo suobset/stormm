@@ -48,6 +48,19 @@ enum class ConformationEdit {
   BOND_ROTATION, CIS_TRANS_FLIP, CHIRAL_INVERSION
 };
 
+/// \brief Enumerate the methods by which chemically equivalent groups may be exchanged in order to
+///        achieve a reduced positional RMSD between structures.
+enum class EquivalenceSwap {
+  FREE_FOR_ALL,    ///< Any member of the chemically eqivalent group may be exchanged with any
+                   ///<   other, with the pidgeonhole principal enforcing that one and only one of
+                   ///<   the equivalent members corresponds to atoms of the other structure.  For
+                   ///<   a group with N equivalent units, this implies N! possible combinations,
+                   ///<   including the case of N = 2.
+  ROTARY           ///< Only circular permutations of the group members are allowed, but without
+                   ///<   directional dependence.  For a group wih N equivalent members, this
+                   ///<   implies N possible combinations.
+};
+ 
 } // namespace chemistry
 } // namespace stormm
 

@@ -114,20 +114,7 @@ bool GpuDetails::operator==(const GpuDetails &right) const {
 
 //-------------------------------------------------------------------------------------------------
 bool GpuDetails::operator!=(const GpuDetails &right) const {
-  return (available             != right.available ||
-          supported             != right.supported ||
-          arch_major            != right.arch_major ||
-          arch_minor            != right.arch_minor ||
-          smp_count             != right.smp_count ||
-          card_ram              != right.card_ram ||
-          card_name             != right.card_name ||
-          max_threads_per_block != right.max_threads_per_block ||
-          max_threads_per_smp   != right.max_threads_per_smp ||
-          max_blocks_per_smp    != right.max_blocks_per_smp ||
-          max_shared_per_block  != right.max_shared_per_block ||
-          max_shared_per_smp    != right.max_shared_per_smp ||
-          registers_per_block   != right.registers_per_block ||
-          registers_per_smp     != right.registers_per_smp);
+  return (! operator==(right));
 }
   
 } // namespace card

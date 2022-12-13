@@ -4,11 +4,7 @@ add_executable(${APP_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/src/setup.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/setup.h)
 
-if (STORMM_ENABLE_CUDA)
-    target_sources(${APP_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/conformer.cu)
-else()
-    target_sources(${APP_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/conformer.cpp)
-endif()
+target_sources(${APP_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/conformer.cpp)
 
 target_link_libraries(${APP_NAME} ${PROJECT_NAME})
 
