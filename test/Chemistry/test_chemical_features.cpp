@@ -1,11 +1,14 @@
 #include "copyright.h"
 #include "../../src/Chemistry/atommask.h"
+#include "../../src/Chemistry/atom_equivalence.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/symbol_values.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
@@ -15,6 +18,7 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/stopwatch.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::ExceptionResponse;
@@ -23,10 +27,12 @@ using stormm::symbols::amber_ancient_bioq;
 using stormm::data_types::int2;
 using stormm::data_types::char4;
 #endif
+using stormm::data_types::ullint;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
+using stormm::math::maxValue;
 using stormm::parse::polyNumericVector;
 using stormm::parse::NumberFormat;
 using stormm::parse::operator!=;
@@ -61,6 +67,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 3: object manipulation
   section("A first-class C++ object");
+
+  // Section 4: test bond pattern matching (a free function critical to the AtomEquivalence oject)
+  section("Bond pattern matching");
   
   // Test the existence of topology and coordinate files
   const char osc = osSeparator();
@@ -429,6 +438,115 @@ int main(const int argc, const char* argv[]) {
   check(sys_chem_pf[7].getRotatableBondCount(), RelationalOperator::EQUAL,
         rotatable_bond_cnt_ans[7] - 1, "The number of rotatable bonds was not reduced as a "
         "consequence of immobilizing even the CA atom.", do_tests);
+
+  // Test bond pattern matching
+  TestSystemManager bmp_tsm(base_top_name, "top", { "symmetry_L1", "stereo_L1", "trpcage" },
+                            base_crd_name, "inpcrd", { "symmetry_L1", "stereo_L1", "trpcage" });
+  const AtomGraph& symm_ag = bmp_tsm.getTopologyReference(0);
+  const CoordinateFrame symm_cf = bmp_tsm.exportCoordinateFrame(0);
+  const ChemicalFeatures symm_chemfe(symm_ag, symm_cf, MapRotatableGroups::YES, 300.0, &timer);
+  const std::vector<double> symm_formal_charges = symm_chemfe.getFormalCharges();
+  const std::vector<double> symm_free_electrons = symm_chemfe.getFreeElectrons();
+  const std::vector<ChiralOrientation> symm_chiralities = symm_chemfe.getAtomChirality();
+  const std::vector<ullint> symm_rings = symm_chemfe.getRingInclusion();
+  const std::vector<int> nitro_atoms = { 6, 9, 14, 16, 23, 25 };
+  std::vector<int> nitro_equiv_results(5);
+  const std::vector<int> random_atoms = { 8, 2, 9, 18, 7, 24, 0, 1, 3, 20 };
+  std::vector<int> decoy_equiv_results(5);
+  const std::vector<int> decoy_equiv_ans = { 0, 0, 1, 0, 1 };
+  for (int i = 0; i < 5; i++) {
+    nitro_equiv_results[i] = matchBondingPattern(symm_ag, symm_formal_charges, symm_free_electrons,
+                                                 symm_rings, symm_chiralities, nitro_atoms[0],
+                                                 nitro_atoms[i + 1]);
+    decoy_equiv_results[i] = matchBondingPattern(symm_ag, symm_formal_charges, symm_free_electrons,
+                                                 symm_rings, symm_chiralities, random_atoms[2 * i],
+                                                 random_atoms[(2 * i) + 1]);
+  }
+  check(nitro_equiv_results, RelationalOperator::EQUAL, std::vector<int>(5, 1), "Equivalent "
+        "bonding patterns between atoms N1 and N3 of a molecule with three-fold and two-fold "
+        "compounded symmetry were not detected as they should have been.",
+        bmp_tsm.getTestingStatus());
+  check(decoy_equiv_results, RelationalOperator::EQUAL, decoy_equiv_ans, "Equivalent bonding "
+        "patterns between decoy atoms of molecule with three-fold and two-fold compounded "
+        "symmetry were not detected as they should have been.", bmp_tsm.getTestingStatus());
+  const int equiv_timings = timer.addCategory("Symmetry equivalence");
+
+  // Test atom equivalence determination
+  const AtomEquivalence symm_eq(symm_ag, symm_formal_charges, symm_free_electrons, symm_rings,
+                                symm_chemfe.getChiralCenters(), &timer);
+  check(symm_eq.getGroupCount(), RelationalOperator::EQUAL, 4, "The number of symmetric atom "
+        "groups with interchangeable atoms in a highly symmetric molecule was not determined as "
+        "expected.", bmp_tsm.getTestingStatus());
+  check(static_cast<int>(symm_eq.getAsymmetricAtoms().size()), RelationalOperator::EQUAL, 1,
+        "The asymmetric component of the small molecule should include only one atom, N2 at the "
+        "center.", bmp_tsm.getTestingStatus());
+  const AtomGraph &trpi_ag = bmp_tsm.getTopologyReference(2);
+  const CoordinateFrame trpi_cf = bmp_tsm.exportCoordinateFrame(2);
+  const ChemicalFeatures trpi_chemfe (trpi_ag, trpi_cf, MapRotatableGroups::NO, 300.0, &timer);
+  const std::vector<double> trpi_formal_charges = trpi_chemfe.getFormalCharges();
+  const std::vector<double> trpi_free_electrons = trpi_chemfe.getFreeElectrons();
+  const std::vector<ChiralOrientation> trpi_chiralities = trpi_chemfe.getAtomChirality();
+  const std::vector<ullint> trpi_rings = trpi_chemfe.getRingInclusion();
+  const AtomEquivalence trpi_eq(trpi_ag, trpi_formal_charges, trpi_free_electrons, trpi_rings,
+                                trpi_chemfe.getChiralCenters(), &timer);
+  const int n_trpi_groups = trpi_eq.getGroupCount();
+  check(n_trpi_groups, RelationalOperator::EQUAL, 48, "The number of symmetric atom groups found "
+        "for Trp-cage miniprotein does not meet expectations.", bmp_tsm.getTestingStatus());
+  std::vector<int> trpi_group_sizes(n_trpi_groups), trpi_group_orders(n_trpi_groups);
+  bool trpi_arg_group_found = false;
+  const ChemicalDetailsKit trpi_cdk = trpi_ag.getChemicalDetailsKit();
+  int trpi_symm_atom_count = 0;
+  for (int i = 0; i < n_trpi_groups; i++) {
+    trpi_group_sizes[i] = trpi_eq.getGroupSize(i);
+    trpi_group_orders[i] = trpi_eq.getGroupOrder(i);
+    trpi_symm_atom_count += trpi_group_sizes[i] * trpi_group_orders[i];
+    if (trpi_group_sizes[i] == 3 && trpi_group_orders[i] == 2) {
+      const std::vector<int> trpi_arg_group = trpi_eq.getGroup(i);
+      const int narg_group = trpi_arg_group.size();
+      const char4 arg_res = { 'A', 'R', 'G', ' ' };
+      const char4 nh1_atm = { 'N', 'H', '1', ' ' };
+      if (trpi_cdk.res_names[trpi_ag.getResidueIndex(trpi_arg_group[0])] == arg_res) {
+        for (int j = 0; j < narg_group; j++) {
+          const int j_atom = trpi_arg_group[j];
+          if (fabs(trpi_cdk.masses[j_atom] - 14.01) < 1.0e-4 &&
+              trpi_cdk.atom_names[j_atom] == nh1_atm) {
+            trpi_arg_group_found = true;
+          }
+        }
+      }
+    }
+  }
+  check(maxValue(trpi_group_sizes), RelationalOperator::EQUAL, 4, "The maximum size of a group "
+        "in the Trp-cage miniprotein does not meet expectations.", bmp_tsm.getTestingStatus());
+  check(maxValue(trpi_group_orders), RelationalOperator::EQUAL, 3, "The maximum order of a group "
+        "in the Trp-cage miniprotein does not meet expectations.", bmp_tsm.getTestingStatus());
+  check(trpi_arg_group_found, "The ARG guanidino head group did not appear in the list of "
+        "Trp-cage symmetry groups.", bmp_tsm.getTestingStatus());
+  const std::vector<int> trpi_asymm_atoms = trpi_eq.getAsymmetricAtoms();
+  check(static_cast<int>(trpi_asymm_atoms.size()), RelationalOperator::EQUAL, 195, "The number of "
+        "asymmetric atoms in Trp-cage miniprotein does not account for atoms not in symmetry "
+        "groups.  This may indicate that nested symmetry groups (dependencies) were found in "
+        "Trp-cage miniprotein.", bmp_tsm.getTestingStatus());
+  check(trpi_symm_atom_count, RelationalOperator::EQUAL, 125, "The number of atoms in symmetry "
+        "groups in Trp-cage miniprotein does not meet expectations.  Various nested groups should "
+        "be present, raising the total.", bmp_tsm.getTestingStatus());
+  bool no_asymm_overlap = true;
+  const int trpi_asymm_atom_count = trpi_asymm_atoms.size();
+  bool asymm_distinct = true;
+  for (int i = 0; i < n_trpi_groups; i++) {
+    const int jlim = trpi_eq.getGroupSize(i) * trpi_eq.getGroupOrder(i);
+    const std::vector<int> jgroup = trpi_eq.getGroup(i);
+    for (int j = 0; j < jlim; j++) {
+      bool atom_found = false;
+      for (int k = 0; k < trpi_asymm_atom_count; k++) {
+        atom_found = (atom_found || (jgroup[j] == trpi_asymm_atoms[k]));
+      }
+      asymm_distinct = (asymm_distinct && atom_found == false);
+    }
+  }
+  check(asymm_distinct, "Overlap was found between atoms in the asymmetric regions of Trp-cage "
+        "miniprotein and one or more of its symmetry-equivalent groups.",
+        bmp_tsm.getTestingStatus());
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

@@ -1,8 +1,15 @@
+#include "../../../src/Accelerator/hpc_config.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/Math/vector_ops.h"
-#include "../../../src/MolecularMechanics/minimization.h"
+#ifdef STORMM_USE_HPC
+#  include "../../../src/Accelerator/kernel_manager.h"
+#  include "../../../src/Accelerator/gpu_details.h"
+#  include "../../../src/MolecularMechanics/hpc_minimization.h"
+#else
+#  include "../../../src/MolecularMechanics/minimization.h"
+#endif
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
@@ -25,6 +32,7 @@ using stormm::testing::StopWatch;
 using conf_app::setup::setGenerativeConditions;
 using conf_app::setup::expandConformers;
 
+using namespace stormm::card;
 using namespace stormm::chemistry;
 using namespace stormm::diskutil;
 using namespace stormm::display;
@@ -78,6 +86,13 @@ int main(int argc, const char* argv[]) {
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::CONFORMER);
 
+  // Get details of the GPU to use
+#ifdef STORMM_USE_HPC
+  const HpcConfig gpu_config(ExceptionResponse::WARN);
+  const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
+  const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+#endif
+  
   // Boot up the master random number generator
   const RandomControls rngcon = ui.getRandomNamelistInfo();
   Xoshiro256ppGenerator xrs(rngcon.getRandomSeed(), rngcon.getWarmupCycleCount());
@@ -100,14 +115,42 @@ int main(int argc, const char* argv[]) {
   const std::vector<int> conformer_topology_indices =
     conformer_population.getUniqueTopologyIndices();
   AtomGraphSynthesis conf_poly_ag(unique_topologies, conformer_topology_indices);
-  master_timer.assignTime(3);
 
-  // Loop over all systems and perform energy minimizations
+  // Complete the work unit construction.  Upload data to the GPU, if applicable.
+#ifdef STORMM_USE_HPC
+  StaticExclusionMaskSynthesis conformer_masks(conf_poly_ag.getTopologyPointers(),
+                                               conf_poly_ag.getTopologyIndices());
+  InitializationTask init_task;
+  switch (conf_poly_ag.getImplicitSolventModel()) {
+  case ImplicitSolventModel::NONE:
+    init_task = InitializationTask::GENERAL_MINIMIZATION;
+    break;
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    init_task = InitializationTask::GB_MINIMIZATION;
+    break;
+  }
+  conf_poly_ag.loadNonbondedWorkUnits(conformer_masks, init_task, 0, gpu);
+  conf_poly_ag.upload();
+  conformer_masks.upload();
+  conformer_population.upload();
+#else
   std::vector<StaticExclusionMask> conformer_masks;
   conformer_masks.reserve(unique_topologies.size());
   for (int i = 0; i < unique_topologies.size(); i++) {
     conformer_masks.emplace_back(unique_topologies[i]);
   }
+#endif
+  master_timer.assignTime(3);
+
+  // Loop over all systems and perform energy minimizations
+#ifdef STORMM_USE_HPC
+  launchMinimization(conf_poly_ag, conformer_masks, &conformer_population,
+                     ui.getMinimizeNamelistInfo(), gpu);
+#else
   const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
   const int nconf = conformer_population.getSystemCount();
   for (int i = 0; i < nconf; i++) {
@@ -116,9 +159,18 @@ int main(int argc, const char* argv[]) {
     const ScoreCard emin = minimize(&psi, agi, conformer_masks[conformer_topology_indices[i]],
                                     mincon);
   }
+#endif
   master_timer.assignTime(4);
 
+  // Download the results from the HPC device, if applicable
+#ifdef STORMM_USE_HPC
+  conformer_population.download();
+#endif
+
   // CHECK
+#ifdef STORMM_USE_HPC
+  const int nconf = conformer_population.getSystemCount();
+#endif
   printf("Total system count: %5d.\n", nconf);
   std::vector<double> system_sizes(nconf);
   for (int i = 0; i < nconf; i++) {

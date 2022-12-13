@@ -929,6 +929,16 @@ public:
   ConstraintKit<float>
   getSinglePrecisionConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a pointer to the object itself.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer to a const AtomGraph
+  ///   - Get a non-const pointer to a mutable AtomGraph
+  /// \{
+  const AtomGraph* getSelfPointer() const;
+  AtomGraph* getSelfPointer();
+  /// \}
+  
 #ifdef STORMM_USE_HPC
   /// \brief Push all data to the device
   void upload();
@@ -1642,7 +1652,7 @@ private:
   Hybrid<float> float_data;
   Hybrid<char4> char4_data;
   /// \}
-
+  
   /// \brief Function to wrap pointer re-assignments after copy constructor initialization or
   ///        a copy assignment operation.
   void rebasePointers();

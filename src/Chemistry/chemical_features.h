@@ -213,7 +213,7 @@ private:
                                         ///<   is set to CHIRAL_INVERSION)
   std::vector<int> moving_atoms;        ///< List of all atoms that turn as a consequence of
                                         ///<   twisting about the rotatable bond axis
-  const AtomGraph* ag_pointer;          ///< Pointer to the AtomGraph object to which this
+  const AtomGraph *ag_pointer;          ///< Pointer to the AtomGraph object to which this
                                         ///<   isomerization applies
 };
 
@@ -356,6 +356,14 @@ public:
   ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
                    MapRotatableGroups map_group_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
+
+  ChemicalFeatures(const AtomGraph &ag_in, const CoordinateFrame &cf,
+                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
+
+  ChemicalFeatures(const AtomGraph &ag_in, const PhaseSpace &ps,
+                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Copy and move constructors
@@ -421,7 +429,7 @@ public:
   /// \param min_ring_size  The minimum number of atoms in the rings that will be reported
   /// \param max_ring_size  The maximum number of atoms in the rings that will be reported
   std::vector<uint> getRingMask(int min_ring_size, int max_ring_size) const;
-  
+
   /// \brief Return a mask of atomatic atoms in the system.
   ///
   /// \param min_pi_electrons  Minimum number of electrons in the aromatic ring system to report
@@ -453,10 +461,26 @@ public:
   ///
   /// \param direction  Preferred chiral orientation of the centers to return (D-, L-, or both)
   std::vector<int> getChiralCenters(ChiralOrientation direction = ChiralOrientation::NONE) const;
-  
+
+  /// \brief Return the chiral orientations for one or more atoms in the system.
+  ///
+  /// Overloaded:
+  ///   - Get the chiral orientation for a specific atom
+  ///   - Get the chiral orientations for a range of atoms
+  ///   - Get the chiral orientations for all atoms
+  ///
+  /// \param atom_index  The one atom of interest
+  /// \param low_index   The start of a series of atoms for which to get ring inclusions
+  /// \param high_index  The upper limit of a series of atoms for which to get ring inclusions
+  /// \{
+  ChiralOrientation getAtomChirality(int atom_index) const;
+  std::vector<ChiralOrientation> getAtomChirality(int low_index, int high_index) const;
+  std::vector<ChiralOrientation> getAtomChirality() const;  
+  /// \}
+
   /// \brief Return a mask of chiral centers in the system.
   ///
-  /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the maks
+  /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the mask
   std::vector<uint> getChiralityMask(ChiralOrientation direction) const;
 
   /// \brief Return a vector containing the formal charges on all particles in the system (this
@@ -468,6 +492,39 @@ public:
   ///        to virtual sites only if they are defined in the topology's connectivity, and such
   ///        bonds will have order zero).
   std::vector<double> getBondOrders() const;
+
+  /// \brief Return the (resonance-averaged) free electron content for one or more atoms in the
+  ///        system.
+  ///
+  /// Overloaded:
+  ///   - Get the free electron content for a specific atom
+  ///   - Get the free electron content for a range of atoms
+  ///   - Get the free electron content for all atoms
+  ///
+  /// \param atom_index  The one atom of interest
+  /// \param low_index   The start of a series of atoms for which to get ring inclusions
+  /// \param high_index  The upper limit of a series of atoms for which to get ring inclusions
+  /// \{
+  double getFreeElectrons(int atom_index) const;
+  std::vector<double> getFreeElectrons(int low_index, int high_index) const;
+  std::vector<double> getFreeElectrons() const;  
+  /// \}
+  
+  /// \brief Return the ring inclusion specifications for one or more atoms in the system.
+  ///
+  /// Overloaded:
+  ///   - Get the ring inclusion for a specific atom
+  ///   - Get the ring inclusion for a range of atoms
+  ///   - Get the ring inclusion for all atoms
+  ///
+  /// \param atom_index  The one atom of interest
+  /// \param low_index   The start of a series of atoms for which to get ring inclusions
+  /// \param high_index  The upper limit of a series of atoms for which to get ring inclusions
+  /// \{
+  ullint getRingInclusion(int atom_index) const;
+  std::vector<ullint> getRingInclusion(int low_index, int high_index) const;
+  std::vector<ullint> getRingInclusion() const;
+  /// \}
 
   /// \brief Get the atom endpoints of a rotatable bond.  The bond root atom is returned in the x
   ///        member of the tuple, the pivot atom (the second atom, closest to atoms that will turn)
@@ -627,11 +684,9 @@ private:
   /// priority arms.
   Hybrid<int4> chiral_arm_atoms;
   
-  /// List of chiral centers (needs no bounds array, but each center is a five-membered tuple
-  /// consisting of the topological index of the center itself, followed by the four substituent
-  /// atoms, in order of decreasing IUPAC score, which define its chirality.  Positive values in
-  /// this list indicate that an atom is L-chiral, while negative values indicate that an atom
-  /// with the index equal to the absolute value is D-chiral.
+  /// List of chiral centers (needs no bounds array).  Positive values in this list indicate that
+  /// an atom is L-chiral, while negative values indicate that an atom with the index equal to the
+  /// absolute value is D-chiral.
   Hybrid<int> chiral_centers;
 
   /// List of chiral inversion capabilities.  The integers are tied to the chemistry enumeration

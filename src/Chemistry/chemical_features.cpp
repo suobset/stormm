@@ -544,6 +544,21 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
 {}
 
 //-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const CoordinateFrame &cf,
+                                   const MapRotatableGroups map_group_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+  ChemicalFeatures(ag_in.getSelfPointer(), cf, map_group_in, temperature_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const PhaseSpace &ps,
+                                   const MapRotatableGroups map_group_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+  ChemicalFeatures(ag_in.getSelfPointer(), CoordinateFrameReader(ps), map_group_in, temperature_in,
+                   timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     atom_count{original.atom_count},
     planar_atom_count{original.planar_atom_count},
@@ -2628,6 +2643,54 @@ std::vector<int> ChemicalFeatures::getChiralCenters(const ChiralOrientation dire
 }
 
 //-------------------------------------------------------------------------------------------------
+ChiralOrientation ChemicalFeatures::getAtomChirality(const int atom_index) const {
+  if (atom_index < 0 || atom_index >= atom_count) {
+    rtErr("Atom index " + std::to_string(atom_index) + " is invalid for a system containing " +
+          std::to_string(atom_count) + " atoms.", "ChemicalFeatures", "getAtomChirality");
+  }
+  const int irec = atom_index + 1;
+  const int* chir_ptr = chiral_centers.data();
+  for (int i = 0; i < chiral_center_count; i++) {
+    if (chir_ptr[i] == irec) {
+      return ChiralOrientation::SINISTER;
+    }
+    else if (chir_ptr[i] == -irec) {
+      return ChiralOrientation::RECTUS;
+    }
+  }
+  return ChiralOrientation::NONE;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ChiralOrientation> ChemicalFeatures::getAtomChirality(const int low_index,
+                                                                  const int high_index) const {
+  if (low_index < 0 || low_index >= high_index || high_index > atom_count) {
+    rtErr("Atom index range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
+          " is invalid for a system containing " + std::to_string(atom_count) + " atoms.",
+          "ChemicalFeatures", "getAtomChirality");
+  }
+  std::vector<ChiralOrientation> result(high_index - low_index, ChiralOrientation::NONE);
+  const int* chir_ptr = chiral_centers.data();
+  for (int i = 0; i < chiral_center_count; i++) {
+    const int irec = abs(chir_ptr[i]) - 1;
+    if (irec >= low_index && irec < high_index) {
+      if (chir_ptr[i] > 0) {
+        result[irec - low_index] = ChiralOrientation::SINISTER;
+      }
+      else {
+        result[irec - low_index] = ChiralOrientation::RECTUS;
+      }
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ChiralOrientation> ChemicalFeatures::getAtomChirality() const {
+  return getAtomChirality(0, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<uint> ChemicalFeatures::getChiralityMask(const ChiralOrientation direction) const {
   const int n_bits = sizeof(uint) * 8;
   const int n_uint = (atom_count + n_bits - 1) / n_bits;
@@ -2669,6 +2732,38 @@ std::vector<double> ChemicalFeatures::getFormalCharges() const {
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ChemicalFeatures::getBondOrders() const {
   return bond_orders.readHost(0, ag_pointer->getBondTermCount());
+}
+
+//-------------------------------------------------------------------------------------------------
+double ChemicalFeatures::getFreeElectrons(const int atom_index) const {
+  return free_electrons.readHost(atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ChemicalFeatures::getFreeElectrons(const int low_index,
+                                                       const int high_index) const {
+  return free_electrons.readHost(low_index, high_index - low_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ChemicalFeatures::getFreeElectrons() const {
+  return free_electrons.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+ullint ChemicalFeatures::getRingInclusion(const int atom_index) const {
+  return ring_inclusion.readHost(atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ullint> ChemicalFeatures::getRingInclusion(const int low_index,
+                                                       const int high_index) const {
+  return ring_inclusion.readHost(low_index, high_index - low_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ullint> ChemicalFeatures::getRingInclusion() const {
+  return ring_inclusion.readHost();
 }
 
 //-------------------------------------------------------------------------------------------------

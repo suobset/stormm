@@ -908,5 +908,15 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
                               sp_constraint_target_lengths.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* AtomGraph::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraph* AtomGraph::getSelfPointer() {
+  return this;
+}
+
 } // namespace topology
 } // namespace stormm
