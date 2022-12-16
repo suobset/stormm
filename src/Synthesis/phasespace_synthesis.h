@@ -479,7 +479,9 @@ public:
   ///        for accessibility to other functions.
   std::vector<AtomGraph*> getUniqueTopologies() const;
 
-  /// \brief Get a list of the unique indices of all systems in this coordinate synthesis.
+  /// \brief Get a list of system indices from within this coordinate synthesis, providing examples
+  ///        of each unique topology as presented in the order the topology pointers appear in the
+  ///        output of getUniqueTopologies() above.
   std::vector<int> getUniqueTopologyIndices() const;
   
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.

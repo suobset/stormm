@@ -178,7 +178,7 @@ int ConformerControls::getSystemTrialCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-double ConformerControls::getRmsdTolerance() const {
+double ConformerControls::getRMSDTolerance() const {
   return rmsd_tolerance;
 }
 

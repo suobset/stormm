@@ -8,7 +8,7 @@ namespace structure {
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, const Tcoord* xcrd_b,
            const Tcoord* ycrd_b, const Tcoord* zcrd_b, const Tcalc* masses,
-           const RmsdMethod method, const int lower_limit, const int upper_limit,
+           const RMSDMethod method, const int lower_limit, const int upper_limit,
            const Tcalc inv_gpos_scale_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
@@ -17,18 +17,18 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
   Tcalc result = 0.0;
   Tcalc inv_mass_divisor;
   switch (method) {
-  case RmsdMethod::ALIGN_MASS:
-  case RmsdMethod::NO_ALIGN_MASS:
+  case RMSDMethod::ALIGN_MASS:
+  case RMSDMethod::NO_ALIGN_MASS:
     inv_mass_divisor = value_one / sum<Tcalc>(&masses[lower_limit], upper_limit - lower_limit);
     break;
-  case RmsdMethod::ALIGN_GEOM:
-  case RmsdMethod::NO_ALIGN_GEOM:
+  case RMSDMethod::ALIGN_GEOM:
+  case RMSDMethod::NO_ALIGN_GEOM:
     inv_mass_divisor = value_one / static_cast<Tcalc>(upper_limit - lower_limit);
     break;
   }
   switch (method) {
-  case RmsdMethod::ALIGN_MASS:
-  case RmsdMethod::ALIGN_GEOM:
+  case RMSDMethod::ALIGN_MASS:
+  case RMSDMethod::ALIGN_GEOM:
     {
       // In order to compute the aligned RMSD without moving the coordinates, the movement must
       // be computed in temporary variables only.
@@ -47,7 +47,7 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       Tcalc sb_x = 0.0;
       Tcalc sb_y = 0.0;
       Tcalc sb_z = 0.0;
-      const bool use_mass = (method == RmsdMethod::ALIGN_MASS);
+      const bool use_mass = (method == RMSDMethod::ALIGN_MASS);
       if (tcoord_is_sgnint) {
         for (int i = lower_limit; i < upper_limit; i++) {
           const Tcalc tmass = (use_mass) ? masses[i] : 1.0;
@@ -200,7 +200,7 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       }
     }
     break;
-  case RmsdMethod::NO_ALIGN_MASS:
+  case RMSDMethod::NO_ALIGN_MASS:
     if (tcoord_is_sgnint) {
       for (int i = lower_limit; i < upper_limit; i++) {
         const Tcalc dx = static_cast<Tcalc>(xcrd_b[i] - xcrd_a[i]) * inv_gpos_scale_factor;
@@ -218,7 +218,7 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       }
     }
     break;
-  case RmsdMethod::NO_ALIGN_GEOM:
+  case RMSDMethod::NO_ALIGN_GEOM:
     if (tcoord_is_sgnint) {
       for (int i = lower_limit; i < upper_limit; i++) {
         const Tcalc dx = static_cast<Tcalc>(xcrd_b[i] - xcrd_a[i]) * inv_gpos_scale_factor;
@@ -243,7 +243,7 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame_a, const size_t frame_b,
-           const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
+           const ChemicalDetailsKit &cdk, const RMSDMethod method, const int lower_limit,
            const int upper_limit) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
@@ -259,7 +259,7 @@ Tcalc rmsd(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame_a, cons
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeriesWriter<Tcoord> &csw, const size_t frame_a, const size_t frame_b,
-           const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
+           const ChemicalDetailsKit &cdk, const RMSDMethod method, const int lower_limit,
            const int upper_limit) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
@@ -275,7 +275,7 @@ Tcalc rmsd(const CoordinateSeriesWriter<Tcoord> &csw, const size_t frame_a, cons
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const int frame_a, const int frame_b,
-           const AtomGraph &ag, const RmsdMethod method, const int lower_limit,
+           const AtomGraph &ag, const RMSDMethod method, const int lower_limit,
            const int upper_limit) {
   const int nframes = cs.getFrameCount();
   if (frame_a < 0 || frame_a >= nframes || frame_b < 0 || frame_b >= nframes) {
