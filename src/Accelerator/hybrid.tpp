@@ -881,6 +881,15 @@ template <typename T> void Hybrid<T>::resize(const size_t new_length) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::resize(const size_t new_length, const T value) {
+  const size_t original_length = length;
+  resize(new_length);
+  for (size_t i = original_length; i < new_length; i++) {
+    host_data[i] = value;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_t new_length) {
 

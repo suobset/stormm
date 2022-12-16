@@ -440,8 +440,12 @@ int main(const int argc, const char* argv[]) {
         "consequence of immobilizing even the CA atom.", do_tests);
 
   // Test bond pattern matching
-  TestSystemManager bmp_tsm(base_top_name, "top", { "symmetry_L1", "stereo_L1", "trpcage" },
-                            base_crd_name, "inpcrd", { "symmetry_L1", "stereo_L1", "trpcage" });
+  TestSystemManager bmp_tsm(base_top_name, "top", { "symmetry_L1", "stereo_L1", "trpcage",
+                                                    "symmetry_C1", "symmetry_C2", "symmetry_C3",
+                                                    "symmetry_C4", "symmetry_C5", "symmetry_C6" },
+                            base_crd_name, "inpcrd",
+                            { "symmetry_L1", "stereo_L1", "trpcage", "symmetry_C1", "symmetry_C2",
+                              "symmetry_C3", "symmetry_C4", "symmetry_C5", "symmetry_C6" });
   const AtomGraph& symm_ag = bmp_tsm.getTopologyReference(0);
   const CoordinateFrame symm_cf = bmp_tsm.exportCoordinateFrame(0);
   const ChemicalFeatures symm_chemfe(symm_ag, symm_cf, MapRotatableGroups::YES, 300.0, &timer);
@@ -473,7 +477,7 @@ int main(const int argc, const char* argv[]) {
 
   // Test atom equivalence determination
   const AtomEquivalence symm_eq(symm_ag, symm_formal_charges, symm_free_electrons, symm_rings,
-                                symm_chemfe.getChiralCenters(), &timer);
+                                symm_chemfe.getAtomChirality(), &timer);
   check(symm_eq.getGroupCount(), RelationalOperator::EQUAL, 4, "The number of symmetric atom "
         "groups with interchangeable atoms in a highly symmetric molecule was not determined as "
         "expected.", bmp_tsm.getTestingStatus());
@@ -488,9 +492,9 @@ int main(const int argc, const char* argv[]) {
   const std::vector<ChiralOrientation> trpi_chiralities = trpi_chemfe.getAtomChirality();
   const std::vector<ullint> trpi_rings = trpi_chemfe.getRingInclusion();
   const AtomEquivalence trpi_eq(trpi_ag, trpi_formal_charges, trpi_free_electrons, trpi_rings,
-                                trpi_chemfe.getChiralCenters(), &timer);
+                                trpi_chiralities, &timer);
   const int n_trpi_groups = trpi_eq.getGroupCount();
-  check(n_trpi_groups, RelationalOperator::EQUAL, 48, "The number of symmetric atom groups found "
+  check(n_trpi_groups, RelationalOperator::EQUAL, 52, "The number of symmetric atom groups found "
         "for Trp-cage miniprotein does not meet expectations.", bmp_tsm.getTestingStatus());
   std::vector<int> trpi_group_sizes(n_trpi_groups), trpi_group_orders(n_trpi_groups);
   bool trpi_arg_group_found = false;
@@ -523,11 +527,11 @@ int main(const int argc, const char* argv[]) {
   check(trpi_arg_group_found, "The ARG guanidino head group did not appear in the list of "
         "Trp-cage symmetry groups.", bmp_tsm.getTestingStatus());
   const std::vector<int> trpi_asymm_atoms = trpi_eq.getAsymmetricAtoms();
-  check(static_cast<int>(trpi_asymm_atoms.size()), RelationalOperator::EQUAL, 195, "The number of "
+  check(static_cast<int>(trpi_asymm_atoms.size()), RelationalOperator::EQUAL, 186, "The number of "
         "asymmetric atoms in Trp-cage miniprotein does not account for atoms not in symmetry "
         "groups.  This may indicate that nested symmetry groups (dependencies) were found in "
         "Trp-cage miniprotein.", bmp_tsm.getTestingStatus());
-  check(trpi_symm_atom_count, RelationalOperator::EQUAL, 125, "The number of atoms in symmetry "
+  check(trpi_symm_atom_count, RelationalOperator::EQUAL, 134, "The number of atoms in symmetry "
         "groups in Trp-cage miniprotein does not meet expectations.  Various nested groups should "
         "be present, raising the total.", bmp_tsm.getTestingStatus());
   bool no_asymm_overlap = true;
@@ -547,6 +551,43 @@ int main(const int argc, const char* argv[]) {
   check(asymm_distinct, "Overlap was found between atoms in the asymmetric regions of Trp-cage "
         "miniprotein and one or more of its symmetry-equivalent groups.",
         bmp_tsm.getTestingStatus());
+  for (int i = 0; i < 9; i++) {
+    const CoordinateFrame ifrm(bmp_tsm.exportCoordinateFrame(i));
+    const AtomGraph& iag_ref = bmp_tsm.getTopologyReference(i);
+    const ChemicalFeatures ichemfe(iag_ref, ifrm);
+    const AtomRank irnks(iag_ref, ichemfe);
+    const std::vector<int>& atom_ranks = irnks.getRanks();
+    const int natom = iag_ref.getAtomCount();
+    std::vector<bool> bonds_same(natom * natom);
+    for (int j = 0; j < natom; j++) {
+      for (int k = j; k < natom; k++) {
+        bonds_same[(j * natom) + k] = matchBondingPattern(iag_ref, ichemfe, j, k);
+        bonds_same[(k * natom) + j] = bonds_same[(j * natom) + k];
+      }
+    }
+    int false_positives = 0;
+    int false_negatives = 0;
+    for (int j = 0; j < natom; j++) {
+      for (int k = j + 1; k < natom; k++) {
+        if (atom_ranks[k] == atom_ranks[j]) {
+          if (bonds_same[(j * natom) + k] == false) {
+            false_positives++;
+          }
+        }
+        else {
+          if (bonds_same[(j * natom) + k]) {
+            false_negatives++;
+          }
+        }
+      }
+    }
+    check(false_positives, RelationalOperator::EQUAL, 0, "Atom ranks incorrectly identify atoms "
+          "as equivalent when a direct comparison of their bonding patterns indicates they are "
+          "not.", bmp_tsm.getTestingStatus());
+    check(false_negatives, RelationalOperator::EQUAL, 0, "Atom ranks fail to identify atoms as "
+          "equivalent when a direct comparison of their bonding patterns indicates they are.",
+          bmp_tsm.getTestingStatus());
+  }
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

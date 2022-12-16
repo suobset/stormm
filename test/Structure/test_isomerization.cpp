@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "../../src/Chemistry/atom_equivalence.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/scaling.h"
@@ -15,6 +16,7 @@
 #include "../../src/Structure/isomerization.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/rmsd.h"
+#include "../../src/Structure/rmsd_plan.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
@@ -22,6 +24,7 @@
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using stormm::chemistry::AtomEquivalence;
 using stormm::chemistry::ChemicalFeatures;
 using stormm::chemistry::MapRotatableGroups;
 using stormm::chemistry::IsomerPlan;
@@ -37,7 +40,7 @@ using stormm::math::computeBoxTransform;
 using stormm::review::stormmSplash;
 using stormm::structure::rotateCoordinates;
 using stormm::structure::rmsd;
-using stormm::structure::RmsdMethod;
+using stormm::structure::RMSDMethod;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::UnitCellType;
@@ -111,7 +114,7 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
                     rt_grp[i].getMovingAtoms(), -2.0 * stormm::symbols::pi / 3.0);
 
     // Check that the molecule was returned to its original state
-    repos_dev[i] = rmsd(ps, rotation_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
+    repos_dev[i] = rmsd(ps, rotation_copy, ag, RMSDMethod::ALIGN_GEOM, cdk.mol_limits[0],
                         cdk.mol_limits[1]);
   }
   const char osc = osSeparator();
@@ -194,7 +197,7 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
     
     // Reverse the inversion to check that the molecule recovers its initial state
     flipChiralCenter(&inversion_copy, i, centers, protocols, inv_grp);
-    repos_dev[i] = rmsd(ps, inversion_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
+    repos_dev[i] = rmsd(ps, inversion_copy, ag, RMSDMethod::ALIGN_GEOM, cdk.mol_limits[0],
                         cdk.mol_limits[1]);
   }
   const char osc = osSeparator();
@@ -238,7 +241,10 @@ int main(const int argc, const char* argv[]) {
 
   // Section 3
   section("Test RMSD calculations");
-  
+
+  // Section 4
+  section("Test symmetry-reduced RMSD");
+
   // Get a handful of realistic systems
   const char osc = osSeparator();
   const std::string base_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -325,9 +331,9 @@ int main(const int argc, const char* argv[]) {
                     strfb.natom);
   double rms_no_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd,
                                              strfb.ycrd, strfb.zcrd, nullptr,
-                                             RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
+                                             RMSDMethod::NO_ALIGN_GEOM, 0, strfa.natom);
   double rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd,
-                                          strfb.ycrd, strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM,
+                                          strfb.ycrd, strfb.zcrd, nullptr, RMSDMethod::ALIGN_GEOM,
                                           0, strfa.natom);
   check(rms_no_align, RelationalOperator::EQUAL, Approx(0.578562967).margin(1.0e-8),
         "Positional (non-aligned) RMSD computed for coordinates pre-shifted to their respective "
@@ -337,10 +343,10 @@ int main(const int argc, const char* argv[]) {
         "does not produce the expected result.");
   translateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 5.0, 4.8, 9.7, 0, strfb.natom);
   rms_no_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                                      strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0,
+                                      strfb.zcrd, nullptr, RMSDMethod::NO_ALIGN_GEOM, 0,
                                       strfa.natom);
   rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+                                   strfb.zcrd, nullptr, RMSDMethod::ALIGN_GEOM, 0, strfa.natom);
   check(rms_no_align, RelationalOperator::EQUAL, Approx(11.935859211).margin(1.0e-8),
         "Positional (non-aligned) RMSD computed for coordinates differing in their respective "
         "centers of mass does not produce the expected result.");
@@ -349,10 +355,23 @@ int main(const int argc, const char* argv[]) {
         "does not produce the expected result.");
   rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.1, -0.3, -0.25, 0, strfb.natom);
   rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+                                   strfb.zcrd, nullptr, RMSDMethod::ALIGN_GEOM, 0, strfa.natom);
   check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
         "positional RMSD computed for coordinates differing in their respective centers of mass, "
         "one rotated a second time for more frustration, does not produce the expected result.");
+
+  // Test an RMSD calculation guide
+  section(4);
+  const AtomEquivalence lig2_eq(lig2_feat);
+  const RMSDPlan lig2_rplan(lig2_eq);
+  const RMSDPlanReader lig2_rpr = lig2_rplan.data();
+  check(lig2_rpr.plan_count, RelationalOperator::EQUAL, 1, "Only one plan should be present in "
+        "the RMSD guide tailored for a single system.", do_tests);
+
+  // CHECK
+  for (int i = 0; i <= 1; i++) {
+    
+  }
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

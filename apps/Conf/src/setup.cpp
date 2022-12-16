@@ -28,7 +28,7 @@ using stormm::math::TickCounter;
 using stormm::namelist::ConformerControls;
 using stormm::structure::maskFromSdfDataItem;
 using stormm::structure::rmsd;
-using stormm::structure::RmsdMethod;
+using stormm::structure::RMSDMethod;
 using stormm::structure::rotateAboutBond;
 using stormm::structure::flipChiralCenter;
 using stormm::topology::ChemicalDetailsKit;

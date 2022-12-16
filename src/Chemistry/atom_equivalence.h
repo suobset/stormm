@@ -8,6 +8,7 @@
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "UnitTesting/stopwatch.h"
+#include "chemical_features.h"
 #include "chemistry_enumerators.h"
 
 namespace stormm {
@@ -15,30 +16,120 @@ namespace chemistry {
 
 using topology::AtomGraph;
 using testing::StopWatch;
+
+/// \brief Compute ranks for each atom from one or more molecules, assigning a unique (but,
+///        essentially arbitrary) integer to each atom based on whether its connections to other
+///        atoms in the system can be deemed unique.  If the matchBondingPattern() function below
+///        returns TRUE for atoms i and j, then atoms i and j will have the same integer rank in
+///        this object.
+class AtomRank {
+public:
+
+  /// \brief The atom ranks can be constructed with or without temporary arrays to use as a
+  ///        workspace.  This optimization can help conserve memory allocations in the context of
+  ///        other functions, e.g. constructing an AtomEquivalence object, which use much of the
+  ///        same storage space.
+  /// \{
+  AtomRank(const AtomGraph *ag_in = nullptr);
   
+  AtomRank(const AtomGraph *ag_in, const std::vector<double> &formal_charges,
+           const std::vector<double> &free_electrons, const std::vector<ullint> &ring_inclusion,
+           const std::vector<ChiralOrientation> &chiralities, std::vector<int> *a_idx_tree,
+           std::vector<int> *b_idx_tree, std::vector<int> *a_zn_tree, std::vector<int> *b_zn_tree,
+           std::vector<double> *a_fc_tree, std::vector<double> *b_fc_tree,
+           std::vector<double> *a_fe_tree, std::vector<double> *b_fe_tree,
+           std::vector<ullint> *a_ri_tree, std::vector<ullint> *b_ri_tree,
+           std::vector<ChiralOrientation> *a_ch_tree, std::vector<ChiralOrientation> *b_ch_tree,
+           std::vector<int> *a_coverage, std::vector<int> *b_coverage, int low_molecule_index = 0,
+           int high_molecule_index = -1);
+
+  AtomRank(const AtomGraph &ag_in, const std::vector<double> &formal_charges,
+           const std::vector<double> &free_electrons, const std::vector<ullint> &ring_inclusion,
+           const std::vector<ChiralOrientation> &chiralities, int low_molecule_index = 0,
+           int high_molecule_index = -1);
+
+  AtomRank(const AtomGraph *ag_in, const ChemicalFeatures &chemfe, int low_molecule_index = 0,
+           int high_molecule_index = -1);
+
+  AtomRank(const AtomGraph &ag_in, const ChemicalFeatures &chemfe, int low_molecule_index = 0,
+           int high_molecule_index = -1);
+  /// \}
+
+  /// \brief Get the rank of one or more atoms.
+  ///
+  /// Overload:
+  ///   - Get a const reference to the vector of all atoms' ranks
+  ///   - Get a copy of the ranks for a segment of the atoms in the molecule
+  ///   - Get a particular atom's rank  
+  ///
+  /// \param low_index   Lower limit of atoms whose ranks to query
+  /// \param high_index  Upper limit of atoms whose ranks to query
+  /// \param atom_index  Topological index of the atom of interest
+  /// \{
+  const std::vector<int>& getRanks() const;
+  std::vector<int> getRanks(int low_index, int high_index) const;
+  int getRank(int atom_index) const;
+  /// \}
+
+  /// \brief Get a list of all atoms in the system with a particular rank.
+  ///
+  /// \param rank_value  The rank of interest
+  std::vector<int> getAtomsWithRank(const int rank_value) const;
+
+  /// \brief Get a list of all atoms which have a similar rank to a specific atom.
+  ///
+  /// \param atom_index  The atom of interest
+  std::vector<int> getRankPartners(const int atom_index) const;
+  
+private:
+  int maximum_rank;
+  std::vector<int> ranks;
+  std::vector<int> rank_degeneracy_bounds;
+  std::vector<int> rank_instances;
+  AtomGraph *ag_pointer;
+};
+  
+/// \brief Collect the set of symmetry-related and interchangeable groups for one or more molecules
+///        within a topology.
 class AtomEquivalence {
 public:
 
   /// \brief The constructor relies on a topology pointer plus arrays of formal charges, bond
   ///        orders, and ring inclusion as will have been derived by a ChemicalFeatures object.
-  ///        Due to this object possibly feeding back into the ChemicalFeatures, however, its
-  ///        constructor only takes the distilled data.
   ///
-  /// \param ag_in           Topology for the system of interest (a pointer will be retained by
-  ///                        the object)
-  /// \param formal_charges  Array of formal charges for all atoms in the entire topology
-  /// \param free_electrons  Array of free electron content for all atoms in the entire topology
-  /// \param ring_inclusion  Array of ring inclusion marks for all atoms in the entire topology
-  /// \param chiralities     Array of chiral statuses for all atoms in the entire topology
-  /// \param timer           Wall time tracker to monitor time spent in various stages of the
-  ///                        calculation
+  /// \param ag_in                Topology for the system of interest (a pointer will be retained
+  ///                             by the object)
+  /// \param formal_charges       Array of formal charges for all atoms in the entire topology
+  /// \param free_electrons       Array of free electron content for all atoms in the topology
+  /// \param ring_inclusion       Array of ring inclusion marks for all atoms in the topology
+  /// \param chiralities          Array of chiral statuses for all atoms in the entire topology
+  /// \param chemfe_in            Chemical features of the molecular system in question, from which
+  ///                             the previous four arrays as well as the original topology pointer
+  ///                             can be obtained
+  /// \param timer                Wall time tracker to monitor time spent in various stages of the
+  ///                             calculation
+  /// \param low_molecule_index   Index of the first molecule in the topology for which to draw
+  ///                             atom equivalence groups
+  /// \param high_molecule_index  Upper index limit of molecules in the topology for which to draw
+  ///                             atom equivalence groups.  The default of -1 triggers the upper
+  ///                             limit to be set as one beyond the lower limit.
   /// \{
   AtomEquivalence();
   
+  AtomEquivalence(const AtomGraph *ag_in, const std::vector<double> &formal_charges,
+                  const std::vector<double> &free_electrons,
+                  const std::vector<ullint> &ring_inclusion,
+                  const std::vector<ChiralOrientation> &chiralities, StopWatch *timer = nullptr,
+                  int low_molecule_index = 0, int high_molecule_index = -1);
+
   AtomEquivalence(const AtomGraph &ag_in, const std::vector<double> &formal_charges,
                   const std::vector<double> &free_electrons,
                   const std::vector<ullint> &ring_inclusion,
-                  const std::vector<int> &chiral_centers, StopWatch *timer = nullptr);
+                  const std::vector<ChiralOrientation> &chiralities, StopWatch *timer = nullptr,
+                  int low_molecule_index = 0, int high_molecule_index = -1);
+  
+  AtomEquivalence(const ChemicalFeatures &chemfe_in, StopWatch *timer = nullptr,
+                  int low_molecule_index = 0, int high_molecule_index = -1);
   /// \}
 
   /// The default copy and move constructors, as well as copy and move assignment operators, will
@@ -62,6 +153,14 @@ public:
   /// \param group_index  The group of interest
   std::vector<int> getGroup(int group_index) const;
 
+  /// \brief Get one atom index from within a symmetry-equivalent atom group.
+  ///
+  /// \param group_index   The group of interest
+  /// \param domain_index  The interchangeable collection of atoms within the group
+  /// \param atom_index    Index of the atom within the interchangeable domain (this is not a
+  ///                      topological index)
+  int getSymmetryRelatedAtom(int group_index, int domain_index, int atom_index) const;
+
   /// \brief Get a pointer to the atom indices of a particular group.
   ///
   /// \param group_index  The group of interest  
@@ -76,6 +175,12 @@ public:
   ///
   /// \param group_index  The group of interest  
   int getGroupOrder(int group_index) const;
+
+  /// \brief Get the manner by which combinations of the group's interchangeable subunits should be
+  ///        laid out in order to search for the best RMSD fit.
+  ///
+  /// \param group_index  The group of interest  
+  EquivalenceSwap getGroupRule(int group_index) const;
   
   /// \brief Get a list of a group's dependencies (other groups that the group in question contains
   ///        completely).  When evaluating dependent groups, the procedure must be to work from the
@@ -118,7 +223,6 @@ private:
   /// \brief Find equivalent atoms from within a subset of the topology, then call the
   ///        drawEquivalentGroups() function below.
   ///
-  /// \param ag                System topology
   /// \param subset_atoms      Topological indices for the subset of atoms that this call will look
   ///                          at, i.e. { 4, 5, 6, 7, 21, 22, 23, 24 }.
   /// \param map_to_subset     Mapping of each topological atom its place in the subset, i.e. for
@@ -130,6 +234,9 @@ private:
   /// \param free_electrons    Array of free electron content for all atoms in the entire topology
   /// \param ring_inclusion    Array of ring inclusion marks for all atoms in the entire topology
   /// \param chiralities       Array of chiral statuses for all atoms in the entire topology
+  /// \param atom_ranks        Ranks of all atoms in the topology.  Ranks are only required for the
+  ///                          atoms in the molecule range of interest.  This vector may contain -1
+  ///                          entries for atoms outside of the relevant set.
   /// \param domain_coverage   Array (with space for all topological atom indices) for recording
   ///                          the extent to which various symmetry-related groups expanding
   ///                          outwards from each partner have covered the available atoms
@@ -146,55 +253,15 @@ private:
   /// \param aligned_groups    Re-arrangement of jumbled groups that places atoms from each
   ///                          symmetry-equivalent domain, layer by layer working outward from the
   ///                          symmetric partner atom, into a contiguous stretch of memory
-  /// \param a_idx_tree        Tree of topological atom indices branching out from the first (A)
-  ///                          atom of a bond pattern comparison.  This and subsequent arrays are
-  ///                          pre-allocated for the call to findEquivalentAtoms() so that they
-  ///                          can be passed down through recursive calls, onward to
-  ///                          drawEquivalentGroups(), and finally used in calls to the
-  ///                          matchBondingPattern() function.  Re-allocation for each recursive
-  ///                          call is then not needed.
-  /// \param b_idx_tree        Tree of topological atom indices branching out from the second (B)
-  ///                          atom of a bond pattern comparison
-  /// \param a_zn_tree         Tree of atomic numbers found in a bond pattern comparison when
-  ///                          branching from the first atom
-  /// \param b_zn_tree         Tree of atomic numbers found in a bond pattern comparison when
-  ///                          branching from the second atom
-  /// \param a_fc_tree         Tree of formal charges branching from the first atom in a bond
-  ///                          pattern comparison
-  /// \param b_fc_tree         Tree of formal charges branching from the second atom in a bond
-  ///                          pattern comparison
-  /// \param a_fe_tree         Tree of free electron contents branching from the first atom in a
-  ///                          bond pattern comparison
-  /// \param b_fe_tree         Tree of free electron contents branching from the second atom in a
-  ///                          bond pattern comparison
-  /// \param a_ri_tree         Tree of ring inclusions branching from the first atom in a bond
-  ///                          pattern comparison
-  /// \param b_ri_tree         Tree of ring inclusions branching from the second atom in a bond
-  ///                          pattern comparison
-  /// \param a_ch_tree         Tree of chiral designations branching from the first atom in a bond
-  ///                          pattern comparison
-  /// \param b_ch_tree         Tree of chiral designations branching from the second atom in a bond
-  ///                          pattern comparison
-  /// \param a_coverage        Coverage of the first atom's tree in a bond pattern comparison
-  /// \param b_coverage        Coverage of the second atom's tree in a bond pattern comparison
-  void findEquivalentAtoms(const AtomGraph &ag, const std::vector<int> &subset_atoms,
-                           std::vector<int> *map_to_subset,
+  void findEquivalentAtoms(const std::vector<int> &subset_atoms, std::vector<int> *map_to_subset,
                            const std::vector<double> &formal_charges,
                            const std::vector<double> &free_electrons,
                            const std::vector<ullint> &ring_inclusion,
                            const std::vector<ChiralOrientation> &chiralities,
-                           std::vector<int> *domain_coverage, std::vector<int> *allowed_atoms,
-                           std::vector<int> *candidate_hopper, std::vector<int> *domain_assignment,
-                           std::vector<int> *jumbled_groups, std::vector<int> *aligned_groups,
-                           std::vector<int> *layer_bounds, std::vector<int> *a_idx_tree,
-                           std::vector<int> *b_idx_tree, std::vector<int> *a_zn_tree,
-                           std::vector<int> *b_zn_tree, std::vector<double> *a_fc_tree,
-                           std::vector<double> *b_fc_tree, std::vector<double> *a_fe_tree,
-                           std::vector<double> *b_fe_tree, std::vector<ullint> *a_ri_tree,
-                           std::vector<ullint> *b_ri_tree,
-                           std::vector<ChiralOrientation> *a_ch_tree,
-                           std::vector<ChiralOrientation> *b_ch_tree,
-                           std::vector<int> *a_coverage, std::vector<int> *b_coverage);
+                           const AtomRank &arnks, std::vector<int> *domain_coverage,
+                           std::vector<int> *allowed_atoms, std::vector<int> *candidate_hopper,
+                           std::vector<int> *domain_assignment, std::vector<int> *jumbled_groups,
+                           std::vector<int> *aligned_groups, std::vector<int> *layer_bounds);
 
   /// \brief Draw the equivalent groups for a molecule, based on a trusted list of partners each
   ///        representing a distinct collection of symmetry-related atoms.  The strategy is to
@@ -222,24 +289,15 @@ private:
   /// \param subset_atoms      A list of atoms within which the equivalence groups can be drawn
   /// \param layer_bounds      Working array for the bounds of each layer forming the domains of
   ///                          equivalent atom groups
-  void drawEquivalentGroups(const std::vector<int> &partners,
-                            const std::vector<int> &subset_atoms,
+  void drawEquivalentGroups(const std::vector<int> &partners, const std::vector<int> &subset_atoms,
                             const std::vector<double> &formal_charges,
                             const std::vector<double> &free_electrons,
                             const std::vector<ullint> &ring_inclusion,
                             const std::vector<ChiralOrientation> &chiralities,
-                            std::vector<int> *domain_coverage, std::vector<int> *allowed_atoms,
-                            std::vector<int> *candidate_hopper,
+                            const AtomRank &arnks, std::vector<int> *domain_coverage,
+                            std::vector<int> *allowed_atoms, std::vector<int> *candidate_hopper,
                             std::vector<int> *domain_assignment, std::vector<int> *jumbled_groups,
-                            std::vector<int> *aligned_groups, std::vector<int> *layer_bounds,
-                            std::vector<int> *a_idx_tree, std::vector<int> *b_idx_tree,
-                            std::vector<int> *a_zn_tree, std::vector<int> *b_zn_tree,
-                            std::vector<double> *a_fc_tree, std::vector<double> *b_fc_tree,
-                            std::vector<double> *a_fe_tree, std::vector<double> *b_fe_tree,
-                            std::vector<ullint> *a_ri_tree, std::vector<ullint> *b_ri_tree,
-                            std::vector<ChiralOrientation> *a_ch_tree,
-                            std::vector<ChiralOrientation> *b_ch_tree,
-                            std::vector<int> *a_coverage, std::vector<int> *b_coverage);
+                            std::vector<int> *aligned_groups, std::vector<int> *layer_bounds);
 
   /// \brief Add a selection of the symmetry-equivalent domains as an interchangeable collection
   ///        of atom groups, with a plan for how to do the swapping.
@@ -284,7 +342,11 @@ private:
 ///        outward from each atom have identical properties.
 ///
 /// Overloaded:
+///   - Pass the topology by pointer or by reference (this is an optimization for when the
+///     function gets heavy usage--with its member variables, the topology constitutes an object of
+///     significant size)
 ///   - Accept a collection of pre-allocated vectors to use a scratch space
+///   - Accept a ChemicalFeatures object from which to extract critical information
 ///   - Allocate temporary storage space for all work
 ///
 /// \param ag              System topology
@@ -310,7 +372,7 @@ private:
 /// \param a_coverage      Coverage of the first atom's tree
 /// \param b_coverage      Coverage of the second atom's tree
 /// \{
-bool matchBondingPattern(const AtomGraph &ag, const std::vector<double> &formal_charges,
+bool matchBondingPattern(const AtomGraph *ag, const std::vector<double> &formal_charges,
                          const std::vector<double> &free_electrons,
                          const std::vector<ullint> &ring_inclusion,
 	                 const std::vector<ChiralOrientation> &chiralities, const int atom_a,
@@ -327,8 +389,76 @@ bool matchBondingPattern(const AtomGraph &ag, const std::vector<double> &formal_
 bool matchBondingPattern(const AtomGraph &ag, const std::vector<double> &formal_charges,
                          const std::vector<double> &free_electrons,
                          const std::vector<ullint> &ring_inclusion,
+                         const std::vector<ChiralOrientation> &chiralities, const int atom_a,
+                         const int atom_b, std::vector<int> *a_idx_tree,
+                         std::vector<int> *b_idx_tree, std::vector<int> *a_zn_tree,
+                         std::vector<int> *b_zn_tree, std::vector<double> *a_fc_tree,
+                         std::vector<double> *b_fc_tree, std::vector<double> *a_fe_tree,
+                         std::vector<double> *b_fe_tree, std::vector<ullint> *a_ri_tree,
+                         std::vector<ullint> *b_ri_tree,
+                         std::vector<ChiralOrientation> *a_ch_tree,
+                         std::vector<ChiralOrientation> *b_ch_tree,
+                         std::vector<int> *a_coverage, std::vector<int> *b_coverage);
+
+bool matchBondingPattern(const AtomGraph &ag, const std::vector<double> &formal_charges,
+                         const std::vector<double> &free_electrons,
+                         const std::vector<ullint> &ring_inclusion,
                          const std::vector<ChiralOrientation> &chiralities, int atom_i,
                          int atom_j);
+
+bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, int atom_i,
+                         int atom_j);
+/// \}
+
+/// \brief Assign unique ranks to each atom, with an implicit behavior that ties are not broken.
+///        Atoms identified to have the same rank in the result will be equivalent in the sense
+///        that they belong to distinct groups of atoms which can be interchanged to improve a
+///        symmetry-aware RMSD result.  Descriptions of various modifiable vectors (all sized to
+///        accommodate the number of atoms in the molecular system) follow from
+///        matchBondingPattern() above.
+///
+/// Overloaded:
+///   - Supply a const pointer or const reference to the topology
+///   - Supply the arrays of atom properties directly
+///   - Supply a chemical features object from which these arrays will be copied
+///
+/// \param ag                   System topology
+/// \param formal_charges       Array of formal charges for all atoms in the entire topology
+/// \param bond_orders          Array of bond orders for all bonds in the topology
+/// \param free_electrons       Array of ree electron content for all atoms in the entire topology
+/// \param ring_inclusion       Array of ring inclusion marks for all atoms in the entire topology
+/// \param chiralities          Array of chiral statuses for all atoms in the entire topology
+/// \param low_molecule_index   Index of the first molecule in the topology for which to draw
+///                             atom equivalence groups
+/// \param high_molecule_index  Upper index limit of molecules in the topology for which to draw
+///                             atom equivalence groups.  The default of -1 triggers the upper
+///                             limit to be set as one beyond the lower limit.
+/// \{
+std::vector<int> rankAtoms(const AtomGraph *ag, const std::vector<double> &formal_charges,
+                           const std::vector<double> &free_electrons,
+                           const std::vector<ullint> &ring_inclusion,
+                           const std::vector<ChiralOrientation> &chiralities,
+                           std::vector<int> *a_idx_tree, std::vector<int> *b_idx_tree,
+                           std::vector<int> *a_zn_tree, std::vector<int> *b_zn_tree,
+                           std::vector<double> *a_fc_tree, std::vector<double> *b_fc_tree,
+                           std::vector<double> *a_fe_tree, std::vector<double> *b_fe_tree,
+                           std::vector<ullint> *a_ri_tree, std::vector<ullint> *b_ri_tree,
+                           std::vector<ChiralOrientation> *a_ch_tree,
+                           std::vector<ChiralOrientation> *b_ch_tree,
+                           std::vector<int> *a_coverage, std::vector<int> *b_coverage,
+                           int low_molecule_index = 0, int high_molecule_index = -1);
+
+std::vector<int> rankAtoms(const AtomGraph &ag, const std::vector<double> &formal_charges,
+                           const std::vector<double> &free_electrons,
+                           const std::vector<ullint> &ring_inclusion,
+                           const std::vector<ChiralOrientation> &chiralities,
+                           int low_molecule_index = 0, int high_molecule_index = -1);
+
+std::vector<int> rankAtoms(const AtomGraph *ag, const ChemicalFeatures &chemfe,
+                           int low_molecule_index = 0, int high_molecule_index = -1);
+
+std::vector<int> rankAtoms(const AtomGraph &ag, const ChemicalFeatures &chemfe,
+                           int low_molecule_index = 0, int high_molecule_index = -1);
 /// \}
 
 } // namespace chemistry

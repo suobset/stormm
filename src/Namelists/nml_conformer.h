@@ -103,7 +103,7 @@ struct ConformerControls {
   
   /// \brief Get the positional root mean squared deviation that will distinguish each reported
   ///        confomer.
-  double getRmsdTolerance() const;
+  double getRMSDTolerance() const;
 
   /// \brief Validate the restraining potential that will define the common core.
   void validateCoreRestraint() const;

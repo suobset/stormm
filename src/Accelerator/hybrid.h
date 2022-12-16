@@ -431,10 +431,18 @@ public:
 
   /// \brief A std::vector-like resize() feature.
   ///
-  /// \param new_length   The new length.  If less than the current length, all that will change is
-  ///                     the counted number of elements.  The original data will persist, as will
-  ///                     the array(s) storing it.
+  /// Overloaded:
+  ///   - Resize and fill the new space with zero
+  ///   - Resize and fill the new space with a constant value
+  ///
+  /// \param new_length  The new length.  If less than the current length, all that will change is
+  ///                    the counted number of elements.  The original data will persist, as will
+  ///                    the array(s) storing it.
+  /// \param new_value   The value with which to populate new space.
+  /// \{
   void resize(size_t new_length);
+  void resize(size_t new_length, T value);
+  /// \}
 
   /// \brief Set a Hybrid pointer struct to a segment of a Hybrid array struct.
   ///

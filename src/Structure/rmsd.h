@@ -78,48 +78,48 @@ using trajectory::PhaseSpaceWriter;
 /// \{
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, const Tcoord* xcrd_b,
-           const Tcoord* ycrd_b, const Tcoord* zcrd_b, const Tcalc* masses, RmsdMethod method,
+           const Tcoord* ycrd_b, const Tcoord* zcrd_b, const Tcalc* masses, RMSDMethod method,
            int lower_limit, int upper_limit, Tcalc inv_gpos_scale_factor = 1.0);
   
 double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, const double* xcrd_b,
-            const double* ycrd_b, const double* zcrd_b, const double* masses, RmsdMethod method,
+            const double* ycrd_b, const double* zcrd_b, const double* masses, RMSDMethod method,
             int lower_limit, int upper_limit);
 
 double rmsd(const PhaseSpaceReader &psr_a, const PhaseSpaceReader &psr_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            const ChemicalDetailsKit &cdk, RMSDMethod method, int lower_limit = 0,
             int upper_limit = 0);
 
 double rmsd(const PhaseSpaceWriter &psw_a, const PhaseSpaceWriter &psw_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            const ChemicalDetailsKit &cdk, RMSDMethod method, int lower_limit = 0,
             int upper_limit = 0);
 
-double rmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b, const AtomGraph &ag, RmsdMethod method,
+double rmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b, const AtomGraph &ag, RMSDMethod method,
             int lower_limit = 0, int upper_limit = 0);
 
 double rmsd(const CoordinateFrameReader &cfr_a, const CoordinateFrameReader &cfr_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            const ChemicalDetailsKit &cdk, RMSDMethod method, int lower_limit = 0,
             int upper_limit = 0);
 
 double rmsd(const CoordinateFrameWriter &cfw_a, const CoordinateFrameWriter &cfw_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            const ChemicalDetailsKit &cdk, RMSDMethod method, int lower_limit = 0,
             int upper_limit = 0);
 
 double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const AtomGraph &ag,
-            RmsdMethod method, int lower_limit = 0, int upper_limit = 0);
+            RMSDMethod method, int lower_limit = 0, int upper_limit = 0);
 
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame_a, const size_t frame_b,
-           const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
+           const ChemicalDetailsKit &cdk, const RMSDMethod method, const int lower_limit,
            const int upper_limit);
 
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeriesWriter<Tcoord> &csw, const size_t frame_a, const size_t frame_b,
-           const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
+           const ChemicalDetailsKit &cdk, const RMSDMethod method, const int lower_limit,
            const int upper_limit);
 
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const size_t frame_a, const size_t frame_b,
-           const AtomGraph &ag, const RmsdMethod method, const int lower_limit,
+           const AtomGraph &ag, const RMSDMethod method, const int lower_limit,
            const int upper_limit);
 /// \}
 

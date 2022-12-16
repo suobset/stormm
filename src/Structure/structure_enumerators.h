@@ -17,7 +17,7 @@ enum class ImagingMethod {
 
 /// \brief List methods for computing (positional) Root Mean Squared Deviation (RMSD) between
 ///        two sets of coordinates
-enum class RmsdMethod {
+enum class RMSDMethod {
   ALIGN_MASS,     ///< Align the two structures, centering each by their respective centers of
                   ///<   mass, prior to computing mass-weighted positional RMSD
   ALIGN_GEOM,     ///< Align the two structures, centering each by their respective centers of
@@ -35,14 +35,14 @@ enum class RmsdMethod {
 ///        groups, which would allow the RMSD to be computed in a single pass.  If no alignment is
 ///        necessary, then it is possible to sample any symmetry-related groups in order of their
 ///        dependence on one another, in any order.
-enum class RmsdAlignmentProtocol {
+enum class RMSDAlignmentProtocol {
   BUILD_CORE,  ///< Sample the possible arrangements of the largest symmetry-related groups until
                ///<   enough mass has been placed, then proceed to...
   ALIGN_CORE,  ///< Align the molecule's massive core (starting with asymmetric atoms) and
                ///<   afterwards test the various arrangements of each symmetry-related group in
                ///<   the order of their dependencies.
   ALIGN_ALL    ///< With no symmetry-related groups, perform a standard RMSD calculation according
-               ///<   to the RmsdMethod indicated.
+               ///<   to the RMSDMethod indicated.
 };
   
 /// \brief Virtual site standalone functiosn and kernels call into two categories.
