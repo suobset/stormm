@@ -741,7 +741,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
       relevant_pair_bounds[tmp_local_pair_idx[i].y] += 1;
     }
   }
-  prefixSumInPlace<int>(&relevant_pair_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
+  prefixSumInPlace(&relevant_pair_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
   std::vector<int4> relevant_pairs(total_pairs);
   std::vector<int2> local_pair_idx(total_pairs);
   for (int i = 0; i < total_pairs; i++) {
@@ -769,7 +769,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     const int atom_i = centers_list[i];
     center_state_bounds[i] = all_centers[atom_i].getStateCount();
   }
-  prefixSumInPlace<int>(&center_state_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
+  prefixSumInPlace(&center_state_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
   std::vector<int> negative_carbon_states(center_state_bounds[ccenter_count], 0);
   for (int i = 0; i < ccenter_count; i++) {
     const int atom_i = centers_list[i];
@@ -1202,7 +1202,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   }
 
   // Compute the prefix sum over atom 1:2 neighbors to get the bounds array
-  prefixSumInPlace<int>(&atom_connect_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");  
+  prefixSumInPlace(&atom_connect_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");  
 
   // Make lists of all bond partners for each atom
   atom_relevant_bonds.resize(atom_connect_bounds[atom_count]);

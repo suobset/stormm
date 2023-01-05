@@ -110,7 +110,7 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
 
   // Compute the exclusive prefix sum to get the starting locations of the stretch of items
   // affecting each atom.
-  prefixSumInPlace<int>(affector_bounds, PrefixSumType::EXCLUSIVE, "markAffectorAtoms");
+  prefixSumInPlace(affector_bounds, PrefixSumType::EXCLUSIVE, "markAffectorAtoms");
   int *list_ptr = affector_list->data();
   affectorListAssembly(item_count, i_atoms, bounds_ptr, list_ptr);
   affectorListAssembly(item_count, j_atoms, bounds_ptr, list_ptr);

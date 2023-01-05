@@ -19,6 +19,7 @@
 #include "../../src/MolecularMechanics/mm_evaluation.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/cacheresource.h"
+#include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/scorecard.h"
@@ -415,11 +416,11 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
                                                         AccumulationMethod::SPLIT,
-                                                        VwuGoal::ACCUMULATE);
+                                                        VwuGoal::ACCUMULATE, ClashResponse::NONE);
   const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
                                                         EvaluateEnergy::YES,
                                                         AccumulationMethod::SPLIT,
-                                                        VwuGoal::ACCUMULATE);
+                                                        VwuGoal::ACCUMULATE, ClashResponse::NONE);
   const int2 vste_mv_lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
   const int2 vste_xm_lp = launcher.getVirtualSiteKernelDims(prec,
                                                             VirtualSiteActivity::TRANSMIT_FORCES);
@@ -427,7 +428,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   const ImplicitSolventModel ism_type = poly_ag.getImplicitSolventModel();
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
                                                        EvaluateEnergy::YES,
-                                                       AccumulationMethod::SPLIT, ism_type);
+                                                       AccumulationMethod::SPLIT, ism_type,
+                                                       ClashResponse::NONE);
   const int2 gbr_lp = launcher.getBornRadiiKernelDims(prec, nb_work_type,
                                                       AccumulationMethod::SPLIT, ism_type);
   const int2 gbd_lp = launcher.getBornDerivativeKernelDims(prec, nb_work_type,

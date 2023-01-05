@@ -348,6 +348,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  endif
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
+#  define CBRT_FUNC cbrtf
 #  define LOG_FUNC  logf
 #  define EXP_FUNC  expf
 #  define TANH_FUNC tanhf
@@ -457,8 +458,86 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #      undef DO_NECK_CORRECTION
 #    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
+#  define CLASH_FORGIVENESS
+#    define COMPUTE_FORCE
+#      define SPLIT_FORCE_ACCUMULATION
+#        define COMPUTE_ENERGY
+#          define KERNEL_NAME ktgfsVacuumForceEnergyNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#          define DO_GENERALIZED_BORN
+#            define KERNEL_NAME ktgfsGBForceEnergyNonClash
+#              include "nonbonded_potential_tilegroups.cui"
+#            undef KERNEL_NAME
+#            define DO_NECK_CORRECTION
+#              define KERNEL_NAME ktgfsGBNeckForceEnergyNonClash
+#                include "nonbonded_potential_tilegroups.cui"
+#              undef KERNEL_NAME
+#            undef DO_NECK_CORRECTION
+#          undef DO_GENERALIZED_BORN
+#        undef COMPUTE_ENERGY
+#        define KERNEL_NAME ktgfsVacuumForceNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_GENERALIZED_BORN
+#          define KERNEL_NAME ktgfsGBForceNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#          define DO_NECK_CORRECTION
+#            define KERNEL_NAME ktgfsGBNeckForceNonClash
+#              include "nonbonded_potential_tilegroups.cui"
+#            undef KERNEL_NAME
+#          undef DO_NECK_CORRECTION
+#        undef DO_GENERALIZED_BORN
+#      undef SPLIT_FORCE_ACCUMULATION
+#      define COMPUTE_ENERGY
+#        define KERNEL_NAME ktgfVacuumForceEnergyNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_GENERALIZED_BORN
+#          define KERNEL_NAME ktgfGBForceEnergyNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#          define DO_NECK_CORRECTION
+#            define KERNEL_NAME ktgfGBNeckForceEnergyNonClash
+#              include "nonbonded_potential_tilegroups.cui"
+#            undef KERNEL_NAME
+#          undef DO_NECK_CORRECTION
+#        undef DO_GENERALIZED_BORN
+#      undef COMPUTE_ENERGY
+#      define KERNEL_NAME ktgfVacuumForceNonClash
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgfGBForceNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgfGBNeckForceNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#    undef COMPUTE_FORCE
+#    define COMPUTE_ENERGY
+#      define KERNEL_NAME ktgfVacuumEnergyNonClash
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgfGBEnergyNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgfGBNeckEnergyNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#    undef COMPUTE_ENERGY
+#  undef CLASH_FORGIVENESS
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
+#  undef CBRT_FUNC
 #  undef LOG_FUNC
 #  undef EXP_FUNC
 #  undef TANH_FUNC
@@ -479,6 +558,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  define GBDERIV_KERNEL_BLOCKS_MULTIPLIER 3
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
+#  define CBRT_FUNC cbrt
 #  define LOG_FUNC  log
 #  define EXP_FUNC  exp
 #  define TANH_FUNC tanh
@@ -542,8 +622,56 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #      undef DO_NECK_CORRECTION
 #    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
+#  define CLASH_FORGIVENESS
+#    define COMPUTE_FORCE
+#      define COMPUTE_ENERGY
+#        define KERNEL_NAME ktgdsVacuumForceEnergyNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_GENERALIZED_BORN
+#          define KERNEL_NAME ktgdsGBForceEnergyNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#          define DO_NECK_CORRECTION
+#            define KERNEL_NAME ktgdsGBNeckForceEnergyNonClash
+#              include "nonbonded_potential_tilegroups.cui"
+#            undef KERNEL_NAME
+#          undef DO_NECK_CORRECTION
+#        undef DO_GENERALIZED_BORN
+#      undef COMPUTE_ENERGY
+#      define KERNEL_NAME ktgdsVacuumForceNonClash
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgdsGBForceNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgdsGBNeckForceNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#    undef COMPUTE_FORCE
+#    define COMPUTE_ENERGY
+#      define KERNEL_NAME ktgdVacuumEnergyNonClash
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgdGBEnergyNonClash
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgdGBNeckEnergyNonClash
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#    undef COMPUTE_ENERGY
+#  undef CLASH_FORGIVENESS
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
+#  undef CBRT_FUNC
 #  undef LOG_FUNC
 #  undef EXP_FUNC
 #  undef TANH_FUNC
@@ -558,6 +686,8 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 //-------------------------------------------------------------------------------------------------
 extern void nonbondedKernelSetup() {
   const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+
+  // Standard kernels
   if (cudaFuncSetSharedMemConfig(ktgfVacuumForce, sms_eight) != cudaSuccess) {
     rtErr("Error setting ktgfVacuumForce __shared__ memory bank size to eight bytes.",
           "nonbondedKernelSetup");
@@ -630,6 +760,80 @@ extern void nonbondedKernelSetup() {
     rtErr("Error setting ktgdsGBNeckForceEnergy __shared__ memory bank size to eight bytes.",
           "nonbondedKernelSetup");
   }
+
+  // Clash-damping kernels
+  if (cudaFuncSetSharedMemConfig(ktgfVacuumForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfVacuumForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfVacuumEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfVacuumEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfVacuumForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfVacuumForceEnergyNonClash __shared__ memory bank size to eight "
+          "bytes.", "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsVacuumForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdVacuumEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdVacuumEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsVacuumForceEnergyNonClash __shared__ memory bank size to eight "
+          "bytes.", "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBForceEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsGBForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsGBForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdGBEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdGBEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsGBForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsGBForceEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBNeckForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBNeckEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBNeckEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfGBNeckForceEnergyNonClash __shared__ memory bank size to eight "
+          "bytes.", "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForceNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsGBNeckForceNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdGBNeckEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdGBNeckEnergyNonClash __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForceEnergyNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsGBNeckForceEnergyNonClash __shared__ memory bank size to eight "
+          "bytes.", "nonbondedKernelSetup");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -637,262 +841,526 @@ extern cudaFuncAttributes
 queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
                                  const EvaluateForce eval_frc, const EvaluateEnergy eval_nrg,
                                  const AccumulationMethod acc_meth,
-                                 const ImplicitSolventModel igb) {
+                                 const ImplicitSolventModel igb,
+                                 const ClashResponse collision_handling) {
   
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes attr;
-  switch (igb) {
-  case ImplicitSolventModel::NONE:
-    switch (prec) {
-    case PrecisionModel::DOUBLE:
-      switch (eval_frc) {
-      case EvaluateForce::YES:
-        switch (eval_nrg) {
-        case EvaluateEnergy::YES:
-          if (cudaFuncGetAttributes(&attr, ktgdsVacuumForceEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsVacuumForceEnergy.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        case EvaluateEnergy::NO:
-          if (cudaFuncGetAttributes(&attr, ktgdsVacuumForce) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsVacuumForce.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        }
-        break;
-      case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&attr, ktgdVacuumEnergy) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel ktgdVacuumEnergy.",
-                "queryNonbondedKernelRequirements");
-        }
-        break;
-      }
-      break;
-    case PrecisionModel::SINGLE:
-      switch (kind) {
-        case NbwuKind::TILE_GROUPS:
+  switch (collision_handling) {
+  case ClashResponse::NONE:
+    switch (igb) {
+    case ImplicitSolventModel::NONE:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
         switch (eval_frc) {
         case EvaluateForce::YES:
           switch (eval_nrg) {
           case EvaluateEnergy::YES:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsVacuumForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsVacuumForceEnergy.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfVacuumForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfVacuumForceEnergy.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
+            if (cudaFuncGetAttributes(&attr, ktgdsVacuumForceEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsVacuumForceEnergy.",
+                    "queryNonbondedKernelRequirements");
             }
             break;
           case EvaluateEnergy::NO:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsVacuumForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsVacuumForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfVacuumForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfVacuumForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
+            if (cudaFuncGetAttributes(&attr, ktgdsVacuumForce) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsVacuumForce.",
+                    "queryNonbondedKernelRequirements");
             }
             break;
           }
           break;
         case EvaluateForce::NO:
-          if (cudaFuncGetAttributes(&attr, ktgfVacuumEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgfVacuumEnergy.",
+          if (cudaFuncGetAttributes(&attr, ktgdVacuumEnergy) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdVacuumEnergy.",
                   "queryNonbondedKernelRequirements");
           }
           break;
         }
         break;
-      case NbwuKind::SUPERTILES:
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsVacuumForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsVacuumForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfVacuumForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfVacuumForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsVacuumForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsVacuumForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfVacuumForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfVacuumForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            }
+            break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfVacuumEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfVacuumEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
         break;
-      case NbwuKind::HONEYCOMB:
+      }
+      break;
+    case ImplicitSolventModel::HCT_GB:
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
+        switch (eval_frc) {
+        case EvaluateForce::YES:
+          switch (eval_nrg) {
+          case EvaluateEnergy::YES:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBForceEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBForceEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          case EvaluateEnergy::NO:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBForce) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBForce.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          if (cudaFuncGetAttributes(&attr, ktgdGBEnergy) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdGBEnergy.",
+                  "queryNonbondedKernelRequirements");
+          }
+          break;
+        }
+        break;
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            }
+            break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfGBEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfGBEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
+        break;
+      }
+      break;
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
+        switch (eval_frc) {
+        case EvaluateForce::YES:
+          switch (eval_nrg) {
+          case EvaluateEnergy::YES:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForceEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBNeckForceEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          case EvaluateEnergy::NO:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForce) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBNeckForce.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          if (cudaFuncGetAttributes(&attr, ktgdGBNeckEnergy) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdGBNeckEnergy.",
+                  "queryNonbondedKernelRequirements");
+          }
+          break;
+        }
+        break;
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBNeckForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBNeckForceEnergy) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBNeckForceEnergy.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBNeckForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBNeckForce) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBNeckForce.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            }
+            break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfGBNeckEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfGBNeckEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
         break;
       }
       break;
     }
     break;
-  case ImplicitSolventModel::HCT_GB:
-  case ImplicitSolventModel::OBC_GB:
-  case ImplicitSolventModel::OBC_GB_II:
-    switch (prec) {
-    case PrecisionModel::DOUBLE:
-      switch (eval_frc) {
-      case EvaluateForce::YES:
-        switch (eval_nrg) {
-        case EvaluateEnergy::YES:
-          if (cudaFuncGetAttributes(&attr, ktgdsGBForceEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsGBForceEnergy.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        case EvaluateEnergy::NO:
-          if (cudaFuncGetAttributes(&attr, ktgdsGBForce) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsGBForce.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        }
-        break;
-      case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&attr, ktgdGBEnergy) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel ktgdGBEnergy.",
-                "queryNonbondedKernelRequirements");
-        }
-        break;
-      }
-      break;
-    case PrecisionModel::SINGLE:
-      switch (kind) {
-        case NbwuKind::TILE_GROUPS:
+  case ClashResponse::FORGIVE:
+    switch (igb) {
+    case ImplicitSolventModel::NONE:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
         switch (eval_frc) {
         case EvaluateForce::YES:
           switch (eval_nrg) {
           case EvaluateEnergy::YES:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsGBForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsGBForceEnergy.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfGBForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfGBForceEnergy.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
+            if (cudaFuncGetAttributes(&attr, ktgdsVacuumForceEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsVacuumForceEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
             }
             break;
           case EvaluateEnergy::NO:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsGBForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsGBForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfGBForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfGBForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
+            if (cudaFuncGetAttributes(&attr, ktgdsVacuumForceNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsVacuumForceNonClash.",
+                    "queryNonbondedKernelRequirements");
             }
             break;
           }
           break;
         case EvaluateForce::NO:
-          if (cudaFuncGetAttributes(&attr, ktgfGBEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgfGBEnergy.",
+          if (cudaFuncGetAttributes(&attr, ktgdVacuumEnergyNonClash) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdVacuumEnergyNonClash.",
                   "queryNonbondedKernelRequirements");
           }
           break;
         }
         break;
-      case NbwuKind::SUPERTILES:
-        break;
-      case NbwuKind::HONEYCOMB:
-        break;
-      }
-      break;
-    }
-    break;
-  case ImplicitSolventModel::NECK_GB:
-  case ImplicitSolventModel::NECK_GB_II:
-    switch (prec) {
-    case PrecisionModel::DOUBLE:
-      switch (eval_frc) {
-      case EvaluateForce::YES:
-        switch (eval_nrg) {
-        case EvaluateEnergy::YES:
-          if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForceEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsGBNeckForceEnergy.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        case EvaluateEnergy::NO:
-          if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForce) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgdsGBNeckForce.",
-                  "queryNonbondedKernelRequirements");
-          }
-          break;
-        }
-        break;
-      case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&attr, ktgdGBNeckEnergy) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel ktgdGBNeckEnergy.",
-                "queryNonbondedKernelRequirements");
-        }
-        break;
-      }
-      break;
-    case PrecisionModel::SINGLE:
-      switch (kind) {
-        case NbwuKind::TILE_GROUPS:
-        switch (eval_frc) {
-        case EvaluateForce::YES:
-          switch (eval_nrg) {
-          case EvaluateEnergy::YES:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsGBNeckForceEnergy.",
-                      "queryNonbondedKernelRequirements");
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsVacuumForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsVacuumForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfVacuumForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfVacuumForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
               }
               break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfGBNeckForceEnergy) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfGBNeckForceEnergy.",
-                      "queryNonbondedKernelRequirements");
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsVacuumForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsVacuumForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfVacuumForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfVacuumForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
               }
               break;
             }
             break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfVacuumEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfVacuumEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
+        break;
+      }
+      break;
+    case ImplicitSolventModel::HCT_GB:
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
+        switch (eval_frc) {
+        case EvaluateForce::YES:
+          switch (eval_nrg) {
+          case EvaluateEnergy::YES:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBForceEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBForceEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
           case EvaluateEnergy::NO:
-            switch (acc_meth) {
-            case AccumulationMethod::SPLIT:
-              if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfsGBNeckForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
-            case AccumulationMethod::WHOLE:
-              if (cudaFuncGetAttributes(&attr, ktgfGBNeckForce) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel ktgfGBNeckForce.",
-                      "queryNonbondedKernelRequirements");
-              }
-              break;
+            if (cudaFuncGetAttributes(&attr, ktgdsGBForceNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBForceNonClash.",
+                    "queryNonbondedKernelRequirements");
             }
             break;
           }
           break;
         case EvaluateForce::NO:
-          if (cudaFuncGetAttributes(&attr, ktgfGBNeckEnergy) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel ktgfGBNeckEnergy.",
+          if (cudaFuncGetAttributes(&attr, ktgdGBEnergyNonClash) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdGBEnergyNonClash.",
                   "queryNonbondedKernelRequirements");
           }
           break;
         }
         break;
-      case NbwuKind::SUPERTILES:
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            }
+            break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfGBEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfGBEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
         break;
-      case NbwuKind::HONEYCOMB:
+      }
+      break;
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
+        switch (eval_frc) {
+        case EvaluateForce::YES:
+          switch (eval_nrg) {
+          case EvaluateEnergy::YES:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForceEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBNeckForceEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          case EvaluateEnergy::NO:
+            if (cudaFuncGetAttributes(&attr, ktgdsGBNeckForceNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgdsGBNeckForceNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          if (cudaFuncGetAttributes(&attr, ktgdGBNeckEnergyNonClash) != cudaSuccess) {
+            rtErr("Error obtaining attributes for kernel ktgdGBNeckEnergyNonClash.",
+                  "queryNonbondedKernelRequirements");
+          }
+          break;
+        }
+        break;
+      case PrecisionModel::SINGLE:
+        switch (kind) {
+          case NbwuKind::TILE_GROUPS:
+          switch (eval_frc) {
+          case EvaluateForce::YES:
+            switch (eval_nrg) {
+            case EvaluateEnergy::YES:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBNeckForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBNeckForceEnergyNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBNeckForceEnergyNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            case EvaluateEnergy::NO:
+              switch (acc_meth) {
+              case AccumulationMethod::SPLIT:
+                if (cudaFuncGetAttributes(&attr, ktgfsGBNeckForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfsGBNeckForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              case AccumulationMethod::WHOLE:
+                if (cudaFuncGetAttributes(&attr, ktgfGBNeckForceNonClash) != cudaSuccess) {
+                  rtErr("Error obtaining attributes for kernel ktgfGBNeckForceNonClash.",
+                        "queryNonbondedKernelRequirements");
+                }
+                break;
+              }
+              break;
+            }
+            break;
+          case EvaluateForce::NO:
+            if (cudaFuncGetAttributes(&attr, ktgfGBNeckEnergyNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfGBNeckEnergyNonClash.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case NbwuKind::SUPERTILES:
+          break;
+        case NbwuKind::HONEYCOMB:
+          break;
+        }
         break;
       }
       break;
@@ -1109,83 +1577,180 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
                             ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
                             ISWorkspaceKit<double> *iswk, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy, const int2 bt, const int2 gbr_bt,
-                            const int2 gbd_bt) {
-  switch (kind) {
-  case NbwuKind::TILE_GROUPS:
-    switch (poly_nbk.igb) {
-    case ImplicitSolventModel::NONE:
-      switch (eval_force) {
-      case EvaluateForce::YES:
-        switch (eval_energy) {
-        case EvaluateEnergy::YES:
-          ktgdsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *tstw,
-                                                 *gmem_r);
+                            const int2 gbd_bt, const double clash_minimum_distance,
+                            const double clash_ratio) {
+
+  // As with the valence kernels, detect the intention to intercept and dampen clashes by nonzero
+  // values in the parameters, not an explicit input based on the ClashResponse enumerator.
+  if (clash_minimum_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      switch (poly_nbk.igb) {
+      case ImplicitSolventModel::NONE:
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsVacuumForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                           clash_minimum_distance, clash_ratio,
+                                                           *scw, *tstw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsVacuumForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                     clash_minimum_distance, clash_ratio, *tstw,
+                                                     *gmem_r);
+            break;
+          }
           break;
-        case EvaluateEnergy::NO:
-          ktgdsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw, *gmem_r);
+        case EvaluateForce::NO:
+          ktgdVacuumEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                   clash_minimum_distance, clash_ratio, *scw,
+                                                   *tstw, *gmem_r);
           break;
         }
         break;
-      case EvaluateForce::NO:
-        ktgdVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *tstw,
-                                         *gmem_r);
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+        ktgdsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                      *gmem_r);
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsGBForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                       clash_minimum_distance, clash_ratio, *scw,
+                                                       *iswk, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsGBForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                 clash_minimum_distance, clash_ratio, *iswk,
+                                                 *gmem_r);
+            break;
+          }
+          ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                              *gmem_r);
+          break;
+        case EvaluateForce::NO:
+          ktgdGBEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                               clash_minimum_distance, clash_ratio, *scw, *iswk,
+                                               *gmem_r);
+          break;
+        }
+        break;
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        ktgdsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                          *gmem_r);
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsGBNeckForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                           clash_minimum_distance, clash_ratio,
+                                                           *scw, *iswk, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsGBNeckForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                     clash_minimum_distance, clash_ratio, *iswk,
+                                                     *gmem_r);
+            break;
+          }
+          ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                  *iswk, *gmem_r);
+          break;
+        case EvaluateForce::NO:
+          ktgdGBNeckEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                   clash_minimum_distance, clash_ratio, *scw,
+                                                   *iswk, *gmem_r);
+          break;
+        }
         break;
       }
       break;
-    case ImplicitSolventModel::HCT_GB:
-    case ImplicitSolventModel::OBC_GB:
-    case ImplicitSolventModel::OBC_GB_II:
-      ktgdsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
-                                                    *gmem_r);
-      switch (eval_force) {
-      case EvaluateForce::YES:
-        switch (eval_energy) {
-        case EvaluateEnergy::YES:
-          ktgdsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                             *iswk, *gmem_r);
-          break;
-        case EvaluateEnergy::NO:
-          ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk,
-                                       *gmem_r);
-          break;
-        }
-        ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
-                                                            *gmem_r);
-        break;
-      case EvaluateForce::NO:
-        ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
-        break;
-      }
-      break;
-    case ImplicitSolventModel::NECK_GB:
-    case ImplicitSolventModel::NECK_GB_II:
-      ktgdsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
-                                                        *gmem_r);
-      switch (eval_force) {
-      case EvaluateForce::YES:
-        switch (eval_energy) {
-        case EvaluateEnergy::YES:
-          ktgdsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
-                                                 *gmem_r);
-          break;
-        case EvaluateEnergy::NO:
-          ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
-          break;
-        }
-        ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                *iswk, *gmem_r);
-        break;
-      case EvaluateForce::NO:
-        ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
-                                         *gmem_r);
-        break;
-      }
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
       break;
     }
-    break;
-  case NbwuKind::SUPERTILES:
-  case NbwuKind::HONEYCOMB:
-    break;
+  }
+  else {
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      switch (poly_nbk.igb) {
+      case ImplicitSolventModel::NONE:
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                   *tstw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw, *gmem_r);
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgdVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *tstw,
+                                           *gmem_r);
+          break;
+        }
+        break;
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+        ktgdsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                      *gmem_r);
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                               *iswk, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk,
+                                         *gmem_r);
+            break;
+          }
+          ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                              *gmem_r);
+          break;
+        case EvaluateForce::NO:
+          ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
+          break;
+        }
+        break;
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        ktgdsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                          *gmem_r);
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgdsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                   *iswk, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
+            break;
+          }
+          ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                  *iswk, *gmem_r);
+          break;
+        case EvaluateForce::NO:
+          ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                           *gmem_r);
+          break;
+        }
+        break;
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
   }
 }
 
@@ -1196,162 +1761,348 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
                             ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
                             ISWorkspaceKit<float> *iswk, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy, const AccumulationMethod force_sum,
-                            const int2 bt, const int2 gbr_bt, const int2 gbd_bt) {
+                            const int2 bt, const int2 gbr_bt, const int2 gbd_bt,
+                            const float clash_minimum_distance, const float clash_ratio) {
   const AccumulationMethod actual_force_sum = (force_sum == AccumulationMethod::AUTOMATIC) ?
                                               chooseAccumulationMethod(poly_psw->frc_bits) :
                                               force_sum;
-  switch (kind) {
-  case NbwuKind::TILE_GROUPS:
-    switch (poly_nbk.igb) {
-    case ImplicitSolventModel::NONE:
-      switch (eval_force) {
-      case EvaluateForce::YES:
-        switch (actual_force_sum) {
-        case AccumulationMethod::SPLIT:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                   *tstw, *gmem_r);
+  // As with the valence kernels, detect the intention to intercept and dampen clashes by nonzero
+  // values in the parameters, not an explicit input based on the ClashResponse enumerator.
+  if (clash_minimum_distance > 0.000001f || clash_ratio > 0.000001f) {
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      switch (poly_nbk.igb) {
+      case ImplicitSolventModel::NONE:
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsVacuumForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                             clash_minimum_distance, clash_ratio,
+                                                             *scw, *tstw, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsVacuumForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                       clash_minimum_distance, clash_ratio, *tstw,
+                                                       *gmem_r);
+              break;
+            }
             break;
-          case EvaluateEnergy::NO:
-            ktgfsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw, *gmem_r);
-            break;
-          }
-          break;
-        case AccumulationMethod::WHOLE:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                  *tstw, *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            ktgfVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw, *gmem_r);
-            break;
-          }
-          break;
-        case AccumulationMethod::AUTOMATIC:
-
-          // This case was converted into SPLIT or WHOLE by evaluating actual_force_sum
-          break;
-        }
-        break;
-      case EvaluateForce::NO:
-        ktgfVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *tstw,
-                                         *gmem_r);
-        break;
-      }
-      break;
-    case ImplicitSolventModel::HCT_GB:
-    case ImplicitSolventModel::OBC_GB:
-    case ImplicitSolventModel::OBC_GB_II:
-      switch (actual_force_sum) {
-      case AccumulationMethod::SPLIT:
-        ktgfsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfVacuumForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                            clash_minimum_distance, clash_ratio,
+                                                            *scw, *tstw, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfVacuumForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                      clash_minimum_distance, clash_ratio, *tstw,
                                                       *gmem_r);
+              break;
+            }
+            break;
+          case AccumulationMethod::AUTOMATIC:
+
+            // This case was converted into SPLIT or WHOLE by evaluating actual_force_sum
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfVacuumEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                   clash_minimum_distance, clash_ratio, *scw,
+                                                   *tstw, *gmem_r);
+          break;
+        }
         break;
-      case AccumulationMethod::WHOLE:
-        ktgfCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
-                                                     *gmem_r);
-        break;
-      case AccumulationMethod::AUTOMATIC:
-        break;
-      }
-      switch (eval_force) {
-      case EvaluateForce::YES:
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
         switch (actual_force_sum) {
         case AccumulationMethod::SPLIT:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
-                                               *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            ktgfsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
-            break;
-          }
-          ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
-                                                              *gmem_r);
+          ktgfsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                        *gmem_r);
           break;
         case AccumulationMethod::WHOLE:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
-                                              *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            ktgfGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
-            break;
-          }
-          ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
-                                                             *gmem_r);
+          ktgfCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                       *gmem_r);
           break;
         case AccumulationMethod::AUTOMATIC:
           break;
         }
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsGBForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                         clash_minimum_distance, clash_ratio, *scw,
+                                                         *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsGBForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                   clash_minimum_distance, clash_ratio, *iswk,
+                                                   *gmem_r);
+              break;
+            }
+            ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                                *gmem_r);
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfGBForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                        clash_minimum_distance, clash_ratio, *scw,
+                                                        *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfGBForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                  clash_minimum_distance, clash_ratio, *iswk,
+                                                  *gmem_r);
+              break;
+            }
+            ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                               *gmem_r);
+            break;
+          case AccumulationMethod::AUTOMATIC:
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfGBEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                               clash_minimum_distance, clash_ratio, *scw, *iswk,
+                                               *gmem_r);
+          break;
+        }
         break;
-      case EvaluateForce::NO:
-        ktgfGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        switch (actual_force_sum) {
+        case AccumulationMethod::SPLIT:
+          ktgfsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw,
+                                                            *iswk, *gmem_r);
+          break;
+        case AccumulationMethod::WHOLE:
+          ktgfCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw,
+                                                           *iswk, *gmem_r);
+          break;
+        case AccumulationMethod::AUTOMATIC:
+          break;
+        }
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsGBNeckForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                             clash_minimum_distance, clash_ratio,
+                                                             *scw, *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsGBNeckForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                       clash_minimum_distance, clash_ratio, *iswk,
+                                                       *gmem_r);
+              break;
+            }
+            ktgfsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                    *iswk, *gmem_r);
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfGBNeckForceEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                            clash_minimum_distance, clash_ratio,
+                                                            *scw, *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfGBNeckForceNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                      clash_minimum_distance, clash_ratio, *iswk,
+                                                      *gmem_r);
+              break;
+            }
+            ktgfCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                   *iswk, *gmem_r);
+            break;
+          case AccumulationMethod::AUTOMATIC:
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfGBNeckEnergyNonClash<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
+                                                   clash_minimum_distance, clash_ratio, *scw,
+                                                   *iswk, *gmem_r);
+          break;
+        }
         break;
       }
       break;
-    case ImplicitSolventModel::NECK_GB:
-    case ImplicitSolventModel::NECK_GB_II:
-      switch (actual_force_sum) {
-      case AccumulationMethod::SPLIT:
-        ktgfsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
-                                                          *gmem_r);
-        break;
-      case AccumulationMethod::WHOLE:
-        ktgfCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
-                                                         *gmem_r);
-        break;
-      case AccumulationMethod::AUTOMATIC:
-        break;
-      }
-      switch (eval_force) {
-      case EvaluateForce::YES:
-        switch (actual_force_sum) {
-        case AccumulationMethod::SPLIT:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                   *iswk, *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            ktgfsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
-            break;
-          }
-          ktgfsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                  *iswk, *gmem_r);
-          break;
-        case AccumulationMethod::WHOLE:
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            ktgfGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                  *iswk, *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            ktgfGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
-            break;
-          }
-          ktgfCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                 *iswk, *gmem_r);
-          break;
-        case AccumulationMethod::AUTOMATIC:
-          break;
-        }
-        break;
-      case EvaluateForce::NO:
-        ktgfGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
-                                         *gmem_r);
-        break;
-      }
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
       break;
     }
-    break;
-  case NbwuKind::SUPERTILES:
-  case NbwuKind::HONEYCOMB:
-    break;
+  }
+  else {
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      switch (poly_nbk.igb) {
+      case ImplicitSolventModel::NONE:
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                     *tstw, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw,
+                                               *gmem_r);
+              break;
+            }
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                    *tstw, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *tstw,
+                                              *gmem_r);
+              break;
+            }
+            break;
+          case AccumulationMethod::AUTOMATIC:
+
+            // This case was converted into SPLIT or WHOLE by evaluating actual_force_sum
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *tstw,
+                                           *gmem_r);
+          break;
+        }
+        break;
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+        switch (actual_force_sum) {
+        case AccumulationMethod::SPLIT:
+          ktgfsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                        *gmem_r);
+          break;
+        case AccumulationMethod::WHOLE:
+          ktgfCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw, *iswk,
+                                                       *gmem_r);
+          break;
+        case AccumulationMethod::AUTOMATIC:
+          break;
+        }
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                                 *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
+              break;
+            }
+            ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                                *gmem_r);
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                                *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
+              break;
+            }
+            ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                               *gmem_r);
+            break;
+          case AccumulationMethod::AUTOMATIC:
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
+          break;
+        }
+        break;
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        switch (actual_force_sum) {
+        case AccumulationMethod::SPLIT:
+          ktgfsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw,
+                                                            *iswk, *gmem_r);
+          break;
+        case AccumulationMethod::WHOLE:
+          ktgfCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *tstw,
+                                                           *iswk, *gmem_r);
+          break;
+        case AccumulationMethod::AUTOMATIC:
+          break;
+        }
+        switch (eval_force) {
+        case EvaluateForce::YES:
+          switch (actual_force_sum) {
+          case AccumulationMethod::SPLIT:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                     *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk,
+                                               *gmem_r);
+              break;
+            }
+            ktgfsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                    *iswk, *gmem_r);
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (eval_energy) {
+            case EvaluateEnergy::YES:
+              ktgfGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                    *iswk, *gmem_r);
+              break;
+            case EvaluateEnergy::NO:
+              ktgfGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk,
+                                              *gmem_r);
+              break;
+            }
+            ktgfCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                   *iswk, *gmem_r);
+            break;
+          case AccumulationMethod::AUTOMATIC:
+            break;
+          }
+          break;
+        case EvaluateForce::NO:
+          ktgfGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                           *gmem_r);
+          break;
+        }
+        break;
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
   }
 }
 
@@ -1362,7 +2113,8 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                             ImplicitSolventWorkspace *ism_space, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy, const AccumulationMethod force_sum,
-                            const KernelManager &launcher) {
+                            const KernelManager &launcher, const double clash_minimum_distance,
+                            const double clash_ratio) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
@@ -1370,7 +2122,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
   const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
   const ImplicitSolventModel ism_type = poly_ag.getImplicitSolventModel();
   const int2 bt = launcher.getNonbondedKernelDims(prec, nb_work_type, eval_force, eval_energy,
-                                                  force_sum, ism_type);
+                                                  force_sum, ism_type, ClashResponse::NONE);
   const int2 gbr_bt = launcher.getBornRadiiKernelDims(prec, nb_work_type, force_sum, ism_type);
   const int2 gbd_bt = launcher.getBornDerivativeKernelDims(prec, nb_work_type, force_sum,
                                                            ism_type);
@@ -1384,7 +2136,8 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
       ThermostatWriter<double> tstw = heat_bath->dpData(tier);
       ISWorkspaceKit<double> iswk = ism_space->dpData(tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw, &gmem_r,
-                      &iswk, eval_force, eval_energy, bt, gbr_bt, gbd_bt);
+                      &iswk, eval_force, eval_energy, bt, gbr_bt, gbd_bt, clash_minimum_distance,
+                      clash_ratio);
     }
     break;
   case PrecisionModel::SINGLE:
@@ -1396,7 +2149,8 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
       ThermostatWriter<float> tstw = heat_bath->spData(tier);
       ISWorkspaceKit<float> iswk = ism_space->spData(tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw, &gmem_r,
-                      &iswk, eval_force, eval_energy, force_sum, bt, gbr_bt, gbd_bt);
+                      &iswk, eval_force, eval_energy, force_sum, bt, gbr_bt, gbd_bt,
+                      clash_minimum_distance, clash_ratio);
     }
     break;
   }
@@ -1408,14 +2162,17 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                             Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                             ImplicitSolventWorkspace *ism_space, const EvaluateForce eval_force,
-                            const EvaluateEnergy eval_energy, const KernelManager &launcher) {
+                            const EvaluateEnergy eval_energy, const KernelManager &launcher,
+                            const double clash_minimum_distance, const double clash_ratio) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, heat_bath, sc, tb_space, ism_space,
-                    eval_force, eval_energy, AccumulationMethod::SPLIT, launcher);
+                    eval_force, eval_energy, AccumulationMethod::SPLIT, launcher,
+                    clash_minimum_distance, clash_ratio);
   }
   else {
     launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, heat_bath, sc, tb_space, ism_space,
-                    eval_force, eval_energy, AccumulationMethod::WHOLE, launcher);
+                    eval_force, eval_energy, AccumulationMethod::WHOLE, launcher,
+                    clash_minimum_distance, clash_ratio);
   }
 }
 

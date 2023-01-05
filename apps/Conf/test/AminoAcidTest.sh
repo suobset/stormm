@@ -28,4 +28,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn
+~/StormmBuild/apps/Conf/conformer.stormm -i cgen.in -warn

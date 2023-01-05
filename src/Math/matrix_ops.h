@@ -30,7 +30,7 @@ using testing::writeSnapshot;
 
 /// \brief The maximum number of QL iterations that will be allowed before the algorithm is
 ///        declared non-convergent.
-  constexpr int maximum_ql_iterations = 30;
+constexpr int maximum_ql_iterations = 30;
   
 /// \brief A twin pointer, useful for performing partial-pivoting Gaussian elimination on
 ///        row-major matrices.
@@ -58,6 +58,8 @@ enum class TransposeState {
 ///
 /// Overloaded:
 ///   - Operate on raw pointers to C-style arrays, with trusted row and column bounds
+///   - Accept Standard Template Library objects
+///   - Accept Hybrid objects for the arrays
 ///   - Take HpcMatrices as inputs, with desired transposes
 ///
 /// \param a        Hereafter "matrix A", the first of the operand matrices
@@ -80,6 +82,18 @@ void matrixMultiply(const T* a, size_t row_a, size_t col_a, const T* b, size_t r
                     TransposeState x_b = TransposeState::AS_IS);
 
 template <typename T>
+void matrixMultiply(const std::vector<T> &a, size_t row_a, size_t col_a, const std::vector<T> &b,
+                    size_t row_b, size_t col_b, std::vector<T> *c, T scale_a = 1.0,
+                    T scale_b = 1.0, T scale_c = 1.0, TransposeState x_a = TransposeState::AS_IS,
+                    TransposeState x_b = TransposeState::AS_IS);
+
+template <typename T>
+void matrixMultiply(const Hybrid<T> &a, size_t row_a, size_t col_a, const Hybrid<T> &b,
+                    size_t row_b, size_t col_b, Hybrid<T> *c, T scale_a = 1.0, T scale_b = 1.0,
+                    T scale_c = 1.0, TransposeState x_a = TransposeState::AS_IS,
+                    TransposeState x_b = TransposeState::AS_IS);
+
+template <typename T>
 void matrixMultiply(const HpcMatrix<T> &a, const HpcMatrix<T> &b, HpcMatrix<T> *c, T scale_a = 1.0,
                     T scale_b = 1.0, T scale_c = 1.0, TransposeState x_a = TransposeState::AS_IS,
                     TransposeState x_b = TransposeState::AS_IS);
@@ -92,6 +106,8 @@ void matrixMultiply(const HpcMatrix<T> &a, const HpcMatrix<T> &b, HpcMatrix<T> *
 ///
 /// Overloaded:
 ///   - Operate on raw pointers to C-style arrays, with trusted row and column bounds
+///   - Accept Standard Template Library objects
+///   - Accept Hybrid objects for the arrays
 ///   - Take an HpcMatrix, with either desired transpose, plus Hybrid object "vectors" as inputs 
 ///
 /// \param a        Hereafter "matrix A", the matrix in b = scale_b * b + scale_a * scale_x * (A x)
@@ -114,11 +130,50 @@ void matrixVectorMultiply(const T* a, const T* x, T* b, size_t row_a, size_t col
                           TransposeState x_a = TransposeState::AS_IS);
 
 template <typename T>
+void matrixVectorMultiply(const std::vector<T> &a, const std::vector<T> &x, std::vector<T> *b,
+                          size_t row_a, size_t col_a, T scale_a = 1.0, T scale_x = 1.0,
+                          T scale_b = 1.0, TransposeState x_a = TransposeState::AS_IS);
+
+template <typename T>
+void matrixVectorMultiply(const Hybrid<T> &a, const Hybrid<T> &x, Hybrid<T> *b, size_t row_a,
+                          size_t col_a, T scale_a = 1.0, T scale_x = 1.0, T scale_b = 1.0,
+                          TransposeState x_a = TransposeState::AS_IS);
+
+template <typename T>
 void matrixVectorMultiply(const HpcMatrix<T> &a, const Hybrid<T> &x, Hybrid<T> *b, T scale_a = 1.0,
                           T scale_x = 1.0, T scale_b = 1.0,
                           TransposeState x_a = TransposeState::AS_IS);
 /// \}
 
+/// \brief Compute the transpose of a matrix.
+///
+/// Overloaded:
+///   - Compute the in-place transpose using a pre-allocated workspace of known length (this will
+///     be checked for minimum space requirements)
+///   - Compute the out-of-place transpose
+///   - Operate on C-style arrays of trusted lengths
+///   - Operate on Standard Template Library Vectors
+///   - Operate on Hybrid objects
+/// \{
+template <typename T>
+void transpose(T* a, size_t rows, size_t columns, size_t n_work);
+
+template <typename T>
+void transpose(const T* a, T* a_transpose, size_t rows, size_t columns);
+
+template <typename T>
+void transpose(std::vector<T> *a, size_t rows, size_t columns, size_t n_work);
+
+template <typename T>
+void transpose(const std::vector<T> &a, std::vector<T> *a_transpose, size_t rows, size_t columns);
+
+template <typename T>
+void transpose(Hybrid<T> *a, size_t rows, size_t columns, size_t n_work);
+
+template <typename T>
+void transpose(const Hybrid<T> &a, Hybrid<T> *a_transpose, size_t rows, size_t columns);
+/// \}
+  
 /// \brief Invert a square matrix.  Simple function to avoid the heavy lift and compilation of
 ///        BLAS calls.  Templated for single- and double-precision functionality.
 ///
@@ -157,7 +212,7 @@ void checkArraySizeToMatrixRank(size_t actual_rank, size_t rank, size_t s_a, siz
 /// \param v       Pre-allocated matrix which will eventually hold the eiegnvectors
 /// \param d       Pre-allocated vector which will eventually hold the eigenvalues
 /// \param rank    Rank of the matrix
-/// \param policy  Procedure in the event that the iterative solver does not coverge
+/// \param policy  Procedure in the event that the iterative solver does not converge
 /// \{
 template <typename T>
 void jacobiEigensolver(T* a, T* v, T* d, size_t rank,
@@ -209,9 +264,82 @@ template <typename T>
 void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::vector<T> *diag,
                          std::vector<T> *eigv, EigenWork process = EigenWork::EIGENVECTORS);
 /// \}
-  
-/// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
-///        The matrix shall be presented in column-major format.
+
+/// \brief Solve the pseudo-inverse of a real matrix A by computing inv(At * A) * At.  The matrix
+///        A must have more rows than columns.  If the matrix is well-behaved, this produces the
+///        Moore-Penrose Inverse.
+///
+/// Overloaded:
+///   - Overwrite the original matrix A with its pseudo-inverse
+///   - Allocate new memory for the pseudo-inverse
+///   - Provide pre-allocated C-style arrays with trusted lengths
+///   - Provide Standard Template Library vectors
+///   - Provide Hybrid objects
+///
+/// \{
+template <typename T>
+void pseudoInverse(T* amat, T* workspace, T* inv_workspace, size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(T* amat, size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(const T* amat, T* result, T* workspace, T* inv_workspace, size_t rows,
+                   size_t columns);
+
+template <typename T>
+void pseudoInverse(std::vector<T> *amat, std::vector<T> *workspace, std::vector<T> *inv_workspace,
+                   size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(std::vector<T> *amat, size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(const std::vector<T> &amat, std::vector<T> *result, std::vector<T> *workspace,
+                   std::vector<T> *inv_workspace, size_t rows, size_t columns);
+
+template <typename T>
+std::vector<T> pseudoInverse(const std::vector<T> &amat, size_t rows, size_t columns);
+
+template <typename T>
+std::vector<T> pseudoInverse(const std::vector<T> &amat, std::vector<T> *workspace,
+                             std::vector<T> *inv_workspace, size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(Hybrid<T> *amat, Hybrid<T> *workspace, Hybrid<T> *inv_workspace, size_t rows,
+                   size_t columns);
+
+template <typename T>
+void pseudoInverse(Hybrid<T> *amat, size_t rows, size_t columns);
+
+template <typename T>
+void pseudoInverse(const Hybrid<T> &amat, Hybrid<T> *result, Hybrid<T> *workspace,
+                   Hybrid<T> *inv_workspace, size_t rows, size_t columns);
+/// \}
+
+/// \brief Solve a system of equations using the QR decomposition.  The matrix shall be presented
+///        in column-major format.
+///
+/// Overloaded:
+///   - Provide C-style arrays, all modifiable and with trusted row and column counts, for the
+///     stiffness matrix, the solution vector, and the coefficients vector.
+///   - Proivde Standard Template Library vectors with compatible lengths
+///
+/// \param amat    The stiffness matrix
+/// \param xvec    The vector of coefficients to be solved
+/// \param bvec    The solution vector for the system of equations
+/// \param a_rows  Trusted number of rows in amat, and length of bvec
+/// \param a_cols  Trusted number of columns in amat, and length of xvec
+/// \{
+template <typename T>
+void qrSolver(T* amat, T* xvec, T* bvec, const size_t a_rows, const size_t a_cols);
+
+template <typename T>
+void qrSolver(std::vector<T> *amat, std::vector<T> *xvec, std::vector<T> *bvec);  
+
+template <typename T>
+void qrSolver(const std::vector<T> &amat, std::vector<T> *xvec, const std::vector<T> &bvec);
+/// \}
 
 /// \brief Compute the determinant of a rank N matrix using the Leibniz formula.
 ///

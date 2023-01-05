@@ -28,6 +28,9 @@
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, VALENCE_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
+#ifdef CLASH_FORGIVENESS
+            const TCALC clash_minimum_distance, const TCALC clash_ratio,
+#endif
 #ifdef UPDATE_ATOMS            
             SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk, ThermostatWriter<TCALC> tstw,
 #endif
@@ -792,8 +795,28 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                 poly_vk.coulomb / attn_qq14;
             const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
             const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]);
+#ifdef CLASH_FORGIVENESS
+
+            // Compute the distance and then the ratio of this distance to the pair sigma value.
+            // Use the minimum distance criterion to provide a floor on the perceived distance, to
+            // ensure that virtual sites with no van-der Waals parameters cannot come too close.
+            const TCALC r = SQRT_FUNC((ad.x * ad.x) + (ad.y * ad.y) + (ad.z * ad.z));
+            const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ?
+                                SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) : (TCALC)(0.0);
+            TCALC invr_il;
+            if (r < clash_minimum_distance) {
+              invr_il = (TCALC)(1.0) / clash_minimum_distance;
+            }
+            else if (r < sigma * clash_ratio) {
+              invr_il = (TCALC)(1.0) / (sigma * clash_ratio);
+            }
+            else {
+              invr_il = (TCALC)(1.0) / r;
+            }
+#else
             const TCALC invr_il = (TCALC)(1.0) /
                                   SQRT_FUNC((ad.x * ad.x) + (ad.y * ad.y) + (ad.z * ad.z));
+#endif
             const TCALC invr2_il = invr_il * invr_il;
             const TCALC invr4_il = invr2_il * invr2_il;
 #ifdef COMPUTE_ENERGY
@@ -1259,7 +1282,27 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                             poly_vk.coulomb * attn_qq14;
         const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]) * attn_lj14;
         const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]) * attn_lj14;
+#ifdef CLASH_FORGIVENESS
+
+        // Compute the distance and then the ratio of this distance to the pair sigma value.  Use
+        // the minimum distance criterion to provide a floor on the perceived distance, to ensure
+        // that virtual sites with no van-der Waals parameters cannot come too close.
+        const TCALC r = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+        const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ? SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) :
+                                                         (TCALC)(0.0);
+        TCALC invr;
+        if (r < clash_minimum_distance) {
+          invr = (TCALC)(1.0) / clash_minimum_distance;
+        }
+        else if (r < sigma * clash_ratio) {
+          invr = (TCALC)(1.0) / (sigma * clash_ratio);
+        }
+        else {
+          invr = (TCALC)(1.0) / r;
+        }
+#else
         const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+#endif
         const TCALC invr2 = invr  * invr;
         const TCALC invr4 = invr2 * invr2;
 #ifdef COMPUTE_ENERGY
@@ -2577,7 +2620,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 
     // Update virtual site positions.
     if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
-    }    
+    }
 #  endif
 #endif // UPDATE_ATOMS or COMPUTE_FORCE
     

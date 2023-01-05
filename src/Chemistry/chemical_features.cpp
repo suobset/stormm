@@ -164,8 +164,42 @@ IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
                        const int pivot_atom_in, const std::vector<int> &moving_atoms_in,
                        const AtomGraph* ag_pointer_in) :
     motion{motion_in}, chiral_plan{chiral_plan_in}, root_atom{root_atom_in},
-    pivot_atom{pivot_atom_in}, moving_atoms{moving_atoms_in}, ag_pointer{ag_pointer_in}
-{}
+    pivot_atom{pivot_atom_in}, root_handle{-1}, pivot_handle{-1}, moving_atoms{moving_atoms_in},
+    ag_pointer{const_cast<AtomGraph*>(ag_pointer_in)}
+{
+  switch (motion) {
+  case ConformationEdit::BOND_ROTATION:
+  case ConformationEdit::CIS_TRANS_FLIP:
+    {
+      // Find the root atom's handle
+      const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+      const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+      const int root_min_bound = nbk.nb12_bounds[root_atom];
+      const int root_max_bound = nbk.nb12_bounds[root_atom + 1];
+      int max_root_z = -1;
+      for (int i = root_min_bound; i < root_max_bound; i++) {
+        if (nbk.nb12x[i] != pivot_atom && cdk.z_numbers[nbk.nb12x[i]] > max_root_z) {
+          max_root_z = cdk.z_numbers[nbk.nb12x[i]];
+          root_handle = nbk.nb12x[i];
+        }
+      }
+
+      // Find the pivot atom's handle
+      const int pivot_min_bound = nbk.nb12_bounds[pivot_atom];
+      const int pivot_max_bound = nbk.nb12_bounds[pivot_atom + 1];
+      int max_pivot_z = -1;
+      for (int i = pivot_min_bound; i < pivot_max_bound; i++) {
+        if (nbk.nb12x[i] != pivot_atom && cdk.z_numbers[nbk.nb12x[i]] > max_root_z) {
+          max_pivot_z = cdk.z_numbers[nbk.nb12x[i]];
+          pivot_handle = nbk.nb12x[i];
+        }
+      }
+    }
+    break;
+  case ConformationEdit::CHIRAL_INVERSION:
+    break;
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
@@ -190,40 +224,6 @@ IsomerPlan::IsomerPlan(const ConformationEdit motion_in, const int root_atom_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-IsomerPlan& IsomerPlan::operator=(const IsomerPlan &other) {
-
-  // Guard against self-assignment
-  if (this == &other) {
-    return *this;
-  }
-
-  // Copy each element
-  motion = other.motion;
-  root_atom = other.root_atom;
-  pivot_atom = other.pivot_atom;
-  moving_atoms = other.moving_atoms;
-  ag_pointer = other.ag_pointer;
-  return *this;
-}
-
-//-------------------------------------------------------------------------------------------------
-IsomerPlan& IsomerPlan::operator=(IsomerPlan &&other) {
-
-  // Guard against self-assignment
-  if (this == &other) {
-    return *this;
-  }
-
-  // Copy each element
-  motion = other.motion;
-  root_atom = other.root_atom;
-  pivot_atom = other.pivot_atom;
-  moving_atoms = std::move(other.moving_atoms);
-  ag_pointer = other.ag_pointer;
-  return *this;
-}
-
-//-------------------------------------------------------------------------------------------------
 ConformationEdit IsomerPlan::getMotion() const {
   return motion;
 }
@@ -241,6 +241,16 @@ int IsomerPlan::getRootAtom() const {
 //-------------------------------------------------------------------------------------------------
 int IsomerPlan::getPivotAtom() const {
   return pivot_atom;
+}
+
+//-------------------------------------------------------------------------------------------------
+int IsomerPlan::getRootHandle() const {
+  return root_handle;
+}
+
+//-------------------------------------------------------------------------------------------------
+int IsomerPlan::getPivotHandle() const {
+  return pivot_handle;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -883,7 +893,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       ring_participation_bounds[ring_atoms_ptr[j]] += 1;
     }
   }
-  prefixSumInPlace<int>(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  prefixSumInPlace(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
   std::vector<int> ring_participation(ring_participation_bounds[atom_count]);
   for (int i = 0; i < nring; i++) {
     for (int j = ring_bounds_ptr[i]; j < ring_bounds_ptr[i + 1]; j++) {
@@ -1543,7 +1553,7 @@ void ChemicalFeatures::findAromaticGroups(const ChemicalDetailsKit &cdk,
       ring_participation_bounds[tmp_ring_atoms[j]] += 1;
     }
   }
-  prefixSumInPlace<int>(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  prefixSumInPlace(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
   std::vector<int> ring_participation(ring_participation_bounds[atom_count]);
   for (int i = 0; i < ring_count; i++) {
     for (int j = tmp_ring_atom_bounds[i]; j < tmp_ring_atom_bounds[i+1]; j++) {
@@ -1987,7 +1997,7 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
   for (int i = 0; i < tmp_ring_atom_bounds[ring_count]; i++) {
     ring_occupancy_bounds[tmp_ring_atoms[i]] += 1;
   }
-  prefixSumInPlace<int>(&ring_occupancy_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  prefixSumInPlace(&ring_occupancy_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
   std::vector<int> ring_occupancy(ring_occupancy_bounds[atom_count]);
   for (int i = 0; i < ring_count; i++) {
     for (int j = tmp_ring_atom_bounds[i]; j < tmp_ring_atom_bounds[i + 1]; j++) {

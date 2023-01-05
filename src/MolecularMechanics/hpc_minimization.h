@@ -84,30 +84,36 @@ void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
 ///     (the energy minimizations will accumulate the results in the prepared energy tracking
 ///     object and leave it modified when the function completes)
 ///
-/// \param prec           The precision to use in general arithmetic.  Also activates an extended
-///                       mode of fixed-precision data representation in the coordinates object.
-/// \param poly_ag        Compilation of all systems' topologies (a "synthesis" of systems)
-/// \param poly_se        Synthesis of exclusion masks, tailored to the topology synthesis
-/// \param poly_ps        Compilation of coordinates, forces, and other useful arrays for
-///                       minimizing each structure
-/// \param mmctrl_fe      Control data for the minimization run, plus progress counters for GPU
-///                       kernel management in force + energy computations
-/// \param mmctrl_xe      Control data for the minimization run, plus progress counters for GPU
-///                       kernel management in energy-only computations
-/// \param sc             Energy tracking object allocated to cover all systems in the synthesis
-/// \param vale_fe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
-///                       energy computations
-/// \param vale_xe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
-///                       energy computations
-/// \param nonb_cache     Pre-allocated scratch space for non-bonded kernel thread blocks
-/// \param ism_space      Pre-allocated space to store intermediate computations for Born radii
-///                       and their derivatives
-/// \param rbg            Pre-allocated storage space for reduction work units
-/// \param line_record    Stores line minimization progress, energies and move lengths
-/// \param acc_meth       Choice of force accumulation method
-/// \param gpu            Details of the GPU in use
-/// \param launcher       Holds parameters for all kernels, will be accessed for the correct
-///                       launch configurations of the kernels relevant to the workload at hand
+/// \param prec             The precision to use in general arithmetic.  Also activates an extended
+///                         mode of fixed-precision data representation in the coordinates object.
+/// \param poly_ag          Compilation of all systems' topologies (a "synthesis" of systems)
+/// \param poly_se          Synthesis of exclusion masks, tailored to the topology synthesis
+/// \param poly_ps          Compilation of coordinates, forces, and other useful arrays for
+///                         minimizing each structure
+/// \param mmctrl_fe        Control data for the minimization run, plus progress counters for GPU
+///                         kernel management in force + energy computations
+/// \param mmctrl_xe        Control data for the minimization run, plus progress counters for GPU
+///                         kernel management in energy-only computations
+/// \param sc               Energy tracking object allocated to cover all systems in the synthesis
+/// \param vale_fe_cache    Pre-allocated scratch space for valence kernel thread blocks in force +
+///                         energy computations
+/// \param vale_xe_cache    Pre-allocated scratch space for valence kernel thread blocks in force +
+///                         energy computations
+/// \param vale_cdfe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
+///                         energy computations with clash damping
+/// \param vale_cdxe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
+///                         energy computations with clash damping
+/// \param nonb_cache       Pre-allocated scratch space for non-bonded kernel thread blocks
+/// \param nonb_cd_cache    Pre-allocated scratch space for non-bonded kernel thread blocks with
+///                         clash damping
+/// \param ism_space        Pre-allocated space to store intermediate computations for Born radii
+///                         and their derivatives
+/// \param rbg              Pre-allocated storage space for reduction work units
+/// \param line_record      Stores line minimization progress, energies and move lengths
+/// \param acc_meth         Choice of force accumulation method
+/// \param gpu              Details of the GPU in use
+/// \param launcher         Holds parameters for all kernels, will be accessed for the correct
+///                         launch configurations of the kernels relevant to the workload at hand
 /// \{
 void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                         const StaticExclusionMaskSynthesis &poly_se,
@@ -115,10 +121,12 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         MolecularMechanicsControls *mmctrl_fe,
                         MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
                         CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
-                        CacheResource *nonb_xe_cache, ImplicitSolventWorkspace *ism_space,
-                        ReductionBridge *rbg, LineMinimization *line_record,
-                        const AccumulationMethod acc_meth, const GpuDetails &gpu,
-                        const KernelManager &launcher, StopWatch *timer = nullptr,
+                        CacheResource *vale_cdfe_cache, CacheResource *vale_cdxe_cache,
+                        CacheResource *nonb_cache, CacheResource *nonb_cd_cache,
+                        ImplicitSolventWorkspace *ism_space, ReductionBridge *rbg,
+                        LineMinimization *line_record, const AccumulationMethod acc_meth,
+                        const GpuDetails &gpu, const KernelManager &launcher,
+                        StopWatch *timer = nullptr,
                         const std::string &task_name = std::string(""));
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,

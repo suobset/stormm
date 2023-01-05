@@ -130,6 +130,9 @@ public:
   
   AtomEquivalence(const ChemicalFeatures &chemfe_in, StopWatch *timer = nullptr,
                   int low_molecule_index = 0, int high_molecule_index = -1);
+
+  AtomEquivalence(const AtomGraph &ag_in, const CoordinateFrame &cf, StopWatch *timer = nullptr,
+                  int low_molecule_index = 0, int high_molecule_index = -1);
   /// \}
 
   /// The default copy and move constructors, as well as copy and move assignment operators, will
@@ -148,6 +151,10 @@ public:
   /// \brief Get the number of atom equivalence groups.
   int getGroupCount() const;
 
+  /// \brief Get the number of levels of symmetry-related groups.  This is essential for mapping
+  ///        identity swaps that an atom might undergo in a symmetry-corrected RMSD calculation.
+  int getSymmetryDepth() const;
+  
   /// \brief Get the atoms of one group as an independent Standard Template Library vector.
   ///
   /// \param group_index  The group of interest
@@ -176,6 +183,12 @@ public:
   /// \param group_index  The group of interest  
   int getGroupOrder(int group_index) const;
 
+  /// \brief Get the depth of the group of interest in terms of its dependence on (containment
+  ///        within) other groups of symmetry-related atoms.
+  ///
+  /// \param group_index  The group of interest  
+  int getGroupLevel(int group_index) const;
+  
   /// \brief Get the manner by which combinations of the group's interchangeable subunits should be
   ///        laid out in order to search for the best RMSD fit.
   ///
@@ -183,12 +196,15 @@ public:
   EquivalenceSwap getGroupRule(int group_index) const;
   
   /// \brief Get a list of a group's dependencies (other groups that the group in question contains
-  ///        completely).  When evaluating dependent groups, the procedure must be to work from the
-  ///        outside in, swapping 
+  ///        completely).  Chained dependencies are handled implicitly by the complete containment
+  ///        criterion.
   ///
   /// \param group_index  The group of interest  
   std::vector<int> getGroupDependencies(int group_index) const;
 
+  /// \brief Get the number of asymmetric core atoms
+  int getAsymmetricAtomCount() const;
+  
   /// \brief Get a const reference to the list of atoms outside any symmetry group.
   const std::vector<int>& getAsymmetricAtoms() const;
 
@@ -197,6 +213,8 @@ public:
 
 private:
   int group_count;                     ///< The number of equivalent atom groups
+  int symmetry_depth;                  ///< The number of levels in symmetry groups and their
+                                       ///<   dependencies 
   std::vector<int> group_atoms;        ///< Indices of atoms in each equivalent group.  For a group
                                        ///<   with K atoms and N-fold symmetry, the equivalent
                                        ///<   atoms of the first group instance are listed
@@ -206,6 +224,12 @@ private:
   std::vector<int> group_sizes;        ///< The number of atoms in each equivalent atom group
   std::vector<int> group_orders;       ///< The number of symmetric instances of each group
   std::vector<int> group_bounds;       ///< Bounds array for group_atoms above
+  std::vector<int> group_levels;       ///< The depth at which each group is accessed.  Groups that
+                                       ///<   are not the dependents of any other are level 0 (and
+                                       ///<   if all groups are at level 0 the object's overall
+                                       ///<   symmetry_depth is 1).  Symmetry-related atom groups
+                                       ///<   that are the direct dependents of level 0 groups are
+                                       ///<   level 1, their dependents are level 2, and so on.
   std::vector<int> dependencies;       ///< Indices of dependent groups for each group in the
                                        ///<   molecule.  If group 4 is completely subsumed within
                                        ///<   group 3, then the dependencies of group 3 will
@@ -332,9 +356,18 @@ private:
                            const std::vector<int> &selected_domains,
                            const std::vector<bool> &touch_table);
 
+  /// \brief Cull duplicate groups (those containing the same atoms and only the same atoms) from
+  ///        the list of symmetry groups to be considered.
+  void cullDuplicateGroups();
+  
   /// \brief Analyze the detected symmetry groups and determine which ones are subsumed within
   ///        others.  When making plans to create 
   void findDependencies();
+
+  /// \brief Order the symmetry-related atom groups in decreasing order of the ratio of total mass
+  ///        in the group's atoms to the combinatorial number of possible arrangements for those
+  ///        atoms, given the group's symmetry order and that of all its dependents.
+  void orderAllGroups();
 };
 
 /// \brief Beginning with two distinct atoms in a molecule within a topology, proceed throughout

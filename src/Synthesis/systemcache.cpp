@@ -677,7 +677,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   for (int i = 0; i < system_count; i++) {
     topology_case_bounds[topology_indices[i]] += 1;
   }
-  prefixSumInPlace<int>(&topology_case_bounds, PrefixSumType::EXCLUSIVE, "SystemCache");
+  prefixSumInPlace(&topology_case_bounds, PrefixSumType::EXCLUSIVE, "SystemCache");
   for (int i = 0; i < system_count; i++) {
     const int case_idx = topology_case_bounds[topology_indices[i]];
     topology_cases[case_idx] = i;
@@ -725,19 +725,19 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   // system.
   features_cache.reserve(system_count);
   for (int i = 0; i < system_count; i++) {
-
+    
     // Determine whether chemical features have been computed for this topology already.
     // If not, create them anew.  If so, copy the features and recompute chiral orientations.
     const int top_idx = topology_indices[i];
     if (i > example_indices[top_idx]) {
       features_cache.emplace_back(features_cache[example_indices[top_idx]]);
-      features_cache[i].findChiralOrientations(CoordinateFrameReader(coordinates_cache[i]));
     }
     else {
       features_cache.emplace_back(&topology_cache[top_idx],
                                   CoordinateFrameReader(coordinates_cache[i]), map_chemfe_rotators,
                                   300.0, timer_in);
     }
+    features_cache[i].findChiralOrientations(CoordinateFrameReader(coordinates_cache[i]));
   }
 
   // Create Exclusion masks of the appropriate kind
@@ -915,11 +915,11 @@ AtomGraph* SystemCache::getTopologyPointer(const int topology_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<const AtomGraph*> SystemCache::getTopologyPointer() const {
+const std::vector<AtomGraph*> SystemCache::getTopologyPointer() const {
   const size_t ntop = topology_cache.size();
-  std::vector<const AtomGraph*> result(ntop);
+  std::vector<AtomGraph*> result(ntop);
   for (size_t i = 0; i < ntop; i++) {
-    result[i] = &topology_cache[i];
+    result[i] = const_cast<AtomGraph*>(&topology_cache[i]);
   }
   return result;
 }
@@ -966,12 +966,11 @@ AtomGraph* SystemCache::getSystemTopologyPointer(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<const AtomGraph*> SystemCache::getSystemTopologyPointer() const {
+const std::vector<AtomGraph*> SystemCache::getSystemTopologyPointer() const {
   const size_t nsys = coordinates_cache.size();
-  std::vector<const AtomGraph*> result(nsys);
-  const AtomGraph* tp_data = topology_cache.data();
+  std::vector<AtomGraph*> result(nsys);
   for (size_t i = 0; i < nsys; i++) {
-    result[i] = &tp_data[topology_indices[i]];
+    result[i] = const_cast<AtomGraph*>(&topology_cache[topology_indices[i]]);
   }
   return result;
 }
@@ -1039,12 +1038,12 @@ PhaseSpace* SystemCache::getCoordinatePointer(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<const PhaseSpace*> SystemCache::getCoordinatePointer() const {
+const std::vector<PhaseSpace*> SystemCache::getCoordinatePointer() const {
   const PhaseSpace* ps_ptr = coordinates_cache.data();
   const int nsys = coordinates_cache.size();
-  std::vector<const PhaseSpace*> result(nsys);
+  std::vector<PhaseSpace*> result(nsys);
   for (size_t i = 0; i < nsys; i++) {
-    result[i] = &ps_ptr[i];
+    result[i] = const_cast<PhaseSpace*>(&ps_ptr[i]);
   }
   return result;
 }

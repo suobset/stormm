@@ -4,6 +4,7 @@
 
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
@@ -19,6 +20,7 @@ namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using constants::CartesianDimension;
 using data_types::isFloatingPointScalarType;
 using data_types::isSignedIntegralScalarType;
 using diskutil::DrivePathType;
@@ -285,6 +287,21 @@ public:
   /// \brief Download all information
   void download();
 #endif
+
+  /// \brief Get a const pointer to the object iself, so that it may be passed to functions by
+  ///        const reference and still emit a const poiner.
+  const CoordinateSeries<T>* getSelfPointer() const;
+
+  /// \brief Get a const reference to the one of the Cartesian coordinate arrays.
+  ///
+  /// \param dim  The dimension of interest
+  const Hybrid<T>& getCoordinateReference(CartesianDimension dim) const;
+
+  /// \brief Get a const pointer to the one of the Cartesian coordinate arrays.
+  ///
+  /// \param dim  The dimension of interest
+  const Hybrid<T>* getCoordinatePointer(CartesianDimension dim) const;
+
   /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
   ///        access to any of its member variables.
   ///

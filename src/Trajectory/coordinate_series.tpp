@@ -631,6 +631,40 @@ template <typename T> void CoordinateSeries<T>::download() {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+const CoordinateSeries<T>* CoordinateSeries<T>::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const Hybrid<T>& CoordinateSeries<T>::getCoordinateReference(CartesianDimension dim) const {
+  switch (dim) {
+  case CartesianDimension::X:
+    return x_coordinates;
+  case CartesianDimension::Y:
+    return y_coordinates;
+  case CartesianDimension::Z:
+    return z_coordinates;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const Hybrid<T>* CoordinateSeries<T>::getCoordinatePointer(CartesianDimension dim) const {
+  switch (dim) {
+  case CartesianDimension::X:
+    return &x_coordinates;
+  case CartesianDimension::Y:
+    return &y_coordinates;
+  case CartesianDimension::Z:
+    return &z_coordinates;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 CoordinateSeriesWriter<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) {
   return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
                                    globalpos_scale, inverse_globalpos_scale,

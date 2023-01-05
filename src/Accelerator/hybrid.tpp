@@ -577,11 +577,6 @@ void Hybrid<T>::readHost(T* v, const size_t offset, const size_t count) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void Hybrid<T>::readHost(T* v) const {
-  readHost(v, 0, length);
-}
-
-//-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::putHost(const T value, const size_t index) {
 
   // Check that there is data on the host

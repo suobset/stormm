@@ -78,6 +78,37 @@ double Ran2Generator::uniformRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> Ran2Generator::uniformRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = uniformRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Ran2Generator::uniformRandomNumber(const size_t rows, const size_t columns,
+                                                       const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = uniformRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = uniformRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 double Ran2Generator::gaussianRandomNumber() {
 
   using symbols::twopi;
@@ -87,6 +118,36 @@ double Ran2Generator::gaussianRandomNumber() {
   return x1 * x2;
 }
 
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Ran2Generator::gaussianRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = gaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Ran2Generator::gaussianRandomNumber(const size_t rows, const size_t columns,
+                                                        const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(count);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = gaussianRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = gaussianRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
 //-------------------------------------------------------------------------------------------------
 Xoroshiro128pGenerator::Xoroshiro128pGenerator(const int igseed, const int niter) :
     state{seed128(igseed)}
@@ -127,11 +188,75 @@ double Xoroshiro128pGenerator::uniformRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> Xoroshiro128pGenerator::uniformRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = uniformRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Xoroshiro128pGenerator::uniformRandomNumber(const size_t rows,
+                                                                const size_t columns,
+                                                                const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = uniformRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = uniformRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 float Xoroshiro128pGenerator::spUniformRandomNumber() {
   const ullint rndbits = next();
   PolyNumeric work;
   work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
   return work.f2.x - 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoroshiro128pGenerator::spUniformRandomNumber(const size_t count) {
+  std::vector<float> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = spUniformRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoroshiro128pGenerator::spUniformRandomNumber(const size_t rows,
+                                                                 const size_t columns,
+                                                                 const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = spUniformRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = spUniformRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -142,10 +267,74 @@ double Xoroshiro128pGenerator::gaussianRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> Xoroshiro128pGenerator::gaussianRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = gaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Xoroshiro128pGenerator::gaussianRandomNumber(const size_t rows,
+                                                                 const size_t columns,
+                                                                 const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(count);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = gaussianRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = gaussianRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 float Xoroshiro128pGenerator::spGaussianRandomNumber() {
   const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
   const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoroshiro128pGenerator::spGaussianRandomNumber(const size_t count) {
+  std::vector<float> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = spGaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoroshiro128pGenerator::spGaussianRandomNumber(const size_t rows,
+                                                                  const size_t columns,
+                                                                  const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(count);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = spGaussianRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = spGaussianRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -270,11 +459,75 @@ double Xoshiro256ppGenerator::uniformRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> Xoshiro256ppGenerator::uniformRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = uniformRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Xoshiro256ppGenerator::uniformRandomNumber(const size_t rows,
+                                                               const size_t columns,
+                                                               const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = uniformRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = uniformRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 float Xoshiro256ppGenerator::spUniformRandomNumber() {
   const ullint rndbits = next();
   PolyNumeric work;
   work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
   return work.f2.x - 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoshiro256ppGenerator::spUniformRandomNumber(const size_t count) {
+  std::vector<float> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = spUniformRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoshiro256ppGenerator::spUniformRandomNumber(const size_t rows,
+                                                                const size_t columns,
+                                                                const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = spUniformRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = spUniformRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -285,12 +538,77 @@ double Xoshiro256ppGenerator::gaussianRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> Xoshiro256ppGenerator::gaussianRandomNumber(const size_t count) {
+  std::vector<double> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = gaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> Xoshiro256ppGenerator::gaussianRandomNumber(const size_t rows,
+                                                                const size_t columns,
+                                                                const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(count);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = gaussianRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = gaussianRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 float Xoshiro256ppGenerator::spGaussianRandomNumber() {
   const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
   const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }
- 
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoshiro256ppGenerator::spGaussianRandomNumber(const size_t count) {
+  std::vector<float> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = spGaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<float> Xoshiro256ppGenerator::spGaussianRandomNumber(const size_t rows,
+                                                                 const size_t columns,
+                                                                 const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(count);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = spGaussianRandomNumber();
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = spGaussianRandomNumber();
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+
 //-------------------------------------------------------------------------------------------------
 void Xoshiro256ppGenerator::jump() {
   const ullint4 stride = { xrs256pp_jump_i,   xrs256pp_jump_ii,

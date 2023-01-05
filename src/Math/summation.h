@@ -28,13 +28,25 @@ enum class PrefixSumType {
 ///       array, provide an array that is one element larger than the actual number of indices of
 ///       interest with a zero in the final element.
 ///
+/// Overloaded:
+///   - Operate on a C-style array with a trusted length
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object (HOST data only)
+///
 /// \param v       The vector to accumulate
 /// \param style   Method for computing the sum
 /// \param caller  Name of the calling function (optional)
 /// \{
-template <typename TSum, typename TBase>
+template <typename TBase>
+void prefixSumInPlace(TBase* vdata, const size_t n_elements, const PrefixSumType style,
+                      const char* caller);
+
+template <typename TBase>
 void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style,
                       const char* caller = nullptr);
+
+template <typename TBase>
+void prefixSumInPlace(Hybrid<TBase> *v, const PrefixSumType style, const char* caller = nullptr);
 /// \}
 
 /// \brief Sum the elements of a standard template library vector for elements of known types.

@@ -787,8 +787,8 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
       cnst_affector_bounds[cnk.group_list[j]] += 1;
     }
   }
-  prefixSumInPlace<int>(&vste_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
-  prefixSumInPlace<int>(&cnst_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace(&vste_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace(&cnst_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   
   // Finish up the virtual site mapping
   for (int pos = 0; pos < vsk.nsite; pos++) {

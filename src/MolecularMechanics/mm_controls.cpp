@@ -8,6 +8,7 @@ namespace stormm {
 namespace mm {
 
 using card::HybridKind;
+using energy::ClashResponse;
 using math::ReductionGoal;
 using numerics::AccumulationMethod;
 using synthesis::VwuGoal;
@@ -312,14 +313,15 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
   const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
                                                     AccumulationMethod::SPLIT,
-                                                    VwuGoal::ACCUMULATE);
+                                                    VwuGoal::ACCUMULATE, ClashResponse::NONE);
   const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                         AccumulationMethod::SPLIT, igb);
   const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                              AccumulationMethod::SPLIT, igb);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        eval_frc, eval_nrg,
-                                                       AccumulationMethod::SPLIT, igb);
+                                                       AccumulationMethod::SPLIT, igb,
+                                                       ClashResponse::NONE);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
 

@@ -15,6 +15,9 @@
 __global__ void __launch_bounds__(small_block_size, NONBOND_KERNEL_BLOCKS_MULTIPLIER)
 KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisReader poly_se,
             const MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
+#ifdef CLASH_FORGIVENESS
+            const TCALC clash_minimum_distance, const TCALC clash_ratio,
+#endif
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,
 #endif
@@ -477,12 +480,28 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #  endif
 #endif
         if (!((t_mask >> (crd_src_lane - (tile_length * (warp_lane_idx < tile_length)))) & 0x1)) {
-          const TCALC invr      = rsqrt(r2);
-          const TCALC invr2     = invr * invr;
-          const TCALC invr4     = invr2 * invr2;
           const size_t ot_ljidx = (t_ljidx * nljt) + o_ljidx + lj_offset;
           const TCALC lja       = poly_nbk.lja_coeff[ot_ljidx];
           const TCALC ljb       = poly_nbk.ljb_coeff[ot_ljidx];
+#ifdef CLASH_FORGIVENESS
+          const TCALC r         = sqrt(r2);
+          const TCALC sigma     = (ljb > (TCALC)(1.0e-6)) ? SQRT_FUNC(CBRT_FUNC(lja / ljb)) :
+                                                            (TCALC)(0.0);
+          TCALC invr;
+          if (r < clash_minimum_distance) {
+            invr = (TCALC)(1.0) / clash_minimum_distance;
+          }
+          else if (r < sigma * clash_ratio) {
+            invr = (TCALC)(1.0) / (sigma * clash_ratio);
+          }
+          else {
+            invr = rsqrt(r2);
+          }
+#else
+          const TCALC invr      = rsqrt(r2);
+#endif
+          const TCALC invr2     = invr * invr;
+          const TCALC invr4     = invr2 * invr2;
 #ifdef COMPUTE_FORCE
           fmag += ((((TCALC)(6.0) * ljb) -
                     ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4) -

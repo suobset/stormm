@@ -6,6 +6,36 @@ namespace random {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void Ran2Generator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
+  const size_t count = xv->size();
+  T* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void Xoroshiro128pGenerator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
+  const size_t count = xv->size();
+  T* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void Xoshiro256ppGenerator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
+  const size_t count = xv->size();
+  T* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 RandomNumberMill<T>::RandomNumberMill(const ullint2 state_in, const size_t generators_in,
                                       const size_t depth_in, const RandomNumberKind init_kind,
                                       const size_t bank_limit) :

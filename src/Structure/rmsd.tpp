@@ -5,6 +5,56 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+                        const Hybrid<T> *result, const RMSDTask process) {
+  const PsSynthesisReader poly_psr = poly_ps.data();
+  const int ntop = poly_psr.unique_topology_count;
+  if (ntop != rplan.getPlanCount()) {
+    rtErr("The number of unique topologies in the synthesis " + std::to_string(ntop) + "must "
+          "comport with the number of individual RMSD calculation plans (" +
+          std::to_string(rplan.getPlanCount()) + ").", "checkComatibility");
+  }
+  switch (process) {
+  case RMSDTask::REFERENCE:
+    if (result->size() != rplan.getReferenceRMSDSize()) {
+      rtErr("The anticipated total sizes of RMSD-to-reference calculations (" +
+            std::to_string(rplan.getReferenceRMSDSize()) + ") is not matched by the size of the "
+            "results array (" + std::to_string(result->size()) + ").", "checkCompatibility");
+    }
+    break;
+  case RMSDTask::MATRIX:
+    if (result->size() != rplan.getRMSDMatrixSize()) {
+      rtErr("The anticipated total sizes of RMSD matrix calculations (" +
+            std::to_string(rplan.getRMSDMatrixSize()) + ") is not matched by the size of the "
+            "results array (" + std::to_string(result->size()) + ").", "checkCompatibility");
+    }
+    break;
+  }
+  for (int i = 0; i < ntop; i++) {
+    if (rplan.getFrameCount(i) !=
+        poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i]) {
+      rtErr("The anticipated number of frames relating to unique topology " +
+            std::to_string(i) + " in the synthesis (" +
+            std::to_string(poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i]) +
+            ") does not agree with the space allocated in the RMSD calculation tables (" +
+            std::to_string(rplan.getFrameCount(i)) + ").", "rmsd");
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+                        const Condensate &cdns, const Hybrid<T> *result, const RMSDTask process) {
+  checkCompatibility(rplan, poly_ps, result, process);
+  if (cdns.getSynthesisPointer() != poly_ps.getSelfPointer()) {
+    rtErr("The condensed coordinate representation does not reference the original synthesis.",
+          "checkCompatibility");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, const Tcoord* xcrd_b,
            const Tcoord* ycrd_b, const Tcoord* zcrd_b, const Tcalc* masses,
@@ -14,7 +64,8 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
   const Tcalc value_one = 1.0;
-  Tcalc result = 0.0;
+  const Tcalc value_zero = 0.0;
+  Tcalc result = value_zero;
   Tcalc inv_mass_divisor;
   switch (method) {
   case RMSDMethod::ALIGN_MASS:
@@ -32,21 +83,21 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
     {
       // In order to compute the aligned RMSD without moving the coordinates, the movement must
       // be computed in temporary variables only.
-      Tcalc sab_xx = 0.0;
-      Tcalc sab_xy = 0.0;
-      Tcalc sab_xz = 0.0;
-      Tcalc sab_yx = 0.0;
-      Tcalc sab_yy = 0.0;
-      Tcalc sab_yz = 0.0;
-      Tcalc sab_zx = 0.0;
-      Tcalc sab_zy = 0.0;
-      Tcalc sab_zz = 0.0;
-      Tcalc sa_x = 0.0;
-      Tcalc sa_y = 0.0;
-      Tcalc sa_z = 0.0;
-      Tcalc sb_x = 0.0;
-      Tcalc sb_y = 0.0;
-      Tcalc sb_z = 0.0;
+      Tcalc sab_xx = value_zero;
+      Tcalc sab_xy = value_zero;
+      Tcalc sab_xz = value_zero;
+      Tcalc sab_yx = value_zero;
+      Tcalc sab_yy = value_zero;
+      Tcalc sab_yz = value_zero;
+      Tcalc sab_zx = value_zero;
+      Tcalc sab_zy = value_zero;
+      Tcalc sab_zz = value_zero;
+      Tcalc sa_x = value_zero;
+      Tcalc sa_y = value_zero;
+      Tcalc sa_z = value_zero;
+      Tcalc sb_x = value_zero;
+      Tcalc sb_y = value_zero;
+      Tcalc sb_z = value_zero;
       const bool use_mass = (method == RMSDMethod::ALIGN_MASS);
       if (tcoord_is_sgnint) {
         for (int i = lower_limit; i < upper_limit; i++) {
@@ -135,16 +186,21 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       for (int i = 0; i < 16; i++) {
         rmat[i] *= inv_mass_divisor;
       }
-      std::vector<Tcalc> eigval(4, 0.0), sdiag(4, 0.0);
-      realSymmEigensolver(&rmat, &eigval, &sdiag, EigenWork::EIGENVALUES);
+      std::vector<Tcalc> eigval(4, value_zero), sdiag(4, value_zero);
+      realSymmEigensolver(&rmat, &eigval, &sdiag, EigenWork::EIGENVECTORS);
       int max_eig_loc = 0;
       for (int i = 1; i < 4; i++) {
         if (eigval[i] > eigval[max_eig_loc]) {
           max_eig_loc = i;
         }
       }
-
-      // Form the rotation matrix
+      
+      // Form the rotation matrix.  This is prone to some instability when crd_a and crd_b are
+      // close to identical, or indeed entirely identical.  As a result, when computed in single
+      // precision, the RMSD of identical structures computed in 32 bit floating-point arithmetic
+      // can be reported to be on the order of 0.001 Angstroms, an error much higher than that
+      // computed for structures with perturbations that cause their true RMSD to sit at 0.2-0.5
+      // Angstroms.
       const Tcalc a = rmat[(4 * max_eig_loc)    ];
       const Tcalc x = rmat[(4 * max_eig_loc) + 1];
       const Tcalc y = rmat[(4 * max_eig_loc) + 2];
@@ -158,7 +214,7 @@ Tcalc rmsd(const Tcoord* xcrd_a, const Tcoord* ycrd_a, const Tcoord* zcrd_a, con
       umat[7] = 2.0 * ((y * z) + (a * x));
       umat[2] = 2.0 * ((x * z) + (a * y));
       umat[5] = 2.0 * ((y * z) - (a * x));
-      umat[8] = (a * a) - (x * x) - (y * y) + (z * z);
+      umat[8] = (a * a) - (x * x) - (y * y) + (z * z);      
 
       // Shift and rotate the coordinates of the first frame (in temporary variables only) and
       // compare them to the shifted, unrotated coordinates of the second frame.
@@ -284,6 +340,346 @@ Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const int frame_a, const int fram
   }
   return rmsd(cs.data(), frame_a, frame_b, ag.getChemicalDetailsKit(), method, lower_limit,
               upper_limit);
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const CoordinateFrameReader &reference,
+            const CoordinateFrameReader &snapshot) {
+  const ChemicalDetailsKit cdk = rplan.getTopologyPointer(0)->getChemicalDetailsKit();
+  const int natom = cdk.natom;
+  if (rplan.getPlanCount() == 1) {
+    if (natom != reference.natom && natom != snapshot.natom) {
+      rtErr("The system and topology do not have matching atom counts (" + std::to_string(natom) +
+            " vs. " + std::to_string(reference.natom) + ").", "RMSDPlan", "execute");
+    }
+  }
+  else {
+    rtErr("A plan must have only one topology in order to serve a specific coordinate frame.",
+          "RMSDPlan", "execute");
+  }
+  switch (rplan.getAlignmentProtocol(0)) {
+  case RMSDAlignmentProtocol::BUILD_CORE:
+  case RMSDAlignmentProtocol::ALIGN_CORE:
+  case RMSDAlignmentProtocol::ALIGN_ALL:
+    return rmsd(reference, snapshot, cdk, rplan.getGeneralStrategy());
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
+            const CoordinateFrame &snapshot) {
+  return rmsd(rplan, reference.data(), snapshot.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const PhaseSpace &reference, const PhaseSpace &snapshot) {
+  return rmsd(rplan, CoordinateFrameReader(reference), CoordinateFrameReader(snapshot));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<double> rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
+                         const CoordinateSeries<T> &snapshots) {
+  const int frame_count = snapshots.getFrameCount();
+  std::vector<double> result(frame_count);
+  const ChemicalDetailsKit cdk = rplan.getTopologyPointer(0)->getChemicalDetailsKit();
+  const CoordinateFrameReader refr = reference.data();
+  for (int i = 0; i < frame_count; i++) {
+    const CoordinateFrame cfi = snapshots.exportFrame(i);
+    if (i == 0) {
+      
+      // Invoke the primary overload to engage its error checking
+      result[i] = rmsd(rplan, refr, cfi.data());
+    }
+    else {
+      switch (rplan.getAlignmentProtocol(0)) {
+      case RMSDAlignmentProtocol::BUILD_CORE:
+      case RMSDAlignmentProtocol::ALIGN_CORE:
+      case RMSDAlignmentProtocol::ALIGN_ALL:
+        result[i] = rmsd(refr, cfi.data(), cdk, rplan.getGeneralStrategy());
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<double> rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots,
+                         const int reference_frame) {
+  const CoordinateFrame reference = snapshots.exportFrame(reference_frame);
+  return rmsd(rplan, reference, snapshots);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
+          const CoordinateSeries<T> &snapshots, Hybrid<T> *result) {
+  T* res_ptr = result->data();
+  const int nval = result->size();
+  if (nval != snapshots.getFrameCount()) {
+    rtErr("A result vector of size " + std::to_string(nval) + " is not set up to accept "
+          "results from a comparison of " + std::to_string(snapshots.getFrameCount()) +
+          "snapshots to the reference structure.");
+  }
+  std::vector<double> output = rmsd(rplan, reference, snapshots);
+  for (int i = 0; i < nval; i++) {
+    res_ptr[i] = output[i];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots, const int reference_frame,
+          Hybrid<T> *result) {
+  const CoordinateFrame reference = snapshots.exportFrame(reference_frame);
+  execute(rplan, reference, snapshots, result);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots, Hybrid<T> *result) {
+  T* res_ptr = result->data();
+  const size_t nval = result->size() ;
+  const size_t nfrm = snapshots.getFrameCount();
+  if (nval != (nfrm - 1LLU) * nfrm / 2LLU) {
+    rtErr("A result vector of size " + std::to_string(nval) + " is not set up to accept "
+          "results from a comparison of " + std::to_string(snapshots.getFrameCount()) +
+          "snapshots to the reference structure.");        
+  }
+  CoordinateSeriesReader<T> snapr = snapshots.data();
+  const ChemicalDetailsKit cdk = rplan.getTopologyPointer(0)->getChemicalDetailsKit();
+  const double* mass_ptr = cdk.masses;
+  const size_t natom = snapr.natom;
+  const size_t padded_natom = roundUp(snapr.natom, warp_size_int);
+  switch (rplan.getAlignmentProtocol(0)) {
+  case RMSDAlignmentProtocol::BUILD_CORE:
+  case RMSDAlignmentProtocol::ALIGN_CORE:
+  case RMSDAlignmentProtocol::ALIGN_ALL:
+    for (size_t i = 1; i < nfrm; i++) {
+      const T* ixcrd = &snapr.xcrd[i * padded_natom];
+      const T* iycrd = &snapr.ycrd[i * padded_natom];
+      const T* izcrd = &snapr.zcrd[i * padded_natom];
+      for (size_t j = 0; j < i; j++) {
+        const T* jxcrd = &snapr.xcrd[j * padded_natom];
+        const T* jycrd = &snapr.ycrd[j * padded_natom];
+        const T* jzcrd = &snapr.zcrd[j * padded_natom];
+        res_ptr[((i - 1LLU) * i / 2LLU) + j] = rmsd(ixcrd, iycrd, izcrd, jxcrd, jycrd, jzcrd,
+                                                    mass_ptr, rplan.getGeneralStrategy(), 0, natom,
+                                                    snapr.inv_gpos_scale);
+      }
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
+          const Hybrid<int> &reference_frames, Hybrid<T> *result) {
+  checkCompatibility(rplan, snapshots, result, RMSDTask::REFERENCE);
+  const PsSynthesisReader snapr = snapshots.data();
+  const RMSDPlanReader<double> rplanr = rplan.dpData();
+  T* res_ptr = result->data();
+  const int ntop = snapshots.getUniqueTopologyCount();
+  for (int i = 0; i < ntop; i++) {
+    const int plan_offset = rplan.getReferenceRMSDStart(i);
+    const int inst_offset = snapr.common_ag_bounds[i];
+    const double *mass_ptr = &rplanr.masses[rplanr.atom_starts[i]];
+    const int nfrm = rplan.getFrameCount(i);
+    const CoordinateFrame ref_i = snapshots.exportCoordinates(reference_frames.readHost(i));
+    const CoordinateFrameReader ref_ir = ref_i.data();
+    switch (rplan.getAlignmentProtocol(0)) {
+    case RMSDAlignmentProtocol::BUILD_CORE:
+    case RMSDAlignmentProtocol::ALIGN_CORE:
+    case RMSDAlignmentProtocol::ALIGN_ALL:
+      for (int j = 0; j < nfrm; j++) {
+        const int sys_idx = snapr.common_ag_list[inst_offset + j];
+        const CoordinateFrame cf_ij = snapshots.exportCoordinates(sys_idx);
+        const CoordinateFrameReader cf_ijr = cf_ij.data();
+        res_ptr[plan_offset + j] = rmsd<double, double>(ref_ir.xcrd, ref_ir.ycrd, ref_ir.zcrd,
+                                                        cf_ijr.xcrd, cf_ijr.ycrd, cf_ijr.zcrd,
+                                                        mass_ptr, rplanr.strategy, 0,
+                                                        ref_ir.natom);
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, Hybrid<T> *result) {
+  checkCompatibility(rplan, snapshots, result, RMSDTask::MATRIX);
+  const PsSynthesisReader snapr = snapshots.data();
+  const RMSDPlanReader<double> rplanr = rplan.dpData();
+  T* res_ptr = result->data();
+  const int ntop = snapshots.getUniqueTopologyCount();
+  for (int i = 0; i < ntop; i++) {
+    const size_t plan_offset = rplan.getRMSDMatrixStart(i);
+    const int inst_offset = snapr.common_ag_bounds[i];
+    const double *mass_ptr = &rplanr.masses[rplanr.atom_starts[i]];
+    const size_t nfrm = rplan.getFrameCount(i);
+    switch (rplan.getAlignmentProtocol(0)) {
+    case RMSDAlignmentProtocol::BUILD_CORE:
+    case RMSDAlignmentProtocol::ALIGN_CORE:
+    case RMSDAlignmentProtocol::ALIGN_ALL:
+      for (size_t j = 1; j < nfrm; j++) {
+        const int jidx = inst_offset + j;
+        const CoordinateFrame cf_ij = snapshots.exportCoordinates(snapr.common_ag_list[jidx]);
+        const CoordinateFrameReader cf_ijr = cf_ij.data();
+        for (size_t k = 0; k < j; k++) {
+          const int kidx = inst_offset + k;
+          const CoordinateFrame cf_ik = snapshots.exportCoordinates(snapr.common_ag_list[kidx]);
+          const CoordinateFrameReader cf_ikr = cf_ik.data();
+          const int result_idx = plan_offset + ((j - 1) * j / 2) + k;
+          res_ptr[result_idx] = rmsd<double, double>(cf_ijr.xcrd, cf_ijr.ycrd, cf_ijr.zcrd,
+                                                     cf_ikr.xcrd, cf_ikr.ycrd, cf_ikr.zcrd,
+                                                     mass_ptr, rplanr.strategy, 0, cf_ijr.natom);
+        }
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
+          const Hybrid<int> &reference_frames, Hybrid<T> *result) {
+  checkCompatibility(rplan, snapshots, cdns, result, RMSDTask::REFERENCE);
+  T* res_ptr = result->data();
+  const PsSynthesisReader snapr = snapshots.data();
+  const CondensateReader cdr = cdns.data();
+
+  // Obtain both RMSD plan abstracts, anticipating one to match either mode for the Condensate
+  const RMSDPlanReader<double> rplandr = rplan.dpData();
+  const RMSDPlanReader<float> rplanfr = rplan.spData();
+  for (int i = 0; i < cdr.natr_insr; i++) {
+
+    // Rather than check the plan for the number of frames, check the Condensate for the work unit.
+    // On the CPU, this will indicate an amount of work that spans all replicas for each system,
+    // but in parallel computating situations (HPC) the work unit may indicate a subset of the
+    // systems to work on.
+    const int4 tinsr = cdr.atr_insr[i];
+    const size_t result_offset = rplandr.atr_starts[tinsr.z];
+    const int inst_offset = snapr.common_ag_bounds[tinsr.z];
+    const int ref_idx = reference_frames.readHost(tinsr.z);
+    const size_t ref_crd_idx = snapr.atom_starts[ref_idx];
+
+    // Assign all pointers at this level to accept their const-ness.  Adding a switch would
+    // require that the pointers be cast as non-const, or that they be inherently confined to
+    // the scope of one case in the switch.
+    const double *ref_xcrd = &cdr.xcrd[ref_crd_idx];
+    const double *ref_ycrd = &cdr.ycrd[ref_crd_idx];
+    const double *ref_zcrd = &cdr.zcrd[ref_crd_idx];
+    const float *ref_xcrd_sp = &cdr.xcrd_sp[ref_crd_idx];
+    const float *ref_ycrd_sp = &cdr.ycrd_sp[ref_crd_idx];
+    const float *ref_zcrd_sp = &cdr.zcrd_sp[ref_crd_idx];
+    const double *ref_masses = &rplandr.masses[rplandr.atom_starts[tinsr.z]];
+    const float *ref_masses_sp = &rplanfr.masses[rplandr.atom_starts[tinsr.z]];
+    const int ni_atom = snapr.atom_counts[ref_idx];
+    for (int j = tinsr.x; j < tinsr.x + tinsr.w; j++) {
+      const int system_idx = snapr.common_ag_list[inst_offset + j];
+      const size_t system_crd_idx = snapr.atom_starts[system_idx];
+      const size_t result_idx = static_cast<size_t>(snapr.replica_idx[system_idx]) + result_offset;
+      switch (cdr.mode) {
+      case CondensationLevel::DOUBLE:
+        {
+          const double *system_xcrd = &cdr.xcrd[system_crd_idx];
+          const double *system_ycrd = &cdr.ycrd[system_crd_idx];
+          const double *system_zcrd = &cdr.zcrd[system_crd_idx];
+          res_ptr[result_idx] = rmsd<double, double>(ref_xcrd, ref_ycrd, ref_zcrd, system_xcrd,
+                                                     system_ycrd, system_zcrd, ref_masses,
+                                                     rplandr.strategy, 0, ni_atom);
+        }
+        break;
+      case CondensationLevel::FLOAT:
+        {
+          const float *system_xcrd_sp = &cdr.xcrd_sp[system_crd_idx];
+          const float *system_ycrd_sp = &cdr.ycrd_sp[system_crd_idx];
+          const float *system_zcrd_sp = &cdr.zcrd_sp[system_crd_idx];
+          res_ptr[result_idx] = rmsd<float, float>(ref_xcrd_sp, ref_ycrd_sp, ref_zcrd_sp,
+                                                   system_xcrd_sp, system_ycrd_sp, system_zcrd_sp,
+                                                   ref_masses_sp, rplanfr.strategy, 0, ni_atom);
+        }
+        break;
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
+          Hybrid<T> *result) {
+  checkCompatibility(rplan, snapshots, cdns, result, RMSDTask::MATRIX);
+  T* res_ptr = result->data();
+  const PsSynthesisReader snapr = snapshots.data();
+  const CondensateReader cdr = cdns.data();
+
+  // Again, obtain both RMSD plan abstracts, and always use them rather than getter functions
+  // querying the underlying object in the inner loops to mimic GPU kernel activity.
+  const RMSDPlanReader<double> rplandr = rplan.dpData();
+  const RMSDPlanReader<float> rplanfr = rplan.spData();
+  for (int i = 0; i < cdr.nata_insr; i++) {
+    const int4 tinsr = cdr.ata_insr[i];
+    const size_t result_offset = rplandr.ata_starts[tinsr.z];
+    const int inst_offset = snapr.common_ag_bounds[tinsr.z];
+    const double *i_masses   = &rplandr.masses[rplandr.atom_starts[i]];
+    const float *i_masses_sp = &rplanfr.masses[rplanfr.atom_starts[i]];
+    const int xwidth = (tinsr.w & 0xffff);
+    const int ywidth = (tinsr.w >> 16);
+    for (int j = tinsr.x; j < tinsr.x + xwidth; j++) {
+      const int jrep_idx = snapr.common_ag_list[inst_offset + j];
+      const size_t jrepno = snapr.replica_idx[jrep_idx];
+
+      // Obtain pointers to the coordinates of the "reference" frame for this row of the matrix
+      const size_t jrep_crd_idx = snapr.atom_starts[jrep_idx];
+      const int njk_atom = snapr.atom_counts[jrep_idx];
+
+      // Again, assign all pointers at this level to accept their const-ness.
+      const double *jxcrd = &cdr.xcrd[jrep_crd_idx];
+      const double *jycrd = &cdr.ycrd[jrep_crd_idx];
+      const double *jzcrd = &cdr.zcrd[jrep_crd_idx];
+      const float *jxcrd_sp = &cdr.xcrd_sp[jrep_crd_idx];
+      const float *jycrd_sp = &cdr.ycrd_sp[jrep_crd_idx];
+      const float *jzcrd_sp = &cdr.zcrd_sp[jrep_crd_idx];
+      for (int k = tinsr.y; k < tinsr.y + ywidth; k++) {
+        const int krep_idx = snapr.common_ag_list[inst_offset + k];
+        const size_t krepno = snapr.replica_idx[krep_idx];
+
+        // Skip the calculation if otuside the lower, sub-trace triangular region.
+        if (jrepno > krepno) {
+          const size_t krep_crd_idx = snapr.atom_starts[krep_idx];
+          const size_t result_idx = (jrepno * (jrepno - 1) / 2) + krepno + result_offset;
+          switch (cdr.mode) {
+          case CondensationLevel::DOUBLE:
+            {
+              const double *kxcrd = &cdr.xcrd[krep_crd_idx];
+              const double *kycrd = &cdr.ycrd[krep_crd_idx];
+              const double *kzcrd = &cdr.zcrd[krep_crd_idx];
+              res_ptr[result_idx] = rmsd<double, double>(jxcrd, jycrd, jzcrd, kxcrd, kycrd, kzcrd,
+                                                         i_masses, rplandr.strategy, 0, njk_atom);
+            }
+            break;
+          case CondensationLevel::FLOAT:
+            {
+              const float *kxcrd_sp = &cdr.xcrd_sp[krep_crd_idx];
+              const float *kycrd_sp = &cdr.ycrd_sp[krep_crd_idx];
+              const float *kzcrd_sp = &cdr.zcrd_sp[krep_crd_idx];
+              res_ptr[result_idx] = rmsd<float, float>(jxcrd_sp, jycrd_sp, jzcrd_sp, kxcrd_sp,
+                                                       kycrd_sp, kzcrd_sp, i_masses_sp,
+                                                       rplanfr.strategy, 0, njk_atom);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace structure

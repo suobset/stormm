@@ -228,6 +228,10 @@ public:
 
   /// \brief Get the largest molecule's size
   int getLargestMoleculeSize() const;
+
+  /// \brief Get the total mass of all atoms in the topology (this is a computation, not a stored
+  ///        value).
+  double getTotalMass() const;
   
   /// \brief Get a descriptor from within the array of topology descriptors.  If this topology were
   ///        read from an Amber-format file, all descriptors are taken from the preamble in its

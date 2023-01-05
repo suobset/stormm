@@ -19,16 +19,18 @@ using parse::WrapTextSearch;
 /// \{
 constexpr int default_conf_rotation_samples     = 3;
 constexpr int default_conf_max_rotatable_bonds  = 4;
+constexpr int default_conf_max_seeding_attempts = 3;
 constexpr int default_conf_max_system_trials    = 16384;
+constexpr int default_conf_running_states       = 16;
+constexpr int default_conf_final_states         = 100;
+constexpr int default_conf_reshuffle_iterations = 0;
+constexpr int active_states_limit               = 524288;
+constexpr double default_conf_rmsd_tolerance    = 0.5;
+constexpr double default_conf_core_restraint    = 16.0;
+constexpr double default_conf_self_clash_ratio  = 0.5;
 constexpr char default_conf_chirality[]         = "false";
 constexpr char default_conf_cis_trans[]         = "false";
 constexpr char default_conf_stop_hbonds[]       = "false";
-constexpr int default_conf_running_states       = 16;
-constexpr int default_conf_final_states         = 100;
-constexpr double default_conf_rmsd_tolerance    = 0.5;
-constexpr double default_conf_core_restraint    = 16.0;
-constexpr int default_conf_reshuffle_iterations = 0;
-constexpr int active_states_limit  = 524288;
 /// \}
 
 /// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
@@ -95,6 +97,13 @@ struct ConformerControls {
   /// \brief Get the maximum number of rotatable bonds to sample.
   int getRotatableBondLimit() const;
 
+  /// \brief Get the maximum number of conformer seeding attempts
+  int getMaxSeedingAttempts() const;
+
+  /// \brief Get the minimum ratio for self interactions below which they will be considered
+  ///        van-der Waals clashes.
+  double getSelfClashRatio() const;
+
   /// \brief Get the maximum number of minimizations to attempt with any one molecule.  Each
   ///        initial state provided by the user will be subject to this limit, so if the limit
   ///        is 5000 and one molecule has two initial states listed in the input deck, the total
@@ -158,6 +167,12 @@ private:
   int final_states;                 ///< Number of final states to collect
   int rotation_samples;             ///< Number of times to sample about a rotatable bond
   int rotatable_bond_limit;         ///< Maximum number of rotatable bonds to explicitly sample
+  int max_seeding_attempts;         ///< Maximum number of attempts to make in seeding each
+                                    ///<   conformer.  If the seeding fails, the conformer will be
+                                    ///<   left in its original state from the user input.
+  double self_clash_ratio;          ///< The minimum ratio of the distance between two particles to
+                                    ///<   their pair sigma value.  Ratios below this level will be
+                                    ///<   considered clashes.
   int system_trials;                ///< Maximum number of distinct minimizations to attempt with
                                     ///<   one molecule
   double rmsd_tolerance;            ///< Minimum mass-weighted root-mean squared deviation between

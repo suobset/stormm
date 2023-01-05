@@ -48,7 +48,7 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
   const size_t nt_col_a = (relevant_col_a + tile_size - 1) / tile_size;
   const size_t nt_row_b = (relevant_row_b + tile_size - 1) / tile_size;
   const size_t nt_col_b = (relevant_col_b + tile_size - 1) / tile_size;
-
+  
   // Perform the multiplication.  Step through tiles of each matrix, first with each tile row
   // of matrix A and pairing it with the correct tile from the corresponding tile column of
   // matrix B.
@@ -99,7 +99,7 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
                 for (size_t kk = 0; kk < kk_hlim; kk++) {
                   dsum += buffer_a[iits + kk] * buffer_b[jjts + kk];
                 }
-                c[(jj * col_b) + ii + row_llim_a] += dsum * scale_ab;
+                c[(jj * row_a) + ii + row_llim_a] += dsum * scale_ab;
               }
             }
             break;
@@ -120,7 +120,7 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
                 for (size_t kk = 0; kk < kk_hlim; kk++) {
                   dsum += buffer_a[iits + kk] * buffer_b[jjts + kk];
                 }
-                c[(jj * row_b) + ii + row_llim_a] += dsum * scale_ab;
+                c[(jj * row_a) + ii + row_llim_a] += dsum * scale_ab;
               }
             }
             break;
@@ -145,7 +145,7 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
                 for (size_t kk = col_llim_a; kk < col_hlim_a; kk++) {
                   dsum += a[ii_rowa + kk] * buffer_b[jjts + kk - col_llim_a];
                 }
-                c[(jj * col_b) + ii] += dsum * scale_ab;
+                c[(jj * col_a) + ii] += dsum * scale_ab;
               }
             }
             break;
@@ -166,7 +166,7 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
                 for (size_t kk = col_llim_a; kk < col_hlim_a; kk++) {
                   dsum += a[ii_rowa + kk] * buffer_b[jjts + kk - col_llim_a];
                 }
-                c[(jj * row_b) + ii] += dsum * scale_ab;
+                c[(jj * col_a) + ii] += dsum * scale_ab;
               }
             }
             break;
@@ -176,6 +176,61 @@ void matrixMultiply(const T* a, const size_t row_a, const size_t col_a, const T*
       }
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void matrixMultiply(const std::vector<T> &a, const size_t row_a, const size_t col_a,
+                    const std::vector<T> &b, const size_t row_b, const size_t col_b,
+                    std::vector<T> *c, const T scale_a, const T scale_b, const T scale_c,
+                    const TransposeState x_a, const TransposeState x_b) {
+  if (a.size() != row_a * col_a) {
+    rtErr("The size of the input matrix A (" + std::to_string(a.size()) + ") must comport with "
+          "its stated row and column counts (" + std::to_string(row_a) + ", " +
+          std::to_string(col_a) + ").", "matrixMultiply");
+  }
+  if (b.size() != row_b * col_b) {
+    rtErr("The size of the input matrix B (" + std::to_string(b.size()) + ") must comport with "
+          "its stated row and column counts (" + std::to_string(row_b) + ", " +
+          std::to_string(col_b) + ").", "matrixMultiply");
+  }
+  const size_t relevant_row_c = (x_a == TransposeState::AS_IS) ? row_a : col_a;
+  const size_t relevant_col_c = (x_b == TransposeState::AS_IS) ? col_b : row_b;
+  if (c->size() != relevant_row_c * relevant_col_c) {
+    rtErr("The size of the output matrix C (" + std::to_string(c->size()) + ") must comport with "
+          "its stated row and column counts (" + std::to_string(relevant_row_c) + ", " +
+          std::to_string(relevant_col_c) + ").", "matrixMultiply");
+  }
+  matrixMultiply(a.data(), row_a, col_a, b.data(), row_b, col_b, c->data(), scale_a, scale_b,
+                 scale_c, x_a, x_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void matrixMultiply(const Hybrid<T> &a, const size_t row_a, const size_t col_a, const Hybrid<T> &b,
+                    const size_t row_b, const size_t col_b, Hybrid<T> *c, const T scale_a,
+                    const T scale_b, const T scale_c, const TransposeState x_a,
+                    const TransposeState x_b) {
+  if (a.size() != row_a * col_a) {
+    rtErr("The size of the input matrix A (" + std::to_string(a.size()) + ", Hybrid " +
+          std::string(a.getLabel().name) + ") must comport with its stated row and column counts "
+          "(" + std::to_string(row_a) + ", " + std::to_string(col_a) + ").", "matrixMultiply");
+  }
+  if (b.size() != row_b * col_b) {
+    rtErr("The size of the input matrix B (" + std::to_string(b.size()) + ", Hybrid " +
+          std::string(b.getLabel().name) + ") must comport with its stated row and column counts "
+          "(" + std::to_string(row_b) + ", " + std::to_string(col_b) + ").", "matrixMultiply");
+  }
+  const size_t relevant_row_c = (x_a == TransposeState::AS_IS) ? row_a : col_a;
+  const size_t relevant_col_c = (x_b == TransposeState::AS_IS) ? col_b : row_b;
+  if (c->size() != relevant_row_c * relevant_col_c) {
+    rtErr("The size of the output matrix C (" + std::to_string(c->size()) + ", Hybrid " +
+          std::string(c->getLabel().name) + ") must comport with its stated row and column counts "
+          "(" + std::to_string(relevant_row_c) + ", " + std::to_string(relevant_col_c) + ").",
+          "matrixMultiply");
+  }
+  matrixMultiply(a.data(), row_a, col_a, b.data(), row_b, col_b, c->data(), scale_a, scale_b,
+                 scale_c, x_a, x_b);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -264,6 +319,84 @@ void matrixVectorMultiply(const T* a, const T* x, T* b, const size_t row_a, cons
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void matrixVectorMultiply(const std::vector<T> &a, const std::vector<T> &x, std::vector<T> *b,
+                          const size_t row_a, const size_t col_a, const T scale_a, const T scale_x,
+                          const T scale_b, const TransposeState x_a) {
+  if (row_a * col_a != a.size()) {
+    rtErr("The number of elements in the input matrix (" + std::to_string(a.size()) +
+          ") must equal the product of its stated row and column counts (" +
+          std::to_string(row_a) + " and " + std::to_string(col_a) + ", respectively).",
+          "matrixVectorMultiply");
+  }
+  switch (x_a) {
+  case TransposeState::AS_IS:
+    if (row_a != b->size()) {
+      rtErr("The number of elements in the output vector must equal the number of rows in the "
+            "left-hand input matrix.  Currently " + std::to_string(row_a) + " (input) vs " +
+            std::to_string(b->size()) + " (output).", "matrixVectorMultiply");
+    }
+    if (col_a != x.size()) {
+      rtErr("The number of elements in the right-hand input vector must equal the number of "
+            "columns in the left-hand input matrix.  Currently " + std::to_string(col_a) +
+            " (matrix) vs " + std::to_string(x.size()) + " (vector).", "matrixVectorMultiply");
+    }
+    break;
+  case TransposeState::TRANSPOSE:
+    if (col_a != b->size()) {
+      rtErr("The number of elements in the output vector must equal the number of columns in the "
+            "left-hand input matrix (which is to be transposed).  Currently " +
+            std::to_string(col_a) + " (input) vs " + std::to_string(b->size()) + " (output).",
+            "matrixVectorMultiply");
+    }
+    break;
+  }
+  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_b, scale_x,
+                       x_a);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void matrixVectorMultiply(const Hybrid<T> &a, const Hybrid<T> &x, Hybrid<T> *b,
+                          const size_t row_a, const size_t col_a, const T scale_a, const T scale_x,
+                          const T scale_b, const TransposeState x_a) {
+  if (row_a * col_a != a.size()) {
+    rtErr("The number of elements in the input matrix (" + std::to_string(a.size()) +
+          ", Hybrid " + std::string(a.getLabel().name) + ") must equal the product of its stated "
+          "row and column counts (" + std::to_string(row_a) + " and " + std::to_string(col_a) +
+          ", respectively).", "matrixVectorMultiply");
+  }
+  switch (x_a) {
+  case TransposeState::AS_IS:
+    if (row_a != b->size()) {
+      rtErr("The number of elements in the output vector must equal the number of rows in the "
+            "left-hand input matrix.  Currently " + std::to_string(row_a) + " (input matrix, "
+            "Hybrid " + std::string(a.getLabel().name) + ") vs " + std::to_string(b->size()) +
+            " (output vector, Hybrid " + std::string(b->getLabel().name) + ").",
+            "matrixVectorMultiply");
+    }
+    if (col_a != x.size()) {
+      rtErr("The number of elements in the right-hand input vector must equal the number of "
+            "columns in the left-hand input matrix.  Currently " + std::to_string(col_a) +
+            " (matrix, Hybrid " + std::string(a.getLabel().name) + ") vs " +
+            std::to_string(x.size()) + " (vector, Hybrid " + std::string(x.getLabel().name) + ").",
+            "matrixVectorMultiply");
+    }
+    break;
+  case TransposeState::TRANSPOSE:
+    if (col_a != b->size()) {
+      rtErr("The number of elements in the output vector must equal the number of columns in the "
+            "left-hand input matrix (which is to be transposed).  Currently " +
+            std::to_string(col_a) + " (input) vs " + std::to_string(b->size()) + " (output).",
+            "matrixVectorMultiply");
+    }
+    break;
+  }
+  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_b, scale_x,
+                       x_a);  
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void matrixVectorMultiply(const HpcMatrix<T> &a, const Hybrid<T> &x, Hybrid<T> *b, const T scale_a,
                           const T scale_x, const T scale_b, const TransposeState x_a) {
   switch (x_a) {
@@ -290,6 +423,98 @@ void matrixVectorMultiply(const HpcMatrix<T> &a, const Hybrid<T> &x, Hybrid<T> *
   }
   matrixVectorMultiply(a.memptr(), x.data(), b->data(), a.n_rows, a.n_cols, scale_a, scale_x,
                        scale_b, x_a);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(T* a, size_t rows, size_t columns) {
+  const size_t space = (rows * columns) - 1LLU;
+  std::vector<bool> visited(rows * columns, false);
+  visited[0] = true;
+  visited[space] = true;
+  size_t i = 1;
+  while (i < space) {
+
+    // Proceed to swap one cycle
+    size_t focus_index = i;
+    size_t cycle_begin = focus_index;
+    T t = a[focus_index];
+    do {
+      size_t next = (focus_index * columns) % space;
+      std::swap(a[next], t);
+      visited[focus_index] = true;
+      focus_index = next;
+    } while (focus_index != cycle_begin);
+
+    // Advance to the next cycle based on elements that have not been moved
+    while (i < space && visited[i]) {
+      i++;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(const T* a, T* a_transpose, size_t rows, size_t columns) {
+  for (size_t i = 0; i < rows; i++) {
+    for (size_t j = 0; j < columns; j++) {
+      a_transpose[(i * columns) + j] = a[(j * rows) + i];
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(std::vector<T> *a, size_t rows, size_t columns) {
+  if (a->size() != rows * columns) {
+    rtErr("The stated dimensions of the matrix (" + std::to_string(rows) + ", " +
+          std::to_string(columns) + ") do not match the array size (" +
+          std::to_string(a->size()) + ").", "transpose");
+  }
+  transpose(a->data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(const std::vector<T> &a, std::vector<T> *a_transpose, size_t rows, size_t columns) {
+  if (a.size() != rows * columns) {
+    rtErr("The stated dimensions of the matrix (" + std::to_string(rows) + ", " +
+          std::to_string(columns) + ") do not match the array size (" +
+          std::to_string(a.size()) + ").", "transpose");
+  }
+  if (a.size() != a_transpose->size()) {
+    rtErr("The transposed matrix array (" + std::to_string(a_transpose->size()) + " elements) is "
+          "not of the same size as the original (" + std::to_string(a.size()) + " elements).",
+          "transpose");
+  }
+  transpose(a.data(), a_transpose->data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(Hybrid<T> *a, size_t rows, size_t columns) {
+  if (a->size() != rows * columns) {
+    rtErr("The stated dimensions of the matrix (" + std::to_string(rows) + ", " +
+          std::to_string(columns) + ") do not match the array size (" +
+          std::to_string(a->size()) + ").", "transpose");
+  }
+  transpose(a->data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void transpose(const Hybrid<T> &a, Hybrid<T> *a_transpose, size_t rows, size_t columns) {
+  if (a.size() != rows * columns) {
+    rtErr("The stated dimensions of the matrix (" + std::to_string(rows) + ", " +
+          std::to_string(columns) + ") do not match the array size (" +
+          std::to_string(a.size()) + ").", "transpose");
+  }
+  if (a.size() != a_transpose->size()) {
+    rtErr("The transposed matrix array (" + std::to_string(a_transpose->size()) + " elements) is "
+          "not of the same size as the original (" + std::to_string(a.size()) + " elements).",
+          "transpose");
+  }
+  transpose(a.data(), a_transpose->data(), rows, columns);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -599,10 +824,10 @@ void realSymmEigensolver(T* amat, const int rank, T* eigv, T* sdiag, const Eigen
         T f = amat[(l * rank) + i];
         T g;
         if (t_is_double) {
-          g = (f >= zero ? -sqrt(h) : sqrt(h));
+          g = (f >= zero) ? -sqrt(h) : sqrt(h);
         }
         else {
-          g = (f >= zero ? -sqrtf(h) : sqrtf(h));
+          g = (f >= zero) ? -sqrtf(h) : sqrtf(h);
         }
         sdiag[i] = scale * g;
 	h -= f * g;
@@ -780,6 +1005,338 @@ void realSymmEigensolver(const std::vector<T> &amat, std::vector<T> *vmat, std::
     vmat_ptr[i] = amat[i];
   }
   realSymmEigensolver(vmat->data(), rank, eigv->data(), sdiag->data());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(T* amat, T* workspace, T* inv_workspace, const size_t rows,
+                   const size_t columns) {
+
+  // If the matrix is already square, just invert it
+  if (rows == columns) {
+    invertSquareMatrix(amat, workspace, columns);
+    for (size_t i = 0; i < columns * columns; i++) {
+      amat[i] = workspace[i];
+    }
+    return;
+  }
+  if (rows > columns) {
+
+    // Compute A' * A for a "left" pseudo-inverse if a "tall" matrix
+    matrixMultiply(amat, rows, columns, amat, rows, columns, workspace, 1.0, 1.0, 0.0,
+                   TransposeState::TRANSPOSE, TransposeState::AS_IS);
+    invertSquareMatrix(workspace, inv_workspace, columns);
+  }
+  else {
+
+    // Compute A * A' for a "right" pseudo-inverse of a "wide" matrix
+    matrixMultiply(amat, rows, columns, amat, rows, columns, workspace, 1.0, 1.0, 0.0,
+                   TransposeState::AS_IS, TransposeState::TRANSPOSE);
+    invertSquareMatrix(workspace, inv_workspace, rows);
+  }
+
+  // Perform an in-place transpose of the matrix A, then use the workspace array to perform an
+  // in-place replacement of the matrix with inv(A' * A) * A' or A' * inv(A * A'), depending on
+  // whether the original matrix was tall or wide.
+  if (rows > columns) {
+    transpose(amat, rows, columns);
+    for (size_t i = 0; i < rows; i += columns) {
+      T* achunk = &amat[i * columns];
+      const size_t chunk_columns = std::min(columns, rows - i);
+      matrixMultiply(inv_workspace, columns, columns, achunk, columns, chunk_columns, workspace,
+                     1.0, 1.0, 0.0);
+      for (size_t j = 0; j < chunk_columns * columns; j++) {
+        achunk[j] = workspace[j];
+      }
+    }
+  }
+  else {
+
+    // To compute A' * inv(A * A'), use the identity (A * B)' = B' * A'.  Thus, A' * inv(A * A') =
+    // (inv(A * A')' * A)'.  By first transposing the inverse matrix, the in-place multiplication
+    // can be accomplished in a manner similar to that in the case of the tall matrix.  The result
+    // can then be transposed into the "right" pseudo-inverse.
+    transpose(inv_workspace, rows, rows);
+    for (size_t i = 0; i < columns; i += rows) {
+      T* achunk = &amat[i * rows];
+      const size_t chunk_columns = std::min(rows, columns - i);
+      matrixMultiply(inv_workspace, rows, rows, achunk, rows, chunk_columns, workspace,
+                     1.0, 1.0, 0.0);
+      for (size_t j = 0; j < chunk_columns * rows; j++) {
+        achunk[j] = workspace[j];
+      }
+    }
+    transpose(amat, rows, columns);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(T* amat, const size_t rows, const size_t columns) {
+  const size_t lesser = std::min(rows, columns);
+  std::vector<T> workspace(lesser * lesser, 0.0), inv_workspace(lesser * lesser, 0.0);
+  pseudoInverse(amat, workspace.data(), inv_workspace.data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(const T* amat, T* result, T* workspace, T* inv_workspace, const size_t rows,
+                   const size_t columns) { 
+  const size_t rc = rows * columns;
+  for (size_t i = 0; i < rc; i++) {
+    result[i] = amat[i];
+  }
+  pseudoInverse(result, workspace, inv_workspace, rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(std::vector<T> *amat, std::vector<T> *workspace, std::vector<T> *inv_workspace,
+                   size_t rows, size_t columns) {
+  if (amat->size() != rows * columns) {
+    rtErr("The size of the input matrix (" + std::to_string(amat->size()) + ") must equal the "
+          "product of the stated numbers of rows (" + std::to_string(rows) + ") and columns (" +
+          std::to_string(columns) + ").", "pseudoInverse");
+  }
+  const size_t lesser = std::min(rows, columns);
+  const std::string pinv_type = (rows > columns) ? "left" : "right";
+  if (workspace->size() != lesser * lesser) {
+    rtErr("The workspace (size " + std::to_string(workspace->size()) + ") must accommodate a "
+          "square matrix of rank " + std::to_string(lesser) + " to compute the " + pinv_type +
+          " pseudo-inverse of a " + std::to_string(rows) + " x " + std::to_string(columns) +
+          " matrix.", "pseudoInverse");
+  }
+  if (inv_workspace->size() != lesser * lesser) {
+    rtErr("The inverse workspace (size " + std::to_string(workspace->size()) + ") must "
+          "accommodate a square matrix of rank " + std::to_string(lesser) + " to compute the " +
+          pinv_type + " pseudo-inverse of a " + std::to_string(rows) + " x " +
+          std::to_string(columns) + " matrix.", "pseudoInverse");
+  }
+  pseudoInverse(amat->data(), workspace->data(), inv_workspace->data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(std::vector<T> *amat, size_t rows, size_t columns) {
+  const size_t lesser = std::min(rows, columns);
+  std::vector<T> workspace(lesser * lesser, 0.0), inv_workspace(lesser * lesser, 0.0);
+  pseudoInverse(amat, &workspace, &inv_workspace, rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(const std::vector<T> &amat, std::vector<T> *result, std::vector<T> *workspace,
+                   std::vector<T> *inv_workspace, size_t rows, size_t columns) {
+  if (amat->size() != rows * columns) {
+    rtErr("The size of the input matrix (" + std::to_string(amat->size()) + ") must equal the "
+          "product of the stated numbers of rows (" + std::to_string(rows) + ") and columns (" +
+          std::to_string(columns) + ").", "pseudoInverse");
+  }
+  if (result->size() != amat->size()) {
+    result->resize(amat->size());
+  }
+  const size_t rc = rows * columns;
+  T* res_ptr = result->data();
+  for (size_t i = 0; i < rc; i++) {
+    res_ptr[i] = amat[i];
+  }
+  pseudoInverse(result, workspace, inv_workspace, rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> pseudoInverse(const std::vector<T> &amat, size_t rows, size_t columns) {
+  std::vector<T> result = amat;
+  const size_t lesser = std::min(rows, columns);
+  std::vector<T> workspace(lesser * lesser, 0.0), inv_workspace(lesser * lesser, 0.0);
+  pseudoInverse(&result, &workspace, &inv_workspace, rows, columns);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> pseudoInverse(const std::vector<T> &amat, std::vector<T> *workspace,
+                             std::vector<T> *inv_workspace, size_t rows, size_t columns) {
+  std::vector<T> result = amat;
+  pseudoInverse(&result, workspace, inv_workspace, rows, columns);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(Hybrid<T> *amat, Hybrid<T> *workspace, Hybrid<T> *inv_workspace, size_t rows,
+                   size_t columns) {
+  if (amat->size() != rows * columns) {
+    rtErr("The size of the input matrix (" + std::to_string(amat->size()) + ", Hybrid " +
+          std::string(amat->getLabel().name) + ") must equal the product of the stated numbers of "
+          "rows (" + std::to_string(rows) + ") and columns (" + std::to_string(columns) + ").",
+          "pseudoInverse");
+  }
+  const size_t lesser = std::min(rows, columns);
+  const std::string pinv_type = (rows > columns) ? "left" : "right";
+  if (workspace->size() != lesser * lesser) {
+    rtErr("The workspace (size " + std::to_string(workspace->size()) + ", Hybrid " +
+          std::string(inv_workspace->getLabel().name) + ") must accommodate a square matrix of "
+          "rank " + std::to_string(lesser) + " to compute the " + pinv_type +
+          " pseudo-inverse of a " + std::to_string(rows) + " x " + std::to_string(columns) +
+          " matrix.", "pseudoInverse");
+  }
+  if (inv_workspace->size() != lesser * lesser) {
+    rtErr("The inverse workspace (size " + std::to_string(workspace->size()) + ", Hybrid " +
+          std::string(workspace->getLabel().name) + ") must accommodate a square matrix of rank " +
+          std::to_string(lesser) + " to compute the " + pinv_type + " pseudo-inverse of a " +
+          std::to_string(rows) + " x " + std::to_string(columns) + " matrix.", "pseudoInverse");
+  }
+  pseudoInverse(amat->data(), workspace->data(), inv_workspace->data(), rows, columns);  
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(Hybrid<T> *amat, size_t rows, size_t columns) {
+
+  // Perform the size check on the amat object--the mixture of std::vector<T> and Hybrid<T> must
+  // go directly to the baseline C-style array overload.
+  if (amat->size() != rows * columns) {
+    rtErr("The size of the input matrix (" + std::to_string(amat->size()) + ", Hybrid " +
+          std::string(amat->getLabel().name) + ") must equal the product of the stated numbers of "
+          "rows (" + std::to_string(rows) + ") and columns (" + std::to_string(columns) + ").",
+          "pseudoInverse");
+  }
+  std::vector<T> workspace(columns * columns);
+  std::vector<T> inv_workspace(columns * columns);
+  pseudoInverse(amat->data(), workspace->data(), inv_workspace->data(), rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void pseudoInverse(const Hybrid<T> &amat, Hybrid<T> *result, Hybrid<T> *workspace,
+                   Hybrid<T> *inv_workspace, size_t rows, size_t columns) {
+  if (amat->size() != rows * columns) {
+    rtErr("The size of the input matrix (" + std::to_string(amat->size()) + ", Hybrid " +
+          std::string(amat->getLabel().name) + ") must equal the product of the stated numbers of "
+          "rows (" + std::to_string(rows) + ") and columns (" + std::to_string(columns) + ").",
+          "pseudoInverse");
+  }
+  if (result->size() != amat->size()) {
+    result->resize(amat->size());
+  }
+  const size_t rc = rows * columns;
+  T* res_ptr = result->data();
+  for (size_t i = 0; i < rc; i++) {
+    res_ptr[i] = amat[i];
+  }
+  pseudoInverse(result, workspace, inv_workspace, rows, columns);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void qrSolver(T* amat, T* xvec, T* bvec, const size_t a_rows, const size_t a_cols) {
+
+  // QR decomposition of rank-deficient matrices will not be attempted
+  if (a_rows < a_cols) {
+    rtErr("The matrix is rank deficient (" + std::to_string(a_rows) + " rows, " +
+          std::to_string(a_cols) + " columns).", "qrSolver");
+  }
+
+  // Constants in the relevant data type
+  const T value_negative_one = -1.0;
+  const T value_zero         =  0.0;
+  const T value_one          =  1.0;
+  const T value_two          =  2.0;
+  const size_t ct = std::type_index(typeid(T)).hash_code();
+  const bool tcalc_is_double = (ct == double_type_index);
+  
+  // Allocate workspace
+  std::vector<T> v(a_rows), v_prime(a_rows);
+  for (size_t k = 0; k < a_cols; k++) {
+
+    // Compute the kth column of Q*
+    T tnm_v2 = 0.0;
+    const size_t arowk = (k * a_rows) + k;
+    for (size_t i = 0; i < a_rows - k; i++) {
+      v[i] = amat[arowk + i];
+      tnm_v2 += v[i] * v[i];
+    }
+    const T sign_v = value_negative_one + (value_two * (v[0] >= value_zero));
+    T tnm_v = (tcalc_is_double) ? sqrt(tnm_v2) : sqrtf(tnm_v2);
+    tnm_v2 -= v[0] * v[0];
+    v[0] += sign_v * tnm_v;
+    tnm_v = (tcalc_is_double) ? value_one / sqrt(tnm_v2 + (v[0] * v[0])) :
+                                value_one / sqrtf(tnm_v2 + (v[0] * v[0]));
+    for (size_t i = 0; i < a_rows - k; i++) {
+      v[i] = v[i] * tnm_v;
+    }
+
+    // Update A as R evolves
+    for (size_t i = 0; i < a_cols - k; i++) {
+      v_prime[i] = value_zero;
+    }
+
+    const size_t acolsmk = a_cols - k;
+    const size_t arowsmk = a_rows - k;
+    for (size_t j = 0; j < acolsmk; j++) {
+      T vp_acc = 0.0;
+      const size_t arowkjk = ((k + j) * a_rows) + k;
+      for (size_t i = 0; i < arowsmk; i++) {
+        vp_acc += v[i] * amat[arowkjk + i];
+      }
+      v_prime[j] += vp_acc;
+    }
+    for (size_t j = 0; j < acolsmk; j++) {
+      const T tempval = value_two * v_prime[j];
+      const size_t arowkjk = ((k + j) * a_rows) + k;
+      for (size_t i = 0; i < arowsmk; i++) {
+        amat[arowkjk + i] -= tempval * v[i];        
+      }
+    }
+
+    // Update b as Q* evolves
+    const T tempval = value_two * dot(v.data(), &bvec[k], a_rows - k);
+    for (size_t i = 0; i < a_rows - k; i++) {
+      bvec[k + i] -= tempval * v[i];
+    }
+  }
+
+  // Use back-substitution to solve the system of equations R * x = b.
+  for (size_t i = a_cols - 1; i > 0; i--) {
+    const T pivot = value_one / amat[(i * a_rows) + i];
+    const T temp_b = bvec[i];
+
+    // Use the criterion that j stays less than the number of rows to anticipate the fact that
+    // the always positive size_t will wrap after passing below zero.
+    const size_t arowi = i * a_rows;
+    for (size_t j = i - 1; j < a_rows; j--) {
+      const T multval = amat[arowi + j] * pivot;
+      bvec[j] -= multval * temp_b;
+    }
+    bvec[i] *= pivot;
+  }
+  bvec[0] /= amat[0];
+
+  // Read the entries of x out of b
+  for (size_t i = 0; i < a_cols; i++) {
+    xvec[i] = bvec[i];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void qrSolver(std::vector<T> *amat, std::vector<T> *xvec, std::vector<T> *bvec) {
+  if (amat->size() != xvec->size() * bvec->size()) {
+    rtErr("The stiffness matrix must hold data commensurate with the sizes of the solution "
+          "vector (" + std::to_string(bvec->size()) + ") and coefficients vector (" +
+          std::to_string(xvec->size()) + ") counts.  The stiffness matrix holds " +
+          std::to_string(amat->size()) + " elements.", "qrSolver");
+  }
+  qrSolver(amat->data(), xvec->data(), bvec->data(), bvec->size(), xvec->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void qrSolver(const std::vector<T> &amat, std::vector<T> *xvec, const std::vector<T> &bvec) {
+  std::vector<T> amat_copy = amat;
+  std::vector<T> bvec_copy = bvec;
+  qrSolver(amat_copy.data(), xvec->data(), bvec_copy.data(), bvec.size(), xvec->size());
 }
 
 //-------------------------------------------------------------------------------------------------

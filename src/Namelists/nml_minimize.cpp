@@ -18,12 +18,15 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in, const Wrap
     policy{policy_in},
     total_cycles{default_minimize_maxcyc},
     steepest_descent_cycles{default_minimize_ncyc},
+    clash_damping_cycles{default_minimize_cdcyc},
     print_frequency{default_minimize_ntpr},
     produce_checkpoint{true},
     electrostatic_cutoff{default_minimize_cut},
     lennard_jones_cutoff{default_minimize_cut},
     initial_step{default_minimize_dx0},
-    convergence_target{default_minimize_drms}
+    convergence_target{default_minimize_drms},
+    clash_minimum_distance{default_minimize_clash_r0},
+    clash_vdw_ratio{default_minimize_clash_ratio}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -34,6 +37,7 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
   NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy, wrap);
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
+  clash_damping_cycles = t_nml.getIntValue("cdcyc");
   print_frequency = t_nml.getIntValue("ntpr");
   const std::string chkp_behavior = t_nml.getStringValue("checkpoint");
   validateCheckpointProduction(chkp_behavior);
@@ -48,10 +52,13 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
   }
   initial_step = t_nml.getRealValue("dx0");
   convergence_target = t_nml.getRealValue("drms");
+  clash_minimum_distance = t_nml.getRealValue("clash_r0");
+  clash_vdw_ratio = t_nml.getRealValue("clash_vdw_ratio");
 
   // Validate input
   validateTotalCycles();
-  validateSteepestDescentCycles();
+  validateAuxiliaryCycles(&steepest_descent_cycles, default_minimize_ncyc);
+  validateAuxiliaryCycles(&clash_damping_cycles, default_minimize_cdcyc);
   validatePrintFrequency();
   validateElectrostaticCutoff();
   validateLennardJonesCutoff();
@@ -67,6 +74,11 @@ int MinimizeControls::getTotalCycles() const {
 //-------------------------------------------------------------------------------------------------
 int MinimizeControls::getSteepestDescentCycles() const {
   return steepest_descent_cycles;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MinimizeControls::getClashDampingCycles() const {
+  return clash_damping_cycles;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -100,6 +112,16 @@ double MinimizeControls::getConvergenceTarget() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double MinimizeControls::getAbsoluteClashDistance() const {
+  return clash_minimum_distance;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MinimizeControls::getVdwClashRatio() const {
+  return clash_vdw_ratio;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MinimizeControls::setTotalCycles(const int cycles_in) {
   total_cycles = cycles_in;
   validateTotalCycles();
@@ -108,7 +130,13 @@ void MinimizeControls::setTotalCycles(const int cycles_in) {
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setSteepestDescentCycles(const int cycles_in) {
   steepest_descent_cycles = cycles_in;
-  validateSteepestDescentCycles();
+  validateAuxiliaryCycles(&steepest_descent_cycles, default_minimize_ncyc);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setClashDampingCycles(const int cycles_in) {
+  clash_damping_cycles = cycles_in;
+  validateAuxiliaryCycles(&clash_damping_cycles, default_minimize_cdcyc);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -167,40 +195,39 @@ void MinimizeControls::validateTotalCycles() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MinimizeControls::validateSteepestDescentCycles() {
-  if (steepest_descent_cycles < 0) {
+void MinimizeControls::validateAuxiliaryCycles(int *cycles_in, const int default_cycles) {
+  if (*cycles_in < 0) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is invalid for "
             "the steepest descent phase of minimization.", "MinimizeControls",
-            "validateTotalCycles");
+            "validateAuxiliaryCycles");
     case ExceptionResponse::WARN:
       rtWarn("The cycle count of " + std::to_string(steepest_descent_cycles) + " is invalid for "
              "the steepest descent phase and will be reset to the default value of " +
-             std::to_string(default_minimize_ncyc) + ".", "MinimizeControls",
-             "validateTotalCycles");      
-      steepest_descent_cycles = std::min(default_minimize_ncyc, total_cycles);
+             std::to_string(default_cycles) + ".", "MinimizeControls",
+             "validateAuxiliaryCycles");      
+      *cycles_in = std::min(default_cycles, total_cycles);
       break;
     case ExceptionResponse::SILENT:
-      steepest_descent_cycles = std::min(default_minimize_ncyc, total_cycles);
+      *cycles_in = std::min(default_cycles, total_cycles);
       break;
     }
   }
-  if (steepest_descent_cycles > total_cycles) {
+  if (*cycles_in > total_cycles) {
     switch (policy) {
     case ExceptionResponse::DIE:
-      rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is greater than "
-            "the stated number of total cycles " + std::to_string(total_cycles) + ".",
-            "MinimizeControls", "validateTotalCycles");
+      rtErr("The cycle count of " + std::to_string(*cycles_in) + " is greater than the stated "
+            "number of total cycles " + std::to_string(total_cycles) + ".", "MinimizeControls",
+            "validateAuxiliaryCycles");
     case ExceptionResponse::WARN:
-      rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is greater than "
-            "the stated number of total cycles " + std::to_string(total_cycles) + " and will be "
-            "reduced to the maximum overall cycle count.", "MinimizeControls",
-            "validateTotalCycles");
-      steepest_descent_cycles = total_cycles;
+      rtWarn("The cycle count of " + std::to_string(*cycles_in) + " is greater than the stated "
+             "number of total cycles " + std::to_string(total_cycles) + " and will be reduced to "
+             "the maximum overall cycle count.", "MinimizeControls", "validateAuxiliaryCycles");
+      *cycles_in = total_cycles;
       break;
     case ExceptionResponse::SILENT:
-      steepest_descent_cycles = total_cycles;
+      *cycles_in = total_cycles;
       break;
     }
   }
@@ -324,6 +351,8 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                    std::to_string(default_minimize_maxcyc)));
   t_nml.addKeyword(NamelistElement("ncyc", NamelistType::INTEGER,
                                    std::to_string(default_minimize_ncyc)));
+  t_nml.addKeyword(NamelistElement("cdcyc", NamelistType::INTEGER,
+                                   std::to_string(default_minimize_cdcyc)));
   t_nml.addKeyword(NamelistElement("ntpr", NamelistType::INTEGER,
                                    std::to_string(default_minimize_ntpr)));
   t_nml.addKeyword(NamelistElement("checkpoint", NamelistType::STRING,
@@ -337,9 +366,16 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                    std::to_string(default_minimize_dx0)));
   t_nml.addKeyword(NamelistElement("drms", NamelistType::REAL,
                                    std::to_string(default_minimize_drms)));
+  t_nml.addKeyword(NamelistElement("clash_r0", NamelistType::REAL,
+                                   std::to_string(default_minimize_clash_r0)));
+  t_nml.addKeyword(NamelistElement("clash_vdw_ratio", NamelistType::REAL,
+                                   std::to_string(default_minimize_clash_ratio)));
   t_nml.addHelp("maxcyc", "Maximum number of line minimization cycles to pursue.");
   t_nml.addHelp("ncyc", "Number of steepest-descent optimization steps to perform, prior to the "
                 "onset of conjugate gradient optimization for the remaining maxcyc - ncyc steps.");
+  t_nml.addHelp("cdcyc", "Number of clash-damping optimization steps to perform, to mitigate the "
+                "effects of hard collisions between particles at the outset of structure "
+                "relaxation.");
   t_nml.addHelp("ntpr", "Interval at which to report energy diagnostics for the minimization run, "
                 "akin to the mdout results in Amber's sander and pmemd programs.  The default "
                 "of " + std::to_string(default_minimize_ntpr) + " suppresses output except at the "
@@ -351,7 +387,7 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                 "size of subsequent moves will grow or shrink based on the history of success in "
                 "previous optimizations.");
   t_nml.addHelp("drms", "Convergence criterion for the minimization, based on the root mean "
-                "squared value of the Cartesian forces on all particles.  Units of kcal/mol-A.");  
+                "squared value of the Cartesian forces on all particles.  Units of kcal/mol-A.");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

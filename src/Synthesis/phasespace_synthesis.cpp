@@ -28,6 +28,8 @@ using diskutil::DataFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
 using math::invertSquareMatrix;
+using math::prefixSumInPlace;
+using math::PrefixSumType;
 using math::roundUp;
 using math::sum;
 using math::tileVector;
@@ -45,10 +47,13 @@ using trajectory::PhaseSpaceReader;
 using trajectory::writeFrame;
   
 //-------------------------------------------------------------------------------------------------
-PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellType unit_cell_in,
+PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const int unique_topology_count_in,
+                                     const UnitCellType unit_cell_in,
                                      const ThermostatKind heat_bath_kind_in,
                                      const BarostatKind piston_kind_in, const double time_step_in,
                                      const int* atom_starts_in, const int* atom_counts_in,
+                                     const int* common_ag_list_in, const int* common_ag_bounds_in,
+                                     const int* unique_ag_idx_in, const int* replica_idx_in,
                                      const double gpos_scale_in, const double lpos_scale_in,
                                      const double vel_scale_in, const double frc_scale_in,
                                      const int gpos_bits_in, const int lpos_bits_in,
@@ -74,10 +79,12 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      int* fyprv_ovrf_in, int* fzprv_ovrf_in, llint* fxnxt_in,
                                      llint* fynxt_in, llint* fznxt_in, int* fxnxt_ovrf_in,
                                      int* fynxt_ovrf_in, int* fznxt_ovrf_in) :
-    system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
-    piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
-    atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
-    vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
+    system_count{system_count_in}, unique_topology_count{unique_topology_count_in},
+    unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in}, piston_kind{piston_kind_in},
+    time_step{time_step_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+    common_ag_list{common_ag_list_in}, common_ag_bounds{common_ag_bounds_in},
+    unique_ag_idx{unique_ag_idx_in}, replica_idx{replica_idx_in}, gpos_scale{gpos_scale_in},
+    lpos_scale{lpos_scale_in}, vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
     inv_gpos_scale{1.0 / gpos_scale_in},
     inv_lpos_scale{1.0 / lpos_scale_in},
     inv_vel_scale{1.0 / vel_scale_in},
@@ -110,10 +117,13 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
 {}
 
 //-------------------------------------------------------------------------------------------------
-PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellType unit_cell_in,
+PsSynthesisReader::PsSynthesisReader(const int system_count_in, const int unique_topology_count_in,
+                                     const UnitCellType unit_cell_in,
                                      const ThermostatKind heat_bath_kind_in,
                                      const BarostatKind piston_kind_in, const double time_step_in,
                                      const int* atom_starts_in, const int* atom_counts_in,
+                                     const int* common_ag_list_in, const int* common_ag_bounds_in,
+                                     const int*	unique_ag_idx_in, const int* replica_idx_in,
                                      const double gpos_scale_in, const double lpos_scale_in,
                                      const double vel_scale_in, const double frc_scale_in,
                                      const int gpos_bits_in, const int lpos_bits_in,
@@ -149,10 +159,12 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
                                      const llint* fxnxt_in, const llint* fynxt_in,
                                      const llint* fznxt_in, const int* fxnxt_ovrf_in,
                                      const int* fynxt_ovrf_in, const int* fznxt_ovrf_in) :
-    system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
-    piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
-    atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
-    vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
+    system_count{system_count_in}, unique_topology_count{unique_topology_count_in},
+    unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in}, piston_kind{piston_kind_in},
+    time_step{time_step_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+    common_ag_list{common_ag_list_in}, common_ag_bounds{common_ag_bounds_in},
+    unique_ag_idx{unique_ag_idx_in}, replica_idx{replica_idx_in}, gpos_scale{gpos_scale_in},
+    lpos_scale{lpos_scale_in}, vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
     inv_gpos_scale{1.0 / gpos_scale_in},
     inv_lpos_scale{1.0 / lpos_scale_in},
     inv_vel_scale{1.0 / vel_scale_in},
@@ -187,12 +199,17 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
 //-------------------------------------------------------------------------------------------------
 PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
     system_count{psyw.system_count},
+    unique_topology_count{psyw.unique_topology_count},
     unit_cell{psyw.unit_cell},
     heat_bath_kind{psyw.heat_bath_kind},
     piston_kind{psyw.piston_kind},
     time_step{psyw.time_step},
     atom_starts{psyw.atom_starts},
     atom_counts{psyw.atom_counts},
+    common_ag_list{psyw.common_ag_list},
+    common_ag_bounds{psyw.common_ag_bounds},
+    unique_ag_idx{psyw.unique_ag_idx},
+    replica_idx{psyw.replica_idx},
     gpos_scale{psyw.gpos_scale},
     lpos_scale{psyw.lpos_scale},
     vel_scale{psyw.vel_scale},
@@ -251,6 +268,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     system_count{static_cast<int>(ps_list.size())},
+    unique_topology_count{0},
     unit_cell{UnitCellType::NONE},
     cycle_position{CoordinateCycle::PRESENT},
     heat_bath_kind{ThermostatKind::NONE},
@@ -270,6 +288,10 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     force_scale_bits{force_scale_bits_in},
     atom_starts{HybridKind::POINTER, "labframe_starts"},
     atom_counts{HybridKind::POINTER, "labframe_counts"},
+    shared_topology_instances{HybridKind::POINTER, "labframe_instances"},
+    shared_topology_instance_bounds{HybridKind::POINTER, "labframe_instance_bnds"},
+    unique_topology_reference{HybridKind::POINTER, "labframe_unique_idx"},
+    shared_topology_instance_index{HybridKind::POINTER, "labframe_shared_idx"},
     x_coordinates{HybridKind::POINTER, "labframe_xpos"},
     y_coordinates{HybridKind::POINTER, "labframe_ypos"},
     z_coordinates{HybridKind::POINTER, "labframe_zpos"},
@@ -336,9 +358,14 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     llint_data{HybridKind::ARRAY, "labframe_llint"},
     double_data{HybridKind::ARRAY, "labframe_double"},
     float_data{HybridKind::ARRAY, "labframe_float"},
-    topologies{ag_list.begin(), ag_list.end()}
+    topologies{ag_list},
+    unique_topologies{}
 {
   // Check validity of input
+  if (ag_list.size() != ps_list.size()) {
+    rtErr("The number of input topologies (" + std::to_string(ag_list.size()) + ") must match the "
+          "number of systems (" + std::to_string(ps_list.size()) + ").", "PhaseSpaceSynthesis");
+  }
   checkGlobalPositionBits(globalpos_scale_bits);
   checkLocalPositionBits(localpos_scale_bits);
   checkVelocityBits(velocity_scale_bits);
@@ -388,6 +415,23 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     }
   }
 
+  // Find the unique topologies
+  std::vector<bool> unique(system_count, true);
+  for (int i = 0; i < system_count; i++) {
+    if (unique[i]) {
+      for (int j = i + 1; j < system_count; j++) {
+        unique[j] = (unique[j] && (topologies[j] != topologies[i]));
+      }
+    }
+  }
+  unique_topology_count = sum<int>(unique);
+  unique_topologies.reserve(unique_topology_count);
+  for (int i = 0; i < system_count; i++) {
+    if (unique[i]) {
+      unique_topologies.push_back(const_cast<AtomGraph*>(topologies[i]));
+    }
+  }  
+  
   // Allocate data and set internal pointers
   int atom_stride = 0;
   for (int i = 0; i < system_count; i++) {
@@ -395,6 +439,38 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
   }
   allocate(atom_stride);
 
+  // Survey all systems and list all examples using each unique topology.
+  int* stib_ptr = shared_topology_instance_bounds.data();
+  for (int i = 0; i < system_count; i++) {
+    const AtomGraph* iag_ptr = topologies[i];
+    for (int j = 0; j < unique_topology_count; j++) {
+      if (iag_ptr == unique_topologies[j]) {
+        stib_ptr[j] += 1;
+      }
+    }
+  }
+  prefixSumInPlace(&shared_topology_instance_bounds, PrefixSumType::EXCLUSIVE,
+                   "PhaseSpaceSynthesis");
+  std::vector<int> stib_counters = shared_topology_instance_bounds.readHost();
+  if (stib_counters.back() != system_count) {
+    rtErr("Counts of systems linked to each unique topology are incorrect.",
+          "PhaseSpaceSynthesis");
+  }
+  int* sti_ptr  = shared_topology_instances.data();
+  int* replica_ptr = shared_topology_instance_index.data();
+  int* utr_ptr = unique_topology_reference.data();
+  for (int i = 0; i < system_count; i++) {
+    const AtomGraph* iag_ptr = topologies[i];
+    for (int j = 0; j < unique_topology_count; j++) {
+      if (iag_ptr == unique_topologies[j]) {
+        sti_ptr[stib_counters[j]] = i;
+        replica_ptr[i] = stib_counters[j] - stib_ptr[j];
+        utr_ptr[i] = j;
+        stib_counters[j] += 1;
+      }
+    }
+  }
+  
   // Check that coordinates match topologies.  Set atom starts and counts in the process.
   int acc_limit = 0;
   for (int i = 0; i < system_count; i++) {
@@ -639,6 +715,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     system_count{original.system_count},
+    unique_topology_count{original.unique_topology_count},
     unit_cell{original.unit_cell},
     cycle_position{original.cycle_position},
     heat_bath_kind{original.heat_bath_kind},
@@ -658,6 +735,10 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     force_scale_bits{original.force_scale_bits},
     atom_starts{original.atom_starts},
     atom_counts{original.atom_counts},
+    shared_topology_instances{original.shared_topology_instances},
+    shared_topology_instance_bounds{original.shared_topology_instance_bounds},
+    unique_topology_reference{original.unique_topology_reference},
+    shared_topology_instance_index{original.shared_topology_instance_index},
     x_coordinates{original.x_coordinates},
     y_coordinates{original.y_coordinates},
     z_coordinates{original.z_coordinates},
@@ -724,9 +805,10 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     llint_data{original.llint_data},
     double_data{original.double_data},
     float_data{original.float_data},
-    topologies{original.topologies}
+    topologies{original.topologies},
+    unique_topologies{original.unique_topologies}
 {
-  // The allocate function again handle pointer repair, just like in the PhaseSpace object.
+  // The allocate function again handles pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
   // the original must have been in agreement in order for it to exist in the first place.  The
   // Hybrid objects will not be resized as they already have the proper sizes.
@@ -740,6 +822,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     system_count{original.system_count},
+    unique_topology_count{original.unique_topology_count},
     unit_cell{original.unit_cell},
     cycle_position{original.cycle_position},
     heat_bath_kind{original.heat_bath_kind},
@@ -759,6 +842,10 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     force_scale_bits{original.force_scale_bits},
     atom_starts{std::move(original.atom_starts)},
     atom_counts{std::move(original.atom_counts)},
+    shared_topology_instances{std::move(original.shared_topology_instances)},
+    shared_topology_instance_bounds{std::move(original.shared_topology_instance_bounds)},
+    unique_topology_reference{std::move(original.unique_topology_reference)},
+    shared_topology_instance_index{std::move(original.shared_topology_instance_index)},
     x_coordinates{std::move(original.x_coordinates)},
     y_coordinates{std::move(original.y_coordinates)},
     z_coordinates{std::move(original.z_coordinates)},
@@ -824,8 +911,15 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     int_data{std::move(original.int_data)},
     llint_data{std::move(original.llint_data)},
     double_data{std::move(original.double_data)},
-    float_data{std::move(original.float_data)}
+    float_data{std::move(original.float_data)},
+    topologies{std::move(original.topologies)},
+    unique_topologies{std::move(original.unique_topologies)}
 {}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceSynthesis* PhaseSpaceSynthesis::getSelfPointer() const {
+  return this;
+}
 
 //-------------------------------------------------------------------------------------------------
 const PsSynthesisReader PhaseSpaceSynthesis::data(const HybridTargetLevel tier) const {
@@ -837,8 +931,12 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientat
                                                   const HybridTargetLevel tier) const {
   switch (orientation) {
   case CoordinateCycle::PAST:
-    return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -876,8 +974,12 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientat
                              z_forces.data(tier), x_force_overflow.data(tier),
                              y_force_overflow.data(tier), z_force_overflow.data(tier));
   case CoordinateCycle::PRESENT:
-    return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -917,8 +1019,12 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientat
                              y_future_force_overflow.data(tier),
                              z_future_force_overflow.data(tier));
   case CoordinateCycle::FUTURE:
-    return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -966,8 +1072,12 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                                             const HybridTargetLevel tier) {
   switch (orientation) {
   case CoordinateCycle::PAST:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -1005,8 +1115,12 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              z_forces.data(tier), x_force_overflow.data(tier),
                              y_force_overflow.data(tier), z_force_overflow.data(tier));
   case CoordinateCycle::PRESENT:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -1045,8 +1159,12 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              y_future_force_overflow.data(tier),
                              z_future_force_overflow.data(tier));
   case CoordinateCycle::FUTURE:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, atom_starts.data(tier),
+                             atom_counts.data(tier), shared_topology_instances.data(tier),
+                             shared_topology_instance_bounds.data(tier),
+                             unique_topology_reference.data(tier),
+                             shared_topology_instance_index.data(tier), globalpos_scale,
                              localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                              localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                              box_vectors.data(tier), box_vector_overflow.data(tier),
@@ -1091,6 +1209,11 @@ int PhaseSpaceSynthesis::getSystemCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getUniqueTopologyCount() const {
+  return unique_topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 UnitCellType PhaseSpaceSynthesis::getUnitCellType() const {
   return unit_cell;
 }
@@ -1121,49 +1244,64 @@ int PhaseSpaceSynthesis::getForceAccumulationBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int index) const {
-  return topologies[index];
+const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int system_index) const {
+  if (system_index < 0 || system_index >= system_count) {
+    rtErr("System index " + std::to_string(system_index) + " is invalid for a synthesis with " +
+          std::to_string(system_count) + " coordinate sets.", "PhaseSpaceSynthesis",
+          "getSystemTopologyPointer");
+  }
+  return topologies[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<AtomGraph*> PhaseSpaceSynthesis::getUniqueTopologies() const {
-  std::vector<AtomGraph*> result;
-  std::vector<bool> unique(system_count, true);
-  for (int i = 0; i < system_count; i++) {
-    if (unique[i]) {
-      for (int j = i + 1; j < system_count; j++) {
-        if (topologies[j] == topologies[i]) {
-          unique[j] = false;
-        }
-      }
-    }
-  }
-  const int n_unique = sum<int>(unique);
-  result.reserve(n_unique);
-  for (int i = 0; i < system_count; i++) {
-    if (unique[i]) {
-      result.push_back(const_cast<AtomGraph*>(topologies[i]));
-    }
+const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getUniqueTopologies() const {
+  return unique_topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getUniqueTopologyIndex(const int system_index) const {
+  return unique_topology_reference.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyIndices() const {
+  return unique_topology_reference.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyExampleIndices() const {
+  std::vector<int> result(unique_topology_count);
+  const int* sti_ptr = shared_topology_instances.data();
+  for (int i = 0; i < unique_topology_count; i++) {
+    result[i] = sti_ptr[shared_topology_instance_bounds.readHost(i)];
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyIndices() const {
-  std::vector<int> result(system_count);
-  std::vector<bool> unique(system_count, true);
-  int n_unique = 0;
-  for (int i = 0; i < system_count; i++) {
-    if (unique[i]) {
-      result[i] = n_unique;
-      for (int j = i + 1; j < system_count; j++) {
-        if (topologies[j] == topologies[i]) {
-          unique[j] = false;
-          result[j] = n_unique;
-        }
-      }
-      n_unique++;
-    }
+int PhaseSpaceSynthesis::getTopologyInstanceCount(const int topology_index) const {
+  if (topology_index < 0 || topology_index >= unique_topology_count) {
+    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
+          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
+          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
+  }
+  return shared_topology_instance_bounds.readHost(topology_index + 1) -
+         shared_topology_instance_bounds.readHost(topology_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getSystemIndicesByTopology(const int topology_index) const {
+  if (topology_index < 0 || topology_index >= unique_topology_count) {
+    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
+          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
+          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
+  }
+  const int llim = shared_topology_instance_bounds.readHost(topology_index);
+  const int hlim = shared_topology_instance_bounds.readHost(topology_index + 1);
+  const int* sti_ptr = shared_topology_instances.data();
+  std::vector<int> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = sti_ptr[i];
   }
   return result;
 }
@@ -1181,12 +1319,13 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
   // Hybrids were allocated to infer the values of subsequent pointers, but
   // cudaHostGetDevicePointer is not a high-latency or laborious call.  Reduce complexity in the
   // central Hybrid object by generating the pointers every time this special case occurs.
-  int*    devc_atom_starts;
-  int*    devc_atom_counts;
-  llint*  devc_boxvecs;
-  int*  devc_boxvec_ovrf;
-  double* devc_umat, *devc_invu, *devc_boxdims;
-  float*  devc_sp_umat, *devc_sp_invu, *devc_sp_boxdims;
+  int *devc_atom_starts, *devc_atom_counts;
+  int *devc_shared_topology_instances, *devc_shared_topology_instance_bounds;
+  int *devc_unique_topology_reference, *devc_shared_topology_instance_index;
+  llint *devc_boxvecs;
+  int *devc_boxvec_ovrf;
+  double *devc_umat, *devc_invu, *devc_boxdims;
+  float *devc_sp_umat, *devc_sp_invu, *devc_sp_boxdims;
   llint *devc_xcrd,  *devc_ycrd,  *devc_zcrd,  *devc_xvel,  *devc_yvel,  *devc_zvel;
   llint *devc_xfrc,  *devc_yfrc,  *devc_zfrc,  *devc_xprv,  *devc_yprv,  *devc_zprv;
   llint *devc_xnxt,  *devc_ynxt,  *devc_znxt,  *devc_vxprv, *devc_vyprv, *devc_vzprv;
@@ -1210,6 +1349,13 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
                                                  (void *)atom_starts.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_counts,
                                                  (void *)atom_counts.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_shared_topology_instances,
+                                      (void *)shared_topology_instances.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_shared_topology_instance_bounds,
+                                      (void *)shared_topology_instance_bounds.data(), 0) !=
+             cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_boxvecs,
                                                  (void *)box_vectors.data(), 0) != cudaSuccess);
   problem = (problem ||
@@ -1232,7 +1378,14 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
   problem = (problem ||
              cudaHostGetDevicePointer((void **)&devc_sp_boxdims,
                                       (void *)sp_box_dimensions.data(), 0) != cudaSuccess);
-
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_unique_topology_reference,
+                                      (void *)unique_topology_reference.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_shared_topology_instance_index,
+                                      (void *)shared_topology_instance_index.data(), 0) !=
+             cudaSuccess);
+  
   // Obtain pointers to the host-data for atomic positions.
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_xcrd,
                                                  (void *)x_coordinates.data(), 0) != cudaSuccess);
@@ -1408,60 +1561,67 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
   }
   switch (orientation) {
   case CoordinateCycle::PAST:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             devc_atom_starts, devc_atom_counts, globalpos_scale,
-                             localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
-                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                             devc_boxvecs, devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims,
-                             devc_sp_umat, devc_sp_invu, devc_sp_boxdims, devc_xprv, devc_yprv,
-                             devc_zprv, devc_xprv_ovrf, devc_yprv_ovrf, devc_zprv_ovrf, devc_xvel,
-                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
-                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
-                             devc_zfrc_ovrf, devc_xnxt, devc_ynxt, devc_znxt, devc_xnxt_ovrf,
-                             devc_ynxt_ovrf, devc_znxt_ovrf, devc_xcrd, devc_ycrd, devc_zcrd,
-                             devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_vxnxt,
-                             devc_vynxt, devc_vznxt, devc_vxnxt_ovrf, devc_vynxt_ovrf,
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
+                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
+                             devc_unique_topology_reference, devc_shared_topology_instance_index,
+                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
+                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
+                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_sp_umat, devc_sp_invu, devc_sp_boxdims,
+                             devc_xprv, devc_yprv, devc_zprv, devc_xprv_ovrf, devc_yprv_ovrf,
+                             devc_zprv_ovrf, devc_xvel, devc_yvel, devc_zvel, devc_xvel_ovrf,
+                             devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc, devc_yfrc, devc_zfrc,
+                             devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_xnxt, devc_ynxt,
+                             devc_znxt, devc_xnxt_ovrf, devc_ynxt_ovrf, devc_znxt_ovrf, devc_xcrd,
+                             devc_ycrd, devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf,
+                             devc_vxnxt, devc_vynxt, devc_vznxt, devc_vxnxt_ovrf, devc_vynxt_ovrf,
                              devc_vznxt_ovrf, devc_xvel, devc_yvel, devc_zvel, devc_xvel_ovrf,
                              devc_yvel_ovrf, devc_zvel_ovrf, devc_fxnxt, devc_fynxt, devc_fznxt,
                              devc_fxnxt_ovrf, devc_fynxt_ovrf, devc_fznxt_ovrf, devc_xfrc,
                              devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf);
   case CoordinateCycle::PRESENT:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             devc_atom_starts, devc_atom_counts, globalpos_scale,
-                             localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
-                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                             devc_boxvecs, devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims,
-                             devc_sp_umat, devc_sp_invu, devc_sp_boxdims, devc_xcrd, devc_ycrd,
-                             devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel,
-                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
-                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
-                             devc_zfrc_ovrf, devc_xprv, devc_yprv, devc_zprv, devc_xprv_ovrf,
-                             devc_yprv_ovrf, devc_zprv_ovrf, devc_xnxt, devc_ynxt, devc_znxt,
-                             devc_xnxt_ovrf, devc_ynxt_ovrf, devc_znxt_ovrf, devc_vxprv,
-                             devc_vyprv, devc_vzprv, devc_vxprv_ovrf, devc_vyprv_ovrf,
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
+                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
+                             devc_unique_topology_reference, devc_shared_topology_instance_index,
+                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
+                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
+                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_sp_umat, devc_sp_invu, devc_sp_boxdims,
+                             devc_xcrd, devc_ycrd, devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf,
+                             devc_zcrd_ovrf, devc_xvel, devc_yvel, devc_zvel, devc_xvel_ovrf,
+                             devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc, devc_yfrc, devc_zfrc,
+                             devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_xprv, devc_yprv,
+                             devc_zprv, devc_xprv_ovrf, devc_yprv_ovrf, devc_zprv_ovrf, devc_xnxt,
+                             devc_ynxt, devc_znxt, devc_xnxt_ovrf, devc_ynxt_ovrf, devc_znxt_ovrf,
+                             devc_vxprv, devc_vyprv, devc_vzprv, devc_vxprv_ovrf, devc_vyprv_ovrf,
                              devc_vzprv_ovrf, devc_vxnxt, devc_vynxt, devc_vznxt, devc_vxnxt_ovrf,
                              devc_vynxt_ovrf, devc_vznxt_ovrf, devc_fxprv, devc_fyprv, devc_fzprv,
                              devc_fxprv_ovrf, devc_fyprv_ovrf, devc_fzprv_ovrf, devc_fxnxt,
                              devc_fynxt, devc_fznxt, devc_fxnxt_ovrf, devc_fynxt_ovrf,
                              devc_fznxt_ovrf);
   case CoordinateCycle::FUTURE:
-    return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                             devc_atom_starts, devc_atom_counts, globalpos_scale,
-                             localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
-                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                             devc_boxvecs, devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims,
-                             devc_sp_umat, devc_sp_invu, devc_sp_boxdims, devc_xnxt, devc_ynxt,
-                             devc_znxt, devc_xnxt_ovrf, devc_ynxt_ovrf, devc_znxt_ovrf, devc_xvel,
-                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
-                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
-                             devc_zfrc_ovrf, devc_xcrd, devc_ycrd, devc_zcrd, devc_xcrd_ovrf,
-                             devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xprv, devc_yprv, devc_zprv,
-                             devc_xprv_ovrf, devc_yprv_ovrf, devc_zprv_ovrf, devc_xvel, devc_yvel,
-                             devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf, devc_vxprv,
-                             devc_vyprv, devc_vzprv, devc_vxprv_ovrf, devc_vyprv_ovrf,
-                             devc_vzprv_ovrf, devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf,
-                             devc_yfrc_ovrf, devc_zfrc_ovrf, devc_fxprv, devc_fyprv, devc_fzprv,
-                             devc_fxprv_ovrf, devc_fyprv_ovrf, devc_fzprv_ovrf);
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
+                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
+                             devc_unique_topology_reference, devc_shared_topology_instance_index,
+                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
+                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
+                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_sp_umat, devc_sp_invu, devc_sp_boxdims,
+                             devc_xnxt, devc_ynxt, devc_znxt, devc_xnxt_ovrf, devc_ynxt_ovrf,
+                             devc_znxt_ovrf, devc_xvel, devc_yvel, devc_zvel, devc_xvel_ovrf,
+                             devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc, devc_yfrc, devc_zfrc,
+                             devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_xcrd, devc_ycrd,
+                             devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xprv,
+                             devc_yprv, devc_zprv, devc_xprv_ovrf, devc_yprv_ovrf, devc_zprv_ovrf,
+                             devc_xvel, devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf,
+                             devc_zvel_ovrf, devc_vxprv, devc_vyprv, devc_vzprv, devc_vxprv_ovrf,
+                             devc_vyprv_ovrf, devc_vzprv_ovrf, devc_xfrc, devc_yfrc, devc_zfrc,
+                             devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_fxprv,
+                             devc_fyprv, devc_fzprv, devc_fxprv_ovrf, devc_fyprv_ovrf,
+                             devc_fzprv_ovrf);
   }
   __builtin_unreachable();
 }
@@ -2483,10 +2643,11 @@ void PhaseSpaceSynthesis::import(const CoordinateFrame &cf, const int system_ind
 void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   const size_t system_stride = roundUp<size_t>(system_count, warp_size_zu);
   const size_t xfrm_stride = system_count * roundUp<size_t>(9, warp_size_zu);
-  int_data.resize((2LLU * system_stride) + (27LLU * atom_stride) + xfrm_stride);
+  int_data.resize((6LLU * system_stride) + (27LLU * atom_stride) + xfrm_stride +
+                  roundUp(static_cast<size_t>(unique_topology_count + 1), warp_size_zu));
   atom_counts.setPointer(&int_data, 0LLU, system_count);
   atom_starts.setPointer(&int_data, system_stride, system_count);
-  const size_t twosys  = 2LLU * system_stride;
+  const size_t twosys  = (2LLU * system_stride);
   const size_t twosysx = twosys + xfrm_stride;
   llint_data.resize((27LLU * atom_stride) + xfrm_stride);
   x_coordinates.setPointer(&llint_data,                                     0LLU, atom_stride);
@@ -2526,7 +2687,7 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   x_future_coord_overflow.setPointer(&int_data,    ( 6LLU * atom_stride) +  twosys, atom_stride);
   y_future_coord_overflow.setPointer(&int_data,    ( 7LLU * atom_stride) +  twosys, atom_stride);
   z_future_coord_overflow.setPointer(&int_data,    ( 8LLU * atom_stride) +  twosys, atom_stride);
-  box_vector_overflow.setPointer(&int_data,        ( 9LLU * atom_stride) +  twosys, xfrm_stride);  
+  box_vector_overflow.setPointer(&int_data,        ( 9LLU * atom_stride) +  twosys, xfrm_stride);
   x_velocity_overflow.setPointer(&int_data,        ( 9LLU * atom_stride) + twosysx, atom_stride);
   y_velocity_overflow.setPointer(&int_data,        (10LLU * atom_stride) + twosysx, atom_stride);
   z_velocity_overflow.setPointer(&int_data,        (11LLU * atom_stride) + twosysx, atom_stride);
@@ -2553,6 +2714,17 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   sp_box_space_transforms.setPointer(&float_data,             0LLU, xfrm_stride);
   sp_inverse_transforms.setPointer(&float_data,        xfrm_stride, xfrm_stride);
   sp_box_dimensions.setPointer(&float_data,     2LLU * xfrm_stride, xfrm_stride);
+
+  // Target the arrays detailing unique system instances to the back of the int_data array, as
+  // the alignment of int_data and llint_data then works better for fixed-precision coordinates.
+  // This is strictly organizational and has no effect on performance.
+  shared_topology_instances.setPointer(&int_data, (27LLU * atom_stride) + twosysx, system_count);
+  shared_topology_instance_bounds.setPointer(&int_data, (27LLU * atom_stride) + twosysx +
+                                             system_stride, unique_topology_count + 1);
+  unique_topology_reference.setPointer(&int_data, (27LLU * atom_stride) + twosysx +
+                                       (2LLU * system_stride), system_count);
+  shared_topology_instance_index.setPointer(&int_data, (27LLU * atom_stride) + twosysx +
+                                       (3LLU * system_stride), system_count);
 }
 
 } // namespace trajectory

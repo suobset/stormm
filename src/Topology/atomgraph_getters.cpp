@@ -73,6 +73,16 @@ int AtomGraph::getLargestMoleculeSize() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double AtomGraph::getTotalMass() const {
+  double tmass = 0.0;
+  const double* mass_ptr = atomic_masses.data();
+  for (int i = 0; i < atom_count; i++) {
+    tmass += mass_ptr[i];
+  }
+  return tmass;
+}
+  
+//-------------------------------------------------------------------------------------------------
 int AtomGraph::getDescriptor(const TopologyDescriptor choice) const {
   return descriptors.readHost(static_cast<ulint>(choice));
 }
