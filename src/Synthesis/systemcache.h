@@ -154,7 +154,7 @@ public:
   /// \{
   const AtomGraph* getTopologyPointer(int topology_index) const;
   AtomGraph* getTopologyPointer(int topology_index);
-  std::vector<const AtomGraph*> getTopologyPointer() const;
+  const std::vector<AtomGraph*> getTopologyPointer() const;
   std::vector<AtomGraph*> getTopologyPointer();
   /// \}
 
@@ -176,7 +176,7 @@ public:
   /// \{
   const AtomGraph* getSystemTopologyPointer(int index) const;
   AtomGraph* getSystemTopologyPointer(int index);
-  std::vector<const AtomGraph*> getSystemTopologyPointer() const;
+  const std::vector<AtomGraph*> getSystemTopologyPointer() const;
   std::vector<AtomGraph*> getSystemTopologyPointer();
   /// \}
 
@@ -212,7 +212,7 @@ public:
   /// \{
   const PhaseSpace* getCoordinatePointer(int index) const;
   PhaseSpace* getCoordinatePointer(int index);
-  std::vector<const PhaseSpace*> getCoordinatePointer() const;
+  const std::vector<PhaseSpace*> getCoordinatePointer() const;
   std::vector<PhaseSpace*> getCoordinatePointer();
   /// \}
 
@@ -231,7 +231,7 @@ public:
   std::vector<PhaseSpace>& getCoordinateReference();
   /// \}
 
-  /// \brief Get a pointer to the chemical features for a particular topology in the cache.
+  /// \brief Get a pointer to the chemical features for a particular system in the cache.
   ///
   /// Overloaded:
   ///   - Return a const pointer to an object in a const SystemCache
@@ -243,13 +243,13 @@ public:
   ChemicalFeatures* getFeaturesPointer(int index);
   /// \}  
 
-  /// \brief Get a reference to the chemical features for a particular topology in the cache.
+  /// \brief Get a reference to the chemical features for a particular system in the cache.
   ///
   /// Overloaded:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///
-  /// \param index  Index of the system of interest
+  /// \param index  Index of the system  of interest
   /// \{
   const ChemicalFeatures& getFeaturesReference(int index) const;
   ChemicalFeatures& getFeaturesReference(int index);

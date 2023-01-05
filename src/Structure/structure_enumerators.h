@@ -44,7 +44,15 @@ enum class RMSDAlignmentProtocol {
   ALIGN_ALL    ///< With no symmetry-related groups, perform a standard RMSD calculation according
                ///<   to the RMSDMethod indicated.
 };
-  
+
+/// \brief There are two orders of RMSD calculation: all to one (reference structure), or all to
+///        all (matrix).
+enum class RMSDTask {
+  REFERENCE,  ///< Compute the RMSD of all structures to a reference structure
+  MATRIX      ///< Compute the RMSD of all structures following a particular topology to all others
+              ///<   following that same topology.
+};
+
 /// \brief Virtual site standalone functiosn and kernels call into two categories.
 enum class VirtualSiteActivity {
   PLACEMENT,       ///< Place virtual sites after motion of the underlying frame atoms

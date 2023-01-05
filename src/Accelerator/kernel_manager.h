@@ -30,10 +30,13 @@ using data_types::int2;
 #endif
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
+using energy::ClashResponse;
 using numerics::AccumulationMethod;
+using structure::RMSDTask;
 using structure::VirtualSiteActivity;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
+using synthesis::VwuGoal;
 using math::ReductionGoal;
 using math::ReductionStage;
 using synthesis::VwuGoal;
@@ -137,13 +140,16 @@ public:
   
   /// \brief Get the block and thread counts for a valence kernel.
   ///
-  /// \param prec        The type of floating point numbers in which the kernel shall work
-  /// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
-  /// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
-  /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
-  ///                    error in this context)
+  /// \param prec                The type of floating point numbers in which the kernel shall work
+  /// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
+  /// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
+  ///                            whole
+  /// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
+  ///                            produce an error in this context)
+  /// \param collision_handling  Indication of whether clashes are to be dampened
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            AccumulationMethod acc_meth, VwuGoal purpose) const;
+                            AccumulationMethod acc_meth, VwuGoal purpose,
+                            ClashResponse collision_handling) const;
 
   /// \brief Get the block and thread counts for a non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
@@ -152,7 +158,7 @@ public:
   /// \param igb   Type of implicit solvent model to use ("NONE" in periodic boundary conditions)
   int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
-                              ImplicitSolventModel igb) const;
+                              ImplicitSolventModel igb, ClashResponse collision_handling) const;
 
   /// \brief Get the block and thread counts for a Born radii computation kernel.  Parameter
   ///        descriptions for this function follow from getValenceKernelDims() and
@@ -185,6 +191,12 @@ public:
   ///                 sites or transmit forces from them to frame atoms with mass
   int2 getVirtualSiteKernelDims(PrecisionModel prec, VirtualSiteActivity purpose) const;
 
+  /// \brief Get the launch parameters for an RMSD calculation kernel.
+  ///
+  /// \param prec   The precision model in which to perform calculations and present results
+  /// \param order  The order of the calculation (all to reference, or all to all)
+  int2 getRMSDKernelDims(PrecisionModel prec, RMSDTask order) const;
+  
   /// \brief Get the GPU information for the active GPU.
   const GpuDetails& getGpu() const;
   
@@ -218,29 +230,37 @@ private:
   int nonbond_block_multiplier_sp;
   /// \}
   
-  /// Architecture-specific block multiplier for Generalized Born radii computation kernels, again
+  /// Architecture-specific block multipliers for Generalized Born radii computation kernels, again
   /// a provision for NVIDIA Turing cards.
   /// \{
   int gbradii_block_multiplier_dp;
   int gbradii_block_multiplier_sp;
   /// \}
 
-  /// Architecture-specific block multiplier for Generalized Born radii derivative computation
+  /// Architecture-specific block multipliers for Generalized Born radii derivative computation
   /// kernels, again a provision for NVIDIA Turing cards.
   /// \{
   int gbderiv_block_multiplier_dp;
   int gbderiv_block_multiplier_sp;
   /// \}
   
-  /// The workload-specific block multiplier for reduction kernels.  Like the valence kernels, the
+  /// The workload-specific block multipliers for reduction kernels.  Like the valence kernels, the
   /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
   int reduction_block_multiplier;
 
-  /// The architecture-specific block multiplier for virtual site handling kernels.
+  /// The architecture-specific block multipliers for virtual site handling kernels.
   /// \{
   int virtual_site_block_multiplier_dp;
   int virtual_site_block_multiplier_sp;
+  /// \}
+
+  /// The architecture-specific block multipliers for RMSD computation kernels.  The thread count
+  /// for each kernel is set to 128 (tiny) as each kernel operates strictly as a collection of
+  /// warps.
+  /// \{
+  int rmsd_block_multiplier_dp;
+  int rmsd_block_multiplier_sp;
   /// \}
   
   /// Store the resource requirements and selected launch parameters for a variety of kernels.
@@ -252,15 +272,18 @@ private:
   ///        function reports numbers based on this functions input information and some further
   ///        analysis.
   ///
-  /// \param prec         The type of floating point numbers in which the kernel shall work
-  /// \param eval_force   Indication of whether the kernel will evaluate forces on atoms
-  /// \param eval_nrg     Indication of whether to evaluate the energy of the system as a whole
-  /// \param acc_meth     The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce
-  ///                     an error in this context)
-  /// \param subdivision  Number of times that the basic valence kernel should be subdivided
-  /// \param kernel_name  [Optional] Name of the kernel in the actual code
+  /// \param prec                Type of floating point numbers in which the kernel shall work
+  /// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
+  /// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
+  ///                            whole
+  /// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
+  ///                            produce an error in this context)
+  /// \param collision_handling  Indication of whether collisions are to be forgiven
+  /// \param subdivision         Number of times that the basic valence kernel should be subdivided
+  /// \param kernel_name         [Optional] Name of the kernel in the actual code
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            AccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
+                            AccumulationMethod acc_meth, VwuGoal purpose,
+                            ClashResponse collision_handling, int subdivision,
                             const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
@@ -271,7 +294,7 @@ private:
   /// \param igb   Type of implicit solvent model to use ("NONE" in periodic boundary conditions)
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
-                              ImplicitSolventModel igb,
+                              ImplicitSolventModel igb, ClashResponse collision_handling,
                               const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
@@ -307,6 +330,13 @@ private:
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogVirtualSiteKernel(PrecisionModel prec, VirtualSiteActivity purpose, int subdivision,
                                 const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the maximum block size and thread counts for one of the RMSD calculation kernels.
+  ///
+  /// \param prec   The type of floating point numbers in which the kernel shall work
+  /// \param order  The order of the calculation (all to reference, or all to all)
+  void catalogRMSDKernel(PrecisionModel prec, RMSDTask order,
+                         const std::string &kernel_name = std::string(""));
 };
 
 /// \brief Obtain the workload-specific block multiplier for valence interaction kernels.
@@ -338,28 +368,38 @@ int gbDerivativeBlockMultiplier(const GpuDetails &gpu, PrecisionModel prec);
 int reductionBlockMultiplier();
 
 /// \brief Obtain the workload-specific block multiplier for virtual site handling kernels.  The
-///        typical kernel will run on 256 threads.
+///        typical kernel will run on 256 threads per block.
 ///
 /// \param prec  The type of floating point numbers in which the kernel shall work
 int virtualSiteBlockMultiplier(PrecisionModel prec);
 
+/// \brief Obtain the block multiplier for RMSD calculation kernels.  Each block will run on 128
+///        threads.
+///
+/// \param prec  The type of floating point numbers in which the kernel shall work
+int rmsdBlockMultiplier(PrecisionModel prec);
+  
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
 ///        - { d, f }      Perform calculations in double (d) or float (f) arithmetic
 ///        - { e, f, fe }  Compute energies (e), forces (f), or both (ef)
 ///        - { s, w }      Accumulate forces in split integers (s) or whole integers (w)
-///        - { m, a }      Move atoms (m) or accumulate forces or energies (a)
+///        - { m, a }      Move atoms (m) or accumulate forces or energies (a
+///        - { cl, nc }    Take no action (cl) in the event of a collision, or implement an
+///                        increase in the perceived distance between particles (nc) 
 ///
-/// \param prec        The type of floating point numbers in which the kernel shall work
-/// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
-/// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
-/// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
-///                    error in this context)
-/// \param purpose     The intended action to take with computed forces
+/// \param prec                Type of floating point numbers in which the kernel shall work
+/// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
+/// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
+///                            whole
+/// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
+///                            produce an error in this context)
+/// \param purpose             The intended action to take with computed forces
+/// \param collision_handling  Indication of whether to dampen collision effects between particles
 std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
-                             VwuGoal purpose);
+                             VwuGoal purpose, ClashResponse collision_handling);
 
 /// \brief Obtain a unique string identifier for one of the non-bonded kernels.  Each identifier
 ///        begins with "nonb_" and is then appended with letter codes for different aspects
@@ -373,17 +413,22 @@ std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
 ///                             systems in isolated boundary conditions
 ///        - { e, f, fe }       Compute energies (e), forces (f), or both (ef)
 ///        - { s, w }           Accumulate forces in split integers (s) or whole integers (w)
+///        - { cl, nc }    Take no action (cl) in the event of a collision, or implement an
+///                        increase in the perceived distance between particles (nc) 
 ///
-/// \param prec        The type of floating point numbers in which the kernel shall work
-/// \param kind        The type of non-bonded work unit to evaluate
-/// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
-/// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
-/// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
-///                    error in this context)
-/// \param igb         Type of implicit solvent model ("NONE" in periodic boundary conditions)
+/// \param prec                The type of floating point numbers in which the kernel shall work
+/// \param kind                The type of non-bonded work unit to evaluate
+/// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
+/// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
+///                            whole
+/// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
+///                            produce an error in this context)
+/// \param igb                 Type of implicit solvent model ("NONE" in periodic boundary
+///                            conditions)
+/// \param collision_handling  Indication of whether to dampen collision effects between particles
 std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                                EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
-                               ImplicitSolventModel igb);
+                               ImplicitSolventModel igb, ClashResponse collision_handling);
 
 /// \brief Encapsulate the work of encoding a Generalized Born computation kernel key, shared
 ///        across radii and derivative computations.  Parameter descriptions, and the features of
@@ -417,7 +462,7 @@ std::string bornDerivativeKernelKey(PrecisionModel prec, NbwuKind kind,
 /// \param process  The reduction stage to perform
 std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, ReductionStage process);
 
-/// \brief Obtain a unique string identifier for one of the virtaul site handling kernels.  Each
+/// \brief Obtain a unique string identifier for one of the virtual site handling kernels.  Each
 ///        identifier begins with "vste_" and is then appended with letter codes for different
 ///        activities according to the following system:
 ///        - { d, f }    Perform calculations in double (d) or float (f) arithmetic
@@ -426,6 +471,17 @@ std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, Reduc
 /// \param prec     The type of floating point numbers in which the kernel shall work
 /// \param purpose  The process to perform with standalone virtual site kernels
 std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity process);
+
+/// \brief Obtain a unique string identifier for one of the RMSD calculation kernels.  Each
+///        identifier begins with "rmsd_" and is then appended with letter codes for different
+///        activities according to the following system:
+///        - { d, f }  Perform calculations in double (d) or float (f) arithmetic
+///        - { r, m }  Compute RMSD with respect to a reference structure or create matrices of
+///                    all-to-all RMSD values
+///
+/// \param prec   The type of floating point numbers in which the kernel shall work
+/// \param order  The order of the calculation (all to reference, or all to all)
+std::string rmsdKernelKey(PrecisionModel prec, RMSDTask order);
   
 } // namespace card
 } // namespace stormm

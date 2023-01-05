@@ -15,13 +15,16 @@ using parse::WrapTextSearch;
 
 /// \brief Default values for energy minimization
 /// \{
-constexpr int default_minimize_maxcyc        = 200;
-constexpr int default_minimize_ncyc          = 50;
-constexpr int default_minimize_ntpr          = 50;
-constexpr char default_minimize_checkpoint[] = "true";
-constexpr double default_minimize_cut        = 8.0;
-constexpr double default_minimize_dx0        = 0.01;
-constexpr double default_minimize_drms       = 0.0001;
+constexpr int default_minimize_maxcyc         = 200;
+constexpr int default_minimize_ncyc           = 50;
+constexpr int default_minimize_cdcyc          = 25;
+constexpr int default_minimize_ntpr           = 50;
+constexpr char default_minimize_checkpoint[]  = "true";
+constexpr double default_minimize_cut         = 8.0;
+constexpr double default_minimize_dx0         = 0.01;
+constexpr double default_minimize_drms        = 0.0001;
+constexpr double default_minimize_clash_r0    = 0.2;
+constexpr double default_minimize_clash_ratio = 0.5;
 /// \}
   
 /// \brief Object to encapsulate energy minimization control information.  Like other namelist
@@ -56,6 +59,9 @@ public:
   /// \brief Get the number of steepest descent cycles.
   int getSteepestDescentCycles() const;
 
+  /// \brief Get the number of clash-relaxation cycles.
+  int getClashDampingCycles() const;
+  
   /// \brief Get the diagnostic output printing frequency, akin to the major contribution to pmemd
   ///        and sander mdout files.
   int getDiagnosticPrintFrequency() const;
@@ -76,6 +82,13 @@ public:
   /// \brief Get the convergence criterion.
   double getConvergenceTarget() const;
 
+  /// \brief Get the absolute clash distance, below which two particles will be deemed colliding.
+  double getAbsoluteClashDistance() const;
+
+  /// \brief Get the minimum ratio of inter-particle distance to the pairwise van-der Waals sigma
+  ///        parameter, below which two particles will be deemed colliding.
+  double getVdwClashRatio() const;
+
   /// \brief Set the total number of minimization cycles.
   ///
   /// \param cycles_in  The requested number of minimization cycles
@@ -85,6 +98,11 @@ public:
   ///
   /// \param cycles_in  The requested number of steepest descent cycles
   void setSteepestDescentCycles(int cycles_in);
+
+  /// \brief Set the number of clash damping cycles.
+  ///
+  /// \param cycles_in  The requested number of clash damping cycles
+  void setClashDampingCycles(int cycles_in);
 
   /// \brief Set the diagnostic printing frequency.
   ///
@@ -114,42 +132,58 @@ public:
   void setConvergenceTarget(double target_in);
   
 private:
-  ExceptionResponse policy;     ///< Set the behavior when bad inputs are encountered.  DIE =
-                                ///<   abort program, WARN = warn the user, and likely reset to
-                                ///<   the default value if one is available, SILENT = do not
-                                ///<   warn the user, but also likely reset to the default value
-                                ///<   if one is available.
-  int total_cycles;             ///< Maximum number of minimization steps to attempt (equivalent
-                                ///<   to maxcyc in sander)
-  int steepest_descent_cycles;  ///< Number of steepest descent steps to perform prior to beginning
-                                ///<   conjugate gradient moves (equivalent to ncyc in sander)
-  int print_frequency;          ///< Print results at step 0 and, thereafter, after each interval
-                                ///<   of this many line minimizations.  The default of 0
-                                ///<   suppresses output except at the outset of the run.
-  bool produce_checkpoint;      ///< Indicate that a checkpoint file should be produced at the end
-                                ///<   of the energy minimization run (default TRUE), with the name
-                                ///<   of the checkpoint file for each system found in the &files
-                                ///<   namelist.
-  double electrostatic_cutoff;  ///< Cutoff for (short-ranged) electrostatic interactions, or for
-                                ///<   all gas-phase Coulombic electrostatics in a non-periodic
-                                ///<   system.  Units of Angstroms (A).
-  double lennard_jones_cutoff;  ///< Cutoff for van-der Waals interactions, in Angstroms (A).
-  double initial_step;          ///< Magnitude of the initial displacement along the gradient
-                                ///<   vector.  The size of subsequent moves will grow or shrink
-                                ///<   based on the history of success in previous optimizations.
-                                ///<   Units of Angstroms (A).
-  double convergence_target;    ///< Convergence target for root mean squared value of all
-                                ///<   gradients obtained after the minimization, in kcal/mol-A.
+  ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
+                                  ///<   abort program, WARN = warn the user, and likely reset to
+                                  ///<   the default value if one is available, SILENT = do not
+                                  ///<   warn the user, but also likely reset to the default value
+                                  ///<   if one is available.
+  int total_cycles;               ///< Maximum number of minimization steps to attempt (equivalent
+                                  ///<   to maxcyc in sander)
+  int steepest_descent_cycles;    ///< Number of steepest descent steps to perform prior to
+                                  ///<   beginning conjugate gradient moves (equivalent to ncyc in
+                                  ///<   sander)
+  int clash_damping_cycles;       ///< Number of clash-damping moves to include--this applies on
+                                  ///<   top of steepest descent and conjugate gradient cycles. 
+                                  ///<   The first clash_damping_cycles of the minimization will
+                                  ///<   take place with special kernels that identify clashes
+                                  ///<   between atoms and clamp the inter-particle distances at
+                                  ///<   certain minimum values.  If there are no clashes, the
+                                  ///<   provisions for clash-damping has no effect.
+  int print_frequency;            ///< Print results at step 0 and, thereafter, after each interval
+                                  ///<   of this many line minimizations.  The default of 0
+                                  ///<   suppresses output except at the outset of the run.
+  bool produce_checkpoint;        ///< Indicate that a checkpoint file should be produced at the
+                                  ///<   end of the energy minimization run (default TRUE), with
+                                  ///<   the name of the checkpoint file for each system found in
+                                  ///<   the &files namelist.
+  double electrostatic_cutoff;    ///< Cutoff for (short-ranged) electrostatic interactions, or for
+                                  ///<   all gas-phase Coulombic electrostatics in a non-periodic
+                                  ///<   system.  Units of Angstroms (A).
+  double lennard_jones_cutoff;    ///< Cutoff for van-der Waals interactions, in Angstroms (A).
+  double initial_step;            ///< Magnitude of the initial displacement along the gradient
+                                  ///<   vector.  The size of subsequent moves will grow or shrink
+                                  ///<   based on the history of success in previous optimizations.
+                                  ///<   Units of Angstroms (A).
+  double convergence_target;      ///< Convergence target for root mean squared value of all
+                                  ///<   gradients obtained after the minimization, in kcal/mol-A.
+  double clash_minimum_distance;  ///< The minimum separation between two particles, below which a
+                                  ///<   clash will be declared
+  double clash_vdw_ratio;         ///< The minimum ratio of inter-particle distance to the pairwise
+                                  ///<   Lennard-Jones (van-der Waals) sigma parameter, below which
+                                  ///<   a clash will be declared
   
-  /// \brief Validate the total number of minimization cycles
+  /// \brief Validate the total number of minimization cycles.
   void validateTotalCycles();
 
-  /// \brief Validate the number of steepest descent cycles.  This does NOT ensure that this number
-  ///        is less than the number of total cycles.  That behavior is enforced by only taking up
-  ///        to the total number of steps, and taking a steepest descent approach if the step
-  ///        number is less than the appropriate threshold.
-  void validateSteepestDescentCycles();
-
+  /// \brief Validate the number of steepest descent or clash-damping cycles.
+  ///
+  /// \param cycles_in       The number of cycles for either auxiliary process.  May be modified
+  ///                        and returned.
+  /// \param default_cycles  The default number of cycles to impose if there is an error and
+  ///                        automatic corrections are allowed (a behavior which depends on the
+  ///                        runtime exception response setting)
+  void validateAuxiliaryCycles(int *cycles_in, int default_cycles);
+  
   /// \brief Validate the diagnostic printing frequency
   void validatePrintFrequency();
 

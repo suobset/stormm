@@ -7,6 +7,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/Potential/cacheresource.h"
+#include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/scorecard.h"
@@ -117,12 +118,13 @@ int main(const int argc, const char* argv[]) {
   const int2 vale_lp = trpi_launcher.getValenceKernelDims(PrecisionModel::SINGLE,
                                                           EvaluateForce::YES, EvaluateEnergy::NO,
                                                           AccumulationMethod::SPLIT,
-                                                          VwuGoal::MOVE_PARTICLES);
+                                                          VwuGoal::MOVE_PARTICLES,
+                                                          ClashResponse::NONE);
   const int2 nonb_lp =
     trpi_launcher.getNonbondedKernelDims(PrecisionModel::SINGLE,
                                          trpi_poly_ag.getNonbondedWorkType(), EvaluateForce::YES,
                                          EvaluateEnergy::NO, AccumulationMethod::SPLIT,
-                                         born_model);
+                                         born_model, ClashResponse::NONE);
   CacheResource trpi_vale_tb_space(vale_lp.x, maximum_valence_work_unit_atoms);
   CacheResource trpi_nonb_tb_space(nonb_lp.x, small_block_max_atoms);
   ImplicitSolventWorkspace trpi_isw(trpi_poly_ag.getSystemAtomOffsets(),

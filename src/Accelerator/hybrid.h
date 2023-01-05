@@ -342,7 +342,6 @@ public:
   std::vector<T> readHost(size_t offset, size_t count) const;
   std::vector<T> readHost() const;
   void readHost(T* v, size_t offset, size_t count) const;
-  void readHost(T* v) const;
   /// \}
 
   /// \brief Put data into the host_data array.  This substitutes for direct array access via the

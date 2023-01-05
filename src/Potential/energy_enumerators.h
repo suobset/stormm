@@ -92,6 +92,15 @@ enum class VdwCombiningRule {
   NBFIX               ///< Pair-specific combinations, with some off-diagonal terms not conforming
                       ///<   to either of the other rules
 };
+
+/// \brief Functions and kernels can be configured to dampen the effects of clashes (at a minor
+///        expense in computation and registers), or not.
+enum class ClashResponse {
+  NONE,    ///< Do not attempt to dampen the effects of clashes between particles
+  FORGIVE  ///< Forgive clashes by not letting the perceived interparticle distance drop below
+           ///<   some multiple of the pairwise Lennard-Jones sigma value, or if that is also zero
+           ///<   then some arbitrary minimum value.
+};
   
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///

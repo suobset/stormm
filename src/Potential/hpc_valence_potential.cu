@@ -319,13 +319,15 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SPLITCONV_FUNC floatToInt63
 #  define SPLIT_TYPE int2
 #  define SQRT_FUNC sqrtf
+#  define CBRT_FUNC cbrtf
 #  define ACOS_FUNC acosf
 #  define COS_FUNC  cosf
 #  define SIN_FUNC  sinf
 #  define ABS_FUNC  fabsf
 #  define MIX_FUNC  computeRestraintMixtureF
 #  define TCALC_IS_SINGLE
-  
+
+// Compile the standard kernels with all combinations of energy, and force accumulation methods.
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
 #      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
@@ -386,7 +388,72 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
 #    undef VALENCE_KERNEL_THREAD_COUNT
-#  undef  COMPUTE_ENERGY
+#  undef COMPUTE_ENERGY
+
+// Make new kernels with a clash forgiveness check.
+#  define CLASH_FORGIVENESS
+#    define COMPUTE_FORCE
+#      define SPLIT_FORCE_ACCUMULATION
+#        define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#        define KERNEL_NAME kfsValenceForceAccumulationNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME  
+#        define UPDATE_ATOMS
+#          define KERNEL_NAME kfsValenceAtomUpdateNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef UPDATE_ATOMS
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define COMPUTE_ENERGY
+#          define VALENCE_KERNEL_THREAD_COUNT 448
+#          define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define UPDATE_ATOMS
+#            define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClash
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef UPDATE_ATOMS
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#        undef COMPUTE_ENERGY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef SPLIT_FORCE_ACCUMULATION
+#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#      define KERNEL_NAME kfValenceForceAccumulationNonClash
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME  
+#      define UPDATE_ATOMS
+#        define KERNEL_NAME kfValenceAtomUpdateNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef UPDATE_ATOMS
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define COMPUTE_ENERGY
+#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define KERNEL_NAME kfValenceForceEnergyAccumulationNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define UPDATE_ATOMS
+#          define KERNEL_NAME kfValenceEnergyAtomUpdateNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef UPDATE_ATOMS
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef COMPUTE_ENERGY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef COMPUTE_FORCE
+#    define COMPUTE_ENERGY
+#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#      define KERNEL_NAME kfValenceEnergyAccumulationNonClash
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef COMPUTE_ENERGY
+#  undef CLASH_FORGIVENESS
 
 // Clear single-precision floating point definitions
 #  undef VALENCE_BLOCK_MULTIPLICITY
@@ -397,6 +464,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef SPLITCONV_FUNC
 #  undef SPLIT_TYPE
 #  undef SQRT_FUNC
+#  undef CBRT_FUNC
 #  undef ACOS_FUNC
 #  undef COS_FUNC
 #  undef SIN_FUNC
@@ -416,6 +484,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SPLITCONV_FUNC doubleToInt95
 #  define SPLIT_TYPE int95_t
 #  define SQRT_FUNC sqrt
+#  define CBRT_FUNC cbrt
 #  define ACOS_FUNC acos
 #  define COS_FUNC  cos
 #  define SIN_FUNC  sin
@@ -423,6 +492,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define MIX_FUNC  computeRestraintMixtureD
 #  define SPLIT_FORCE_ACCUMULATION
 
+// Compile the standard kernels with all combinations of energy, and force accumulation methods.
 #  define COMPUTE_FORCE
 #    define KERNEL_NAME kdsValenceForceAccumulation
 #      include "valence_potential.cui"
@@ -447,7 +517,36 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    define KERNEL_NAME kdsValenceEnergyAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
-#  undef  COMPUTE_ENERGY
+#  undef COMPUTE_ENERGY
+
+// Make new kernels with a clash forgiveness check.
+#  define CLASH_FORGIVENESS
+#    define COMPUTE_FORCE
+#      define KERNEL_NAME kdsValenceForceAccumulationNonClash
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME  
+#      define UPDATE_ATOMS
+#        define KERNEL_NAME kdsValenceAtomUpdateNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef UPDATE_ATOMS
+#      define COMPUTE_ENERGY
+#        define KERNEL_NAME kdsValenceForceEnergyAccumulationNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        define UPDATE_ATOMS
+#          define KERNEL_NAME kdsValenceEnergyAtomUpdateNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef UPDATE_ATOMS
+#      undef  COMPUTE_ENERGY
+#    undef COMPUTE_FORCE
+#    define COMPUTE_ENERGY
+#      define KERNEL_NAME kdsValenceEnergyAccumulationNonClash
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#    undef COMPUTE_ENERGY
+#  undef CLASH_FORGIVENESS
 
 // Clear double-precision floating point definitions
 #  undef VALENCE_KERNEL_THREAD_COUNT
@@ -459,6 +558,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef SPLITCONV_FUNC
 #  undef SPLIT_TYPE
 #  undef SQRT_FUNC
+#  undef CBRT_FUNC
 #  undef ACOS_FUNC
 #  undef COS_FUNC
 #  undef SIN_FUNC
@@ -470,6 +570,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 //-------------------------------------------------------------------------------------------------
 extern void valenceKernelSetup() {
   const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+
+  // Standard routines
   if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdate, sms_eight) != cudaSuccess) {
     rtErr("Error setting kfValenceAtomUpdate __shared__ memory bank size to eight bytes.",
           "valenceKernelSetup");
@@ -510,6 +612,50 @@ extern void valenceKernelSetup() {
     rtErr("Error setting kdsValenceForceEnergyAccumulation __shared__ memory bank size to eight "
           "bytes.", "valenceKernelSetup");
   }
+
+  // Clash-damping routines
+  if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdateNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceAtomUpdateNonClash __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdateNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceEnergyAtomUpdateNonClash __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceForceAccumulationNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceForceAccumulationNonClash __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulationNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceEnergyAccumulationNonClash __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulationNonClash, sms_eight) !=
+      cudaSuccess) {
+    rtErr("Error setting kfValenceForceEnergyAccumulationNonClash __shared__ memory bank size to "
+          "eight bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceAtomUpdateNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceAtomUpdateNonClash __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdateNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceEnergyAtomUpdateNonClash __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceForceAccumulationNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceForceAccumulationNonClash __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulationNonClash, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceEnergyAccumulationNonClash __shared__ memory bank size to "
+          "eight bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulationNonClash, sms_eight) !=
+      cudaSuccess) {
+    rtErr("Error setting kdsValenceForceEnergyAccumulationNonClash __shared__ memory bank size to "
+          "eight bytes.", "valenceKernelSetup");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -517,139 +663,293 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
                                                          const EvaluateForce eval_frc,
                                                          const EvaluateEnergy eval_nrg,
                                                          const AccumulationMethod acc_meth,
-                                                         const VwuGoal purpose) {
+                                                         const VwuGoal purpose,
+                                                         const ClashResponse collision_handling) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes result;
-  switch (prec) {
-  case PrecisionModel::DOUBLE:
-    switch (eval_frc) {
-    case EvaluateForce::YES:
-      switch (eval_nrg) {
-      case EvaluateEnergy::YES:
-        switch (purpose) {
-        case VwuGoal::ACCUMULATE:
-          if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
-                  "queryValenceKernelRequirements");
+  switch (collision_handling) {
+  case ClashResponse::NONE:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        switch (eval_nrg) {
+        case EvaluateEnergy::YES:
+          switch (purpose) {
+          case VwuGoal::ACCUMULATE:
+            if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
+                    "queryValenceKernelRequirements");
+            }
+            break;
+          case VwuGoal::MOVE_PARTICLES:
+            if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
+                    "queryValenceKernelRequirements");
+            }
+            break;
           }
           break;
-        case VwuGoal::MOVE_PARTICLES:
-          if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
-                  "queryValenceKernelRequirements");
+        case EvaluateEnergy::NO:
+          switch (purpose) {
+          case VwuGoal::ACCUMULATE:
+            if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulation) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
+                    "queryValenceKernelRequirements");
+            }
+            break;
+          case VwuGoal::MOVE_PARTICLES:
+            if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdate) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
+                    "queryValenceKernelRequirements");
+            }
+            break;
           }
           break;
         }
-        break;
-      case EvaluateEnergy::NO:
-        switch (purpose) {
-        case VwuGoal::ACCUMULATE:
-          if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulation) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
-                  "queryValenceKernelRequirements");
-          }
-          break;
-        case VwuGoal::MOVE_PARTICLES:
-          if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdate) != cudaSuccess) {
-            rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
-                  "queryValenceKernelRequirements");
-          }
-          break;
+      case EvaluateForce::NO:
+        if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
+                "queryValenceKernelRequirements");
         }
         break;
       }
-    case EvaluateForce::NO:
-      if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
-              "queryValenceKernelRequirements");
+      break;
+    case PrecisionModel::SINGLE:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        switch (eval_nrg) {
+        case EvaluateEnergy::YES:
+          switch (acc_meth) {
+          case AccumulationMethod::SPLIT:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulation) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulation) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdate) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          }
+          break;
+        case EvaluateEnergy::NO:
+          switch (acc_meth) {
+          case AccumulationMethod::SPLIT:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulation) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdate) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfValenceForceAccumulation) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfValenceAtomUpdate) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          }
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulation) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
+                "queryValenceKernelRequirements");
+        }
+        break;
       }
       break;
     }
     break;
-  case PrecisionModel::SINGLE:
-    switch (eval_frc) {
-    case EvaluateForce::YES:
-      switch (eval_nrg) {
-      case EvaluateEnergy::YES:
-        switch (acc_meth) {
-        case AccumulationMethod::SPLIT:
+  case ClashResponse::FORGIVE:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        switch (eval_nrg) {
+        case EvaluateEnergy::YES:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
+            if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulationNonClash) !=
+                cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel "
+                    "kdsValenceForceEnergyAccumulationNonClash.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
+            if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdateNonClash) !=
+                cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdateNonClash.",
                     "queryValenceKernelRequirements");
             }
             break;
           }
           break;
-        case AccumulationMethod::WHOLE:
+        case EvaluateEnergy::NO:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
+            if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulationNonClash) !=
+                cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulationNonClash.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
+            if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdateNonClash) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdateNonClash.",
                     "queryValenceKernelRequirements");
             }
             break;
           }
           break;
         }
-        break;
-      case EvaluateEnergy::NO:
-        switch (acc_meth) {
-        case AccumulationMethod::SPLIT:
-          switch (purpose) {
-          case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-                    "queryValenceKernelRequirements");
-            }
-            break;
-          case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
-                    "queryValenceKernelRequirements");
-            }
-            break;
-          }
-          break;
-        case AccumulationMethod::WHOLE:
-          switch (purpose) {
-          case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kfValenceForceAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
-                    "queryValenceKernelRequirements");
-            }
-            break;
-          case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kfValenceAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
-                    "queryValenceKernelRequirements");
-            }
-            break;
-          }
-          break;
+      case EvaluateForce::NO:
+        if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulationNonClash) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulationNonClash.",
+                "queryValenceKernelRequirements");
         }
         break;
       }
       break;
-    case EvaluateForce::NO:
-      if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulation) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
-              "queryValenceKernelRequirements");
+    case PrecisionModel::SINGLE:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        switch (eval_nrg) {
+        case EvaluateEnergy::YES:
+          switch (acc_meth) {
+          case AccumulationMethod::SPLIT:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel "
+                      "kfsValenceForceEnergyAccumulationNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdateNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel "
+                      "kfValenceForceEnergyAccumulationNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdateNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          }
+          break;
+        case EvaluateEnergy::NO:
+          switch (acc_meth) {
+          case AccumulationMethod::SPLIT:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulationNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClash) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdateNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          case AccumulationMethod::WHOLE:
+            switch (purpose) {
+            case VwuGoal::ACCUMULATE:
+              if (cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClash) !=
+                  cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceForceAccumulationNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            case VwuGoal::MOVE_PARTICLES:
+              if (cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClash) != cudaSuccess) {
+                rtErr("Error obtaining attributes for kernel kfValenceAtomUpdateNonClash.",
+                      "queryValenceKernelRequirements");
+              }
+              break;
+            }
+            break;
+          }
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClash) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulationNonClash.",
+                "queryValenceKernelRequirements");
+        }
+        break;
       }
       break;
     }
@@ -665,49 +965,97 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
                           const SyAtomUpdateKit<double, double2, double4> &poly_auk,
                           ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
                           CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt) {
-  switch (purpose) {
-  case VwuGoal::ACCUMULATE:
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
+                          const double clash_minimum_distance, const double clash_ratio) {
 
-    // When the goal is to accumulate energies, forces, or both, the force accumulation method
-    // is set to use int64 data.  A 95-bit method that splits the accumulation with overflow into
-    // a secondary 32-bit int may be added, and likewise become the sole option for
-    // double-precision computations.
-    switch (eval_force) {
-    case EvaluateForce::YES:
+  // Rather than a switch over cases of the ClashResponse enumerator, just use the nonzero values
+  // of either parameter to indicate that clash damping has been requested.
+  if (clash_minimum_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+
+      // When the goal is to accumulate energies, forces, or both, the force accumulation method
+      // is set to use int64 data.  A 95-bit method that splits the accumulation with overflow into
+      // a secondary 32-bit int may be added, and likewise become the sole option for
+      // double-precision computations.
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw,
+                                                                    clash_minimum_distance,
+                                                                    clash_ratio, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              clash_minimum_distance, clash_ratio,
+                                                              *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_minimum_distance, clash_ratio,
+                                                             *scw, *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+
+      // When the goal is to move particles, evaluating the force is obligatory, but the manner in
+      // which forces are accumulated is still important.  Whether to accumulate energies while
+      // evaluating forces and moving the particles remains a consideration in choosing the proper
+      // kernel.
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                          *scw, *gmem_r);
+        kdsValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_minimum_distance, clash_ratio,
+                                                           poly_auk, *tstw, *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kdsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+        kdsValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                     clash_minimum_distance, clash_ratio, poly_auk,
+                                                     *tstw, *gmem_r);
         break;
       }
       break;
-    case EvaluateForce::NO:
-      kdsValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                   *gmem_r);
+    }
+  }
+  else {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                     *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                             *gmem_r);
+        break;
+      }
       break;
     }
-    break;
-  case VwuGoal::MOVE_PARTICLES:
-
-    // When the goal is to move particles, evaluating the force is obligatory, but the manner in
-    // which forces are accumulated is still important.  Whether to accumulate energies while
-    // evaluating forces and moving the particles remains a consideration in choosing the proper
-    // kernel.
-    switch (eval_energy) {
-    case EvaluateEnergy::YES:
-      kdsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
-                                                 *tstw, *scw, *gmem_r);
-      break;
-    case EvaluateEnergy::NO:
-      kdsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
-                                           *gmem_r);
-      break;
-    }
-    break;
   }
 }
 
@@ -719,7 +1067,8 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
                           ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
                           CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
                           const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                          const AccumulationMethod force_sum, const int2 bt) {
+                          const AccumulationMethod force_sum, const int2 bt,
+                          const float clash_minimum_distance, const float clash_ratio) {
   AccumulationMethod refined_force_sum;
   switch (force_sum) {
   case AccumulationMethod::SPLIT:
@@ -730,33 +1079,91 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     refined_force_sum = chooseAccumulationMethod(poly_psw->frc_bits);
     break;
   }
-  switch (purpose) {
-  case VwuGoal::ACCUMULATE:
+
+  // Rather than a switch over cases of the ClashResponse enumerator, just use the nonzero values
+  // of either parameter to indicate that clash damping has been requested.
+  if (clash_minimum_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
     
-    // When the goal is to accumulate energies, forces, or both, the force accumulation method
-    // becomes a critical detail when choosing the kernel.
-    switch (eval_force) {
-    case EvaluateForce::YES:
+      // When the goal is to accumulate energies, forces, or both, the force accumulation method
+      // becomes a critical detail when choosing the kernel.
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (refined_force_sum) {
+        case AccumulationMethod::SPLIT:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfsValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                      *poly_psw,
+                                                                      clash_minimum_distance,
+                                                                      clash_ratio, *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfsValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                clash_minimum_distance,
+                                                                clash_ratio, *gmem_r);
+            break;
+          }
+          break;
+        case AccumulationMethod::WHOLE:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                     *poly_psw,
+                                                                     clash_minimum_distance,
+                                                                     clash_ratio, *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                               clash_minimum_distance, clash_ratio,
+                                                               *gmem_r);
+            break;
+          }
+          break;
+        case AccumulationMethod::AUTOMATIC:
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kfValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            clash_minimum_distance, clash_ratio,
+                                                            *scw, *gmem_r);
+        break;
+      }
+      break;
+    case VwuGoal::MOVE_PARTICLES:
+    
+      // When the goal is to move particles, evaluating the force is obligatory, but the manner in
+      // which forces are accumulated is still important.  Whether to accumulate energies while
+      // evaluating forces and moving the particles remains a consideration in choosing the proper
+      // kernel.
       switch (refined_force_sum) {
       case AccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                            *scw, *gmem_r);
+          kfsValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_minimum_distance, clash_ratio,
+                                                             poly_auk, *tstw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+          kfsValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                       clash_minimum_distance, clash_ratio,
+                                                       poly_auk, *tstw, *gmem_r);
           break;
         }
         break;
       case AccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                           *scw, *gmem_r);
+          kfValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            clash_minimum_distance, clash_ratio,
+                                                            poly_auk, *tstw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+          kfValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                      clash_minimum_distance, clash_ratio,
+                                                      poly_auk, *tstw, *gmem_r);
           break;
         }
         break;
@@ -764,47 +1171,83 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         break;
       }
       break;
-    case EvaluateForce::NO:
-      kfValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                  *gmem_r);
-      break;
     }
-    break;
-  case VwuGoal::MOVE_PARTICLES:
+  }
+  else {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+
+      // See above for the rationale on whether forces or energies are evaluated in each context.
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (refined_force_sum) {
+        case AccumulationMethod::SPLIT:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                        *gmem_r);
+            break;
+          }
+          break;
+        case AccumulationMethod::WHOLE:
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                       *gmem_r);
+            break;
+          }
+          break;
+        case AccumulationMethod::AUTOMATIC:
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kfValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                    *gmem_r);
+        break;
+      }
+      break;
+    case VwuGoal::MOVE_PARTICLES:
     
-    // When the goal is to move particles, evaluating the force is obligatory, but the manner in
-    // which forces are accumulated is still important.  Whether to accumulate energies while
-    // evaluating forces and moving the particles remains a consideration in choosing the proper
-    // kernel.
-    switch (refined_force_sum) {
-    case AccumulationMethod::SPLIT:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
-                                                   *tstw, *scw, *gmem_r);
+      // See above for the rationale on the choice of each kernel.
+      switch (refined_force_sum) {
+      case AccumulationMethod::SPLIT:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                     *tstw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                               *gmem_r);
+          break;
+        }
         break;
-      case EvaluateEnergy::NO:
-        kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
-                                             *gmem_r);
+      case AccumulationMethod::WHOLE:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                    *tstw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                              *gmem_r);
+          break;
+        }
+        break;
+      case AccumulationMethod::AUTOMATIC:
         break;
       }
-      break;
-    case AccumulationMethod::WHOLE:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
-                                                  *tstw, *scw, *gmem_r);
-        break;
-      case EvaluateEnergy::NO:
-        kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
-                                            *gmem_r);
-        break;
-      }
-      break;
-    case AccumulationMethod::AUTOMATIC:
       break;
     }
-    break;
   }
 }
 
@@ -814,12 +1257,14 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                           const VwuGoal purpose, const AccumulationMethod force_sum,
-                          const KernelManager &launcher) {
+                          const KernelManager &launcher, const double clash_minimum_distance,
+                          const double clash_ratio) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
   const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
-                                                AccumulationMethod::SPLIT, purpose);
+                                                AccumulationMethod::SPLIT, purpose,
+                                                ClashResponse::NONE);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
@@ -832,7 +1277,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
       ThermostatWriter tstw = heat_bath->dpData(tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
       launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
-                    eval_energy, purpose, bt);
+                    eval_energy, purpose, bt, clash_minimum_distance, clash_ratio);
     }
     break;
   case PrecisionModel::SINGLE:
@@ -846,7 +1291,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
       ThermostatWriter tstw = heat_bath->spData(tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(tier);
       launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
-                    eval_energy, purpose, force_sum, bt);
+                    eval_energy, purpose, force_sum, bt, clash_minimum_distance, clash_ratio);
     }
     break;
   }
@@ -857,14 +1302,17 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                          const VwuGoal purpose, const KernelManager &launcher) {
+                          const VwuGoal purpose, const KernelManager &launcher,
+                          const double clash_minimum_distance, const double clash_ratio) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
-                  purpose, AccumulationMethod::SPLIT, launcher);
+                  purpose, AccumulationMethod::SPLIT, launcher, clash_minimum_distance,
+                  clash_ratio);
   }
   else {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
-                  purpose, AccumulationMethod::WHOLE, launcher);
+                  purpose, AccumulationMethod::WHOLE, launcher, clash_minimum_distance,
+                  clash_ratio);
   }
 }
 

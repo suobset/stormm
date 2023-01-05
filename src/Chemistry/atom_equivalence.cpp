@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/summation.h"
@@ -286,7 +287,7 @@ AtomRank::AtomRank(const AtomGraph *ag_in, const std::vector<double> &formal_cha
       }
     }
   }
-  prefixSumInPlace<int>(&rank_degeneracy_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&rank_degeneracy_bounds, PrefixSumType::EXCLUSIVE);
   std::vector<int> rank_dg_counters = rank_degeneracy_bounds;
   rank_instances.resize(rank_degeneracy_bounds[maximum_rank]);
   if (actual_high_mol_idx - low_molecule_index < cdk.nmol) {
@@ -398,8 +399,9 @@ std::vector<int> AtomRank::getRankPartners(const int atom_index) const {
 
 //-------------------------------------------------------------------------------------------------
 AtomEquivalence::AtomEquivalence() :
-    group_count{0}, group_atoms{}, group_sizes{}, group_orders{}, group_bounds{}, dependencies{},
-    dependency_bounds{}, asymmetric_atoms{}, group_rules{}, ag_pointer{nullptr}
+    group_count{0}, symmetry_depth{0}, group_atoms{}, group_sizes{}, group_orders{},
+    group_bounds{}, group_levels{}, dependencies{}, dependency_bounds{}, asymmetric_atoms{},
+    group_rules{}, ag_pointer{nullptr}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -470,11 +472,20 @@ AtomEquivalence::AtomEquivalence(const AtomGraph *ag_in, const std::vector<doubl
                         &domain_assignment, &jumbled_groups, &aligned_groups, &layer_bounds);
   }
   if (timer != nullptr) timer->assignTime(aeq_timings);
+
+  // Cull duplicate groups, if any exist.
+  cullDuplicateGroups();
   
   // Determine the dependencies of symmetry-equivalent groups on one another.  Having the atom
   // indices pre-sorted is again helpful in this respect.
   findDependencies();
 
+  // Place groups in order, ranked by the total mass of the group divided by the combinatorial
+  // possibilities in which it and its dependents could be placed.  All dependents of a group will
+  // follow it directly in the list.  Rearrange all descriptors and bounds arrays to meet the new
+  // ordering.
+  orderAllGroups();
+  
   // Determine the list of asymmetric atoms (those which are not in any symmetry group)
   std::vector<bool> in_symmetry_group(cdk.natom, false);
   const int glim = group_bounds[group_count];
@@ -492,6 +503,31 @@ AtomEquivalence::AtomEquivalence(const AtomGraph *ag_in, const std::vector<doubl
     }
   }
   if (timer != nullptr) timer->assignTime(dep_timings);
+
+  // Compute the depth of the symmetry group dependencies
+  std::vector<bool> groups_included(group_count, false);
+  for (int i = 0; i < group_count; i++) {
+    if (groups_included[i]) {
+      continue;
+    }
+    groups_included[i] = true;
+    int test_depth = 1;
+    std::vector<int> ideps = getGroupDependencies(i);
+    int llim = 0;
+    int hlim = dependency_bounds[i + 1] - dependency_bounds[i];
+    while (hlim > llim) {
+      const int orig_llim = llim;
+      const int orig_hlim = hlim;
+      llim = hlim;
+      for (int j = orig_llim; j < orig_hlim; j++) {
+        const std::vector<int> jdeps = getGroupDependencies(ideps[j]);
+        ideps.insert(ideps.end(), jdeps.begin(), jdeps.end());
+      }
+      hlim = ideps.size();
+      test_depth++;
+    }
+    symmetry_depth = std::max(symmetry_depth, test_depth);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -514,8 +550,20 @@ AtomEquivalence::AtomEquivalence(const ChemicalFeatures &chemfe_in, StopWatch *t
 {}
 
 //-------------------------------------------------------------------------------------------------
+AtomEquivalence::AtomEquivalence(const AtomGraph &ag_in, const CoordinateFrame &cf,
+                                 StopWatch *timer, const int low_molecule_index,
+                                 const int high_molecule_index) :
+  AtomEquivalence(ChemicalFeatures(ag_in, cf), timer, low_molecule_index, high_molecule_index)
+{}
+
+//-------------------------------------------------------------------------------------------------
 int AtomEquivalence::getGroupCount() const {
   return group_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomEquivalence::getSymmetryDepth() const {
+  return symmetry_depth;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -553,19 +601,29 @@ int AtomEquivalence::getGroupOrder(const int group_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomEquivalence::getGroupLevel(const int group_index) const {
+  return group_levels[group_index];
+}
+
+//-------------------------------------------------------------------------------------------------
 EquivalenceSwap AtomEquivalence::getGroupRule(int group_index) const {
   return group_rules[group_index];
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomEquivalence::getGroupDependencies(int group_index) const {
-  const size_t llim = dependency_bounds[group_index];
-  const size_t hlim = dependency_bounds[group_index + 1];
+  const int llim = dependency_bounds[group_index];
+  const int hlim = dependency_bounds[group_index + 1];
   std::vector<int> result(hlim - llim);
-  for (size_t i = llim; i < hlim; i++) {
+  for (int i = llim; i < hlim; i++) {
     result[i - llim] = dependencies[i];
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomEquivalence::getAsymmetricAtomCount() const {
+  return static_cast<int>(asymmetric_atoms.size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1186,6 +1244,70 @@ void AtomEquivalence::rotarySymmetryGroup(const std::vector<int> &all_domains,
 }
 
 //-------------------------------------------------------------------------------------------------
+void AtomEquivalence::cullDuplicateGroups() {
+
+  // Set an array to mark groups as unique
+  std::vector<bool> group_is_unique(group_count, true);
+  int n_unique = group_count;
+  for (int i = 0; i < group_count; i++) {
+    if (group_is_unique[i]) {
+      const int i_gs = group_sizes[i];
+      for (int j = i + 1; j < group_count; j++) {
+        if (group_sizes[j] == i_gs) {
+          bool atoms_identical = true;
+          const int ibnd = group_bounds[i];
+          const int jbnd = group_bounds[j];
+          for (int k = 0; k < i_gs; k++) {
+            atoms_identical = (atoms_identical && group_atoms[ibnd + k] == group_atoms[jbnd + k]);
+          }
+          if (atoms_identical) {
+            group_is_unique[j] = false;
+            n_unique--;
+          }
+        }
+      }
+    }
+  }
+  if (n_unique == group_count) {
+    return;
+  }
+  
+  // Remove duplicate groups
+  std::vector<int> tmp_group_atoms;
+  std::vector<int> tmp_group_sizes(n_unique);
+  std::vector<int> tmp_group_orders(n_unique);
+  std::vector<int> tmp_group_bounds(n_unique + 1);
+  std::vector<EquivalenceSwap> tmp_group_rules(n_unique);
+  int unique_atom_count = 0;
+  int ug_counter = 0;
+  for (int i = 0; i < group_count; i++) {
+    if (group_is_unique[i]) {
+      tmp_group_sizes[ug_counter] = group_sizes[i];
+      tmp_group_orders[ug_counter] = group_orders[i];
+      tmp_group_rules[ug_counter] = group_rules[i];
+      tmp_group_bounds[ug_counter] = unique_atom_count;
+      unique_atom_count += group_sizes[i] * group_orders[i];
+      ug_counter++;
+    }
+  }
+  tmp_group_bounds[ug_counter] = unique_atom_count;
+  tmp_group_atoms.reserve(unique_atom_count);
+  for (int i = 0; i < group_count; i++) {
+    if (group_is_unique[i]) {
+      for (int j = group_bounds[i]; j < group_bounds[i + 1]; j++) {
+        tmp_group_atoms.push_back(group_atoms[j]);
+      }
+    }
+  }
+  group_count = n_unique;
+  group_atoms = tmp_group_atoms;
+  group_sizes = tmp_group_sizes;
+  group_orders = tmp_group_orders;
+  group_bounds = tmp_group_bounds;
+  group_rules = tmp_group_rules;  
+}
+
+//-------------------------------------------------------------------------------------------------
 void AtomEquivalence::findDependencies() {
   std::vector<int2> minmax(group_count, { ag_pointer->getAtomCount(), -1 });
   for (int i = 0; i < group_count; i++) {
@@ -1242,6 +1364,118 @@ void AtomEquivalence::findDependencies() {
       }
     }
     dependency_bounds.push_back(dependencies.size());
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomEquivalence::orderAllGroups() {
+  std::vector<bool> is_head_group(group_count, true);
+  for (int i = 0; i < dependency_bounds[group_count]; i++) {
+    is_head_group[dependencies[i]] = false;
+  }
+  int n_head_groups = 0;
+  for (int i = 0; i < group_count; i++) {
+    n_head_groups += is_head_group[i];    
+  }
+  std::vector<double2> head_groups(n_head_groups);
+  const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+  n_head_groups = 0;
+  for (int i = 0; i < group_count; i++) {
+    if (is_head_group[i]) {
+      head_groups[n_head_groups].x = static_cast<double>(i);
+      double group_mass = 0.0;
+      for (int j = group_bounds[i]; j < group_bounds[i + 1]; j++) {
+        group_mass += cdk.masses[group_atoms[j]];        
+      }
+      double group_degen = tgamma(group_orders[i] + 1);
+      for (int j = dependency_bounds[i]; j < dependency_bounds[i + 1]; j++) {
+        group_degen *= tgamma(group_orders[j] + 1);
+      }
+      head_groups[n_head_groups].y = group_mass / group_degen;
+      n_head_groups++;
+    }
+  }
+  std::sort(head_groups.begin(), head_groups.end(),
+            []( double2 a, double2 b ) { return a.y > b.y; });
+
+  // Allocate working space to rebuild the atom ordering and group details
+  std::vector<int> tmp_group_atoms, tmp_group_sizes, tmp_group_orders, tmp_group_bounds;
+  std::vector<EquivalenceSwap> tmp_group_rules;
+  std::vector<int> original_group_indices;
+  std::vector<int> new_group_assignments(group_count);
+  tmp_group_atoms.reserve(group_atoms.size());
+  tmp_group_sizes.reserve(group_count);
+  tmp_group_orders.reserve(group_count);
+  tmp_group_bounds.reserve(group_count + 1);
+  tmp_group_rules.reserve(group_count);
+  original_group_indices.reserve(group_count);
+  tmp_group_bounds.push_back(0);
+  for (int i = 0; i < n_head_groups; i++) {
+    const int hgi = static_cast<int>(head_groups[i].x);
+    for (int j = group_bounds[hgi]; j < group_bounds[hgi + 1]; j++) {
+      tmp_group_atoms.push_back(group_atoms[j]);
+    }
+    tmp_group_sizes.push_back(group_sizes[hgi]);
+    tmp_group_orders.push_back(group_orders[hgi]);
+    tmp_group_bounds.push_back(tmp_group_atoms.size());
+    tmp_group_rules.push_back(group_rules[hgi]);
+    new_group_assignments[hgi] = original_group_indices.size();
+    original_group_indices.push_back(hgi);
+
+    // Add the dependents of this head group immediately behind it.  The dependents of different
+    // head groups will not overlap.
+    for (int j = dependency_bounds[hgi]; j < dependency_bounds[hgi + 1]; j++) {
+      const int dgj = dependencies[j];
+      for (int k = group_bounds[dgj]; k < group_bounds[dgj + 1]; k++) {
+        tmp_group_atoms.push_back(group_atoms[k]);
+      }
+      tmp_group_sizes.push_back(group_sizes[dgj]);
+      tmp_group_orders.push_back(group_orders[dgj]);
+      tmp_group_bounds.push_back(tmp_group_atoms.size());
+      tmp_group_rules.push_back(group_rules[dgj]);
+      new_group_assignments[dgj] = original_group_indices.size();
+      original_group_indices.push_back(dgj);
+    }
+  }
+
+  // Reconstruct the dependencies based on the new group arrangement
+  std::vector<int> tmp_dependencies, tmp_dependency_bounds;
+  tmp_dependencies.reserve(dependencies.size());
+  tmp_dependency_bounds.reserve(dependency_bounds.size());
+  tmp_dependency_bounds.push_back(0);
+  for (int i = 0; i < group_count; i++) {
+    const int orig_group = original_group_indices[i];
+    const int orig_llim = dependency_bounds[orig_group];
+    const int orig_hlim = dependency_bounds[orig_group + 1];
+    tmp_dependency_bounds.push_back(tmp_dependency_bounds.back() + orig_hlim - orig_llim);
+    for (int j = orig_llim; j < orig_hlim; j++) {
+      tmp_dependencies.push_back(new_group_assignments[dependencies[j]]);
+    }
+  }
+
+  // Complete the out-of-place rearrangement
+  group_atoms = tmp_group_atoms;
+  group_sizes = tmp_group_sizes;
+  group_orders = tmp_group_orders;
+  group_bounds = tmp_group_bounds;
+  dependencies = tmp_dependencies;
+  dependency_bounds = tmp_dependency_bounds;
+  group_rules = tmp_group_rules;
+
+  // With ordering complete, compute the access level (depth position) of each group.
+  group_levels.resize(group_count, 0);
+  bool levels_adjusted = true;
+  while (levels_adjusted) {
+    levels_adjusted = false;
+    for (int i = 0; i < group_count; i++) {
+      const int ig_level = group_levels[i];
+      for (int j = dependency_bounds[i]; j < dependency_bounds[i + 1]; j++) {
+        if (group_levels[dependencies[j]] <= ig_level) {
+          group_levels[dependencies[j]] = ig_level + 1;
+          levels_adjusted = true;
+        }
+      }
+    }
   }
 }
 

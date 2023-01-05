@@ -56,27 +56,29 @@ struct PsSynthesisWriter {
 
   /// \brief Constructor takes a straight list of pointers and constants from the parent object
   ///        (in this case, a PhaseSpaceSynthesis), like other abstracts.
-  PsSynthesisWriter(int system_count_in, UnitCellType unit_cell_in,
+  PsSynthesisWriter(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
                     ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
-                    double gpos_scale_in, double lpos_scale_in, double vel_scale_in,
-                    double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
-                    int frc_bits_in, llint* boxvecs_in, int* boxvec_ovrf_in, double* umat_in,
-                    double* invu_in, double* boxdims_in, float* sp_umat_in, float* sp_invu_in,
-                    float* sp_boxdims_in, llint* xcrd_in, llint* ycrd_in, llint* zcrd_in,
-                    int* xcrd_ovrf_in, int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in,
-                    llint* yvel_in, llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in,
-                    int* zvel_ovrf_in, llint* xfrc_in, llint* yfrc_in, llint* zfrc_in,
-                    int* xfrc_ovrf_in, int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xprv_in,
-                    llint* yprv_in, llint* zprv_in, int* xprv_ovrf_in, int* yprv_ovrf_in,
-                    int* zprv_ovrf_in, llint* xnxt_in, llint* ynxt_in,  llint* znxt_in,
-                    int* xnxt_ovrf_in, int* ynxt_ovrf_in, int* znxt_ovrf_in, llint* vxprv_in,
-                    llint* vyprv_in, llint* vzprv_in, int* vxprv_ovrf_in, int* vyprv_ovrf_in,
-                    int* vzprv_ovrf_in, llint* vxnxt_in, llint* vynxt_in,  llint* vznxt_in,
-                    int* vxnxt_ovrf_in, int* vynxt_ovrf_in, int* vznxt_ovrf_in, llint* fxprv_in,
-                    llint* fyprv_in, llint* fzprv_in, int* fxprv_ovrf_in, int* fyprv_ovrf_in,
-                    int* fzprv_ovrf_in, llint* fxnxt_in, llint* fynxt_in,  llint* fznxt_in,
-                    int* fxnxt_ovrf_in, int* fynxt_ovrf_in, int* fznxt_ovrf_in);
+                    const int* common_ag_list_in, const int* common_ag_bounds_in,
+                    const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
+                    double lpos_scale_in, double vel_scale_in, double frc_scale_in,
+                    int gpos_bits_in, int lpos_bits_in, int vel_bits_in, int frc_bits_in,
+                    llint* boxvecs_in, int* boxvec_ovrf_in, double* umat_in, double* invu_in,
+                    double* boxdims_in, float* sp_umat_in, float* sp_invu_in, float* sp_boxdims_in,
+                    llint* xcrd_in, llint* ycrd_in, llint* zcrd_in, int* xcrd_ovrf_in,
+                    int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
+                    llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in, int* zvel_ovrf_in,
+                    llint* xfrc_in, llint* yfrc_in, llint* zfrc_in, int* xfrc_ovrf_in,
+                    int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xprv_in, llint* yprv_in,
+                    llint* zprv_in, int* xprv_ovrf_in, int* yprv_ovrf_in, int* zprv_ovrf_in,
+                    llint* xnxt_in, llint* ynxt_in, llint* znxt_in, int* xnxt_ovrf_in,
+                    int* ynxt_ovrf_in, int* znxt_ovrf_in, llint* vxprv_in, llint* vyprv_in,
+                    llint* vzprv_in, int* vxprv_ovrf_in, int* vyprv_ovrf_in, int* vzprv_ovrf_in,
+                    llint* vxnxt_in, llint* vynxt_in, llint* vznxt_in, int* vxnxt_ovrf_in,
+                    int* vynxt_ovrf_in, int* vznxt_ovrf_in, llint* fxprv_in, llint* fyprv_in,
+                    llint* fzprv_in, int* fxprv_ovrf_in, int* fyprv_ovrf_in, int* fzprv_ovrf_in,
+                    llint* fxnxt_in, llint* fynxt_in, llint* fznxt_in, int* fxnxt_ovrf_in,
+                    int* fynxt_ovrf_in, int* fznxt_ovrf_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -89,13 +91,21 @@ struct PsSynthesisWriter {
   // conditions, the number of systems, and the number of atoms in each system.  The layout
   // of the data must not be corrupted.
   const int system_count;               ///< The number of independent systems
+  const int unique_topology_count;      ///< The number of unique topologies
   const UnitCellType unit_cell;         ///< Type of unit cells (or none) each system resides in
   const ThermostatKind heat_bath_kind;  ///< The type of thermostat used throughout all systems
   const BarostatKind piston_kind;       ///< The type of barostat used throughout all systems
   const double time_step;               ///< Time step used in all simulations
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
-
+  const int* common_ag_list;            ///< Concatenated lists of systems in the synthesis sharing
+                                        ///<   the same topology
+  const int* common_ag_bounds;          ///< Bounds array for common_ag_list
+  const int* unique_ag_idx;             ///< Indices of the unique topologies referenced by each
+                                        ///<   set of coordinates
+  const int* replica_idx;               ///< The instance number of each system in the list of
+                                        ///<   all systems sharing its topology.
+  
   // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
   // arithmetic.
   const double gpos_scale;       ///< Global position coordinate scaling factor
@@ -196,32 +206,34 @@ struct PsSynthesisReader {
   ///        CoordinateFrameReader, it can also convert its cognate writer by turning all of
   ///        the relevant pointers const.
   /// \{
-  PsSynthesisReader(int system_count_in, UnitCellType unit_cell_in,
+  PsSynthesisReader(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
                     ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
-                    double gpos_scale_in, double lpos_scale_in, double vel_scale_in,
-                    double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
-                    int frc_bits_in, const llint* boxvecs_in, const int* boxvec_ovrf_in,
-                    const double* umat_in, const double* invu_in, const double* boxdims_in,
-                    const float* sp_umat_in, const float* sp_invu_in, const float* sp_boxdims_in,
-                    const llint* xcrd_in, const llint* ycrd_in, const llint* zcrd_in,
-                    const int* xcrd_ovrf_in, const int* ycrd_ovrf_in, const int* zcrd_ovrf_in,
-                    const llint* xvel_in, const llint* yvel_in, const llint* zvel_in,
-                    const int* xvel_ovrf_in, const int* yvel_ovrf_in, const int* zvel_ovrf_in,
-                    const llint* xfrc_in, const llint* yfrc_in, const llint* zfrc_in,
-                    const int* xfrc_ovrf_in, const int* yfrc_ovrf_in, const int* zfrc_ovrf_in,
-                    const llint* xprv_in, const llint* yprv_in, const llint* zprv_in,
-                    const int* xprv_ovrf_in, const int* yprv_ovrf_in, const int* zprv_ovrf_in,
-                    const llint* xnxt_in, const llint* ynxt_in, const llint* znxt_in,
-                    const int* xnxt_ovrf_in, const int* ynxt_ovrf_in, const int* znxt_ovrf_in,
-                    const llint* vxprv_in, const llint* vyprv_in, const llint* vzprv_in,
-                    const int* vxprv_ovrf_in, const int* vyprv_ovrf_in, const int* vzprv_ovrf_in,
-                    const llint* vxnxt_in, const llint* vynxt_in, const llint* vznxt_in,
-                    const int* vxnxt_ovrf_in, const int* vynxt_ovrf_in, const int* vznxt_ovrf_in,
-                    const llint* fxprv_in, const llint* fyprv_in, const llint* fzprv_in,
-                    const int* fxprv_ovrf_in, const int* fyprv_ovrf_in, const int* fzprv_ovrf_in,
-                    const llint* fxnxt_in, const llint* fynxt_in, const llint* fznxt_in,
-                    const int* fxnxt_ovrf_in, const int* fynxt_ovrf_in, const int* fznxt_ovrf_in);
+                    const int* common_ag_list_in, const int* common_ag_bounds_in,
+                    const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
+                    double lpos_scale_in, double vel_scale_in, double frc_scale_in,
+                    int gpos_bits_in, int lpos_bits_in, int vel_bits_in, int frc_bits_in,
+                    const llint* boxvecs_in, const int* boxvec_ovrf_in, const double* umat_in,
+                    const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
+                    const float* sp_invu_in, const float* sp_boxdims_in, const llint* xcrd_in,
+                    const llint* ycrd_in, const llint* zcrd_in, const int* xcrd_ovrf_in,
+                    const int* ycrd_ovrf_in, const int* zcrd_ovrf_in, const llint* xvel_in,
+                    const llint* yvel_in, const llint* zvel_in, const int* xvel_ovrf_in,
+                    const int* yvel_ovrf_in, const int* zvel_ovrf_in, const llint* xfrc_in,
+                    const llint* yfrc_in, const llint* zfrc_in, const int* xfrc_ovrf_in,
+                    const int* yfrc_ovrf_in, const int* zfrc_ovrf_in, const llint* xprv_in,
+                    const llint* yprv_in, const llint* zprv_in, const int* xprv_ovrf_in,
+                    const int* yprv_ovrf_in, const int* zprv_ovrf_in, const llint* xnxt_in,
+                    const llint* ynxt_in, const llint* znxt_in, const int* xnxt_ovrf_in,
+                    const int* ynxt_ovrf_in, const int* znxt_ovrf_in, const llint* vxprv_in,
+                    const llint* vyprv_in, const llint* vzprv_in, const int* vxprv_ovrf_in,
+                    const int* vyprv_ovrf_in, const int* vzprv_ovrf_in, const llint* vxnxt_in,
+                    const llint* vynxt_in, const llint* vznxt_in, const int* vxnxt_ovrf_in,
+                    const int* vynxt_ovrf_in, const int* vznxt_ovrf_in, const llint* fxprv_in,
+                    const llint* fyprv_in, const llint* fzprv_in, const int* fxprv_ovrf_in,
+                    const int* fyprv_ovrf_in, const int* fzprv_ovrf_in, const llint* fxnxt_in,
+                    const llint* fynxt_in, const llint* fznxt_in, const int* fxnxt_ovrf_in,
+                    const int* fynxt_ovrf_in, const int* fznxt_ovrf_in);
 
   PsSynthesisReader(const PsSynthesisWriter &psyw);
   /// \}
@@ -235,12 +247,20 @@ struct PsSynthesisReader {
   
   // System sizing information
   const int system_count;               ///< The number of independent systems
+  const int unique_topology_count;      ///< The number of unique topologies
   const UnitCellType unit_cell;         ///< Type of unit cells (or none) each system resides in
   const ThermostatKind heat_bath_kind;  ///< The type of thermostat used throughout all systems
   const BarostatKind piston_kind;       ///< The type of barostat used throughout all systems
   const double time_step;               ///< Time step used in all simulations
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
+  const int* common_ag_list;            ///< Concatenated lists of systems in the synthesis sharing
+                                        ///<   the same topology
+  const int* common_ag_bounds;          ///< Bounds array for common_ag_list
+  const int* unique_ag_idx;             ///< Indices of the unique topologies referenced by each
+                                        ///<   set of coordinates
+  const int* replica_idx;               ///< The instance number of each system in the list of
+                                        ///<   all systems sharing its topology.
 
   // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
   // arithmetic.
@@ -451,7 +471,10 @@ public:
 
   /// \brief Get the number of systems in the object.
   int getSystemCount() const;
-
+  
+  /// \brief Get the number of unique topologies in the object.
+  int getUniqueTopologyCount() const;
+  
   /// \brief Get the unit cell type.
   UnitCellType getUnitCellType() const;
 
@@ -472,18 +495,41 @@ public:
 
   /// \brief Get the topology pointer for a particular system within the synthesis.
   ///
-  /// \param index  Index of the system of interest within the synthesis
-  const AtomGraph* getSystemTopologyPointer(int index) const;
+  /// \param system_index  Index of the system of interest within the synthesis
+  const AtomGraph* getSystemTopologyPointer(int system_index) const;
 
   /// \brief Get a list of unique topology pointers from this coordinate synthesis, const-casted
   ///        for accessibility to other functions.
-  std::vector<AtomGraph*> getUniqueTopologies() const;
+  const std::vector<AtomGraph*>& getUniqueTopologies() const;
 
+  /// \brief Get the index of the unique topology used by a particular system in the synthesis.
+  ///
+  /// \param system_index  Index of the system of interest
+  int getUniqueTopologyIndex(int system_index) const;
+
+  /// \brief Get the unique topology index of all systems in the synthesis.
+  std::vector<int> getUniqueTopologyIndices() const;
+  
   /// \brief Get a list of system indices from within this coordinate synthesis, providing examples
   ///        of each unique topology as presented in the order the topology pointers appear in the
   ///        output of getUniqueTopologies() above.
-  std::vector<int> getUniqueTopologyIndices() const;
+  std::vector<int> getUniqueTopologyExampleIndices() const;
+
+  /// \brief Get the number of systems that make use of a particular topology.
+  ///
+  /// \param topology_index  Index of the unique topology of interest
+  int getTopologyInstanceCount(const int topology_index) const;
   
+  /// \brief Get a list of system indices which all reference the same unique topology (the unique
+  ///        topology index is determined by the order in which each unique topology appears in the
+  ///        overall list of systems in the object).
+  ///
+  /// \param topology_index  Index of the unique topology of interest
+  std::vector<int> getSystemIndicesByTopology(const int topology_index) const;
+
+  /// \brief Get a const pointer to the object itself.
+  const PhaseSpaceSynthesis* getSelfPointer() const;
+
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
   ///
   /// Overloaded:
@@ -788,6 +834,7 @@ public:
   
 private:
   int system_count;               ///< The number of systems to tend at once
+  int unique_topology_count;      ///< The number of unique topologies used by this synthesis
   UnitCellType unit_cell;         ///< The types of unit cells.  All unit cells must exist in
                                   ///<   isolated boundary conditions, or all cells must exist in
                                   ///<   periodic boundary conditions with a rectilinear or
@@ -822,9 +869,26 @@ private:
   /// presented in their respective topologies.
   Hybrid<int> atom_starts;
 
-  ///< The numbers of atoms in each system
+  /// The numbers of atoms in each system
   Hybrid<int> atom_counts;
 
+  /// Lists of systems which make use of each unique topology.  The order of unique topologies is
+  /// the same as appears in the unique_topologies array, returned by the getUniqueTopologies()
+  /// function.
+  Hybrid<int> shared_topology_instances;
+
+  /// Bounds array for shared_topology_instances above
+  Hybrid<int> shared_topology_instance_bounds;
+
+  /// Indices of the unique topologies used by each system (this enables the reverse lookup of
+  /// shared_topology_instances above).
+  Hybrid<int> unique_topology_reference;
+
+  /// Indices indicating the number of the replica of each system in the synthesis.  If a system
+  /// is the first to make use of a particular topology, it has a value of 0 in this array.  The
+  /// fourth system to make use of the same topology would have a value of 3.
+  Hybrid<int> shared_topology_instance_index;
+  
   // These variables are POINTER-kind Hybrid objects targeting the llint_data and int_data arrays
   Hybrid<llint> x_coordinates;            ///< Cartesian X coordinates of all particles
   Hybrid<llint> y_coordinates;            ///< Cartesian Y coordinates of all particles
@@ -922,15 +986,18 @@ private:
                                ///<   image a particle or move it between honeycomb pencils these
                                ///<   can be useful.
 
-  // Pointer to the topology that describes each system
-  const std::vector<AtomGraph*> topologies;
+  /// Pointers to the topologies that describe each system
+  std::vector<AtomGraph*> topologies;
 
+  /// Pointers to the unique topologies used by this synthesis
+  std::vector<AtomGraph*> unique_topologies;
+  
   /// \brief Allocate private array data
   ///
   /// \param atom_stride  The total number of padded atoms in the system (sum over all individual
   ///                     systems with warp size padding in each of them)
   void allocate(size_t atom_stride);
-
+  
 #ifdef STORMM_USE_HPC
   /// \brief Extract a system into a pre-allocated PhaseSpace object based on information in this
   ///        PhaseSpaceSynthesis on the HPC device.

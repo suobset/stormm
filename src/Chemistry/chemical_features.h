@@ -159,14 +159,13 @@ public:
              const AtomGraph* ag_pointer_in);
   /// \}
 
-  /// \brief The default copy and move constructors will suffice, but the copy and move assignment
-  ///        operators will need to be written out using return statements based on newly created
-  ///        objects.
+  /// \brief The default copy and move constructors will suffice, and with no const members the
+  ///        copy and move assignment operators can also take on their default forms.
   /// \{
   IsomerPlan(const IsomerPlan &original) = default;
   IsomerPlan(IsomerPlan &&original) = default;
-  IsomerPlan& operator=(const IsomerPlan &other);
-  IsomerPlan& operator=(IsomerPlan &&other);
+  IsomerPlan& operator=(const IsomerPlan &other) = default;
+  IsomerPlan& operator=(IsomerPlan &&other) = default;
   /// \}
 
   /// \brief Get the isomerizing motion.
@@ -180,7 +179,15 @@ public:
 
   /// \brief Get the pivot atom for the motion.
   int getPivotAtom() const;
-  
+
+  /// \brief Get the root atom handle (for a rotatable bond J-K, this might be I of the sequence
+  ///        I-J-K-L).
+  int getRootHandle() const;
+
+  /// \brief Get the pivot atom handle (for a rotatable bond J-K, this might be L of the sequence
+  ///        I-J-K-L).
+  int getPivotHandle() const;
+
   /// \brief Get the number of moving atoms.
   int getMovingAtomCount() const;
 
@@ -211,9 +218,15 @@ private:
   int root_atom;                        ///< Root of the rotatable bond, chiral center atom
   int pivot_atom;                       ///< The end atom of the rotatable bond (unused if motion
                                         ///<   is set to CHIRAL_INVERSION)
+  int root_handle;                      ///< The most significant atom connected to the root atom,
+                                        ///<   decided by the highest Z number or, in the case of a
+                                        ///<   tie, the atom with the lowest topological index.
+                                        ///<   Only relevant in the case of a rotatable or
+                                        ///<   cis-trans bond, set to -1 for chiral centers.
+  int pivot_handle;                     ///< The most significan atom connected to the pivot atom
   std::vector<int> moving_atoms;        ///< List of all atoms that turn as a consequence of
                                         ///<   twisting about the rotatable bond axis
-  const AtomGraph *ag_pointer;          ///< Pointer to the AtomGraph object to which this
+  AtomGraph *ag_pointer;                ///< Pointer to the AtomGraph object to which this
                                         ///<   isomerization applies
 };
 

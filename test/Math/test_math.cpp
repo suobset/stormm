@@ -19,6 +19,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/approx.h"
+#include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
@@ -26,6 +27,7 @@ using stormm::llint;
 using stormm::ulint;
 using stormm::ullint;
 #ifndef STORMM_USE_HPC
+using stormm::double2;
 using stormm::double3;
 #endif
 using stormm::ullint2;
@@ -46,6 +48,140 @@ using stormm::review::stormmSplash;
 using stormm::symbols::pi;
 using namespace stormm::math;
 using namespace stormm::testing;
+
+//-------------------------------------------------------------------------------------------------
+// Check the matrix multiplication routine with a hand-written, much simpler protocol.
+//
+// Arguments:
+//   row_a:  Row count of matrix A
+//   col_a:  Column count of matrix A
+//   row_b:  Row count of matrix B
+//   col_b:  Column count of matrix B
+//   axps:   Transposition state for matrix A
+//   bxps:   Transposition state for matrix B
+//-------------------------------------------------------------------------------------------------
+void checkMatrixMultiply(const int row_a, const int col_a, const int row_b, const int col_b,
+                         const TransposeState axps = TransposeState::AS_IS,
+                         const TransposeState bxps = TransposeState::AS_IS) {
+
+  // Try a matrix multiply between 5 x 5 and 5 x 2 matrices
+  std::vector<double> amat(row_a * col_a), bmat(row_b * col_b);
+  Xoroshiro128pGenerator xrsm((row_a * col_b) + (row_b * col_a) +
+                              ((row_a < row_b) * (row_a * row_b)) + (col_a * col_b)); 
+  for (int i = 0; i < row_a * col_a; i++) {
+    amat[i] = xrsm.uniformRandomNumber();
+  }
+  for (int i = 0; i < row_b * col_b; i++) {
+    bmat[i] = xrsm.uniformRandomNumber();
+  }
+  int actual_row_a, actual_col_a, actual_row_b, actual_col_b;
+  switch (axps) {
+  case TransposeState::AS_IS:
+    actual_row_a = row_a;
+    actual_col_a = col_a;
+    break;
+  case TransposeState::TRANSPOSE:
+    actual_row_a = col_a;
+    actual_col_a = row_a;
+    break;
+  }
+  switch (bxps) {
+  case TransposeState::AS_IS:
+    actual_row_b = row_b;
+    actual_col_b = col_b;
+    break;
+  case TransposeState::TRANSPOSE:
+    actual_row_b = col_b;
+    actual_col_b = row_b;
+    break;
+  }
+  std::vector<double> result(actual_row_a * actual_col_b, 0.0);
+  std::vector<double> byhand(actual_row_a * actual_col_b, 0.0);
+  matrixMultiply(amat.data(), row_a, col_a, bmat.data(), row_b, col_b, result.data(), 1.0, 1.0,
+                 0.0, axps, bxps);
+  if (axps == TransposeState::TRANSPOSE) {
+    transpose(&amat, row_a, col_a);
+  }
+  if (bxps == TransposeState::TRANSPOSE) {
+    transpose(&bmat, row_b, col_b);
+  }
+  for (int i = 0; i < actual_row_a; i++) {
+    for (int j = 0; j < actual_col_a; j++) {
+      for (int k = 0; k < actual_col_b; k++) {
+        byhand[(k * actual_row_a) + i] += amat[(j * actual_row_a) + i] *
+                                          bmat[(k * actual_row_b) + j];
+      }
+    }
+  }
+  const std::string a_state = (axps == TransposeState::TRANSPOSE) ? "(t)" : "";
+  const std::string b_state = (bxps == TransposeState::TRANSPOSE) ? "(t)" : "";
+  check(result, RelationalOperator::EQUAL, byhand, "A(" + std::to_string(row_a) + " x " +
+        std::to_string(col_a) + ")" + a_state + " * B(" + std::to_string(row_b) + " x " +
+        std::to_string(col_b) + ")" + b_state + " was not multiplied correctly.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Take the (Moore-Penrose) pseudo-inverse of a matrix.
+//
+// Arguments:
+//   nrow:  Number of rows to impart to the matrix
+//   ncol:  Number of columns to impart to the matrix
+//-------------------------------------------------------------------------------------------------
+void takePseudoInverse(const int nrow, const int ncol, const std::string &matrices_snp,
+                       const std::string &var_name, const TestEnvironment &oe,
+                       const TestPriority do_test) {
+  std::vector<double> amat(nrow * ncol);
+  Xoroshiro128pGenerator xrsm(nrow * ncol);
+  for (int i = 0; i < nrow * ncol; i++) {
+    amat[i] = xrsm.gaussianRandomNumber() + 1.5;
+  }
+  pseudoInverse(&amat, nrow, ncol);
+  snapshot(matrices_snp, polyNumericVector(amat), var_name, 1.0e-5, "The matrix pseudo-inversion "
+           "result for a " + std::to_string(nrow) + " x " + std::to_string(ncol) + " matrix is "
+           "incorrect.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::APPEND, do_test);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Fashion an over-determined system of linear equations based on random coefficients, a
+// pre-determined solution vector, and random perturbations.  The perturbations guarantee that,
+// while the pre-determined solution is still a good one, it is not the optimal answer.  The
+// optimal answer can then be determined using either the Moore-Penrose left pseudo-inverse or a
+// QR decomposition.  Both methods should give very similar answers.
+//
+// Arguments:
+//   n_equations:  The number of equations in the system
+//   n_unknowns:   The number of independent coefficients describing the cost function
+//-------------------------------------------------------------------------------------------------
+void solveLinearSystem(const size_t n_equations, const size_t n_unknowns) {
+  Xoroshiro128pGenerator xrsm(n_equations * n_unknowns);
+  const std::vector<double> base_coefficients = xrsm.gaussianRandomNumber(n_unknowns);
+  const std::vector<double> amat = xrsm.gaussianRandomNumber(n_equations * n_unknowns);
+  std::vector<double> bvec = xrsm.gaussianRandomNumber(n_equations);
+  elementwiseMultiply(&bvec, 0.5);
+  matrixVectorMultiply(amat, base_coefficients, &bvec, n_equations, n_unknowns, 1.0, 1.0, 1.0);
+
+  // Compute the solution using the pseudo-inverse
+  const std::vector<double> amat_pinv = pseudoInverse(amat, n_equations, n_unknowns);
+  std::vector<double> xvec_pinv(n_unknowns, 0.0);
+  matrixVectorMultiply(amat_pinv, bvec, &xvec_pinv, n_unknowns, n_equations);
+  std::vector<double> base_result(n_equations, 0.0);
+  matrixVectorMultiply(amat, base_coefficients, &base_result, n_equations, n_unknowns);
+  std::vector<double> pinv_result(n_equations, 0.0);
+  matrixVectorMultiply(amat, xvec_pinv, &pinv_result, n_equations, n_unknowns);
+  const double base_error = relativeRmsError(base_result, bvec);
+  const double pinv_error = relativeRmsError(pinv_result, bvec);
+  check(base_error > pinv_error, "The pseudo-inverse does not produce a better answer than the "
+        "original solution before the introduction of noise.");
+
+  // Compute the solution using the QR decomposition
+  std::vector<double> xvec_qr(n_unknowns, 0.0);
+  qrSolver(amat, &xvec_qr, bvec);
+
+  // Check that the two solutions are similar.
+  check(xvec_qr, RelationalOperator::EQUAL, xvec_pinv, "The coefficients computed by "
+        "Moore-Penrose pseudo-inverse and QR decomposition do not agree.");
+}
 
 //-------------------------------------------------------------------------------------------------
 // Produce a series of random numbers from a generator based on an initial state and some
@@ -101,8 +237,8 @@ std::vector<double> generateExpectedSeries(Tgen *xrs, const Tstate init_state, c
 // Test a TickCounter object to ensure that its incrementation is valid for a variety of series
 // lengths.
 //-------------------------------------------------------------------------------------------------
-void testDialCounter(TickCounter *dials, const int ncyc) {
-  const int ndials = dials->getStateCount();
+void testDialCounter(TickCounter<int> *dials, const int ncyc) {
+  const int ndials = dials->getVariableCount();
   const std::vector<int>& dial_settings = dials->getSettings();
   const std::vector<int>& dial_limits = dials->getStateLimits();
   for (int i = 0; i < ncyc; i++) {
@@ -470,7 +606,7 @@ int main(const int argc, const char* argv[]) {
   if (oe.getVerbosity() == TestVerbosity::FULL) {
     stormmSplash();
   }
-
+  
   // Section 1
   section("Vector processing capabilities");
 
@@ -780,6 +916,29 @@ int main(const int argc, const char* argv[]) {
     tr_b_ptr[i] = prng_c.gaussianRandomNumber();
   }
 
+  // Tranpose the matrices in-place and out-of-place.
+  std::vector<double> tr_mat_a_copy = tr_mat_a.readHost();
+  std::vector<double> tr_mat_b_copy = tr_mat_b.readHost();
+  std::vector<double> tr_mat_c_copy = tr_mat_c.readHost();
+  std::vector<double> tr_mat_a_xpse(tr_mat_a_copy.size());
+  std::vector<double> tr_mat_b_xpse(tr_mat_b_copy.size());
+  std::vector<double> tr_mat_c_xpse(tr_mat_c_copy.size());
+  transpose(tr_mat_a_copy, &tr_mat_a_xpse, rows_a, cols_a);
+  transpose(tr_mat_b_copy, &tr_mat_b_xpse, rows_b, cols_b);
+  transpose(tr_mat_c_copy, &tr_mat_c_xpse, rows_a, cols_b);
+  transpose(&tr_mat_a_copy, rows_a, cols_a);
+  transpose(&tr_mat_b_copy, rows_b, cols_b);
+  transpose(&tr_mat_c_copy, rows_a, cols_b);
+  check(tr_mat_a_copy, RelationalOperator::EQUAL, tr_mat_a_xpse, "In-place transposition of a "
+        "non-square matrix does not yield the same result as out-of-place transposition.");
+  check(tr_mat_b_copy, RelationalOperator::EQUAL, tr_mat_b_xpse, "In-place transposition of a "
+        "non-square matrix does not yield the same result as out-of-place transposition.");
+  check(tr_mat_c_copy, RelationalOperator::EQUAL, tr_mat_c_xpse, "In-place transposition of a "
+        "square matrix does not yield the same result as out-of-place transposition.");
+  transpose(&tr_mat_a_copy, cols_a, rows_a);
+  transpose(&tr_mat_b_copy, cols_b, rows_b);
+  transpose(&tr_mat_c_copy, cols_b, rows_a);
+
   // Check that the GEMM matrix multiplication snapshot file exists
   const std::string matrices_snp = oe.getStormmSourcePath() + osSeparator() + "test" +
                                    osSeparator() + "Math" + osSeparator() + "matrices.m";
@@ -798,7 +957,7 @@ int main(const int argc, const char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(tr_mat_c.readHost()), "tr_ab", 1.0e-5, "Matrix "
            "multiply result for [7 by 5] x [5 by 7] matrices is incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE, snp_found);
-
+  
   // Overwrite the result with a positive definite [7 by 7] matrix result
   matrixMultiply(tr_mat_a.data(), rows_a, cols_a, tr_mat_a.data(), rows_a, cols_a, tr_mat_c.data(),
                  1.0, 1.0, 0.0, TransposeState::AS_IS, TransposeState::TRANSPOSE);
@@ -812,6 +971,32 @@ int main(const int argc, const char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(tr_mat_d.readHost()), "tr_ata", 1.0e-5, "Matrix "
            "multiply result for [7 by 5](T) x [7 by 5] matrices is incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+
+  // Try additional GEMM operations
+  checkMatrixMultiply( 5,  5,  5,  3);
+  checkMatrixMultiply( 5,  5,  5,  3, TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  checkMatrixMultiply( 6,  3,  3,  3);
+  checkMatrixMultiply( 6,  3,  3,  3, TransposeState::AS_IS, TransposeState::TRANSPOSE);
+  checkMatrixMultiply( 6,  3,  3,  3);
+  checkMatrixMultiply( 6,  7,  3,  6, TransposeState::TRANSPOSE, TransposeState::TRANSPOSE);
+  checkMatrixMultiply( 5,  9,  5,  3, TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  checkMatrixMultiply( 5,  9, 37,  5, TransposeState::TRANSPOSE, TransposeState::TRANSPOSE);
+  checkMatrixMultiply(17,  5, 37,  5, TransposeState::AS_IS, TransposeState::TRANSPOSE);
+
+  // Compute the Moore-Penrose matrix pseudo-inverse of one of the matrices obtained earlier.
+  takePseudoInverse( 7,  5, matrices_snp, "pinv_a", oe, snp_found);
+  takePseudoInverse( 8,  6, matrices_snp, "pinv_b", oe, snp_found);
+  takePseudoInverse( 6,  8, matrices_snp, "pinv_c", oe, snp_found);
+  takePseudoInverse( 8,  6, matrices_snp, "pinv_d", oe, snp_found);
+  takePseudoInverse(15, 11, matrices_snp, "pinv_e", oe, snp_found);
+  takePseudoInverse(35, 49, matrices_snp, "pinv_f", oe, snp_found);
+
+  // Try solving some overdetermined systems of linear equations using the left pseudo-inverse
+  // method, then the QR decomposition.
+  solveLinearSystem( 7,  5);
+  solveLinearSystem(17,  7);
+  solveLinearSystem(12, 12);
+  solveLinearSystem(39, 22);
   
   // Try inverting a positive definite matrix
   Hybrid<double> tr_mat_e(cols_a * rows_b, "inverse matrix");
@@ -827,7 +1012,7 @@ int main(const int argc, const char* argv[]) {
            "multiply result for [7 by 5](T) x [5 by 7](T) matrices is incorrect.",
            oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND,
            snp_found);
-
+  
   // Create a positive-definite matrix, then compute its eigenvalues and eigenvectors (this is
   // better accomplished by a routine like BLAS dsyevd, as it is more than just real and symmetric,
   // but the slower jacobi routine is all STORMM has got without real BLAS compiled).
@@ -1142,20 +1327,57 @@ int main(const int argc, const char* argv[]) {
         "meet expectations.");
 
   // Create a tick counter with a series of dials with different lengths.
-  TickCounter dials({ 2, 2, 3, 5, 7, 4, 1, 2 });
+  section(5);
+  TickCounter<int> dials({ 2, 2, 3, 5, 7, 4, 1, 2 });
   testDialCounter(&dials, 5000);
   dials.reset();
   testDialCounter(&dials, 2134);
   dials.reset();
   testDialCounter(&dials,  187);
-  CHECK_THROWS(TickCounter test_dials({ 2, 0, 7}), "A TickCounter object was created with zero "
-               "increments possible in one of the variables.");
-  CHECK_THROWS(TickCounter test_dials({ 9, 5, -7}), "A TickCounter object was created with "
+  CHECK_THROWS(TickCounter<int> test_dials({ 2, 0, 7}), "A TickCounter object was created with "
+              "zero increments possible in one of the variables.");
+  CHECK_THROWS(TickCounter<int> test_dials({ 9, 5, -7}), "A TickCounter object was created with "
                "negative increments in one of the variables.");
   CHECK_THROWS(dials.set({ 0, 0, 1, 1, 5, 3, 0}), "A TickCounter allowed a misaligned vector "
                "to be used in setting its state.");
   CHECK_THROWS(dials.set({ 0, 0, -1, 1, 5, 3, 0, 0}), "A TickCounter allowed a negative number to "
                "enter its state settings.");
+  dials.loadStateValues({ 0, 1 }, 0);
+  dials.loadStateValues({ 7, 5 }, 1);
+  dials.loadStateValues({ 1, 2, 4 }, 2);
+  dials.loadStateValues({ 3, 2, 4, 7, 7 }, 3);
+  dials.loadStateValues({ 6, 8, 3, 2, 4, 7, 7 }, 4);
+  dials.loadStateValues({ 4, 5, 7, 8 }, 5);
+  CHECK_THROWS(dials.loadStateValues({ 4, 5, 7, 8 }, 6), "A TickCounter accepted a series of four "
+               "values for a variable with only one setting.");
+  dials.loadStateValues({ 3 }, 6);
+  dials.loadStateValues({ 3, 3 }, 7);
+  dials.reset();
+  const std::vector<int> zero_state = dials.getState();
+  const std::vector<int> zero_state_ans = { 0, 7, 1, 3, 6, 4, 3, 3 };
+  check(zero_state, RelationalOperator::EQUAL, zero_state_ans, "A TickCounter does not return the "
+        "expected state after a reset operation.");
+  dials.advance();
+  const std::vector<int> one_state = dials.getState();
+  const std::vector<int> one_state_ans = { 1, 7, 1, 3, 6, 4, 3, 3 };
+  check(one_state, RelationalOperator::EQUAL, one_state_ans, "A TickCounter does not return the "
+        "expected state after a advancing one tick.");
+  dials.advance(8);
+  const std::vector<int> nine_state = dials.getState();
+  const std::vector<int> nine_state_ans = { 1, 7, 4, 3, 6, 4, 3, 3 };
+  check(nine_state, RelationalOperator::EQUAL, nine_state_ans, "A TickCounter does not return the "
+        "expected state after a advancing one tick.");
+  TickCounter<double> k_dials({ 3, 3, 6 });
+  loadScalarStateValues(&k_dials, std::vector<double2>({ {0.0, 4.5}, {5.7, 7.8}, {4.5, 12.6} }));
+  const std::vector<double> dzero_state = k_dials.getState();
+  const std::vector<double> dzero_state_ans = { 0.0, 5.7, 4.5 };
+  check(dzero_state, RelationalOperator::EQUAL, dzero_state_ans, "A TIckCounter does not return "
+        "the expected state just after construction.");
+  k_dials.advance(10);
+  const std::vector<double> dten_state = k_dials.getState();
+  const std::vector<double> dten_state_ans = { 1.5, 5.7, 5.85 };
+  check(dten_state, RelationalOperator::EQUAL, dten_state_ans, "A TIckCounter does not return "
+        "the expected state after some advancement.");
 
   // Check tricubic interpolation mechanics
   section(6);

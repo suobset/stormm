@@ -49,18 +49,21 @@ void nonbondedKernelSetup();
 ///        the non-bonded interactions kernel.  Deposit the results in a developing object that
 ///        will later record launch grid dimensions for managing the kernels.
 ///
-/// \param prec      The desired precision model for the kernel
-/// \param kind      The type of non-bonded work units to evaluate
-/// \param eval_frc  Whether the kernel shall evaluate forces
-/// \param eval_nrg  Whether the kernel shall evaluate energies
-/// \param acc_meth  Accumulation method for forces
-/// \param igb       The implicit solvent model to use (i.e. "NONE" in periodic boundary
-///                  conditions--otherwise NECK and non-NECK models are the relevant choices)
+/// \param prec                The desired precision model for the kernel
+/// \param kind                The type of non-bonded work units to evaluate
+/// \param eval_frc            Whether the kernel shall evaluate forces
+/// \param eval_nrg            Whether the kernel shall evaluate energies
+/// \param acc_meth            Accumulation method for forces
+/// \param igb                 The implicit solvent model to use (i.e. "NONE" in periodic boundary
+///                            conditions--otherwise NECK and non-NECK models are the relevant
+///                            choices)
+/// \param collision_handling  Means of dealing with close contacts between particles
 cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKind kind,
                                                     EvaluateForce eval_frc,
                                                     EvaluateEnergy eval_nrg,
                                                     AccumulationMethod acc_meth,
-                                                    ImplicitSolventModel igb);
+                                                    ImplicitSolventModel igb,
+                                                    ClashResponse collision_handling);
 
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the Born radii computation kernel.  Deposit the results in a developing object that
@@ -127,7 +130,8 @@ void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_
                      ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
                      ISWorkspaceKit<double> *iswk, EvaluateForce eval_force,
                      EvaluateEnergy eval_energy, const int2 bt, const int2 gbr_bt,
-                     const int2 gbd_bt);
+                     const int2 gbd_bt, double clash_minimum_distance = 0.0,
+                     double clash_ratio = 0.0);
 
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
@@ -135,7 +139,8 @@ void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nb
                      ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
                      ISWorkspaceKit<float> *iswk, EvaluateForce eval_force,
                      EvaluateEnergy eval_energy, AccumulationMethod force_sum, const int2 bt,
-                     const int2 gbr_bt, const int2 gbd_bt);
+                     const int2 gbr_bt, const int2 gbd_bt, float clash_minimum_distance = 0.0f,
+                     float clash_ratio = 0.0f);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
@@ -143,14 +148,16 @@ void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                      ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
                      EvaluateEnergy eval_energy, AccumulationMethod force_sum,
-                     const KernelManager &launcher);
+                     const KernelManager &launcher, double clash_minimum_distance = 0.0,
+                     double clash_ratio = 0.0);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
                      MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                      Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                      ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, const KernelManager &launcher);
+                     EvaluateEnergy eval_energy, const KernelManager &launcher,
+                     double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 /// \}
 
 } // namespace energy

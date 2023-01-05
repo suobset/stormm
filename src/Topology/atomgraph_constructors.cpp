@@ -685,7 +685,7 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       cmap_offsets[cmap_correspondence[i]] = orig_vk.cmap_dim[i] * orig_vk.cmap_dim[i];
     }
   }
-  prefixSumInPlace<int>(&cmap_offsets, PrefixSumType::EXCLUSIVE, "AtomGraph");
+  prefixSumInPlace(&cmap_offsets, PrefixSumType::EXCLUSIVE, "AtomGraph");
   const int cmap_alloc_size = cmap_offsets[cmap_surface_count];
   std::vector<double> tmp_cmap_surfaces(cmap_alloc_size);
   for (int i = 0; i < nscan; i++) {

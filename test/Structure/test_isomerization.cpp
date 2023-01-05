@@ -2,6 +2,7 @@
 #include "../../src/Chemistry/atom_equivalence.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
+#include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -10,6 +11,7 @@
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Structure/global_manipulation.h"
@@ -20,6 +22,7 @@
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -29,6 +32,8 @@ using stormm::chemistry::ChemicalFeatures;
 using stormm::chemistry::MapRotatableGroups;
 using stormm::chemistry::IsomerPlan;
 using stormm::constants::tiny;
+using stormm::constants::warp_size_int;
+using stormm::constants::warp_size_zu;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
@@ -37,6 +42,7 @@ using stormm::energy::evaluateAngleTerms;
 using stormm::energy::ScoreCard;
 using stormm::errors::rtWarn;
 using stormm::math::computeBoxTransform;
+using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::structure::rotateCoordinates;
 using stormm::structure::rmsd;
@@ -45,12 +51,9 @@ using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::UnitCellType;
 using stormm::topology::ValenceKit;
-using stormm::trajectory::CoordinateFileKind;
-using stormm::trajectory::CoordinateFrame;
-using stormm::trajectory::CoordinateFrameReader;
-using stormm::trajectory::PhaseSpace;
 using namespace stormm::structure;
 using namespace stormm::testing;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Check rotatable bonds throughout a structure.  If the topology supplied pertains to a system
@@ -223,6 +226,135 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the RMSD calculation guide on a variety of structures.  This will takes lists of system
+// topologies and coordinates, replicate each to varying degrees, and apply a small perturbation
+// plus rotational and translational motion to make RMSD calculations and alignments meaningful.
+//
+// Arguments:
+//   ag_list:              List of system topologies describing each structure in ps_list
+//   ps_list:              List of initial structures (each will be replicated, then randomly
+//                         perturbed, rotated, and translated)
+//   approach:             The RMSD calculation method to use
+//   do_tests:             Pre-determined indicator of whether unit tests are possible
+//   frame_counts:         The number of replicas to apply to each system
+//   default_frame_count:  The number of replicas to apply to any remaining systems if the
+//                         frame_counts vector runs out of information
+//-------------------------------------------------------------------------------------------------
+void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<PhaseSpace> &ps_list,
+                   const RMSDMethod approach, const TestPriority do_tests,
+                   const std::vector<int> &frame_counts = { 16, 14, 8, 7, 19 },
+                   const int default_frame_count = 16) {
+  std::vector<CoordinateSeries<double>> structure_pile;
+  for (size_t item = 0; item < ag_list.size(); item++) {
+    const CoordinateFrame item_cf(ps_list[item]);
+    const AtomEquivalence item_eq(ag_list[item], item_cf);
+    RMSDPlan item_rplan(item_eq, approach);
+    const int nframe = (item < frame_counts.size()) ? frame_counts[item] : default_frame_count;
+    CoordinateSeries<double> item_series(ps_list[item], nframe);
+    CoordinateSeriesWriter<double> item_seriesw = item_series.data();
+    Xoshiro256ppGenerator xrs(71842203 + item);
+    for (int i = 1; i < item_seriesw.nframe; i++) {
+      const int frame_offset = roundUp(item_seriesw.natom, warp_size_int) * i;
+      for (int j = 0; j < item_seriesw.natom; j++) {
+        const int ij_pos = frame_offset + j;
+        item_seriesw.xcrd[ij_pos] += 0.25 * (0.5 - xrs.uniformRandomNumber());
+        item_seriesw.ycrd[ij_pos] += 0.25 * (0.5 - xrs.uniformRandomNumber());
+        item_seriesw.zcrd[ij_pos] += 0.25 * (0.5 - xrs.uniformRandomNumber());
+      }
+    }
+    item_rplan.formatResults(item_series);
+    Hybrid<double> item_rmsds(item_rplan.getReferenceRMSDSize());
+    Hybrid<double> item_pair_rmsds(item_rplan.getRMSDMatrixSize());
+    rmsd(item_rplan, item_cf, item_series, &item_rmsds);
+    rmsd(item_rplan, item_series, &item_pair_rmsds);
+
+    // Check basic features of the RMSDPlan object
+    if (item == 0 && ps_list.size() == 1) {
+      RMSDPlanReader<double> item_rpr = item_rplan.dpData();
+      check(item_rpr.plan_count, RelationalOperator::EQUAL, 1, "Only one plan should be present "
+            "in the RMSD guide tailored for a single system.", do_tests);
+    }
+
+    // Remember the structures
+    structure_pile.push_back(item_series);
+  }
+
+  // Shuffle the structures (but do not re-order the list of structures instantiating any given
+  // topology) and create a synthesis of them.
+  std::vector<PhaseSpace> shuffled_ps;
+  std::vector<AtomGraph*> shuffled_ag;
+  int ns = 0;
+  for (size_t i = 0; i < ag_list.size(); i++) {
+    ns += structure_pile[i].getFrameCount();
+  }
+  shuffled_ps.reserve(ns);
+  shuffled_ag.reserve(ns);
+  int added = 1;
+  int add_frame = 0;
+  while (added > 0) {
+    added = 0;
+    for (size_t i = 0; i < ag_list.size(); i++) {
+      if (add_frame < structure_pile[i].getFrameCount()) {
+        const CoordinateFrame cf = structure_pile[i].exportFrame(add_frame);
+        const CoordinateFrameReader cfr = cf.data();
+        shuffled_ps.emplace_back(cfr.natom, cfr.unit_cell);
+        shuffled_ps.back().fill(cfr.xcrd, cfr.ycrd, cfr.zcrd, TrajectoryKind::POSITIONS,
+                                CoordinateCycle::PRESENT, 0, cfr.boxdim);
+        shuffled_ag.push_back(const_cast<AtomGraph*>(ag_list[i].getSelfPointer()));
+        added++;
+      }
+    }
+    add_frame++;
+  }
+  PhaseSpaceSynthesis poly_ps(shuffled_ps, shuffled_ag, 40);
+  const RMSDPlan poly_rplan(poly_ps, approach);
+  Hybrid<double> poly_rmsds(poly_rplan.getReferenceRMSDSize());
+  Hybrid<double> poly_pair_rmsds(poly_rplan.getRMSDMatrixSize());
+  Hybrid<int> sys_example_idx(poly_ps.getUniqueTopologyExampleIndices());
+  rmsd(poly_rplan, poly_ps, sys_example_idx, &poly_rmsds);
+  rmsd(poly_rplan, poly_ps, &poly_pair_rmsds);
+  std::vector<double> replica_rmsds, replica_pair_rmsds;
+  for (size_t i = 0; i < ag_list.size(); i++) {
+    const ChemicalDetailsKit icdk = ag_list[i].getChemicalDetailsKit();
+
+    // Recompute the reference RMSDs
+    replica_rmsds.push_back(0.0);
+    const int jlim = structure_pile[i].getFrameCount();
+    const CoordinateFrame iref = structure_pile[i].exportFrame(0);
+    const CoordinateFrameReader irefr = iref.data();
+    for (int j = 1; j < jlim; j++) {
+      const CoordinateFrame cf_ij = structure_pile[i].exportFrame(j);
+      replica_rmsds.push_back(rmsd(irefr, cf_ij.data(), icdk, approach));
+    }
+    const int padded_jlim = roundUp(jlim, warp_size_int);
+    for (int j = jlim; j < padded_jlim; j++) {
+      replica_rmsds.push_back(0.0);
+    }
+
+    // Recompute the RMSD matrices
+    for (size_t j = 1; j < jlim; j++) {
+      const CoordinateFrame cf_ij = structure_pile[i].exportFrame(j);
+      const CoordinateFrameReader cf_ijr = cf_ij.data();
+      for (size_t k = 0; k < j; k++) {
+        const CoordinateFrame cf_ik = structure_pile[i].exportFrame(k);
+        replica_pair_rmsds.push_back(rmsd(cf_ijr, cf_ik.data(), icdk, approach));
+      }
+    }
+    const size_t padded_triangle = roundUp(replica_pair_rmsds.size(), warp_size_zu);
+    for (size_t j = replica_pair_rmsds.size(); j < padded_triangle; j++) {
+      replica_pair_rmsds.push_back(0.0);
+    }
+  }
+  check(poly_rmsds.readHost(), RelationalOperator::EQUAL, Approx(replica_rmsds).margin(tiny),
+        "RMSD calculations to a reference structure performed across a synthesis of structures "
+        "did not match the list of values computed individually.", do_tests);
+  check(poly_pair_rmsds.readHost(), RelationalOperator::EQUAL,
+        Approx(replica_pair_rmsds).margin(tiny), "RMSD matrix calculations to a reference "
+        "structure performed across a synthesis of structures did not match the list of values "
+        "computed individually.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -362,16 +494,9 @@ int main(const int argc, const char* argv[]) {
 
   // Test an RMSD calculation guide
   section(4);
-  const AtomEquivalence lig2_eq(lig2_feat);
-  const RMSDPlan lig2_rplan(lig2_eq);
-  const RMSDPlanReader lig2_rpr = lig2_rplan.data();
-  check(lig2_rpr.plan_count, RelationalOperator::EQUAL, 1, "Only one plan should be present in "
-        "the RMSD guide tailored for a single system.", do_tests);
-
-  // CHECK
-  for (int i = 0; i <= 1; i++) {
-    
-  }
+  testRMSDGuide({ lig2_ag }, { lig2_ps }, RMSDMethod::ALIGN_MASS, do_tests);
+  testRMSDGuide({ lig1_ag, lig2_ag, trpc_ag, }, { lig1_ps, lig2_ps, trpc_ps },
+                RMSDMethod::ALIGN_MASS, do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

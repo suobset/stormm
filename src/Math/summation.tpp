@@ -8,12 +8,11 @@ using data_types::isScalarType;
 using data_types::getStormmScalarTypeName;
 
 //-------------------------------------------------------------------------------------------------
-template <typename TSum, typename TBase>
-void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style, const char* caller) {
-  const size_t n_elements = v->size();
-  TBase* vdata = v->data();
+template <typename TBase>
+void prefixSumInPlace(TBase* vdata, const size_t n_elements, const PrefixSumType style,
+                      const char* caller) {
   TBase sum = 0;
-  TSum llsum = 0;
+  llint llsum = 0;
   switch (style) {
   case PrefixSumType::EXCLUSIVE:
     for (size_t i = 0; i < n_elements; i++) {
@@ -32,18 +31,27 @@ void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style, const ch
     break;
   }
   if (llsum != Approx(sum, ComparisonType::RELATIVE, constants::tiny)) {
-    const std::string tsum_name = isScalarType<TSum>() ?
-                                  getStormmScalarTypeName<TSum>() :
-                                  std::string(std::type_index(typeid(TSum)).name());
     const std::string tbase_name = isScalarType<TBase>() ?
                                    getStormmScalarTypeName<TBase>() :
                                    std::string(std::type_index(typeid(TBase)).name());
     const std::string callfunc = (caller == nullptr) ? "" : ".  Called by " + std::string(caller);
     rtErr("Overflow of numerical format.  Summation of a " + std::to_string(n_elements) +
-          "-element series as " + tsum_name + " produces " + std::to_string(llsum) +
-          ", whereas the vector's base type " + tbase_name + " records " + std::to_string(sum) +
+          "-element series as llint produces " + std::to_string(llsum) +
+          ", whereas the array's base type " + tbase_name + " records " + std::to_string(sum) +
           callfunc + ".", "prefixSumInPlace");
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename TBase>
+void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style, const char* caller) {
+  prefixSumInPlace(v->data(), v->size(), style, caller);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename TBase>
+void prefixSumInPlace(Hybrid<TBase> *v, const PrefixSumType style, const char* caller) {
+  prefixSumInPlace(v->data(), v->size(), style, caller);
 }
 
 //-------------------------------------------------------------------------------------------------

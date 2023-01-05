@@ -63,16 +63,17 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
 /// \brief Obtain information on launch bounds and block-specific requirements for a selected
 ///        version of the valence interactions kernel.
 ///
-/// \param prec                   Precision model for the selected kernel
-/// \param eval_frc               Select whether to evaluate forces
-/// \param eval_nrg               Select whether to evaluate energies
-/// \param acc_meth               Accumulation method for forces
-/// \param purpose                Indicate whether the kernel shall deposit its accumulated forces
-///                               back into global arrays or use them immediately to move particles
+/// \param prec                Precision model for the selected kernel
+/// \param eval_frc            Select whether to evaluate forces
+/// \param eval_nrg            Select whether to evaluate energies
+/// \param acc_meth            Accumulation method for forces
+/// \param purpose             Indicate whether the kernel shall deposit its accumulated forces
+///                            back into global arrays or use them immediately to move particles
+/// \param collision_handling  Indication of whether to forgive clashes
 cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
                                                   EvaluateEnergy eval_nrg,
-                                                  AccumulationMethod acc_meth,
-                                                  VwuGoal purpose);
+                                                  AccumulationMethod acc_meth, VwuGoal purpose,
+                                                  ClashResponse collision_handling);
 
 /// \brief Evaluate valence work units and move atoms.
 ///
@@ -108,7 +109,8 @@ void launchValence(const SyValenceKit<double> &poly_vk,
                    const SyAtomUpdateKit<double, double2, double4> &poly_auk,
                    ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
-                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt);
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
+                   double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 
 void launchValence(const SyValenceKit<float> &poly_vk,
                    const SyRestraintKit<float, float2, float4> &poly_rk,
@@ -117,19 +119,21 @@ void launchValence(const SyValenceKit<float> &poly_vk,
                    ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
-                   const int2 bt);
+                   const int2 bt, float clash_minimum_distance = 0.0, float clash_ratio = 0.0);
   
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                   AccumulationMethod force_sum, const KernelManager &launcher);
+                   AccumulationMethod force_sum, const KernelManager &launcher,
+                   double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                   const KernelManager &launcher);
+                   const KernelManager &launcher, double clash_minimum_distance = 0.0,
+                   double clash_ratio = 0.0);
 /// \}
   
 } // namespace energy

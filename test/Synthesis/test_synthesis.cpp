@@ -1177,8 +1177,8 @@ int main(const int argc, const char* argv[]) {
 
   // Try extracting the unique topologies and unique topology indices from a PhaseSpaceSynthesis
   const std::vector<AtomGraph*> psv_tops = psynth.getUniqueTopologies();
-  const std::vector<int> psv_top_idx = psynth.getUniqueTopologyIndices();
-  const std::vector<int> psv_top_idx_ans = { 0, 1, 2, 0, 1, 0, 0, 1, 2 };
+  const std::vector<int> psv_top_idx = psynth.getUniqueTopologyExampleIndices();
+  const std::vector<int> psv_top_idx_ans = { 0, 1, 2 };
   const bool top_ordered = (psv_tops[0] == &tip3p_ag && psv_tops[1] == &tip4p_ag &&
                             psv_tops[2] == &trpcage_ag);
   check(top_ordered, "The order of unique topologies produced by a PhaseSpaceSynthesis object is "

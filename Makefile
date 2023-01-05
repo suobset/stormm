@@ -33,7 +33,6 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Math/rounding.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
 		   $(SRCDIR)/Math/statistics.cpp \
-		   $(SRCDIR)/Math/tickcounter.cpp \
 		   $(SRCDIR)/Math/tricubic_cell.cpp \
 		   $(SRCDIR)/Math/vector_ops.cpp \
 		   $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
@@ -92,6 +91,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		   $(SRCDIR)/Restraints/restraint_builder.cpp \
 		   $(SRCDIR)/Restraints/restraint_enumerators.cpp \
+		   $(SRCDIR)/Structure/clash_detection.cpp \
 		   $(SRCDIR)/Structure/global_manipulation.cpp \
 		   $(SRCDIR)/Structure/isomerization.cpp \
 		   $(SRCDIR)/Structure/local_arrangement.cpp \
@@ -102,6 +102,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
+		   $(SRCDIR)/Synthesis/condensate.cpp \
 		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.cpp \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
@@ -153,6 +154,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Constants/behavior.h \
 		     $(SRCDIR)/Constants/fixed_precision.h \
 		     $(SRCDIR)/Constants/generalized_born.h \
+		     $(SRCDIR)/Constants/hpc_bounds.h \
 		     $(SRCDIR)/Constants/scaling.h \
 		     $(SRCDIR)/Constants/symbol_values.h \
 		     $(SRCDIR)/Chemistry/chemistry_enumerators.h \
@@ -243,6 +245,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Restraints/restraint_enumerators.h \
 		     $(SRCDIR)/Restraints/restraint_util.h \
 		     $(SRCDIR)/Structure/background_mesh.h \
+		     $(SRCDIR)/Structure/clash_detection.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
@@ -253,6 +256,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Structure/structure_utils.h \
 		     $(SRCDIR)/Structure/virtual_site_handling.h \
 		     $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
+		     $(SRCDIR)/Synthesis/condensate.h \
 		     $(SRCDIR)/Synthesis/implicit_solvent_workspace.h \
 		     $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		     $(SRCDIR)/Synthesis/nonbonded_workunit.h \
@@ -320,13 +324,16 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Potential/valence_potential.tpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.tpp \
 		   $(SRCDIR)/Restraints/restraint_util.tpp \
+		   $(SRCDIR)/Structure/clash_detection.tpp \
 		   $(SRCDIR)/Structure/global_manipulation.tpp \
 		   $(SRCDIR)/Structure/isomerization.tpp \
 		   $(SRCDIR)/Structure/local_arrangement.tpp \
 		   $(SRCDIR)/Structure/background_mesh.tpp \
 		   $(SRCDIR)/Structure/mesh_parameters.tpp \
 		   $(SRCDIR)/Structure/rmsd.tpp \
+		   $(SRCDIR)/Structure/rmsd_plan.tpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.tpp \
+		   $(SRCDIR)/Synthesis/condensate.tpp \
 		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.tpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.tpp \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.tpp \
@@ -367,7 +374,6 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/rounding.o \
 		  $(SRCDIR)/Math/series_ops.o \
 		  $(SRCDIR)/Math/statistics.o \
-		  $(SRCDIR)/Math/tickcounter.o \
 		  $(SRCDIR)/Math/tricubic_cell.o \
 		  $(SRCDIR)/Math/vector_ops.o \
 		  $(SRCDIR)/MolecularMechanics/line_minimization.o \
@@ -426,6 +432,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Restraints/restraint_apparatus.o \
 		  $(SRCDIR)/Restraints/restraint_builder.o \
 		  $(SRCDIR)/Restraints/restraint_enumerators.o \
+		  $(SRCDIR)/Structure/clash_detection.o \
 		  $(SRCDIR)/Structure/global_manipulation.o \
 		  $(SRCDIR)/Structure/isomerization.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \
@@ -436,6 +443,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
 		  $(SRCDIR)/Structure/virtual_site_handling.o \
 		  $(SRCDIR)/Synthesis/atomgraph_synthesis.o \
+		  $(SRCDIR)/Synthesis/condensate.o \
 		  $(SRCDIR)/Synthesis/implicit_solvent_workspace.o \
 		  $(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		  $(SRCDIR)/Synthesis/nonbonded_workunit.o \
@@ -482,13 +490,14 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Potential/hpc_nonbonded_potential.cu \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		    $(SRCDIR)/Random/hpc_random.cu \
+		    $(SRCDIR)/Structure/hpc_rmsd.cu \
 		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
+		    $(SRCDIR)/Synthesis/hpc_condensate.cu \
 		    $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.cu \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
 # STORMM CUDA header files
-STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		      $(SRCDIR)/Accelerator/hpc_config.h \
+STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Accelerator/ptx_macros.h \
 		      $(SRCDIR)/Math/hpc_reduction.h \
 		      $(SRCDIR)/Math/hpc_summation.cuh \
@@ -499,6 +508,7 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		      $(SRCDIR)/Random/hpc_random.h \
 		      $(SRCDIR)/Random/hpc_random.cuh \
 		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
+		      $(SRCDIR)/Synthesis/hpc_condensate.cuh \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
@@ -513,6 +523,7 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Potential/gbradii_tilegroups.cui \
 			     $(SRCDIR)/Potential/valence_potential.cui \
 			     $(SRCDIR)/Random/xor_shift_rng.cui \
+			     $(SRCDIR)/Structure/rmsd_calculation.cui \
 			     $(SRCDIR)/Structure/virtual_site_placement.cui \
 			     $(SRCDIR)/Structure/virtual_site_transmission.cui \
 			     $(SRCDIR)/Trajectory/thermostat_utilities.cui
@@ -525,7 +536,9 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Potential/hpc_scorecard.o \
 		   $(SRCDIR)/Potential/hpc_valence_potential.o \
 		   $(SRCDIR)/Random/hpc_random.o \
+		   $(SRCDIR)/Structure/hpc_rmsd.o \
 		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
+		   $(SRCDIR)/Synthesis/hpc_condensate.o \
 		   $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.o \
 		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
@@ -545,6 +558,7 @@ STORMM_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 		    $(TESTDIR)/bin/test_atommask \
 		    $(TESTDIR)/bin/test_local_arrangement \
 		    $(TESTDIR)/bin/test_isomerization \
+		    $(TESTDIR)/bin/test_condensate \
 		    $(TESTDIR)/bin/test_synthesis \
 		    $(TESTDIR)/bin/test_atomgraph_synthesis \
 		    $(TESTDIR)/bin/test_valence_evaluation \
@@ -585,8 +599,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \
@@ -729,6 +743,13 @@ $(TESTDIR)/bin/test_synthesis : $(LIBDIR)/libstormm.so \
 	@echo "[STORMM]  Building test_synthesis..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_synthesis \
 	  $(TESTDIR)/Synthesis/test_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
+# Target: testing the condensed coordinate object usde for analyses
+$(TESTDIR)/bin/test_condensate : $(LIBDIR)/libstormm.so \
+				$(TESTDIR)/Synthesis/test_condensate.cpp
+	@echo "[STORMM]  Building test_condensate..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_condensate \
+	  $(TESTDIR)/Synthesis/test_condensate.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 # Target: prmtop collating object test program
 $(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libstormm.so \

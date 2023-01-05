@@ -31,6 +31,8 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in,
     final_states{default_conf_final_states},
     rotation_samples{default_conf_rotation_samples},
     rotatable_bond_limit{default_conf_max_rotatable_bonds},
+    max_seeding_attempts{default_conf_max_seeding_attempts},
+    self_clash_ratio{default_conf_self_clash_ratio},
     system_trials{default_conf_max_system_trials},
     rmsd_tolerance{default_conf_rmsd_tolerance}
 {}
@@ -97,6 +99,8 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
   final_states = t_nml.getIntValue("final_states");
   rotation_samples = t_nml.getIntValue("rotation_samples");
   rotatable_bond_limit = t_nml.getIntValue("max_rotatable_bonds");
+  max_seeding_attempts = t_nml.getIntValue("max_seeding_attempts");
+  self_clash_ratio = t_nml.getRealValue("self_clash_tolerance");
   system_trials = t_nml.getIntValue("max_system_trials");
   rmsd_tolerance = t_nml.getRealValue("rmsd_tol");
 
@@ -170,6 +174,16 @@ int ConformerControls::getRotationSampleCount() const {
 //-------------------------------------------------------------------------------------------------
 int ConformerControls::getRotatableBondLimit() const {
   return rotatable_bond_limit;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ConformerControls::getMaxSeedingAttempts() const {
+  return max_seeding_attempts;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getSelfClashRatio() const {
+  return self_clash_ratio;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -388,6 +402,10 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                    std::to_string(default_conf_rotation_samples)));
   t_nml.addKeyword(NamelistElement("max_rotatable_bonds", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_rotatable_bonds)));
+  t_nml.addKeyword(NamelistElement("max_seeding_attempts", NamelistType::INTEGER,
+                                   std::to_string(default_conf_max_seeding_attempts)));
+  t_nml.addKeyword(NamelistElement("self_clash_tolerance", NamelistType::REAL,
+                                   std::to_string(default_conf_self_clash_ratio)));
   t_nml.addKeyword(NamelistElement("max_system_trials", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_system_trials)));
   t_nml.addKeyword(NamelistElement("rmsd_tol", NamelistType::REAL,
@@ -412,13 +430,22 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addHelp("max_rotatable_bonds", "The maximum number of rotatable bonds to explicitly "
                 "sample.  This quickly runs into a combinatorial problem, but there is a "
                 "guardrail in the max_system_trials keyword.");
+  t_nml.addHelp("max_seeding_attempts", "If a conformer's initial configuration contains a clash "
+                "between atoms (their van-der Waals radii are violated), randomization of the "
+                "configuration will occur for this number of attempts.  If, after exhausting this "
+                "provision, a stable configuration still cannot be found, the input configuration "
+                "will be accepted as the initial coordinates for subsequent energy "
+                "minimizations.");
+  t_nml.addHelp("self_clash_tolerance", "The minimum ratio of distances between any two particles "
+                "to their mutual van-der Waals radii that will be tolerated.  Ratios beneath this "
+                "value will be considered clashes.");
   t_nml.addHelp("max_system_trials", "The maximum number of trials that will be made for each "
                 "system.  Explicit sampling of chirality, cis-trans isomers, and then rotatable "
                 "bonds will proceed in that priority, but the maximum number of sampled states "
                 "will be cut off at this value.");
   t_nml.addHelp("rmsd_tol", "Positional, mass-weighted root-mean squared deviation between "
                 "conformers required to declare uniqueness.");
-
+  
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
