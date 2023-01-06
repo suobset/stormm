@@ -1084,12 +1084,13 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, const EvaluateForce eval_elec_force,
                                      const EvaluateForce eval_vdw_force,
-                                     const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                     const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                     const Tcalc clash_distance, const Tcalc clash_ratio) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
-  const Tcalc value_one = 1.0;
-  const int ilj_t = lj_param_idx[i_atom];
-  const int jlj_t = lj_param_idx[l_atom] + ljtab_offset;
+  const Tcalc value_zero  = 0.0;
+  const Tcalc value_nil   = 1.0e-6;
+  const Tcalc value_one   = 1.0;
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
     dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
@@ -1102,14 +1103,79 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
     dz = zcrd[l_atom] - zcrd[i_atom];
   }
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const Tcalc invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+  const int ilj_t = lj_param_idx[i_atom];
+  const int jlj_t = lj_param_idx[l_atom] + ljtab_offset;
+  const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
+  const Tcalc lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  const Tcalc ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  Tcalc invr2;
+  if (clash_distance > value_nil || clash_ratio > value_nil) {
+    const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
+    Tcalc r, ij_sigma;
+    if (tcalc_is_double) {
+      r = sqrt(r2);
+      ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+    }
+    else {
+      r = sqrtf(r2);
+      ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+    }
+    const Tcalc sigma_limit = clash_ratio * ij_sigma;
+    if (r < sigma_limit) {
+
+      // Protect against the case where two particles are absolutely coincident.  The
+      // inter-particle distance will go to a floor value but the displacements must be adjusted
+      // to have nonzero values.  Give them bigger values than the adjusted distance would imply,
+      // to ensure that the resulting force will be significant (but still no overflow the
+      // accumulators).  In other cases, the arbitrary adjustment of the distance will lead to a
+      // consistent magnitude of the force for clashing particles at any distance, and because dx,
+      // dy, and dz will remain very small this in turn will mean that the closer two particles are
+      // to one another, the less they will influence one another.  In the case of particles with
+      // nonzero van-der Waals properties, this means that the necessary van-der Waals repulsion
+      // for a cluster of clashing atoms will be weakest for the most severe clashes.  Reverse that
+      // trend by multiplying dx, dy, and dz by the inverse square of the inter-particle distance
+      // to sigma ratio.
+      if (r < value_nil) {
+        dx = dy = dz = (tcalc_is_double) ? cbrt(sigma_limit) : cbrtf(sigma_limit);
+      }
+      else {
+        const Tcalc disp_boost = sigma_limit / r;
+        dx *= disp_boost;
+        dy *= disp_boost;
+        dz *= disp_boost;
+      }
+      invr2 = value_one / (sigma_limit * sigma_limit);
+    }
+    else if (r < clash_distance) {
+
+      // When there is are no van-der Waals parameters on the particles, this criterion will catch
+      // exposed charged particles coming too close together.  Again, protect against coincident
+      // particles to ensure that the resulting forces are nonzero, but otherwise the decrease in
+      // inter-particle forces with decreasing distance is likely to be beneficial, reducing the
+      // attraction of oppositely charged particles that may have resulted in the close contact to
+      // begin with.
+      if (r < value_nil) {
+        dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) : cbrtf(clash_distance);
+      }
+      else {
+        const Tcalc disp_boost = clash_distance / r;
+        dx *= disp_boost;
+        dy *= disp_boost;
+        dz *= disp_boost;
+      }
+      invr2 = value_one / (clash_distance * clash_distance);
+    }
+    else {
+      invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+    }
+  }
+  else {
+    invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+  }
   const Tcalc invr = (tcalc_is_double) ? sqrt(invr2) : sqrtf(invr2);
   const Tcalc invr4 = invr2 * invr2;
   const Tcalc ele_scale = attn14_elec_factors[attn_idx];
-  const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
   const Tcalc qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
-  const Tcalc lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
-  const Tcalc ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
   const Tcalc ele_contrib = qiqj * invr;
   const Tcalc vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
 
@@ -1162,12 +1228,14 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, const EvaluateForce eval_elec_force,
                                      const EvaluateForce eval_vdw_force,
-                                     const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                     const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                     const Tcalc clash_distance, const Tcalc clash_ratio) {
   return evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, coulomb_constant, charges,
                                   lj_param_idx, attn14_elec_factors, attn14_vdw_factors,
                                   lja_14_coeff, ljb_14_coeff, 0, n_lj_types, xcrd, ycrd, zcrd,
                                   umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                  eval_vdw_force, inv_gpos_factor, force_factor);
+                                  eval_vdw_force, inv_gpos_factor, force_factor,
+                                  clash_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1179,7 +1247,8 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                   Tforce* zfrc, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
                                   const EvaluateForce eval_vdw_force, const int system_index,
-                                  const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                  const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                  const Tcalc clash_distance, const Tcalc clash_ratio) {
   double vdw_energy = 0.0;
   llint vdw_acc = 0LL;
   double ele_energy = 0.0;
@@ -1210,7 +1279,7 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                                       nbk.n_lj_types, xcrd, ycrd, zcrd, umat, invu,
                                                       unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
                                                       eval_vdw_force, inv_gpos_factor,
-                                                      force_factor);
+                                                      force_factor, clash_distance, clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);
@@ -1232,7 +1301,8 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                               nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
                                               xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
                                               zfrc, eval_elec_force, eval_vdw_force,
-                                              inv_gpos_factor, force_factor);
+                                              inv_gpos_factor, force_factor, clash_distance,
+                                              clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);
@@ -1251,7 +1321,8 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
 template <typename Tcoord, typename Tcalc>
 double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                   const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                                  const int system_index, const int force_scale_bits) {
+                                  const int system_index, const int force_scale_bits,
+                                  const Tcalc clash_distance, const Tcalc clash_ratio) {
   const size_t atom_os = static_cast<size_t>(system_index) *
                          roundUp<size_t>(csr.natom, warp_size_zu);
   const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
@@ -1262,16 +1333,19 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                                   &csr.zcrd[atom_os], &csr.umat[xfrm_os],
                                                   &csr.invu[xfrm_os], csr.unit_cell, nullptr,
                                                   nullptr, nullptr, ecard, EvaluateForce::NO,
-                                                  system_index, csr.inv_gpos_scale, force_scale);
+                                                  system_index, csr.inv_gpos_scale, force_scale,
+                                                  clash_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                   const CoordinateSeriesWriter<Tcoord> csw, ScoreCard *ecard,
-                                  const int system_index, const int force_scale_bits) {
+                                  const int system_index, const int force_scale_bits,
+                                  const Tcalc clash_distance, const Tcalc clash_ratio) {
   return evaluateAttenuated14Terms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard,
-                                                  system_index, force_scale_bits);
+                                                  system_index, force_scale_bits, clash_distance,
+                                                  clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------

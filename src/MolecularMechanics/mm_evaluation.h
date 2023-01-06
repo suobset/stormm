@@ -55,40 +55,53 @@ using namespace generalized_born_defaults;
 ///     to the required parameters
 ///   - Take a PhaseSpace object and the relevant topology, or abstracts thereof
 ///
-/// \param xcrd          Cartesian X positions of all particles
-/// \param ycrd          Cartesian Y positions of all particles
-/// \param zcrd          Cartesian Z positions of all particles
-/// \param umat          Transformation matrix taking coordinates into fractional (unit cell) space
-/// \param invu          Transformation matrix to take fractional coordinates back into real space
-/// \param unit_cell     The type of simulation cell, to guide re-imaging considerations
-/// \param xfrc          Forces acting on all particles in the Cartesian X direction (accumulated
-///                      and returned)
-/// \param yfrc          Forces acting on all particles in the Cartesian Y direction
-/// \param zfrc          Forces acting on all particles in the Cartesian Z direction
-/// \param ps            PhaseSpace object with all coordinates, box information, and forces
-/// \param psw           PhaseSpace object abstract with coordinates, box information, and forces
-/// \param sc            Object to hold the resulting energies (also keeps running sums)
-/// \param vk            Valence parameters abstract from the original topology
-/// \param nbk           Non-bonded parameter abstract from the original topology
-/// \param ag            System topology from which relevant parameter abstracts can be obtained
-/// \param eval_force    Directive to have forces evaluated or not
-/// \param system_index  Index of the system within the score card
+/// \param xcrd             Cartesian X positions of all particles
+/// \param ycrd             Cartesian Y positions of all particles
+/// \param zcrd             Cartesian Z positions of all particles
+/// \param umat             Transformation matrix taking coordinates into fractional (unit cell)
+///                         space
+/// \param invu             Transformation matrix to take fractional coordinates back into real
+///                         space
+/// \param unit_cell        The type of simulation cell, to guide re-imaging considerations
+/// \param xfrc             Forces acting on all particles in the Cartesian X direction
+///                         (accumulated and returned)
+/// \param yfrc             Forces acting on all particles in the Cartesian Y direction
+/// \param zfrc             Forces acting on all particles in the Cartesian Z direction
+/// \param ps               PhaseSpace object with all coordinates, box information, and forces
+/// \param psw              PhaseSpace object abstract with coordinates, box information, and
+///                         forces
+/// \param sc               Object to hold the resulting energies (also keeps running sums)
+/// \param vk               Valence parameters abstract from the original topology
+/// \param nbk              Non-bonded parameter abstract from the original topology
+/// \param ag               System topology from which relevant parameter abstracts can be obtained
+/// \param eval_force       Directive to have forces evaluated or not
+/// \param system_index     Index of the system within the score card
+/// \param inv_gpos_factor  De-scaling factor to apply to fixed-precision coordinates to get them
+///                         back in units of Angstroms
+/// \param force factor     Scaling factor to apply to real-values forces for fixed-precision
+///                         accumulation
+/// \param clash_distance   Minimum absolute separation, in Angstroms, below which two particles
+///                         can be considered to be clashing
+/// \param clash_ratio      Minimum ratio of the separation distance to the particle pair's van-der
+///                         Waals sigma parameter, below which the two particles can be consdiered
+///                         to be clashing
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc>
 void evalValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
                 UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *sc,
                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                 EvaluateForce eval_force, int system_index = 0, Tcalc inv_gpos_factor = 1.0,
-                Tcalc force_factor = 1.0);
+                Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 void evalValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
-                const NonbondedKit<double> &nbk, EvaluateForce eval_force, int system_index = 0);
+                const NonbondedKit<double> &nbk, EvaluateForce eval_force, int system_index = 0,
+                double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag, EvaluateForce eval_force,
-                int system_index = 0);
+                int system_index = 0, double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForce eval_force,
-                int system_index = 0);
+                int system_index = 0, double clash_distance = 0.0, double clash_ratio = 0.0);
 /// \}
 
 /// \brief Evaluate molecular mechanics energies and forces due to valence interactions and
@@ -113,20 +126,22 @@ void evalValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, doub
                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                     ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                     const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
-                    int system_index = 0, int step = 0);
+                    int system_index = 0, int step = 0, Tcalc inv_gpos_factor = 1.0,
+                    Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk,
                     const RestraintKit<double, double2, double4> &rar, EvaluateForce eval_force,
-                    int system_index = 0, int step = 0);
+                    int system_index = 0, int step = 0, double clash_distance = 0.0,
+                    double clash_ratio = 0.0);
 
 void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                     const RestraintApparatus &ra, EvaluateForce eval_force, int system_index = 0,
-                    int step = 0);
+                    int step = 0, double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                     const RestraintApparatus &ra, EvaluateForce eval_force, int system_index = 0,
-                    int step = 0);
+                    int step = 0, double clash_distance = 0.0, double clash_ratio = 0.0);
 /// \}
   
 /// \brief Evaluate the molecular mechanics energies and forces due to valence and non-bonded
@@ -146,17 +161,21 @@ void evalNonbValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, doub
                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                     ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                     const StaticExclusionMaskReader &ser, EvaluateForce eval_force,
-                    int system_index = 0);
+                    int system_index = 0, Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                    Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 void evalNonbValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                    EvaluateForce eval_force, int system_index = 0);
+                    EvaluateForce eval_force, int system_index = 0,
+                    double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
-                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0);
+                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0,
+                    double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
-                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0);
+                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0,
+                    double clash_distance = 0.0, double clash_ratio = 0.0);
 /// \}
   
 /// \brief Evaluate molecular mechanics energies and forces due to valence interactions, NMR
@@ -181,20 +200,25 @@ void evalNonbValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, 
                         ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                         const StaticExclusionMaskReader &ser,
                         const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
-                        int system_index = 0, int step = 0);
+                        int system_index = 0, int step = 0, Tcalc inv_gpos_factor = 1.0,
+                        Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0,
+                        Tcalc clash_ratio = 0.0);
 
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                         const RestraintKit<double, double2, double4> &rar,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         const StaticExclusionMask &se, const RestraintApparatus &ra,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                         const StaticExclusionMask &se, const RestraintApparatus *ra,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
 /// \}
 
 /// \brief Evaluate the complete molecular mechanics energies and forces for a system in isolated
@@ -224,24 +248,29 @@ void evalRestrainedMMGB(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, 
                         const NeckGeneralizedBornKit<Tcalc> &neck_gbk,
                         Tforce* effective_gb_radii, Tforce* psi, Tforce* sumdeijda,
                         const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
-                        int system_index = 0, int step = 0);
+                        int system_index = 0, int step = 0, Tcalc inv_gpos_factor = 1.0,
+                        Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0,
+                        Tcalc clash_ratio = 0.0);
 
 void evalRestrainedMMGB(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                         const ImplicitSolventKit<double> &isk,
                         const NeckGeneralizedBornKit<double> &neck_gbk,
                         const RestraintKit<double, double2, double4> &rar,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         const NeckGeneralizedBornTable &neck_gbtab,
                         const StaticExclusionMask &se, const RestraintApparatus &ra,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
                         
 void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                         const NeckGeneralizedBornTable &neck_gbtab,
                         const StaticExclusionMask &se, const RestraintApparatus *ra,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0,
+                        double clash_distance = 0.0, double clash_ratio = 0.0);
 /// \}
   
 } // namespace mm

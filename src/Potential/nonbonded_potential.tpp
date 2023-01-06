@@ -13,12 +13,17 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                                 Tforce* zfrc, ScoreCard *ecard,
                                 const EvaluateForce eval_elec_force,
                                 const EvaluateForce eval_vdw_force, const int system_index,
-                                const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                const Tcalc clash_distance, const Tcalc clash_ratio) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
   const bool tforce_is_sgnint = isSignedIntegralScalarType<Tforce>();
-  const Tcalc value_one = 1.0;
+  const Tcalc value_zero  = 0.0;
+  const Tcalc value_nil   = 1.0e-6;
+  const Tcalc value_one   = 1.0;
+  const Tcalc value_three = 3.0;
+  const Tcalc value_four  = 4.0;
   
   // Initialize the energy result as two separate accumulators for each of a pair of quantities
   double ele_energy = 0.0;
@@ -26,7 +31,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
   llint ele_acc = 0LL;
   llint vdw_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
-
+  const bool clash_check = (clash_distance > value_nil || clash_ratio > value_nil);
+  
   // Allocate arrays for tile coordinates and accumulated forces, akin to GPU protocols.
   std::vector<Tcalc> cachi_xcrd(tile_length), cachi_ycrd(tile_length), cachi_zcrd(tile_length);
   std::vector<Tcalc> cachj_xcrd(tile_length), cachj_ycrd(tile_length), cachj_zcrd(tile_length);
@@ -99,139 +105,344 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
           // Branch for different types of tiles
           if (stij_map_index == 0) {
 
-            // Exclusion-free loops
-            for (int i = 0; i < ni_atoms; i++) {
-              const Tcalc qi = cachi_q[i];
-              const int ljt_i = cachi_ljidx[i];
-              const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
-              const Tcalc atomi_x = cachi_xcrd[i];
-              const Tcalc atomi_y = cachi_ycrd[i];
-              const Tcalc atomi_z = cachi_zcrd[i];
-              Tcalc ele_contrib = 0.0;
-              Tcalc vdw_contrib = 0.0;
-              for (int j = 0; j < jlim; j++) {
-                const Tcalc dx = cachj_xcrd[j] - atomi_x;
-                const Tcalc dy = cachj_ycrd[j] - atomi_y;
-                const Tcalc dz = cachj_zcrd[j] - atomi_z;
-                Tcalc invr2, invr;
-                if (tcalc_is_double) {
-                  invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
-                  invr = sqrt(invr2);
-                }
-                else {
-                  invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
-                  invr = sqrtf(invr2);
-                }
-                const Tcalc invr4 = invr2 * invr2;
-                const Tcalc qiqj = qi * cachj_q[j];
-                ele_contrib += qiqj * invr;
-                const int ljt_j = cachj_ljidx[j];
-                const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+            // Branch for clash detection and mitigation
+            if (clash_check) {
 
-                // Evaluate the force, if requested
-                if (eval_elec_force == EvaluateForce::YES ||
-                    eval_vdw_force == EvaluateForce::YES) {
-                  Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
-                                                                         0.0;
-                  if (eval_vdw_force == EvaluateForce::YES) {
-                    if (tcalc_is_double) {
-                      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+              // Exclusion-free loops with clash checking
+              for (int i = 0; i < ni_atoms; i++) {
+                const Tcalc qi = cachi_q[i];
+                const int ljt_i = cachi_ljidx[i];
+                const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+                const Tcalc atomi_x = cachi_xcrd[i];
+                const Tcalc atomi_y = cachi_ycrd[i];
+                const Tcalc atomi_z = cachi_zcrd[i];
+                Tcalc ele_contrib = 0.0;
+                Tcalc vdw_contrib = 0.0;
+                for (int j = 0; j < jlim; j++) {
+                  Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const int ljt_j = cachj_ljidx[j];
+                  const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  Tcalc r, ij_sigma;
+                  if (tcalc_is_double) {
+                    r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                    ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+                  }
+                  else {
+                    r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+                    ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+                  }
+                  Tcalc invr;
+                  if (r < clash_ratio * ij_sigma) {
+                    if (r < value_nil) {
+                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_ratio * ij_sigma) :
+                                                         cbrtf(clash_ratio * ij_sigma);
                     }
                     else {
-                      fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      const Tcalc disp_boost = clash_ratio * ij_sigma / r;
+                      dx *= disp_boost;
+                      dy *= disp_boost;
+                      dz *= disp_boost;
                     }
+                    invr = value_one / (clash_ratio * ij_sigma);
                   }
-                  const Tcalc fmag_dx = fmag * dx;
-                  const Tcalc fmag_dy = fmag * dy;
-                  const Tcalc fmag_dz = fmag * dz;
-                  cachi_xfrc[i] += fmag_dx;
-                  cachi_yfrc[i] += fmag_dy;
-                  cachi_zfrc[i] += fmag_dz;
-                  cachj_xfrc[j] -= fmag_dx;
-                  cachj_yfrc[j] -= fmag_dy;
-                  cachj_zfrc[j] -= fmag_dz;
-                }
-              }
+                  else if (r < clash_distance) {
+                    if (r < value_nil) {
+                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) :
+                                                         cbrtf(clash_distance);
+                    }
+                    else {
+                      const Tcalc disp_boost = clash_distance / r;
+                      dx *= disp_boost;
+                      dy *= disp_boost;
+                      dz *= disp_boost;                      
+                    }
+                    invr = value_one / clash_distance;
+                  }
+                  else {
+                    invr = value_one / r;
+                  }
+                  const Tcalc invr2 = invr * invr;
+                  const Tcalc invr4 = invr2 * invr2;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  ele_contrib += qiqj * invr;
+                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
-              // Contribute what would be thread-accumulated energies to the totals
-              ele_energy += ele_contrib;
-              ele_acc += llround(ele_contrib * nrg_scale_factor);
-              vdw_energy += vdw_contrib;
-              vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+                  // Evaluate the force, if requested
+                  if (eval_elec_force == EvaluateForce::YES ||
+                      eval_vdw_force == EvaluateForce::YES) {
+                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                           value_zero;
+                    if (eval_vdw_force == EvaluateForce::YES) {
+                      if (tcalc_is_double) {
+                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                      else {
+                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                    }
+                    const Tcalc fmag_dx = fmag * dx;
+                    const Tcalc fmag_dy = fmag * dy;
+                    const Tcalc fmag_dz = fmag * dz;
+                    cachi_xfrc[i] += fmag_dx;
+                    cachi_yfrc[i] += fmag_dy;
+                    cachi_zfrc[i] += fmag_dz;
+                    cachj_xfrc[j] -= fmag_dx;
+                    cachj_yfrc[j] -= fmag_dy;
+                    cachj_zfrc[j] -= fmag_dz;
+                  }
+                }
+            
+                // Contribute what would be thread-accumulated energies to the totals
+                ele_energy += ele_contrib;
+                ele_acc += llround(ele_contrib * nrg_scale_factor);
+                vdw_energy += vdw_contrib;
+                vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+              }
+            }
+            else {
+
+              // Exclusion-free loops without clash checking
+              for (int i = 0; i < ni_atoms; i++) {
+                const Tcalc qi = cachi_q[i];
+                const int ljt_i = cachi_ljidx[i];
+                const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+                const Tcalc atomi_x = cachi_xcrd[i];
+                const Tcalc atomi_y = cachi_ycrd[i];
+                const Tcalc atomi_z = cachi_zcrd[i];
+                Tcalc ele_contrib = 0.0;
+                Tcalc vdw_contrib = 0.0;
+                for (int j = 0; j < jlim; j++) {
+                  const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  Tcalc invr2, invr;
+                  if (tcalc_is_double) {
+                    invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+                    invr = sqrt(invr2);
+                  }
+                  else {
+                    invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+                    invr = sqrtf(invr2);
+                  }
+                  const Tcalc invr4 = invr2 * invr2;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  ele_contrib += qiqj * invr;
+                  const int ljt_j = cachj_ljidx[j];
+                  const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+
+                  // Evaluate the force, if requested
+                  if (eval_elec_force == EvaluateForce::YES ||
+                      eval_vdw_force == EvaluateForce::YES) {
+                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                           value_zero;
+                    if (eval_vdw_force == EvaluateForce::YES) {
+                      if (tcalc_is_double) {
+                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                      else {
+                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                    }
+                    const Tcalc fmag_dx = fmag * dx;
+                    const Tcalc fmag_dy = fmag * dy;
+                    const Tcalc fmag_dz = fmag * dz;
+                    cachi_xfrc[i] += fmag_dx;
+                    cachi_yfrc[i] += fmag_dy;
+                    cachi_zfrc[i] += fmag_dz;
+                    cachj_xfrc[j] -= fmag_dx;
+                    cachj_yfrc[j] -= fmag_dy;
+                    cachj_zfrc[j] -= fmag_dz;
+                  }
+                }
+            
+                // Contribute what would be thread-accumulated energies to the totals
+                ele_energy += ele_contrib;
+                ele_acc += llround(ele_contrib * nrg_scale_factor);
+                vdw_energy += vdw_contrib;
+                vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+              }
             }
           }
           else {
 
-            // Get the tile's mask and check exclusions with each interaction
+            // Get the tile's mask to check exclusions with each interaction
             const int tij_map_index = ser.tile_map_idx[stij_map_index +
                                                        (tj * tile_lengths_per_supertile) + ti];
-            for (int i = 0; i < ni_atoms; i++) {
-              const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
-              const uint mask_i = ser.mask_data[tij_map_index + i];
-              const Tcalc atomi_x = cachi_xcrd[i];
-              const Tcalc atomi_y = cachi_ycrd[i];
-              const Tcalc atomi_z = cachi_zcrd[i];
-              const Tcalc qi = cachi_q[i];
-              const int ljt_i = cachi_ljidx[i];
-              const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
-              Tcalc ele_contrib = 0.0;
-              Tcalc vdw_contrib = 0.0;
-              for (int j = 0; j < jlim; j++) {
-                if ((mask_i >> j) & 0x1) {
-                  continue;
-                }
-                const Tcalc dx = cachj_xcrd[j] - atomi_x;
-                const Tcalc dy = cachj_ycrd[j] - atomi_y;
-                const Tcalc dz = cachj_zcrd[j] - atomi_z;
-                Tcalc invr2, invr;
-                if (tcalc_is_double) {
-                  invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
-                  invr = sqrt(invr2);
-                }
-                else {
-                  invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
-                  invr = sqrtf(invr2);
-                }
-                const Tcalc invr4 = invr2 * invr2;
-                const Tcalc qiqj = qi * cachj_q[j];
-                ele_contrib += qiqj * invr;
-                const int ljt_j = cachj_ljidx[j];
-                const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+            if (clash_check) {
 
-                // Evaluate the force, if requested
-                if (eval_elec_force == EvaluateForce::YES ||
-                    eval_vdw_force == EvaluateForce::YES) {
-                  Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
-                                                                          0.0;
-                  if (eval_vdw_force == EvaluateForce::YES) {
-                    if (tcalc_is_double) {
-                      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+              // Perform clash checking in addition to exclusion checking
+              for (int i = 0; i < ni_atoms; i++) {
+                const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+                const uint mask_i = ser.mask_data[tij_map_index + i];
+                const Tcalc atomi_x = cachi_xcrd[i];
+                const Tcalc atomi_y = cachi_ycrd[i];
+                const Tcalc atomi_z = cachi_zcrd[i];
+                const Tcalc qi = cachi_q[i];
+                const int ljt_i = cachi_ljidx[i];
+                const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+                Tcalc ele_contrib = 0.0;
+                Tcalc vdw_contrib = 0.0;
+                for (int j = 0; j < jlim; j++) {
+                  if ((mask_i >> j) & 0x1) {
+                    continue;
+                  }
+                  Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const int ljt_j = cachj_ljidx[j];
+                  const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  Tcalc r, ij_sigma;
+                  if (tcalc_is_double) {
+                    r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                    ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+                  }
+                  else {
+                    r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+                    ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+                  }
+                  Tcalc invr;
+                  if (r < clash_ratio * ij_sigma) {
+                    if (r < value_nil) {
+                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_ratio * ij_sigma) :
+                                                         cbrtf(clash_ratio * ij_sigma);
                     }
                     else {
-                      fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      const Tcalc disp_boost = clash_ratio * ij_sigma / r;
+                      dx *= disp_boost;
+                      dy *= disp_boost;
+                      dz *= disp_boost;
                     }
+                    invr = value_one / (clash_ratio * ij_sigma);
                   }
-                  const Tcalc fmag_dx = fmag * dx;
-                  const Tcalc fmag_dy = fmag * dy;
-                  const Tcalc fmag_dz = fmag * dz;
-                  cachi_xfrc[i] += fmag_dx;
-                  cachi_yfrc[i] += fmag_dy;
-                  cachi_zfrc[i] += fmag_dz;
-                  cachj_xfrc[j] -= fmag_dx;
-                  cachj_yfrc[j] -= fmag_dy;
-                  cachj_zfrc[j] -= fmag_dz;
-                }                
-              }
+                  else if (r < clash_distance) {
+                    if (r < value_nil) {
+                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) :
+                                                         cbrtf(clash_distance);
+                    }
+                    else {
+                      const Tcalc disp_boost = clash_distance / r;
+                      dx *= disp_boost;
+                      dy *= disp_boost;
+                      dz *= disp_boost;                      
+                    }
+                    invr = value_one / clash_distance;
+                  }
+                  else {
+                    invr = value_one / r;
+                  }
+                  const Tcalc invr2 = invr * invr;
+                  const Tcalc invr4 = invr2 * invr2;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  ele_contrib += qiqj * invr;
+                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
-              // Contribute what would be thread-accumulated energies to the totals
-              ele_energy += ele_contrib;
-              ele_acc += llround(ele_contrib * nrg_scale_factor);
-              vdw_energy += vdw_contrib;
-              vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+                  // Evaluate the force, if requested
+                  if (eval_elec_force == EvaluateForce::YES ||
+                      eval_vdw_force == EvaluateForce::YES) {
+                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                           value_zero;
+                    if (eval_vdw_force == EvaluateForce::YES) {
+                      if (tcalc_is_double) {
+                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                      else {
+                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                    }
+                    const Tcalc fmag_dx = fmag * dx;
+                    const Tcalc fmag_dy = fmag * dy;
+                    const Tcalc fmag_dz = fmag * dz;
+                    cachi_xfrc[i] += fmag_dx;
+                    cachi_yfrc[i] += fmag_dy;
+                    cachi_zfrc[i] += fmag_dz;
+                    cachj_xfrc[j] -= fmag_dx;
+                    cachj_yfrc[j] -= fmag_dy;
+                    cachj_zfrc[j] -= fmag_dz;
+                  }                
+                }
+
+                // Contribute what would be thread-accumulated energies to the totals
+                ele_energy += ele_contrib;
+                ele_acc += llround(ele_contrib * nrg_scale_factor);
+                vdw_energy += vdw_contrib;
+                vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+              }
+            }
+            else {
+
+              // Proceed without clash checking
+              for (int i = 0; i < ni_atoms; i++) {
+                const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+                const uint mask_i = ser.mask_data[tij_map_index + i];
+                const Tcalc atomi_x = cachi_xcrd[i];
+                const Tcalc atomi_y = cachi_ycrd[i];
+                const Tcalc atomi_z = cachi_zcrd[i];
+                const Tcalc qi = cachi_q[i];
+                const int ljt_i = cachi_ljidx[i];
+                const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+                Tcalc ele_contrib = 0.0;
+                Tcalc vdw_contrib = 0.0;
+                for (int j = 0; j < jlim; j++) {
+                  if ((mask_i >> j) & 0x1) {
+                    continue;
+                  }
+                  const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  Tcalc invr2, invr;
+                  if (tcalc_is_double) {
+                    invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+                    invr = sqrt(invr2);
+                  }
+                  else {
+                    invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+                    invr = sqrtf(invr2);
+                  }
+                  const Tcalc invr4 = invr2 * invr2;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  ele_contrib += qiqj * invr;
+                  const int ljt_j = cachj_ljidx[j];
+                  const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+
+                  // Evaluate the force, if requested
+                  if (eval_elec_force == EvaluateForce::YES ||
+                      eval_vdw_force == EvaluateForce::YES) {
+                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                           value_zero;
+                    if (eval_vdw_force == EvaluateForce::YES) {
+                      if (tcalc_is_double) {
+                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                      else {
+                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                      }
+                    }
+                    const Tcalc fmag_dx = fmag * dx;
+                    const Tcalc fmag_dy = fmag * dy;
+                    const Tcalc fmag_dz = fmag * dz;
+                    cachi_xfrc[i] += fmag_dx;
+                    cachi_yfrc[i] += fmag_dy;
+                    cachi_zfrc[i] += fmag_dz;
+                    cachj_xfrc[j] -= fmag_dx;
+                    cachj_yfrc[j] -= fmag_dy;
+                    cachj_zfrc[j] -= fmag_dz;
+                  }                
+                }
+
+                // Contribute what would be thread-accumulated energies to the totals
+                ele_energy += ele_contrib;
+                ele_acc += llround(ele_contrib * nrg_scale_factor);
+                vdw_energy += vdw_contrib;
+                vdw_acc += llround(vdw_contrib * nrg_scale_factor);
+              }
             }
           }
 
@@ -282,7 +493,8 @@ template <typename Tcoord, typename Tcalc>
 double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> &nbk,
                                 const StaticExclusionMaskReader &ser,
                                 const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                                const int system_index) {
+                                const int system_index, const Tcalc clash_distance,
+                                const Tcalc clash_ratio) {
   const size_t atom_os = static_cast<size_t>(system_index) *
                          roundUp<size_t>(csr.natom, warp_size_zu);
   const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
@@ -292,7 +504,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> &nbk,
                                                         csr.unit_cell, nullptr, nullptr, nullptr,
                                                         ecard, EvaluateForce::NO,
                                                         EvaluateForce::NO, system_index,
-                                                        csr.inv_gpos_scale);
+                                                        csr.inv_gpos_scale, clash_distance,
+                                                        clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------

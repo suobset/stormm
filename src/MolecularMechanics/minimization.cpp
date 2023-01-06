@@ -32,7 +32,7 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const NeckGeneralizedBor
                   double, double2, double4>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc,
                                             psw.zfrc, psw.xvel, psw.yvel, psw.zvel, psw.xprv,
                                             psw.yprv, psw.zprv, vk, nbk, isk, ngbk, ra.dpData(),
-                                            vsk, se.data(), mincon, nrg_scale_bits);
+                                            vsk, se.data(), mincon, nrg_scale_bits, 1.0, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const NeckGeneralizedBor
                   double, double2, double4>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc,
                                             psw.zfrc, psw.xvel, psw.yvel, psw.zvel, psw.xprv,
                                             psw.yprv, psw.zprv, vk, nbk, isk, ngbk, ra.dpData(),
-                                            vsk, se.data(), mincon, nrg_scale_bits);
+                                            vsk, se.data(), mincon, nrg_scale_bits, 1.0, 1.0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
                   double, double2, double4>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc,
                                             psw.zfrc, psw.xvel, psw.yvel, psw.zvel, psw.xprv,
                                             psw.yprv, psw.zprv, vk, nbk, isk, ngbk, rar, vsk, ser,
-                                            mincon, nrg_scale_bits);
+                                            mincon, nrg_scale_bits, 1.0, 1.0);
 }
   
 } // namespace mm

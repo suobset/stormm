@@ -628,7 +628,8 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
                                      UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, EvaluateForce eval_elec_force,
                                      EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
-                                     Tcalc force_factor = 1.0);
+                                     Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
+                                     Tcalc clash_ratio = 0.0);
 
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
@@ -640,7 +641,8 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
                                      const double* invu, UnitCellType unit_cell, Tforce* xfrc,
                                      Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
                                      EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
-                                     Tcalc force_factor = 1.0);
+                                     Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
+                                     Tcalc clash_ratio = 0.0);
 /// \}
   
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
@@ -686,47 +688,57 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                   EvaluateForce eval_elec_force = EvaluateForce::NO,
                                   EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                   int system_index = 0, Tcalc inv_gpos_factor = 1.0,
-                                  Tcalc force_factor = 1.0);
+                                  Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
+                                  Tcalc clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
                                   EvaluateForce eval_elec_force = EvaluateForce::NO,
                                   EvaluateForce eval_vdw_force = EvaluateForce::NO,
-                                  int system_index = 0);
+                                  int system_index = 0, double clash_minimum_distance = 0.0,
+                                  double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                                   EvaluateForce eval_elec_force = EvaluateForce::NO,
                                   EvaluateForce eval_vdw_force = EvaluateForce::NO,
-                                  int system_index = 0);
+                                  int system_index = 0, double clash_minimum_distance = 0.0,
+                                  double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
                                   EvaluateForce eval_elec_force = EvaluateForce::NO,
                                   EvaluateForce eval_vdw_force = EvaluateForce::NO,
-                                  int system_index = 0);
+                                  int system_index = 0, double clash_minimum_distance = 0.0,
+                                  double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameReader cfr, ScoreCard *ecard,
-                                  int system_index = 0);
+                                  int system_index = 0, double clash_minimum_distance = 0.0,
+                                  double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameWriter &cfw, ScoreCard *ecard,
-                                  int system_index = 0);
+                                  int system_index = 0, double clash_minimum_distance = 0.0,
+                                  double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrame &cf,
-                                  ScoreCard *ecard, int system_index = 0);
+                                  ScoreCard *ecard, int system_index = 0,
+                                  double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrame &cf,
-                                  ScoreCard *ecard, int system_index = 0);
+                                  ScoreCard *ecard, int system_index = 0,
+                                  double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 
 template <typename Tcoord, typename Tcalc>
 double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                   const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                                  int system_index = 0, int force_scale_bits = 23);
+                                  int system_index = 0, int force_scale_bits = 23,
+                                  Tcalc clash_minimum_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 template <typename Tcoord, typename Tcalc>
 double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                   const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
-                                  int system_index = 0, int force_scale_bits = 23);
+                                  int system_index = 0, int force_scale_bits = 23,
+                                  Tcalc clash_minimum_distance = 0.0, Tcalc clash_ratio = 0.0);
 /// \}
 
 /// \brief Evaluate a positional restraint.  Return the energy penalty.

@@ -198,8 +198,12 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
   }
   
   // Loop for the requested number of cycles
+  const int cd_steps = mincon.getClashDampingCycles();
+  const Tcalc clash_distance = mincon.getAbsoluteClashDistance();
+  const Tcalc clash_ratio = mincon.getVdwClashRatio();
   ScoreCard sc(1, mincon.getTotalCycles() + 1, nrg_scale_bits), sc_temp(1);
-  Tcalc move_scale = mincon.getInitialStep();
+  const Tcalc inv_gpos_factor = static_cast<Tcalc>(1.0) / gpos_factor;
+  Tcalc move_scale = mincon.getInitialStep() * gpos_factor;
   Tcalc evec[4], mvec[4], abcd_coefs[4], d_abcd[3], amat[16], inva[16];
   for (int i = 0; i < vk.natom; i++) {
     xprv_move[i] = 0.0;
@@ -217,25 +221,58 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       yfrc[i] = 0.0;
       zfrc[i] = 0.0;
     }
-    switch (isk.igb) {
-    case ImplicitSolventModel::NONE:
-      evalNonbValeRestMM<Tcoord, Tforce,
-                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                                                ser, rar, EvaluateForce::YES, 0, step);
-      break;
-    case ImplicitSolventModel::HCT_GB:
-    case ImplicitSolventModel::OBC_GB:
-    case ImplicitSolventModel::OBC_GB_II:
-    case ImplicitSolventModel::NECK_GB:
-    case ImplicitSolventModel::NECK_GB_II:
-      evalRestrainedMMGB<Tcoord, Tforce,
-                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                                                ser, isk, ngbk, effective_gb_radii.data(),
-                                                psi.data(), sumdeijda.data(), rar,
-                                                EvaluateForce::YES, 0, step);
-      break;
+    if (step < cd_steps) {
+      const Tcalc cd_progress = static_cast<Tcalc>(cd_steps - step) / static_cast<Tcalc>(cd_steps);
+      const Tcalc tmp_clash_distance = clash_distance * cd_progress;
+      const Tcalc tmp_clash_ratio    = clash_ratio * cd_progress;
+      switch (isk.igb) {
+      case ImplicitSolventModel::NONE:
+        evalNonbValeRestMM<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk,
+                                                  nbk, ser, rar, EvaluateForce::YES, 0, step,
+                                                  inv_gpos_factor, force_factor,
+                                                  tmp_clash_distance, tmp_clash_ratio);
+        break;
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        evalRestrainedMMGB<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk,
+                                                  nbk, ser, isk, ngbk, effective_gb_radii.data(),
+                                                  psi.data(), sumdeijda.data(), rar,
+                                                  EvaluateForce::YES, 0, step, inv_gpos_factor,
+                                                  force_factor, tmp_clash_distance,
+                                                  tmp_clash_ratio);
+        break;
+      }
+    }
+    else {
+      switch (isk.igb) {
+      case ImplicitSolventModel::NONE:
+        evalNonbValeRestMM<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk,
+                                                  nbk, ser, rar, EvaluateForce::YES, 0, step,
+                                                  inv_gpos_factor, force_factor);
+        break;
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        evalRestrainedMMGB<Tcoord, Tforce,
+                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk,
+                                                  nbk, ser, isk, ngbk, effective_gb_radii.data(),
+                                                  psi.data(), sumdeijda.data(), rar,
+                                                  EvaluateForce::YES, 0, step, inv_gpos_factor,
+                                                  force_factor);
+        break;
+      }
     }
     transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                             UnitCellType::NONE, vsk);
@@ -255,26 +292,59 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       moveParticles<Tcoord, Tforce, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                            UnitCellType::NONE, vsk, vk.natom, move_scale,
                                            force_factor);
-      switch (isk.igb) {
-      case ImplicitSolventModel::NONE:
-        evalNonbValeRestMM<Tcoord, Tforce,
-                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
-                                                  vk, nbk, ser, rar, EvaluateForce::NO, 0, step);
-        break;
-      case ImplicitSolventModel::HCT_GB:
-      case ImplicitSolventModel::OBC_GB:
-      case ImplicitSolventModel::OBC_GB_II:
-      case ImplicitSolventModel::NECK_GB:
-      case ImplicitSolventModel::NECK_GB_II:
-        evalRestrainedMMGB<Tcoord, Tforce,
-                           Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                                  UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
-                                                  vk, nbk, ser, isk, ngbk,
-                                                  effective_gb_radii.data(), psi.data(),
-                                                  sumdeijda.data(), rar, EvaluateForce::NO, 0,
-                                                  step);
-        break;
+      if (step < cd_steps) {
+        const Tcalc cd_progress = static_cast<Tcalc>(cd_steps - step) /
+                                  static_cast<Tcalc>(cd_steps);
+        const Tcalc tmp_clash_distance = clash_distance * cd_progress;
+        const Tcalc tmp_clash_ratio    = clash_ratio * cd_progress;
+        switch (isk.igb) {
+        case ImplicitSolventModel::NONE:
+          evalNonbValeRestMM<Tcoord, Tforce,
+                             Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                    UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                    vk, nbk, ser, rar, EvaluateForce::NO, 0, step,
+                                                    inv_gpos_factor, force_factor,
+                                                    tmp_clash_distance, tmp_clash_ratio);
+          break;
+        case ImplicitSolventModel::HCT_GB:
+        case ImplicitSolventModel::OBC_GB:
+        case ImplicitSolventModel::OBC_GB_II:
+        case ImplicitSolventModel::NECK_GB:
+        case ImplicitSolventModel::NECK_GB_II:
+          evalRestrainedMMGB<Tcoord, Tforce,
+                             Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                    UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                    vk, nbk, ser, isk, ngbk,
+                                                    effective_gb_radii.data(), psi.data(),
+                                                    sumdeijda.data(), rar, EvaluateForce::NO, 0,
+                                                    step, inv_gpos_factor, force_factor,
+                                                    tmp_clash_distance, tmp_clash_ratio);
+          break;
+        }
+      }
+      else {
+        switch (isk.igb) {
+        case ImplicitSolventModel::NONE:
+          evalNonbValeRestMM<Tcoord, Tforce,
+                             Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                    UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                    vk, nbk, ser, rar, EvaluateForce::NO, 0, step,
+                                                    inv_gpos_factor, force_factor);
+          break;
+        case ImplicitSolventModel::HCT_GB:
+        case ImplicitSolventModel::OBC_GB:
+        case ImplicitSolventModel::OBC_GB_II:
+        case ImplicitSolventModel::NECK_GB:
+        case ImplicitSolventModel::NECK_GB_II:
+          evalRestrainedMMGB<Tcoord, Tforce,
+                             Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                    UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp,
+                                                    vk, nbk, ser, isk, ngbk,
+                                                    effective_gb_radii.data(), psi.data(),
+                                                    sumdeijda.data(), rar, EvaluateForce::NO, 0,
+                                                    step, inv_gpos_factor, force_factor);
+          break;
+        }
       }
       evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
@@ -360,6 +430,9 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
       }
     }
   }
+
+  // Perform one final energy and force evaluation, without clash checking (use the unmodified
+  // potential function)
   switch (isk.igb) {
   case ImplicitSolventModel::NONE:
     evalNonbValeRestMM<Tcoord, Tforce,

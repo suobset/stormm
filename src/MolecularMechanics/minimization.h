@@ -112,29 +112,32 @@ void moveParticles(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tforce* xmove
 ///     topology and restraint apparatus, or abstracts thereof
 ///   - Call with or without a restraint apparatus
 ///
-/// \param xcrd            Cartesian X coordinates of all particles
-/// \param ycrd            Cartesian Y coordinates of all particles
-/// \param zcrd            Cartesian Z coordinates of all particles
-/// \param xfrc            Forces acting on all atoms in the Cartesian X direction (pre-allocated
-///                        for speed, probably fed in from a PhaseSapce object or equivalent)
-/// \param yfrc            Forces acting on all atoms in the Cartesian Y direction
-/// \param zfrc            Forces acting on all atoms in the Cartesian Z direction
-/// \param xmove           Cartesian X moves to apply to each particle (pre-allocated for speed
-///                        and to replicate the layout of memory available on the GPU)
-/// \param ymove           Cartesian Y moves to apply to each particle
-/// \param zmove           Cartesian Z moves to apply to each particle
-/// \param x_cg_temp       Temporary array reserved for conjugate gradient computations
-///                        (pre-allocated for speed and to replicate the layout of memory
-///                        available on the GPU)
-/// \param y_cg_temp       Temporary array reserved for conjugate gradient computations
-/// \param z_cg_temp       Temporary array reserved for conjugate gradient computations
-/// \param vk              Valence parameters abstract from the original topology
-/// \param nbk             Non-bonded parameters abstract from the original topology
-/// \param rar             Restraints applicable to the system (supplement to the topology)
-/// \param vsk             Virtual site abstract from the original topology
-/// \param se              Static exclusion mask for systems with isolated boundary conditions
-/// \param mincon          User input from a &minimize namelist
-/// \param nrg_scale_bits  Number of bits after the decimal with which to accumulate energy terms
+/// \param xcrd             Cartesian X coordinates of all particles
+/// \param ycrd             Cartesian Y coordinates of all particles
+/// \param zcrd             Cartesian Z coordinates of all particles
+/// \param xfrc             Forces acting on all atoms in the Cartesian X direction (pre-allocated
+///                         for speed, probably fed in from a PhaseSapce object or equivalent)
+/// \param yfrc             Forces acting on all atoms in the Cartesian Y direction
+/// \param zfrc             Forces acting on all atoms in the Cartesian Z direction
+/// \param xmove            Cartesian X moves to apply to each particle (pre-allocated for speed
+///                         and to replicate the layout of memory available on the GPU)
+/// \param ymove            Cartesian Y moves to apply to each particle
+/// \param zmove            Cartesian Z moves to apply to each particle
+/// \param x_cg_temp        Temporary array reserved for conjugate gradient computations
+///                         (pre-allocated for speed and to replicate the layout of memory
+///                         available on the GPU)
+/// \param y_cg_temp        Temporary array reserved for conjugate gradient computations
+/// \param z_cg_temp        Temporary array reserved for conjugate gradient computations
+/// \param vk               Valence parameters abstract from the original topology
+/// \param nbk              Non-bonded parameters abstract from the original topology
+/// \param rar              Restraints applicable to the system (supplement to the topology)
+/// \param vsk              Virtual site abstract from the original topology
+/// \param se               Static exclusion mask for systems with isolated boundary conditions
+/// \param mincon           User input from a &minimize namelist
+/// \param nrg_scale_bits   Number of bits after the decimal with which to accumulate energy terms
+/// \param gpos_factor      Scaling factor to take coordinates in units of Angstroms into
+///                         fixed-precision format
+/// \param force_factor     Scaling factor for fixed-precision force accumulation
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforce* yfrc,
@@ -157,7 +160,7 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const NeckGeneralizedBor
 
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask &se,
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
-  
+
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const NeckGeneralizedBornTable &ngb_tab,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,
                    int nrg_scale_bits = default_energy_scale_bits);
