@@ -268,13 +268,17 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
+        double clash_progress, tmp_clash_floor, tmp_clash_ratio;
         if (i < clash_steps) {
+          clash_progress = static_cast<double>(clash_steps - i) / static_cast<double>(clash_steps);
+          tmp_clash_floor = clash_floor * clash_progress;
+          tmp_clash_ratio = clash_ratio * clash_progress;
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_cdlp,
-                          gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdfe_tbr, EvaluateForce::YES, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, vale_cdfe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, vale_cdfe_lp, tmp_clash_floor, tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
@@ -307,10 +311,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
-                          gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -334,10 +338,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
-                          gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -361,10 +365,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
-                          gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -427,13 +431,18 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
+        double clash_progress, tmp_clash_floor, tmp_clash_ratio;
         if (i < clash_steps) {
+          clash_progress = static_cast<double>(clash_steps - i) / static_cast<double>(clash_steps);
+          tmp_clash_floor = clash_floor * clash_progress;
+          tmp_clash_ratio = clash_ratio * clash_progress;
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth,
-                          nonb_cdlp, gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdfe_tbr, EvaluateForce::YES, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, acc_meth, vale_cdfe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, acc_meth, vale_cdfe_lp, tmp_clash_floor,
+                        tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
@@ -467,10 +476,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
-                          nonb_cdlp, gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
+                        tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -495,10 +505,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
-                          nonb_cdlp, gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
+                        tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -523,10 +534,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         if (i < clash_steps) {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
-                          nonb_cdlp, gbr_lp, gbd_lp, clash_floor, clash_ratio);
+                          nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
           launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, clash_floor, clash_ratio);
+                        VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
+                        tmp_clash_ratio);
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,

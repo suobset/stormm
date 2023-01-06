@@ -78,11 +78,21 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
   __shared__ int vwu_idx;
-  
+#ifdef CLASH_FORGIVENESS
+  __shared__ TCALC clash_cbrt_distance;
+#endif
   // Each block takes its first valence work unit based on its block index.
   if (threadIdx.x == 0) {
     vwu_idx = blockIdx.x;
   }
+#ifdef CLASH_FORGIVENESS
+  else if (threadIdx.x == warp_size_int) {
+
+    // Pre-compute the cube root of the minimum inter-particle distance to call this function as
+    // little as possible in register-heavy routines.
+    clash_cbrt_distance = CBRT_FUNC(clash_minimum_distance);
+  }
+#endif
   __syncthreads();
   while (vwu_idx < poly_vk.nvwu) {
 
@@ -678,9 +688,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_psw.inv_gpos_scale_f };
+#  ifdef CLASH_FORGIVENESS
+        // The 1:4 interaction displacements may need further adjustment if there is a clash.
+        TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
+                      (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
+                      (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#  else
         const TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#  endif
 #else
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
@@ -697,12 +714,22 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int95_t ilx_cmb = int95Sum(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
         const int95_t ily_cmb = int95Sum(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
         const int95_t ilz_cmb = int95Sum(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
+#  ifdef CLASH_FORGIVENESS
+        // The 1:4 interaction displacements may need further adjustment if there is a clash.
+        TCALC3 ad = { (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
+                      poly_psw.inv_gpos_scale,
+                      (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
+                      poly_psw.inv_gpos_scale,
+                      (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
+                      poly_psw.inv_gpos_scale };
+#  else
         const TCALC3 ad = { (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
                             poly_psw.inv_gpos_scale,
                             (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
                             poly_psw.inv_gpos_scale,
                             (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
                             poly_psw.inv_gpos_scale };
+#  endif
 #endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
@@ -804,11 +831,32 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
             const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ?
                                 SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) : (TCALC)(0.0);
             TCALC invr_il;
-            if (r < clash_minimum_distance) {
-              invr_il = (TCALC)(1.0) / clash_minimum_distance;
-            }
-            else if (r < sigma * clash_ratio) {
+            if (r < sigma * clash_ratio) {
+
+              // See the corresponding C++ code (valence_potential.tpp) for an explanation of why
+              // the displacements get adjusted.
+              if (r < (TCALC)(1.0e-6)) {
+                ad.x = ad.y = ad.z = CBRT_FUNC(sigma * clash_ratio);
+              }
+              else {
+                const TCALC disp_boost = (sigma * clash_ratio) / r;
+                ad.x *= disp_boost;
+                ad.y *= disp_boost;
+                ad.z *= disp_boost;
+              }
               invr_il = (TCALC)(1.0) / (sigma * clash_ratio);
+            }
+            else if (r < clash_minimum_distance) {
+              if (r < (TCALC)(1.0e-6)) {
+                ad.x = ad.y = ad.z = clash_cbrt_distance;
+              }
+              else {
+                const TCALC disp_boost = clash_minimum_distance / r;
+                ad.x *= disp_boost;
+                ad.y *= disp_boost;
+                ad.z *= disp_boost;
+              }
+              invr_il = (TCALC)(1.0) / clash_minimum_distance;
             }
             else {
               invr_il = (TCALC)(1.0) / r;
@@ -1253,9 +1301,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
 #ifdef TCALC_IS_SINGLE
+#  ifdef CLASH_FORGIVENESS
+        // The displacements may require adjustment if there is a clash
+        TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
+        TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
+        TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
+#  else
         const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
+#  endif
 #else
         const int ixloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[i_atom]);
         const int iyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[i_atom]);
@@ -1266,12 +1321,22 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int95_t ilx_cmb = int95Sum(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
         const int95_t ily_cmb = int95Sum(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
         const int95_t ilz_cmb = int95Sum(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
+#  ifdef CLASH_FORGIVENESS
+        // The displacements may require adjustment if there is a clash
+        TCALC dx = (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
+                   poly_psw.inv_gpos_scale;
+        TCALC dy = (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
+                   poly_psw.inv_gpos_scale;
+        TCALC dz = (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
+                   poly_psw.inv_gpos_scale;
+#  else
         const TCALC dx = (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
                          poly_psw.inv_gpos_scale;
         const TCALC dy = (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
                          poly_psw.inv_gpos_scale;
         const TCALC dz = (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
                          poly_psw.inv_gpos_scale;
+#  endif
 #endif
         const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
         const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
@@ -1291,11 +1356,29 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ? SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) :
                                                          (TCALC)(0.0);
         TCALC invr;
-        if (r < clash_minimum_distance) {
-          invr = (TCALC)(1.0) / clash_minimum_distance;
-        }
-        else if (r < sigma * clash_ratio) {
+        if (r < sigma * clash_ratio) {
+          if (r < (TCALC)(1.0e-6)) {
+            dx = dy = dz = CBRT_FUNC(sigma * clash_ratio);
+          }
+          else {
+            const TCALC disp_boost = (sigma * clash_ratio) / r;
+            dx *= disp_boost;
+            dy *= disp_boost;
+            dz *= disp_boost;
+          }
           invr = (TCALC)(1.0) / (sigma * clash_ratio);
+        }
+        else if (r < clash_minimum_distance) {
+          if (r < (TCALC)(1.0e-6)) {
+            dx = dy = dz = clash_cbrt_distance;
+          }
+          else {
+            const TCALC disp_boost = clash_minimum_distance / r;
+            dx *= disp_boost;
+            dy *= disp_boost;
+            dz *= disp_boost;
+          }
+          invr = (TCALC)(1.0) / clash_minimum_distance;
         }
         else {
           invr = (TCALC)(1.0) / r;

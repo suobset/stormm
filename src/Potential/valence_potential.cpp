@@ -317,64 +317,76 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCa
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index) {
+                                  const EvaluateForce eval_vdw_force, const int system_index,
+                                  const double clash_minimum_distance, const double clash_ratio) {
   return evaluateAttenuated14Terms<double, double, double>(vk, nbk, psw.xcrd, psw.ycrd, psw.zcrd,
                                                            psw.umat, psw.invu, psw.unit_cell,
                                                            psw.xfrc, psw.yfrc, psw.zfrc, ecard,
                                                            eval_elec_force, eval_vdw_force,
-                                                           system_index);
+                                                           system_index, clash_minimum_distance,
+                                                           clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index) {
+                                  const EvaluateForce eval_vdw_force, const int system_index,
+                                  const double clash_minimum_distance, const double clash_ratio) {
   return evaluateAttenuated14Terms(ag.getDoublePrecisionValenceKit(),
                                    ag.getDoublePrecisionNonbondedKit(), ps->data(), ecard,
-                                   eval_elec_force, eval_vdw_force, system_index);
+                                   eval_elec_force, eval_vdw_force, system_index,
+                                   clash_minimum_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index) {
+                                  const EvaluateForce eval_vdw_force, const int system_index,
+                                  const double clash_minimum_distance, const double clash_ratio) {
   return evaluateAttenuated14Terms(ag->getDoublePrecisionValenceKit(),
                                    ag->getDoublePrecisionNonbondedKit(), ps->data(), ecard,
-                                   eval_elec_force, eval_vdw_force, system_index);
+                                   eval_elec_force, eval_vdw_force, system_index,
+                                   clash_minimum_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameReader cfr, ScoreCard *ecard,
-                                  const int system_index) {
+                                  const int system_index, const double clash_minimum_distance,
+                                  const double clash_ratio) {
   return evaluateAttenuated14Terms<double, double, double>(vk, nbk, cfr.xcrd, cfr.ycrd, cfr.zcrd,
                                                            cfr.umat, cfr.invu, cfr.unit_cell,
                                                            nullptr, nullptr, nullptr, ecard,
                                                            EvaluateForce::NO, EvaluateForce::NO,
-                                                           system_index);
+                                                           system_index, clash_minimum_distance,
+                                                           clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameWriter &cfw, ScoreCard *ecard,
-                                  const int system_index) {
-  return evaluateAttenuated14Terms(vk, nbk, CoordinateFrameReader(cfw), ecard, system_index);
+                                  const int system_index, const double clash_minimum_distance,
+                                  const double clash_ratio) {
+  return evaluateAttenuated14Terms(vk, nbk, CoordinateFrameReader(cfw), ecard, system_index,
+                                   clash_minimum_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrame &cf,
-                                  ScoreCard *ecard, const int system_index) {
+                                  ScoreCard *ecard, const int system_index,
+                                  const double clash_minimum_distance, const double clash_ratio) {
   return evaluateAttenuated14Terms(ag.getDoublePrecisionValenceKit(),
                                    ag.getDoublePrecisionNonbondedKit(), cf.data(), ecard,
-                                   system_index);
+                                   system_index, clash_minimum_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrame &cf,
-                                  ScoreCard *ecard, const int system_index) {
+                                  ScoreCard *ecard, const int system_index,
+                                  const double clash_minimum_distance, const double clash_ratio) {
   return evaluateAttenuated14Terms(ag->getDoublePrecisionValenceKit(),
                                    ag->getDoublePrecisionNonbondedKit(), cf.data(), ecard,
-                                   system_index);
+                                   system_index, clash_minimum_distance, clash_ratio);
 }
 
 //-------------------------------------------------------------------------------------------------

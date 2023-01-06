@@ -161,7 +161,7 @@ int main(int argc, const char* argv[]) {
   const int nconf = sandbox.getSystemCount();
 
   // CHECK
-  std::vector<double> efinal;
+  std::vector<double> efinal, ebond, eangl, edihe, eimpr, eelec, evdw, eqq14, elj14;
   // END CHECK
   
   for (int i = 0; i < nconf; i++) {
@@ -171,6 +171,14 @@ int main(int argc, const char* argv[]) {
 
     // CHECK
     efinal.push_back(emin.reportTotalEnergy());
+    ebond.push_back(emin.reportInstantaneousStates(StateVariable::BOND, 0));
+    eangl.push_back(emin.reportInstantaneousStates(StateVariable::ANGLE, 0));
+    edihe.push_back(emin.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0));
+    eimpr.push_back(emin.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0));
+    eelec.push_back(emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0));
+    evdw.push_back(emin.reportInstantaneousStates(StateVariable::VDW, 0));
+    eqq14.push_back(emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0));
+    elj14.push_back(emin.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0));
     // END CHECK
   }
 #endif
@@ -195,13 +203,67 @@ int main(int argc, const char* argv[]) {
   const std::vector<double> efinal = emin.reportTotalEnergies();
 #endif
   const std::vector<AtomGraph*> unique_ag = sandbox.getUniqueTopologies();
+  int nbad = 0;
   for (int i = 0; i < sandboxw.unique_topology_count; i++) {
+    const int nbad_so_far = nbad;
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      nbad += (efinal[sandboxw.common_ag_list[j]] < -1000.0 ||
+               efinal[sandboxw.common_ag_list[j]] >  1000.0);
+    }
+    if (nbad > nbad_so_far) {
+      printf("Topology %s: %4d\n", getBaseName(unique_ag[i]->getFileName()).c_str(),
+             nbad - nbad_so_far);
+    }
+#if 0
     printf("Topology %s:\n", getBaseName(unique_ag[i]->getFileName()).c_str());
+    printf("  Total E:");
     for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
       printf("  %11.4lf", efinal[sandboxw.common_ag_list[j]]);
     }
     printf("\n");
+    printf("  Bond  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", ebond[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  Angl  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", eangl[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  Dihe  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", edihe[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  Impr  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", eimpr[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  Elec  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", eelec[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  vdW   E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", evdw[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  QQ14  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", eqq14[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+    printf("  LJ14  E:");
+    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
+      printf("  %11.4lf", elj14[sandboxw.common_ag_list[j]]);
+    }
+    printf("\n");
+#endif
   }
+  printf("There are %4d bad conformers in all.\n", nbad);
   // END CHECK
 
   // CHECK
