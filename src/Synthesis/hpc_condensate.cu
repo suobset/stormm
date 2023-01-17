@@ -36,16 +36,24 @@ kCondensateUpdate(CondensateWriter cdw, const PsSynthesisReader poly_psr) {
       zi += (double)(poly_psr.zcrd_ovrf[i]) * max_llint_accumulation;
     }
     switch (cdw.mode) {
-    case CondensationLevel::DOUBLE:
+    case PrecisionModel::DOUBLE:
       cdw.xcrd[i] = xi * poly_psr.inv_gpos_scale;
       cdw.ycrd[i] = yi * poly_psr.inv_gpos_scale;
       cdw.zcrd[i] = zi * poly_psr.inv_gpos_scale;
       break;
-    case CondensationLevel::FLOAT:
+    case PrecisionModel::SINGLE:
       cdw.xcrd_sp[i] = (float)(xi) * poly_psr.inv_gpos_scale_f;
       cdw.ycrd_sp[i] = (float)(yi) * poly_psr.inv_gpos_scale_f;
       cdw.zcrd_sp[i] = (float)(zi) * poly_psr.inv_gpos_scale_f;
       break;
+    }
+  }
+  const size_t matrix_entries = (size_t)(poly_psr.system_count) *
+                                (size_t)(devcRoundUp(9, warp_size_int));
+  for (size_t i = threadIdx.x + (blockIdx.x * blockDim.x); i < matrix_entries; i += istride) {
+    if ((i & warp_bits_mask_zu) < 9) {
+      cdw.umat[i] = poly_psr.umat[i];
+      cdw.invu[i] = poly_psr.invu[i];
     }
   }
 }

@@ -361,14 +361,10 @@ template <typename T>
 T AtomGraph::getLennardJonesSigma(const int index_a, const int index_b) const {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
-    const double lj_a = sp_lj_a_values.readHost((index_a * atom_type_count) + index_b);
-    const double lj_b = sp_lj_b_values.readHost((index_a * atom_type_count) + index_b);
-    return (lj_b < constants::tiny) ? 0.0 : pow(lj_a / lj_b, 1.0/6.0);
+    return sp_lj_sigma_values.readHost((index_a * atom_type_count) + index_b);
   }
   else if (ct == double_type_index) {
-    const double lj_a = lj_a_values.readHost((index_a * atom_type_count) + index_b);
-    const double lj_b = lj_b_values.readHost((index_a * atom_type_count) + index_b);
-    return (lj_b < constants::tiny) ? 0.0 : pow(lj_a / lj_b, 1.0/6.0);
+    return lj_sigma_values.readHost((index_a * atom_type_count) + index_b);
   }
   else {
     rtErr("Lennard-Jones sigma values may be specified as single- or double-precision real "

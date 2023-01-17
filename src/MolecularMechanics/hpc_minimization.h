@@ -94,6 +94,10 @@ void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
 ///                         kernel management in force + energy computations
 /// \param mmctrl_xe        Control data for the minimization run, plus progress counters for GPU
 ///                         kernel management in energy-only computations
+/// \param mmctrl_cdfe      Control data for the minimization run, plus progress counters for GPU
+///                         kernel management in force + energy + clash dampiing computations
+/// \param mmctrl_cdxe      Control data for the minimization run, plus progress counters for GPU
+///                         kernel management in energy + clash damping computations
 /// \param sc               Energy tracking object allocated to cover all systems in the synthesis
 /// \param vale_fe_cache    Pre-allocated scratch space for valence kernel thread blocks in force +
 ///                         energy computations
@@ -119,7 +123,9 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         const StaticExclusionMaskSynthesis &poly_se,
                         PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                         MolecularMechanicsControls *mmctrl_fe,
-                        MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
+                        MolecularMechanicsControls *mmctrl_xe,
+                        MolecularMechanicsControls *mmctrl_cdfe,
+                        MolecularMechanicsControls *mmctrl_cdxe, ScoreCard *sc,
                         CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
                         CacheResource *vale_cdfe_cache, CacheResource *vale_cdxe_cache,
                         CacheResource *nonb_cache, CacheResource *nonb_cd_cache,

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 echo "&files" > cgen.in
-for SYS in gly_lys ; do # gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_gly gly_lys \
-#           gly_phe gly_pro gly_trp gly_tyr ; do
+for SYS in  gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_gly gly_lys \
+            gly_phe gly_pro gly_trp gly_tyr ; do
   echo "  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/${SYS}.top" >> cgen.in
   echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd }" >> cgen.in
 done
@@ -11,8 +11,8 @@ cat >> cgen.in << EOF
 
 &conformer
   rotation_samples 6,
-  max_system_trials 10, final_states 10,
-  core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
+  max_system_trials 1500, final_states 1500,
+  // core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
 &solvent
@@ -20,7 +20,12 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 50, maxcyc 500
+  ncyc 50, cdcyc 150, maxcyc 500, ntpr = 1,
+  clash_vdw_ratio 0.65,
+&end
+
+&random
+  igseed 9183025
 &end
 EOF
 
@@ -28,4 +33,8 @@ cat >> cgen.in << EOF
 
 EOF
 
-~/StormmBuild/apps/Conf/conformer.stormm -i cgen.in -warn
+if [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda ] ; then
+  ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda -i cgen.in -warn
+elif [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm ] ; then
+  ${STORMM_BUILD}/apps/Conf/conformer.stormm -i cgen.in -warn
+fi

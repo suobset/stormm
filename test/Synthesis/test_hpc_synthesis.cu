@@ -974,7 +974,7 @@ int main(const int argc, const char* argv[]) {
   // Transmit forces from the virtual sites back to their frame atoms.  Attempt similar processes
   // on the CPU, using PhaseSpace objects to process one system at a time.
   const VirtualSiteActivity t_activity = VirtualSiteActivity::TRANSMIT_FORCES;
-  launchVirtualSiteHandling(PrecisionModel::SINGLE, t_activity ,&ligand_poly_ps, &valence_tb_space,
+  launchVirtualSiteHandling(PrecisionModel::SINGLE, t_activity, &ligand_poly_ps, &valence_tb_space,
                            ligand_poly_ag, ligand_launcher);
   launchVirtualSiteHandling(PrecisionModel::DOUBLE, t_activity, &ligand_poly_ps_dbl,
                             &valence_tb_space, ligand_poly_ag, ligand_launcher);

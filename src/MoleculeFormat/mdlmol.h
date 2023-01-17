@@ -204,7 +204,7 @@ public:
   ///        object, the atom count of the incoming coordinate set will be checked.  In all cases,
   ///        the order of atoms in the incoming coordinate set is expect to match this object's
   ///        own arrangement.  If presenting an abstract of a PhaseSpace object, the coordinates of
-  ///        the PRESENT stage in the time cycle will be taken.  When presenting the original
+  ///        the PRIMARY stage in the time cycle will be taken.  When presenting the original
   ///        objects, the developer may select the stage in the time cycle.
   ///
   /// Overloaded:

@@ -125,6 +125,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Trajectory/amber_ascii.cpp \
 		   $(SRCDIR)/Trajectory/barostat.cpp \
 		   $(SRCDIR)/Trajectory/coordinateframe.cpp \
+		   $(SRCDIR)/Trajectory/coordinate_copy.cpp \
 		   $(SRCDIR)/Trajectory/coordinate_intake.cpp \
 		   $(SRCDIR)/Trajectory/coordinate_swap_plan.cpp \
 		   $(SRCDIR)/Trajectory/phasespace.cpp \
@@ -230,6 +231,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Potential/forward_exclusionmask.h \
 		     $(SRCDIR)/Potential/nonbonded_potential.h \
 		     $(SRCDIR)/Potential/scorecard.h \
+		     $(SRCDIR)/Potential/soft_core_potentials.h \
 		     $(SRCDIR)/Potential/static_exclusionmask.h \
 		     $(SRCDIR)/Potential/valence_potential.h \
 		     $(SRCDIR)/Random/random.h \
@@ -277,6 +279,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Trajectory/amber_ascii.h \
 		     $(SRCDIR)/Trajectory/barostat.h \
 		     $(SRCDIR)/Trajectory/coordinateframe.h \
+		     $(SRCDIR)/Trajectory/coordinate_copy.h \
 		     $(SRCDIR)/Trajectory/coordinate_intake.h \
 		     $(SRCDIR)/Trajectory/coordinate_series.h \
 		     $(SRCDIR)/Trajectory/coordinate_swap_plan.h \
@@ -321,6 +324,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Potential/eval_synthesis.tpp \
 		   $(SRCDIR)/Potential/nonbonded_potential.tpp \
 		   $(SRCDIR)/Potential/scorecard.tpp \
+		   $(SRCDIR)/Potential/soft_core_potentials.tpp \
 		   $(SRCDIR)/Potential/valence_potential.tpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.tpp \
 		   $(SRCDIR)/Restraints/restraint_util.tpp \
@@ -342,6 +346,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		   $(SRCDIR)/Topology/topology_util.tpp \
 		   $(SRCDIR)/Trajectory/coordinateframe.tpp \
+		   $(SRCDIR)/Trajectory/coordinate_copy.tpp \
 		   $(SRCDIR)/Trajectory/coordinate_series.tpp \
 		   $(SRCDIR)/Trajectory/phasespace.tpp \
 		   $(SRCDIR)/Trajectory/thermostat.tpp \
@@ -466,6 +471,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Trajectory/amber_ascii.o \
 		  $(SRCDIR)/Trajectory/barostat.o \
 		  $(SRCDIR)/Trajectory/coordinateframe.o \
+		  $(SRCDIR)/Trajectory/coordinate_copy.o \
 		  $(SRCDIR)/Trajectory/coordinate_intake.o \
 		  $(SRCDIR)/Trajectory/coordinate_swap_plan.o \
 		  $(SRCDIR)/Trajectory/phasespace.o \
@@ -599,8 +605,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \

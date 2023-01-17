@@ -5,6 +5,7 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
+#include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"
@@ -18,6 +19,8 @@ namespace synthesis {
 using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
+using constants::CartesianDimension;
+using constants::PrecisionModel;
 using math::roundUp;
 using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesReader;
@@ -27,8 +30,10 @@ using trajectory::CoordinateSeriesReader;
 struct CondensateWriter {
 
   /// \brief The constructor takes a straight list of all relevant constants and pointers.
-  CondensateWriter(CondensationLevel mode_in, int natr_insr_in, int nata_insr_in, float* xcrd_sp,
-                   float* ycrd_sp, float* zcrd_sp, double* xcrd, double* ycrd, double* zcrd,
+  CondensateWriter(PrecisionModel mode_in, CondensateSource basis_in, int system_count_in,
+                   int natr_insr_in, int nata_insr_in, const size_t* atom_starts_in,
+                   const int* atom_counts_in, float* xcrd_sp, float* ycrd_sp, float* zcrd_sp,
+                   double* xcrd, double* ycrd, double* zcrd, double* umat_in, double* invu_in,
                    const int4* atr_insr, const int4* ata_insr);
 
   /// \brief The usual copy and move constructors aply for an abstract, with copy and move
@@ -40,17 +45,23 @@ struct CondensateWriter {
   CondensateWriter(CondensateWriter &&original) = default;
   /// \}
 
-  const CondensationLevel mode;  ///< The compression mode
+  const PrecisionModel mode;     ///< The compression mode
+  const CondensateSource basis;  ///< The original material on which the original object is based
+  const int system_count;        ///< The number of systems held by the underlying Condensate
   const int natr_insr;           ///< Number of block instructions needed to span the entire
                                  ///<   coordinate synthesis in all-to-one analyses
   const int nata_insr;           ///< Number of block instructions needed to span the entire
                                  ///<   coordinate synthesis in all-to-all analyses
+  const size_t* atom_starts;     ///< Starting indices of each system's atoms in the data arrays
+  const int* atom_counts;        ///< Number of atoms in each system
   float* xcrd_sp;                ///< Single-precision Cartesian X coordinates
   float* ycrd_sp;                ///< Single-precision Cartesian Y coordinates
   float* zcrd_sp;                ///< Single-precision Cartesian Z coordinates
   double* xcrd;                  ///< Double-precision Cartesian X coordinates
   double* ycrd;                  ///< Double-precision Cartesian Y coordinates
   double* zcrd;                  ///< Double-precision Cartesian Z coordinates
+  double* umat;                  ///< Box transform information for all systems
+  double* invu;                  ///< Inverse box transform information for all systems
   const int4* atr_insr;          ///< Block instructions for all-to-one (All To Reference) analyses
   const int4* ata_insr;          ///< Block instructions for _A_ll _T_o _A_ll analyses
 };
@@ -63,9 +74,11 @@ struct CondensateReader {
   /// \brief The constructor takes a straight list of all relevant constants and pointers.
   ///        One overloaded form accepts the corresponding writer to convert it to read-only form.
   /// \{
-  CondensateReader(CondensationLevel mode_in, int natr_insr_in, int nata_insr_in,
-                   const float* xcrd_sp_in, const float* ycrd_sp_in, const float* zcrd_sp_in,
-                   const double* xcrd_in, const double* ycrd_in, const double* zcrd_in,
+  CondensateReader(PrecisionModel mode_in, CondensateSource basis_in, int system_count_in,
+                   int natr_insr_in, int nata_insr_in, const size_t* atom_starts_in,
+                   const int* atom_counts_in, const float* xcrd_sp_in, const float* ycrd_sp_in,
+                   const float* zcrd_sp_in, const double* xcrd_in, const double* ycrd_in,
+                   const double* zcrd_in, const double* umat_in, const double* invu_in,
                    const int4* atr_insr_in, const int4* ata_insr_in);
 
   CondensateReader(const CondensateWriter &cdw);
@@ -80,17 +93,23 @@ struct CondensateReader {
   CondensateReader(CondensateReader &&original) = default;
   /// \}
 
-  const CondensationLevel mode;  ///< The compression mode
+  const PrecisionModel mode;     ///< The compression mode
+  const CondensateSource basis;  ///< The original material on which the original object is based
+  const int system_count;        ///< The number of systems held by the underlying Condensate
   const int natr_insr;           ///< Number of block instructions needed to span the entire
                                  ///<   coordinate synthesis in all-to-one analyses
   const int nata_insr;           ///< Number of block instructions needed to span the entire
                                  ///<   coordinate synthesis in all-to-all analyses
+  const size_t* atom_starts;     ///< Starting indices of each system's atoms in the data arrays
+  const int* atom_counts;        ///< Number of atoms in each system
   const float* xcrd_sp;          ///< Single-precision Cartesian X coordinates
   const float* ycrd_sp;          ///< Single-precision Cartesian Y coordinates
   const float* zcrd_sp;          ///< Single-precision Cartesian Z coordinates
   const double* xcrd;            ///< Double-precision Cartesian X coordinates
   const double* ycrd;            ///< Double-precision Cartesian Y coordinates
   const double* zcrd;            ///< Double-precision Cartesian Z coordinates
+  const double* umat;            ///< Box transform information for all systems
+  const double* invu;            ///< Inverse box transform information for all systems
   const int4* atr_insr;          ///< Block instructions for all-to-one (All To Reference) analyses
   const int4* ata_insr;          ///< Block instructions for _A_ll _T_o _A_ll analyses
 };
@@ -110,22 +129,18 @@ public:
   /// \param gpu         Details of the available GPU
   /// \{
   Condensate(const PhaseSpaceSynthesis *poly_ps_in = nullptr,
-             CondensationLevel mode_in = CondensationLevel::FLOAT,
-             const GpuDetails &gpu = null_gpu);
+             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
 
   Condensate(const PhaseSpaceSynthesis &poly_ps_in,
-             CondensationLevel mode_in = CondensationLevel::FLOAT,
-             const GpuDetails &gpu = null_gpu);
+             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
 
   template <typename T>
   Condensate(const CoordinateSeries<T> *cs_in,
-             CondensationLevel mode_in = CondensationLevel::FLOAT,
-             const GpuDetails &gpu = null_gpu);
+             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
 
   template <typename T>
   Condensate(const CoordinateSeries<T> &cs_in,
-             CondensationLevel mode_in = CondensationLevel::FLOAT,
-             const GpuDetails &gpu = null_gpu);
+             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
   /// \}
 
   /// \brief Copy and move constructors as well as copy and move assignment operator overloads
@@ -140,8 +155,11 @@ public:
   /// \}
   
   /// \bried Get the compression mode.
-  CondensationLevel getMode() const;
+  PrecisionModel getMode() const;
 
+  /// \brief Get the basis for the coordinates in the object: synthesis or series
+  CondensateSource getBasis() const;
+  
   /// \brief Get an indication of whether the Condensate keeps its own copy of the coordinates.
   bool ownsCoordinates() const;
   
@@ -150,7 +168,7 @@ public:
 
   /// \brief Get the number of all-to-all (ATA) block instructions.
   int getATAInstructionCount() const;
-
+  
   /// \brief Get a const pointer to the original coordinate synthesis.
   const PhaseSpaceSynthesis* getSynthesisPointer() const;
 
@@ -203,21 +221,13 @@ public:
   /// \param gpu         Details of the available GPU
   /// \{
   void rebuild(const PhaseSpaceSynthesis *poly_ps_in,
-               CondensationLevel mode_in = CondensationLevel::FLOAT,
-               const GpuDetails &gpu = null_gpu);
+               PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
 
   void rebuild(const PhaseSpaceSynthesis &poly_ps_in,
-               CondensationLevel mode_in = CondensationLevel::FLOAT,
-               const GpuDetails &gpu = null_gpu);
+               PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
 
-  void rebuild(const CoordinateSeries<double> *cs_in, const CondensationLevel mode_in,
-               const GpuDetails &gpu);
-  
-  void rebuild(const CoordinateSeries<float> *cs_in, const CondensationLevel mode_in,
-               const GpuDetails &gpu);
-  
   template <typename T>
-  void rebuild(const CoordinateSeries<T> *cs_in, const CondensationLevel mode_in,
+  void rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel mode_in,
                const GpuDetails &gpu);
   /// \}
 
@@ -244,8 +254,11 @@ public:
   /// \}
 
 private:
-  CondensationLevel mode;          ///< Mode in which the data from the PhaseSpaceSynthesis object
+  PrecisionModel mode;             ///< Mode in which the data from the PhaseSpaceSynthesis object
                                    ///<   is compressed
+  CondensateSource basis;          ///< Indicate whether the condensate's coordinates are based on
+                                   ///<   PhaseSpaceSynthesis or a CoordinateSeries.
+  int system_count;                ///< The number of systems held by the Condensate
   bool holds_own_data;             ///< An indication of whether this object has allocated arrays
                                    ///<   to hold a separate copy of the coordinates it represents.
                                    ///<   A Condensate produced (or rebuilt) based on a
@@ -262,12 +275,24 @@ private:
                                    ///<   synthesis in all-to-reference (ATR) analyses
   int ata_instruction_count;       ///< The number of instructions needed to span the coordinate
                                    ///<   synthesis in all-to-all (ATA) analyses
+  Hybrid<size_t> atom_starts;      ///< Starting points of each system in the coordinate arrays.
+                                   ///<   This is a size_t array rather than an integer array due
+                                   ///<   the need to accommodate coordinate series, which could
+                                   ///<   exceed the practical 2-billion atom limit for syntheses.
+  Hybrid<int> atom_counts;         ///< The number of atoms in each system.  While this replicates
+                                   ///<   information from the synthesis or series that the object
+                                   ///<   is based upon, the amount of information is trivial, and
+                                   ///<   it frees the condensate of template considerations when
+                                   ///<   trying to determine a map of the contents.
   Hybrid<float> x_coordinates_sp;  ///< Cartesian X coordinates of all particles (single precision)
   Hybrid<float> y_coordinates_sp;  ///< Cartesian Y coordinates of all particles (single precision)
   Hybrid<float> z_coordinates_sp;  ///< Cartesian Z coordinates of all particles (single precision)
   Hybrid<double> x_coordinates;    ///< Cartesian X coordinates of all particles
   Hybrid<double> y_coordinates;    ///< Cartesian Y coordinates of all particles
   Hybrid<double> z_coordinates;    ///< Cartesian Z coordinates of all particles
+  Hybrid<double> umat;             ///< Box space transformation matrices
+  Hybrid<double> invu;             ///< Inverse box space (back to real space) transformation
+                                   ///<   matrices
   Hybrid<int4> atr_instructions;   ///< Block instructions for all-to-reference calculations.
                                    ///<   The reference structures corresponding to each topology
                                    ///<   will be supplied by an auxiliary array of integers giving

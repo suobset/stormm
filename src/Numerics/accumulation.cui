@@ -168,9 +168,15 @@ __device__ __forceinline__ int2 floatToInt63(const float fval) {
 ///   - Accept int64 / int32 and produce a double-precision, 64-bit floating point number
 ///   - Accept int32 / int32 and produce a single-precision, 32-bit floating point number
 ///
-/// \param isfp    An integral, split fixed precision value
-/// \param isfp_x  The finer part of an integral, split fixed precision value
-/// \param isfp_y  The coarse, overflow part of an integral, split fixed precision value
+/// \param result   Array into which results shall be placed
+/// \param iter     Iteration of the procedure (if a block of threads is to perform multiple
+///                 conversions in series)
+/// \param isfp     An integral, split fixed precision value
+/// \param isfp_x   The finer part of an integral, split fixed precision value
+/// \param isfp_y   The coarse, overflow part of an integral, split fixed precision value
+/// \param length   The quantity of entries to convert
+/// \param descale  De-scaling value to apply in order to bring the fixed-precision representation
+///                 into some internal unit
 /// \{
 __device__ __forceinline__ double splitFPToReal(const int95_t isfp) {
   return ((double)(isfp.y) * max_llint_accumulation) + (double)(isfp.x);

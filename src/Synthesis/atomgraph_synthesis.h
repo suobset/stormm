@@ -785,6 +785,10 @@ private:
                                                 ///<   of tables covering all systems
   Hybrid<double> lennard_jones_14_c_coeff;      ///< Lennard-Jones C coefficients, a series of
                                                 ///<   tables covering all systems
+  Hybrid<double> lennard_jones_sigma;           ///< Lennard-Jones sigma values, a series of tables
+                                                ///<   covering all systems
+  Hybrid<double> lennard_jones_14_sigma;        ///< Lennard-Jones 1:4 sigma values, a series of
+                                                ///<   tables covering all systems
   Hybrid<float> sp_lennard_jones_a_coeff;       ///< Lennard-Jones A coefficients, a series of
                                                 ///<   tables covering all systems (single
                                                 ///<   precision)
@@ -802,6 +806,11 @@ private:
                                                 ///<   precision)
   Hybrid<float> sp_lennard_jones_14_c_coeff;    ///< Lennard-Jones C coefficients, a series of
                                                 ///<  tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float> sp_lennard_jones_sigma;         ///< Lennard-Jones sigma values, a series of tables
+                                                ///<   covering all systems (single precision)
+  Hybrid<float> sp_lennard_jones_14_sigma;      ///< Lennard-Jones 1:4 sigma values, a series of
+                                                ///<   tables covering all systems (single
                                                 ///<   precision)
 
   // Implicit solvent model parameters.  Like the atomic partial charges arrays, most of these will

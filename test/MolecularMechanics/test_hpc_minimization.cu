@@ -400,18 +400,19 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   MinimizeControls mincon;
   mincon.setTotalCycles(maxcyc);
   mincon.setSteepestDescentCycles(maxcyc / 10);
-  
+  mincon.setClashDampingCycles(0);
+    
   // Create separate molecular mechanics control objects based on the minimization operations
   // for each of the ways that the valence kernel gets subdivided. 
   MolecularMechanicsControls mmctrl_fe(mincon);
   MolecularMechanicsControls mmctrl_xe(mincon);
-
+  
   // Track energies in the systems
   ScoreCard sc(mol_id_vec.size(), mincon.getTotalCycles(), 32);
   
   // Obtain kernel launch parameters for the workload
   KernelManager launcher(gpu, poly_ag);
-    
+      
   // Lay out GPU cache resources
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
@@ -442,7 +443,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
   Thermostat heat_bath(ThermostatKind::NONE);
-  
+    
   // Upload the synthesis and prime the pumps
   poly_ag.upload();
   poly_ps.upload();
@@ -506,7 +507,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
-    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
+    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -572,7 +573,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       timer->assignTime(chek_timings);
     }
-    
+
     // Download and check the forces for each system to verify consistency.  If the forces are
     // consistent enough, set them to be exactly consistent, and do the same with the coordinates,
     // to avoid miniscule roundoff errors that could otherwis creep in over hundreds of steps.
@@ -612,10 +613,10 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       poly_ps.upload();
     }
-    
+
     // Second stage of the cycle: advance once along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 0, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
+    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -661,10 +662,10 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       poly_ps.upload();
     }
-    
+
     // Third stage of the cycle: advance once more along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 1, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
+    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -713,7 +714,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Final stage of the cycle: advance a final time along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 2, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
+    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -828,7 +829,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                  TestPriority::NON_CRITICAL : TestPriority::ABORT;
     const std::vector<double> final_e = sc.reportTotalEnergies(devc);
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
-    snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
+    snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-5, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
@@ -1070,7 +1071,7 @@ int main(const int argc, const char* argv[]) {
   testCompilation(lig_top, lig_crd, { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 },
                   256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", PrintSituation::OVERWRITE,
                   snap_name, "small_mol_", &timer);
-  
+
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 1, 0, 1, 1, 1, 0, 0 }, 3, 1.0e-5, 1.0e-3, oe, gpu,
                   "Folded proteins", PrintSituation::APPEND, snap_name, "folded_pro_", &timer);

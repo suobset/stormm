@@ -18,8 +18,10 @@
 
 using stormm::constants::PrecisionModel;
 using stormm::constants::tiny;
+using stormm::data_types::int95_t;
 using stormm::data_types::llint;
 #ifndef STORMM_USE_HPC
+using stormm::data_types::int2;
 using stormm::data_types::float2;
 #endif
 using stormm::diskutil::DrivePathType;
@@ -141,6 +143,36 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         " to split integer fixed-precision values by incrementing 9x when sampled with a " +
         realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.  Precision model: " +
         getPrecisionModelName(lvl) + ".");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test a change in the fixed-precision bit count using the 95-bit accumulators.
+//
+// Arguments:
+//   x:         The real number to represent in fixed precision
+//   fp_orig:   The number of bits after the decimal in the first representation
+//   fp_new:    The number of bits after the decimal in the second representation
+//-------------------------------------------------------------------------------------------------
+void testFixedPrecisionChange(const double x, const int fp_orig, const int fp_new) {
+  const double oscale = pow(2.0, fp_orig);
+  const double nscale = pow(2.0, fp_new);
+  const double etol = std::max(pow(2.0, -std::min(fp_new, fp_orig) + 1), 1.0e-12);
+  const int95_t ix = hostDoubleToInt95(x * oscale);
+  const int95_t in_x = hostChangeFPBits(ix, fp_orig, fp_new);
+  const double nx = hostInt95ToDouble(in_x) / nscale;
+  check(nx, RelationalOperator::EQUAL, Approx(x).margin(etol), "A fixed-precision bit change "
+        "does not work going from " + std::to_string(fp_orig) + " to " + std::to_string(fp_new) +
+        " bits in 95-bit format.");
+
+  // Try the 63-bit fixed-precision format
+  if (fp_orig < 48 && fp_new < 48) {
+    const int2 ix = hostDoubleToInt63(x * oscale);
+    const int2 in_x = hostChangeFPBits(ix, fp_orig, fp_new);
+    const double nx = hostInt63ToDouble(in_x) / nscale;
+    check(nx, RelationalOperator::EQUAL, Approx(x).margin(etol), "A fixed-precision bit change "
+          "does not work going from " + std::to_string(fp_orig) + " to " + std::to_string(fp_new) +
+          " bits in 63-bit format.");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -320,7 +352,11 @@ int main(const int argc, const char* argv[]) {
         "representation (X), when using a Hybrid object.");
 
   // Test functions for changing the precision model
-  
+  testFixedPrecisionChange(67.029, 24, 36);
+  testFixedPrecisionChange(67.029, 36, 24);
+  testFixedPrecisionChange(-23.981, 24, 36);
+  testFixedPrecisionChange(-76.329, 63, 70);
+  testFixedPrecisionChange(-76.329, 70, 63);
   
   // Print results
   printTestSummary(oe.getVerbosity());

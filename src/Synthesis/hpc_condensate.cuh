@@ -3,6 +3,7 @@
 #define STORMM_HPC_CONDENSATE_CUH
 
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
 #include "Trajectory/coordinate_series.h"
 #include "condensate.h"
@@ -10,6 +11,7 @@
 namespace stormm {
 namespace synthesis {
 
+using constants::PrecisionModel;
 using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesReader;
 
@@ -33,16 +35,24 @@ kCondensateUpdate(CondensateWriter cdw, const CoordinateSeriesReader<T> csr) {
   const float inv_gpos_scale_f = csr.inv_gpos_scale;
   for (size_t i = threadIdx.x + (blockIdx.x * blockDim.x); i < padded_atoms; i += istride) {
     switch (cdw.mode) {
-    case CondensationLevel::DOUBLE:
+    case PrecisionModel::DOUBLE:
       cdw.xcrd[i] = (double)(csr.xcrd[i]) * csr.inv_gpos_scale;
       cdw.ycrd[i] = (double)(csr.ycrd[i]) * csr.inv_gpos_scale;
       cdw.zcrd[i] = (double)(csr.zcrd[i]) * csr.inv_gpos_scale;
       break;
-    case CondensationLevel::FLOAT:
+    case PrecisionModel::SINGLE:
       cdw.xcrd_sp[i] = (float)(csr.xcrd[i]) * inv_gpos_scale_f;
       cdw.ycrd_sp[i] = (float)(csr.ycrd[i]) * inv_gpos_scale_f;
       cdw.zcrd_sp[i] = (float)(csr.zcrd[i]) * inv_gpos_scale_f;
       break;
+    }
+  }
+  const size_t matrix_entries = (size_t)(csr.nframe) *
+                                (size_t)(((9 + warp_size_int) / warp_size_int) * warp_size_int);
+  for (size_t i = threadIdx.x + (blockIdx.x * blockDim.x); i < matrix_entries; i += istride) {
+    if ((i & warp_bits_mask_zu) < 9) {
+      cdw.umat[i] = csr.umat[i];
+      cdw.invu[i] = csr.invu[i];
     }
   }
 }

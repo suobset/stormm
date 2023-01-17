@@ -1511,6 +1511,10 @@ private:
   Hybrid<double> lj_14_a_values;         ///< Lennard-Jones A coefficients for 1:4 interactions
   Hybrid<double> lj_14_b_values;         ///< Lennard-Jones B coefficients for 1:4 interactions
   Hybrid<double> lj_14_c_values;         ///< Lennard-Jones C coefficients for 1:4 interactions
+  Hybrid<double> lj_sigma_values;        ///< Lennard-Jones sigma parameters, back-computed from
+                                         ///<   combinations of A and B coefficients for each pair
+  Hybrid<double> lj_14_sigma_values;     ///< Lennard-Jones 1:4 sigma parameters, back-computed
+                                         ///<   from combinations of 1:4 A and B coefficients
   Hybrid<double> lj_type_corrections;    ///< Long-ranged homogeneity coefficients for vdW energy
   Hybrid<double> attn14_elec_factors;    ///< Array of attenuated electrostatic strengths for 1:4
                                          ///<   non-bonded interactions
@@ -1531,6 +1535,8 @@ private:
   Hybrid<float> sp_lj_14_a_values;       ///< Lennard-Jones 1:4 A coefficients (single precision)
   Hybrid<float> sp_lj_14_b_values;       ///< Lennard-Jones 1:4 B coefficients (single precision)
   Hybrid<float> sp_lj_14_c_values;       ///< Lennard-Jones 1:4 C coefficients (single precision)
+  Hybrid<float> sp_lj_sigma_values;      ///< Lennard-Jones sigma parameters (single precision)
+  Hybrid<float> sp_lj_14_sigma_values;   ///< Lennard-Jones 1:4 sigma parameters (single precision)
   Hybrid<float> sp_lj_type_corrections;  ///< Long-ranged homogeneity factors (single precision)
   Hybrid<float> sp_attn14_elec_factors;  ///< Array of attenuated electrostatic strengths for 1:4
                                          ///<   non-bonded interactions, single-precision

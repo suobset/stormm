@@ -2639,7 +2639,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
                 // parameters for this exclusion.  If there are more than one dihedral which
                 // could supply parameters, this case would have been trapped above.  If the
                 // policy to to merely warn, or even be silent, then this 1:4 term will likewise
-                // take parameters from the last encoutnered dihedral that could do the job.
+                // take parameters from the last encountered dihedral that could do the job.
                 found = true;
                 const int dihe_param_idx = bvt.dihe_param_idx[dihe_index];
                 atp.z = attn_parm.dihe14_parameter_indices[dihe_param_idx];

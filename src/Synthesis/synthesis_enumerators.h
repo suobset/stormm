@@ -124,16 +124,10 @@ enum class InitializationTask {
   NONE                   ///< Work units perform no initializations or random number computations.
 };
 
-/// \brief List the levels by which cordinates in a PhaseSpaceSynthesis can be compressed.  While
-///        it is essential to have a fixed precision representation with the potential for a very
-///        fine discretization in dynamics and other applications with many serial movements of
-///        atoms, floating point numbers can be used in situations where the structures are no
-///        longer evolving and approximate results can be trusted.  The lower precision models
-///        allow more rapid data access and higher caching rates, which can lead to large gains in
-///        the rate of structure evaluation.
-enum class CondensationLevel {
-  DOUBLE,    ///< Represent coordinates as double-precision floating point numbers
-  FLOAT      ///< Represent coordinates as single-precision floating point numbers
+/// \brief List the possible origins for a condensate object.
+enum class CondensateSource {
+  SYNTHESIS,  ///< The coordinates came from a PhaseSpaceSynthesis
+  SERIES      ///< The coordinates came from a CoordinateSeries
 };
 
 } // namespace synthesis

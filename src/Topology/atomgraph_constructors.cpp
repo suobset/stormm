@@ -200,9 +200,11 @@ AtomGraph::AtomGraph() :
     lj_a_values{HybridKind::POINTER, "tp_lja"},
     lj_b_values{HybridKind::POINTER, "tp_ljb"},
     lj_c_values{HybridKind::POINTER, "tp_ljc"},
-    lj_14_a_values{HybridKind::POINTER, "tp_lja"},
-    lj_14_b_values{HybridKind::POINTER, "tp_ljb"},
-    lj_14_c_values{HybridKind::POINTER, "tp_ljc"},
+    lj_14_a_values{HybridKind::POINTER, "tp_14_lja"},
+    lj_14_b_values{HybridKind::POINTER, "tp_14_ljb"},
+    lj_14_c_values{HybridKind::POINTER, "tp_14_ljc"},
+    lj_sigma_values{HybridKind::POINTER, "tp_sigma"},
+    lj_14_sigma_values{HybridKind::POINTER, "tp_14_sigma"},
     lj_type_corrections{HybridKind::POINTER, "tp_lj_long"},
     attn14_elec_factors{HybridKind::POINTER, "tp_scee_param"},
     attn14_vdw_factors{HybridKind::POINTER, "tp_scnb_param"},
@@ -218,6 +220,8 @@ AtomGraph::AtomGraph() :
     sp_lj_14_a_values{HybridKind::POINTER, "tp_lja_sp"},
     sp_lj_14_b_values{HybridKind::POINTER, "tp_ljb_sp"},
     sp_lj_14_c_values{HybridKind::POINTER, "tp_ljc_sp"},
+    sp_lj_sigma_values{HybridKind::POINTER, "tp_sigma"},
+    sp_lj_14_sigma_values{HybridKind::POINTER, "tp_14_sigma"},
     sp_lj_type_corrections{HybridKind::POINTER, "tp_lj_long_sp"},
     sp_attn14_elec_factors{HybridKind::POINTER, "tp_scee_param_sp"},
     sp_attn14_vdw_factors{HybridKind::POINTER, "tp_scnb_param_sp"},
@@ -869,6 +873,8 @@ void AtomGraph::rebasePointers() {
   lj_14_a_values.swapTarget(&double_data);
   lj_14_b_values.swapTarget(&double_data);
   lj_14_c_values.swapTarget(&double_data);
+  lj_sigma_values.swapTarget(&double_data);
+  lj_14_sigma_values.swapTarget(&double_data);
   lj_type_corrections.swapTarget(&double_data);
   attn14_elec_factors.swapTarget(&double_data);
   attn14_vdw_factors.swapTarget(&double_data);
@@ -884,6 +890,8 @@ void AtomGraph::rebasePointers() {
   sp_lj_14_a_values.swapTarget(&float_data);
   sp_lj_14_b_values.swapTarget(&float_data);
   sp_lj_14_c_values.swapTarget(&float_data);
+  sp_lj_sigma_values.swapTarget(&float_data);
+  sp_lj_14_sigma_values.swapTarget(&float_data);
   sp_lj_type_corrections.swapTarget(&float_data);
   sp_attn14_elec_factors.swapTarget(&float_data);
   sp_attn14_vdw_factors.swapTarget(&float_data);
@@ -1155,6 +1163,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     lj_14_a_values{original.lj_14_a_values},
     lj_14_b_values{original.lj_14_b_values},
     lj_14_c_values{original.lj_14_c_values},
+    lj_sigma_values{original.lj_sigma_values},
+    lj_14_sigma_values{original.lj_14_sigma_values},
     lj_type_corrections{original.lj_type_corrections},
     attn14_elec_factors{original.attn14_elec_factors},
     attn14_vdw_factors{original.attn14_vdw_factors},
@@ -1170,6 +1180,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_lj_14_a_values{original.sp_lj_14_a_values},
     sp_lj_14_b_values{original.sp_lj_14_b_values},
     sp_lj_14_c_values{original.sp_lj_14_c_values},
+    sp_lj_sigma_values{original.sp_lj_sigma_values},
+    sp_lj_14_sigma_values{original.sp_lj_14_sigma_values},
     sp_lj_type_corrections{original.sp_lj_type_corrections},
     sp_attn14_elec_factors{original.sp_attn14_elec_factors},
     sp_attn14_vdw_factors{original.sp_attn14_vdw_factors},
@@ -1489,6 +1501,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   lj_14_a_values = other.lj_14_a_values;
   lj_14_b_values = other.lj_14_b_values;
   lj_14_c_values = other.lj_14_c_values;
+  lj_sigma_values = other.lj_sigma_values;
+  lj_14_sigma_values = other.lj_14_sigma_values;
   lj_type_corrections = other.lj_type_corrections;
   attn14_elec_factors = other.attn14_elec_factors;
   attn14_vdw_factors = other.attn14_vdw_factors;
@@ -1504,6 +1518,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_lj_14_a_values = other.sp_lj_14_a_values;
   sp_lj_14_b_values = other.sp_lj_14_b_values;
   sp_lj_14_c_values = other.sp_lj_14_c_values;
+  sp_lj_sigma_values = other.sp_lj_sigma_values;
+  sp_lj_14_sigma_values = other.sp_lj_14_sigma_values;
   sp_lj_type_corrections = other.sp_lj_type_corrections;
   sp_attn14_elec_factors = other.sp_attn14_elec_factors;
   sp_attn14_vdw_factors = other.sp_attn14_vdw_factors;
@@ -1807,6 +1823,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     lj_14_a_values{std::move(original.lj_14_a_values)},
     lj_14_b_values{std::move(original.lj_14_b_values)},
     lj_14_c_values{std::move(original.lj_14_c_values)},
+    lj_sigma_values{std::move(original.lj_sigma_values)},
+    lj_14_sigma_values{std::move(original.lj_14_sigma_values)},
     lj_type_corrections{std::move(original.lj_type_corrections)},
     attn14_elec_factors{std::move(original.attn14_elec_factors)},
     attn14_vdw_factors{std::move(original.attn14_vdw_factors)},
@@ -1822,6 +1840,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_lj_14_a_values{std::move(original.sp_lj_14_a_values)},
     sp_lj_14_b_values{std::move(original.sp_lj_14_b_values)},
     sp_lj_14_c_values{std::move(original.sp_lj_14_c_values)},
+    sp_lj_sigma_values{std::move(original.sp_lj_sigma_values)},
+    sp_lj_14_sigma_values{std::move(original.sp_lj_14_sigma_values)},
     sp_lj_type_corrections{std::move(original.sp_lj_type_corrections)},
     sp_attn14_elec_factors{std::move(original.sp_attn14_elec_factors)},
     sp_attn14_vdw_factors{std::move(original.sp_attn14_vdw_factors)},
@@ -2135,6 +2155,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   lj_14_a_values = std::move(other.lj_14_a_values);
   lj_14_b_values = std::move(other.lj_14_b_values);
   lj_14_c_values = std::move(other.lj_14_c_values);
+  lj_sigma_values = std::move(other.lj_sigma_values);
+  lj_14_sigma_values = std::move(other.lj_14_sigma_values);
   lj_type_corrections = std::move(other.lj_type_corrections);
   attn14_elec_factors = std::move(other.attn14_elec_factors);
   attn14_vdw_factors = std::move(other.attn14_vdw_factors);
@@ -2150,6 +2172,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_lj_14_a_values = std::move(other.sp_lj_14_a_values);
   sp_lj_14_b_values = std::move(other.sp_lj_14_b_values);
   sp_lj_14_c_values = std::move(other.sp_lj_14_c_values);
+  sp_lj_sigma_values = std::move(other.sp_lj_sigma_values);
+  sp_lj_14_sigma_values = std::move(other.sp_lj_14_sigma_values);
   sp_lj_type_corrections = std::move(other.sp_lj_type_corrections);
   sp_attn14_elec_factors = std::move(other.sp_attn14_elec_factors);
   sp_attn14_vdw_factors = std::move(other.sp_attn14_vdw_factors);

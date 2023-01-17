@@ -144,7 +144,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                const StaticExclusionMaskSynthesis &poly_se,
                                PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                                MolecularMechanicsControls *mmctrl_fe,
-                               MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
+                               MolecularMechanicsControls *mmctrl_xe,
+                               MolecularMechanicsControls *mmctrl_cdfe,
+                               MolecularMechanicsControls *mmctrl_cdxe, ScoreCard *sc,
                                CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
                                CacheResource *vale_cdfe_cache, CacheResource *vale_cdxe_cache,
                                CacheResource *nonb_cache, CacheResource *nonb_cd_cache,
@@ -232,6 +234,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                    poly_ag);
   mmctrl_xe->primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec,
                                    poly_ag);
+  mmctrl_cdfe->primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                                     ClashResponse::FORGIVE, prec, poly_ag);
+  mmctrl_cdxe->primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES,
+                                     ClashResponse::FORGIVE, prec, poly_ag);
   poly_ps->primeConjugateGradientCalculation(gpu, devc_tier);
   int min_timings;
   if (timer != nullptr) {
@@ -257,6 +263,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       ISWorkspaceKit<double> iswk = ism_space->dpData(devc_tier);
       MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
       MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
+      MMControlKit<double> ctrl_cdfe = mmctrl_cdfe->dpData(devc_tier);
+      MMControlKit<double> ctrl_cdxe = mmctrl_cdxe->dpData(devc_tier);
       ThermostatWriter<double> tstw = heat_bath.dpData(devc_tier);
       if (virtual_sites_present) {
         launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
@@ -265,7 +273,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         double clash_progress, tmp_clash_floor, tmp_clash_ratio;
@@ -273,12 +281,13 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           clash_progress = static_cast<double>(clash_steps - i) / static_cast<double>(clash_steps);
           tmp_clash_floor = clash_floor * clash_progress;
           tmp_clash_ratio = clash_ratio * clash_progress;
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdfe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_cdlp,
                           gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdfe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdfe_tbr, EvaluateForce::YES, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, vale_cdfe_lp, tmp_clash_floor, tmp_clash_ratio);
+          ctrl_cdfe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
@@ -307,14 +316,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
                           gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -334,14 +344,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
                           gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -361,14 +372,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_cdlp,
                           gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, vale_cdxe_lp, tmp_clash_floor, tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -391,8 +403,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
-      ScoreCardWriter scw_final = sc->data();
-      ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+      ScoreCardWriter scw_final = sc->data(devc_tier);
+      ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
                       &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
                       nonb_lp, gbr_lp, gbd_lp);
@@ -420,6 +432,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       ISWorkspaceKit<float> iswk = ism_space->spData(devc_tier);
       MMControlKit<float> ctrl_fe = mmctrl_fe->spData(devc_tier);
       MMControlKit<float> ctrl_xe = mmctrl_xe->spData(devc_tier);
+      MMControlKit<float> ctrl_cdfe = mmctrl_fe->spData(devc_tier);
+      MMControlKit<float> ctrl_cdxe = mmctrl_xe->spData(devc_tier);
       ThermostatWriter<float> tstw = heat_bath.spData(devc_tier);
       if (virtual_sites_present) {
         launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
@@ -428,7 +442,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         double clash_progress, tmp_clash_floor, tmp_clash_ratio;
@@ -436,13 +450,14 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           clash_progress = static_cast<double>(clash_steps - i) / static_cast<double>(clash_steps);
           tmp_clash_floor = clash_floor * clash_progress;
           tmp_clash_ratio = clash_ratio * clash_progress;
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdfe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth,
                           nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdfe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdfe_tbr, EvaluateForce::YES, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, acc_meth, vale_cdfe_lp, tmp_clash_floor,
                         tmp_clash_ratio);
+          ctrl_cdfe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
@@ -472,15 +487,16 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                           nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
                         tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -501,15 +517,16 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                           nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
                         tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -530,15 +547,16 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
-        ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+        ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
         if (i < clash_steps) {
-          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+          launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_cdxe, &poly_psw, &tstw, &scw,
                           &nonb_cd_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                           nonb_cdlp, gbr_lp, gbd_lp, tmp_clash_floor, tmp_clash_ratio);
-          launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw,
+          launchValence(poly_vk, poly_rk, &ctrl_cdxe, &poly_psw, poly_auk, &tstw, &scw,
                         &vale_cdxe_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
                         VwuGoal::ACCUMULATE, acc_meth, vale_cdxe_lp, tmp_clash_floor,
                         tmp_clash_ratio);
+          ctrl_cdxe.step += 1;
         }
         else {
           launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
@@ -562,8 +580,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
-      ScoreCardWriter scw_final = sc->data();
-      ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
+      ScoreCardWriter scw_final = sc->data(devc_tier);
+      ism_space->initialize(devc_tier, CoordinateCycle::PRIMARY, gpu);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
                       &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
                       acc_meth, nonb_lp, gbr_lp, gbd_lp);
@@ -632,6 +650,8 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   // Prepare progress tracking objects.
   MolecularMechanicsControls mmctrl_fe(mincon);
   MolecularMechanicsControls mmctrl_xe(mincon);
+  MolecularMechanicsControls mmctrl_cdfe(mincon);
+  MolecularMechanicsControls mmctrl_cdxe(mincon);
 
   // Prepare cache space for each kernel
   CacheResource vale_fe_cache(vale_fe_lp.x, maximum_valence_work_unit_atoms);
@@ -644,11 +664,11 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                                      poly_ag.getSystemAtomCounts(), prec);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   LineMinimization line_record(poly_ag.getSystemCount());
-  launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &result,
-                     &vale_fe_cache, &vale_xe_cache, &vale_cdfe_cache, &vale_cdxe_cache,
-                     &nonb_cache, &nonb_cd_cache, &ism_space, &poly_rbg, &line_record,
-                     chooseAccumulationMethod(poly_ps->getForceAccumulationBits()), gpu, launcher,
-                     timer, task_name);
+  launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &mmctrl_cdfe,
+                     &mmctrl_cdxe, &result, &vale_fe_cache, &vale_xe_cache, &vale_cdfe_cache,
+                     &vale_cdxe_cache, &nonb_cache, &nonb_cd_cache, &ism_space, &poly_rbg,
+                     &line_record, chooseAccumulationMethod(poly_ps->getForceAccumulationBits()),
+                     gpu, launcher, timer, task_name);
   return result;
 }
 

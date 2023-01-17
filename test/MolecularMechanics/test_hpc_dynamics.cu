@@ -142,7 +142,7 @@ int main(const int argc, const char* argv[]) {
                   EvaluateEnergy::NO, VwuGoal::MOVE_PARTICLES, AccumulationMethod::SPLIT,
                   trpi_launcher);
     trpi_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
-    trpi_isw.initialize(HybridTargetLevel::DEVICE, CoordinateCycle::PRESENT, gpu);
+    trpi_isw.initialize(HybridTargetLevel::DEVICE, CoordinateCycle::PRIMARY, gpu);
     trpi_mmctrl.incrementStep();
     trpi_heat_bath.incrementStep();
   }

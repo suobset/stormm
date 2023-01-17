@@ -77,9 +77,9 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
               cachi_ycrd[i] = ycrd[atom_i];
               cachi_zcrd[i] = zcrd[atom_i];
             }
-            cachi_xfrc[i] = 0.0;
-            cachi_yfrc[i] = 0.0;
-            cachi_zfrc[i] = 0.0;
+            cachi_xfrc[i] = value_zero;
+            cachi_yfrc[i] = value_zero;
+            cachi_zfrc[i] = value_zero;
             cachi_q[i] = nbk.coulomb_constant * nbk.charge[atom_i];
             cachi_ljidx[i] = nbk.lj_idx[atom_i];
           }
@@ -95,9 +95,9 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
               cachj_ycrd[j] = ycrd[atom_j];
               cachj_zcrd[j] = zcrd[atom_j];
             }
-            cachj_xfrc[j] = 0.0;
-            cachj_yfrc[j] = 0.0;
-            cachj_zfrc[j] = 0.0;
+            cachj_xfrc[j] = value_zero;
+            cachj_yfrc[j] = value_zero;
+            cachj_zfrc[j] = value_zero;
             cachj_q[j] = nbk.charge[atom_j];
             cachj_ljidx[j] = nbk.lj_idx[atom_j];              
           }
@@ -116,73 +116,38 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 const Tcalc atomi_x = cachi_xcrd[i];
                 const Tcalc atomi_y = cachi_ycrd[i];
                 const Tcalc atomi_z = cachi_zcrd[i];
-                Tcalc ele_contrib = 0.0;
-                Tcalc vdw_contrib = 0.0;
+                Tcalc ele_contrib = value_zero;
+                Tcalc vdw_contrib = value_zero;
                 for (int j = 0; j < jlim; j++) {
-                  Tcalc dx = cachj_xcrd[j] - atomi_x;
-                  Tcalc dy = cachj_ycrd[j] - atomi_y;
-                  Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const Tcalc r = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                                      sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+                  Tcalc fmag = value_zero;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  if (eval_elec_force == EvaluateForce::YES) {
+                    quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib,
+                                                       &fmag);
+                  }
+                  else {
+                    quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib,
+                                                       nullptr);
+                  }
                   const int ljt_j = cachj_ljidx[j];
                   const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                  Tcalc r, ij_sigma;
-                  if (tcalc_is_double) {
-                    r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-                    ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+                  if (eval_vdw_force == EvaluateForce::YES) {
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
                   }
                   else {
-                    r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-                    ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib,
+                                                   nullptr);
                   }
-                  Tcalc invr;
-                  if (r < clash_ratio * ij_sigma) {
-                    if (r < value_nil) {
-                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_ratio * ij_sigma) :
-                                                         cbrtf(clash_ratio * ij_sigma);
-                    }
-                    else {
-                      const Tcalc disp_boost = clash_ratio * ij_sigma / r;
-                      dx *= disp_boost;
-                      dy *= disp_boost;
-                      dz *= disp_boost;
-                    }
-                    invr = value_one / (clash_ratio * ij_sigma);
-                  }
-                  else if (r < clash_distance) {
-                    if (r < value_nil) {
-                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) :
-                                                         cbrtf(clash_distance);
-                    }
-                    else {
-                      const Tcalc disp_boost = clash_distance / r;
-                      dx *= disp_boost;
-                      dy *= disp_boost;
-                      dz *= disp_boost;                      
-                    }
-                    invr = value_one / clash_distance;
-                  }
-                  else {
-                    invr = value_one / r;
-                  }
-                  const Tcalc invr2 = invr * invr;
-                  const Tcalc invr4 = invr2 * invr2;
-                  const Tcalc qiqj = qi * cachj_q[j];
-                  ele_contrib += qiqj * invr;
-                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
                   // Evaluate the force, if requested
                   if (eval_elec_force == EvaluateForce::YES ||
                       eval_vdw_force == EvaluateForce::YES) {
-                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
-                                                                           value_zero;
-                    if (eval_vdw_force == EvaluateForce::YES) {
-                      if (tcalc_is_double) {
-                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
-                      }
-                      else {
-                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
-                      }
-                    }
                     const Tcalc fmag_dx = fmag * dx;
                     const Tcalc fmag_dy = fmag * dy;
                     const Tcalc fmag_dz = fmag * dz;
@@ -212,8 +177,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 const Tcalc atomi_x = cachi_xcrd[i];
                 const Tcalc atomi_y = cachi_ycrd[i];
                 const Tcalc atomi_z = cachi_zcrd[i];
-                Tcalc ele_contrib = 0.0;
-                Tcalc vdw_contrib = 0.0;
+                Tcalc ele_contrib = value_zero;
+                Tcalc vdw_contrib = value_zero;
                 for (int j = 0; j < jlim; j++) {
                   const Tcalc dx = cachj_xcrd[j] - atomi_x;
                   const Tcalc dy = cachj_ycrd[j] - atomi_y;
@@ -285,76 +250,41 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 const Tcalc qi = cachi_q[i];
                 const int ljt_i = cachi_ljidx[i];
                 const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
-                Tcalc ele_contrib = 0.0;
-                Tcalc vdw_contrib = 0.0;
+                Tcalc ele_contrib = value_zero;
+                Tcalc vdw_contrib = value_zero;
                 for (int j = 0; j < jlim; j++) {
                   if ((mask_i >> j) & 0x1) {
                     continue;
                   }
-                  Tcalc dx = cachj_xcrd[j] - atomi_x;
-                  Tcalc dy = cachj_ycrd[j] - atomi_y;
-                  Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                  const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                  const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                  const Tcalc r = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                                      sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+                  Tcalc fmag = value_zero;
+                  const Tcalc qiqj = qi * cachj_q[j];
+                  if (eval_elec_force == EvaluateForce::YES) {
+                    quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib,
+                                                       &fmag);
+                  }
+                  else {
+                    quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib,
+                                                       nullptr);
+                  }
                   const int ljt_j = cachj_ljidx[j];
                   const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                  Tcalc r, ij_sigma;
-                  if (tcalc_is_double) {
-                    r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-                    ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+                  if (eval_vdw_force == EvaluateForce::YES) {
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
                   }
                   else {
-                    r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-                    ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib,
+                                                   nullptr);
                   }
-                  Tcalc invr;
-                  if (r < clash_ratio * ij_sigma) {
-                    if (r < value_nil) {
-                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_ratio * ij_sigma) :
-                                                         cbrtf(clash_ratio * ij_sigma);
-                    }
-                    else {
-                      const Tcalc disp_boost = clash_ratio * ij_sigma / r;
-                      dx *= disp_boost;
-                      dy *= disp_boost;
-                      dz *= disp_boost;
-                    }
-                    invr = value_one / (clash_ratio * ij_sigma);
-                  }
-                  else if (r < clash_distance) {
-                    if (r < value_nil) {
-                      dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) :
-                                                         cbrtf(clash_distance);
-                    }
-                    else {
-                      const Tcalc disp_boost = clash_distance / r;
-                      dx *= disp_boost;
-                      dy *= disp_boost;
-                      dz *= disp_boost;                      
-                    }
-                    invr = value_one / clash_distance;
-                  }
-                  else {
-                    invr = value_one / r;
-                  }
-                  const Tcalc invr2 = invr * invr;
-                  const Tcalc invr4 = invr2 * invr2;
-                  const Tcalc qiqj = qi * cachj_q[j];
-                  ele_contrib += qiqj * invr;
-                  vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
                   // Evaluate the force, if requested
                   if (eval_elec_force == EvaluateForce::YES ||
                       eval_vdw_force == EvaluateForce::YES) {
-                    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
-                                                                           value_zero;
-                    if (eval_vdw_force == EvaluateForce::YES) {
-                      if (tcalc_is_double) {
-                        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
-                      }
-                      else {
-                        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
-                      }
-                    }
                     const Tcalc fmag_dx = fmag * dx;
                     const Tcalc fmag_dy = fmag * dy;
                     const Tcalc fmag_dz = fmag * dz;

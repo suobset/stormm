@@ -586,7 +586,7 @@ void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Con
       const size_t system_crd_idx = snapr.atom_starts[system_idx];
       const size_t result_idx = static_cast<size_t>(snapr.replica_idx[system_idx]) + result_offset;
       switch (cdr.mode) {
-      case CondensationLevel::DOUBLE:
+      case PrecisionModel::DOUBLE:
         {
           const double *system_xcrd = &cdr.xcrd[system_crd_idx];
           const double *system_ycrd = &cdr.ycrd[system_crd_idx];
@@ -596,7 +596,7 @@ void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Con
                                                      rplandr.strategy, 0, ni_atom);
         }
         break;
-      case CondensationLevel::FLOAT:
+      case PrecisionModel::SINGLE:
         {
           const float *system_xcrd_sp = &cdr.xcrd_sp[system_crd_idx];
           const float *system_ycrd_sp = &cdr.ycrd_sp[system_crd_idx];
@@ -656,7 +656,7 @@ void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Con
           const size_t krep_crd_idx = snapr.atom_starts[krep_idx];
           const size_t result_idx = (jrepno * (jrepno - 1) / 2) + krepno + result_offset;
           switch (cdr.mode) {
-          case CondensationLevel::DOUBLE:
+          case PrecisionModel::DOUBLE:
             {
               const double *kxcrd = &cdr.xcrd[krep_crd_idx];
               const double *kycrd = &cdr.ycrd[krep_crd_idx];
@@ -665,7 +665,7 @@ void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Con
                                                          i_masses, rplandr.strategy, 0, njk_atom);
             }
             break;
-          case CondensationLevel::FLOAT:
+          case PrecisionModel::SINGLE:
             {
               const float *kxcrd_sp = &cdr.xcrd_sp[krep_crd_idx];
               const float *kycrd_sp = &cdr.ycrd_sp[krep_crd_idx];

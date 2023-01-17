@@ -255,12 +255,16 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     lennard_jones_14_a_coeff{HybridKind::ARRAY, "tpsyn_lj_14_a"},
     lennard_jones_14_b_coeff{HybridKind::ARRAY, "tpsyn_lj_14_b"},
     lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c"},
+    lennard_jones_sigma{HybridKind::ARRAY, "tpsyn_lj_sigma"},
+    lennard_jones_14_sigma{HybridKind::ARRAY, "tpsyn_lj_14_sigma"},
     sp_lennard_jones_a_coeff{HybridKind::ARRAY, "tpsyn_lj_a_sp"},
     sp_lennard_jones_b_coeff{HybridKind::ARRAY, "tpsyn_lj_b_sp"},
     sp_lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c_sp"},
     sp_lennard_jones_14_a_coeff{HybridKind::ARRAY, "tpsyn_lj_14_a_sp"},
     sp_lennard_jones_14_b_coeff{HybridKind::ARRAY, "tpsyn_lj_14_b_sp"},
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
+    sp_lennard_jones_sigma{HybridKind::ARRAY, "tpsyn_lj_sigma_sp"},
+    sp_lennard_jones_14_sigma{HybridKind::ARRAY, "tpsyn_lj_14_sigma_sp"},
 
     // Implicit solvent model parameters
     neck_table_size{0},
@@ -2179,24 +2183,32 @@ void AtomGraphSynthesis::extendLJMatrices() {
   lennard_jones_14_a_coeff.resize(alloc_size);
   lennard_jones_14_b_coeff.resize(alloc_size);
   lennard_jones_14_c_coeff.resize(alloc_size);
+  lennard_jones_sigma.resize(alloc_size);
+  lennard_jones_14_sigma.resize(alloc_size);
   sp_lennard_jones_a_coeff.resize(alloc_size);
   sp_lennard_jones_b_coeff.resize(alloc_size);
   sp_lennard_jones_c_coeff.resize(alloc_size);
   sp_lennard_jones_14_a_coeff.resize(alloc_size);
   sp_lennard_jones_14_b_coeff.resize(alloc_size);
   sp_lennard_jones_14_c_coeff.resize(alloc_size);
+  sp_lennard_jones_sigma.resize(alloc_size);
+  sp_lennard_jones_14_sigma.resize(alloc_size);
   double* a_ptr = lennard_jones_a_coeff.data();
   double* b_ptr = lennard_jones_b_coeff.data();
   double* c_ptr = lennard_jones_c_coeff.data();
   double* a_14_ptr = lennard_jones_14_a_coeff.data();
   double* b_14_ptr = lennard_jones_14_b_coeff.data();
   double* c_14_ptr = lennard_jones_14_c_coeff.data();
+  double* sigma_ptr = lennard_jones_sigma.data();
+  double* sigma_14_ptr = lennard_jones_14_sigma.data();
   float* sp_a_ptr = sp_lennard_jones_a_coeff.data();
   float* sp_b_ptr = sp_lennard_jones_b_coeff.data();
   float* sp_c_ptr = sp_lennard_jones_c_coeff.data();
   float* sp_a_14_ptr = sp_lennard_jones_14_a_coeff.data();
   float* sp_b_14_ptr = sp_lennard_jones_14_b_coeff.data();
   float* sp_c_14_ptr = sp_lennard_jones_14_c_coeff.data();
+  float* sp_sigma_ptr = sp_lennard_jones_sigma.data();
+  float* sp_sigma_14_ptr = sp_lennard_jones_14_sigma.data();
   seek_idx = 0;
   for (int i = 0; i < topology_count; i++) {
     if (table_idx[i] == seek_idx) {
@@ -2209,12 +2221,16 @@ void AtomGraphSynthesis::extendLJMatrices() {
         a_14_ptr[joffset] = nbkvec[i].lja_14_coeff[j];
         b_14_ptr[joffset] = nbkvec[i].ljb_14_coeff[j];
         c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
+        sigma_ptr[joffset] = nbkvec[i].lj_sigma[j];
+        sigma_14_ptr[joffset] = nbkvec[i].lj_14_sigma[j];
         sp_a_ptr[joffset] = nbkvec[i].lja_coeff[j];
         sp_b_ptr[joffset] = nbkvec[i].ljb_coeff[j];
         sp_c_ptr[joffset] = nbkvec[i].ljc_coeff[j];
         sp_a_14_ptr[joffset] = nbkvec[i].lja_14_coeff[j];
         sp_b_14_ptr[joffset] = nbkvec[i].ljb_14_coeff[j];
         sp_c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
+        sp_sigma_ptr[joffset] = nbkvec[i].lj_sigma[j];
+        sp_sigma_14_ptr[joffset] = nbkvec[i].lj_14_sigma[j];
       }
       seek_idx++;
     }
@@ -3427,17 +3443,18 @@ AtomGraphSynthesis::getDoublePrecisionValenceKit(const HybridTargetLevel tier) c
                               lennard_jones_14_a_coeff.data(tier),
                               lennard_jones_14_b_coeff.data(tier),
                               lennard_jones_14_c_coeff.data(tier),
-                              lennard_jones_indices.data(tier), atom_type_counts.data(tier),
-                              lennard_jones_abc_offsets.data(tier), ubrd_stiffnesses.data(tier),
-                              ubrd_equilibria.data(tier), cimp_stiffnesses.data(tier),
-                              cimp_phase_angles.data(tier), cmap_surface_dimensions.data(tier),
-                              cmap_patches.data(tier), cmap_patch_bounds.data(tier),
-                              vwu_instruction_sets.data(tier), vwu_import_lists.data(tier),
-                              cbnd_instructions.data(tier), angl_instructions.data(tier),
-                              cdhe_instructions.data(tier), cdhe_overtones.data(tier),
-                              cmap_instructions.data(tier), infr14_instructions.data(tier),
-                              accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
-                              accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
+                              lennard_jones_14_sigma.data(tier), lennard_jones_indices.data(tier),
+                              atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
+                              ubrd_stiffnesses.data(tier), ubrd_equilibria.data(tier),
+                              cimp_stiffnesses.data(tier), cimp_phase_angles.data(tier),
+                              cmap_surface_dimensions.data(tier), cmap_patches.data(tier),
+                              cmap_patch_bounds.data(tier), vwu_instruction_sets.data(tier),
+                              vwu_import_lists.data(tier), cbnd_instructions.data(tier),
+                              angl_instructions.data(tier), cdhe_instructions.data(tier),
+                              cdhe_overtones.data(tier), cmap_instructions.data(tier),
+                              infr14_instructions.data(tier), accumulate_cbnd_energy.data(tier),
+                              accumulate_angl_energy.data(tier), accumulate_cdhe_energy.data(tier),
+                              accumulate_cmap_energy.data(tier),
                               accumulate_infr14_energy.data(tier));
 }
 
@@ -3453,6 +3470,7 @@ AtomGraphSynthesis::getSinglePrecisionValenceKit(const HybridTargetLevel tier) c
                              sp_lennard_jones_14_a_coeff.data(tier),
                              sp_lennard_jones_14_b_coeff.data(tier),
                              sp_lennard_jones_14_c_coeff.data(tier),
+                             sp_lennard_jones_14_sigma.data(tier),
                              lennard_jones_indices.data(tier), atom_type_counts.data(tier),
                              lennard_jones_abc_offsets.data(tier), sp_ubrd_stiffnesses.data(tier),
                              sp_ubrd_equilibria.data(tier), sp_cimp_stiffnesses.data(tier),
@@ -3530,10 +3548,11 @@ AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier)
                                  atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                  lennard_jones_a_coeff.data(tier),
                                  lennard_jones_b_coeff.data(tier),
-                                 lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
-                                 atomic_pb_radii.data(tier), gb_screening_factors.data(tier),
-                                 gb_alpha_parameters.data(tier), gb_beta_parameters.data(tier),
-                                 gb_gamma_parameters.data(tier), neck_limit_tables.data(tier));
+                                 lennard_jones_c_coeff.data(tier), lennard_jones_sigma.data(tier),
+                                 neck_gb_indices.data(tier), atomic_pb_radii.data(tier),
+                                 gb_screening_factors.data(tier), gb_alpha_parameters.data(tier),
+                                 gb_beta_parameters.data(tier), gb_gamma_parameters.data(tier),
+                                 neck_limit_tables.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3549,7 +3568,8 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
                                 atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                 sp_lennard_jones_a_coeff.data(tier),
                                 sp_lennard_jones_b_coeff.data(tier),
-                                sp_lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
+                                sp_lennard_jones_c_coeff.data(tier),
+                                sp_lennard_jones_sigma.data(tier), neck_gb_indices.data(tier),
                                 sp_atomic_pb_radii.data(tier), sp_gb_screening_factors.data(tier),
                                 sp_gb_alpha_parameters.data(tier),
                                 sp_gb_beta_parameters.data(tier),
@@ -3605,12 +3625,16 @@ void AtomGraphSynthesis::upload() {
   lennard_jones_14_a_coeff.upload();
   lennard_jones_14_b_coeff.upload();
   lennard_jones_14_c_coeff.upload();
+  lennard_jones_sigma.upload();
+  lennard_jones_14_sigma.upload();
   sp_lennard_jones_a_coeff.upload();
   sp_lennard_jones_b_coeff.upload();
   sp_lennard_jones_c_coeff.upload();
   sp_lennard_jones_14_a_coeff.upload();
   sp_lennard_jones_14_b_coeff.upload();
   sp_lennard_jones_14_c_coeff.upload();
+  sp_lennard_jones_sigma.upload();
+  sp_lennard_jones_14_sigma.upload();
   neck_limit_tables.upload();
   sp_neck_limit_tables.upload();
   nmr_int2_data.upload();
@@ -3664,12 +3688,16 @@ void AtomGraphSynthesis::download() {
   lennard_jones_14_a_coeff.download();
   lennard_jones_14_b_coeff.download();
   lennard_jones_14_c_coeff.download();
+  lennard_jones_sigma.download();
+  lennard_jones_14_sigma.download();
   sp_lennard_jones_a_coeff.download();
   sp_lennard_jones_b_coeff.download();
   sp_lennard_jones_c_coeff.download();
   sp_lennard_jones_14_a_coeff.download();
   sp_lennard_jones_14_b_coeff.download();
   sp_lennard_jones_14_c_coeff.download();
+  sp_lennard_jones_sigma.download();
+  sp_lennard_jones_14_sigma.download();
   neck_limit_tables.download();
   sp_neck_limit_tables.download();
   nmr_int2_data.download();

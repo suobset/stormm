@@ -23,13 +23,14 @@
 /// \param poly_rk   Restraint parameters for all systems
 /// \param ctrl      Molecular mechanics control information
 /// \param poly_psw  Coordinates, velocities, and forces for all systems
+/// \param poly_auk  Information on which atoms' position updates shall be stored
 /// \param scw       Energy tracking object
 /// \param gmem_r    Resources in global memory allocated for exclusive use by each thread block
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, VALENCE_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef CLASH_FORGIVENESS
-            const TCALC clash_minimum_distance, const TCALC clash_ratio,
+            const TCALC clash_distance, const TCALC clash_ratio,
 #endif
 #ifdef UPDATE_ATOMS            
             SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk, ThermostatWriter<TCALC> tstw,
@@ -78,21 +79,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
   __shared__ int vwu_idx;
-#ifdef CLASH_FORGIVENESS
-  __shared__ TCALC clash_cbrt_distance;
-#endif
+
   // Each block takes its first valence work unit based on its block index.
   if (threadIdx.x == 0) {
     vwu_idx = blockIdx.x;
   }
-#ifdef CLASH_FORGIVENESS
-  else if (threadIdx.x == warp_size_int) {
-
-    // Pre-compute the cube root of the minimum inter-particle distance to call this function as
-    // little as possible in register-heavy routines.
-    clash_cbrt_distance = CBRT_FUNC(clash_minimum_distance);
-  }
-#endif
   __syncthreads();
   while (vwu_idx < poly_vk.nvwu) {
 
@@ -688,16 +679,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_psw.inv_gpos_scale_f };
-#  ifdef CLASH_FORGIVENESS
-        // The 1:4 interaction displacements may need further adjustment if there is a clash.
-        TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
-                      (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
-                      (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
-#  else
         const TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
-#  endif
 #else
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
@@ -714,22 +698,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int95_t ilx_cmb = int95Sum(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
         const int95_t ily_cmb = int95Sum(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
         const int95_t ilz_cmb = int95Sum(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
-#  ifdef CLASH_FORGIVENESS
-        // The 1:4 interaction displacements may need further adjustment if there is a clash.
-        TCALC3 ad = { (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
-                      poly_psw.inv_gpos_scale,
-                      (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
-                      poly_psw.inv_gpos_scale,
-                      (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
-                      poly_psw.inv_gpos_scale };
-#  else
         const TCALC3 ad = { (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
                             poly_psw.inv_gpos_scale,
                             (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
                             poly_psw.inv_gpos_scale,
                             (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
                             poly_psw.inv_gpos_scale };
-#  endif
 #endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
@@ -791,7 +765,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
             if (attn14_idx == 0) {
               attn14_idx = ((tinsr_z >> 20) & 0xfff);
             }
-#ifdef COMPUTE_FORCE        
+#ifdef COMPUTE_FORCE
             stiffness_ii = ampl_ii * freq_ii;
 #endif
             sangle_ii = (freq_ii * theta) - phi_ii;
@@ -820,74 +794,147 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                  (__ldca(&poly_vk.n_lj_types[sysid]) * l_ljidx) + i_ljidx;
             const TCALC qq_il = __ldca(&gmem_r.charges[i_atom]) * __ldca(&gmem_r.charges[l_atom]) *
                                 poly_vk.coulomb / attn_qq14;
-            const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
-            const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]);
+            const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]) / attn_lj14;
+            const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]) / attn_lj14;
 #ifdef CLASH_FORGIVENESS
 
             // Compute the distance and then the ratio of this distance to the pair sigma value.
             // Use the minimum distance criterion to provide a floor on the perceived distance, to
             // ensure that virtual sites with no van-der Waals parameters cannot come too close.
             const TCALC r = SQRT_FUNC((ad.x * ad.x) + (ad.y * ad.y) + (ad.z * ad.z));
-            const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ?
-                                SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) : (TCALC)(0.0);
-            TCALC invr_il;
-            if (r < sigma * clash_ratio) {
-
-              // See the corresponding C++ code (valence_potential.tpp) for an explanation of why
-              // the displacements get adjusted.
-              if (r < (TCALC)(1.0e-6)) {
-                ad.x = ad.y = ad.z = CBRT_FUNC(sigma * clash_ratio);
+            
+            // The electrostatic clash distance is an absolute range
+            if (r < clash_distance) {
+              const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
+                                                   (clash_distance + (TCALC)(1.0)));
+              const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
+                                  (aparm * (clash_distance + (TCALC)(1.0)) *
+                                   (clash_distance + (TCALC)(1.0)));
+#  ifdef COMPUTE_ENERGY
+              if (accflag) {
+                const TCALC qq14_contrib = qq_il * ((aparm * (r + (TCALC)(1.0)) *
+                                                     (r + (TCALC)(1.0))) + bparm);
+                qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
               }
-              else {
-                const TCALC disp_boost = (sigma * clash_ratio) / r;
-                ad.x *= disp_boost;
-                ad.y *= disp_boost;
-                ad.z *= disp_boost;
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+              if (accflag) {
+#    endif
+                if (r > (TCALC)(constants::tiny)) {
+                  f14 += (qq_il * (((TCALC)(2.0) * aparm) + ((TCALC)(2.0) * aparm / r))) *
+                         poly_psw.frc_scale_f;
+                }
+#    ifndef UPDATE_ATOMS
               }
-              invr_il = (TCALC)(1.0) / (sigma * clash_ratio);
-            }
-            else if (r < clash_minimum_distance) {
-              if (r < (TCALC)(1.0e-6)) {
-                ad.x = ad.y = ad.z = clash_cbrt_distance;
-              }
-              else {
-                const TCALC disp_boost = clash_minimum_distance / r;
-                ad.x *= disp_boost;
-                ad.y *= disp_boost;
-                ad.z *= disp_boost;
-              }
-              invr_il = (TCALC)(1.0) / clash_minimum_distance;
+#    endif
+#  endif
             }
             else {
-              invr_il = (TCALC)(1.0) / r;
+              const TCALC invr_il = (TCALC)(1.0) / r;
+#  ifdef COMPUTE_ENERGY
+              if (accflag) {
+                const TCALC qq14_contrib = qq_il * invr_il;
+                qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
+              }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+              if (accflag) {
+#    endif
+                f14 -= (qq_il * invr_il * invr_il * invr_il) * poly_psw.frc_scale_f;
+#    ifndef UPDATE_ATOMS
+              }
+#    endif
+#  endif
             }
-#else
+
+            // The van-der Waals clash limit is defined as a proportion of the sigma value.
+            const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ?
+                                SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) : (TCALC)(0.0);
+            const TCALC vdw_limit = clash_ratio * sigma;
+            if (r < vdw_limit) {
+              const TCALC invrlim = (TCALC)(1.0) / vdw_limit;
+              const TCALC invrlim2 = invrlim * invrlim;
+              const TCALC invrlim6 = invrlim2 * invrlim2 * invrlim2;
+              const TCALC aparm = ((((TCALC)(6.0) * ljb_il) -
+                                    ((TCALC)(12.0) * lja_il * invrlim6)) * invrlim * invrlim6) /
+                                  (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
+                                     (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
+              const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
+              const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
+                                                     rlimit_plus_one * rlimit_plus_one);
+              const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - (arlimit_po_four);
+              const TCALC r_plus_one = r + (TCALC)(1.0);
+              const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
+#  ifdef COMPUTE_ENERGY
+              if (accflag) {
+                const TCALC lj14_contrib = (arpo_three * r_plus_one) + bparm;
+                lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
+              }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+              if (accflag) {
+#    endif
+                if (r > (TCALC)(constants::tiny)) {
+                  f14 += ((TCALC)(4.0) * arpo_three / r) * poly_psw.frc_scale_f;
+                }
+#    ifndef UPDATE_ATOMS
+              }
+#    endif
+#  endif
+            }
+            else {
+              const TCALC invr_il = (TCALC)(1.0) / r;
+              const TCALC invr2_il = invr_il * invr_il;
+              const TCALC invr4_il = invr2_il * invr2_il;
+#  ifdef COMPUTE_ENERGY
+              if (accflag) {
+                const TCALC lj14_contrib = ((lja_il * invr4_il * invr4_il) - (ljb_il * invr2_il)) *
+                                           invr4_il;
+                lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
+              }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+              if (accflag) {
+#    endif
+                f14 += ((((TCALC)(6.0) * ljb_il) -
+                         ((TCALC)(12.0) * lja_il * invr4_il * invr2_il)) *
+                        invr4_il * invr4_il) * poly_psw.frc_scale_f;
+#    ifndef UPDATE_ATOMS
+              }
+#    endif
+#  endif
+            }
+#else // CLASH_FORGIVENESS
             const TCALC invr_il = (TCALC)(1.0) /
                                   SQRT_FUNC((ad.x * ad.x) + (ad.y * ad.y) + (ad.z * ad.z));
-#endif
             const TCALC invr2_il = invr_il * invr_il;
             const TCALC invr4_il = invr2_il * invr2_il;
-#ifdef COMPUTE_ENERGY
+#  ifdef COMPUTE_ENERGY
             if (accflag) {
               const TCALC qq14_contrib = qq_il * invr_il;
               qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
               const TCALC lj14_contrib = ((lja_il * invr4_il * invr4_il) - (ljb_il * invr2_il)) *
-                                         invr4_il / attn_lj14;
+                                         invr4_il;
               lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
             }
-#endif
-#ifdef COMPUTE_FORCE
-#  ifndef UPDATE_ATOMS
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
             if (accflag) {
-#  endif
-            f14 = -(qq_il * invr2_il * invr_il) +
-                  ((((TCALC)(6.0) * ljb_il) - ((TCALC)(12.0) * lja_il * invr4_il * invr2_il)) *
-                   invr4_il * invr4_il / attn_lj14);
-            f14 *= poly_psw.frc_scale_f;
-#  ifndef UPDATE_ATOMS
+#    endif
+              f14 = -(qq_il * invr2_il * invr_il) +
+                    ((((TCALC)(6.0) * ljb_il) - ((TCALC)(12.0) * lja_il * invr4_il * invr2_il)) *
+                     invr4_il * invr4_il);
+              f14 *= poly_psw.frc_scale_f;
+#    ifndef UPDATE_ATOMS
             }
+#    endif
 #  endif
-#endif
+#endif // CLASH_FORGIVENESS
           }
         }
 #ifdef COMPUTE_FORCE        
@@ -1301,16 +1348,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
 #ifdef TCALC_IS_SINGLE
-#  ifdef CLASH_FORGIVENESS
-        // The displacements may require adjustment if there is a clash
-        TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
-        TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
-        TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
-#  else
         const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
-#  endif
 #else
         const int ixloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[i_atom]);
         const int iyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[i_atom]);
@@ -1321,22 +1361,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int95_t ilx_cmb = int95Sum(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
         const int95_t ily_cmb = int95Sum(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
         const int95_t ilz_cmb = int95Sum(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
-#  ifdef CLASH_FORGIVENESS
-        // The displacements may require adjustment if there is a clash
-        TCALC dx = (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
-                   poly_psw.inv_gpos_scale;
-        TCALC dy = (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
-                   poly_psw.inv_gpos_scale;
-        TCALC dz = (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
-                   poly_psw.inv_gpos_scale;
-#  else
         const TCALC dx = (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
                          poly_psw.inv_gpos_scale;
         const TCALC dy = (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
                          poly_psw.inv_gpos_scale;
         const TCALC dz = (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
                          poly_psw.inv_gpos_scale;
-#  endif
 #endif
         const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
         const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
@@ -1347,98 +1377,183 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                             poly_vk.coulomb * attn_qq14;
         const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]) * attn_lj14;
         const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]) * attn_lj14;
+        const int acc_elem   = (pos - vterm_offset) / uint_bit_count_int;
+        const int acc_bit    = pos - vterm_offset - (acc_elem * uint_bit_count_int);
+        const int acc_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14_NRG)].x;
+        const bool accflag   = ((__ldca(&poly_vk.infr14_acc[acc_offset + acc_elem]) >> acc_bit) &
+                                0x1);
+
+        // Declare fmag without assignment so that this pre-processor branch can merge with the
+        // code below.  Either branch will set fmag.
+#ifdef COMPUTE_FORCE
+        TCALC fmag = (TCALC)(0.0);
+#endif
 #ifdef CLASH_FORGIVENESS
 
         // Compute the distance and then the ratio of this distance to the pair sigma value.  Use
         // the minimum distance criterion to provide a floor on the perceived distance, to ensure
         // that virtual sites with no van-der Waals parameters cannot come too close.
         const TCALC r = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-        const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ? SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) :
-                                                         (TCALC)(0.0);
-        TCALC invr;
-        if (r < sigma * clash_ratio) {
-          if (r < (TCALC)(1.0e-6)) {
-            dx = dy = dz = CBRT_FUNC(sigma * clash_ratio);
+
+        // The electrostatic clash distance is an absolute range
+        if (r < clash_distance) {
+          const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
+                                              (clash_distance + (TCALC)(1.0)));
+          const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
+                              (aparm * (clash_distance + (TCALC)(1.0)) *
+                               (clash_distance + (TCALC)(1.0)));
+#  ifdef COMPUTE_ENERGY
+          if (accflag) {
+            const TCALC qq14_contrib = qq_il * ((aparm * (r + (TCALC)(1.0)) *
+                                                 (r + (TCALC)(1.0))) + bparm);
+            qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
           }
-          else {
-            const TCALC disp_boost = (sigma * clash_ratio) / r;
-            dx *= disp_boost;
-            dy *= disp_boost;
-            dz *= disp_boost;
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+          if (accflag) {
+#    endif
+            if (r > (TCALC)(constants::tiny)) {
+              fmag = (qq_il * (((TCALC)(2.0) * aparm) + ((TCALC)(2.0) * aparm / r))) *
+                     poly_psw.frc_scale_f;
+            }
+#    ifndef UPDATE_ATOMS
           }
-          invr = (TCALC)(1.0) / (sigma * clash_ratio);
-        }
-        else if (r < clash_minimum_distance) {
-          if (r < (TCALC)(1.0e-6)) {
-            dx = dy = dz = clash_cbrt_distance;
-          }
-          else {
-            const TCALC disp_boost = clash_minimum_distance / r;
-            dx *= disp_boost;
-            dy *= disp_boost;
-            dz *= disp_boost;
-          }
-          invr = (TCALC)(1.0) / clash_minimum_distance;
+#    endif
+#  endif
         }
         else {
-          invr = (TCALC)(1.0) / r;
+          const TCALC invr_il = (TCALC)(1.0) / r;
+#  ifdef COMPUTE_ENERGY
+          if (accflag) {
+            const TCALC qq14_contrib = qq_il * invr_il;
+            qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
+          }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+          if (accflag) {
+#    endif
+            fmag = (qq_il * invr_il * invr_il * invr_il) * poly_psw.frc_scale_f;
+#    ifndef UPDATE_ATOMS
+          }
+#    endif
+#  endif
         }
-#else
+
+        // The van-der Waals clash limit is defined as a proportion of the sigma value.
+        const TCALC sigma = (ljb_il > (TCALC)(1.0e-6)) ? SQRT_FUNC(CBRT_FUNC(lja_il / ljb_il)) :
+                                                         (TCALC)(0.0);
+        const TCALC vdw_limit = clash_ratio * sigma;
+        if (r < vdw_limit) {
+          const TCALC invrlim = (TCALC)(1.0) / vdw_limit;
+          const TCALC invrlim2 = invrlim * invrlim;
+          const TCALC invrlim6 = invrlim2 * invrlim2 * invrlim2;
+          const TCALC aparm = ((((TCALC)(6.0) * ljb_il) -
+                                ((TCALC)(12.0) * lja_il * invrlim6)) * invrlim * invrlim6) /
+                              (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
+                                 (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
+          const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
+          const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
+                                                 rlimit_plus_one * rlimit_plus_one);
+          const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - (arlimit_po_four);
+          const TCALC r_plus_one = r + (TCALC)(1.0);
+          const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
+#  ifdef COMPUTE_ENERGY
+          if (accflag) {
+            const TCALC lj14_contrib = (arpo_three * r_plus_one) + bparm;
+            lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
+          }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+          if (accflag) {
+#    endif
+            if (r > (TCALC)(constants::tiny)) {
+              fmag += ((TCALC)(4.0) * arpo_three / r) * poly_psw.frc_scale_f;
+            }
+#    ifndef UPDATE_ATOMS
+          }
+#    endif
+#  endif
+        }
+        else {
+          const TCALC invr_il = (TCALC)(1.0) / r;
+          const TCALC invr2_il = invr_il * invr_il;
+          const TCALC invr4_il = invr2_il * invr2_il;
+#  ifdef COMPUTE_ENERGY
+          if (accflag) {
+            const TCALC lj14_contrib = ((lja_il * invr4_il * invr4_il) - (ljb_il * invr2_il)) *
+                                       invr4_il;
+            lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
+          }
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+          if (accflag) {
+#    endif
+            fmag += ((((TCALC)(6.0) * ljb_il) - ((TCALC)(12.0) * lja_il * invr4_il * invr2_il)) *
+                     invr4_il * invr4_il) * poly_psw.frc_scale_f;
+#    ifndef UPDATE_ATOMS
+          }
+#    endif
+#  endif
+        }
+#else // CLASH_FORGIVENESS
         const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-#endif
         const TCALC invr2 = invr  * invr;
         const TCALC invr4 = invr2 * invr2;
-#ifdef COMPUTE_ENERGY
-        const int acc_elem   = (pos - vterm_offset) / uint_bit_count_int;
-        const int acc_bit    = pos - vterm_offset - (acc_elem * uint_bit_count_int);
-        const int acc_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14_NRG)].x;
-        if ((__ldca(&poly_vk.infr14_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
+#  ifdef COMPUTE_ENERGY
+        if (accflag) {
           const TCALC ele_contrib = qq_il * invr;
           const TCALC vdw_contrib = (lja_il * invr4 * invr4 * invr4) - (ljb_il * invr4 * invr2);
           qq14_acc += LLCONV_FUNC(ele_contrib * scw.nrg_scale_f);
           lj14_acc += LLCONV_FUNC(vdw_contrib * scw.nrg_scale_f);
         }
-#endif
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifndef UPDATE_ATOMS
+        if (accflag) {
+#    endif
+          fmag = poly_psw.frc_scale * (-(qq_il * invr * invr2) +
+                                       (((TCALC)(6.0) * ljb_il) -
+                                        ((TCALC)(12.0) * lja_il * invr4 * invr2)) * invr4 * invr4);
+#    ifndef UPDATE_ATOMS
+        }
+#    endif
+#  endif // COMPUTE_FORCE
+#endif // CLASH_FORGIVENESS
 #ifdef COMPUTE_FORCE
 #  ifndef UPDATE_ATOMS
-#    ifndef COMPUTE_ENERGY
-        const int acc_elem   = (pos - vterm_offset) / uint_bit_count_int;
-        const int acc_bit    = pos - vterm_offset - (acc_elem * uint_bit_count_int);
-        const int acc_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14_NRG)].x;
-#    endif
-        if ((__ldca(&poly_vk.infr14_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
-#  endif        
-        const TCALC fmag = poly_psw.frc_scale * (-(qq_il * invr * invr2) +
-                                                 (((TCALC)(6.0) * ljb_il) -
-                                                  ((TCALC)(12.0) * lja_il * invr4 * invr2)) *
-                                                 invr4 * invr4);
-        i_atom -= EXCL_GMEM_OFFSET;
-        l_atom -= EXCL_GMEM_OFFSET;
+        if (accflag) {
+#  endif
+          i_atom -= EXCL_GMEM_OFFSET;
+          l_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const TCALC fmag_dx = fmag * dx;
-        const TCALC fmag_dy = fmag * dy;
-        const TCALC fmag_dz = fmag * dz;
-        atomicSplit( fmag_dx, i_atom, sh_xfrc, sh_xfrc_overflow);
-        atomicSplit( fmag_dy, i_atom, sh_yfrc, sh_yfrc_overflow);
-        atomicSplit( fmag_dz, i_atom, sh_zfrc, sh_zfrc_overflow);
-        atomicSplit(-fmag_dx, l_atom, sh_xfrc, sh_xfrc_overflow);
-        atomicSplit(-fmag_dy, l_atom, sh_yfrc, sh_yfrc_overflow);
-        atomicSplit(-fmag_dz, l_atom, sh_zfrc, sh_zfrc_overflow);
+          const TCALC fmag_dx = fmag * dx;
+          const TCALC fmag_dy = fmag * dy;
+          const TCALC fmag_dz = fmag * dz;
+          atomicSplit( fmag_dx, i_atom, sh_xfrc, sh_xfrc_overflow);
+          atomicSplit( fmag_dy, i_atom, sh_yfrc, sh_yfrc_overflow);
+          atomicSplit( fmag_dz, i_atom, sh_zfrc, sh_zfrc_overflow);
+          atomicSplit(-fmag_dx, l_atom, sh_xfrc, sh_xfrc_overflow);
+          atomicSplit(-fmag_dy, l_atom, sh_yfrc, sh_yfrc_overflow);
+          atomicSplit(-fmag_dz, l_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
-        const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
-        const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
-        const llint ifmag_dz = LLCONV_FUNC(fmag * dz);
-        atomicAdd((ullint*)&sh_xfrc[i_atom], (ullint)( ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[i_atom], (ullint)( ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[i_atom], (ullint)( ifmag_dz));
-        atomicAdd((ullint*)&sh_xfrc[l_atom], (ullint)(-ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[l_atom], (ullint)(-ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[l_atom], (ullint)(-ifmag_dz));
+          const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
+          const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
+          const llint ifmag_dz = LLCONV_FUNC(fmag * dz);
+          atomicAdd((ullint*)&sh_xfrc[i_atom], (ullint)( ifmag_dx));
+          atomicAdd((ullint*)&sh_yfrc[i_atom], (ullint)( ifmag_dy));
+          atomicAdd((ullint*)&sh_zfrc[i_atom], (ullint)( ifmag_dz));
+          atomicAdd((ullint*)&sh_xfrc[l_atom], (ullint)(-ifmag_dx));
+          atomicAdd((ullint*)&sh_yfrc[l_atom], (ullint)(-ifmag_dy));
+          atomicAdd((ullint*)&sh_zfrc[l_atom], (ullint)(-ifmag_dz));
 #  endif
 #  ifndef UPDATE_ATOMS
         }
 #  endif
-#endif
+#endif // COMPUTE_FORCE
       }
       pos += blockDim.x;
     }
@@ -2476,11 +2591,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    endif
             vx_update = (vx_update * tstw.ln_explicit) + (hmdt * rxfrc);
 #    ifdef TCALC_IS_SINGLE
-            __stcs(&poly_psw.vxnxt[gbl_write_idx], LLCONV_FUNC(vx_update));
+            __stcs(&poly_psw.vxalt[gbl_write_idx], LLCONV_FUNC(vx_update));
 #    else
             const int95_t ivx_update = doubleToInt95(vx_update);
-            __stcs(&poly_psw.vxnxt[gbl_write_idx],      ivx_update.x);
-            __stcs(&poly_psw.vxnxt_ovrf[gbl_write_idx], ivx_update.y);
+            __stcs(&poly_psw.vxalt[gbl_write_idx],      ivx_update.x);
+            __stcs(&poly_psw.vxalt_ovrf[gbl_write_idx], ivx_update.y);
 #    endif
           }
           break;
@@ -2495,14 +2610,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    ifdef TCALC_IS_SINGLE
             const llint ivx_delta = LLCONV_FUNC(vx_delta);
             const llint ivx_update = __ldca(&gmem_r.xvel[lcl_read_idx]) + ivx_delta;
-            __stcs(&poly_psw.vxnxt[gbl_write_idx], ivx_update);
+            __stcs(&poly_psw.vxalt[gbl_write_idx], ivx_update);
             vx_update = (TCALC)(ivx_update);
 #    else
             const int95_t ivx_delta  = doubleToInt95(vx_delta);
             const int95_t ivx_update = splitFPSum(ivx_delta, __ldca(&gmem_r.xvel[lcl_read_idx]),
                                                   __ldca(&gmem_r.xvel_ovrf[lcl_read_idx]));
-            __stcs(&poly_psw.vxnxt[gbl_write_idx],      ivx_update.x);
-            __stcs(&poly_psw.vxnxt_ovrf[gbl_write_idx], ivx_update.y);
+            __stcs(&poly_psw.vxalt[gbl_write_idx],      ivx_update.x);
+            __stcs(&poly_psw.vxalt_ovrf[gbl_write_idx], ivx_update.y);
             vx_update = int95ToDouble(ivx_update.x, ivx_update.y);
 #    endif
           }
@@ -2516,13 +2631,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                  tstw.dt_factor;
 #    ifdef TCALC_IS_SINGLE
         const llint ixpos_delta = LLCONV_FUNC(xpos_delta);
-        __stcs(&poly_psw.xnxt[gbl_write_idx], __ldcs(&poly_psw.xcrd[gbl_write_idx]) + ixpos_delta);
+        __stcs(&poly_psw.xalt[gbl_write_idx], __ldcs(&poly_psw.xcrd[gbl_write_idx]) + ixpos_delta);
 #    else
         const int95_t ixpos_delta = doubleToInt95(xpos_delta);
         const int95_t ixpos_update = splitFPSum(ixpos_delta, __ldcs(&poly_psw.xcrd[gbl_write_idx]),
                                                 __ldcs(&poly_psw.xcrd_ovrf[gbl_write_idx]));
-        __stcs(&poly_psw.xnxt[gbl_write_idx],      ixpos_update.x);
-        __stcs(&poly_psw.xnxt_ovrf[gbl_write_idx], ixpos_update.y);
+        __stcs(&poly_psw.xalt[gbl_write_idx],      ixpos_update.x);
+        __stcs(&poly_psw.xalt_ovrf[gbl_write_idx], ixpos_update.y);
 #    endif
       }
       pos += blockDim.x;
@@ -2564,11 +2679,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    endif
             vy_update = (vy_update * tstw.ln_explicit) + (hmdt * ryfrc);
 #    ifdef TCALC_IS_SINGLE
-            __stcs(&poly_psw.vynxt[gbl_write_idx], LLCONV_FUNC(vy_update));
+            __stcs(&poly_psw.vyalt[gbl_write_idx], LLCONV_FUNC(vy_update));
 #    else
             const int95_t ivy_update = doubleToInt95(vy_update);
-            __stcs(&poly_psw.vynxt[gbl_write_idx],      ivy_update.x);
-            __stcs(&poly_psw.vynxt_ovrf[gbl_write_idx], ivy_update.y);
+            __stcs(&poly_psw.vyalt[gbl_write_idx],      ivy_update.x);
+            __stcs(&poly_psw.vyalt_ovrf[gbl_write_idx], ivy_update.y);
 #    endif
           }
           break;
@@ -2580,14 +2695,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    ifdef TCALC_IS_SINGLE
             const llint ivy_delta = LLCONV_FUNC(vy_delta);
             const llint ivy_update = __ldca(&gmem_r.yvel[lcl_read_idx]) + ivy_delta;
-            __stcs(&poly_psw.vynxt[gbl_write_idx], ivy_update);
+            __stcs(&poly_psw.vyalt[gbl_write_idx], ivy_update);
             vy_update = (TCALC)(ivy_update);
 #    else
             const int95_t ivy_delta  = doubleToInt95(vy_delta);
             const int95_t ivy_update = splitFPSum(ivy_delta, __ldca(&gmem_r.yvel[lcl_read_idx]),
                                                   __ldca(&gmem_r.yvel_ovrf[lcl_read_idx]));
-            __stcs(&poly_psw.vynxt[gbl_write_idx],      ivy_update.x);
-            __stcs(&poly_psw.vynxt_ovrf[gbl_write_idx], ivy_update.y);
+            __stcs(&poly_psw.vyalt[gbl_write_idx],      ivy_update.x);
+            __stcs(&poly_psw.vyalt_ovrf[gbl_write_idx], ivy_update.y);
             vy_update = int95ToDouble(ivy_update.x, ivy_update.y);
 #    endif
           }
@@ -2599,13 +2714,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                  tstw.dt_factor;
 #    ifdef TCALC_IS_SINGLE
         const llint iypos_delta = LLCONV_FUNC(ypos_delta);
-        __stcs(&poly_psw.ynxt[gbl_write_idx], __ldcs(&poly_psw.ycrd[gbl_write_idx]) + iypos_delta);
+        __stcs(&poly_psw.yalt[gbl_write_idx], __ldcs(&poly_psw.ycrd[gbl_write_idx]) + iypos_delta);
 #    else
         const int95_t iypos_delta = doubleToInt95(ypos_delta);
         const int95_t iypos_update = splitFPSum(iypos_delta, __ldcs(&poly_psw.ycrd[gbl_write_idx]),
                                                 __ldcs(&poly_psw.ycrd_ovrf[gbl_write_idx]));
-        __stcs(&poly_psw.ynxt[gbl_write_idx],      iypos_update.x);
-        __stcs(&poly_psw.ynxt_ovrf[gbl_write_idx], iypos_update.y);
+        __stcs(&poly_psw.yalt[gbl_write_idx],      iypos_update.x);
+        __stcs(&poly_psw.yalt_ovrf[gbl_write_idx], iypos_update.y);
 #    endif
       }
       pos += blockDim.x;
@@ -2647,11 +2762,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    endif
             vz_update = (vz_update * tstw.ln_explicit) + (hmdt * rzfrc);
 #    ifdef TCALC_IS_SINGLE
-            __stcs(&poly_psw.vznxt[gbl_write_idx], LLCONV_FUNC(vz_update));
+            __stcs(&poly_psw.vzalt[gbl_write_idx], LLCONV_FUNC(vz_update));
 #    else
             const int95_t ivz_update = doubleToInt95(vz_update);
-            __stcs(&poly_psw.vznxt[gbl_write_idx],      ivz_update.x);
-            __stcs(&poly_psw.vznxt_ovrf[gbl_write_idx], ivz_update.y);
+            __stcs(&poly_psw.vzalt[gbl_write_idx],      ivz_update.x);
+            __stcs(&poly_psw.vzalt_ovrf[gbl_write_idx], ivz_update.y);
 #    endif
           }
           break;
@@ -2663,14 +2778,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    ifdef TCALC_IS_SINGLE
             const llint ivz_delta = LLCONV_FUNC(vz_delta);
             const llint ivz_update = __ldca(&gmem_r.zvel[lcl_read_idx]) + ivz_delta;
-            __stcs(&poly_psw.vznxt[gbl_write_idx], ivz_update);
+            __stcs(&poly_psw.vzalt[gbl_write_idx], ivz_update);
             vz_update = (TCALC)(ivz_update);
 #    else
             const int95_t ivz_delta  = doubleToInt95(vz_delta);
             const int95_t ivz_update = splitFPSum(ivz_delta, __ldca(&gmem_r.zvel[lcl_read_idx]),
                                                   __ldca(&gmem_r.zvel_ovrf[lcl_read_idx]));
-            __stcs(&poly_psw.vznxt[gbl_write_idx],      ivz_update.x);
-            __stcs(&poly_psw.vznxt_ovrf[gbl_write_idx], ivz_update.y);
+            __stcs(&poly_psw.vzalt[gbl_write_idx],      ivz_update.x);
+            __stcs(&poly_psw.vzalt_ovrf[gbl_write_idx], ivz_update.y);
             vz_update = int95ToDouble(ivz_update.x, ivz_update.y);
 #    endif
           }
@@ -2682,13 +2797,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                  tstw.dt_factor;
 #    ifdef TCALC_IS_SINGLE
         const llint izpos_delta = LLCONV_FUNC(zpos_delta);
-        __stcs(&poly_psw.znxt[gbl_write_idx], __ldcs(&poly_psw.zcrd[gbl_write_idx]) + izpos_delta);
+        __stcs(&poly_psw.zalt[gbl_write_idx], __ldcs(&poly_psw.zcrd[gbl_write_idx]) + izpos_delta);
 #    else
         const int95_t izpos_delta = doubleToInt95(zpos_delta);
         const int95_t izpos_update = splitFPSum(izpos_delta, __ldcs(&poly_psw.zcrd[gbl_write_idx]),
                                                 __ldcs(&poly_psw.zcrd_ovrf[gbl_write_idx]));
-        __stcs(&poly_psw.znxt[gbl_write_idx],      izpos_update.x);
-        __stcs(&poly_psw.znxt_ovrf[gbl_write_idx], izpos_update.y);
+        __stcs(&poly_psw.zalt[gbl_write_idx],      izpos_update.x);
+        __stcs(&poly_psw.zalt_ovrf[gbl_write_idx], izpos_update.y);
 #    endif
       }
       pos += blockDim.x;

@@ -458,10 +458,14 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #      undef DO_NECK_CORRECTION
 #    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
+#  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
+#  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER
+#  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  define CLASH_FORGIVENESS
 #    define COMPUTE_FORCE
 #      define SPLIT_FORCE_ACCUMULATION
 #        define COMPUTE_ENERGY
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
 #          define KERNEL_NAME ktgfsVacuumForceEnergyNonClash
 #            include "nonbonded_potential_tilegroups.cui"
 #          undef KERNEL_NAME
@@ -475,7 +479,9 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #              undef KERNEL_NAME
 #            undef DO_NECK_CORRECTION
 #          undef DO_GENERALIZED_BORN
+#          undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #        undef COMPUTE_ENERGY
+#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
 #        define KERNEL_NAME ktgfsVacuumForceNonClash
 #          include "nonbonded_potential_tilegroups.cui"
 #        undef KERNEL_NAME
@@ -489,8 +495,10 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #            undef KERNEL_NAME
 #          undef DO_NECK_CORRECTION
 #        undef DO_GENERALIZED_BORN
+#        undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #      undef SPLIT_FORCE_ACCUMULATION
 #      define COMPUTE_ENERGY
+#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
 #        define KERNEL_NAME ktgfVacuumForceEnergyNonClash
 #          include "nonbonded_potential_tilegroups.cui"
 #        undef KERNEL_NAME
@@ -504,7 +512,9 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #            undef KERNEL_NAME
 #          undef DO_NECK_CORRECTION
 #        undef DO_GENERALIZED_BORN
+#        undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #      undef COMPUTE_ENERGY
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
 #      define KERNEL_NAME ktgfVacuumForceNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
@@ -518,8 +528,10 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #          undef KERNEL_NAME
 #        undef DO_NECK_CORRECTION
 #      undef DO_GENERALIZED_BORN
+#      undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #    undef COMPUTE_FORCE
 #    define COMPUTE_ENERGY
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
 #      define KERNEL_NAME ktgfVacuumEnergyNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
@@ -533,6 +545,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #          undef KERNEL_NAME
 #        undef DO_NECK_CORRECTION
 #      undef DO_GENERALIZED_BORN
+#      undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #    undef COMPUTE_ENERGY
 #  undef CLASH_FORGIVENESS
 #  undef LLCONV_FUNC
@@ -542,9 +555,6 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  undef EXP_FUNC
 #  undef TANH_FUNC
 #  undef FABS_FUNC
-#  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
-#  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
-#  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER
 #  undef TCALC_IS_SINGLE
 #  undef TCALC2
 #undef TCALC
@@ -622,13 +632,19 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #      undef DO_NECK_CORRECTION
 #    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
+#  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
+#  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER
+#  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  define CLASH_FORGIVENESS
 #    define COMPUTE_FORCE
 #      define COMPUTE_ENERGY
+#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #        define KERNEL_NAME ktgdsVacuumForceEnergyNonClash
 #          include "nonbonded_potential_tilegroups.cui"
 #        undef KERNEL_NAME
+#        undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #        define DO_GENERALIZED_BORN
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 2
 #          define KERNEL_NAME ktgdsGBForceEnergyNonClash
 #            include "nonbonded_potential_tilegroups.cui"
 #          undef KERNEL_NAME
@@ -637,8 +653,10 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #              include "nonbonded_potential_tilegroups.cui"
 #            undef KERNEL_NAME
 #          undef DO_NECK_CORRECTION
+#          undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #        undef DO_GENERALIZED_BORN
 #      undef COMPUTE_ENERGY
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #      define KERNEL_NAME ktgdsVacuumForceNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
@@ -652,8 +670,10 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #          undef KERNEL_NAME
 #        undef DO_NECK_CORRECTION
 #      undef DO_GENERALIZED_BORN
+#      undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #    undef COMPUTE_FORCE
 #    define COMPUTE_ENERGY
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #      define KERNEL_NAME ktgdVacuumEnergyNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
@@ -667,6 +687,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #          undef KERNEL_NAME
 #        undef DO_NECK_CORRECTION
 #      undef DO_GENERALIZED_BORN
+#      undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #    undef COMPUTE_ENERGY
 #  undef CLASH_FORGIVENESS
 #  undef LLCONV_FUNC
@@ -676,9 +697,6 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  undef EXP_FUNC
 #  undef TANH_FUNC
 #  undef FABS_FUNC
-#  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
-#  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
-#  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER
 #  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2
 #undef TCALC

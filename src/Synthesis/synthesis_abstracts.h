@@ -24,16 +24,17 @@ template <typename T> struct SyValenceKit {
                         const T* dihe_amp_in, const T* dihe_freq_in, const T* dihe_phi_in,
                         const T* attn14_elec_in, const T* attn14_vdw_in, const T* charges_in,
                         const T* lja_14_coeff_in, const T* ljb_14_coeff_in,
-                        const T* ljc_14_coeff_in, const int* lj_idx_in, const int* n_lj_types_in,
-                        const int* ljabc_offsets_in, const T* ubrd_keq_in, const T* ubrd_leq_in,
-                        const T* cimp_keq_in, const T* cimp_phi_in, const int* cmap_dim_in,
-                        const T* cmap_patches_in, const int* cmap_patch_bounds_in,
-                        const int2* vwu_abstracts_in, const int* vwu_imports_in,
-                        const uint2* cbnd_insr_in, const uint2* angl_insr_in,
-                        const uint2* cdhe_insr_in, const uint* cdhe_ovrt_insr_in,
-                        const uint2* cmap_insr_in, const uint* infr14_insr_in,
-                        const uint* cbnd_acc_in, const uint* angl_acc_in, const uint* cdhe_acc_in,
-                        const uint* cmap_acc_in, const uint* infr14_acc_in);
+                        const T* ljc_14_coeff_in, const T* lj_14_sigma_in, const int* lj_idx_in,
+                        const int* n_lj_types_in, const int* ljabc_offsets_in,
+                        const T* ubrd_keq_in, const T* ubrd_leq_in, const T* cimp_keq_in,
+                        const T* cimp_phi_in, const int* cmap_dim_in, const T* cmap_patches_in,
+                        const int* cmap_patch_bounds_in, const int2* vwu_abstracts_in,
+                        const int* vwu_imports_in, const uint2* cbnd_insr_in,
+                        const uint2* angl_insr_in, const uint2* cdhe_insr_in,
+                        const uint* cdhe_ovrt_insr_in, const uint2* cmap_insr_in,
+                        const uint* infr14_insr_in, const uint* cbnd_acc_in,
+                        const uint* angl_acc_in, const uint* cdhe_acc_in, const uint* cmap_acc_in,
+                        const uint* infr14_acc_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -60,6 +61,7 @@ template <typename T> struct SyValenceKit {
   const T* lja_14_coeff;         ///< Lennard-Jones 1:4 interaction A coefficients
   const T* ljb_14_coeff;         ///< Lennard-Jones 1:4 interaction B coefficients
   const T* ljc_14_coeff;         ///< Lennard-Jones 1:4 interaction C coefficients
+  const T* lj_14_sigma;          ///< Lennard-Jones 1:4 sigma parameters for all atom type pairs
   const int* lj_idx;             ///< Lennard-Jones type indices for all atoms
   const int* n_lj_types;         ///< Lennard-Jones type counts for all systems
   const int* ljabc_offsets;      ///< Offsets for Lennard-Jones A, B, and C coefficient tables for
@@ -177,9 +179,9 @@ template <typename T, typename T2> struct SyNonbondedKit {
                           T gb_neckcut_in, const T* charge_in, const int* lj_idx_in,
                           const int* n_lj_types_in, const int* ljabc_offsets_in,
                           const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in,
-                          const int* neck_gb_idx_in, const T* pb_radii_in, const T* gb_screen_in,
-                          const T* gb_alpha_in, const T* gb_beta_in, const T* gb_gamma_in,
-                          const T2* neck_limits_in);
+                          const T* lj_sigma_in, const int* neck_gb_idx_in, const T* pb_radii_in,
+                          const T* gb_screen_in, const T* gb_alpha_in, const T* gb_beta_in,
+                          const T* gb_gamma_in, const T2* neck_limits_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -222,6 +224,7 @@ template <typename T, typename T2> struct SyNonbondedKit {
   const T* lja_coeff;             ///< Lennard-Jones interaction A coefficients
   const T* ljb_coeff;             ///< Lennard-Jones interaction B coefficients
   const T* ljc_coeff;             ///< Lennard-Jones interaction C coefficients
+  const T* lj_sigma;              ///< Lennard-Jones sigma parameters for all atom type pairs
   const int* neck_gb_idx;         ///< Neck GB indicies for all atoms in each system, applicable
                                   ///<   for Mongan's "neck" GB models
   const T* pb_radii;              ///< Atomic PB radii for all atoms in all systems

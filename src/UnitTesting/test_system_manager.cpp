@@ -230,13 +230,13 @@ PhaseSpace& TestSystemManager::viewCoordinates(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraph& TestSystemManager::getTopologyReference(const int index) {
+const AtomGraph& TestSystemManager::getTopologyReference(const int index) const {
   checkIndexing(index, "viewTopology");
   return all_topologies[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<AtomGraph>& TestSystemManager::getTopologyReference() {
+const std::vector<AtomGraph>& TestSystemManager::getTopologyReference() const {
   return all_topologies;
 }
 
@@ -247,10 +247,25 @@ AtomGraph* TestSystemManager::getTopologyPointer(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+const AtomGraph* TestSystemManager::getTopologyPointer(const int index) const {
+  checkIndexing(index, "viewTopology");
+  return &all_topologies[index];
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() {
   std::vector<AtomGraph*> result(system_count);
   for (int i = 0; i < system_count; i++) {
     result[i] = &all_topologies[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() const {
+  std::vector<AtomGraph*> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = const_cast<AtomGraph*>(&all_topologies[i]);
   }
   return result;
 }

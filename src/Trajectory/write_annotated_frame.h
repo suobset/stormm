@@ -46,7 +46,7 @@ using synthesis::PsSynthesisReader;
 ///                       the coordinates which are to be read.  If not provided, the object's
 ///                       internal cycle counter will be referenced.
 /// \param psr            Abstract of the PhaseSpace coordinate object holding coordinates to
-///                       swap into the supplied plan.  The PRESENT coordinates found in this
+///                       swap into the supplied plan.  The PRIMARY coordinates found in this
 ///                       abstract are referenced.
 /// \param cf             Object holding coordinates to swap into the xcrd, ycrd, and zcrd arrays
 ///                       according to the supplied plan.
@@ -76,7 +76,7 @@ void writeFrame(const std::string &filename, PrintSituation expectation, const T
 
 void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const PhaseSpace &ps, const CoordinateSwapPlan &excision,
-                CoordinateCycle time_point = CoordinateCycle::PRESENT);
+                CoordinateCycle time_point = CoordinateCycle::PRIMARY);
 
 void writeFrame(const std::string &filename, PrintSituation expectation, const TextFile &tf,
                 const CoordinateFrameReader &cfr, const CoordinateSwapPlan &excision);
@@ -110,7 +110,7 @@ void writeFrame(const std::string &filename, PrintSituation expectation,
                 const std::vector<TextFile> &tf_list, const PhaseSpaceSynthesis &poly_ps,
                 const std::vector<CoordinateSwapPlan> &excision_list,
                 const std::vector<int> &plan_indices,
-                CoordinateCycle time_point = CoordinateCycle::PRESENT);
+                CoordinateCycle time_point = CoordinateCycle::PRIMARY);
 /// \}
 
 } // namespace trajectory

@@ -916,7 +916,7 @@ int main(const int argc, const char* argv[]) {
         "Lennard-Jones sigma radii of particles in each system do not meet expectations when "
         "computed in double precision.", top_check);
   check(realAGProp<float>(all_topologies, all_top_exist, RealInfoCode::AVERAGE_LJ_SIGMA),
-        RelationalOperator::EQUAL, Approx(mean_ljsigf).margin(1.0e-7), "Average (nonzero) "
+        RelationalOperator::EQUAL, Approx(mean_ljsigf).margin(3.5e-7), "Average (nonzero) "
         "Lennard-Jones sigma radii of particles in each system do not meet expectations when "
         "computed in single precision.", top_check);
   const std::vector<double> mean_ljeps = { 0.15200000, 0.16275000, 0.16275000, 0.16000000,

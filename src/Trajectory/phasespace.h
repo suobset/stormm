@@ -26,13 +26,11 @@ struct PhaseSpaceWriter {
   /// Constructor takes a large list of arguments passed in from the original PhaseSpace object
   PhaseSpaceWriter(const int natom_in, const UnitCellType unit_cell_in, double* xcrd_in,
                    double* ycrd_in, double* zcrd_in, double* umat_in, double* invu_in,
-                   double* boxdim_in, double* xvel_in, double* yvel_in, double* zvel_in,
-                   double* xfrc_in, double* yfrc_in, double* zfrc_in, double* xprv_in,
-                   double* yprv_in, double* zprv_in, double* xnxt_in, double* ynxt_in,
-                   double* znxt_in, double* vxprv_in, double* vyprv_in, double* vzprv_in,
-                   double* vxnxt_in, double* vynxt_in, double* vznxt_in, double* fxprv_in,
-                   double* fyprv_in, double* fzprv_in, double* fxnxt_in, double* fynxt_in,
-                   double* fznxt_in);
+                   double* boxdim_in, double* umat_alt_in, double* invu_alt_in,
+                   double* boxdim_alt_in, double* xvel_in, double* yvel_in, double* zvel_in,
+                   double* xfrc_in, double* yfrc_in, double* zfrc_in, double* xalt_in,
+                   double* yalt_in, double* zalt_in, double* vxalt_in, double* vyalt_in,
+                   double* vzalt_in, double* fxalt_in, double* fyalt_in, double* fzalt_in);
 
   /// \brief Copy and move constructors.  The assignment operators are implicitly deleted.
   /// \{
@@ -50,31 +48,26 @@ struct PhaseSpaceWriter {
   double* invu;                  ///< Transformation matrix to take coordinates into real space
   double* boxdim;                ///< Box dimensions (stored for convenience and accuracy if the
                                  ///<   box is resized repeatedly)
+  double* umat_alt;              ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  double* invu_alt;              ///< Transformation matrix to take coordinates into real space
+  double* boxdim_alt;            ///< Box dimensions (stored for convenience and accuracy if the
+                                 ///<   box is resized repeatedly)
   double* xvel;                  ///< Cartesian X velocities of all particles
   double* yvel;                  ///< Cartesian Y velocities of all particles
   double* zvel;                  ///< Cartesian Z velocities of all particles
   double* xfrc;                  ///< Cartesian X forces acting on all particles
   double* yfrc;                  ///< Cartesian Y forces acting on all particles
   double* zfrc;                  ///< Cartesian Z forces acting on all particles
-  double* xprv;                  ///< Prior Cartesian X positions of all particles
-  double* yprv;                  ///< Prior Cartesian Y positions of all particles
-  double* zprv;                  ///< Prior Cartesian Z positions of all particles
-  double* xnxt;                  ///< Next, upcoming Cartesian X positions of all particles
-  double* ynxt;                  ///< Next, upcoming Cartesian Y positions of all particles
-  double* znxt;                  ///< Next, upcoming Cartesian Z positions of all particles 
-  double* vxprv;                 ///< Prior Cartesian X velocities for all particles
-  double* vyprv;                 ///< Prior Cartesian Y velocities for all particles
-  double* vzprv;                 ///< Prior Cartesian Z velocities for all particles
-  double* vxnxt;                 ///< Next (planned) Cartesian X velocities of particles
-  double* vynxt;                 ///< Next (planned) Cartesian Y velocities of particles
-  double* vznxt;                 ///< Next (planned) Cartesian Z velocities of particles
-  double* fxprv;                 ///< Prior Cartesian X forces acting on all particles
-  double* fyprv;                 ///< Prior Cartesian Y forces acting on all particles
-  double* fzprv;                 ///< Prior Cartesian Z forces acting on all particles
-  double* fxnxt;                 ///< Next (currently undergoing updates) forces acting on all
-                                 ///<   particles in the Cartesian X direction
-  double* fynxt;                 ///< Next forces on all particles in the Cartesian Y direction
-  double* fznxt;                 ///< Next forces on all particles in the Cartesian Z direction
+  double* xalt;                  ///< Alternate Cartesian X positions of all particles
+  double* yalt;                  ///< Alternate Cartesian Y positions of all particles
+  double* zalt;                  ///< Alternate Cartesian Z positions of all particles
+  double* vxalt;                 ///< Alternate Cartesian X velocities for all particles
+  double* vyalt;                 ///< Alternate Cartesian Y velocities for all particles
+  double* vzalt;                 ///< Alternate Cartesian Z velocities for all particles
+  double* fxalt;                 ///< Alternate Cartesian X forces acting on all particles
+  double* fyalt;                 ///< Alternate Cartesian Y forces acting on all particles
+  double* fzalt;                 ///< Alternate Cartesian Z forces acting on all particles
 };
 
 /// \brief Collect constants and pointers to the components of a read-only PhaseSpace object.
@@ -85,15 +78,13 @@ struct PhaseSpaceReader {
   /// \{
   PhaseSpaceReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
                    const double* ycrd_in, const double* zcrd_in, const double* umat_in,
-                   const double* invu_in, const double* boxdim_in, const double* xvel_in,
+                   const double* invu_in, const double* boxdim_in, const double* umat_alt_in,
+                   const double* invu_alt_in, const double* boxdim_alt_in, const double* xvel_in,
                    const double* yvel_in, const double* zvel_in, const double* xfrc_in,
-                   const double* yfrc_in, const double* zfrc_in, const double* xprv_in,
-                   const double* yprv_in, const double* zprv_in, const double* xnxt_in,
-                   const double* ynxt_in, const double* znxt_in, const double* vxprv_in,
-                   const double* vyprv_in, const double* vzprv_in, const double* vxnxt_in,
-                   const double* vynxt_in, const double* vznxt_in, const double* fxprv_in,
-                   const double* fyprv_in, const double* fzprv_in, const double* fxnxt_in,
-                   const double* fynxt_in, const double* fznxt_in);
+                   const double* yfrc_in, const double* zfrc_in, const double* xalt_in,
+                   const double* yalt_in, const double* zalt_in, const double* vxalt_in,
+                   const double* vyalt_in, const double* vzalt_in, const double* fxalt_in,
+                   const double* fyalt_in, const double* fzalt_in);
 
   PhaseSpaceReader(const PhaseSpaceWriter &psw);
   /// \}
@@ -114,31 +105,26 @@ struct PhaseSpaceReader {
   const double* invu;            ///< Transformation matrix to take coordinates into real space
   const double* boxdim;          ///< Box dimensions (stored for convenience and accuracy if the
                                  ///<   box is resized repeatedly)
+  const double* umat_alt;        ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  const double* invu_alt;        ///< Transformation matrix to take coordinates into real space
+  const double* boxdim_alt;      ///< Box dimensions (stored for convenience and accuracy if the
+                                 ///<   box is resized repeatedly)
   const double* xvel;            ///< Cartesian X velocities of all particles
   const double* yvel;            ///< Cartesian Y velocities of all particles
   const double* zvel;            ///< Cartesian Z velocities of all particles
   const double* xfrc;            ///< Cartesian X forces acting on all particles
   const double* yfrc;            ///< Cartesian Y forces acting on all particles
   const double* zfrc;            ///< Cartesian Z forces acting on all particles
-  const double* xprv;            ///< Prior Cartesian X positions of all particles
-  const double* yprv;            ///< Prior Cartesian Y positions of all particles
-  const double* zprv;            ///< Prior Cartesian Z positions of all particles
-  const double* xnxt;            ///< Next, upcoming Cartesian X positions of all particles
-  const double* ynxt;            ///< Next, upcoming Cartesian Y positions of all particles
-  const double* znxt;            ///< Next, upcoming Cartesian Z positions of all particles
-  const double* vxprv;           ///< Prior Cartesian X velocities for all particles
-  const double* vyprv;           ///< Prior Cartesian Y velocities for all particles
-  const double* vzprv;           ///< Prior Cartesian Z velocities for all particles
-  const double* vxnxt;           ///< Next (planned) Cartesian X velocities of particles
-  const double* vynxt;           ///< Next (planned) Cartesian Y velocities of particles
-  const double* vznxt;           ///< Next (planned) Cartesian Z velocities of particles
-  const double* fxprv;           ///< Prior Cartesian X forces acting on all particles
-  const double* fyprv;           ///< Prior Cartesian Y forces acting on all particles
-  const double* fzprv;           ///< Prior Cartesian Z forces acting on all particles
-  const double* fxnxt;           ///< Next (currently undergoing updates) forces acting on all
-                                 ///<   particles in the Cartesian X direction
-  const double* fynxt;           ///< Next forces on all particles in the Cartesian Y direction
-  const double* fznxt;           ///< Next forces on all particles in the Cartesian Z direction
+  const double* xalt;            ///< Alternate Cartesian X positions of all particles
+  const double* yalt;            ///< Alternate Cartesian Y positions of all particles
+  const double* zalt;            ///< Alternate Cartesian Z positions of all particles
+  const double* vxalt;           ///< Alternate Cartesian X velocities for all particles
+  const double* vyalt;           ///< Alternate Cartesian Y velocities for all particles
+  const double* vzalt;           ///< Alternate Cartesian Z velocities for all particles
+  const double* fxalt;           ///< Alternate Cartesian X forces acting on all particles
+  const double* fyalt;           ///< Alternate Cartesian Y forces acting on all particles
+  const double* fzalt;           ///< Alternate Cartesian Z forces acting on all particles
 };
 
 /// \brief An object to complement a topology and hold positions, velocities, and forces of all
@@ -223,13 +209,13 @@ public:
   template <typename T>
   void fill(const T* xcrd, const T* ycrd, const T* zcrd,
             TrajectoryKind kind = TrajectoryKind::POSITIONS,
-            CoordinateCycle cycle_in = CoordinateCycle::PRESENT, int scale_bits = 0,
+            CoordinateCycle cycle_in = CoordinateCycle::PRIMARY, int scale_bits = 0,
             const double* box_dims = nullptr);
 
   template <typename T>
   void fill(const std::vector<T> &xcrd, const std::vector<T> &ycrd, const std::vector<T> &zcrd,
             TrajectoryKind kind = TrajectoryKind::POSITIONS,
-            CoordinateCycle cycle_in = CoordinateCycle::PRESENT, int scale_bits = 0,
+            CoordinateCycle cycle_in = CoordinateCycle::PRIMARY, int scale_bits = 0,
             const std::vector<double> &box_dims = {});
   /// \}
 
@@ -293,9 +279,17 @@ public:
   /// Overloaded:
   ///   - Get a const pointer for a const PhaseSpace object's data
   ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///   - Indicate a specific point in the time cycle, or accept whatever the object sees as its
+  ///     own current stage of the cycle
   ///
-  /// \param tier  Level at which to extract the data
+  /// \param orientation  A specific point in the time cycle to query
+  /// \param tier         Level at which to extract the data
   /// \{
+  const double*
+  getBoxSpaceTransformPointer(CoordinateCycle orientation,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getBoxSpaceTransformPointer(CoordinateCycle orientation,
+                                      HybridTargetLevel tier = HybridTargetLevel::HOST);
   const double*
   getBoxSpaceTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   double* getBoxSpaceTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
@@ -308,9 +302,16 @@ public:
   /// Overloaded:
   ///   - Get a const pointer for a const PhaseSpace object's data
   ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///   - Indicate a specific point in the time cycle, or accept whatever the object sees as its
+  ///     own current stage of the cycle
   ///
-  /// \param tier  Level at which to extract the data
+  /// \param orientation  A specific point in the time cycle to query
+  /// \param tier         Level at which to extract the data
   /// \{
+  const double* getInverseTransformPointer(CoordinateCycle orientation,
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getInverseTransformPointer(CoordinateCycle orientation,
+                                     HybridTargetLevel tier = HybridTargetLevel::HOST);
   const double* getInverseTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   double* getInverseTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
@@ -321,9 +322,16 @@ public:
   /// Overloaded:
   ///   - Get a const pointer for a const PhaseSpace object's data
   ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///   - Indicate a specific point in the time cycle, or accept whatever the object sees as its
+  ///     own current stage of the cycle
   ///
-  /// \param tier  Level at which to extract the data
+  /// \param orientation  A specific point in the time cycle to query
+  /// \param tier         Level at which to extract the data
   /// \{
+  const double* getBoxSizePointer(CoordinateCycle orientation,
+                                  HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getBoxSizePointer(CoordinateCycle orientation,
+                            HybridTargetLevel tier = HybridTargetLevel::HOST);
   const double* getBoxSizePointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   double* getBoxSizePointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
@@ -331,15 +339,31 @@ public:
   /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
   ///        result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
+  /// Overloaded:
+  ///   - Indicate a specific point in the time cycle
+  ///   - Accept whatever the object sees as its own current stage of the cycle
+  ///
+  /// \param orientation  A specific point in the time cycle to query
+  /// \param tier         Level at which to retrieve the data (if STORMM is compiled to run on a
+  ///                     GPU)
+  /// \{
+  std::vector<double> getBoxSpaceTransform(CoordinateCycle orientation,
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double> getBoxSpaceTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-
+  /// \}
+  
   /// \brief Get the transformation matrix to take coordinates from fractional space back into
   ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
+  /// \param orientation  A specific point in the time cycle to query
+  /// \param tier         Level at which to retrieve the data (if STORMM is compiled to run on a
+  ///                     GPU)
+  /// \{
+  std::vector<double> getInverseTransform(CoordinateCycle orientation,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double> getInverseTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-
+  /// \}
+  
   /// \brief Get a pointer to the ARRAY-kind Hybrid object that holds the actual data.  Needed by
   ///        CoordinateFrame objects which want to be pointers into a PhaseSpace object.
   ///
@@ -357,7 +381,7 @@ public:
   ///   - Update forces for an arbitrary point in the time cycle
   ///   - Update forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void initializeForces(CoordinateCycle orientation);
   void initializeForces();
@@ -401,7 +425,7 @@ public:
   ///   - Upload particle positions for a specific point in the time cycle
   ///   - Upload particle positions for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void uploadPositions(CoordinateCycle orientation);
   void uploadPositions();
@@ -416,7 +440,7 @@ public:
   ///   - Upload velocities for a specific point in the time cycle
   ///   - Upload velocities for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void uploadVelocities(CoordinateCycle orientation);
   void uploadVelocities();
@@ -428,7 +452,7 @@ public:
   ///   - Upload forces for a specific point in the time cycle
   ///   - Upload forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void uploadForces(CoordinateCycle orientation);
   void uploadForces();
@@ -443,7 +467,7 @@ public:
   ///   - Download particle positions for a specific point in the time cycle
   ///   - Download particle positions for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void downloadPositions(CoordinateCycle orientation);
   void downloadPositions();
@@ -458,7 +482,7 @@ public:
   ///   - Download velocities for a specific point in the time cycle
   ///   - Download velocities for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void downloadVelocities(CoordinateCycle orientation);
   void downloadVelocities();
@@ -470,7 +494,7 @@ public:
   ///   - Download forces for a specific point in the time cycle
   ///   - Download forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
   /// \{
   void downloadForces(CoordinateCycle orientation);
   void downloadForces();
@@ -499,34 +523,35 @@ public:
                         HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Get a pointer to the object itself (useful when the object has been passed as a const
+  ///        reference and a pointer is needed).
+  const PhaseSpace* getSelfPointer() const;
+  
 private:
-  std::string file_name;               ///< Name of the file from which these coordinates (and
-                                       ///<   perhaps velocities) derived.  Empty string indicates
-                                       ///<   no file.
-  int atom_count;                      ///< The number of atoms in the system
-  UnitCellType unit_cell;              ///< The type of unit cell
-  CoordinateCycle cycle_position;      ///< Indicates the place in the past >> present >> future
-                                       ///<   cycle where the object is currently storing its
-                                       ///<   relevant coordinates.  After a dynamics step, present
-                                       ///<   becomes past, future becomes present, and what were
-                                       ///<   the arrays holding past coordinates stand ready to
-                                       ///<   accept the future configuration as it is assembled.
-                                       ///<   With the work unit system, constraint updates might
-                                       ///<   not occur atomically.  Three arrays, not just two as
-                                       ///<   are used in other codes, are needed to protect
-                                       ///<   against race conditions.
-  Hybrid<double> x_coordinates;        ///< Cartesian X coordinates of all particles
-  Hybrid<double> y_coordinates;        ///< Cartesian Y coordinates of all particles
-  Hybrid<double> z_coordinates;        ///< Cartesian Z coordinates of all particles
+  std::string file_name;           ///< Name of the file from which these coordinates (and
+                                   ///<   perhaps velocities) derived.  Empty string indicates
+                                   ///<   no file.
+  int atom_count;                  ///< The number of atoms in the system
+  UnitCellType unit_cell;          ///< The type of unit cell
+  CoordinateCycle cycle_position;  ///< Indicates the place in the past >> present >> future
+                                   ///<   cycle where the object is currently storing its
+                                   ///<   relevant coordinates.  After a dynamics step, present
+                                   ///<   becomes past, future becomes present, and what were
+                                   ///<   the arrays holding past coordinates stand ready to
+                                   ///<   accept the future configuration as it is assembled.
+                                   ///<   With the work unit system, constraint updates might
+                                   ///<   not occur atomically.  Three arrays, not just two as
+                                   ///<   are used in other codes, are needed to protect
+                                   ///<   against race conditions.
+  Hybrid<double> x_coordinates;    ///< Cartesian X coordinates of all particles
+  Hybrid<double> y_coordinates;    ///< Cartesian Y coordinates of all particles
+  Hybrid<double> z_coordinates;    ///< Cartesian Z coordinates of all particles
 
   // The actual nature of the following arrays, as well as the [x,y,z]_coordinates themselves, can
   // change based on the CoordinateCycle position.
-  Hybrid<double> x_prior_coordinates;  ///< Previous step Cartesian X coordinates of all particles
-  Hybrid<double> y_prior_coordinates;  ///< Previous step Cartesian Y coordinates of all particles
-  Hybrid<double> z_prior_coordinates;  ///< Previous step Cartesian Z coordinates of all particles
-  Hybrid<double> x_future_coordinates; ///< Upcoming step Cartesian X coordinates of all particles
-  Hybrid<double> y_future_coordinates; ///< Upcoming step Cartesian Y coordinates of all particles
-  Hybrid<double> z_future_coordinates; ///< Upcoming step Cartesian Z coordinates of all particles
+  Hybrid<double> x_alt_coordinates;  ///< Previous step Cartesian X coordinates of all particles
+  Hybrid<double> y_alt_coordinates;  ///< Previous step Cartesian Y coordinates of all particles
+  Hybrid<double> z_alt_coordinates;  ///< Previous step Cartesian Z coordinates of all particles
 
   // Transformation matrices are given directly after the coordinates in the overall order of data
   Hybrid<double> box_space_transform;  ///< Matrix to transform coordinates into box space (3 x 3)
@@ -534,25 +559,29 @@ private:
   Hybrid<double> box_dimensions;       ///< Three lengths and three angles defining the box
                                        ///<   (lengths are given in Angstroms, angles in radians)
 
-  // Like coordinates, velocities and forces appear in PRESENT -> PAST -> FUTURE blocks
-  Hybrid<double> x_velocities;         ///< Cartesian X velocities of all particles
-  Hybrid<double> y_velocities;         ///< Cartesian Y velocities of all particles
-  Hybrid<double> z_velocities;         ///< Cartesian Z velocities of all particles
-  Hybrid<double> x_prior_velocities;   ///< Prior Cartesian X velocities of all particles
-  Hybrid<double> y_prior_velocities;   ///< Prior Cartesian Y velocities of all particles
-  Hybrid<double> z_prior_velocities;   ///< Prior Cartesian Z velocities of all particles
-  Hybrid<double> x_future_velocities;  ///< Planned Cartesian X velocities of all particles
-  Hybrid<double> y_future_velocities;  ///< Planned Cartesian Y velocities of all particles
-  Hybrid<double> z_future_velocities;  ///< Planned Cartesian Z velocities of all particles
-  Hybrid<double> x_forces;             ///< Cartesian X forces acting on all particles
-  Hybrid<double> y_forces;             ///< Cartesian Y forces acting on all particles
-  Hybrid<double> z_forces;             ///< Cartesian Z forces acting on all particles 
-  Hybrid<double> x_prior_forces;       ///< Prior Cartesian X forces acting on all particles
-  Hybrid<double> y_prior_forces;       ///< Prior Cartesian Y forces acting on all particles
-  Hybrid<double> z_prior_forces;       ///< Prior Cartesian Z forces acting on all particles
-  Hybrid<double> x_future_forces;      ///< Upcoming Cartesian X forces acting on all particles
-  Hybrid<double> y_future_forces;      ///< Upcoming Cartesian Y forces acting on all particles
-  Hybrid<double> z_future_forces;      ///< Upcoming Cartesian Z forces acting on all particles
+  // Alternate transformation matrices are stored next, for consistency.  This provides a complete
+  // record of the previous unit cell dimensions in the event that the trajectory needs to
+  // backtrack against a rejected Monte-Carlo move, or a complete space to build the next state of
+  // the system.
+  Hybrid<double> alt_box_space_transform;  ///< Matrix to transform coordinates into box space
+  Hybrid<double> alt_inverse_transform;    ///< Matrix to transform coordinates into real space
+  Hybrid<double> alt_box_dimensions;       ///< Three lengths and three angles defining the box
+                                           ///<   (lengths are given in Angstroms, angles in
+                                           ///<   radians)
+
+  // Like coordinates, velocities and forces appear in PRIMARY -> ALTERNATE blocks
+  Hybrid<double> x_velocities;      ///< Cartesian X velocities of all particles
+  Hybrid<double> y_velocities;      ///< Cartesian Y velocities of all particles
+  Hybrid<double> z_velocities;      ///< Cartesian Z velocities of all particles
+  Hybrid<double> x_alt_velocities;  ///< Alternate Cartesian X velocities of all particles
+  Hybrid<double> y_alt_velocities;  ///< Alternate Cartesian Y velocities of all particles
+  Hybrid<double> z_alt_velocities;  ///< Alternate Cartesian Z velocities of all particles
+  Hybrid<double> x_forces;          ///< Cartesian X forces acting on all particles
+  Hybrid<double> y_forces;          ///< Cartesian Y forces acting on all particles
+  Hybrid<double> z_forces;          ///< Cartesian Z forces acting on all particles 
+  Hybrid<double> x_alt_forces;      ///< Alternate Cartesian X forces acting on all particles
+  Hybrid<double> y_alt_forces;      ///< Alternate Cartesian Y forces acting on all particles
+  Hybrid<double> z_alt_forces;      ///< Alternate Cartesian Z forces acting on all particles
 
   /// All of the above Hybrid objects are pointers into this single large array, segmented to hold
   /// each type of information with zero-padding to accommodate the HPC warp size.

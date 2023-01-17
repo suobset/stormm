@@ -35,15 +35,14 @@ void ImplicitSolventWorkspace::launchInitialization(const GpuDetails &gpu,
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   const int nsmp = gpu.getSMPCount();
   switch (orientation) {
-  case CoordinateCycle::PAST:
-  case CoordinateCycle::FUTURE:
-    kInitISWorkspace<<<nsmp, large_block_size>>>(nxt_psi.data(devc_tier),
-                                                 nxt_psi_overflow.data(devc_tier),
-                                                 nxt_sum_deijda.data(devc_tier),
-                                                 nxt_sum_deijda_overflow.data(devc_tier),
+  case CoordinateCycle::ALTERNATE:
+    kInitISWorkspace<<<nsmp, large_block_size>>>(alt_psi.data(devc_tier),
+                                                 alt_psi_overflow.data(devc_tier),
+                                                 alt_sum_deijda.data(devc_tier),
+                                                 alt_sum_deijda_overflow.data(devc_tier),
                                                  padded_atom_count);
     break;
-  case CoordinateCycle::PRESENT:
+  case CoordinateCycle::PRIMARY:
     kInitISWorkspace<<<nsmp, large_block_size>>>(psi.data(devc_tier), psi_overflow.data(devc_tier),
                                                  sum_deijda.data(devc_tier),
                                                  sum_deijda_overflow.data(devc_tier),

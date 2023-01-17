@@ -1,5 +1,9 @@
 #include "copyright.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
+#include "../../src/Constants/symbol_values.h"
+#include "../../src/Chemistry/chemical_features.h"
+#include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -14,10 +18,15 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Structure/isomerization.h"
 #include "../../src/Topology/atomgraph.h"
-#include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_copy.h"
 #include "../../src/Trajectory/coordinate_series.h"
+#include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/stopwatch.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 #ifndef STORMM_USE_HPC
@@ -25,7 +34,11 @@ using stormm::double2;
 using stormm::int2;
 using stormm::int3;
 #endif
+using stormm::chemistry::ChemicalFeatures;
+using stormm::chemistry::IsomerPlan;
+using stormm::chemistry::MapRotatableGroups;
 using stormm::constants::ExceptionResponse;
+using stormm::constants::tiny;
 using stormm::data_types::llint;
 using stormm::data_types::llint_type_index;
 using stormm::data_types::getStormmScalarTypeName;
@@ -43,14 +56,12 @@ using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::structure::rotateAboutBond;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
-using stormm::trajectory::CoordinateFileKind;
-using stormm::trajectory::PhaseSpace;
-using stormm::trajectory::CoordinateSeries;
-using stormm::trajectory::TrajectoryKind;
 using namespace stormm::energy;
 using namespace stormm::testing;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Check that the sending atom exclusion masks match the receiving atom masks for each tile of
@@ -197,6 +208,129 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc>nbk, const StaticExclusionMas
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the soft-core Coulomb potential.
+//
+// Arguments:
+//   qiqj:            Product of the two atoms' charges (with any implicit attenuation effects)
+//   clash_distance:  Minimum distance between the two particles before the soft-core potential
+//                    kicks in
+//   rinc:            [Optional] The sampling size for the test.  The quadratic soft core Coulomb
+//                    function wll be tested over a range from rinc to twice the clash distance.
+//-------------------------------------------------------------------------------------------------
+void testSoftCoreCoulomb(const double qiqj, const double clash_distance,
+                         const double rinc = 0.001) {
+  const int npts = ceil(2.0 * clash_distance / rinc);
+  std::vector<double> analytic_coulomb_e(npts);
+  std::vector<double> analytic_coulomb_f(npts);
+  std::vector<double> computed_e(npts);
+  std::vector<double> computed_f(npts);
+  std::vector<double> finite_difference_f(npts);
+  bool e_on_track = true;
+  bool f_on_track = true;
+  bool e_has_kink = false;
+  bool f_has_kink = false;
+  for (int i = 0; i < npts; i++) {
+    const double r = static_cast<double>(i + 1) * rinc;
+    analytic_coulomb_e[i] = qiqj / r;
+    analytic_coulomb_f[i] = -qiqj / (r * r * r);
+    quadraticCoreElectrostatics<double>(r, clash_distance, qiqj, &computed_e[i], &computed_f[i]);
+    if (r >= clash_distance) {
+      e_on_track = (e_on_track && fabs(computed_e[i] - analytic_coulomb_e[i]) < tiny);
+      f_on_track = (f_on_track && fabs(computed_f[i] - analytic_coulomb_f[i]) < tiny);
+    }
+    if (i > 1) {
+      e_has_kink = (e_has_kink || fabs(computed_e[i] - computed_e[i - 1]) >
+                                  10.0 * fabs(computed_e[i - 1] - computed_e[i - 2]));
+      f_has_kink = (f_has_kink || fabs(computed_f[i] - computed_f[i - 1]) >
+                                  10.0 * fabs(computed_f[i - 1] - computed_f[i - 2]));
+    }
+    double p_nrg = 0.0;
+    double n_nrg = 0.0;
+    quadraticCoreElectrostatics<double>(r + 5.0e-8, clash_distance, qiqj, &p_nrg, nullptr);
+    quadraticCoreElectrostatics<double>(r - 5.0e-8, clash_distance, qiqj, &n_nrg, nullptr);
+
+    // The extra division by r is necessary as the force magnitudes emerging from the
+    // quadraticCoreElectrostatics() function are divided by the distance to prepare for computing
+    // force components.
+    finite_difference_f[i] = (p_nrg - n_nrg) / (1.0e-7) / r;
+  }
+  check(e_on_track, "Energies computed for the non-softcore range of the Coulomb function do not "
+        "meet expectations.");
+  check(f_on_track, "Forces computed for the non-softcore range of the Coulomb function do not "
+        "meet expectations.");
+  check(e_has_kink == false, "The quadratic soft core Coulomb function evaluates with a kink in "
+        "its energy.");
+  check(f_has_kink == false, "The quadratic soft core Coulomb function evaluates with a kink in "
+        "its force.");
+  check(computed_f, RelationalOperator::EQUAL, Approx(finite_difference_f).margin(1.0e-5),
+        "Soft-core Coulomb forces do not agree with a finite difference approximation.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test the soft-core Lennard-Jones potential.
+//
+// Arguments:
+//   lja:          The Lennard-Jones A parameter for the atom pair
+//   ljb:          The Lennard-Jones B parameter for the atom pair
+//   clash_ratio:  Minimum ratio of the distance between the two particles and their pariwise
+//                 LennardJones sigma, below which the soft-core potential engages
+//   rinc:         [Optional] The sampling size for the test.  Quartic soft core Lennard-Jones
+//                 evaluations wll be tested over a range from rinc to twice the clash distance.
+//-------------------------------------------------------------------------------------------------
+void testSoftCoreLennardJones(const double lja, const double ljb, const double clash_ratio,
+                              const double rinc = 0.001) {
+  const double sigma = (ljb > 1.0e-6) ? sqrt(cbrt(lja / ljb)) : 0.0;
+  const int npts = ceil(2.0 * sigma / rinc);
+  std::vector<double> analytic_lj_e(npts);
+  std::vector<double> analytic_lj_f(npts);
+  std::vector<double> computed_e(npts);
+  std::vector<double> computed_f(npts);
+  std::vector<double> finite_difference_f(npts);
+  bool e_on_track = true;
+  bool f_on_track = true;
+  bool e_has_kink = false;
+  bool f_has_kink = false;
+  for (int i = 0; i < npts; i++) {
+    const double r = static_cast<double>(i + 1) * rinc;
+    const double invr = 1.0 / r;
+    const double invr2 = invr * invr;
+    const double invr4 = invr2 * invr2;
+    analytic_lj_e[i] = ((lja * invr2 * invr4) - ljb) * invr2 * invr4;
+    analytic_lj_f[i] = ((6.0 * ljb) - (12.0 * lja * invr2 * invr4)) * invr4 * invr4;
+    quarticCoreLennardJones<double>(r, clash_ratio, lja, ljb, &computed_e[i], &computed_f[i]);
+    if (r >= clash_ratio * sigma) {
+      e_on_track = (e_on_track && fabs(computed_e[i] - analytic_lj_e[i]) < tiny);
+      f_on_track = (f_on_track && fabs(computed_f[i] - analytic_lj_f[i]) < tiny);
+    }
+    if (i > 1) {
+      e_has_kink = (e_has_kink || fabs(computed_e[i] - computed_e[i - 1]) >
+                                  20.0 * fabs(computed_e[i - 1] - computed_e[i - 2]));
+      f_has_kink = (f_has_kink || fabs(computed_f[i] - computed_f[i - 1]) >
+                                  20.0 * fabs(computed_f[i - 1] - computed_f[i - 2]));
+    }
+    double p_nrg = 0.0;
+    double n_nrg = 0.0;
+    quarticCoreLennardJones<double>(r + 5.0e-7, clash_ratio, lja, ljb, &p_nrg, nullptr);
+    quarticCoreLennardJones<double>(r - 5.0e-7, clash_ratio, lja, ljb, &n_nrg, nullptr);
+
+    // The extra division by r is necessary as the force magnitudes emerging from the
+    // quadraticCoreElectrostatics() function are divided by the distance to prepare for computing
+    // force components.
+    finite_difference_f[i] = (p_nrg - n_nrg) / (1.0e-6) / r;
+  }
+  check(e_on_track, "Energies computed for the non-softcore range of the Lennard-Jones function "
+        "do not meet expectations.");
+  check(f_on_track, "Forces computed for the non-softcore range of the Lennard-Jones function do "
+        "not meet expectations.");
+  check(e_has_kink == false, "The quartic soft-core Lennard-Jones function evaluates with a kink "
+        "in its energy.");
+  check(f_has_kink == false, "The quartic soft-core Lennard-Jones function evaluates with a kink "
+        "in its force.");
+  check(computed_f, RelationalOperator::EQUAL, Approx(finite_difference_f).margin(3.0e-4),
+        "Soft-core Lennard-Jones forces do not agree with a finite difference approximation.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -235,6 +369,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 8
   section("Energy tracking object validation");
+
+  // Section 9
+  section("Soft core potential evaluation");
   
   // Locate topologies and coordinate files
   const char osc = osSeparator();
@@ -1038,6 +1175,40 @@ int main(const int argc, const char* argv[]) {
         "familiar potential energy terms, taken point by point throughout the history, failed to "
         "confirm the results reported by the tracking object.");
 
+  // Check the non-bonded soft-core potentials by iteratively feeding them different values of
+  // the displacement and checking the results against analytic numbers.
+  section(9);
+  testSoftCoreCoulomb( 0.54 *  0.31, 0.9);
+  testSoftCoreCoulomb( 0.47 * -0.24, 0.9);
+  testSoftCoreCoulomb(-0.17 *  0.84, 0.5);
+  testSoftCoreLennardJones( 79716.0, 109.35, 0.6);
+  testSoftCoreLennardJones(110272.8, 124.25, 0.5);
+
+  // Compute the potential and forces on some configurations that have clashes.
+  const std::string base_nml_topl = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
+                                    osc + "topol";
+  const std::string base_nml_icrd = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
+                                    osc + "coord";
+  TestSystemManager tsm(base_nml_topl, "top", { "gly_phe", "gly_trp", "gly_lys" }, base_nml_icrd,
+                        "inpcrd", { "gly_phe", "gly_trp", "gly_lys" });
+  std::vector<PhaseSpace> clashing_structures;
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    const AtomGraph* iag_ptr = tsm.getTopologyPointer(i);
+    const PhaseSpace ips = tsm.exportPhaseSpace(i);
+    const PhaseSpaceReader ipsr = ips.data();
+    CoordinateFrame icf(ips);
+    CoordinateFrameWriter icfw = icf.data();
+    const ChemicalFeatures ichemfe(iag_ptr, icf, MapRotatableGroups::YES);
+    const std::vector<IsomerPlan> irgroups = ichemfe.getRotatableBondGroups();
+    const int nrot = ichemfe.getRotatableBondCount();
+    for (int j = 0; j < nrot; j++) {
+      coordCopy(&icfw, ipsr, TrajectoryKind::POSITIONS);
+      rotateAboutBond(icfw.xcrd, icfw.ycrd, icfw.zcrd, irgroups[j].getRootAtom(),
+                      irgroups[j].getPivotAtom(), irgroups[j].getMovingAtoms(),
+                      xrs.uniformRandomNumber() * stormm::symbols::twopi);
+    }
+  }
+  
   // Print results
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

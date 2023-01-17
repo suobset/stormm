@@ -88,8 +88,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const EvaluateForce eval_force, const int system_index) {
   return evaluateGeneralizedBornEnergy<double, double, double>(nbk, ser, isk, ngb_kit, psw.xcrd,
                                                                psw.ycrd, psw.zcrd, psw.xfrc,
-                                                               psw.yfrc, psw.zfrc, psw.xprv,
-                                                               psw.yprv, psw.zprv, ecard,
+                                                               psw.yfrc, psw.zfrc, psw.xalt,
+                                                               psw.yalt, psw.zalt, ecard,
                                                                eval_force, system_index, 1.0, 1.0);
 }
 

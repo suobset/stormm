@@ -117,7 +117,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                          2 * roundUp(angl_parameter_count, warp_size_int) +
                          3 * roundUp(dihe_parameter_count, warp_size_int) +
                          3 * roundUp(virtual_site_count, warp_size_int) +
-                         8 * roundUp(atom_type_count * atom_type_count, warp_size_int) +
+                        10 * roundUp(atom_type_count * atom_type_count, warp_size_int) +
                          2 * roundUp(atom_type_count, warp_size_int) +
                          roundUp(charge_type_count,  warp_size_int) +
                          2 * roundUp(attenuated_14_type_count, warp_size_int) +
@@ -258,6 +258,22 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   for (int i = 0; i < atom_count; i++) {
     inv_mass[i] = (tmp_masses[i] > constants::tiny) ? 1.0 / tmp_masses[i] : 0.0;
   }
+  const size_t nlj_pairs = tmp_lj_a_values.size();
+  std::vector<double> tmp_lj_sigma_values(nlj_pairs), tmp_lj_14_sigma_values(nlj_pairs);
+  for (size_t i = 0; i < nlj_pairs; i++) {
+    if (tmp_lj_b_values[i] > 1.0e-6) {
+      tmp_lj_sigma_values[i] = sqrt(cbrt(tmp_lj_a_values[i] / tmp_lj_b_values[i]));
+    }
+    else {
+      tmp_lj_sigma_values[i] = 0.0;
+    }
+    if (tmp_lj_14_b_values[i] > 1.0e-6) {
+      tmp_lj_14_sigma_values[i] = sqrt(cbrt(tmp_lj_14_a_values[i] / tmp_lj_14_b_values[i]));
+    }
+    else {
+      tmp_lj_14_sigma_values[i] = 0.0;
+    }
+  }
   dc = inverse_atomic_masses.putHost(&double_data, inv_mass, dc, warp_size_zu);
   dc = urey_bradley_stiffnesses.putHost(&double_data, tmp_ub_stiffnesses, dc, warp_size_zu);
   dc = urey_bradley_equilibria.putHost(&double_data, tmp_ub_equilibria, dc, warp_size_zu);
@@ -288,6 +304,8 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   dc = lj_14_a_values.putHost(&double_data, tmp_lj_14_a_values, dc, warp_size_zu);
   dc = lj_14_b_values.putHost(&double_data, tmp_lj_14_b_values, dc, warp_size_zu);
   dc = lj_14_c_values.putHost(&double_data, tmp_lj_14_c_values, dc, warp_size_zu);
+  dc = lj_sigma_values.putHost(&double_data, tmp_lj_sigma_values, dc, warp_size_zu);
+  dc = lj_14_sigma_values.putHost(&double_data, tmp_lj_14_sigma_values, dc, warp_size_zu);
   dc = lj_type_corrections.putHost(&double_data, std::vector<double>(atom_type_count, 0.0), dc,
                                    warp_size_zu);
   dc = attn14_elec_factors.putHost(&double_data, attn_parm.elec_screening_factors, dc,
@@ -439,6 +457,12 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   const std::vector<float> sp_tmp_lj_14_c_values(tmp_lj_14_c_values.begin(),
                                                  tmp_lj_14_c_values.end());
   fc = sp_lj_14_c_values.putHost(&float_data, sp_tmp_lj_14_c_values, fc, warp_size_zu);
+  const std::vector<float>sp_tmp_lj_sigma_values(tmp_lj_sigma_values.begin(),
+                                                 tmp_lj_sigma_values.end());
+  fc = sp_lj_sigma_values.putHost(&float_data, sp_tmp_lj_sigma_values, fc, warp_size_zu);
+  const std::vector<float>sp_tmp_lj_14_sigma_values(tmp_lj_14_sigma_values.begin(),
+                                                    tmp_lj_14_sigma_values.end());
+  fc = sp_lj_14_sigma_values.putHost(&float_data, sp_tmp_lj_14_sigma_values, fc, warp_size_zu);
   fc = sp_lj_type_corrections.putHost(&float_data, std::vector<float>(atom_type_count, 0.0), fc,
                                       warp_size_zu);
   const std::vector<float> sp_tmp_elec_screening_factors(attn_parm.elec_screening_factors.begin(),

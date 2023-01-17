@@ -10,10 +10,11 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
-#include "scorecard.h"
-#include "static_exclusionmask.h"
 #include "energy_abstracts.h"
 #include "energy_enumerators.h"
+#include "scorecard.h"
+#include "soft_core_potentials.h"
+#include "static_exclusionmask.h"
 
 namespace stormm {
 namespace energy {

@@ -24,8 +24,8 @@ template <typename T> struct ISWorkspaceKit {
 
   /// \brief The constructor takes a straight list of arguments.
   ISWorkspaceKit(int fp_bits_in, llint* psi_in, int* psi_overflow_in, llint* sum_deijda_in,
-                 int* sum_deijda_overflow_in, llint* nxt_psi_in, int* nxt_psi_overflow_in,
-                 llint* nxt_sum_deijda_in, int* nxt_sum_deijda_overflow_in);
+                 int* sum_deijda_overflow_in, llint* alt_psi_in, int* alt_psi_overflow_in,
+                 llint* alt_sum_deijda_in, int* alt_sum_deijda_overflow_in);
 
   /// \brief The copy and move constructors are defaulted, assignment operators implicitly deleted
   ///        due to const members in this object.
@@ -54,10 +54,10 @@ template <typename T> struct ISWorkspaceKit {
 
   // The following are alternative arrays made available so that one of the GB kernels can
   // initialize them for use in the following calculation, saving a kernel call in the GB cycle.
-  llint* nxt_psi;            ///< Alternate array for psi accumulators
-  int* nxt_psi_ovrf;         ///< Alternate array for psi overflow accumulators
-  llint* nxt_sum_deijda;     ///< Alternate GB radii derivative accumulators
-  int* nxt_sum_deijda_ovrf;  ///< Alternate GB radii derivative overflow accumulators
+  llint* alt_psi;            ///< Alternate array for psi accumulators
+  int* alt_psi_ovrf;         ///< Alternate array for psi overflow accumulators
+  llint* alt_sum_deijda;     ///< Alternate GB radii derivative accumulators
+  int* alt_sum_deijda_ovrf;  ///< Alternate GB radii derivative overflow accumulators
 };
   
 /// \brief A small collection of arrays to manage temporary accumulators for computing Born radii
@@ -106,16 +106,16 @@ public:
   /// \brief Get the double-precision abstract, containing pointers to data on the host or device.
   ///
   /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
-  /// \param orientation  Perform the zeroing on psi / sumdeijda or nxt_psi / nxt_sumdeijda arrays
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                                CoordinateCycle orientation = CoordinateCycle::PRESENT);
+                                CoordinateCycle orientation = CoordinateCycle::PRIMARY);
 
   /// \brief Get the single-precision abstract, containing pointers to data on the host or device.
   ///
   /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
-  /// \param orientation  Perform the zeroing on psi / sumdeijda or nxt_psi / nxt_sumdeijda arrays
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                               CoordinateCycle orientation = CoordinateCycle::PRESENT);
+                               CoordinateCycle orientation = CoordinateCycle::PRIMARY);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents from the host to the GPU device.  This may be useful in
@@ -130,18 +130,18 @@ public:
   /// \brief Set the Generalized Born radii and radii derivative accumulators to zero.
   ///
   /// \param tier         Do the zeroing on the host or on the GPU device
-  /// \param orientation  Perform the zeroing on psi / sumdeijda or nxt_psi / nxt_sumdeijda arrays
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   /// \param gpu          Details of the GPU in use
   void initialize(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                  CoordinateCycle orientation = CoordinateCycle::PRESENT,
+                  CoordinateCycle orientation = CoordinateCycle::PRIMARY,
                   const GpuDetails &gpu = null_gpu);
 
 #ifdef STORMM_USE_HPC
   /// \brief Launch a small kernel to manage initialization of this object on the HPC device.
   ///
-  /// \param orientation  Perform the zeroing on psi / sumdeijda or nxt_psi / nxt_sumdeijda arrays
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   void launchInitialization(const GpuDetails &gpu,
-                            CoordinateCycle orientation = CoordinateCycle::PRESENT);
+                            CoordinateCycle orientation = CoordinateCycle::PRIMARY);
 #endif
 
 private:
@@ -159,11 +159,11 @@ private:
                                         ///<   pair contributions with all other atoms j with
                                         ///<   respect to an order parameter
   Hybrid<int> sum_deijda_overflow;      ///< Overflow accumulators for sum_deijda
-  Hybrid<llint> nxt_psi;                ///< Alternate array for accumulating psi values--one can
+  Hybrid<llint> alt_psi;                ///< Alternate array for accumulating psi values--one can
                                         ///<   be in use while the other is being reset
-  Hybrid<int> nxt_psi_overflow;         ///< Overflow accumulators for the alternate psi array
-  Hybrid<llint> nxt_sum_deijda;         ///< Alternative array for storing GB radii derivatives
-  Hybrid<int> nxt_sum_deijda_overflow;  ///< Alternative array for GB radial derivative overflows
+  Hybrid<int> alt_psi_overflow;         ///< Overflow accumulators for the alternate psi array
+  Hybrid<llint> alt_sum_deijda;         ///< Alternative array for storing GB radii derivatives
+  Hybrid<int> alt_sum_deijda_overflow;  ///< Alternative array for GB radial derivative overflows
   Hybrid<llint> llint_data;             ///< ARRAY-kind Hybrid targeted by the preceding
                                         ///<   POINTER-kind objects to store all long long integer
                                         ///<   data

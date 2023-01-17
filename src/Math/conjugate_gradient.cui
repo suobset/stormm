@@ -335,7 +335,6 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
                                         cgsbs.zprv, cgsbs.x_cg_temp, cgsbs.y_cg_temp,
                                         cgsbs.z_cg_temp);
 #endif
-
     // The accumulated value of msum for this block, and thus the entire system, is understood by
     // all threads thanks to work done in conjGradScatter().  Use that value to scale the forces.
     const double inv_factor = 1.0 / (sqrt(msum) * cgsbs.inv_frc_scale);

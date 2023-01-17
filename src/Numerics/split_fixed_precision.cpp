@@ -240,7 +240,7 @@ void hostFloatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 doubleToInt63(const double dval) {
+int2 hostDoubleToInt63(const double dval) {
   int2 result;
   if (fabs(dval) >= max_int_accumulation) {
     const int spillover = dval / max_int_accumulation;
@@ -255,8 +255,8 @@ int2 doubleToInt63(const double dval) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void doubleToInt63(const double dval, int *primary, int *overflow) {
-  const int2 result = doubleToInt63(dval);
+void hostDoubleToInt63(const double dval, int *primary, int *overflow) {
+  const int2 result = hostDoubleToInt63(dval);
   *primary  = result.x;
   *overflow = result.y;
 }
@@ -718,8 +718,8 @@ int2 hostChangeFPBits(const int2 fp, const int native_bits, const int output_bit
   conv_factor.ulli <<= 52;
   const double xcomp = static_cast<double>(fp.x) * conv_factor.d;
   const double ycomp = static_cast<double>(fp.y) * max_int_accumulation * conv_factor.d;
-  const int2 xnew = doubleToInt63(xcomp);
-  const int2 ynew = doubleToInt63(ycomp);
+  const int2 xnew = hostDoubleToInt63(xcomp);
+  const int2 ynew = hostDoubleToInt63(ycomp);
   return hostSplitFPSum(xnew, ynew);  
 }
   
@@ -737,8 +737,7 @@ int95_t hostChangeFPBits(const int95_t fp, const int native_bits, const int outp
   llint ilow_xcomp = (static_cast<ullint>(fp.x) & 0xffffffffLLU);
   llint ihigh_xcomp = fp.x - ilow_xcomp;
   const double xcomp_low  = static_cast<double>(ilow_xcomp) * conv_factor.d;
-  const double xcomp_high = static_cast<double>(ihigh_xcomp) * max_int_accumulation * 2.0 *
-                            conv_factor.d;
+  const double xcomp_high = static_cast<double>(ihigh_xcomp) * conv_factor.d;
   const double ycomp = static_cast<double>(fp.y) * max_llint_accumulation * conv_factor.d;
   const int95_t xnew_low  = hostDoubleToInt95(xcomp_low);
   const int95_t xnew_high = hostDoubleToInt95(xcomp_high);

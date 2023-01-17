@@ -11,30 +11,30 @@ void PhaseSpace::fill(const T* xcrd, const T* ycrd, const T* zcrd, const Traject
                       const double* box_dims) {
   double *xptr, *yptr, *zptr;
   switch (cycle_in) {
-  case CoordinateCycle::PAST:
+  case CoordinateCycle::ALTERNATE:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      xptr = x_prior_coordinates.data();
-      yptr = y_prior_coordinates.data();
-      zptr = z_prior_coordinates.data();
+      xptr = x_alt_coordinates.data();
+      yptr = y_alt_coordinates.data();
+      zptr = z_alt_coordinates.data();
       break;
     case TrajectoryKind::VELOCITIES:
-      xptr = x_prior_velocities.data();
-      yptr = y_prior_velocities.data();
-      zptr = z_prior_velocities.data();
+      xptr = x_alt_velocities.data();
+      yptr = y_alt_velocities.data();
+      zptr = z_alt_velocities.data();
       break;
     case TrajectoryKind::FORCES:
-      xptr = x_prior_forces.data();
-      yptr = y_prior_forces.data();
-      zptr = z_prior_forces.data();
+      xptr = x_alt_forces.data();
+      yptr = y_alt_forces.data();
+      zptr = z_alt_forces.data();
       break;
     }
     break;
-  case CoordinateCycle::PRESENT:
+  case CoordinateCycle::PRIMARY:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
 
-      // Only in the case of PRESENT POSITIONS should the box dimensions be filled.
+      // Only in the case of PRIMARY POSITIONS should the box dimensions be filled.
       if (box_dims != nullptr) {
         double* boxptr = box_dimensions.data();
         for (int i = 0; i < 6; i++) {
@@ -56,25 +56,6 @@ void PhaseSpace::fill(const T* xcrd, const T* ycrd, const T* zcrd, const Traject
       xptr = x_forces.data();
       yptr = y_forces.data();
       zptr = z_forces.data();
-      break;
-    }
-    break;
-  case CoordinateCycle::FUTURE:
-    switch (kind) {
-    case TrajectoryKind::POSITIONS:
-      xptr = x_future_coordinates.data();
-      yptr = y_future_coordinates.data();
-      zptr = z_future_coordinates.data();
-      break;
-    case TrajectoryKind::VELOCITIES:
-      xptr = x_future_velocities.data();
-      yptr = y_future_velocities.data();
-      zptr = z_future_velocities.data();
-      break;
-    case TrajectoryKind::FORCES:
-      xptr = x_future_forces.data();
-      yptr = y_future_forces.data();
-      zptr = z_future_forces.data();
       break;
     }
     break;

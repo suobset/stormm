@@ -285,10 +285,11 @@ template <typename T> struct NonbondedKit {
                         const T coulomb_constant_in, const T* charge_in, const int* q_idx_in,
                         const int* lj_idx_in, const T* q_parameter_in, const T* lja_coeff_in,
                         const T* ljb_coeff_in, const T* ljc_coeff_in, const T* lja_14_coeff_in,
-                        const T* ljb_14_coeff_in, const T* ljc_14_coeff_in, const int* nb11x_in,
-                        const int* nb11_bounds_in, const int* nb12x_in, const int* nb12_bounds_in,
-                        const int* nb13x_in, const int* nb13_bounds_in, const int* nb14x_in,
-                        const int* nb14_bounds_in, const T* lj_type_corr_in);
+                        const T* ljb_14_coeff_in, const T* ljc_14_coeff_in, const T* lj_sigma,
+                        const T* lj_14_sigma, const int* nb11x_in, const int* nb11_bounds_in,
+                        const int* nb12x_in, const int* nb12_bounds_in, const int* nb13x_in,
+                        const int* nb13_bounds_in, const int* nb14x_in, const int* nb14_bounds_in,
+                        const T* lj_type_corr_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -323,6 +324,8 @@ template <typename T> struct NonbondedKit {
                             ///<   square matrix in the same form as lja_coeff
   const T* ljb_14_coeff;    ///< Lennard_jones B coefficients for 1:4 interactions
   const T* ljc_14_coeff;    ///< Lennard_jones C coefficients for 1:4 interactions
+  const T* lj_sigma;        ///< Lennard_jones sigma parameters
+  const T* lj_14_sigma;     ///< Lennard_jones sigma parameters for 1:4 interactions
   const int* nb11x;         ///< Non-bonded 1:1 exclusions, applicable to virtual sites
   const int* nb11_bounds;   ///< Non-bonded 1:1 exclusion array bounds for each atom
   const int* nb12x;         ///< Non-bonded 1:2 exclusions, applicable to bonded atoms
