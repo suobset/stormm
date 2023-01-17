@@ -8,7 +8,6 @@ namespace stormm {
 namespace mm {
 
 using card::HybridKind;
-using energy::ClashResponse;
 using math::ReductionGoal;
 using numerics::AccumulationMethod;
 using synthesis::VwuGoal;
@@ -298,6 +297,7 @@ MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel t
 void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
                                                        const EvaluateForce eval_frc,
                                                        const EvaluateEnergy eval_nrg,
+                                                       const ClashResponse softcore,
                                                        const PrecisionModel prec,
                                                        const AtomGraphSynthesis &poly_ag) {
   const GpuDetails wgpu = launcher.getGpu();
@@ -313,18 +313,16 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
   const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
                                                     AccumulationMethod::SPLIT,
-                                                    VwuGoal::ACCUMULATE, ClashResponse::NONE);
+                                                    VwuGoal::ACCUMULATE, softcore);
   const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                         AccumulationMethod::SPLIT, igb);
   const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                              AccumulationMethod::SPLIT, igb);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        eval_frc, eval_nrg,
-                                                       AccumulationMethod::SPLIT, igb,
-                                                       ClashResponse::NONE);
+                                                       AccumulationMethod::SPLIT, igb, softcore);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
-
   const int vwu_block_count = vwu_lp.x;
   const int nbwu_block_count = nbwu_lp.x;
   const int gbrwu_block_count = gbrwu_lp.x;
@@ -346,6 +344,15 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
 #ifdef STORMM_USE_HPC
   upload();
 #endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
+                                                       const EvaluateForce eval_frc,
+                                                       const EvaluateEnergy eval_nrg,
+                                                       const PrecisionModel prec,
+                                                       const AtomGraphSynthesis &poly_ag) {
+  primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, prec, poly_ag);
 }
 
 //-------------------------------------------------------------------------------------------------

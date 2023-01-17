@@ -3,8 +3,11 @@
 #include "Constants/behavior.h"
 #include "Namelists/nml_conformer.h"
 #include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
+#include "Namelists/nml_precision.h"
+#include "Namelists/nml_random.h"
 #include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
 #include "Namelists/nml_solvent.h"
@@ -18,8 +21,11 @@ namespace display {
 using constants::CaseSensitivity;
 using namelist::conformerInput;
 using namelist::dynamicsInput;
+using namelist::ffmorphInput;
 using namelist::filesInput;
 using namelist::minimizeInput;
+using namelist::precisionInput;
+using namelist::randomInput;
 using namelist::reportInput;
 using namelist::restraintInput;
 using namelist::solventInput;
@@ -138,6 +144,21 @@ bool displayNamelistHelp(const std::string &module_name) {
   }
   else if (strcmpCased(module_name, "&report", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = reportInput(tf, &start_line, nullptr);
+    t_nml.printHelp();
+    return true;
+  }
+  else if (strcmpCased(module_name, "&random", CaseSensitivity::YES)) {
+    const NamelistEmulator t_nml = randomInput(tf, &start_line, nullptr);
+    t_nml.printHelp();
+    return true;
+  }
+  else if (strcmpCased(module_name, "&precision", CaseSensitivity::YES)) {
+    const NamelistEmulator t_nml = precisionInput(tf, &start_line);
+    t_nml.printHelp();
+    return true;
+  }
+  else if (strcmpCased(module_name, "&ffmorph", CaseSensitivity::YES)) {
+    const NamelistEmulator t_nml = ffmorphInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }

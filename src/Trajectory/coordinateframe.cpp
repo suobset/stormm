@@ -41,6 +41,47 @@ CoordinateFrameWriter::CoordinateFrameWriter(PhaseSpace *ps, const HybridTargetL
 {}
 
 //-------------------------------------------------------------------------------------------------
+CoordinateFrameWriter::CoordinateFrameWriter(PhaseSpace *ps, const TrajectoryKind kind,
+                                             const CoordinateCycle orientation,
+                                             const HybridTargetLevel tier) :
+    natom{ps->getAtomCount()},
+    unit_cell{ps->getUnitCellType()},
+    xcrd{}, ycrd{}, zcrd{},
+    umat{ps->getBoxSpaceTransformPointer(tier)},
+    invu{ps->getInverseTransformPointer(tier)},
+    boxdim{ps->getBoxSizePointer(tier)}
+{
+  PhaseSpaceWriter psw = ps->data(orientation);
+
+  // With the PhaseSpace abstract having been taken at the specified point in the time cycle,
+  // the CoordinateFrameWriter can be set based on whatever appears in the current position,
+  // velocity, or force arrays.
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    xcrd = psw.xcrd;
+    ycrd = psw.ycrd;
+    zcrd = psw.zcrd;
+    break;
+  case TrajectoryKind::VELOCITIES:
+    xcrd = psw.xvel;
+    ycrd = psw.yvel;
+    zcrd = psw.zvel;
+    break;
+  case TrajectoryKind::FORCES:
+    xcrd = psw.xfrc;
+    ycrd = psw.yfrc;
+    zcrd = psw.zfrc;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameWriter::CoordinateFrameWriter(PhaseSpace *ps, const TrajectoryKind kind,
+                                             const HybridTargetLevel tier) :
+    CoordinateFrameWriter(ps, kind, ps->getCyclePosition(), tier)
+{}
+
+//-------------------------------------------------------------------------------------------------
 CoordinateFrameReader::CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in,
                                              const double* xcrd_in, const double* ycrd_in,
                                              const double* zcrd_in, const double* umat_in,
@@ -56,18 +97,6 @@ CoordinateFrameReader::CoordinateFrameReader(const CoordinateFrameWriter &cfw) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const HybridTargetLevel tier) :
-    natom{ps.getAtomCount()},
-    unit_cell{ps.getUnitCellType()},
-    xcrd{ps.getCoordinatePointer(CartesianDimension::X, TrajectoryKind::POSITIONS, tier)},
-    ycrd{ps.getCoordinatePointer(CartesianDimension::Y, TrajectoryKind::POSITIONS, tier)},
-    zcrd{ps.getCoordinatePointer(CartesianDimension::Z, TrajectoryKind::POSITIONS, tier)},
-    umat{ps.getBoxSpaceTransformPointer(tier)},
-    invu{ps.getInverseTransformPointer(tier)},
-    boxdim{ps.getBoxSizePointer(tier)}
-{}
-
-//-------------------------------------------------------------------------------------------------
 CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace *ps, const HybridTargetLevel tier) :
     natom{ps->getAtomCount()},
     unit_cell{ps->getUnitCellType()},
@@ -77,6 +106,65 @@ CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace *ps, const HybridT
     umat{ps->getBoxSpaceTransformPointer(tier)},
     invu{ps->getInverseTransformPointer(tier)},
     boxdim{ps->getBoxSizePointer(tier)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const HybridTargetLevel tier) :
+    CoordinateFrameReader(ps.getSelfPointer(), tier)
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace *ps, const TrajectoryKind kind,
+                                             const CoordinateCycle orientation,
+                                             const HybridTargetLevel tier) :
+    natom{ps->getAtomCount()},
+    unit_cell{ps->getUnitCellType()},
+    xcrd{}, ycrd{}, zcrd{},
+    umat{ps->getBoxSpaceTransformPointer(tier)},
+    invu{ps->getInverseTransformPointer(tier)},
+    boxdim{ps->getBoxSizePointer(tier)}
+{
+  const PhaseSpaceReader psr = ps->data(orientation);
+
+  // With the PhaseSpace abstract having been taken at the specified point in the time cycle,
+  // the CoordinateFrameWriter can be set based on whatever appears in the current position,
+  // velocity, or force arrays.
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    xcrd = psr.xcrd;
+    ycrd = psr.ycrd;
+    zcrd = psr.zcrd;
+    break;
+  case TrajectoryKind::VELOCITIES:
+    xcrd = psr.xvel;
+    ycrd = psr.yvel;
+    zcrd = psr.zvel;
+    break;
+  case TrajectoryKind::FORCES:
+    xcrd = psr.xfrc;
+    ycrd = psr.yfrc;
+    zcrd = psr.zfrc;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const TrajectoryKind kind,
+                                             const CoordinateCycle orientation,
+                                             const HybridTargetLevel tier) :
+    CoordinateFrameReader(ps.getSelfPointer(), kind, ps.getCyclePosition(), tier)
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace *ps, const TrajectoryKind kind,
+                                             const HybridTargetLevel tier) :
+    CoordinateFrameReader(ps, kind, ps->getCyclePosition(), tier)
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const TrajectoryKind kind,
+                                             const HybridTargetLevel tier) :
+    CoordinateFrameReader(ps.getSelfPointer(), kind, ps.getCyclePosition(), tier)
 {}
 
 //-------------------------------------------------------------------------------------------------

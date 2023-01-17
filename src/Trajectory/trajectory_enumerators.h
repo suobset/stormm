@@ -59,10 +59,9 @@ enum class TrajectoryKind {
 ///        present, and what was past becomes the staging ground for the forthcoming future
 ///        configuration.
 enum class CoordinateCycle {
-  PAST,     ///< Set the prior positions arrays (x_prior_coordinates...) as holding the current
-            ///<   coordinates.
-  PRESENT,  ///< Set the typical positions arrays (x_coordinates...) as current
-  FUTURE    ///< Set the future positions arrays (x_future_coordinates...) as current
+  ALTERNATE, ///< Set the prior positions arrays (x_prior_coordinates...) as holding the current
+             ///<   coordinates.
+  PRIMARY    ///< Set the typical positions arrays (x_coordinates...) as current
 };
 
 /// \brief Differentiate between fixed-column and free-format (but ordered) files.
@@ -106,6 +105,8 @@ std::string getEnumerationName(CoordinateFileKind cfkind);
 std::string getEnumerationName(AncdfVariable key);
 std::string getEnumerationName(CoordinateFileRole cpkind);
 std::string getEnumerationName(TrajectoryFusion protocol);
+std::string getEnumerationName(TrajectoryKind);
+std::string getEnumerationName(CoordinateCycle orientation);
 /// \}
 
 /// \brief Get the nature of a trajectory file based on the stated format (this will return

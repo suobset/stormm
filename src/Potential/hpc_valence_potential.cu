@@ -398,19 +398,21 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        define KERNEL_NAME kfsValenceForceAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME  
+#        undef VALENCE_KERNEL_THREAD_COUNT
 #        define UPDATE_ATOMS
+#          define VALENCE_KERNEL_THREAD_COUNT 448
 #          define KERNEL_NAME kfsValenceAtomUpdateNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef UPDATE_ATOMS
-#        undef VALENCE_KERNEL_THREAD_COUNT
 #        define COMPUTE_ENERGY
-#          define VALENCE_KERNEL_THREAD_COUNT 448
+#          define VALENCE_KERNEL_THREAD_COUNT 384
 #          define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #          undef VALENCE_KERNEL_THREAD_COUNT
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 320
 #          define UPDATE_ATOMS
 #            define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClash
 #              include "valence_potential.cui"
@@ -424,6 +426,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      define KERNEL_NAME kfValenceForceAccumulationNonClash
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 448
 #      define UPDATE_ATOMS
 #        define KERNEL_NAME kfValenceAtomUpdateNonClash
 #          include "valence_potential.cui"
@@ -431,12 +435,12 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef UPDATE_ATOMS
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #        define KERNEL_NAME kfValenceForceEnergyAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #        define UPDATE_ATOMS
 #          define KERNEL_NAME kfValenceEnergyAtomUpdateNonClash
 #            include "valence_potential.cui"
@@ -475,8 +479,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Double-precision floating point definitions
 #define TCALC double
-#  define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #  define VALENCE_BLOCK_MULTIPLICITY  2
+#  define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #  define TCALC2 double2
 #  define TCALC3 double3
 #  define TCALC4 double4
@@ -518,10 +522,12 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
 #  undef COMPUTE_ENERGY
+#  undef VALENCE_KERNEL_THREAD_COUNT
 
 // Make new kernels with a clash forgiveness check.
 #  define CLASH_FORGIVENESS
 #    define COMPUTE_FORCE
+#      define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #      define KERNEL_NAME kdsValenceForceAccumulationNonClash
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
@@ -530,26 +536,32 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef UPDATE_ATOMS
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
+#        define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #        define KERNEL_NAME kdsValenceForceEnergyAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
 #        define UPDATE_ATOMS
+#          define VALENCE_KERNEL_THREAD_COUNT 192
 #          define KERNEL_NAME kdsValenceEnergyAtomUpdateNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef UPDATE_ATOMS
 #      undef  COMPUTE_ENERGY
 #    undef COMPUTE_FORCE
 #    define COMPUTE_ENERGY
+#      define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #      define KERNEL_NAME kdsValenceEnergyAccumulationNonClash
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef COMPUTE_ENERGY
 #  undef CLASH_FORGIVENESS
 
 // Clear double-precision floating point definitions
-#  undef VALENCE_KERNEL_THREAD_COUNT
 #  undef VALENCE_BLOCK_MULTIPLICITY
 #  undef TCALC2
 #  undef TCALC3
@@ -966,11 +978,11 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
                           ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
                           CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
                           const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
-                          const double clash_minimum_distance, const double clash_ratio) {
+                          const double clash_distance, const double clash_ratio) {
 
   // Rather than a switch over cases of the ClashResponse enumerator, just use the nonzero values
   // of either parameter to indicate that clash damping has been requested.
-  if (clash_minimum_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
     switch (purpose) {
     case VwuGoal::ACCUMULATE:
 
@@ -983,21 +995,20 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kdsValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
-                                                                    *poly_psw,
-                                                                    clash_minimum_distance,
+                                                                    *poly_psw, clash_distance,
                                                                     clash_ratio, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
           kdsValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                              clash_minimum_distance, clash_ratio,
+                                                              clash_distance, clash_ratio,
                                                               *gmem_r);
           break;
         }
         break;
       case EvaluateForce::NO:
         kdsValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                             clash_minimum_distance, clash_ratio,
-                                                             *scw, *gmem_r);
+                                                             clash_distance, clash_ratio, *scw,
+                                                             *gmem_r);
         break;
       }
      break;
@@ -1010,13 +1021,13 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
       switch (eval_energy) {
       case EvaluateEnergy::YES:
         kdsValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                           clash_minimum_distance, clash_ratio,
-                                                           poly_auk, *tstw, *scw, *gmem_r);
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
         kdsValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                     clash_minimum_distance, clash_ratio, poly_auk,
-                                                     *tstw, *gmem_r);
+                                                     clash_distance, clash_ratio, poly_auk, *tstw,
+                                                     *gmem_r);
         break;
       }
       break;
@@ -1068,7 +1079,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
                           CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
                           const EvaluateEnergy eval_energy, const VwuGoal purpose,
                           const AccumulationMethod force_sum, const int2 bt,
-                          const float clash_minimum_distance, const float clash_ratio) {
+                          const float clash_distance, const float clash_ratio) {
   AccumulationMethod refined_force_sum;
   switch (force_sum) {
   case AccumulationMethod::SPLIT:
@@ -1082,7 +1093,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
 
   // Rather than a switch over cases of the ClashResponse enumerator, just use the nonzero values
   // of either parameter to indicate that clash damping has been requested.
-  if (clash_minimum_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
     switch (purpose) {
     case VwuGoal::ACCUMULATE:
     
@@ -1095,14 +1106,13 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             kfsValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
-                                                                      *poly_psw,
-                                                                      clash_minimum_distance,
+                                                                      *poly_psw, clash_distance,
                                                                       clash_ratio, *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
             kfsValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                                clash_minimum_distance,
-                                                                clash_ratio, *gmem_r);
+                                                                clash_distance, clash_ratio,
+                                                                *gmem_r);
             break;
           }
           break;
@@ -1110,13 +1120,12 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             kfValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
-                                                                     *poly_psw,
-                                                                     clash_minimum_distance,
+                                                                     *poly_psw, clash_distance,
                                                                      clash_ratio, *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
             kfValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                               clash_minimum_distance, clash_ratio,
+                                                               clash_distance, clash_ratio,
                                                                *gmem_r);
             break;
           }
@@ -1127,7 +1136,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         break;
       case EvaluateForce::NO:
         kfValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                            clash_minimum_distance, clash_ratio,
+                                                            clash_distance, clash_ratio,
                                                             *scw, *gmem_r);
         break;
       }
@@ -1143,13 +1152,13 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kfsValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                             clash_minimum_distance, clash_ratio,
+                                                             clash_distance, clash_ratio,
                                                              poly_auk, *tstw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
           kfsValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                       clash_minimum_distance, clash_ratio,
-                                                       poly_auk, *tstw, *gmem_r);
+                                                       clash_distance, clash_ratio, poly_auk,
+                                                       *tstw, *gmem_r);
           break;
         }
         break;
@@ -1157,13 +1166,13 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kfValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                            clash_minimum_distance, clash_ratio,
-                                                            poly_auk, *tstw, *scw, *gmem_r);
+                                                            clash_distance, clash_ratio, poly_auk,
+                                                            *tstw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
           kfValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                      clash_minimum_distance, clash_ratio,
-                                                      poly_auk, *tstw, *gmem_r);
+                                                      clash_distance, clash_ratio, poly_auk, *tstw,
+                                                      *gmem_r);
           break;
         }
         break;
@@ -1257,7 +1266,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                           const VwuGoal purpose, const AccumulationMethod force_sum,
-                          const KernelManager &launcher, const double clash_minimum_distance,
+                          const KernelManager &launcher, const double clash_distance,
                           const double clash_ratio) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
@@ -1277,7 +1286,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
       ThermostatWriter tstw = heat_bath->dpData(tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
       launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
-                    eval_energy, purpose, bt, clash_minimum_distance, clash_ratio);
+                    eval_energy, purpose, bt, clash_distance, clash_ratio);
     }
     break;
   case PrecisionModel::SINGLE:
@@ -1291,7 +1300,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
       ThermostatWriter tstw = heat_bath->spData(tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(tier);
       launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
-                    eval_energy, purpose, force_sum, bt, clash_minimum_distance, clash_ratio);
+                    eval_energy, purpose, force_sum, bt, clash_distance, clash_ratio);
     }
     break;
   }
@@ -1303,16 +1312,14 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                           const VwuGoal purpose, const KernelManager &launcher,
-                          const double clash_minimum_distance, const double clash_ratio) {
+                          const double clash_distance, const double clash_ratio) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
-                  purpose, AccumulationMethod::SPLIT, launcher, clash_minimum_distance,
-                  clash_ratio);
+                  purpose, AccumulationMethod::SPLIT, launcher, clash_distance, clash_ratio);
   }
   else {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
-                  purpose, AccumulationMethod::WHOLE, launcher, clash_minimum_distance,
-                  clash_ratio);
+                  purpose, AccumulationMethod::WHOLE, launcher, clash_distance, clash_ratio);
   }
 }
 

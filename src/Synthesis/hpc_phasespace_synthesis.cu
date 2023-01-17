@@ -101,16 +101,16 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
           destination.xcrd[read_pos] = source.xcrd[read_pos];
           destination.ycrd[read_pos] = source.ycrd[read_pos];
           destination.zcrd[read_pos] = source.zcrd[read_pos];
-          destination.xprv[read_pos] = source.xprv[read_pos];
-          destination.yprv[read_pos] = source.yprv[read_pos];
-          destination.zprv[read_pos] = source.zprv[read_pos];
+          destination.xalt[read_pos] = source.xalt[read_pos];
+          destination.yalt[read_pos] = source.yalt[read_pos];
+          destination.zalt[read_pos] = source.zalt[read_pos];
           if (source.gpos_bits > globalpos_scale_nonoverflow_bits) {
             destination.xcrd_ovrf[read_pos] = source.xcrd_ovrf[read_pos];
             destination.ycrd_ovrf[read_pos] = source.ycrd_ovrf[read_pos];
             destination.zcrd_ovrf[read_pos] = source.zcrd_ovrf[read_pos];
-            destination.xprv_ovrf[read_pos] = source.xprv_ovrf[read_pos];
-            destination.yprv_ovrf[read_pos] = source.yprv_ovrf[read_pos];
-            destination.zprv_ovrf[read_pos] = source.zprv_ovrf[read_pos];
+            destination.xalt_ovrf[read_pos] = source.xalt_ovrf[read_pos];
+            destination.yalt_ovrf[read_pos] = source.yalt_ovrf[read_pos];
+            destination.zalt_ovrf[read_pos] = source.zalt_ovrf[read_pos];
           }
           read_pos += atom_warps * warp_size_int;
         }
@@ -125,6 +125,7 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
           int read_pos = mtrx_read_start + (box_warp_idx * warp_size_int) + tgx;
           while (read_pos < mtrx_read_end) {
             destination.boxvecs[read_pos] = source.boxvecs[read_pos];
+            destination.alt_boxvecs[read_pos] = source.alt_boxvecs[read_pos];
             read_pos += mtrx_warps * warp_size_int;
           }
         }
@@ -132,6 +133,7 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
           int read_pos = mtrx_read_start + ((box_warp_idx - mtrx_warps) * warp_size_int) + tgx;
           while (read_pos < mtrx_read_end) {
             destination.umat[read_pos] = source.umat[read_pos];
+            destination.umat_alt[read_pos] = source.umat_alt[read_pos];
             read_pos += mtrx_warps * warp_size_int;
           }
         }
@@ -140,38 +142,16 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
                          ((box_warp_idx - (2 * mtrx_warps)) * warp_size_int) + tgx;
           while (read_pos < mtrx_read_end) {
             destination.invu[read_pos] = source.invu[read_pos];
+            destination.invu_alt[read_pos] = source.invu_alt[read_pos];
             read_pos += mtrx_warps * warp_size_int;
           }
         }
-        else if (warp_nature < 4 * mtrx_work_units) {
-          int read_pos = mtrx_read_start +
-                         ((box_warp_idx - (3 * mtrx_warps)) * warp_size_int) + tgx;
-          while (read_pos < mtrx_read_end) {
-            destination.sp_umat[read_pos] = source.sp_umat[read_pos];
-            read_pos += mtrx_warps * warp_size_int;
-          }
-        }
-        else if (warp_nature < 5 * mtrx_work_units) {
-          int read_pos = mtrx_read_start +
-                         ((box_warp_idx - (4 * mtrx_warps)) * warp_size_int) + tgx;
-          while (read_pos < mtrx_read_end) {
-            destination.sp_invu[read_pos] = source.sp_invu[read_pos];
-            read_pos += mtrx_warps * warp_size_int;
-          }
-        }
-        else if (warp_nature < (5 * mtrx_work_units) + bdim_work_units) {
+        else if (warp_nature < (4 * mtrx_work_units) + bdim_work_units) {
           int read_pos = bdim_read_start +
-                         ((box_warp_idx - (5 * mtrx_warps)) * warp_size_int) + tgx;
+                         ((box_warp_idx - (3 * mtrx_warps)) * warp_size_int) + tgx;
           while (read_pos < bdim_read_end) {
             destination.boxdims[read_pos] = source.boxdims[read_pos];
-            read_pos += bdim_warps * warp_size_int;
-          }
-        }
-        else {
-          int read_pos = bdim_read_start +
-                         ((box_warp_idx - (5 * mtrx_warps) - bdim_warps) * warp_size_int) + tgx;
-          while (read_pos < bdim_read_end) {
-            destination.sp_boxdims[read_pos] = source.sp_boxdims[read_pos];
+            destination.alt_boxdims[read_pos] = source.alt_boxdims[read_pos];
             read_pos += bdim_warps * warp_size_int;
           }
         }
@@ -187,14 +167,18 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.xvel[read_pos] = source.xvel[read_pos];
+            destination.vxalt[read_pos] = source.vxalt[read_pos];
             if (source.vel_bits > velocity_scale_nonoverflow_bits) {
-              destination.xvel_ovrf[read_pos] = source.xvel_ovrf[read_pos];              
+              destination.xvel_ovrf[read_pos]  = source.xvel_ovrf[read_pos];              
+              destination.vxalt_ovrf[read_pos] = source.vxalt_ovrf[read_pos];              
             }
           }
           else {
             destination.xfrc[read_pos] = source.xfrc[read_pos];
+            destination.fxalt[read_pos] = source.fxalt[read_pos];
             if (source.frc_bits > force_scale_nonoverflow_bits) {
-              destination.xfrc_ovrf[read_pos] = source.xfrc_ovrf[read_pos];              
+              destination.xfrc_ovrf[read_pos]  = source.xfrc_ovrf[read_pos];              
+              destination.fxalt_ovrf[read_pos] = source.fxalt_ovrf[read_pos];              
             }
           }
           read_pos += pdim_warps * warp_size_int;
@@ -205,14 +189,18 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.yvel[read_pos] = source.yvel[read_pos];
+            destination.vyalt[read_pos] = source.vyalt[read_pos];
             if (source.vel_bits > velocity_scale_nonoverflow_bits) {
-              destination.yvel_ovrf[read_pos] = source.yvel_ovrf[read_pos];              
+              destination.yvel_ovrf[read_pos]  = source.yvel_ovrf[read_pos];              
+              destination.vyalt_ovrf[read_pos] = source.vyalt_ovrf[read_pos];              
             }
           }
           else {
             destination.yfrc[read_pos] = source.yfrc[read_pos];
+            destination.fyalt[read_pos] = source.fyalt[read_pos];
             if (source.frc_bits > force_scale_nonoverflow_bits) {
-              destination.yfrc_ovrf[read_pos] = source.yfrc_ovrf[read_pos];              
+              destination.yfrc_ovrf[read_pos]  = source.yfrc_ovrf[read_pos];              
+              destination.fyalt_ovrf[read_pos] = source.fyalt_ovrf[read_pos];              
             }
           }
           read_pos += pdim_warps * warp_size_int;
@@ -223,14 +211,18 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.zvel[read_pos] = source.zvel[read_pos];
+            destination.vzalt[read_pos] = source.vzalt[read_pos];
             if (source.vel_bits > velocity_scale_nonoverflow_bits) {
-              destination.zvel_ovrf[read_pos] = source.zvel_ovrf[read_pos];              
+              destination.zvel_ovrf[read_pos]  = source.zvel_ovrf[read_pos];              
+              destination.vzalt_ovrf[read_pos] = source.vzalt_ovrf[read_pos];              
             }
           }
           else {
             destination.zfrc[read_pos] = source.zfrc[read_pos];
+            destination.fzalt[read_pos] = source.fzalt[read_pos];
             if (source.frc_bits > force_scale_nonoverflow_bits) {
-              destination.zfrc_ovrf[read_pos] = source.zfrc_ovrf[read_pos];              
+              destination.zfrc_ovrf[read_pos]  = source.zfrc_ovrf[read_pos];              
+              destination.fzalt_ovrf[read_pos] = source.fzalt_ovrf[read_pos];              
             }
           }
           read_pos += pdim_warps * warp_size_int;
@@ -286,16 +278,16 @@ kPsyPrimeConjugateGradient(PsSynthesisWriter psyw) {
   const int last_system = psyw.system_count - 1;
   const int maxpos = psyw.atom_starts[last_system] + psyw.atom_counts[last_system];
   for (int pos = minpos; pos < maxpos; pos += blockDim.x * gridDim.x) {
-    psyw.xprv[pos] = psyw.xfrc[pos];
-    psyw.yprv[pos] = psyw.yfrc[pos];
-    psyw.zprv[pos] = psyw.zfrc[pos];
+    psyw.xalt[pos] = psyw.xfrc[pos];
+    psyw.yalt[pos] = psyw.yfrc[pos];
+    psyw.zalt[pos] = psyw.zfrc[pos];
     psyw.xvel[pos] = 0LL;
     psyw.yvel[pos] = 0LL;
     psyw.zvel[pos] = 0LL;
     if (psyw.frc_bits > force_scale_nonoverflow_bits) {
-      psyw.xprv_ovrf[pos] = psyw.xfrc_ovrf[pos];
-      psyw.yprv_ovrf[pos] = psyw.yfrc_ovrf[pos];
-      psyw.zprv_ovrf[pos] = psyw.zfrc_ovrf[pos];
+      psyw.xalt_ovrf[pos] = psyw.xfrc_ovrf[pos];
+      psyw.yalt_ovrf[pos] = psyw.yfrc_ovrf[pos];
+      psyw.zalt_ovrf[pos] = psyw.zfrc_ovrf[pos];
       psyw.xvel_ovrf[pos] = 0;
       psyw.yvel_ovrf[pos] = 0;
       psyw.zvel_ovrf[pos] = 0;
@@ -319,54 +311,36 @@ kPsyCopySystem(PhaseSpaceWriter psw, const PsSynthesisReader poly_psw, const int
                       &poly_psw.ycrd_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
   pos = splitFPToReal(psw.zcrd, pos,  2, &poly_psw.zcrd[atom_offset],
                       &poly_psw.zcrd_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.xprv, pos,  3, &poly_psw.xprv[atom_offset],
-                      &poly_psw.xprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.yprv, pos,  4, &poly_psw.yprv[atom_offset],
-                      &poly_psw.yprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.zprv, pos,  5, &poly_psw.zprv[atom_offset],
-                      &poly_psw.zprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.xnxt, pos,  6, &poly_psw.xnxt[atom_offset],
-                      &poly_psw.xnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.ynxt, pos,  7, &poly_psw.ynxt[atom_offset],
-                      &poly_psw.ynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.znxt, pos,  8, &poly_psw.znxt[atom_offset],
-                      &poly_psw.znxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
-  pos = splitFPToReal(psw.xvel, pos,  9, &poly_psw.xvel[atom_offset],
+  pos = splitFPToReal(psw.xalt, pos,  3, &poly_psw.xalt[atom_offset],
+                      &poly_psw.xalt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.yalt, pos,  4, &poly_psw.yalt[atom_offset],
+                      &poly_psw.yalt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.zalt, pos,  5, &poly_psw.zalt[atom_offset],
+                      &poly_psw.zalt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.xvel, pos,  6, &poly_psw.xvel[atom_offset],
                       &poly_psw.xvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.yvel, pos, 10, &poly_psw.yvel[atom_offset],
+  pos = splitFPToReal(psw.yvel, pos,  7, &poly_psw.yvel[atom_offset],
                       &poly_psw.yvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.zvel, pos, 11, &poly_psw.zvel[atom_offset],
+  pos = splitFPToReal(psw.zvel, pos,  8, &poly_psw.zvel[atom_offset],
                       &poly_psw.zvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vxprv, pos, 12, &poly_psw.vxprv[atom_offset],
-                      &poly_psw.vxprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vyprv, pos, 13, &poly_psw.vyprv[atom_offset],
-                      &poly_psw.vyprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vzprv, pos, 14, &poly_psw.vzprv[atom_offset],
-                      &poly_psw.vzprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vxnxt, pos, 15, &poly_psw.vxnxt[atom_offset],
-                      &poly_psw.vxnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vynxt, pos, 16, &poly_psw.vynxt[atom_offset],
-                      &poly_psw.vynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.vznxt, pos, 17, &poly_psw.vznxt[atom_offset],
-                      &poly_psw.vznxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
-  pos = splitFPToReal(psw.xfrc, pos, 18, &poly_psw.xfrc[atom_offset],
+  pos = splitFPToReal(psw.vxalt, pos,  9, &poly_psw.vxalt[atom_offset],
+                      &poly_psw.vxalt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vyalt, pos, 10, &poly_psw.vyalt[atom_offset],
+                      &poly_psw.vyalt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vzalt, pos, 11, &poly_psw.vzalt[atom_offset],
+                      &poly_psw.vzalt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.xfrc, pos, 12, &poly_psw.xfrc[atom_offset],
                       &poly_psw.xfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.yfrc, pos, 19, &poly_psw.yfrc[atom_offset],
+  pos = splitFPToReal(psw.yfrc, pos, 13, &poly_psw.yfrc[atom_offset],
                       &poly_psw.yfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.zfrc, pos, 20, &poly_psw.zfrc[atom_offset],
+  pos = splitFPToReal(psw.zfrc, pos, 14, &poly_psw.zfrc[atom_offset],
                       &poly_psw.zfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fxprv, pos, 21, &poly_psw.fxprv[atom_offset],
-                      &poly_psw.fxprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fyprv, pos, 22, &poly_psw.fyprv[atom_offset],
-                      &poly_psw.fyprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fzprv, pos, 23, &poly_psw.fzprv[atom_offset],
-                      &poly_psw.fzprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fxnxt, pos, 24, &poly_psw.fxnxt[atom_offset],
-                      &poly_psw.fxnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fynxt, pos, 25, &poly_psw.fynxt[atom_offset],
-                      &poly_psw.fynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
-  pos = splitFPToReal(psw.fznxt, pos, 26, &poly_psw.fznxt[atom_offset],
-                      &poly_psw.fznxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fxalt, pos, 15, &poly_psw.fxalt[atom_offset],
+                      &poly_psw.fxalt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fyalt, pos, 16, &poly_psw.fyalt[atom_offset],
+                      &poly_psw.fyalt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fzalt, pos, 17, &poly_psw.fzalt[atom_offset],
+                      &poly_psw.fzalt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
 
   // Copy the transformation matrices and box dimensions
   const int mtrx_offset = devcRoundUp(9, warp_size_int) * index;
@@ -391,6 +365,27 @@ kPsyCopySystem(PhaseSpaceWriter psw, const PsSynthesisReader poly_psw, const int
     int npos = lane_idx;
     while (npos < 6) {
       psw.boxdim[npos] = poly_psw.boxdims[bdim_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+  else if (warp_idx == 3) {
+    int npos = lane_idx;
+    while (npos < 9) {
+      psw.umat_alt[npos] = poly_psw.umat_alt[mtrx_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+  else if (warp_idx == 4) {
+    int npos = lane_idx;
+    while (npos < 9) {
+      psw.invu_alt[npos] = poly_psw.invu_alt[mtrx_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+  else if (warp_idx == 5) {
+    int npos = lane_idx;
+    while (npos < 6) {
+      psw.boxdim_alt[npos] = poly_psw.alt_boxdims[bdim_offset + npos];
       npos += warp_size_int;
     }
   }

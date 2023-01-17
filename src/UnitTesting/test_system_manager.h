@@ -111,20 +111,23 @@ public:
   ///
   /// \param index  The system of interest
   /// \{
-  AtomGraph& getTopologyReference(int index);
-  std::vector<AtomGraph>& getTopologyReference();
+  const AtomGraph& getTopologyReference(int index) const;
+  const std::vector<AtomGraph>& getTopologyReference() const;
   /// \}
   
   /// \brief Get a pointer to one or more topologies
   ///
   /// Overloaded:
   ///   - Get a pointer to a single topology
-  ///   - Get a const vector of pointers to all topologies in order
+  ///   - Get a vector of pointers to all topologies in order
+  ///   - Return const results for a const object or non-const results for a non-const object
   ///
   /// \param index  Identifier of a specific topology of interest
   /// \{
   AtomGraph* getTopologyPointer(int index);
+  const AtomGraph* getTopologyPointer(int index) const;
   std::vector<AtomGraph*> getTopologyPointer();
+  const std::vector<AtomGraph*> getTopologyPointer() const;
   /// \}
   
 private:

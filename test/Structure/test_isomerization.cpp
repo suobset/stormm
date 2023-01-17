@@ -299,7 +299,7 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
         const CoordinateFrameReader cfr = cf.data();
         shuffled_ps.emplace_back(cfr.natom, cfr.unit_cell);
         shuffled_ps.back().fill(cfr.xcrd, cfr.ycrd, cfr.zcrd, TrajectoryKind::POSITIONS,
-                                CoordinateCycle::PRESENT, 0, cfr.boxdim);
+                                CoordinateCycle::PRIMARY, 0, cfr.boxdim);
         shuffled_ag.push_back(const_cast<AtomGraph*>(ag_list[i].getSelfPointer()));
         added++;
       }

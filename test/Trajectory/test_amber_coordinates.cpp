@@ -14,6 +14,7 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::small;
@@ -642,7 +643,7 @@ int main(const int argc, const char* argv[]) {
   check(lowres_orig_tip5p_crd, RelationalOperator::EQUAL, Approx(mult_tip5p_crd).margin(0.01),
         "Conversion of data in a CoordinateSeries with fixed-precision representation does not go "
         "to a shallower fixed-precision representation with the expected result.", do_tip5p);
-  
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

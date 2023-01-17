@@ -1090,7 +1090,9 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_zero  = 0.0;
   const Tcalc value_nil   = 1.0e-6;
+  const Tcalc value_half  = 1.0e-6;
   const Tcalc value_one   = 1.0;
+  const Tcalc value_two   = 2.0;
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
     dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
@@ -1108,88 +1110,51 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
   const Tcalc lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
   const Tcalc ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
-  Tcalc invr2;
-  if (clash_distance > value_nil || clash_ratio > value_nil) {
-    const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
-    Tcalc r, ij_sigma;
-    if (tcalc_is_double) {
-      r = sqrt(r2);
-      ij_sigma = (ljb > value_nil) ? sqrt(cbrt(lja / ljb)) : value_zero;
+  const Tcalc ele_scale = attn14_elec_factors[attn_idx];
+  const Tcalc qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
+  const bool mitigate_clashes = (clash_distance > value_nil || clash_ratio > value_nil);
+  Tcalc fmag = value_zero;
+  Tcalc ele_contrib = value_zero;
+  Tcalc vdw_contrib = value_zero;
+  if (mitigate_clashes) {
+    const Tcalc r = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    if (eval_elec_force == EvaluateForce::YES) {
+      quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib, &fmag);
     }
     else {
-      r = sqrtf(r2);
-      ij_sigma = (ljb > value_nil) ? sqrtf(cbrtf(lja / ljb)) : value_zero;
+      quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib, nullptr);
     }
-    const Tcalc sigma_limit = clash_ratio * ij_sigma;
-    if (r < sigma_limit) {
-
-      // Protect against the case where two particles are absolutely coincident.  The
-      // inter-particle distance will go to a floor value but the displacements must be adjusted
-      // to have nonzero values.  Give them bigger values than the adjusted distance would imply,
-      // to ensure that the resulting force will be significant (but still no overflow the
-      // accumulators).  In other cases, the arbitrary adjustment of the distance will lead to a
-      // consistent magnitude of the force for clashing particles at any distance, and because dx,
-      // dy, and dz will remain very small this in turn will mean that the closer two particles are
-      // to one another, the less they will influence one another.  In the case of particles with
-      // nonzero van-der Waals properties, this means that the necessary van-der Waals repulsion
-      // for a cluster of clashing atoms will be weakest for the most severe clashes.  Reverse that
-      // trend by multiplying dx, dy, and dz by the inverse square of the inter-particle distance
-      // to sigma ratio.
-      if (r < value_nil) {
-        dx = dy = dz = (tcalc_is_double) ? cbrt(sigma_limit) : cbrtf(sigma_limit);
-      }
-      else {
-        const Tcalc disp_boost = sigma_limit / r;
-        dx *= disp_boost;
-        dy *= disp_boost;
-        dz *= disp_boost;
-      }
-      invr2 = value_one / (sigma_limit * sigma_limit);
-    }
-    else if (r < clash_distance) {
-
-      // When there is are no van-der Waals parameters on the particles, this criterion will catch
-      // exposed charged particles coming too close together.  Again, protect against coincident
-      // particles to ensure that the resulting forces are nonzero, but otherwise the decrease in
-      // inter-particle forces with decreasing distance is likely to be beneficial, reducing the
-      // attraction of oppositely charged particles that may have resulted in the close contact to
-      // begin with.
-      if (r < value_nil) {
-        dx = dy = dz = (tcalc_is_double) ? cbrt(clash_distance) : cbrtf(clash_distance);
-      }
-      else {
-        const Tcalc disp_boost = clash_distance / r;
-        dx *= disp_boost;
-        dy *= disp_boost;
-        dz *= disp_boost;
-      }
-      invr2 = value_one / (clash_distance * clash_distance);
+    if (eval_vdw_force == EvaluateForce::YES) {
+      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
     }
     else {
-      invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, nullptr);
     }
   }
   else {
-    invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
-  }
-  const Tcalc invr = (tcalc_is_double) ? sqrt(invr2) : sqrtf(invr2);
-  const Tcalc invr4 = invr2 * invr2;
-  const Tcalc ele_scale = attn14_elec_factors[attn_idx];
-  const Tcalc qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
-  const Tcalc ele_contrib = qiqj * invr;
-  const Tcalc vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
 
-  // Evaluate the force, if requested
-  if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
-    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
-    if (eval_vdw_force == EvaluateForce::YES) {
-      if (tcalc_is_double) {
-        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
-      }
-      else {
-        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+    // Standard evaluation of the Lennard-Jones and Coulomb potentials
+    const Tcalc invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+    const Tcalc invr = (tcalc_is_double) ? sqrt(invr2) : sqrtf(invr2);
+    const Tcalc invr4 = invr2 * invr2;
+    ele_contrib = qiqj * invr;
+    vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
+    if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
+      fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
+      if (eval_vdw_force == EvaluateForce::YES) {
+        if (tcalc_is_double) {
+          fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+        }
+        else {
+          fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+        }
       }
     }
+  }
+
+  // Accumulate forces, if their calculation was requested
+  if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
     if (isSignedIntegralScalarType<Tforce>()) {
       const Tforce ifmag_dx = llround(fmag * dx * force_factor);
       const Tforce ifmag_dy = llround(fmag * dy * force_factor);
@@ -1212,7 +1177,7 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
       yfrc[l_atom] -= fmag_dy;
       zfrc[l_atom] -= fmag_dz;
     }
-  } 
+  }
   return Vec2<Tcalc>(ele_contrib, vdw_contrib);
 }
 

@@ -11,6 +11,7 @@
 #include "Math/reduction_enumerators.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
+#include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Topology/atomgraph_enumerators.h"
 
@@ -22,6 +23,7 @@ using card::KernelManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
+using energy::ClashResponse;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
 using math::ReductionStage;
@@ -178,18 +180,30 @@ public:
 
   /// \brief Prime the work unit counters based on a particular GPU configuration.
   ///
+  /// Overloaded:
+  ///   - Assume clashes are not handled specially
+  ///   - Make provisions for clashes to be forgiven (or not) with softcore potential functions
+  /// 
   /// \param launcher  Object containing launch parameters for all kernels
   /// \param eval_frc  Indicate whether forces are to be evaluated--some kernels allocate different
   ///                  numbers of blocks in the launch grid if forces are not required.
   /// \param eval_nrg  Indicate whether energy is to be evaluated--some kernels allocate different
   ///                  numbers of blocks in the launch grid if the energy is not required.
+  /// \param softcore  Indicate whether the control counters should take clash handling kernel
+  ///                  variants into account
   /// \param prec      Precision model for calculations
   /// \param poly_ag   Compilation of topologies describing the workload (used here for general
   ///                  descriptors such as the non-bonded work unit type)
+  /// \{
+  void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
+                             EvaluateEnergy eval_nrg, const ClashResponse softcore,
+                             PrecisionModel prec, const AtomGraphSynthesis &poly_ag); 
+
   void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, PrecisionModel prec,
                              const AtomGraphSynthesis &poly_ag); 
-
+  /// \}
+  
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();
   

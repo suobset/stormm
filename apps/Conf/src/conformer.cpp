@@ -49,15 +49,18 @@ using namespace conf_app::setup;
 //-------------------------------------------------------------------------------------------------
 // Display a general help message for this program.
 //-------------------------------------------------------------------------------------------------
-void displayGeneralHelpMessage() {
+void displayGeneralHelpMessage(const std::vector<std::string> &all_namelists) {
   const std::string base_msg =
     terminalFormat("A program for probing conformations of chemical structures and returning "
-                   "those with the lowest energy.\n\n", "conformer"); 
+                   "those with the lowest energy.\n\n", "conformer");
+  std::string list_of_nml;
+  for (size_t i = 0; i < all_namelists.size(); i++) {
+    list_of_nml += "  - " + all_namelists[i] + "\n";
+  }
   const std::string nml_msg =
     terminalFormat("Applicable namelists (re-run with one of these terms as the command-line "
-                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n"
-                   "  - &files\n  - &restraint\n  - &conformer\n  - &minimize\n  - &report\n",
-                   nullptr, nullptr, 0, 2, 2);
+                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n" +
+                   list_of_nml, nullptr, nullptr, 0, 2, 2);
   printf("%s", base_msg.c_str());
   printf("%s", nml_msg.c_str());
   printf("\n");
@@ -69,12 +72,15 @@ void displayGeneralHelpMessage() {
 int main(int argc, const char* argv[]) {
 
   // Check for a help message
+  const std::vector<std::string> my_namelists = {
+    "&files", "&conformer", "&restraint", "&solvent", "&random", "&minimize", "&report",
+    "&precision"
+  };
   if (detectHelpSignal(argc, argv)) {
-    displayGeneralHelpMessage();
+    displayGeneralHelpMessage(my_namelists);
     return 0;
   }
-  if (displayNamelistHelp(argc, argv, { "&files", "&conformer", "&restraint", "&solvent",
-                                        "&minimize", "&report" })) {
+  if (displayNamelistHelp(argc, argv, my_namelists)) { 
     return 0;
   }
 
@@ -188,7 +194,7 @@ int main(int argc, const char* argv[]) {
 #ifdef STORMM_USE_HPC
   sandbox.download();
   emin.download();
-  Condensate sandbox_snapshot(sandbox, CondensationLevel::FLOAT, gpu);
+  Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE, gpu);
 #else
   Condensate sandbox_snapshot(sandbox);
 #endif
@@ -201,6 +207,53 @@ int main(int argc, const char* argv[]) {
 #ifdef STORMM_USE_HPC
   emin.computeTotalEnergy();
   const std::vector<double> efinal = emin.reportTotalEnergies();
+  const std::vector<double> ebond  = emin.reportInstantaneousStates(StateVariable::BOND);
+  const std::vector<double> eangl  = emin.reportInstantaneousStates(StateVariable::ANGLE);
+  const std::vector<double> edihe  =
+    emin.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
+  const std::vector<double> eimpr  =
+    emin.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
+  const std::vector<double> eelec  = emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC);
+  const std::vector<double> evdw   = emin.reportInstantaneousStates(StateVariable::VDW);
+  const std::vector<double> eqq14  =
+    emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
+  const std::vector<double> elj14  = emin.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
+  const std::vector<double> e_tot  = emin.reportEnergyHistory(198);
+  const std::vector<double> e_bond = emin.reportEnergyHistory(StateVariable::BOND, 136);
+
+  // CHECK
+#if 0
+  printf("E_tot = [\n");
+  int jj = 0;
+  for (size_t i = 0; i < e_tot.size(); i++) {
+    printf("  %14.8lf", e_tot[i]);
+    jj++;
+    if (jj == 6) {
+      printf("\n");
+      jj = 0;
+    }
+  }
+  if (jj > 0) {
+    printf("\n");
+  }
+  printf("];\n");
+  printf("E_bond = [\n");
+  jj = 0;
+  for (size_t i = 0; i < e_bond.size(); i++) {
+    printf("  %14.8lf", e_bond[i]);
+    jj++;
+    if (jj == 6) {
+      printf("\n");
+      jj = 0;
+    }
+  }
+  if (jj > 0) {
+    printf("\n");
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+  
 #endif
   const std::vector<AtomGraph*> unique_ag = sandbox.getUniqueTopologies();
   int nbad = 0;
@@ -208,7 +261,7 @@ int main(int argc, const char* argv[]) {
     const int nbad_so_far = nbad;
     for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
       nbad += (efinal[sandboxw.common_ag_list[j]] < -1000.0 ||
-               efinal[sandboxw.common_ag_list[j]] >  1000.0);
+               efinal[sandboxw.common_ag_list[j]] >  20000.0);
     }
     if (nbad > nbad_so_far) {
       printf("Topology %s: %4d\n", getBaseName(unique_ag[i]->getFileName()).c_str(),

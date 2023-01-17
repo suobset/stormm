@@ -3,6 +3,7 @@
 #define STORMM_STRUCTURE_RMSD_H
 
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
@@ -20,6 +21,7 @@
 namespace stormm {
 namespace structure {
 
+using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
 using math::EigenWork;
 using math::jacobiEigensolver;
@@ -30,7 +32,6 @@ using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using synthesis::Condensate;
 using synthesis::CondensateReader;
-using synthesis::CondensationLevel;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisReader;
 using trajectory::CoordinateFrame;

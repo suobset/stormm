@@ -119,6 +119,30 @@ std::string getEnumerationName(const TrajectoryFusion protocol) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TrajectoryKind kind) {
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    return std::string("POSITIONS");
+  case TrajectoryKind::VELOCITIES:
+    return std::string("VELOCITIES");
+  case TrajectoryKind::FORCES:
+    return std::string("FORCES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const CoordinateCycle orientation) {
+  switch (orientation) {
+  case CoordinateCycle::PRIMARY:
+    return std::string("PRIMARY");
+  case CoordinateCycle::ALTERNATE:
+    return std::string("ALTERNATE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   switch (cfkind) {
   case CoordinateFileKind::AMBER_CRD:

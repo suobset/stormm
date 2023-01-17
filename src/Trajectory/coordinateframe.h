@@ -8,6 +8,7 @@
 #include "Parsing/textfile.h"
 #include "Topology/atomgraph.h"
 #include "phasespace.h"
+#include "trajectory_enumerators.h"
 
 namespace stormm {
 namespace trajectory {
@@ -31,6 +32,10 @@ struct CoordinateFrameWriter {
   CoordinateFrameWriter(int natom_in, UnitCellType unit_cell_in, double* xcrd_in, double* ycrd_in,
                         double* zcrd_in, double* umat_in, double* invu_in, double* boxdim_in);
   CoordinateFrameWriter(PhaseSpace *ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameWriter(PhaseSpace *ps, TrajectoryKind kind,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameWriter(PhaseSpace *ps, TrajectoryKind kind, CoordinateCycle orientation,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
@@ -66,6 +71,14 @@ struct CoordinateFrameReader {
   CoordinateFrameReader(const CoordinateFrameWriter &cfw);
   CoordinateFrameReader(const PhaseSpace &ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
   CoordinateFrameReader(const PhaseSpace *ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameReader(const PhaseSpace *ps, TrajectoryKind kind, CoordinateCycle orientation,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameReader(const PhaseSpace &ps, TrajectoryKind kind, CoordinateCycle orientation,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameReader(const PhaseSpace *ps, TrajectoryKind kind,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameReader(const PhaseSpace &ps, TrajectoryKind kind,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.

@@ -243,7 +243,7 @@ public:
                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   void extractFrame(PhaseSpace *ps, int frame_index,
                     TrajectoryKind kind = TrajectoryKind::POSITIONS,
-                    CoordinateCycle time_point = CoordinateCycle::PRESENT,
+                    CoordinateCycle time_point = CoordinateCycle::PRIMARY,
                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
@@ -297,10 +297,22 @@ public:
   /// \param dim  The dimension of interest
   const Hybrid<T>& getCoordinateReference(CartesianDimension dim) const;
 
-  /// \brief Get a const pointer to the one of the Cartesian coordinate arrays.
+  /// \brief Get a const pointer to one of the Cartesian coordinate arrays.
   ///
   /// \param dim  The dimension of interest
   const Hybrid<T>* getCoordinatePointer(CartesianDimension dim) const;
+
+  /// \brief Get a const pointer to the box space transformation matrices
+  const Hybrid<double>& getBoxTransforms() const;
+
+  /// \brief Get a const pointer to the box space transformation matrices
+  const Hybrid<double>* getBoxTransformPointer() const;
+
+  /// \brief Get a const pointer to the box space transformation matrices
+  const Hybrid<double>& getInverseTransforms() const;
+
+  /// \brief Get a const pointer to the box space transformation matrices
+  const Hybrid<double>* getInverseTransformPointer() const;
 
   /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
   ///        access to any of its member variables.
@@ -337,24 +349,28 @@ public:
   /// \param frame_index  Index of the frame into which the coordinates should be imported.  The
   ///                     default value of -1 adds the new coordinates to the end of the list.
   /// \{
-  void importCoordinateSet(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrameReader &cfr, int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrameWriter &cfw, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrameWriter &cfw, int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrame &cf, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrame &cf, int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrame *cf, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const CoordinateFrame *cf, int frame_index = -1);
-  void importCoordinateSet(const PhaseSpace &ps, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const PhaseSpace &ps, int frame_index = -1);
-  void importCoordinateSet(const PhaseSpace *ps, int atom_start, int atom_end,
-                           int frame_index = -1);
-  void importCoordinateSet(const PhaseSpace *ps, int frame_index = -1);
+  void import(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
+              int frame_index = -1);
+  void import(const CoordinateFrameReader &cfr, int frame_index = -1);
+  void import(const CoordinateFrameWriter &cfw, int atom_start, int atom_end,
+              int frame_index = -1);
+  void import(const CoordinateFrameWriter &cfw, int frame_index = -1);
+  void import(const CoordinateFrame &cf, int atom_start, int atom_end, int frame_index = -1);
+  void import(const CoordinateFrame &cf, int frame_index = -1);
+  void import(const CoordinateFrame *cf, int atom_start, int atom_end, int frame_index = -1);
+  void import(const CoordinateFrame *cf, int frame_index = -1);
+  void import(const PhaseSpace &ps, int atom_start, int atom_end, int frame_index = -1,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+  void import(const PhaseSpace &ps, int frame_index = -1,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+  void import(const PhaseSpace *ps, int atom_start, int atom_end, int frame_index = -1,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+  void import(const PhaseSpace *ps, int frame_index = -1,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
   /// \}
 
   /// \brief Import coordinates from a file.  This function accepts directives to read a subset of
@@ -425,9 +441,9 @@ public:
   void resize(int new_frame_count, PhaseSpace *ps, int atom_start = 0, int atom_end = 0);
   /// \}
   
-  /// \brief Push a coordinate set to the back of the list.  This invokes the importCoordinateSet
-  ///        member function after reallocating the frame series with 25% spare capacity if the
-  ///        original capacity is insufficient.
+  /// \brief Push a coordinate set to the back of the list.  This invokes the import member
+  ///        function after reallocating the frame series with 25% spare capacity if the original
+  ///        capacity is insufficient.
   ///
   /// Overloaded:
   ///   - Accept all types of single-frame coordinate objects

@@ -249,7 +249,7 @@ CheckResult check(const double lhs, const RelationalOperator relationship, const
         error_edit += "Relative comparison of " + realToString(lhs, idec) + " to " +
                       realToString(rhs.getValue(), idec) + " +/- " +
                       realToString(rhs.getTol(), idec) + " fails by " +
-                      realToString(100.0 * fabs((lhs - rhs.getValue()) / rhs.getValue()), idec) +
+                      realToString(100.0 * fabs((lhs - rhs.getValue()) / (rhs.getTol())), idec) +
                       "%.";
       }
       else {
@@ -503,10 +503,8 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
       if (mismatch) {
         printf("Snapshot MISMATCH: ");
         std::string error_edit("  ");
-        if (urgency == TestPriority::CRITICAL) {
-          error_edit += vectorAlignmentReport(ref_content, content, data_format,
-                                              comparison_tolerance);
-        }
+        error_edit += vectorAlignmentReport(ref_content, content, data_format,
+                                            comparison_tolerance);
         const std::string parsed_msg = terminalFormat(error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());

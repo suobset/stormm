@@ -106,7 +106,8 @@ private:
 ///                    beginning of an input file if no such namelist is found starting from the
 ///                    original starting point
 NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
-                              ExceptionResponse policy, WrapTextSearch wrap = WrapTextSearch::NO);
+                              ExceptionResponse policy = ExceptionResponse::DIE,
+                              WrapTextSearch wrap = WrapTextSearch::NO);
   
 } // namespace namelist
 } // namespace stormm

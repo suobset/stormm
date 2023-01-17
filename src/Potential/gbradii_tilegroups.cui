@@ -365,33 +365,33 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const int atom_limit = refresh_start + ((refresh_code >> 16) & 0xffff);
       while (pos < atom_limit) {
         if (refresh_code & 0x1) {
-          __stwt(&poly_psw.fxnxt[pos], 0LL);
+          __stwt(&poly_psw.fxalt[pos], 0LL);
 #ifndef TCALC_IS_SINGLE
-          __stwt(&poly_psw.fxnxt_ovrf[pos], 0);
+          __stwt(&poly_psw.fxalt_ovrf[pos], 0);
 #endif
       	}
         if ((refresh_code >> 1) & 0x1) {
-          __stwt(&poly_psw.fynxt[pos], 0LL);
+          __stwt(&poly_psw.fyalt[pos], 0LL);
 #ifndef TCALC_IS_SINGLE
-          __stwt(&poly_psw.fynxt_ovrf[pos], 0);
+          __stwt(&poly_psw.fyalt_ovrf[pos], 0);
 #endif
         }
         if ((refresh_code >> 2) & 0x1) {
-          __stwt(&poly_psw.fznxt[pos], 0LL);
+          __stwt(&poly_psw.fzalt[pos], 0LL);
 #ifndef TCALC_IS_SINGLE
-          __stwt(&poly_psw.fznxt_ovrf[pos], 0);
+          __stwt(&poly_psw.fzalt_ovrf[pos], 0);
 #endif
         }
         if ((refresh_code >> 3) & 0x1) {
-          __stwt(&iswk.nxt_psi[pos], 0LL);
+          __stwt(&iswk.alt_psi[pos], 0LL);
 #ifndef TCALC_IS_SINGLE
-          __stwt(&iswk.nxt_psi_ovrf[pos], 0);
+          __stwt(&iswk.alt_psi_ovrf[pos], 0);
 #endif
         }
         if ((refresh_code >> 4) & 0x1) {
-          __stwt(&iswk.nxt_sum_deijda[pos], 0LL);
+          __stwt(&iswk.alt_sum_deijda[pos], 0LL);
 #ifndef TCALC_IS_SINGLE
-          __stwt(&iswk.nxt_sum_deijda_ovrf[pos], 0);
+          __stwt(&iswk.alt_sum_deijda_ovrf[pos], 0);
 #endif
         }
         pos += blockDim.x;

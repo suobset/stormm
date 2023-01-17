@@ -181,6 +181,7 @@ int main(const int argc, const char* argv[]) {
   section(1);
   MinimizeControls mincon;
   mincon.setTotalCycles(600);
+  mincon.setClashDampingCycles(0);
   if (files_exist) {
     timer.assignTime(0);
     const int alad_timings = timer.addCategory("Minimize Ala dipeptide");

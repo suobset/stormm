@@ -21,6 +21,7 @@
 #include "Trajectory/phasespace.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
+#include "soft_core_potentials.h"
 
 namespace stormm {
 namespace energy {
