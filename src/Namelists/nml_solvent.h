@@ -52,6 +52,15 @@ public:
                   WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  SolventControls(const SolventControls &original) = default;
+  SolventControls(SolventControls &&original) = default;
+  SolventControls& operator=(const SolventControls &original) = default;
+  SolventControls& operator=(SolventControls &&original) = default;
+  /// \}
+
   /// \brief Get the type of implicit solvent (some flavor of Generalized Born)
   ImplicitSolventModel getImplicitSolventModel() const;
 

@@ -898,7 +898,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     timer->assignTime(pert_timings);
   }
   mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
-  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec, timer,
+  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec, 32, timer,
                                           test_name + " (II)");
   cudaDeviceSynchronize();
   e_refine.download();
@@ -908,7 +908,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
     e_hist_a[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
   }
-  e_refine = launchMinimization(poly_ag, poly_se, &poly_ps_cpy, mincon, gpu, prec, timer,
+  e_refine = launchMinimization(poly_ag, poly_se, &poly_ps_cpy, mincon, gpu, prec, 32, timer,
                                 test_name + " (III)");
   cudaDeviceSynchronize();
   e_refine.download();

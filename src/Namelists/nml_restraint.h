@@ -58,6 +58,15 @@ public:
                     ExceptionResponse policy_in = ExceptionResponse::DIE,
                     WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
+  
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  RestraintControls(const RestraintControls &original) = default;
+  RestraintControls(RestraintControls &&original) = default;
+  RestraintControls& operator=(const RestraintControls &original) = default;
+  RestraintControls& operator=(RestraintControls &&original) = default;
+  /// \}
 
   /// \brief Get the order of the restraint.  If the object describes a collection (ensemble) of
   ///        restraints, the order will be returned as zero.

@@ -99,7 +99,8 @@ public:
   /// \brief The constructor requires only the number of systems.
   ///
   /// \param system_count_in    The number of systems to track
-  /// \param capacity_in        The capacity to initially allocate for
+  /// \param capacity_in        The capacity (samples per energy component in each system) to
+  ///                           initially allocate for
   /// \param nrg_scale_bits_in  Number of bits after the decimal with which to store energy values
   ScoreCard(int system_count_in, int capacity_in = 16,
             int nrg_scale_bits_in = default_energy_scale_bits);
@@ -397,6 +398,35 @@ public:
   std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST);
   std::vector<double2> reportEnergyHistory(StateVariable aspect,
                                            HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+  /// \brief Get a const pointer to this object.
+  const ScoreCard* getSelfPointer() const;
+  
+  /// \brief Import the results of another ScoreCard into this one, including all components and the
+  ///        associated energy history.  If the current object does not have sufficient space either
+  ///        in terms of systems or sample capacity (depth of history), it will be re-allocated.  This
+  ///        functionality is available on the GPU as a free function energyCopy(), which allows the
+  ///        reader from the source and the writer from the destination to be used rather than a long
+  ///        series of pointers and array size constants.
+  ///
+  /// Overloaded:
+  ///   - Supply a const pointer or const reference to the other energy tracking object
+  ///   - Import a single system into a specific index.
+  ///   - Import multiple systems into multiple indices.
+  ///
+  /// \param other           The other energy tracking object
+  /// \param fill_index      Index of the current object to import results into
+  /// \param fill_indices    Indices of the current object to import results into
+  /// \param source_index    Index of the original object to import results from
+  /// \param source_indices  Indices of the original object to import results from
+  /// \{
+  void import(const ScoreCard *other, size_t fill_index, size_t source_index);
+  void import(const ScoreCard &other, size_t fill_index, size_t source_index);
+  void import(const ScoreCard *other, const std::vector<int> &fill_indices,
+              const std::vector<int> &source_indices);
+  void import(const ScoreCard &other, const std::vector<int> &fill_indices,
+              const std::vector<int> &source_indices);
   /// \}
   
 private:

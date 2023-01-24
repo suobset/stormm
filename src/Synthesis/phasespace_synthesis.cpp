@@ -1036,6 +1036,11 @@ const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int system_
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getSystemTopologyPointer() const {
+  return topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
 const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getUniqueTopologies() const {
   return unique_topologies;
 }
@@ -1978,37 +1983,13 @@ void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
 void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
                                           const std::string &file_name, const double current_time,
                                           const CoordinateFileKind output_kind,
-                                          const PrintSituation expectation, const GpuDetails &gpu)
-{
+                                          const PrintSituation expectation) const {
+
   // Bail out if there are no frames to print
   const size_t nframe = system_indices.size();
   if (nframe == 0LLU) {
     return;
   }
-#ifdef STORMM_USE_HPC
-  int low_frame = nframe;
-  int high_frame = 0;
-  for (size_t i = 0; i < nframe; i++) {
-    low_frame = std::min(system_indices[i], low_frame);
-    high_frame = std::max(system_indices[i], high_frame);
-  }
-  high_frame++;
-  switch (output_kind) {
-  case CoordinateFileKind::AMBER_CRD:
-  case CoordinateFileKind::AMBER_INPCRD:
-  case CoordinateFileKind::AMBER_NETCDF:
-    download(TrajectoryKind::POSITIONS, low_frame, high_frame, gpu);
-    break;
-  case CoordinateFileKind::AMBER_ASCII_RST:
-  case CoordinateFileKind::AMBER_NETCDF_RST:
-    download(TrajectoryKind::POSITIONS, low_frame, high_frame, gpu);
-    download(TrajectoryKind::VELOCITIES, low_frame, high_frame, gpu);
-    break;
-  case CoordinateFileKind::SDF:
-  case CoordinateFileKind::UNKNOWN:
-    break;
-  }
-#endif
   
   // Open and write, or append the file with the named frames by transferring the necessary data
   // to temporary arrays (the fixed-precision conversion to real numbers is needed, and the

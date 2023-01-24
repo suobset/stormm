@@ -45,7 +45,7 @@ using namespace generalized_born_defaults;
 ///   - Evaluate based on a PhaseSpace object, with the option to compute forces
 ///   - Evaluate energy only, based on a CoordinateFrame abstract
 ///
-/// \param ag              System topology
+/// \param ag              The system topology
 /// \param nbk             Non-bonded parameters abstract taken from the original topology
 /// \param se              Exclusion mask providing bits for all atom pairs
 /// \param ser             Abstract of the exclusion mask providing bits for all atom pairs

@@ -3,6 +3,7 @@
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "Math/rounding.h"
+#include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
@@ -21,6 +22,7 @@ namespace synthesis {
 
 using card::HybridKind;
 using math::buildReductionWorkUnits;
+using math::incrementingSeries;
 using math::maxAbsoluteDifference;
 using math::maxValue;
 using math::minValue;
@@ -492,12 +494,31 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                                       const std::vector<RestraintApparatus*> &restraints_in,
+                                       const ExceptionResponse policy_in, const GpuDetails &gpu,
+                                       StopWatch *timer_in) :
+  AtomGraphSynthesis(topologies_in, restraints_in,
+                     incrementingSeries<int>(0, topologies_in.size()),
+                     incrementingSeries<int>(0, topologies_in.size()), policy_in, gpu, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                                        const std::vector<int> &topology_indices_in,
                                        const ExceptionResponse policy_in, const GpuDetails &gpu,
                                        StopWatch *timer_in) :
     AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
                        topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
                        policy_in, gpu, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                                       const ExceptionResponse policy_in, const GpuDetails &gpu,
+                                       StopWatch *timer_in) :
+    AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
+                       incrementingSeries<int>(0, topologies_in.size()),
+                       std::vector<int>(topologies_in.size(), 0), policy_in, gpu, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -674,6 +695,9 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
              std::to_string(n_unused_network) + " are not referenced by any systems in this "
              "synthesis.", "AtomGraphSynthesis", "checkRestraintList");
       break;
+
+
+
     case ExceptionResponse::SILENT:
       break;
     }
@@ -683,9 +707,14 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
   std::vector<int> restraint_index_rebase(restraint_network_count, -1);
   int n_unique_network = 0;
   for (int i = 0; i < restraint_network_count; i++) {
-    restraint_index_rebase[i] = n_unique_network;
-    restraint_networks[n_unique_network] = restraint_networks[i];
     if (network_unique[i]) {
+      restraint_index_rebase[i] = n_unique_network;
+      for (int j = i + 1; j < restraint_network_count; j++) {
+        if (restraint_networks[j] == restraint_networks[i]) {
+          restraint_index_rebase[j] = n_unique_network;
+        }
+      }
+      restraint_networks[n_unique_network] = restraint_networks[i];
       n_unique_network++;
     }
   }
@@ -2680,7 +2709,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = sp_rangl_final_r.putHost(&nmr_float4_data, spfil_rangl_finl_r, ic, warp_size_zu);
   ic = sp_rdihe_init_r.putHost(&nmr_float4_data, spfil_rdihe_init_r, ic, warp_size_zu);
   ic = sp_rdihe_final_r.putHost(&nmr_float4_data, spfil_rdihe_finl_r, ic, warp_size_zu);
-
+  
   // With the restraint parameter tables assembled, mark the restraints for each system in
   // terms of the synthesis tables.
   for (int sysid = 0; sysid < system_count; sysid++) {
@@ -3191,13 +3220,23 @@ int AtomGraphSynthesis::getTopologyCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraph* AtomGraphSynthesis::getSystemTopologyPointer(const int system_index) const {
+const AtomGraph* AtomGraphSynthesis::getSystemTopologyPointer(const int system_index) const {
   if (system_index < 0 || system_index >= system_count) {
     rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "
           "topology relating to system index " + std::to_string(system_index) + ".",
           "AtomGraphSynthesis", "getSystemTopologyPointer");
   }
   return topologies[topology_indices.readHost(system_index)];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*> AtomGraphSynthesis::getSystemTopologyPointer() const {
+  std::vector<AtomGraph*> result(system_count);
+  const int* top_idx_ptr = topology_indices.data();
+  for (int i = 0; i < system_count; i++) {
+    result[i] = topologies[top_idx_ptr[i]];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

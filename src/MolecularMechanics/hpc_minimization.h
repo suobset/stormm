@@ -6,8 +6,10 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "MolecularMechanics/line_minimization.h"
 #include "MolecularMechanics/mm_controls.h"
+#include "Namelists/nml_minimize.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Potential/cacheresource.h"
 #include "Potential/scorecard.h"
@@ -29,6 +31,8 @@ using energy::ScoreCard;
 using energy::ScoreCardWriter;
 using math::ReductionBridge;
 using math::ReductionKit;
+using namelist::MinimizeControls;
+using numerics::default_energy_scale_bits;
 using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::ImplicitSolventWorkspace;
@@ -139,12 +143,14 @@ ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                              const StaticExclusionMaskSynthesis &poly_se,
                              PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                              const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE,
+                             int energy_accumulation_bits = default_energy_scale_bits, 
                              StopWatch *timer = nullptr,
                              const std::string &task_name = std::string(""));
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly_ps,
                              const MinimizeControls &mincon, const GpuDetails &gpu,
                              PrecisionModel prec = PrecisionModel::SINGLE,
+                             int energy_accumulation_bits = default_energy_scale_bits, 
                              StopWatch *timer = nullptr,
                              const std::string &task_name = std::string(""));
 /// \}

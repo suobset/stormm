@@ -10,6 +10,7 @@
 #include "../../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../../src/Parsing/parse.h"
 #include "../../../src/Reporting/error_format.h"
+#include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/isomerization.h"
 #include "../../../src/Topology/atomgraph_abstracts.h"
 #include "../../../src/Topology/topology_util.h"
@@ -34,9 +35,10 @@ using stormm::math::sum;
 using stormm::math::loadScalarStateValues;
 using stormm::namelist::ConformerControls;
 using stormm::parse::char4ToString;
+using stormm::structure::detectClash;
+using stormm::structure::flipChiralCenter;
 using stormm::structure::maskFromSdfDataItem;
 using stormm::structure::rotateAboutBond;
-using stormm::structure::flipChiralCenter;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::ImplicitSolventModel;
 using stormm::topology::MobilitySetting;
@@ -179,7 +181,8 @@ CoordinateFrame forgeConformation(const CoordinateFrame &cf, const AtomGraph *ag
                                   const std::vector<ChiralInversionProtocol> &chiral_center_plans,
                                   const std::vector<int> &chiral_variable_indices,
                                   const std::vector<IsomerPlan> &invertible_groups,
-                                  const int max_seeding_attempts, const double self_clash_ratio) {
+                                  const int max_seeding_attempts, const double min_clash_distance,
+                                  const double min_clash_ratio) {
   const int n_variables = ptrack->getVariableCount();
   CoordinateFrame result = cf;
   int iter = 0;
@@ -215,15 +218,13 @@ CoordinateFrame forgeConformation(const CoordinateFrame &cf, const AtomGraph *ag
         break;
       }
     }
-
+    
     // Randomize the configuration if the conformer contains a clash
-#if 0
-    if (detectVanDerWaalsClash(cf, ag, exclusion_mask, self_clash_ratio)) {
+    if (detectClash(result, *ag, exclusion_mask, min_clash_distance, min_clash_ratio)) {
       clash_detected = true;
       ptrack->randomize(xrs);
       ptrack_altered = true;
     }
-#endif
     iter++;
   } while (clash_detected && iter < max_seeding_attempts);
 
@@ -276,8 +277,8 @@ PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts
                                           const SystemCache &sc, StopWatch *tm) {
   const int n_proto_sys = replica_counts.size();
   if (n_proto_sys != sc.getSystemCount()) {
-    rtErr("Replica counts were provide for " + std::to_string(replica_counts.size()) + ", but the "
-          "systems cache contains " + std::to_string(sc.getSystemCount()) + " systems.",
+    rtErr("Replica counts were provided for " + std::to_string(replica_counts.size()) +
+          ", but the systems cache contains " + std::to_string(sc.getSystemCount()) + " systems.",
           "buildReplicaWorkspace");
   }
   const int n_total_rep = sum<int>(replica_counts);
@@ -297,16 +298,39 @@ PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<RestraintApparatus*>
+buildReplicaRestraints(const std::vector<int> &replica_counts, const SystemCache &sc,
+                       StopWatch *tm) {
+  const int n_proto_sys = replica_counts.size();
+  if (n_proto_sys != sc.getSystemCount()) {
+    rtErr("Replica counts were provided for " + std::to_string(replica_counts.size()) +
+          ", but the systems cache contains " + std::to_string(sc.getSystemCount()) + " systems.",
+          "buildReplicaWorkspace");
+  }
+  const int n_total_rep = sum<int>(replica_counts);
+  std::vector<RestraintApparatus*> result(n_total_rep);
+  int ijcon = 0;
+  for (int i = 0; i < n_proto_sys; i++) {
+    for (int j = 0; j < replica_counts[i]; j++) {
+      result[ijcon] = const_cast<RestraintApparatus*>(sc.getRestraintPointer(i));
+      ijcon++;
+    }
+  }
+  tm->assignTime(tm_coordinate_expansion);
+  return result;  
+}
+  
+//-------------------------------------------------------------------------------------------------
 void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &replica_counts,
-                      const UserSettings &ui, const SystemCache &sc,
-                      const std::vector<StaticExclusionMask> &exclusion_masks,
-                      Xoshiro256ppGenerator *xrs, StopWatch *tm) {
+                      const UserSettings &ui, const SystemCache &sc, Xoshiro256ppGenerator *xrs,
+                      StopWatch *tm) {
 
   // Extract some user input directives
   const ConformerControls& conf_input = ui.getConformerNamelistInfo();
   const int nbond_rotations      = conf_input.getRotationSampleCount();
   const int max_seeding_attempts = conf_input.getMaxSeedingAttempts();
-  const double self_clash_ratio  = conf_input.getSelfClashRatio();
+  const double min_clash_distance  = ui.getMinimizeNamelistInfo().getAbsoluteClashDistance();
+  const double min_clash_ratio  = ui.getMinimizeNamelistInfo().getVdwClashRatio();
   
   // Count the expanded number of systems
   std::vector<int> replica_bounds = replica_counts;
@@ -322,6 +346,7 @@ void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &repl
     
     // Obtain the topology pointer for possible use later
     const AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
+    const StaticExclusionMask imask(iag_ptr);
     const ChemicalFeatures& ichemfe = sc.getFeaturesReference(i);
     
     // Create a list of ways to change the conformation
@@ -413,12 +438,12 @@ void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &repl
     switch (strat) {
     case SamplingStrategy::FULL:
       for (int k = 0; k < conformations_per_case; k++) {
-        const CoordinateFrame seed_cfi = forgeConformation(proto_cfi, iag_ptr, exclusion_masks[i],
-                                                           isomerizers, &ptrack, xrs,
-                                                           chiral_centers, chiral_center_plans,
+        const CoordinateFrame seed_cfi = forgeConformation(proto_cfi, iag_ptr, imask, isomerizers,
+                                                           &ptrack, xrs, chiral_centers,
+                                                           chiral_center_plans,
                                                            chiral_variable_indices,
                                                            invertible_groups, max_seeding_attempts,
-                                                           self_clash_ratio);
+                                                           min_clash_distance, min_clash_ratio);
         poly_ps->import(seed_cfi, replica_bounds[i] + k);
         ptrack.advance();
       }
@@ -444,10 +469,10 @@ void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &repl
                     ptrack.set(pos_k, k);
                     ptrack.set(pos_m, m);
                     const CoordinateFrame seed_cfi =
-                      forgeConformation(proto_cfi, iag_ptr, exclusion_masks[i], isomerizers,
-                                        &ptrack, xrs, chiral_centers, chiral_center_plans,
+                      forgeConformation(proto_cfi, iag_ptr, imask, isomerizers, &ptrack, xrs,
+                                        chiral_centers, chiral_center_plans,
                                         chiral_variable_indices, invertible_groups,
-                                        max_seeding_attempts, self_clash_ratio);
+                                        max_seeding_attempts, min_clash_distance, min_clash_ratio);
                     poly_ps->import(seed_cfi, replica_bounds[i] + fc);
                     fc++;
                     pos_m++;
@@ -473,10 +498,10 @@ void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &repl
               ptrack.randomize(xrs);
               ptrack.set(m, k);
               const CoordinateFrame seed_cfi =
-                forgeConformation(proto_cfi, iag_ptr, exclusion_masks[i], isomerizers, &ptrack,
-                                  xrs, chiral_centers, chiral_center_plans,
-                                  chiral_variable_indices, invertible_groups,
-                                  max_seeding_attempts, self_clash_ratio);
+                forgeConformation(proto_cfi, iag_ptr, imask, isomerizers, &ptrack, xrs,
+                                  chiral_centers, chiral_center_plans, chiral_variable_indices,
+                                  invertible_groups, max_seeding_attempts, min_clash_distance,
+                                  min_clash_ratio);
               poly_ps->import(seed_cfi, replica_bounds[i] + fc);
               fc++;
               m++;

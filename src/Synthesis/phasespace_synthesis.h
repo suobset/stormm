@@ -454,8 +454,15 @@ public:
 
   /// \brief Get the topology pointer for a particular system within the synthesis.
   ///
+  /// Overloaded:
+  ///   - Get the topology pointer for a specific system
+  ///   - Get topology pointers for all systems
+  ///
   /// \param system_index  Index of the system of interest within the synthesis
+  /// \{
   const AtomGraph* getSystemTopologyPointer(int system_index) const;
+  const std::vector<AtomGraph*>& getSystemTopologyPointer() const;
+  /// \}
 
   /// \brief Get a list of unique topology pointers from this coordinate synthesis, const-casted
   ///        for accessibility to other functions.
@@ -682,10 +689,9 @@ public:
   /// \param current_time    Current time progress of the group of simulations
   /// \param output_kind     The type of trajectory file to write
   /// \param expectation     The state that the output trajectory file is expected to be found in
-  /// \param gpu             Specs of the GPU in use for the calculation (HPC mode only)
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
                        double current_time, CoordinateFileKind output_kind,
-                       PrintSituation expectation, const GpuDetails &gpu = null_gpu);
+                       PrintSituation expectation) const;
 
   /// \brief Import a system from one of the other coordinate objects, or from a series of C-style
   ///        arrays with trusted lengths.  The imported system's size must correspond to that

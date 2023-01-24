@@ -223,6 +223,11 @@ CondensateSource Condensate::getBasis() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int Condensate::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool Condensate::ownsCoordinates() const {
   return holds_own_data;
 }

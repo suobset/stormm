@@ -53,6 +53,15 @@ public:
                  WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  ReportControls(const ReportControls &original) = default;
+  ReportControls(ReportControls &&original) = default;
+  ReportControls& operator=(const ReportControls &original) = default;
+  ReportControls& operator=(ReportControls &&original) = default;
+  /// \}
+
   /// \brief Get the output format--what program will be able to read the results?
   OutputSyntax getOutputSyntax() const;
 

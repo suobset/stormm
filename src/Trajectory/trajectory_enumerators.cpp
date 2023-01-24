@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
@@ -11,6 +12,7 @@
 namespace stormm {
 namespace trajectory {
 
+using constants::CaseSensitivity;
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::separateText;
@@ -163,25 +165,26 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   
 //-------------------------------------------------------------------------------------------------
 CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
-  if (strcmpCased(name_in, "AMBER_CRD")) {
+  if (strcmpCased(name_in, "AMBER_CRD", CaseSensitivity::NO)) {
     return CoordinateFileKind::AMBER_CRD;
   }
-  else if (strcmpCased(name_in, "AMBER_INPCRD")) {
+  else if (strcmpCased(name_in, "AMBER_INPCRD", CaseSensitivity::NO)) {
     return CoordinateFileKind::AMBER_INPCRD;
   }
-  else if (strcmpCased(name_in, "AMBER_ASCII_RST")) {
+  else if (strcmpCased(name_in, "AMBER_ASCII_RST", CaseSensitivity::NO)) {
     return CoordinateFileKind::AMBER_ASCII_RST;
   }
-  else if (strcmpCased(name_in, "AMBER_NETCDF")) {
+  else if (strcmpCased(name_in, "AMBER_NETCDF", CaseSensitivity::NO)) {
     return CoordinateFileKind::AMBER_NETCDF;
   }
-  else if (strcmpCased(name_in, "AMBER_NETCDF_RST")) {
+  else if (strcmpCased(name_in, "AMBER_NETCDF_RST", CaseSensitivity::NO)) {
     return CoordinateFileKind::AMBER_NETCDF_RST;
   }
-  else if (strcmpCased(name_in, "SDF") || strcmpCased(name_in, "MDL_MOL")) {
+  else if (strcmpCased(name_in, "SDF", CaseSensitivity::NO) ||
+           strcmpCased(name_in, "MDL_MOL", CaseSensitivity::NO)) {
     return CoordinateFileKind::SDF;
   }
-  else if (strcmpCased(name_in, "UNKNOWN")) {
+  else if (strcmpCased(name_in, "UNKNOWN", CaseSensitivity::NO)) {
     return CoordinateFileKind::UNKNOWN;
   }
   else {

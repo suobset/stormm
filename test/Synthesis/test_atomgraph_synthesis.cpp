@@ -437,13 +437,11 @@ int main(const int argc, const char* argv[]) {
                                          "Namelist" + osc + "coord";
   const std::string brbz_vs_top_name = base_top_name + osc + "bromobenzene_vs.top";
   const std::string brbz_vs_crd_name = base_crd_name + osc + "bromobenzene_vs.inpcrd";
-  std::vector<AtomGraph*> ag_list;
+  const std::vector<AtomGraph*> ag_list = poly_ag.getSystemTopologyPointer();
   std::vector<PhaseSpace> ps_list;
-  ag_list.reserve(poly_ag.getSystemCount());
   ps_list.reserve(poly_ag.getSystemCount());
   for (int i = 0; i < poly_ag.getSystemCount(); i++) {
-    AtomGraph *ag_ptr = poly_ag.getSystemTopologyPointer(i);
-    ag_list.push_back(ag_ptr);
+    const AtomGraph *ag_ptr = poly_ag.getSystemTopologyPointer(i);
     if (ag_ptr == &tip3p_ag) {
       ps_list.push_back(tip3p_ps);
     }
@@ -540,7 +538,7 @@ int main(const int argc, const char* argv[]) {
   const SyNonbondedKit<double, double2> ism_nbk = poly_agn_rst.getDoublePrecisionNonbondedKit();
   const SyNonbondedKit<float, float2> ism_nbk_sp = poly_agn_rst.getSinglePrecisionNonbondedKit();
   for (int i = 0; i < nsys; i++) {
-    AtomGraph *iag_ptr = poly_agn_rst.getSystemTopologyPointer(i);
+    const AtomGraph *iag_ptr = poly_agn_rst.getSystemTopologyPointer(i);
     const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
     const ImplicitSolventKit<float> isk_sp = iag_ptr->getSinglePrecisionImplicitSolventKit();
     const int natom = iag_ptr->getAtomCount();

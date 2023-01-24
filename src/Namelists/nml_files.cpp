@@ -451,7 +451,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
   }
   free_coordinate_count = coordinate_file_names.size();  
 
-  // Get directives on I/O behavior
+  // Get directives on I/O behavior: shall multi-frame trajectory files accept multiple frames?
   const std::string& fusion_cmd = t_nml.getStringValue("fusion");
   if (strcmpCased(fusion_cmd, std::string("ON")) ||
       strcmpCased(fusion_cmd, std::string("ACTIVE"))) {
@@ -476,6 +476,8 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
       break;
     }
   }
+
+  // Shall SD files be corrected, modified if written back to disk?
   const std::string& sdf_mod_cmd = t_nml.getStringValue("correct_sdf");
   if (strcmpCased(sdf_mod_cmd, std::string("NO"))) {
     sdf_mod_policy = ModificationPolicy::DO_NOT_MODIFY;
@@ -499,6 +501,8 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
       break;
     }
   }
+
+  // Shall corrections to SD files be raised to the user's attention?
   const std::string& sdf_alert_cmd = t_nml.getStringValue("sdf_correction_alert");
   if (strcmpCased(sdf_alert_cmd, std::string("NO")) ||
       strcmpCased(sdf_alert_cmd, std::string("SILENT"))) {
@@ -523,6 +527,23 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     case ExceptionResponse::SILENT:
       break;
     }
+  }
+
+  // General file names
+  report_file            = t_nml.getStringValue("-o");
+  coordinate_output_name = t_nml.getStringValue("-x");  
+  checkpoint_name        = t_nml.getStringValue("-r");
+  warning_file_name      = t_nml.getStringValue("-wrn");
+
+  // General file formats
+  if (t_nml.getKeywordStatus("c_kind") != InputStatus::MISSING) {
+    coordinate_input_format = translateCoordinateFileKind(t_nml.getStringValue("c_kind"));
+  }
+  if (t_nml.getKeywordStatus("x_kind") != InputStatus::MISSING) {
+    coordinate_output_format = translateCoordinateFileKind(t_nml.getStringValue("x_kind"));
+  }
+  if (t_nml.getKeywordStatus("r_kind") != InputStatus::MISSING) {
+    coordinate_checkpoint_format = translateCoordinateFileKind(t_nml.getStringValue("r_kind"));
   }
 }
 
@@ -821,6 +842,12 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                                    std::string(default_filecon_trajectory_name)));
   t_nml.addKeyword(NamelistElement("-r", NamelistType::STRING,
                                    std::string(default_filecon_checkpoint_name)));
+  t_nml.addKeyword(NamelistElement("c_kind", NamelistType::STRING,
+                                   std::string(default_filecon_inpcrd_type_name)));
+  t_nml.addKeyword(NamelistElement("x_kind", NamelistType::STRING,
+                                   std::string(default_filecon_outcrd_type_name)));
+  t_nml.addKeyword(NamelistElement("r_kind", NamelistType::STRING,
+                                   std::string(default_filecon_chkcrd_type_name)));
   t_nml.addKeyword(NamelistElement("-wrn", NamelistType::STRING,
                                    std::string(default_filecon_warnings_name)));
   t_nml.addKeyword(NamelistElement("fusion", NamelistType::STRING,
@@ -852,6 +879,15 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                 "system.  As in the case of the trajectory output file specification, this is a "
                 "fallback for free topology / coordinate pairs or systems with no specified "
                 "restart file name.");
+  t_nml.addHelp("c_kind", "The type of input coordinate file to expect, barring specific "
+                "directives for a particular system.  Acceptable settings include 'AMBER_INPCRD' "
+                "and 'SDF', among others.  Default 'AMBER_INPCRD'.");
+  t_nml.addHelp("x_kind", "The type of trajectory file to write, barring specific directives for "
+                "a particular system.  Acceptable settings include 'AMBER_CRD' and 'SDF', among "
+                "others.  Default 'AMBER_CRD'.");
+  t_nml.addHelp("r_kind", "The type of checkpoint file to write, unless specific directives are "
+                "provided for a particular system.  Acceptable settings include 'AMBER_ASCII_RST' "
+                "and 'AMMBER_INPCRD', among others.  Default 'AMBER_ASCII_RST'.");  
   t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
   t_nml.addHelp("fusion", "Indicate whether multiple trajectories or checkpoint files produced "
                 "from systems classified under the same label should be fused into a single file "

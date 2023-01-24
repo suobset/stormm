@@ -12,6 +12,7 @@
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Random/random.h"
+#include "../../../src/Restraints/restraint_apparatus.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph.h"
@@ -32,6 +33,7 @@ using stormm::energy::StaticExclusionMask;
 using stormm::math::TickCounter;
 using stormm::namelist::ConformerControls;
 using stormm::namelist::UserSettings;
+using stormm::restraints::RestraintApparatus;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::structure::MdlMol;
 using stormm::synthesis::PhaseSpaceSynthesis;
@@ -129,7 +131,9 @@ double computeLocalPermutations(const std::vector<int> &limits,
 /// \param invertible_groups        Groups of atoms that move upon inverting a chiral center
 /// \param max_seeding_attempts     Number of allowed attempts for correcting a clashing initial
 ///                                 configuration
-/// \param self_clash_ratio         Minimum ratio of interparticle distance to their respective
+/// \param min_clash_distance       The minimum separation below which two particles will be
+///                                 considered to be in conflict
+/// \param min_clash_ratio          Minimum ratio of interparticle distance to their respective
 ///                                 pair van-der Waals sigma values, before the interaction is
 ///                                 considered a clash
 CoordinateFrame forgeConformation(const CoordinateFrame &cf, const AtomGraph *ag,
@@ -140,7 +144,8 @@ CoordinateFrame forgeConformation(const CoordinateFrame &cf, const AtomGraph *ag
                                   const std::vector<ChiralInversionProtocol> &chiral_center_plans,
                                   const std::vector<int> &chiral_variable_indices,
                                   const std::vector<IsomerPlan> &invertible_groups,
-                                  const int max_seeding_attempts, const double self_clash_ratio);
+                                  const int max_seeding_attempts, const double min_clash_distance,
+                                  const double min_clash_ratio);
 
 /// \brief Count the numbr of conformers that each system might conceivably produce, based on the
 ///        number of rotatable bonds, cis-trans isomers, and invertible chiral centers.  These
@@ -162,6 +167,12 @@ std::vector<int> calculateReplicaCounts(const ConformerControls &conf_input,
 /// \param tm              Timer to record the wall time spent on various setup procedures
 PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts,
                                           const SystemCache &sc, StopWatch *tm);
+
+/// \brief Build a list of restraint apparatus pointers for the synthesis of all system replicas.
+///        Parameter descriptors follow from buildReplicaWorkspace() above.
+const std::vector<RestraintApparatus*>
+buildReplicaRestraints(const std::vector<int> &replica_counts, const SystemCache &sc,
+                       StopWatch *tm);
   
 /// \brief Expand the initial list of systems into a complete list of initial states for the
 ///        population of conformers which conformer.omni will minimize in search of the
@@ -175,14 +186,12 @@ PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts
 /// \param sc               Cache of topologies and initial structures.  The list of topologies will
 ///                         not be expanded by this procedure, but the list of structures will
 ///                         undergo a radical expansion.
-/// \param exclusion_masks  List of exclusion masks for each unique topology in poly_ps
 /// \param xrs              Random number generator (the master generator will guide the CPU-based,
 ///                         coarse-grained conformer selection)
 /// \param tm               Timer to record the wall time spent on various setup procedures
 void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &replica_counts,
-                      const UserSettings &ui, const SystemCache &sc,
-                      const std::vector<StaticExclusionMask> &exclusion_masks,
-                      Xoshiro256ppGenerator *xrs, StopWatch *tm);
+                      const UserSettings &ui, const SystemCache &sc, Xoshiro256ppGenerator *xrs,
+                      StopWatch *tm);
 
 } // namespace setup
 } // namespace conf_app
