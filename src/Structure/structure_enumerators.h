@@ -73,6 +73,14 @@ enum class GridDetail {
                     ///<   explicit particles with unique segments for each bin.
 };
 
+/// \brief The types of clashes that can occur.
+enum class ClashKind {
+  VAN_DER_WAALS,  ///< The distance between two particles is less than the minimum van-der Waals
+                  ///<   (Lennard-Jones) sigma ratio.
+  PURE_DISTANCE   ///< The distance between two particles is less than the minimum absolute
+                  ///<   distance allowed before a clash is declared
+};
+  
 } // namespace structure
 } // namespace stormm
 

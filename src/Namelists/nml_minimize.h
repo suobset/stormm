@@ -53,6 +53,15 @@ public:
                    WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  MinimizeControls(const MinimizeControls &original) = default;
+  MinimizeControls(MinimizeControls &&original) = default;
+  MinimizeControls& operator=(const MinimizeControls &original) = default;
+  MinimizeControls& operator=(MinimizeControls &&original) = default;
+  /// \}
+
   /// \brief Get the total number of minimization cycles.
   int getTotalCycles() const;
 

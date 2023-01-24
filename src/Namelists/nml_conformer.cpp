@@ -32,7 +32,6 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in,
     rotation_samples{default_conf_rotation_samples},
     rotatable_bond_limit{default_conf_max_rotatable_bonds},
     max_seeding_attempts{default_conf_max_seeding_attempts},
-    self_clash_ratio{default_conf_self_clash_ratio},
     system_trials{default_conf_max_system_trials},
     rmsd_tolerance{default_conf_rmsd_tolerance}
 {}
@@ -100,7 +99,6 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
   rotation_samples = t_nml.getIntValue("rotation_samples");
   rotatable_bond_limit = t_nml.getIntValue("max_rotatable_bonds");
   max_seeding_attempts = t_nml.getIntValue("max_seeding_attempts");
-  self_clash_ratio = t_nml.getRealValue("self_clash_tolerance");
   system_trials = t_nml.getIntValue("max_system_trials");
   rmsd_tolerance = t_nml.getRealValue("rmsd_tol");
 
@@ -179,11 +177,6 @@ int ConformerControls::getRotatableBondLimit() const {
 //-------------------------------------------------------------------------------------------------
 int ConformerControls::getMaxSeedingAttempts() const {
   return max_seeding_attempts;
-}
-
-//-------------------------------------------------------------------------------------------------
-double ConformerControls::getSelfClashRatio() const {
-  return self_clash_ratio;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -404,8 +397,6 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                    std::to_string(default_conf_max_rotatable_bonds)));
   t_nml.addKeyword(NamelistElement("max_seeding_attempts", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_seeding_attempts)));
-  t_nml.addKeyword(NamelistElement("self_clash_tolerance", NamelistType::REAL,
-                                   std::to_string(default_conf_self_clash_ratio)));
   t_nml.addKeyword(NamelistElement("max_system_trials", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_system_trials)));
   t_nml.addKeyword(NamelistElement("rmsd_tol", NamelistType::REAL,
@@ -436,9 +427,6 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "provision, a stable configuration still cannot be found, the input configuration "
                 "will be accepted as the initial coordinates for subsequent energy "
                 "minimizations.");
-  t_nml.addHelp("self_clash_tolerance", "The minimum ratio of distances between any two particles "
-                "to their mutual van-der Waals radii that will be tolerated.  Ratios beneath this "
-                "value will be considered clashes.");
   t_nml.addHelp("max_system_trials", "The maximum number of trials that will be made for each "
                 "system.  Explicit sampling of chirality, cis-trans isomers, and then rotatable "
                 "bonds will proceed in that priority, but the maximum number of sampled states "

@@ -41,6 +41,15 @@ public:
                   WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  FFMorphControls(const FFMorphControls &original) = default;
+  FFMorphControls(FFMorphControls &&original) = default;
+  FFMorphControls& operator=(const FFMorphControls &original) = default;
+  FFMorphControls& operator=(FFMorphControls &&original) = default;
+  /// \}
+
   /// \brief Get the number of edits for a particular force field term.
   ///
   /// \param kind  The type of force field parameter edit of interest

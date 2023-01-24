@@ -7,12 +7,14 @@ for SYS in  gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_
   echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd }" >> cgen.in
 done
 cat >> cgen.in << EOF
+  -x conf_.crd
+  x_kind amber_crd
 &end
 
 &conformer
   rotation_samples 6,
-  max_system_trials 1500, final_states 1500,
-  // core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
+  max_system_trials 8, final_states 2,
+  core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
 &solvent
@@ -20,7 +22,7 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 50, cdcyc 150, maxcyc 500, ntpr = 1,
+  ncyc 50, cdcyc 50, maxcyc 200, ntpr = 1,
   clash_vdw_ratio 0.65,
 &end
 

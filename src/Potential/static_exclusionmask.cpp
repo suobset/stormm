@@ -269,6 +269,11 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
 }
 
 //-------------------------------------------------------------------------------------------------
+StaticExclusionMask::StaticExclusionMask(const AtomGraph &ag_in) :
+    StaticExclusionMask(ag_in.getSelfPointer())
+{}
+
+//-------------------------------------------------------------------------------------------------
 int StaticExclusionMask::getAtomCount() const {
   return atom_count;
 }
@@ -338,6 +343,11 @@ const StaticExclusionMaskReader StaticExclusionMask::data(const HybridTargetLeve
   return StaticExclusionMaskReader(atom_count, supertile_stride_count,
                                    supertile_map_indices.data(tier), tile_map_indices.data(tier),
                                    all_masks.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+const StaticExclusionMask* StaticExclusionMask::getSelfPointer() const {
+  return this;
 }
 
 #ifdef STORMM_USE_HPC

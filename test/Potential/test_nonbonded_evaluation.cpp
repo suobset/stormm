@@ -921,6 +921,7 @@ int main(const int argc, const char* argv[]) {
                                             trpi_vdw_frc, 5.0e-5, do_tests);
 
   // Check the energy tracking object (placed in this test program for convenience)
+  section(8);
   Xoshiro256ppGenerator xrs;
   int test_no = 0;
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
@@ -930,6 +931,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<double> tsc_ave_dev(10 * nsys * nvar), tsc_ave_dev_ans(10 * nsys * nvar);
   std::vector<double> tsc_std_dev(10 * nsys * nvar), tsc_std_dev_ans(10 * nsys * nvar);
   bool lateral_survey = true;
+  bool sc_importing_tested = false;
   for (int npts = 3; npts <= 48; npts += 5) {
     ScoreCard trial_sc(nsys, npts, 32);
     ScoreCardWriter trial_scw = trial_sc.data();
@@ -1164,6 +1166,31 @@ int main(const int argc, const char* argv[]) {
       }
     }
     test_no++;
+
+    // Try assembling the pieces of the original ScoreCard into a large one
+    if (sc_importing_tested == false) {
+      sc_importing_tested = true;
+      ScoreCard multi_sc(4 * nsys, 5, 24);
+      const std::vector<double> trial_tote = trial_sc.reportTotalEnergies();
+      std::vector<double> tote_target(4 * nsys);
+      for (int i = 0; i < nsys; i++) {
+        multi_sc.import(trial_sc, i, i);
+        multi_sc.import(trial_sc, (2 * nsys) - (i + 1), i);
+        multi_sc.import(trial_sc, (2 * nsys) + i, i);
+        multi_sc.import(trial_sc, (3 * nsys) + i, i);
+        tote_target[i] = trial_tote[i];
+        tote_target[(2 * nsys) - (i + 1)] = trial_tote[i];
+        tote_target[(2 * nsys) + i] = trial_tote[i];
+        tote_target[(3 * nsys) + i] = trial_tote[i];
+      }
+      CHECK_THROWS(multi_sc.import(trial_sc, (4 * nsys) + 8, 0), "Importation of information into "
+                   "a non-existent entry of the destination was allowed.");
+      CHECK_THROWS(multi_sc.import(trial_sc, 0, (3 * nsys) + 2), "Importation of information from "
+                   "a non-existent entry of the source material was allowed.");
+      const std::vector<double> multi_tote = multi_sc.reportTotalEnergies();
+      check(multi_tote, RelationalOperator::EQUAL, tote_target, "Energies imported into a new "
+            "ScoreCard do not align with a similar series accumulated from the original source.");
+    }
   }
   check(tsc_sample_sizes, RelationalOperator::EQUAL, tsc_sample_size_ans, "Sample sizes for "
         "various time series are not reported correctly by the ScoreCard object.");
@@ -1174,6 +1201,15 @@ int main(const int argc, const char* argv[]) {
   check(lateral_survey, "A survey of the lateral mean values and standard deviations among "
         "familiar potential energy terms, taken point by point throughout the history, failed to "
         "confirm the results reported by the tracking object.");
+  
+  // Check the non-bonded soft-core potentials by iteratively feeding them different values of
+  // the displacement and checking the results against analytic numbers.
+  section(9);
+  testSoftCoreCoulomb( 0.54 *  0.31, 0.9);
+  testSoftCoreCoulomb( 0.47 * -0.24, 0.9);
+  testSoftCoreCoulomb(-0.17 *  0.84, 0.5);
+  testSoftCoreLennardJones( 79716.0, 109.35, 0.6);
+  testSoftCoreLennardJones(110272.8, 124.25, 0.5);
 
   // Check the non-bonded soft-core potentials by iteratively feeding them different values of
   // the displacement and checking the results against analytic numbers.

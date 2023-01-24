@@ -159,6 +159,9 @@ public:
 
   /// \brief Get the basis for the coordinates in the object: synthesis or series
   CondensateSource getBasis() const;
+
+  /// \brief Get the number of systems found in the condensate.
+  int getSystemCount() const;
   
   /// \brief Get an indication of whether the Condensate keeps its own copy of the coordinates.
   bool ownsCoordinates() const;

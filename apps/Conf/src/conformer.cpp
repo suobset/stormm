@@ -2,6 +2,7 @@
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
+#include "../../../src/Math/series_ops.h"
 #include "../../../src/Math/summation.h"
 #include "../../../src/Math/vector_ops.h"
 #ifdef STORMM_USE_HPC
@@ -12,6 +13,8 @@
 #  include "../../../src/MolecularMechanics/minimization.h"
 #endif
 #include "../../../src/MoleculeFormat/mdlmol.h"
+#include "../../../src/Namelists/nml_minimize.h"
+#include "../../../src/Namelists/nml_precision.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
 #include "../../../src/Namelists/user_settings.h"
@@ -21,14 +24,17 @@
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Reporting/reporting_enumerators.h"
+#include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/condensate.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/static_mask_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
+#include "../../../src/Trajectory/coordinate_copy.h"
 #include "../../../src/UnitTesting/stopwatch.h"
 #include "../../../src/UnitTesting/unit_test.h"
+#include "analysis.h"
 #include "setup.h"
 
 using stormm::random::Xoshiro256ppGenerator;
@@ -42,9 +48,12 @@ using namespace stormm::errors;
 using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::namelist;
+using namespace stormm::structure;
 using namespace stormm::synthesis;
+using namespace stormm::trajectory;
 using namespace stormm::topology;
 using namespace conf_app::setup;
+using namespace conf_app::analysis;
 
 //-------------------------------------------------------------------------------------------------
 // Display a general help message for this program.
@@ -121,20 +130,23 @@ int main(int argc, const char* argv[]) {
   PhaseSpaceSynthesis sandbox = buildReplicaWorkspace(replica_counts, sc, &master_timer);
   const std::vector<AtomGraph*> unique_topologies = sandbox.getUniqueTopologies();
   const std::vector<int> conformer_topology_indices = sandbox.getUniqueTopologyIndices();
-  AtomGraphSynthesis sandbox_ag(unique_topologies, conformer_topology_indices);
+  const std::vector<AtomGraph*> replica_topologies = sandbox.getSystemTopologyPointer();
+  const std::vector<RestraintApparatus*> replica_restraints =
+    buildReplicaRestraints(replica_counts, sc, &master_timer);
+  if (replica_topologies.size() != replica_restraints.size()) {
+    rtErr("Replica topology and restraint apparatus pointer vectors must contain the same number "
+          "of elements (" + std::to_string(replica_topologies.size()) + " / " +
+          std::to_string(replica_restraints.size()) + ").", "main");
+  }
+  AtomGraphSynthesis sandbox_ag(unique_topologies, replica_restraints, conformer_topology_indices, 
+                                incrementingSeries<int>(0, replica_restraints.size(), 1));
 #ifdef STORMM_USE_HPC
   StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getTopologyPointers(),
                                             sandbox_ag.getTopologyIndices());
 #endif
-  std::vector<StaticExclusionMask> sandbox_masks;
-  sandbox_masks.reserve(unique_topologies.size());
-  for (int i = 0; i < unique_topologies.size(); i++) {
-    sandbox_masks.emplace_back(unique_topologies[i]);
-  }
-
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
   // a much larger list of all the possible conformers that each system might be able to access.
-  expandConformers(&sandbox, replica_counts, ui, sc, sandbox_masks, &xrs, &master_timer);
+  expandConformers(&sandbox, replica_counts, ui, sc, &xrs, &master_timer);
   
   // Complete the work unit construction.  Upload data to the GPU, if applicable.
 #ifdef STORMM_USE_HPC
@@ -158,34 +170,33 @@ int main(int argc, const char* argv[]) {
 #endif
   master_timer.assignTime(3);
 
-  // Loop over all systems and perform energy minimizations
+  // Loop over all systems and perform energy minimizations.
+  const PrecisionControls preccon = ui.getPrecisionNamelistInfo();
+  std::vector<StaticExclusionMask> sandbox_masks;
+  sandbox_masks.reserve(unique_topologies.size());
+  for (int i = 0; i < unique_topologies.size(); i++) {
+    sandbox_masks.emplace_back(unique_topologies[i]);
+  }
 #ifdef STORMM_USE_HPC
   ScoreCard emin = launchMinimization(sandbox_ag, sandbox_sems, &sandbox,
-                                      ui.getMinimizeNamelistInfo(), gpu);
+                                      ui.getMinimizeNamelistInfo(), gpu,
+                                      preccon.getValenceMethod(), preccon.getEnergyScalingBits());
 #else
+  ScoreCard emin(sandbox.getSystemCount(), ui.getMinimizeNamelistInfo().getTotalCycles() + 1,
+                 preccon.getEnergyScalingBits());
   const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
   const int nconf = sandbox.getSystemCount();
-
-  // CHECK
-  std::vector<double> efinal, ebond, eangl, edihe, eimpr, eelec, evdw, eqq14, elj14;
-  // END CHECK
-  
   for (int i = 0; i < nconf; i++) {
-    PhaseSpace psi = sandbox.exportSystem(i);
-    AtomGraph *agi = sandbox_ag.getSystemTopologyPointer(i);
-    ScoreCard emin = minimize(&psi, agi, sandbox_masks[conformer_topology_indices[i]], mincon);
 
-    // CHECK
-    efinal.push_back(emin.reportTotalEnergy());
-    ebond.push_back(emin.reportInstantaneousStates(StateVariable::BOND, 0));
-    eangl.push_back(emin.reportInstantaneousStates(StateVariable::ANGLE, 0));
-    edihe.push_back(emin.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0));
-    eimpr.push_back(emin.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0));
-    eelec.push_back(emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0));
-    evdw.push_back(emin.reportInstantaneousStates(StateVariable::VDW, 0));
-    eqq14.push_back(emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0));
-    elj14.push_back(emin.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0));
-    // END CHECK
+    // Pull the coordinates out of the synthesis, back into a PhaseSpace object which will keep
+    // them in double-precision for the entire minimization calculation, then re-import the
+    // modified coordinates to the synthesis to maintain consistency with the HPC protocol.
+    // Subsequent analyses can focus on the synthesis.
+    PhaseSpace psi = sandbox.exportSystem(i);
+    const AtomGraph *agi = sandbox_ag.getSystemTopologyPointer(i);
+    ScoreCard emin_i = minimize(&psi, agi, sandbox_masks[conformer_topology_indices[i]], mincon);
+    emin.import(emin_i, i, 0);
+    coordCopy(&sandbox, i, psi);
   }
 #endif
   master_timer.assignTime(4);
@@ -202,158 +213,12 @@ int main(int argc, const char* argv[]) {
   // For each rotatable bond, compute the value obtained in each conformer.  This will produce a
   // map of the viable minima for various conformations.
 
-  // CHECK
-  PsSynthesisWriter sandboxw = sandbox.data();
-#ifdef STORMM_USE_HPC
-  emin.computeTotalEnergy();
-  const std::vector<double> efinal = emin.reportTotalEnergies();
-  const std::vector<double> ebond  = emin.reportInstantaneousStates(StateVariable::BOND);
-  const std::vector<double> eangl  = emin.reportInstantaneousStates(StateVariable::ANGLE);
-  const std::vector<double> edihe  =
-    emin.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
-  const std::vector<double> eimpr  =
-    emin.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
-  const std::vector<double> eelec  = emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC);
-  const std::vector<double> evdw   = emin.reportInstantaneousStates(StateVariable::VDW);
-  const std::vector<double> eqq14  =
-    emin.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
-  const std::vector<double> elj14  = emin.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
-  const std::vector<double> e_tot  = emin.reportEnergyHistory(198);
-  const std::vector<double> e_bond = emin.reportEnergyHistory(StateVariable::BOND, 136);
+  // Get a vector of the best conformations by their indices in the synthesis.
+  const std::vector<int> best_confs = filterMinimizedStructures(sandbox, sandbox_masks, emin,
+                                                                ui.getConformerNamelistInfo());
 
-  // CHECK
-#if 0
-  printf("E_tot = [\n");
-  int jj = 0;
-  for (size_t i = 0; i < e_tot.size(); i++) {
-    printf("  %14.8lf", e_tot[i]);
-    jj++;
-    if (jj == 6) {
-      printf("\n");
-      jj = 0;
-    }
-  }
-  if (jj > 0) {
-    printf("\n");
-  }
-  printf("];\n");
-  printf("E_bond = [\n");
-  jj = 0;
-  for (size_t i = 0; i < e_bond.size(); i++) {
-    printf("  %14.8lf", e_bond[i]);
-    jj++;
-    if (jj == 6) {
-      printf("\n");
-      jj = 0;
-    }
-  }
-  if (jj > 0) {
-    printf("\n");
-  }
-  printf("];\n");
-#endif
-  // END CHECK
-  
-#endif
-  const std::vector<AtomGraph*> unique_ag = sandbox.getUniqueTopologies();
-  int nbad = 0;
-  for (int i = 0; i < sandboxw.unique_topology_count; i++) {
-    const int nbad_so_far = nbad;
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      nbad += (efinal[sandboxw.common_ag_list[j]] < -1000.0 ||
-               efinal[sandboxw.common_ag_list[j]] >  20000.0);
-    }
-    if (nbad > nbad_so_far) {
-      printf("Topology %s: %4d\n", getBaseName(unique_ag[i]->getFileName()).c_str(),
-             nbad - nbad_so_far);
-    }
-#if 0
-    printf("Topology %s:\n", getBaseName(unique_ag[i]->getFileName()).c_str());
-    printf("  Total E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", efinal[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  Bond  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", ebond[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  Angl  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", eangl[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  Dihe  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", edihe[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  Impr  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", eimpr[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  Elec  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", eelec[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  vdW   E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", evdw[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  QQ14  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", eqq14[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-    printf("  LJ14  E:");
-    for (int j = sandboxw.common_ag_bounds[i]; j < sandboxw.common_ag_bounds[i + 1]; j++) {
-      printf("  %11.4lf", elj14[sandboxw.common_ag_list[j]]);
-    }
-    printf("\n");
-#endif
-  }
-  printf("There are %4d bad conformers in all.\n", nbad);
-  // END CHECK
-
-  // CHECK
-#ifdef STORMM_USE_HPC
-  const int nconf = sandbox.getSystemCount();
-#endif
-  printf("Total system count: %5d.\n", nconf);
-  std::vector<double> system_sizes(nconf);
-  for (int i = 0; i < nconf; i++) {
-    system_sizes[i] = sandbox.getSystemTopologyPointer(i)->getAtomCount();
-  }
-  printf("  Average atom count: %9.4lf\n", mean(system_sizes));
-  printf("  Standard deviation: %9.4lf\n", variance(system_sizes,
-                                                    VarianceMethod::STANDARD_DEVIATION));
-  printf("  Minimum atom count: %9.4lf\n", minValue(system_sizes));
-  printf("  Maximum atom count: %9.4lf\n", maxValue(system_sizes));
-  std::vector<bool> is_printed(sandbox.getSystemCount(), false);
-  for (int i = 0; i < nconf; i++) {
-    if (is_printed[i]) {
-      continue;
-    }
-    const AtomGraph* iag_ptr = sandbox.getSystemTopologyPointer(i);
-    std::vector<int> like_confs(1, i);
-    for (int j = i + 1; j < nconf; j++) {
-      const AtomGraph* jag_ptr = sandbox.getSystemTopologyPointer(j);
-      if (iag_ptr == jag_ptr) {
-        like_confs.push_back(j);
-        is_printed[j] = true;
-      }
-    }
-    is_printed[i] = true;
-    const std::string fname = substituteNameExtension("bloom_" +
-                                                      getBaseName(iag_ptr->getFileName()), "crd");
-    sandbox.printTrajectory(like_confs, fname, 0.0, CoordinateFileKind::AMBER_CRD,
-                            PrintSituation::OVERWRITE);
-  }
-  // END CHECK
+  // Print the best conformations for each topological system.
+  printResults(sandbox, best_confs, emin, sc, sdf_recovery, ui.getFilesNamelistInfo());
 
   // Print timings results
   master_timer.printResults();

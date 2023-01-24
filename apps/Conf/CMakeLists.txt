@@ -1,6 +1,8 @@
 set(APP_NAME "conformer.${STORMM_APP_SUFFIX}")
 
 add_executable(${APP_NAME}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis.h
         ${CMAKE_CURRENT_SOURCE_DIR}/src/setup.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/setup.h)
 

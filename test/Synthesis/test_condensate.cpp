@@ -201,32 +201,6 @@ void diffCoordinates(const Tcrd* xcrd, const Tcrd* ycrd, const Tcrd* zcrd, const
                   bounds);
 }
 
-
-// CHECK
-void printPhases(const PhaseSpaceReader &recv_r) {
-  for (int i = 0; i < 4; i++) {
-    printf("  %12.8lf  %12.8lf  %12.8lf    ", recv_r.xcrd[i], recv_r.xvel[i], recv_r.xfrc[i]);
-    printf("  %12.8lf  %12.8lf  %12.8lf\n", recv_r.xalt[i], recv_r.vxalt[i], recv_r.fxalt[i]);
-  }
-  printf("\n");
-}
-
-void printPhases(const PsSynthesisReader &poly_psr, const int sysno) {
-  for (int i = 0; i < 4; i++) {
-    const int j = poly_psr.atom_starts[sysno] + i;
-    printf("  %12.8lf  %12.8lf  %12.8lf    ",
-           hostInt95ToDouble(poly_psr.xcrd[j], poly_psr.xcrd_ovrf[j]) * poly_psr.inv_gpos_scale,
-           hostInt95ToDouble(poly_psr.xvel[j], poly_psr.xvel_ovrf[j]) * poly_psr.inv_vel_scale,
-           hostInt95ToDouble(poly_psr.xfrc[j], poly_psr.xfrc_ovrf[j]) * poly_psr.inv_frc_scale);
-    printf("  %12.8lf  %12.8lf  %12.8lf\n",
-           hostInt95ToDouble(poly_psr.xalt[j], poly_psr.xalt_ovrf[j]) * poly_psr.inv_gpos_scale,
-           hostInt95ToDouble(poly_psr.vxalt[j], poly_psr.vxalt_ovrf[j]) * poly_psr.inv_vel_scale,
-           hostInt95ToDouble(poly_psr.fxalt[j], poly_psr.fxalt_ovrf[j]) * poly_psr.inv_frc_scale);
-  }
-  printf("\n");
-}
-// END CHECK
-
 //-------------------------------------------------------------------------------------------------
 // Replicate a series of integers.
 //

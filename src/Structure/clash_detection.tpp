@@ -66,7 +66,7 @@ template <typename Tcoord, typename Tcalc>
 bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                         const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                         const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
-                        const Tcalc vdw_ratio, const Tcalc inv_scale) {
+                        const Tcalc vdw_ratio, const Tcalc inv_scale, ClashReport *summary) {
 
   // Determine the calculation type and a maximum distance parameter
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
@@ -148,6 +148,11 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
                   const Tcalc r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
                   if (r < nbk.lj_sigma[ljt_ij] * vdw_ratio || r < elec_limit) {
                     clash_found = true;
+                    if (summary != nullptr) {
+                      const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+                      const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+                      summary->addClash(atom_i, atom_j, r);
+                    }
                   }
                 }
               }
@@ -160,9 +165,14 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
                   const Tcalc dx = cachj_xcrd[j] - cachi_xcrd[i];
                   const Tcalc dy = cachj_ycrd[j] - cachi_ycrd[i];
                   const Tcalc dz = cachj_zcrd[j] - cachi_zcrd[i];
-                  const Tcalc r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                  const Tcalc r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
                   if (r < nbk.lj_sigma[ljt_ij] * vdw_ratio || r < elec_limit) {
                     clash_found = true;
+                    if (summary != nullptr) {
+                      const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+                      const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+                      summary->addClash(atom_i, atom_j, r);
+                    }
                   }
                 }
               }
@@ -180,8 +190,15 @@ template <typename Tcoord, typename Tcalc>
 bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                  const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
-                 const Tcalc vdw_ratio, const Tcalc inv_scale) {
+                 const Tcalc vdw_ratio, const Tcalc inv_scale, ClashReport *summary) {
 
+  // Set the summary to make use of the supplied clash limits.  In many cases this will overwrite
+  // the summary's internal parameters with values that it supplied in the first place.
+  if (summary != nullptr) {
+    summary->setMinimumDistance(elec_limit);
+    summary->setMinimumSigmaRatio(vdw_ratio);
+  }
+  
   // Determine the calculation type
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
@@ -190,10 +207,15 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
   // Do the direct calculation if the size is very small
   if (nbk.natom < clash_direct_calculation_size_limit) {
     clash_found = directClashTesting(xcrd, ycrd, zcrd, vk, nbk, maskr, vdw_ratio, elec_limit,
-                                     inv_scale);
+                                     inv_scale, summary);
   }
   else {
 
+    // CHECK
+    clash_found = directClashTesting(xcrd, ycrd, zcrd, vk, nbk, maskr, vdw_ratio, elec_limit,
+                                     inv_scale, summary);
+    // END CHECK
+    
     // Find the largest clashing distance.
     const Tcalc max_clash = maxClashingDistance<Tcalc>(nbk, elec_limit, vdw_ratio);
     if (max_clash >= constants::tiny) {
@@ -218,7 +240,10 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
     const Tcalc r = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                         sqrtf((dx * dx) + (dy * dy) + (dz * dz));
     if (r < nbk.lj_14_sigma[ljt_il] * vdw_ratio) {
-      return true;
+      clash_found = true;
+      if (summary != nullptr) {
+        summary->addClash(atom_i, atom_l, r);
+      }
     }
   }
   for (int pos = 0; pos < vk.ninfr14; pos++) {
@@ -234,57 +259,92 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
     const Tcalc r = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                         sqrtf((dx * dx) + (dy * dy) + (dz * dz));
     if (r < nbk.lj_14_sigma[ljt_il] * vdw_ratio) {
-      return true;
+      clash_found = true;
+      if (summary != nullptr) {
+        summary->addClash(atom_i, atom_l, r);
+      }
     }
   }
   
   // If this point has been reached, no clash was detected.
-  return false;
+  return clash_found;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
-bool detectVanDerWaalsClash(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame,
-                            const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                            const StaticExclusionMaskReader &maskr, const double elec_limit,
-                            const Tcalc vdw_ratio) {
+bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMaskReader &maskr, const double elec_limit,
+                 const Tcalc vdw_ratio, ClashReport *summary) {
   const size_t padded_atoms = roundUp(csr.natom, warp_size_int);
   const size_t atom_start = frame * padded_atoms;
   const size_t xfrm_start = frame * roundUp<size_t>(9, warp_size_zu);
-  return detectVanDerWaalsClash(&csr.xcrd[atom_start], &csr.ycrd[atom_start],
-                                &csr.zcrd[atom_start], vk, nbk, maskr, elec_limit, vdw_ratio,
-                                csr.inv_gpos_scale);
+  return detectClash(&csr.xcrd[atom_start], &csr.ycrd[atom_start], &csr.zcrd[atom_start], vk, nbk,
+                     maskr, elec_limit, vdw_ratio, csr.inv_gpos_scale, summary);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
-bool detectVanDerWaalsClash(const CoordinateSeries<Tcoord> *cs, const int frame,
-                            const AtomGraph *ag, const StaticExclusionMask &mask,
-                            const Tcalc elec_limit, const Tcalc vdw_ratio) {
+bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
   const size_t ct = std::type_index(typeid(Tcalc)).hash_code();
-  if (ct == double_type_index) {
-    return detectClash<Tcoord, double>(cs->data(), frame, ag->getDoublePrecisionValenceKit(),
-                                       ag->getDoublePrecisionNonbondedKit(), mask.data(),
-                                       elec_limit, vdw_ratio);
-  }
-  else if (ct == float_type_index) {
+  if (ct == float_type_index) {
     return detectClash<Tcoord, float>(cs->data(), frame, ag->getSinglePrecisionValenceKit(),
-                                      ag->getSinglePrecisionNonbondedKit(), mask.data(),
-                                      elec_limit, vdw_ratio);
+                                      ag->getSinglePrecisionNonbondedKit(), mask->data(),
+                                      elec_limit, vdw_ratio, summary);
   }
   else {
-    rtErr("The clash detection must be performed in double or float.  " +
-          getStormmScalarTypeName<Tcalc> + " is invalid.", "detectVanDerWaalsClash");
+    return detectClash<Tcoord, double>(cs->data(), frame, ag->getDoublePrecisionValenceKit(),
+                                       ag->getDoublePrecisionNonbondedKit(), mask->data(),
+                                       elec_limit, vdw_ratio, summary);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
-bool detectVanDerWaalsClash(const CoordinateSeries<Tcoord> &cs, const int frame,
-                            const AtomGraph &ag, const StaticExclusionMask &mask,
-                            const Tcalc elec_limit, const Tcalc vdw_ratio) {
-  return detectVanDerWaalsClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
-                                               mask, elec_limit, vdw_ratio);
+bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
+  return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(), mask,
+                                    elec_limit, vdw_ratio, summary);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, ClashReport *summary) {
+  return detectClash<Tcoord, Tcalc>(cs, frame, ag, mask, summary->getMinimumDistance(),
+                                    summary->getMinimumSigmaRatio(), summary);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, ClashReport *summary) {
+  return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
+                                    mask.getSelfPointer(), summary->getMinimumDistance(),
+                                    summary->getMinimumSigmaRatio(), summary);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const CondensateReader &cdnsr, const int system_index,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
+                 const Tcalc vdw_ratio, ClashReport *summary) {
+  const size_t atom_start = cdnsr.atom_starts[system_index];
+  switch (cdnsr.mode) {
+  case PrecisionModel::DOUBLE:
+    return detectClash<double, Tcalc>(&cdnsr.xcrd[atom_start], &cdnsr.ycrd[atom_start],
+                                      &cdnsr.zcrd[atom_start], vk, nbk, maskr, elec_limit,
+                                      vdw_ratio, 1.0, summary);
+  case PrecisionModel::SINGLE:
+    return detectClash<float, Tcalc>(&cdnsr.xcrd_sp[atom_start], &cdnsr.ycrd_sp[atom_start],
+                                     &cdnsr.zcrd_sp[atom_start], vk, nbk, maskr, elec_limit,
+                                     vdw_ratio, 1.0, summary);
+  }
+  __builtin_unreachable();
 }
 
 } // namespace structure

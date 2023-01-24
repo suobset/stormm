@@ -59,6 +59,9 @@ public:
   ///
   /// Overloaded:
   ///   - Prepare the energy surface with or without restraints
+  ///   - Accept lists of unique topologies and restraints with auxiliary lists of indices for
+  ///     replicating them, or accept explicit lists of topologies and restraints with one index
+  ///     for each system.
   ///   
   /// \param topologies_in         List of input topology pointers
   /// \param restraints_in         List of input restraint collections
@@ -84,9 +87,20 @@ public:
                      const GpuDetails &gpu = null_gpu, StopWatch *timer_in = nullptr);
 
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                     const std::vector<RestraintApparatus*> &restraints_in,
+                     ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     const GpuDetails &gpu = null_gpu,
+                     StopWatch *timer_in = nullptr);
+  
+  AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> &topology_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
                      const GpuDetails &gpu = null_gpu, StopWatch *timer_in = nullptr);
+
+  AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                     ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     const GpuDetails &gpu = null_gpu,
+                     StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis
@@ -94,8 +108,15 @@ public:
 
   /// \brief Get a topology pointer for a specific system contained within the synthesis.
   ///
+  /// Overloaded:
+  ///   - Get the topology pointer for a specific system
+  ///   - Get topology pointers for all systems
+  ///
   /// \param system_index  Index of the system of interest
-  AtomGraph* getSystemTopologyPointer(int system_index) const;
+  /// \{
+  const AtomGraph* getSystemTopologyPointer(int system_index) const;
+  const std::vector<AtomGraph*> getSystemTopologyPointer() const;
+  /// \}
 
   /// \brief Get a const reference to the list of all pointers for unique topologies making up
   ///        this synthesis.

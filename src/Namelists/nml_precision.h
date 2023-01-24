@@ -43,15 +43,28 @@ public:
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param found_nml   Indication of whether the namelist was found in the input file
+  /// \param policy_in   Requested error handling behavior
+  /// \param wrap        Indicate that the search for a &conformer namelist should carry on from
+  ///                    the beginning of an input file if no such namelist is found starting
+  ///                    from the original starting point
   /// \{
   PrecisionControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
                     WrapTextSearch wrap = WrapTextSearch::NO);
-  PrecisionControls(const TextFile &tf, int *start_line,
+  PrecisionControls(const TextFile &tf, int *start_line, bool *found_nml,
                     ExceptionResponse policy_in = ExceptionResponse::DIE,
                     WrapTextSearch wrap = WrapTextSearch::NO);
+  /// \}
+
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  PrecisionControls(const PrecisionControls &original) = default;
+  PrecisionControls(PrecisionControls &&original) = default;
+  PrecisionControls& operator=(const PrecisionControls &original) = default;
+  PrecisionControls& operator=(PrecisionControls &&original) = default;
   /// \}
 
   /// \brief Get the global position fixed-precision bits.
@@ -172,11 +185,12 @@ private:
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
 ///                    function will wrap back to the beginning of the TextFile object, if needed,
 ///                    to find a &minimize namelist) 
+/// \param found       Indicator that the namelist was found in the input file
 /// \param policy      Reaction to exceptions encountered during namelist reading
 /// \param wrap        Indicate that the search for a &precision namelist should carry on from the
 ///                    beginning of an input file if no such namelist is found starting from the
 ///                    original starting point
-NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
+NamelistEmulator precisionInput(const TextFile &tf, int *start_line, bool *found,
                                 ExceptionResponse policy = ExceptionResponse::DIE,
                                 WrapTextSearch wrap = WrapTextSearch::NO);
 

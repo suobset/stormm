@@ -897,6 +897,16 @@ int SystemCache::getCoordinateExample(const int topology_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int SystemCache::getTopologyCacheIndex(const AtomGraph *agptr) const {
+  for (int i = 0; i < topology_count; i++) {
+    if (agptr == &topology_cache[i]) {
+      return i;
+    }
+  }
+  return topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 const AtomGraph* SystemCache::getTopologyPointer(const int topology_index) const {
   if (topology_index >= static_cast<int>(topology_cache.size())) {
     rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +

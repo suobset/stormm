@@ -5,6 +5,22 @@ namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> incrementingSeries(const T start_value, const T end_value,
+                                                        const T increment) {
+  const T zero = 0;
+  const T actual_increment = (end_value - start_value > zero) ?  std::abs(increment) :
+                                                                -std::abs(increment);
+  std::vector<T> result((end_value - start_value) / increment);
+  T v = start_value;
+  const size_t nval = result.size();
+  for (size_t i = 0; i < nval; i++) {
+    result[i] = v;
+    v += actual_increment;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> extractIndexedValues(const T* original_values,
                                                           const size_t values_length,
                                                           const std::vector<int> reduced_indices,

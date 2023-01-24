@@ -97,52 +97,6 @@ int main(int argc, const char* argv[]) {
       case UnitCellType::TRICLINIC:
         break;
       }
-      
-      // CHECK
-#if 0
-      printf("Energy progression in system %2d\n", i);
-      printf("STEP    BOND    ANGLE   DIHEDRAL IMPROPER  ELEC 1-4  VDW 1-4    ELEC     VDW   "
-             "  RESTRAINT    TOTAL  \n");
-      printf("----  -------- -------- -------- --------  -------- --------  -------- --------"
-             "  ---------  ---------\n");
-      const std::vector<double> bond_nrg = all_mme[i].reportEnergyHistory(StateVariable::BOND, 0);
-      const std::vector<double> angl_nrg = all_mme[i].reportEnergyHistory(StateVariable::ANGLE, 0);
-      const std::vector<double> dihe_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::PROPER_DIHEDRAL, 0);
-      const std::vector<double> impr_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::IMPROPER_DIHEDRAL, 0);
-      const std::vector<double> qq14_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::ELECTROSTATIC_ONE_FOUR, 0);
-      const std::vector<double> lj14_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::VDW_ONE_FOUR, 0);
-      const std::vector<double> qqnb_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::ELECTROSTATIC, 0);
-      const std::vector<double> ljnb_nrg =
-          all_mme[i].reportEnergyHistory(StateVariable::VDW, 0);
-      const std::vector<double> rstr_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::RESTRAINT, 0);
-      all_mme[i].computePotentialEnergy();      
-      all_mme[i].computeTotalEnergy();
-      const std::vector<double> totl_nrg =
-        all_mme[i].reportEnergyHistory(StateVariable::POTENTIAL_ENERGY, 0);        
-      for (int j = 0; j < all_mme[i].getSampleSize(); j += 50) {
-        printf("%4d  %8.4lf %8.4lf %8.4lf %8.4lf  %8.4lf %8.4lf  %8.4lf %8.4lf  %9.4lf  %9.4lf\n",
-               j, bond_nrg[j], angl_nrg[j], dihe_nrg[j], impr_nrg[j], qq14_nrg[j], lj14_nrg[j],
-               qqnb_nrg[j], ljnb_nrg[j], rstr_nrg[j], totl_nrg[j]);
-      }
-      const AtomGraph *iag_ptr = sysc.getSystemTopologyPointer(i);
-      const ImplicitSolventModel i_ism = iag_ptr->getImplicitSolventModel();
-      if (i >= 0) {
-        printf("Label %2d = %s (%s)\n", i, sysc.getSystemLabel(i).c_str(),
-               getImplicitSolventModelName(i_ism).c_str());
-        PhaseSpaceWriter psw = ps->data();
-        for (int i = 0; i < psw.natom; i++) {
-          printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
-        }
-        printf("\n");
-      }
-#endif
-      // END CHECK
     }
   }
   

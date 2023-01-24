@@ -50,6 +50,15 @@ public:
                  WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  RandomControls(const RandomControls &original) = default;
+  RandomControls(RandomControls &&original) = default;
+  RandomControls& operator=(const RandomControls &original) = default;
+  RandomControls& operator=(RandomControls &&original) = default;
+  /// \}
+
   /// \brief Get the random seed supplied (and possibly, as corrected) from user input.
   int getRandomSeed() const;
 

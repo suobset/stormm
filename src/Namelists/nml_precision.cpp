@@ -39,12 +39,12 @@ PrecisionControls::PrecisionControls(const ExceptionResponse policy_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line,
+PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line, bool *found_nml,
                                      const ExceptionResponse policy_in,
                                      const WrapTextSearch wrap) :
     PrecisionControls(policy_in)
 {
-  NamelistEmulator t_nml = precisionInput(tf, start_line, policy, wrap);
+  NamelistEmulator t_nml = precisionInput(tf, start_line, found_nml, policy, wrap);
   globalpos_scale_bits = t_nml.getIntValue("globalpos_bits");
   localpos_scale_bits = t_nml.getIntValue("localpos_bits");
   velocity_scale_bits = t_nml.getIntValue("velocity_bits");
@@ -188,7 +188,7 @@ void PrecisionControls::validateBondConstraintTol() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
+NamelistEmulator precisionInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("precision", CaseSensitivity::AUTOMATIC, policy, "Wraps directives for "
                          "tuning the precision model and accumulation of molecular mechanics "
@@ -237,13 +237,12 @@ NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
                 "'single', 'single_plus', and 'double.'");
   t_nml.addHelp("nonbonded", "Precision model to use in non-bonded short-ranged calculations.  "
                 "Choices include 'single', 'single_plus', and 'double.'");
-  t_nml.addHelp("pme", "Precision model to use in mesh-based Particle-Mesh Ewald calculations.  "
-                "Choices include 'single', 'single_plus', and 'double.'");
+  t_nml.addHelp("pmegrid", "Precision model to use in mesh-based Particle-Mesh Ewald "
+                "calculations.  Choices include 'single', 'single_plus', and 'double.'");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount());
-
+  *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   return t_nml;
 }
 

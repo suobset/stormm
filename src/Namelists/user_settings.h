@@ -9,6 +9,7 @@
 #include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
+#include "Namelists/nml_precision.h"
 #include "Namelists/nml_random.h"
 #include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
@@ -72,9 +73,27 @@ struct UserSettings {
   /// \brief Detect whether a &minimize namelist was present
   bool getMinimizePresence() const;
 
+  /// \brief Detect whether a &solvent namelist was present
+  bool getSolventPresence() const;
+  
+  /// \brief Detect whether a &random namelist was present
+  bool getRandomPresence() const;
+  
+  /// \brief Detect whether a &precision namelist was present
+  bool getPrecisionPresence() const;
+  
   /// \brief Detect whether a &conformer namelist was present
   bool getConformerPresence() const;
 
+  /// \brief Detect whether a &dynamics namelist was present
+  bool getDynamicsPresence() const;
+  
+  /// \brief Detect whether an &ffmorph namelist was present
+  bool getFFMorphPresence() const;
+  
+  /// \brief Detect whether a &report namelist was present
+  bool getReportPresence() const;
+  
   /// \brief Get the block of information associated with the &files namelist.
   const FilesControls& getFilesNamelistInfo() const;
   
@@ -86,6 +105,9 @@ struct UserSettings {
   
   /// \brief Get the block of information associated with the &random namelist.
   const RandomControls& getRandomNamelistInfo() const;
+
+  /// \brief Get the block of information associated with the &precision namelist.
+  const PrecisionControls& getPrecisionNamelistInfo() const;
 
   /// \brief Get the block of information associated with the &conformer namelist.
   const ConformerControls& getConformerNamelistInfo() const;
@@ -112,6 +134,7 @@ private:
   bool has_minimize_nml;        ///< Indicate the presence of a &minimize namelist in the input
   bool has_solvent_nml;         ///< Indicate the presence of a &solvent namelist in the input
   bool has_random_nml;          ///< Indicate the presence of a &random namelist in the input
+  bool has_precision_nml;       ///< Indicate the presence of a &precision namelist in the input
   bool has_conformer_nml;       ///< Indicate the presence of a &conformer namelist in the input
   bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
   bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
@@ -126,6 +149,8 @@ private:
   MinimizeControls line_min_input;  ///< Line minimization directives
   SolventControls solvent_input;    ///< Implicit solvent specifications
   RandomControls prng_input;        ///< Random number generator specifications
+  PrecisionControls prec_input;     ///< Precision model specifications, including accumulation bit
+                                    ///<   settings as well as calculation floating point types
   ConformerControls conf_input;     ///< Conformer generation instructions
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions

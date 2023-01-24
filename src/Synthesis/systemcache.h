@@ -141,6 +141,12 @@ public:
   /// \param topology_index  Index of the topology of interest
   int getCoordinateExample(int topology_index) const;
 
+  /// \brief Match a topology pointer to one of the topologies in the cache.  If no match is found,
+  ///        the function will return the number of topologies in the cache.
+  ///
+  /// \param agptr  Pointer to the topology for comparison
+  int getTopologyCacheIndex(const AtomGraph *agptr) const;
+  
   /// \brief Get pointers to one or all of the unique topologies from within the compact topology
   ///        cache.
   ///

@@ -153,7 +153,7 @@ bool displayNamelistHelp(const std::string &module_name) {
     return true;
   }
   else if (strcmpCased(module_name, "&precision", CaseSensitivity::YES)) {
-    const NamelistEmulator t_nml = precisionInput(tf, &start_line);
+    const NamelistEmulator t_nml = precisionInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }

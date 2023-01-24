@@ -37,6 +37,9 @@ constexpr char default_filecon_sdf_notification[] = "WARN";
 constexpr CoordinateFileKind default_filecon_inpcrd_type = CoordinateFileKind::UNKNOWN;
 constexpr CoordinateFileKind default_filecon_outcrd_type = CoordinateFileKind::AMBER_CRD;
 constexpr CoordinateFileKind default_filecon_chkcrd_type = CoordinateFileKind::AMBER_ASCII_RST;
+constexpr char default_filecon_inpcrd_type_name[] = "AMBER_INPCRD";
+constexpr char default_filecon_outcrd_type_name[] = "AMBER_CRD";
+constexpr char default_filecon_chkcrd_type_name[] = "AMBER_ASCII_RST";
 /// \}
 
 /// \brief Object to encapsulate a system, a coupled set of coordinates and a single topology.
@@ -72,6 +75,15 @@ public:
                  const std::string &label_in, int frame_start_in, int frame_end_in,
                  int replica_count_in, CoordinateFileKind coordinate_kind_in,
                  CoordinateFileKind trajectory_kind_in, CoordinateFileKind checkpoint_kind_in);
+  /// \}
+
+  /// \brief This object, containing no const members or pointers to repair, can take the default
+  ///        copy and move constructors, plus copy and move assignment operators.
+  /// \{
+  MoleculeSystem(const MoleculeSystem &original) = default;
+  MoleculeSystem(MoleculeSystem &&original) = default;
+  MoleculeSystem& operator=(const MoleculeSystem &original) = default;
+  MoleculeSystem& operator=(MoleculeSystem &&original) = default;
   /// \}
 
   /// \brief Get the name of the topology file in this system.
@@ -253,6 +265,15 @@ public:
                 WrapTextSearch wrap = WrapTextSearch::NO,
                 const std::vector<std::string> &alternatives = {},
                 const std::vector<std::string> &sys_requirements = {"-pe", "-ce"});
+  /// \}
+
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  FilesControls(const FilesControls &original) = default;
+  FilesControls(FilesControls &&original) = default;
+  FilesControls& operator=(const FilesControls &original) = default;
+  FilesControls& operator=(FilesControls &&original) = default;
   /// \}
 
   /// \brief Get the structure count, based on the number of free coordinate files as well as the

@@ -1134,5 +1134,91 @@ std::vector<double2> ScoreCard::reportEnergyHistory(const StateVariable aspect,
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+const ScoreCard* ScoreCard::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::import(const ScoreCard *other, const size_t fill_index,
+                       const size_t source_index) {
+  ScoreCardReader src_r = other->data();
+  if (source_index >= src_r.system_count) {
+    rtErr("System index " + std::to_string(source_index) + " is invalid for a source ScoreCard "
+          "with " + std::to_string(src_r.system_count) + " systems.", "ScoreCard", "import");
+  }
+  if (fill_index >= system_count) {
+    rtErr("System index " + std::to_string(fill_index) + " is invalid for a ScoreCard with " +
+          std::to_string(system_count) + " systems.", "ScoreCard", "import");
+  }
+  if (src_r.sampled_step_count > sample_capacity) {
+    reserve(src_r.sampled_step_count);
+  }
+  const size_t nvar = data_stride;
+  const size_t padded_nvar = data_stride;
+  size_t src_llim = padded_nvar * source_index;
+  size_t fill_llim = padded_nvar * fill_index;
+  llint* inst_acc_ptr = instantaneous_accumulators.data();
+  double* run_acc_ptr = running_accumulators.data();
+  double* sqd_acc_ptr = squared_accumulators.data();
+  llint* ts_acc_ptr = time_series_accumulators.data();
+  const int bit_shift = nrg_scale_bits - other->getEnergyScaleBits();
+  const llint bit_fac = llround(pow(2.0, fabs(bit_shift)));
+  for (size_t i = 0; i < nvar; i++) {
+    if (bit_shift < 0) {
+      inst_acc_ptr[fill_llim + i] = (src_r.instantaneous_accumulators[src_llim + i] / bit_fac);
+    }
+    else if (bit_shift == 0) {
+      inst_acc_ptr[fill_llim + i] = src_r.instantaneous_accumulators[src_llim + i];
+    }
+    else {
+      inst_acc_ptr[fill_llim + i] = (src_r.instantaneous_accumulators[src_llim + i] * bit_fac);
+    }
+    run_acc_ptr[fill_llim + i] = src_r.running_accumulators[src_llim + i];
+    sqd_acc_ptr[fill_llim + i] = src_r.squared_accumulators[src_llim + i];
+  }
+  const size_t nsys = system_count;
+  for (size_t i = 0; i < src_r.sampled_step_count; i++) {
+    src_llim  = padded_nvar * ((src_r.system_count * i) + source_index);
+    fill_llim = padded_nvar * ((nsys * i) + fill_index);
+    for (size_t j = 0; j < nvar; j++) {
+      if (bit_shift < 0) {
+        ts_acc_ptr[fill_llim + j] = (src_r.time_series[src_llim + j] / bit_fac);
+      }
+      else if (bit_shift == 0) {
+        ts_acc_ptr[fill_llim + j] = src_r.time_series[src_llim + j];
+      }
+      else {
+        ts_acc_ptr[fill_llim + j] = (src_r.time_series[src_llim + j] * bit_fac);
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::import(const ScoreCard &other, const size_t fill_index,
+                       const size_t source_index) {
+  import(other.getSelfPointer(), fill_index, source_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::import(const ScoreCard *other, const std::vector<int> &fill_indices,
+                       const std::vector<int> &source_indices) {
+  const size_t nfill = fill_indices.size();
+  if (nfill != source_indices.size()) {
+    rtErr("A series of " + std::to_string(source_indices.size()) + " source systems cannot fill " +
+          std::to_string(nfill) + ".", "ScoreCard", "import"); 
+  }
+  for (size_t i = 0; i < nfill; i++) {
+    import(other, fill_indices[i], source_indices[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::import(const ScoreCard &other, const std::vector<int> &fill_indices,
+                       const std::vector<int> &source_indices) {
+  import(other.getSelfPointer(), fill_indices, source_indices);
+}
+
 } // namespace energy
 } // namespace stormm

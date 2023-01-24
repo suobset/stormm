@@ -901,11 +901,11 @@ $(BENCHDIR)/bin/test_nonperiodic_kernels : $(LIBDIR)/libstormm_cuda.so \
 
 # Target: Conformer generation
 $(APPDIR)/bin/conformer.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Conf/src/conformer.cpp \
-				 $(APPDIR)/Conf/src/setup.cpp
+				 $(APPDIR)/Conf/src/setup.cpp $(APPDIR)/Conf/src/analysis.cpp
 	@echo "[STORMM]  Building conformer.stormm..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.stormm \
 	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/setup.cpp \
-	  -L$(LIBDIR) -I$(SRCDIR) -lstormm
+	  $(APPDIR)/Conf/src/analysis.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 # Target: Molecular dynamics
 $(APPDIR)/bin/dynamics.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Dyna/src/dynamics.cpp
@@ -922,11 +922,13 @@ $(APPDIR)/bin/ffrefine.stormm : $(LIBDIR)/libstormm.so $(APPDIR)/Ffrn/src/ffrefi
 # Target: Conformer generation with CUDA
 $(APPDIR)/bin/conformer.stormm.cuda : $(LIBDIR)/libstormm_cuda.so \
 				      $(APPDIR)/Conf/src/conformer.cpp \
-				      $(APPDIR)/Conf/src/setup.cpp
+				      $(APPDIR)/Conf/src/setup.cpp \
+				      $(APPDIR)/Conf/src/analysis.cpp
 	@echo "[STORMM]  Building conformer.stormm.cuda..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
 	  $(APPDIR)/bin/conformer.stormm.cuda $(APPDIR)/Conf/src/conformer.cpp \
-	  $(APPDIR)/Conf/src/setup.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm_cuda
+	  $(APPDIR)/Conf/src/setup.cpp $(APPDIR)/Conf/src/analysis.cpp -L$(LIBDIR) -I$(SRCDIR) \
+	  -lstormm_cuda
 
 install : $(LIBDIR)/libstormm.so
 

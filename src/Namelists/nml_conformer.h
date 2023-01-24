@@ -25,23 +25,24 @@ constexpr int default_conf_running_states       = 16;
 constexpr int default_conf_final_states         = 100;
 constexpr int default_conf_reshuffle_iterations = 0;
 constexpr int active_states_limit               = 524288;
-constexpr double default_conf_rmsd_tolerance    = 0.5;
+constexpr double default_conf_rmsd_tolerance    = 1.5;
 constexpr double default_conf_core_restraint    = 16.0;
-constexpr double default_conf_self_clash_ratio  = 0.5;
 constexpr char default_conf_chirality[]         = "false";
 constexpr char default_conf_cis_trans[]         = "false";
 constexpr char default_conf_stop_hbonds[]       = "false";
 /// \}
 
 /// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
-struct ConformerControls {
+class ConformerControls {
+public:
 
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param found_nml   Indication of whether the namelist was found in the input file
+  /// \param policy_in   Requested error handling behavior
   /// \param wrap        Indicate that the search for a &conformer namelist should carry on from
   ///                    the beginning of an input file if no such namelist is found starting
   ///                    from the original starting point
@@ -53,6 +54,15 @@ struct ConformerControls {
                     WrapTextSearch wrap = WrapTextSearch::NO);
   /// \}
 
+  /// \brief As with other control objects, copy and move constructors, plus copy and move
+  ///        assignment operators, can all take their default forms.
+  /// \{
+  ConformerControls(const ConformerControls &original) = default;
+  ConformerControls(ConformerControls &&original) = default;
+  ConformerControls& operator=(const ConformerControls &original) = default;
+  ConformerControls& operator=(ConformerControls &&original) = default;
+  /// \}
+  
   /// \brief Get the core atom mask string.
   const std::string& getCoreAtomMask() const;
 
@@ -99,10 +109,6 @@ struct ConformerControls {
 
   /// \brief Get the maximum number of conformer seeding attempts
   int getMaxSeedingAttempts() const;
-
-  /// \brief Get the minimum ratio for self interactions below which they will be considered
-  ///        van-der Waals clashes.
-  double getSelfClashRatio() const;
 
   /// \brief Get the maximum number of minimizations to attempt with any one molecule.  Each
   ///        initial state provided by the user will be subject to this limit, so if the limit
@@ -170,9 +176,6 @@ private:
   int max_seeding_attempts;         ///< Maximum number of attempts to make in seeding each
                                     ///<   conformer.  If the seeding fails, the conformer will be
                                     ///<   left in its original state from the user input.
-  double self_clash_ratio;          ///< The minimum ratio of the distance between two particles to
-                                    ///<   their pair sigma value.  Ratios below this level will be
-                                    ///<   considered clashes.
   int system_trials;                ///< Maximum number of distinct minimizations to attempt with
                                     ///<   one molecule
   double rmsd_tolerance;            ///< Minimum mass-weighted root-mean squared deviation between

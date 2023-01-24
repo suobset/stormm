@@ -607,12 +607,13 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                                     const StaticExclusionMaskSynthesis &poly_se,
                                     PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                                     const GpuDetails &gpu, const PrecisionModel prec,
-                                    StopWatch *timer, const std::string &task_name) {
+                                    const int energy_accumulation_bits, StopWatch *timer,
+                                    const std::string &task_name) {
 
   // Prepare to track the energies of the structures as they undergo geometry optimization.
   const int ntpr   = mincon.getDiagnosticPrintFrequency();
   const int nframe = (roundUp(mincon.getTotalCycles(), ntpr) / ntpr) + 1;
-  ScoreCard result(poly_ps->getSystemCount(), nframe, 32);
+  ScoreCard result(poly_ps->getSystemCount(), nframe, energy_accumulation_bits);
 
   // Map out all kernels.  Only a few are needed but this is not a lot of work.
   KernelManager launcher(gpu, poly_ag);
@@ -675,8 +676,8 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
 //-------------------------------------------------------------------------------------------------
 extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynthesis *poly_ps,
                                     const MinimizeControls &mincon, const GpuDetails &gpu,
-                                    const PrecisionModel prec, StopWatch *timer,
-                                    const std::string &task_name) {
+                                    const PrecisionModel prec, const int energy_accumulation_bits,
+                                    StopWatch *timer, const std::string &task_name) {
   switch (poly_ag->getNonbondedWorkType()) {
   case NbwuKind::TILE_GROUPS:
   case NbwuKind::SUPERTILES:
@@ -684,7 +685,8 @@ extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynth
       const StaticExclusionMaskSynthesis poly_se(poly_ag->getTopologyPointers(),
                                                  poly_ag->getTopologyIndices());
       poly_ag->loadNonbondedWorkUnits(poly_se);
-      return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec, timer, task_name);
+      return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec,
+                                energy_accumulation_bits, timer, task_name);
     }
     break;
   case NbwuKind::HONEYCOMB:

@@ -31,8 +31,8 @@ using trajectory::translateCoordinateFileKind;
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
-    has_minimize_nml{false}, has_solvent_nml{false},
-    has_random_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
+    has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
+    has_precision_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
     has_ffmorph_nml{false}, has_report_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{}, dyna_input{},
@@ -148,6 +148,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   start_line = 0;
   prng_input = RandomControls(inp_tf, &start_line, &has_random_nml, policy);
   start_line = 0;
+  prec_input = PrecisionControls(inp_tf, &start_line, &has_precision_nml, policy);
+  start_line = 0;
   conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
   start_line = 0;
   dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
@@ -223,8 +225,38 @@ bool UserSettings::getMinimizePresence() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool UserSettings::getSolventPresence() const {
+  return has_solvent_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getRandomPresence() const {
+  return has_random_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getPrecisionPresence() const {
+  return has_precision_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool UserSettings::getConformerPresence() const {
   return has_conformer_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getDynamicsPresence() const {
+  return has_dynamics_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getFFMorphPresence() const {
+  return has_ffmorph_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getReportPresence() const {
+  return has_report_nml;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -245,6 +277,11 @@ const SolventControls& UserSettings::getSolventNamelistInfo() const {
 //-------------------------------------------------------------------------------------------------
 const RandomControls& UserSettings::getRandomNamelistInfo() const {
   return prng_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const PrecisionControls& UserSettings::getPrecisionNamelistInfo() const {
+  return prec_input;
 }
 
 //-------------------------------------------------------------------------------------------------

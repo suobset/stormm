@@ -17,6 +17,17 @@ using card::Hybrid;
 using parse::NumberFormat;
 using parse::realToString;
 
+/// \brief Create a number series based on a starting number, a final value, and an increment.
+///        The result is inclusive of the starting value but not the ending value.
+///
+/// \param start_value  The first value in the list
+/// \param end_value    The final value in the list
+/// \param increment    The increment to the list (this will be reversed in sign as necessary to
+///                     ensure that the series can progress from the starting value to the ending
+///                     value.
+template <typename T> std::vector<T> incrementingSeries(const T start_value, const T end_value,
+                                                        const T increment = 1);
+  
 /// \brief Convert a number series into a bitmask, such that for a number series consisting of
 ///        integers { a, b, c, d, e } bits a, b, c, d, and e are checked off in a mask broken into
 ///        segments of 32 bits (or whatever the size of an unsigned integer happens to be).  The

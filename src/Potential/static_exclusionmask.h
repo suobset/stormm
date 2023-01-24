@@ -83,10 +83,13 @@ public:
 
   /// \brief The constructor requires a topology, which will have lists of exclusions
   ///
-  /// \param ag  The topology to base this all-to-all pair list upon (fed in as a pointer so that
-  ///            a private member variable may retain a pointer to the original topology)
+  /// \param ag_in  The topology to base this all-to-all pair list upon (fed in as a pointer so
+  ///               that a private member variable may retain a pointer to the original topology)
+  /// \{
   StaticExclusionMask(const AtomGraph *ag_in = nullptr);
-
+  StaticExclusionMask(const AtomGraph &ag_in);
+  /// \}
+  
   /// \brief The default copy and move constructors as well as the copy assignment operator will
   ///        suffice for this object, which has no POINTER-kind Hybrid objects among its members.
   ///        The move assignment operator will be implicitly deleted due to the presence of a
@@ -141,6 +144,9 @@ public:
   /// \brief Get the abstract for this exclusion mask object
   const StaticExclusionMaskReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a pointer ot the object itself (useful when passing the object by const reference)
+  const StaticExclusionMask* getSelfPointer() const;
+  
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's information to the GPU device
   void upload();

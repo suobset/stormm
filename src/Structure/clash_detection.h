@@ -3,21 +3,26 @@
 #define STORMM_CLASH_DETECTION_H
 
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Namelists/nml_minimize.h"
 #include "Potential/static_exclusionmask.h"
 #include "Reporting/error_format.h"
+#include "Synthesis/condensate.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
+#include "structure_enumerators.h"
 
 namespace stormm {
 namespace structure {
 
+using constants::PrecisionModel;
 using data_types::getStormmScalarTypeName;
 using data_types::isFloatingPointScalarType;
 using energy::StaticExclusionMask;
@@ -28,6 +33,10 @@ using energy::tile_lengths_per_supertile;
 using math::roundUp;
 using namelist::default_minimize_clash_ratio;
 using namelist::default_minimize_clash_r0;
+using synthesis::Condensate;
+using synthesis::CondensateReader;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
 using topology::AtomGraph;
 using topology::NonbondedKit;
 using topology::ValenceKit;
@@ -40,6 +49,183 @@ using trajectory::PhaseSpaceReader;
 
 /// \brief The minimum system size needed in order to engage a neighbor list based search.
 constexpr int clash_direct_calculation_size_limit = 32;
+
+/// \brief An object for listing the clashes between atoms of a system.
+class ClashReport {
+public:
+
+  /// \brief The constructor accepts optional parameters for the clash parameters, or just a
+  ///        pointer to the desired topology.
+  /// \{
+  ClashReport(double clash_distance_in = default_minimize_clash_r0,
+              double clash_ratio_in = default_minimize_clash_ratio,
+              const AtomGraph *ag_pointer_in = nullptr);
+
+  ClashReport(const AtomGraph *ag_pointer_in);
+  /// \}
+
+  /// \brief Copy and move constructors, as well as copy and move assignment operators, can all
+  ///        take their default forms for this object with no POINTER-kind Hybrids or other
+  ///        pointers needing repair.
+  ///
+  /// \param original  Some other object to base the construction upon
+  /// \param other     Some other object to use in assignment
+  /// \{
+  ClashReport(const ClashReport &original) = default;
+  ClashReport(ClashReport &&original) = default;
+  ClashReport& operator=(const ClashReport &original) = default;
+  ClashReport& operator=(ClashReport &&original) = default;
+  /// \}
+  
+  /// \brief Get the number of detected clashes.
+  int getClashCount() const;
+  
+  /// \brief Get the minimum clash distance.
+  double getMinimumDistance() const;
+
+  /// \brief Get the minimum ratio of inter-particle distance to the pairwise sigma parameter.
+  double getMinimumSigmaRatio() const;
+
+  /// \brief Get a const pointer to the topology describing the system.
+  const AtomGraph* getTopologyPointer() const;
+  
+  /// \brief Get one of the clashing pairs of atoms.
+  ///
+  /// \param index  The index of the clashing pair
+  int2 getClashingPair(int index) const;
+
+  /// \brief Get the distance at which two particles clash
+  ///
+  /// \param index  The index of the clashing pair
+  double getClashDistance(int index) const;
+  
+  /// \brief Get the type of clash made by two particles
+  ///
+  /// \param index  The index of the clashing pair
+  ClashKind getClashKind(int index) const;
+
+  /// \brief Produce a string describing the atoms, indices, and relevant names of one of the
+  ///        clashes catalogged in this object.
+  ///
+  /// Overloaded:
+  ///   - Get a string with just the atoms and the inter-particle distance
+  ///   - Get a string with the atoms, inter-particle distance, and current coordinates of each
+  ///     particle
+  ///
+  /// \param clash_index   The index of the clashing pair
+  /// \param crd_object    Object containing the exact coordinates within which the clash occurs
+  /// \param frame         Index of the frame within a series
+  /// \param system_index  Index of the system within a synthesis
+  /// \{
+  std::string getClashDescription(int clash_index) const;
+
+  std::string getClashDescription(int clash_index, const CoordinateFrameReader &crd_object) const;
+
+  std::string getClashDescription(int clash_index, const CoordinateFrame &crd_object) const;
+
+  std::string getClashDescription(int clash_index, const CoordinateFrame *crd_object) const;
+
+  std::string getClashDescription(int clash_index, const PhaseSpaceReader &crd_object) const;
+
+  std::string getClashDescription(int clash_index, const PhaseSpace &crd_object) const;
+
+  std::string getClashDescription(int clash_index, const PhaseSpace *crd_object) const;
+
+  template <typename T>
+  std::string getClashDescription(int clash_index, const CoordinateSeriesReader<T> &crd_object,
+                                  int frame) const;
+
+  template <typename T>
+  std::string getClashDescription(int clash_index, const CoordinateSeries<T> &crd_object,
+                                  int frame) const;
+
+  template <typename T>
+  std::string getClashDescription(int clash_index, const CoordinateSeries<T> *crd_object,
+                                  int frame) const;
+
+  std::string getClashDescription(int clash_index, const PsSynthesisReader &crd_object,
+                                  int system_index) const;
+
+  std::string getClashDescription(int clash_index, const PhaseSpaceSynthesis &crd_object,
+                                  int system_index) const;
+
+  std::string getClashDescription(int clash_index, const PhaseSpaceSynthesis *crd_object,
+                                  int system_index) const;
+
+  std::string getClashDescription(int clash_index, const CondensateReader &crd_object,
+                                  int system_index) const;
+
+  std::string getClashDescription(int clash_index, const Condensate &crd_object,
+                                  int system_index) const;
+
+  std::string getClashDescription(int clash_index, const Condensate *crd_object,
+                                  int system_index) const;
+  /// \}
+
+  /// \brief Add notes about a clash between two particles.
+  ///
+  /// \param atom_i       The first atom of the clashing pair
+  /// \param atom_j       The second atom of the clashing pair
+  /// \param distance_in  Distance between the two particles in the clashing pair
+  void addClash(int atom_i, int atom_j, double distance_in);
+
+  /// \brief Clear the clashes to recompile the report.
+  void clear();
+
+  /// \brief Set the topology that the clash report shall use.
+  ///
+  /// Overloaded:
+  ///   - Supply a pointer to the topology of interest
+  ///   - Pass the topology of interest by reference
+  ///
+  /// \param ag_pointer_in  Pointer to the desired topology
+  /// \param ag_in          Reference to the desired topology
+  /// \{
+  void setTopologyPointer(const AtomGraph *ag_pointer_in);
+  void setTopologyPointer(const AtomGraph &ag_in);
+  /// \}
+
+  /// \brief Set the minimum absolute distance for two particles' separation before a clash is
+  ///        declared.
+  ///
+  /// \param clash_distance_in
+  void setMinimumDistance(double clash_distance_in);
+  
+  /// \brief Set the minimum ratio of interparticle distance to the pairwise sigma value, below
+  ///        which a clash is declared.
+  ///
+  /// \param clash_ratio_in
+  void setMinimumSigmaRatio(double clash_ratio_in);
+  
+private:
+  int clash_count;
+  double clash_distance;
+  double clash_ratio;
+  std::vector<int2> pairs;
+  std::vector<double> distances;
+  std::vector<ClashKind> kinds;
+  AtomGraph* ag_pointer;
+
+  /// \brief Validate the index of some catalogged element, to ensure that it is within the scope
+  ///        of this report.
+  ///
+  /// \param index  The index of interest
+  void validateClashIndex(int index) const;
+
+  /// \brief Validate the system index provided against the coordinate object available.
+  void validateSystemIndex(int system_index, int system_count) const;
+  
+  /// \brief Update the description of a clash with the locations of two atoms.
+  ///
+  /// \param x_i  Cartesian X coordinate of the first atom
+  /// \param y_i  Cartesian Y coordinate of the first atom
+  /// \param z_i  Cartesian Z coordinate of the first atom
+  /// \param x_j  Cartesian X coordinate of the second atom
+  /// \param y_j  Cartesian Y coordinate of the second atom
+  /// \param z_j  Cartesian Z coordinate of the second atom
+  std::string atomPairCoordinates(double x_i, double y_i, double z_i, double x_j, double y_j,
+                                  double z_j) const;
+};
 
 /// \brief Compute the maximum distance at which two particles can be considered to participate in
 ///        a van-der Waals clash.
@@ -91,7 +277,8 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
                         const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                         const StaticExclusionMaskReader &maskr,
                         Tcalc elec_limit = default_minimize_clash_r0,
-                        Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0);
+                        Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
+                        ClashReport *summary = nullptr);
 
 /// \brief Detect a van-der Waals clash between particles based on a minimum required ratio against
 ///        any given pair's non-bonded sigma ratio.  Return TRUE if a clash is found, FALSE if not.
@@ -121,49 +308,94 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                  const StaticExclusionMaskReader &maskr,
                  Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0);
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
+                 ClashReport *summary = nullptr);
 
 bool detectClash(const CoordinateFrameReader &cfr, const ValenceKit<double> &vk,
                  const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 bool detectClash(const CoordinateFrame &cf, const AtomGraph &ag, const StaticExclusionMask &mask,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
-bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExclusionMask &mask,
+bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExclusionMask *mask,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
+
+bool detectClash(const CoordinateFrame &cf, const AtomGraph &ag, const StaticExclusionMask &mask,
+                 ClashReport *summary);
+
+bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExclusionMask *mask,
+                 ClashReport *summary);
 
 bool detectClash(const PhaseSpaceReader &psr, const ValenceKit<double> &vk,
                  const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 bool detectClash(const PhaseSpace &ps, const AtomGraph &ag, const StaticExclusionMask &mask,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
-bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask &mask,
+bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask *mask,
                  double elec_limit = default_minimize_clash_r0,
-                 double vdw_ratio = default_minimize_clash_ratio);
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
+
+bool detectClash(const PhaseSpace &ps, const AtomGraph &ag, const StaticExclusionMask &mask,
+                 ClashReport *summary);
+
+bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask *mask,
+                 ClashReport *summary);
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, int frame, const ValenceKit<Tcalc> &vk,
                  const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
                  Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0);
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
+                 ClashReport *summary = nullptr);
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> *cs, int frame, const AtomGraph *ag,
-                 const StaticExclusionMask &mask, Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0);
-
+                 const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
+                 ClashReport *summary = nullptr);
+  
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> &cs, int frame, const AtomGraph &ag,
                  const StaticExclusionMask &mask, Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0);
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
+                 ClashReport *summary = nullptr);
+
+template <typename Tcoord, typename Tcalc>
+bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, ClashReport *summary);
+
+template <typename Tcoord, typename Tcalc>
+bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, ClashReport *summary);
+
+template <typename Tcalc>
+bool detectClash(const CondensateReader &cdnsr, const int system_index,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMaskReader &maskr,
+                 Tcalc elec_limit = default_minimize_clash_r0,
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
+
+bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, double elec_limit = default_minimize_clash_r0,
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
+
+bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, double elec_limit = default_minimize_clash_r0,
+                 double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
+
+bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, ClashReport *summary);
+
+bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, ClashReport *summary);
 /// \}
 
 } // namespace structure

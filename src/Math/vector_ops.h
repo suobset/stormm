@@ -670,6 +670,8 @@ template <typename T> std::vector<T> tileVector(const std::vector<T> &va, size_t
 template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx, size_t nrep = 1);
 /// \}
+
+/// \brief Construct a vector based on a regular series of 
   
 } // namespace math
 } // namespace stormm

@@ -589,7 +589,7 @@ void NamelistEmulator::categorizeKeyword(const std::string &key,
 void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name_width) const {
   printf(" - %-*.*s : %s\n", name_width, name_width, keywords[p_idx].label.c_str(),
          terminalFormat("[" + getNamelistTypeName(keywords[p_idx].kind) + "] " +
-                        keywords[p_idx].help_message + ".", "", "", 6 + name_width,
+                        keywords[p_idx].help_message, "", "", 6 + name_width,
                         0, 6 + name_width, 0, RTMessageKind::TABULAR).c_str());
   if (keywords[p_idx].kind == NamelistType::STRUCT) {
     int member_width = 0;
