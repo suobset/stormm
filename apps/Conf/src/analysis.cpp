@@ -4,6 +4,7 @@
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/Math/summation.h"
+#include "../../../src/Parsing/parse.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/rmsd.h"
 #include "../../../src/Structure/rmsd_plan.h"
@@ -19,6 +20,7 @@ using stormm::diskutil::PrintSituation;
 using stormm::diskutil::substituteNameExtension;
 using stormm::diskutil::splitPath;
 using stormm::math::sum;
+using stormm::parse::findStringInVector;
 using stormm::structure::detectClash;
 using stormm::structure::RMSDPlan;
 using stormm::structure::MdlMolVersion;
@@ -138,66 +140,62 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
     like_confs[top_idx].push_back(conf_idx);
   }
   const std::vector<AtomGraph*>& unique_topologies = poly_ps.getUniqueTopologies();
+  std::vector<std::string> printed_thus_far;
   for (int i = 0; i < ntop; i++) {
-    switch (fcon.getOutputCoordinateFormat()) {
-    case CoordinateFileKind::AMBER_CRD:
-    case CoordinateFileKind::AMBER_NETCDF:
-    case CoordinateFileKind::SDF:
-      switch (fcon.getFileFusionProtocol()) {
-      case TrajectoryFusion::ON:
-      case TrajectoryFusion::AUTO:
+
+    // Loop over all conformations sharing this topology.
+    for (size_t j = 0; j < like_confs[i].size(); j++) {
+      std::string before, after;
+      const std::string& ij_label = poly_ps.getSystemLabel(like_confs[i][j]);
+      const int cache_idx = sc.getFirstMatchingSystemIndex(unique_topologies[i], ij_label);
+      splitPath(sc.getTrajectoryName(cache_idx), &before, &after);
+      std::string fname;
+      switch (sc.getTrajectoryKind(cache_idx)) {
+      case CoordinateFileKind::AMBER_CRD:
+      case CoordinateFileKind::AMBER_NETCDF:
+      case CoordinateFileKind::SDF:
         {
-          std::string before, after;
-          splitPath(fcon.getTrajectoryFileName(), &before, &after);
-          std::string fname = before + getBaseName(unique_topologies[i]->getFileName());
-          fname = substituteNameExtension(fname, after);
-          if (fcon.getOutputCoordinateFormat() == CoordinateFileKind::SDF) {
-            const int mdl_idx = sc.getTopologyCacheIndex(unique_topologies[i]);
-            MdlMol tmdl = sdf_recovery[mdl_idx];
-            for (size_t j = 0; j < like_confs.size(); j++) {
-              const PrintSituation jpr = (j == 0) ? PrintSituation::OVERWRITE :
-                                                    PrintSituation::APPEND;
-              tmdl.impartCoordinates(poly_ps.exportCoordinates(like_confs[i][j]));
-              tmdl.writeMdl(fname, MdlMolVersion::V2000, jpr);
-              tmdl.writeDataItems(fname, PrintSituation::APPEND);
-            }
-          }
-          else {
-            poly_ps.printTrajectory(like_confs[i], fname, 0.0, fcon.getOutputCoordinateFormat(),
-                                    PrintSituation::OVERWRITE);
-          }
-        }
-        break;
-      case TrajectoryFusion::OFF:
-        {
-          const int mdl_idx = sc.getTopologyCacheIndex(unique_topologies[i]);
-          MdlMol tmdl = sdf_recovery[mdl_idx];
-          for (size_t j = 0; j < like_confs[i].size(); j++) {
-            std::string before, after;
-            splitPath(fcon.getTrajectoryFileName(), &before, &after);
-            std::string fname = before + getBaseName(unique_topologies[i]->getFileName()) + "_" +
-                                std::to_string(j);
-            fname = substituteNameExtension(fname, after);
-            if (fcon.getOutputCoordinateFormat() == CoordinateFileKind::SDF) {
-              tmdl.impartCoordinates(poly_ps.exportCoordinates(like_confs[i][j]));
-              tmdl.writeMdl(fname, MdlMolVersion::V2000, PrintSituation::OVERWRITE);
-              tmdl.writeDataItems(fname, PrintSituation::APPEND);
+          PrintSituation pr_protocol;
+          switch (sc.getTrajectoryFusionProtocol()) {
+          case TrajectoryFusion::ON:
+          case TrajectoryFusion::AUTO:
+            fname = before + "." + after;
+            if ((printed_thus_far.size() > 0 && fname == printed_thus_far.back()) ||
+                findStringInVector(printed_thus_far, fname) < printed_thus_far.size()) {
+              pr_protocol = PrintSituation::APPEND;
             }
             else {
-              poly_ps.printTrajectory(std::vector<int>(1, like_confs[i][j]), fname, 0.0,
-                                      fcon.getOutputCoordinateFormat(), PrintSituation::OVERWRITE);
+              pr_protocol = sc.getPrintingProtocol();
+              printed_thus_far.push_back(fname);
             }
+            break;
+          case TrajectoryFusion::OFF:
+            pr_protocol = sc.getPrintingProtocol();
+            fname = before + "_" + std::to_string(j - poly_psr.common_ag_bounds[i]) + "." + after;
+            break;
+          }
+          if (sc.getTrajectoryKind(cache_idx) == CoordinateFileKind::SDF) {
+            MdlMol tmdl = sdf_recovery[cache_idx];
+            tmdl.impartCoordinates(poly_ps.exportCoordinates(like_confs[i][j]));
+            tmdl.writeMdl(fname, MdlMolVersion::V2000, pr_protocol);
+            tmdl.writeDataItems(fname, PrintSituation::APPEND);
+          }
+          else {
+            poly_ps.printTrajectory(std::vector<int>(1, like_confs[i][j]), fname, 0.0,
+                                    sc.getTrajectoryKind(cache_idx), pr_protocol);
           }
         }
         break;
+      case CoordinateFileKind::AMBER_INPCRD:
+      case CoordinateFileKind::AMBER_ASCII_RST:
+      case CoordinateFileKind::AMBER_NETCDF_RST:
+        fname = before + "_" + std::to_string(j - poly_psr.common_ag_bounds[i]) + "." + after;
+        poly_ps.printTrajectory(std::vector<int>(1, like_confs[i][j]), fname, 0.0,
+                                sc.getTrajectoryKind(cache_idx), sc.getPrintingProtocol());
+        break;
+      case CoordinateFileKind::UNKNOWN:
+        break;
       }
-      break;
-    case CoordinateFileKind::AMBER_INPCRD:
-    case CoordinateFileKind::AMBER_ASCII_RST:
-    case CoordinateFileKind::AMBER_NETCDF_RST:
-      break;
-    case CoordinateFileKind::UNKNOWN:
-      break;
     }
   }
 }

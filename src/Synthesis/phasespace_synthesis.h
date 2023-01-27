@@ -18,7 +18,6 @@
 #include "Trajectory/phasespace.h"
 #include "Trajectory/thermostat.h"
 #include "Trajectory/trajectory_enumerators.h"
-#include "systemcache.h"
 
 namespace stormm {
 namespace synthesis {
@@ -32,6 +31,7 @@ using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
+using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::Barostat;
 using trajectory::BarostatKind;
@@ -347,8 +347,19 @@ public:
   /// \{
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<std::string> &label_list = { std::string("") },
                       const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
                       const std::vector<Barostat> &pistons_in = { Barostat() },
+                      double time_step_in = 1.0,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<Thermostat> &heat_baths_in,
+                      const std::vector<Barostat> &pistons_in,
                       double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
@@ -365,8 +376,10 @@ public:
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
-                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<std::string> &label_list,
+                      const std::vector<int> &index_key,
                       const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
                       const std::vector<Barostat> &pistons_in = { Barostat() },
                       double time_step_in = 1.0,
@@ -375,7 +388,9 @@ public:
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
-  PhaseSpaceSynthesis(const SystemCache &sysc,
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+                      const std::vector<std::string> &label_list = { std::string("") },
                       const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
                       const std::vector<Barostat> &pistons_in = { Barostat() },
                       double time_step_in = 1.0,
@@ -385,11 +400,20 @@ public:
                       int force_scale_bits_in = default_force_scale_bits);
 
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                      const std::vector<AtomGraph*> &ag_list, int globalpos_scale_bits_in,
+                      const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<std::string> &label_list,
+                      int globalpos_scale_bits_in,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list,
+                      int globalpos_scale_bits_in,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+  
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list, const std::vector<int> &index_key,
                       int globalpos_scale_bits_in,
@@ -397,15 +421,27 @@ public:
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
-                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<std::string> &label_list,
+                      const std::vector<int> &index_key,
                       int globalpos_scale_bits_in,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
-  PhaseSpaceSynthesis(const SystemCache &sysc,
-                      int globalpos_scale_bits_in,
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+                      const std::vector<std::string> &label_list,
+                      const std::vector<int> &label_index_key,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
@@ -463,7 +499,7 @@ public:
   const AtomGraph* getSystemTopologyPointer(int system_index) const;
   const std::vector<AtomGraph*>& getSystemTopologyPointer() const;
   /// \}
-
+  
   /// \brief Get a list of unique topology pointers from this coordinate synthesis, const-casted
   ///        for accessibility to other functions.
   const std::vector<AtomGraph*>& getUniqueTopologies() const;
@@ -484,15 +520,21 @@ public:
   /// \brief Get the number of systems that make use of a particular topology.
   ///
   /// \param topology_index  Index of the unique topology of interest
-  int getTopologyInstanceCount(const int topology_index) const;
+  int getTopologyInstanceCount(int topology_index) const;
   
   /// \brief Get a list of system indices which all reference the same unique topology (the unique
   ///        topology index is determined by the order in which each unique topology appears in the
   ///        overall list of systems in the object).
   ///
   /// \param topology_index  Index of the unique topology of interest
-  std::vector<int> getSystemIndicesByTopology(const int topology_index) const;
+  std::vector<int> getSystemIndicesByTopology(int topology_index) const;
 
+  /// \brief Get the label applied to a particular system (this string is not necessarily unique,
+  ///        and likely originates in a SystemCache object).
+  ///
+  /// \param system_index  Index of the system of interest within the synthesis
+  const std::string& getSystemLabel(int system_index) const;
+  
   /// \brief Get a const pointer to the object itself.
   const PhaseSpaceSynthesis* getSelfPointer() const;
 
@@ -942,6 +984,9 @@ private:
 
   /// Pointers to the unique topologies used by this synthesis
   std::vector<AtomGraph*> unique_topologies;
+
+  /// Labels used by this synthesis
+  std::vector<std::string> system_labels;
   
   /// \brief Allocate private array data
   ///
@@ -962,6 +1007,12 @@ private:
   void extractSystem(PhaseSpaceWriter *psw, int index, const GpuDetails &gpu,
                      HybridTargetLevel origin = HybridTargetLevel::DEVICE) const;
 #endif
+
+  /// \brief Check whether the requested system index is valid.
+  ///
+  /// \param index   The numerical index of the system of interest within the synthesis
+  /// \param caller  [Optional] Name of the calling function
+  void validateSystemIndex(int index, const char* caller = nullptr) const;
 };
 
 } // namespace trajectory

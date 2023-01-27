@@ -15,6 +15,8 @@
 #include "Parsing/parse.h"
 #include "Potential/energy_enumerators.h"
 #include "Restraints/restraint_apparatus.h"
+#include "Synthesis/condensate.h"
+#include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
@@ -39,6 +41,8 @@ using diskutil::PrintSituation;
 using energy::StateVariable;
 using parse::TextFile;
 using restraints::RestraintApparatus;
+using synthesis::Condensate;
+using synthesis::PhaseSpaceSynthesis;
 using topology::AtomGraph;
 using trajectory::CoordinateCycle;
 using trajectory::CoordinateFrame;
@@ -235,6 +239,12 @@ public:
 
   void impartCoordinates(const PhaseSpaceWriter &psw);
 
+  void impartCoordinates(const PhaseSpace *ps, CoordinateCycle orientation,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void impartCoordinates(const PhaseSpace *ps,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   void impartCoordinates(const PhaseSpace &ps, CoordinateCycle orientation,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
 
@@ -244,6 +254,9 @@ public:
   void impartCoordinates(const CoordinateFrameReader &cfr);
 
   void impartCoordinates(const CoordinateFrameWriter &cfw);
+
+  void impartCoordinates(const CoordinateFrame *cf,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   void impartCoordinates(const CoordinateFrame &cf,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
@@ -257,7 +270,17 @@ public:
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
+  void impartCoordinates(const CoordinateSeries<T> *cs, int frame_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
   void impartCoordinates(const CoordinateSeries<T> &cs, int frame_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void impartCoordinates(const PhaseSpaceSynthesis *poly_ps, int system_index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void impartCoordinates(const PhaseSpaceSynthesis &poly_ps, int system_index,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   

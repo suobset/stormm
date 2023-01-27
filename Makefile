@@ -127,6 +127,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Trajectory/coordinateframe.cpp \
 		   $(SRCDIR)/Trajectory/coordinate_copy.cpp \
 		   $(SRCDIR)/Trajectory/coordinate_intake.cpp \
+		   $(SRCDIR)/Trajectory/coordinate_series.cpp \
 		   $(SRCDIR)/Trajectory/coordinate_swap_plan.cpp \
 		   $(SRCDIR)/Trajectory/phasespace.cpp \
 		   $(SRCDIR)/Trajectory/thermostat.cpp \
@@ -473,6 +474,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Trajectory/coordinateframe.o \
 		  $(SRCDIR)/Trajectory/coordinate_copy.o \
 		  $(SRCDIR)/Trajectory/coordinate_intake.o \
+		  $(SRCDIR)/Trajectory/coordinate_series.o \
 		  $(SRCDIR)/Trajectory/coordinate_swap_plan.o \
 		  $(SRCDIR)/Trajectory/phasespace.o \
 		  $(SRCDIR)/Trajectory/thermostat.o \
@@ -500,7 +502,8 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
 		    $(SRCDIR)/Synthesis/hpc_condensate.cu \
 		    $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.cu \
-		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
+		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu \
+		    $(SRCDIR)/Trajectory/hpc_coordinate_copy.cu
 
 # STORMM CUDA header files
 STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/hpc_config.h \
@@ -516,7 +519,8 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
 		      $(SRCDIR)/Synthesis/hpc_condensate.cuh \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
-		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
+		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh \
+		      $(SRCDIR)/Trajectory/hpc_coordinate_copy.h \
 
 # STORMM CUDA included files
 STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
@@ -546,7 +550,8 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
 		   $(SRCDIR)/Synthesis/hpc_condensate.o \
 		   $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.o \
-		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
+		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o \
+		   $(SRCDIR)/Trajectory/hpc_coordinate_copy.o
 
 # Test programs using stormm
 STORMM_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \

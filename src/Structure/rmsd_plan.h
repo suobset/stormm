@@ -11,6 +11,7 @@
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "structure_enumerators.h"
 
 namespace stormm {
@@ -24,6 +25,8 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisReader;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
+using trajectory::CoordinateFrame;
+using trajectory::CoordinateSeries;
 
 /// \brief Assume that, if 75% of the mass (or coordinates) of a molecule are asymmetric or
 ///        otherwise placed in definie positions, the remainder of the molecule's symmetric atom

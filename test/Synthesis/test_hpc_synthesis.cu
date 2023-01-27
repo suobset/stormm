@@ -449,14 +449,16 @@ int main(const int argc, const char* argv[]) {
   for (int i = 0; i < nsys; i++) {
     topology_indices[i] = i;
   }
-  AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointerCC(), topology_indices,
+  AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointer(), topology_indices,
                              ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
-  PhaseSpaceSynthesis poly_ps(sysc);
-  PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
-  PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 72);
+  PhaseSpaceSynthesis poly_ps(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer());
+  PhaseSpaceSynthesis poly_ps_dbl(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer(),
+                                  36, 24, 34, 40);
+  PhaseSpaceSynthesis poly_ps_sdbl(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer(),
+                                   72, 24, 34, 72);
   KernelManager launcher(gpu, poly_ag);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "

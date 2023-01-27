@@ -30,15 +30,21 @@ template <typename Tdest, typename Torig>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double dest_scale,
                        const Torig* xorig, const Torig* yorig, const Torig* zorig,
                        const int natom) {
-  const size_t ct = std::type_index(typeid(Tdest)).hash_code();
-  if (ct == llint_type_index) {
+
+  // The origin data must be of some floating point type
+  if (isFloatingPointScalarType<Torig>() == false) {
+    rtErr("Coordinates of type " + getStormmScalarTypeName<Torig>() + " cannot be filled without "
+          "supplying a conversion scaling factor.", "copyCoordinateXYZ");
+  }
+  const size_t ct_dest = std::type_index(typeid(Tdest)).hash_code();
+  if (ct_dest == llint_type_index) {
     for (int i = 0; i < natom; i++) {
       xdest[i] = llround(xorig[i] * dest_scale);
       ydest[i] = llround(yorig[i] * dest_scale);
       zdest[i] = llround(zorig[i] * dest_scale);
     }
   }
-  else if (ct == int_type_index) {
+  else if (ct_dest == int_type_index) {
     for (int i = 0; i < natom; i++) {
       xdest[i] = round(xorig[i] * dest_scale);
       ydest[i] = round(yorig[i] * dest_scale);
@@ -71,7 +77,8 @@ void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const Torig* xo
 template <typename Tdest, typename Torig>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double dest_scale,
                        const Torig* xorig, const Torig* yorig, const Torig* zorig,
-                       const double orig_scale, const int natom) {
+                       const double orig_scale, const int natom, const HybridTargetLevel dest_tier,
+                       const HybridTargetLevel orig_tier) {
   if (isSignedIntegralScalarType<Tdest>() && isSignedIntegralScalarType<Torig>()) {
     const int dest_bits = round(log2(dest_scale));
     const int orig_bits = round(log2(orig_scale));
@@ -112,6 +119,63 @@ void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double de
       ydest[i] = static_cast<double>(yorig[i]) * conv_factor;
       zdest[i] = static_cast<double>(zorig[i]) * conv_factor;
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tdest, typename Torig>
+void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double dest_scale,
+                       const size_t dest_offset, const Torig* xorig, const Torig* yorig,
+                       const Torig* zorig, const double orig_scale, const size_t orig_offset,
+                       const int natom, const HybridTargetLevel dest_tier,
+                       const HybridTargetLevel orig_tier, const GpuDetails &gpu) {
+  switch (dest_tier) {
+  case HybridTargetLevel::HOST:
+    switch (orig_tier) {
+    case HybridTargetLevel::HOST:
+
+      // The host-to-host case can just be a call to the ordinary C++ function.  All other cases
+      // will fire off the templated kernel. 
+      copyCoordinateXYZ(&xdest[dest_offset], &ydest[dest_offset], &zdest[dest_offset], dest_scale,
+                        &xorig[orig_offset], &yorig[orig_offset], &zorig[orig_offset], orig_scale,
+                        natom);
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        const size_t ct_dest = std::type_index(typeid(Tdest)).hash_code();
+        const size_t ct_orig = std::type_index(typeid(Torig)).hash_code();
+        void* vd_xdest = reinterpret_cast<void*>(xdest);
+        void* vd_ydest = reinterpret_cast<void*>(ydest);
+        void* vd_zdest = reinterpret_cast<void*>(zdest);
+        void* vd_xorig = reinterpret_cast<void*>(xorig);
+        void* vd_yorig = reinterpret_cast<void*>(yorig);
+        void* vd_zorig = reinterpret_cast<void*>(zorig);
+        launchCopyCoordinateXYZ(vd_xdest, vd_ydest, vd_zdest, dest_scale, dest_offset, ct_dest,
+                                vd_xorig, vd_yorig, vd_zorig, orig_scale, orig_offset, ct_orig,
+                                natom, gpu);
+      }
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const size_t ct_dest = std::type_index(typeid(Tdest)).hash_code();
+      const size_t ct_orig = std::type_index(typeid(Torig)).hash_code();
+      void* vd_xdest = reinterpret_cast<void*>(xdest);
+      void* vd_ydest = reinterpret_cast<void*>(ydest);
+      void* vd_zdest = reinterpret_cast<void*>(zdest);
+      void* vd_xorig = reinterpret_cast<void*>(xorig);
+      void* vd_yorig = reinterpret_cast<void*>(yorig);
+      void* vd_zorig = reinterpret_cast<void*>(zorig);
+      launchCopyCoordinateXYZ(vd_xdest, vd_ydest, vd_zdest, dest_scale, dest_offset, ct_dest,
+                              vd_xorig, vd_yorig, vd_zorig, orig_scale, orig_offset, ct_orig,
+                              natom, gpu);
+    }
+    break;
+#endif
   }
 }
 
@@ -235,7 +299,7 @@ void copyCoordinateXYZ(llint* xdest, int* xdest_ovrf, llint* ydest, int* ydest_o
     }
   }
 }
-
+  
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void coordCopy(CoordinateFrame *destination, const CoordinateSeries<T> &origin,
@@ -293,6 +357,29 @@ void coordCopy(CoordinateSeries<T> *destination, const int frame_dest,
                const PhaseSpace &origin, const TrajectoryKind kind,
                const CoordinateCycle orientation) {
   destination->import(origin, frame_dest, kind, orientation);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tdest, typename Torig>
+void coordCopy(CoordinateSeries<Tdest> *destination, const size_t frame_dest,
+               const CoordinateSeries<Torig> &origin, size_t frame_orig) {
+  const size_t dest_atom_start = frame_dest * roundUp<size_t>(destination->natom, warp_size_zu);
+  const size_t orig_atom_start = frame_orig * roundUp<size_t>(origin.natom, warp_size_zu);
+  coordCopyValidateFrameIndex(frame_dest, destination->nframe);
+  coordCopyValidateFrameIndex(frame_orig, origin.nframe);
+  coordCopyValidateAtomCounts(destination->natom, origin.natom);
+  copyCoordinateXYZ<Tdest, Torig>(&destination->xcrd[dest_atom_start],
+                                  &destination->ycrd[dest_atom_start],
+                                  &destination->zcrd[dest_atom_start], destination->gpos_scale,
+                                  &origin.xcrd[orig_atom_start], &origin.ycrd[orig_atom_start],
+                                  &origin.zcrd[orig_atom_start], origin.gpos_scale, origin.natom);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tdest, typename Torig>
+void coordCopy(CoordinateSeries<Tdest> *destination, const int frame_dest,
+               const CoordinateSeries<Torig> &origin, int frame_orig) {
+  coordCopy<Tdest, Torig>(destination->data(), frame_dest, origin.data(), frame_orig);
 }
 
 //-------------------------------------------------------------------------------------------------

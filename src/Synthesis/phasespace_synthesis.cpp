@@ -236,6 +236,7 @@ PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<std::string> &label_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
                                          const double time_step_in,
@@ -318,7 +319,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     llint_data{HybridKind::ARRAY, "labframe_llint"},
     double_data{HybridKind::ARRAY, "labframe_double"},
     topologies{ag_list},
-    unique_topologies{}
+    unique_topologies{},
+    system_labels{label_list}
 {
   // Check validity of input
   if (ag_list.size() != ps_list.size()) {
@@ -558,6 +560,22 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(ps_list, ag_list,
+                        std::vector<std::string>(ps_list.size(), std::string("")), heat_baths_in,
+                        pistons_in, time_step_in, globalpos_scale_bits_in, localpos_scale_bits_in,
+                        velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &index_key,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
@@ -567,8 +585,27 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        std::vector<std::string>(index_key.size(), std::string("")),
                         heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<std::string> &label_list,
+                                         const std::vector<int> &index_key,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        tileVector(label_list, index_key), heat_baths_in, pistons_in, time_step_in,
+                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
+                        force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -576,6 +613,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<int> &ps_index_key,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &ag_index_key,
+                                         const std::vector<std::string> &label_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
                                          const double time_step_in,
@@ -584,20 +622,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getSystemTopologyPointerCC(),
+                        (label_list.size() == 1) ?
+                        std::vector<std::string>(ps_index_key.size(), label_list[0]) : label_list,
                         heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
@@ -605,11 +631,12 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<std::string> &label_list,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(ps_list, ag_list, { Thermostat() }, { Barostat() }, 1.0,
+    PhaseSpaceSynthesis(ps_list, ag_list, label_list, { Thermostat() }, { Barostat() }, 1.0,
                         globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
                         force_scale_bits_in)
 {}
@@ -617,14 +644,60 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(ps_list, ag_list,
+                        std::vector<std::string>(ps_list.size(), std::string("")),
+                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &index_key,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        std::vector<std::string>(index_key.size(), std::string("")),
                         { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<std::string> &label_list,
+                                         const std::vector<int> &index_key,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        tileVector(label_list, index_key), { Thermostat() }, { Barostat() }, 1.0,
+                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
+                        force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<int> &ps_index_key,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &ag_index_key,
+                                         const std::vector<std::string> &label_list,
+                                         const std::vector<int> &label_index_key,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
+                        tileVector(label_list, label_index_key), { Thermostat() }, { Barostat() },
+                        1.0, globalpos_scale_bits_in, localpos_scale_bits_in,
+                        velocity_scale_bits_in, force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -637,17 +710,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getSystemTopologyPointerCC(),
+                        std::vector<std::string>(ps_index_key.size(), std::string("")),
                         { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
@@ -729,7 +792,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     llint_data{original.llint_data},
     double_data{original.double_data},
     topologies{original.topologies},
-    unique_topologies{original.unique_topologies}
+    unique_topologies{original.unique_topologies},
+    system_labels{original.system_labels}
 {
   // The allocate function again handles pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
@@ -819,8 +883,119 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     llint_data{std::move(original.llint_data)},
     double_data{std::move(original.double_data)},
     topologies{std::move(original.topologies)},
-    unique_topologies{std::move(original.unique_topologies)}
+    unique_topologies{std::move(original.unique_topologies)},
+    system_labels{std::move(original.system_labels)}
 {}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getUniqueTopologyCount() const {
+  return unique_topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+UnitCellType PhaseSpaceSynthesis::getUnitCellType() const {
+  return unit_cell;
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateCycle PhaseSpaceSynthesis::getCyclePosition() const {
+  return cycle_position;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getGlobalPositionBits() const {
+  return globalpos_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getLocalPositionBits() const {
+  return localpos_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getVelocityBits() const {
+  return velocity_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getForceAccumulationBits() const {
+  return force_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int system_index) const {
+  validateSystemIndex(system_index, "getSystemTopologyPointer");
+  return topologies[system_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getSystemTopologyPointer() const {
+  return topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getUniqueTopologies() const {
+  return unique_topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getUniqueTopologyIndex(const int system_index) const {
+  return unique_topology_reference.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyIndices() const {
+  return unique_topology_reference.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyExampleIndices() const {
+  std::vector<int> result(unique_topology_count);
+  const int* sti_ptr = shared_topology_instances.data();
+  for (int i = 0; i < unique_topology_count; i++) {
+    result[i] = sti_ptr[shared_topology_instance_bounds.readHost(i)];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getTopologyInstanceCount(const int topology_index) const {
+  if (topology_index < 0 || topology_index >= unique_topology_count) {
+    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
+          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
+          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
+  }
+  return shared_topology_instance_bounds.readHost(topology_index + 1) -
+         shared_topology_instance_bounds.readHost(topology_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> PhaseSpaceSynthesis::getSystemIndicesByTopology(const int topology_index) const {
+  if (topology_index < 0 || topology_index >= unique_topology_count) {
+    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
+          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
+          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
+  }
+  const int llim = shared_topology_instance_bounds.readHost(topology_index);
+  const int hlim = shared_topology_instance_bounds.readHost(topology_index + 1);
+  const int* sti_ptr = shared_topology_instances.data();
+  std::vector<int> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = sti_ptr[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& PhaseSpaceSynthesis::getSystemLabel(const int system_index) const {
+  validateSystemIndex(system_index, "getSystemLabel");  
+  return system_labels[system_index];
+}
 
 //-------------------------------------------------------------------------------------------------
 const PhaseSpaceSynthesis* PhaseSpaceSynthesis::getSelfPointer() const {
@@ -983,114 +1158,6 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              y_force_overflow.data(tier), z_force_overflow.data(tier));
   }
   __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getSystemCount() const {
-  return system_count;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getUniqueTopologyCount() const {
-  return unique_topology_count;
-}
-
-//-------------------------------------------------------------------------------------------------
-UnitCellType PhaseSpaceSynthesis::getUnitCellType() const {
-  return unit_cell;
-}
-
-//-------------------------------------------------------------------------------------------------
-CoordinateCycle PhaseSpaceSynthesis::getCyclePosition() const {
-  return cycle_position;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getGlobalPositionBits() const {
-  return globalpos_scale_bits;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getLocalPositionBits() const {
-  return localpos_scale_bits;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getVelocityBits() const {
-  return velocity_scale_bits;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getForceAccumulationBits() const {
-  return force_scale_bits;
-}
-
-//-------------------------------------------------------------------------------------------------
-const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int system_index) const {
-  if (system_index < 0 || system_index >= system_count) {
-    rtErr("System index " + std::to_string(system_index) + " is invalid for a synthesis with " +
-          std::to_string(system_count) + " coordinate sets.", "PhaseSpaceSynthesis",
-          "getSystemTopologyPointer");
-  }
-  return topologies[system_index];
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getSystemTopologyPointer() const {
-  return topologies;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getUniqueTopologies() const {
-  return unique_topologies;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getUniqueTopologyIndex(const int system_index) const {
-  return unique_topology_reference.readHost(system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyIndices() const {
-  return unique_topology_reference.readHost();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> PhaseSpaceSynthesis::getUniqueTopologyExampleIndices() const {
-  std::vector<int> result(unique_topology_count);
-  const int* sti_ptr = shared_topology_instances.data();
-  for (int i = 0; i < unique_topology_count; i++) {
-    result[i] = sti_ptr[shared_topology_instance_bounds.readHost(i)];
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-int PhaseSpaceSynthesis::getTopologyInstanceCount(const int topology_index) const {
-  if (topology_index < 0 || topology_index >= unique_topology_count) {
-    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
-          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
-          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
-  }
-  return shared_topology_instance_bounds.readHost(topology_index + 1) -
-         shared_topology_instance_bounds.readHost(topology_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> PhaseSpaceSynthesis::getSystemIndicesByTopology(const int topology_index) const {
-  if (topology_index < 0 || topology_index >= unique_topology_count) {
-    rtErr("Topology index " + std::to_string(topology_index) + " is invalid for a collection of "
-          "systems based on " + std::to_string(unique_topology_count) + " unique topologies.",
-          "PhaseSpaceSynthesis", "getSystemIndicesByTopology");
-  }
-  const int llim = shared_topology_instance_bounds.readHost(topology_index);
-  const int hlim = shared_topology_instance_bounds.readHost(topology_index + 1);
-  const int* sti_ptr = shared_topology_instances.data();
-  std::vector<int> result(hlim - llim);
-  for (int i = llim; i < hlim; i++) {
-    result[i - llim] = sti_ptr[i];
-  }
-  return result;
 }
 
 #ifdef STORMM_USE_HPC
@@ -1460,6 +1527,7 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
                                         const HybridTargetLevel origin,
                                         const HybridTargetLevel destination,
                                         const GpuDetails &gpu) const {
+  validateSystemIndex(index, "extractSystem");
   PhaseSpaceWriter psw = ps->data();
   if (atom_counts.readHost(index) != psw.natom) {
     rtErr("A PhaseSpace object sized for " + std::to_string(psw.natom) + " atoms is not prepared "
@@ -1540,10 +1608,7 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpace PhaseSpaceSynthesis::exportSystem(const int index, const HybridTargetLevel tier) const {
-  if (index < 0 || index >= system_count) {
-    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
-          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "exportSystem");
-  }
+  validateSystemIndex(index, "exportSystem");
   PhaseSpace result(atom_counts.readHost(index), unit_cell);
   extractSystem(&result, index, tier);
   return result;
@@ -1554,10 +1619,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
                                                        const CoordinateCycle orientation,
                                                        const TrajectoryKind trajkind,
                                                        const HybridTargetLevel tier) const {
-  if (index < 0 || index >= system_count) {
-    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
-          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "exportSystem");
-  }
+  validateSystemIndex(index, "exportCoordinates");
   CoordinateFrame result(atom_counts.readHost(index));
   const int astart = atom_starts.readHost(index);
   CoordinateFrameWriter rsw = result.data();
@@ -1823,10 +1885,6 @@ void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation,
 void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation, const int index)
 #endif
 {
-  if (index >= system_count) {
-    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
-          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "initializeForces");
-  }
 #ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
@@ -2313,6 +2371,14 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
                                        (2LLU * system_stride), system_count);
   shared_topology_instance_index.setPointer(&int_data, (18LLU * atom_stride) + twosysdx +
                                        (3LLU * system_stride), system_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::validateSystemIndex(const int index, const char* caller) const {
+  if (index < 0 || index >= system_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", caller);
+  }
 }
 
 } // namespace trajectory

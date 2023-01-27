@@ -2,6 +2,7 @@
 #ifndef STORMM_COORDINATE_COPY_H
 #define STORMM_COORDINATE_COPY_H
 
+#include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -15,10 +16,14 @@
 #include "coordinate_series.h"
 #include "phasespace.h"
 #include "trajectory_enumerators.h"
+#ifdef STORMM_USE_HPC
+#  include "hpc_coordinate_copy.h"
+#endif
 
 namespace stormm {
 namespace trajectory {
 
+using card::GpuDetails;
 using constants::PrecisionModel;
 using data_types::isFloatingPointScalarType;
 using data_types::isSignedIntegralScalarType;
@@ -47,14 +52,14 @@ void coordCopyValidateAtomCounts(int destination_atoms, int origin_atoms);
 ///
 /// \param frame_index  The frame requested (to write into, or read from)
 /// \param frame_count  The frame count in the series
-void coordCopyValidateFrameIndex(const int frame_index, const int frame_count);
+void coordCopyValidateFrameIndex(int frame_index, int frame_count);
 
 /// \brief Validate the number of systems in a synthesis, against the index requested.  Produce an
 ///        error indicating the source of the problem in one of the coordCopy() overloads.
 ///
 /// \param system_index  The system requested (to write into, or read from)
 /// \param system_count  The system count in the synthesis
-void coordCopyValidateSystemIndex(const int system_index, const int system_count);
+void coordCopyValidateSystemIndex(int system_index, int system_count);
 
 /// \brief Copy the box information from one object to another.
 ///
@@ -79,9 +84,9 @@ void copyBoxInformation(double* dest_boxdim, double* dest_umat, double* dest_inv
                         const double* orig_invu);
 
 void copyBoxInformation(double* dest_boxdim, double* dest_umat, double* dest_invu,
-                        const CondensateReader &cdnsr, const int system_index);
+                        const CondensateReader &cdnsr, int system_index);
 
-void copyBoxInformation(CondensateWriter *cdnsr, const int index_dest, const double* orig_umat,
+void copyBoxInformation(CondensateWriter *cdnsr, int index_dest, const double* orig_umat,
                         const double* orig_invu);
 /// \}
   
@@ -98,61 +103,70 @@ void copyBoxInformation(CondensateWriter *cdnsr, const int index_dest, const dou
 ///   - Copy 95-bit integer data to any other format, including 95-bit integer data in a different
 ///     scaling factor
 ///
-/// \param xdest  Destination object Cartesian X coordinates
-/// \param ydest  Destination object Cartesian Y coordinates
-/// \param zdest  Destination object Cartesian Z coordinates
-/// \param xorig  Origin object Cartesian X coordinates
-/// \param yorig  Origin object Cartesian Y coordinates
-/// \param zorig  Origin object Cartesian Z coordinates
-/// \param natom  Trusted number of atoms
+/// \param xdest        Destination object Cartesian X coordinates
+/// \param ydest        Destination object Cartesian Y coordinates
+/// \param zdest        Destination object Cartesian Z coordinates
+/// \param xorig        Origin object Cartesian X coordinates
+/// \param yorig        Origin object Cartesian Y coordinates
+/// \param zorig        Origin object Cartesian Z coordinates
+/// \param dest_scale   Scaling factor applicable to coordinates in the destination arrays
+/// \param orig_scale   Scaling factor applicable to coordinates in the origin arrays
+/// \param dest_offset  Offset for atoms in each of the destination arrays
+/// \param orig_offset  Offset for atoms in each of the origin arrays
+/// \param natom        Trusted number of atoms
+/// \param dest_tier    
 /// \{
 template <typename Tdest, typename Torig>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const Torig* xorig,
-                       const Torig* yorig, const Torig* zorig, const int natom);
+                       const Torig* yorig, const Torig* zorig, int natom);
 
 template <typename Tdest, typename Torig>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, double dest_scale,
                        const Torig* xorig, const Torig* yorig, const Torig* zorig,
-                       double orig_scale, const int natom);
+                       double orig_scale, int natom);
 
 template <typename Tdest, typename Torig>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const Torig* xorig,
-                       const Torig* yorig, const Torig* zorig, const double orig_scale,
-                       const int natom);
+                       const Torig* yorig, const Torig* zorig, double orig_scale, int natom);
 
 template <typename Tdest, typename Torig>
-void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double dest_scale,
+void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, double dest_scale,
                        const Torig* xorig, const Torig* yorig, const Torig* zorig,
-                       const double orig_scale, const int natom);
+                       double orig_scale, int natom);
+
+template <typename Tdest, typename Torig>
+void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, double dest_scale,
+                       size_t dest_offset, const Torig* xorig, const Torig* yorig,
+                       const Torig* zorig, double orig_scale, size_t orig_offset, int natom,
+                       HybridTargetLevel dest_tier = HybridTargetLevel::HOST,
+                       HybridTargetLevel orig_tier = HybridTargetLevel::HOST);
 
 template <typename Tdest>
 void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest,
                        const llint* xorig, const int* xorig_ovrf, const llint* yorig,
                        const int* yorig_ovrf, const llint* zorig, const int* zorig_ovrf,
-                       const double orig_scale, const int natom);
+                       double orig_scale, int natom);
 
 template <typename Tdest>
-void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, const double dest_scale,
+void copyCoordinateXYZ(Tdest* xdest, Tdest* ydest, Tdest* zdest, double dest_scale,
                        const llint* xorig, const int* xorig_ovrf, const llint* yorig,
                        const int* yorig_ovrf, const llint* zorig, const int* zorig_ovrf,
-                       const double orig_scale, const int natom);
+                       double orig_scale, int natom);
 
 template <typename Torig>
 void copyCoordinateXYZ(llint* xdest, int* xdest_ovrf, llint* ydest, int* ydest_ovrf, llint* zdest,
-                       int* zdest_ovrf, const double dest_scale, const Torig* xorig,
-                       const Torig* yorig, const Torig* zorig, const int natom);
+                       int* zdest_ovrf, double dest_scale, const Torig* xorig, const Torig* yorig,
+                       const Torig* zorig, int natom);
 
 template <typename Torig>
 void copyCoordinateXYZ(llint* xdest, int* xdest_ovrf, llint* ydest, int* ydest_ovrf, llint* zdest,
-                       int* zdest_ovrf, const double dest_scale, const Torig* xorig,
-                       const Torig* yorig, const Torig* zorig, const double orig_scale,
-                       const int natom);
+                       int* zdest_ovrf, double dest_scale, const Torig* xorig, const Torig* yorig,
+                       const Torig* zorig, double orig_scale, int natom);
 
 void copyCoordinateXYZ(llint* xdest, int* xdest_ovrf, llint* ydest, int* ydest_ovrf, llint* zdest,
-                       int* zdest_ovrf, const double dest_scale, const llint* xorig,
+                       int* zdest_ovrf, double dest_scale, const llint* xorig,
                        const int* xorig_ovrf, const llint* yorig, const int* yorig_ovrf,
-                       const llint* zorig, const int* zorig_ovrf, const double orig_scale,
-                       const int natom);
+                       const llint* zorig, const int* zorig_ovrf, double orig_scale, int natom);
 /// \}
 
 /// \brief Make a deep copy of coordinates from one object to another.  The oder of arguments fed
@@ -264,6 +278,14 @@ void coordCopy(CoordinateSeries<T> *destination, int frame_dest, const PhaseSpac
                TrajectoryKind kind = TrajectoryKind::POSITIONS,
                CoordinateCycle orientation = CoordinateCycle::PRIMARY);
 
+template <typename Tdest, typename Torig>
+void coordCopy(CoordinateSeriesWriter<Tdest> *destination, size_t frame_dest,
+               const CoordinateSeriesReader<Torig> &origin, size_t frame_orig);
+
+template <typename Tdest, typename Torig>
+void coordCopy(CoordinateSeries<Tdest> *destination, int frame_dest,
+               const CoordinateSeries<Torig> &origin, int frame_orig);
+  
 template <typename T>
 void coordCopy(CoordinateSeriesWriter<T> *destination, size_t frame_dest,
                const PsSynthesisReader &origin, size_t index_orig,
@@ -305,17 +327,17 @@ void coordCopy(PhaseSpaceSynthesis *destination, int index_dest, const PhaseSpac
 void coordCopy(PhaseSpaceSynthesis *destination, int index_dest, const PhaseSpace &origin);
 
 template <typename T>
-void coordCopy(PsSynthesisWriter *destination, const int index_dest,
-               const CoordinateSeriesReader<T> &origin, const int frame_orig);
+void coordCopy(PsSynthesisWriter *destination, int index_dest,
+               const CoordinateSeriesReader<T> &origin, int frame_orig);
 
 template <typename T>
-void coordCopy(PsSynthesisWriter *destination, const int index_dest, const TrajectoryKind kind,
-               const CoordinateSeriesReader<T> &origin, const int frame_orig);
+void coordCopy(PsSynthesisWriter *destination, int index_dest, const TrajectoryKind kind,
+               const CoordinateSeriesReader<T> &origin, int frame_orig);
 
 template <typename T>
-void coordCopy(PsSynthesisWriter *destination, const int index_dest, const TrajectoryKind kind,
+void coordCopy(PsSynthesisWriter *destination, int index_dest, const TrajectoryKind kind,
                const CoordinateCycle orientation, const CoordinateSeriesReader<T> &origin,
-               const int frame_orig);
+               int frame_orig);
 
 template <typename T>
 void coordCopy(PhaseSpaceSynthesis *destination, int index_dest,

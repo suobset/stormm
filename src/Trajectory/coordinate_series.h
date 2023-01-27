@@ -25,6 +25,29 @@ using data_types::isFloatingPointScalarType;
 using data_types::isSignedIntegralScalarType;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
+
+/// \brief A simple list of all the valid type specifiers for coordinate data.  This will be filled
+///        at runtime based on the type IDs found (see DataTypes/common_types.h).
+struct ValidCoordinateTypes {
+
+  ValidCoordinateTypes(size_t double_id_in, size_t float_id_in, size_t short_id_in,
+                       size_t int_id_in, size_t llint_id_in);
+
+  /// \brief The copy and move constructors as well as assignment operators can all take their
+  ///        default forms for this simple object with no arrays or const members.
+  /// \{
+  ValidCoordinateTypes(const ValidCoordinateTypes &original) = default;
+  ValidCoordinateTypes(ValidCoordinateTypes &&original) = default;
+  ValidCoordinateTypes& operator=(const ValidCoordinateTypes &original) = default;
+  ValidCoordinateTypes& operator=(ValidCoordinateTypes &&original) = default;
+  /// \}
+  
+  size_t double_id;  ///< Double-precision real data type identifier
+  size_t float_id;   ///< Single-precision real data type identifier
+  size_t short_id;   ///< Short (16-bit integer) data type identifier
+  size_t int_id;     ///< Typical / long (32-bit integer) data type identifier
+  size_t llint_id;   ///< Long long (64-bit integer) data type identifier
+};
   
 /// \brief Collect C-style pointers and critical constants for a writeable CoordinateSeries object.
 template <typename T> struct CoordinateSeriesWriter {
