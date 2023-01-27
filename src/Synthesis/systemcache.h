@@ -140,12 +140,6 @@ public:
   ///
   /// \param topology_index  Index of the topology of interest
   int getCoordinateExample(int topology_index) const;
-
-  /// \brief Match a topology pointer to one of the topologies in the cache.  If no match is found,
-  ///        the function will return the number of topologies in the cache.
-  ///
-  /// \param agptr  Pointer to the topology for comparison
-  int getTopologyCacheIndex(const AtomGraph *agptr) const;
   
   /// \brief Get pointers to one or all of the unique topologies from within the compact topology
   ///        cache.
@@ -169,7 +163,49 @@ public:
   ///
   /// \param topology_index  Index of the topology of interes
   const AtomGraph& getTopologyReference(int topology_index) const;  
-  
+
+  /// \brief Get a list of topologies associated with a particular label.  This will return a
+  ///        vector of pointers to the topologies within the cache, and will return an empty vector
+  ///        if no matches are found.
+  ///
+  /// Overloaded:
+  ///   - Return a const vector of pointers to the cached topologies of a const object
+  ///   - Return an unprotected vector of pointers to the cached topologies of a non-const object
+  ///
+  /// \param query_label  The label to search for in the cache
+  /// \{
+  const std::vector<AtomGraph*> getTopologiesMatchingLabel(const std::string &query_label) const;
+  std::vector<AtomGraph*> getTopologiesMatchingLabel(const std::string &query_label);
+  /// \}
+
+  /// \brief Get a list of labels associated with a particular topology.  This will return copies
+  ///        of each label string which can then be manipulated at the developer's discretion.  A
+  ///        blank vector is returned if no associated labels are found.
+  ///
+  /// Overloaded:
+  ///   - Indicate the topology by pointer or by reference
+  ///
+  /// \param query_ag  The topology to search for in the cache
+  /// \{
+  std::vector<std::string> getLabelsMatchingTopology(const AtomGraph *query_ag) const;
+  std::vector<std::string> getLabelsMatchingTopology(const AtomGraph &query_ag) const;
+  /// \}
+
+  /// \brief Get the index of the first system matching the topology and / or system label.
+  ///
+  /// Overloaded:
+  ///   - Provide a topology only
+  ///   - Provide a label only
+  ///   - Provide both a topology and a system label
+  ///
+  /// \param query_ag     The topology to match
+  /// \param query_label  The label to seek out
+  /// \{
+  int getFirstMatchingSystemIndex(const AtomGraph *query_ag) const;
+  int getFirstMatchingSystemIndex(const std::string &query_label) const;
+  int getFirstMatchingSystemIndex(const AtomGraph *query_ag, const std::string &query_label) const;
+  /// \}
+
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
   ///
   /// Overloaded:
@@ -185,11 +221,6 @@ public:
   const std::vector<AtomGraph*> getSystemTopologyPointer() const;
   std::vector<AtomGraph*> getSystemTopologyPointer();
   /// \}
-
-  /// \brief Get a const std::vector of non-const (const-casted) topology pointers.  This is for
-  ///        the specific case of feeding other functions that require std::vectors of topology
-  ///        pointers in this format.
-  const std::vector<AtomGraph*> getSystemTopologyPointerCC() const;
 
   /// \brief Return a reference to the topology that describes a particular set of coordinates
   ///        within the SystemCache.  All overloads apply a bounds check.
@@ -358,36 +389,116 @@ public:
   ///        will be manipulated (by adding _## before the final '.', or at the end of the file
   ///        name if there is no '.').
   ///
+  /// Overloaded:
+  ///   - Specify the system by index
+  ///   - Specify the system by topology and / or label
+  ///
   /// \param system_index  Index of the system from within the coordinates cache
+  /// \param query_ag      Topology to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \param system_index  Index of the system from within the coordinates cache
+  /// \{
   std::string getTrajectoryName(int system_index) const;
+  std::string getTrajectoryName(const AtomGraph *query_ag) const;
+  std::string getTrajectoryName(const AtomGraph &query_ag) const;
+  std::string getTrajectoryName(const AtomGraph *query_ag, const std::string &query_label) const;
+  std::string getTrajectoryName(const AtomGraph &query_ag, const std::string &query_label) const;
+  std::string getTrajectoryName(const std::string &query_label) const;
+  /// \}
   
   /// \brief Get the name of the checkpoint (restart) file associated with one of the systems.
   ///        This name will also be manipulated to differentiate systems making use of the same
   ///        label.
   ///
+  /// Overloaded:
+  ///   - Specify the system by index
+  ///   - Specify the system by topology and / or label
+  ///
   /// \param system_index  Index of the system from within the coordinates cache
+  /// \param query_ag      Topology to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \param system_index  Index of the system from within the coordinates cache
+  /// \{
   std::string getCheckpointName(int system_index) const;
-
+  std::string getCheckpointName(const AtomGraph *query_ag) const;
+  std::string getCheckpointName(const AtomGraph &query_ag) const;
+  std::string getCheckpointName(const AtomGraph *query_ag, const std::string &query_label) const;
+  std::string getCheckpointName(const AtomGraph &query_ag, const std::string &query_label) const;
+  std::string getCheckpointName(const std::string &query_label) const;
+  /// \}
+  
   /// \brief Get the label associated with a particular system in the cache.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
   std::string getSystemLabel(int system_index) const;
 
-  /// \brief Get the coordinate file type associated with a particular system's input.
+  /// \brief Get the coordinate file type associated with a particular system's input.  Raise an
+  ///        error if the system cannot be identified within the cache.
+  ///
+  /// Overloaded:
+  ///   - Specify the system by index
+  ///   - Specify the system by topology and / or label
   ///
   /// \param system_index  Index of the system from within the coordinates cache
+  /// \param query_ag      Topology to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \param query_label   Label to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \{
   CoordinateFileKind getInputCoordinatesKind(const int system_index) const;
+  CoordinateFileKind getInputCoordinatesKind(const AtomGraph *query_ag) const;
+  CoordinateFileKind getInputCoordinatesKind(const AtomGraph &query_ag) const;
+  CoordinateFileKind getInputCoordinatesKind(const AtomGraph *query_ag,
+                                             const std::string &query_label) const;
+  CoordinateFileKind getInputCoordinatesKind(const AtomGraph &query_ag,
+                                             const std::string &query_label) const;
+  CoordinateFileKind getInputCoordinatesKind(const std::string &query_label) const;
+  /// \}
   
   /// \brief Get the coordinate file type associated with a particular system's trajectory.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
+  /// \param query_ag      Topology to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \param query_label   Label to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \{
   CoordinateFileKind getTrajectoryKind(const int system_index) const;
-
+  CoordinateFileKind getTrajectoryKind(const AtomGraph *query_ag) const;
+  CoordinateFileKind getTrajectoryKind(const AtomGraph &query_ag) const;
+  CoordinateFileKind getTrajectoryKind(const AtomGraph *query_ag,
+                                       const std::string &query_label) const;
+  CoordinateFileKind getTrajectoryKind(const AtomGraph &query_ag,
+                                       const std::string &query_label) const;
+  CoordinateFileKind getTrajectoryKind(const std::string &query_label) const;
+  /// \}
+  
   /// \brief Get the coordinate file type associated with a particular system's checkpoint file.
   ///
   /// \param system_index  Index of the system from within the coordinates cache
+  /// \param query_ag      Topology to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \param query_label   Label to seek out (this may or may not provide an unambiguous answer,
+  ///                      and will produce the first available answer if there are multiple
+  ///                      solutions)
+  /// \{
   CoordinateFileKind getCheckpointKind(const int system_index) const;
-
+  CoordinateFileKind getCheckpointKind(const AtomGraph *query_ag) const;
+  CoordinateFileKind getCheckpointKind(const AtomGraph &query_ag) const;
+  CoordinateFileKind getCheckpointKind(const AtomGraph *query_ag,
+                                       const std::string &query_label) const;
+  CoordinateFileKind getCheckpointKind(const AtomGraph &query_ag,
+                                       const std::string &query_label) const;
+  CoordinateFileKind getCheckpointKind(const std::string &query_label) const;
+  /// \}
+  
   /// \brief When multiple systems' coordinates are to be combined into a particular file, the
   ///        file may be opened as a new file once, with whatever overwriting protocol, to write
   ///        the first set of coordinates.  Thereafter, the printing protocol must change: it
@@ -414,6 +525,14 @@ public:
   /// \param expectation_in  The protocol to use in printing any files
   void setPrintingProtocol(const PrintSituation expectation_in);
 
+  /// \brief Get the trajectory fusion protocol.
+  TrajectoryFusion getTrajectoryFusionProtocol() const;
+
+  /// \brief Set the trajectory fusion protocol.
+  ///
+  /// \param file_merger_protocol_in  The new protocol to use.
+  void setTrajectoryFusionProtocol(TrajectoryFusion file_merger_protocol_in);
+  
 private:
 
   /// The object will store the exception response behavior under which it was created, so that
@@ -472,9 +591,9 @@ private:
   /// Forward exclusion masks serve each topology, if appropriate
   std::vector<ForwardExclusionMask> forward_masks_cache;
 
-  /// The vector of all topology indices guiding each simulation.  This may contain repeats, if
-  /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
-  /// when composing the synthesis objects.
+  /// The vector of all topology indices guiding each system.  This may contain repeats, if the
+  /// various MoleculeSystem objects contain the same topology, but the list will be reduced when
+  /// composing the synthesis objects.
   std::vector<int> topology_indices;
 
   /// The vector of all systems' indices into the array of unique labels.
@@ -517,6 +636,13 @@ private:
   /// Labels applied to each system (whether from user input or auto-generated)
   std::vector<std::string> system_labels;
 
+  /// A series of concatenated lists of all the systems sharing a particular label (this is
+  /// complementary to te label_subindices array, above)
+  std::vector<int> label_cases;
+
+  /// Bounds array for label_cases above
+  std::vector<int> label_case_bounds;
+  
   /// File types for the various input coordinate files
   std::vector<CoordinateFileKind> system_input_coordinate_kinds;
 
@@ -563,6 +689,49 @@ private:
   ///                      the label index and its degeneracy)
   std::string nondegenerateName(const std::string &fname_in, CoordinateFileRole purpose,
                                 int system_index) const;
+
+  /// \brief Return the indices of all systems from within the cache, matching a particular
+  ///        topology and / or a label.
+  ///
+  /// Overloaded:
+  ///   - Indicate the topology by pointer or by reference
+  ///   - Provide a topology, a label, or both
+  ///
+  /// \param query_ag     The topology to match
+  /// \param query_label  The label to seek out
+  /// \{
+  std::vector<int> matchSystemIndices(const AtomGraph* query_ag,
+                                      const std::string &query_label) const;
+
+  std::vector<int> matchSystemIndices(const AtomGraph &query_ag,
+                                      const std::string &query_label) const;
+
+  std::vector<int> matchSystemIndices(const AtomGraph *query_ag) const;
+
+  std::vector<int> matchSystemIndices(const AtomGraph &query_ag) const;
+
+  std::vector<int> matchSystemIndices(const std::string &query_label) const;
+  /// \}
+
+  /// \brief Match a topology to one in the cache.  If no match is found, the function will return
+  ///        the number of topologies in the cache.
+  ///
+  /// Overloaded:
+  ///   - Indicate the topology by pointer
+  ///   - Indicate the topology by reference
+  ///
+  /// \param ag  The topology for comparison
+  /// \{
+  int getTopologyCacheIndex(const AtomGraph *ag) const;
+  int getTopologyCacheIndex(const AtomGraph &ag) const;
+  /// \}
+
+  /// \brief Get the index of a particular string label within the cache.  The index is found by
+  ///        a deep match to the string's contents.  If no match is found, the function will return
+  ///        the total number of labels in the cache.
+  ///
+  /// \param query  The string label to match
+  int getLabelCacheIndex(const std::string &query) const;
 };
 
 } // namespace synthesis

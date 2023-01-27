@@ -443,9 +443,14 @@ void MdlMol::impartCoordinates(const PhaseSpaceReader &psr) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MdlMol::impartCoordinates(const PhaseSpaceWriter &psw) {
-  checkAtomCount(psw.natom);
-  impartCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, 1.0);
+void MdlMol::impartCoordinates(const PhaseSpace *ps, const CoordinateCycle orientation,
+                               const HybridTargetLevel tier) {
+  impartCoordinates(ps->data(orientation, tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::impartCoordinates(const PhaseSpace *ps, const HybridTargetLevel tier) {
+  impartCoordinates(ps, ps->getCyclePosition(), tier);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -469,6 +474,11 @@ void MdlMol::impartCoordinates(const CoordinateFrameReader &cfr) {
 void MdlMol::impartCoordinates(const CoordinateFrameWriter &cfw) {
   checkAtomCount(cfw.natom);
   impartCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::impartCoordinates(const CoordinateFrame *cf, const HybridTargetLevel tier) {
+  impartCoordinates(cf->data());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -897,8 +907,8 @@ void MdlMol::writeMdl(std::ofstream *foutp, const MdlMolVersion vformat) const {
 void MdlMol::writeMdl(const std::string &fname, const MdlMolVersion vformat,
                       const PrintSituation expectation) const {
   const std::string activity = (data_item_count > 0) ?
-    "Open an output file for writing an MDL MOL format structure." :
-    "Open an SDF archive for writing MDL MOL format output with additional data items.";
+    "Open an output file for writing an MDL MOL format structure" :
+    "Open an SDF archive for writing MDL MOL format output with additional data items";
   std::ofstream foutp = openOutputFile(fname, expectation, activity);
   writeMdl(&foutp, vformat);
   foutp.close();
@@ -994,7 +1004,7 @@ void MdlMol::writeDataItems(std::ofstream *foutp, const int mol_index) const {
 void MdlMol::writeDataItems(const std::string &fname, const PrintSituation expectation,
                             const int mol_index) const {
   const std::string activity("Open an SDF archive for writing MDL MOL format output with "
-                             "additional data items.");
+                             "additional data items");
   std::ofstream foutp = openOutputFile(fname, expectation, activity);
   writeDataItems(&foutp, mol_index);
   foutp.close();
