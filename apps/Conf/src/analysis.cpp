@@ -4,6 +4,7 @@
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/Math/summation.h"
+#include "../../../src/MoleculeFormat/mdlmol_refinement.h"
 #include "../../../src/Parsing/parse.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/rmsd.h"
@@ -21,9 +22,11 @@ using stormm::diskutil::substituteNameExtension;
 using stormm::diskutil::splitPath;
 using stormm::math::sum;
 using stormm::parse::findStringInVector;
+using stormm::structure::customizeDataItems;
 using stormm::structure::detectClash;
 using stormm::structure::RMSDPlan;
 using stormm::structure::MdlMolVersion;
+using stormm::structure::updateDataItemReadouts;
 using stormm::synthesis::PsSynthesisWriter;
 using stormm::topology::AtomGraph;
 using stormm::trajectory::CoordinateFileKind;
@@ -129,8 +132,8 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
 //-------------------------------------------------------------------------------------------------
 void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &best_confs,
                   const ScoreCard &emin, const SystemCache &sc,
-                  const std::vector<MdlMol> &sdf_recovery, const FilesControls &fcon) {
-  const PsSynthesisReader poly_psr = poly_ps.data(); 
+                  const std::vector<MdlMol> &sdf_recovery, const ReportControls &repcon) {
+  const PsSynthesisReader poly_psr = poly_ps.data();
   const int ntop = poly_ps.getUniqueTopologyCount();
   std::vector<std::vector<int>> like_confs(ntop);
   const int nconfs = best_confs.size();
@@ -171,12 +174,21 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
             break;
           case TrajectoryFusion::OFF:
             pr_protocol = sc.getPrintingProtocol();
-            fname = before + "_" + std::to_string(j - poly_psr.common_ag_bounds[i]) + "." + after;
+            if (like_confs[i].size() <= 1) {
+              fname = before + "." + after;
+            }
+            else {
+              fname = before + "_" + std::to_string(j) + "." +
+                      after;
+            }
             break;
           }
           if (sc.getTrajectoryKind(cache_idx) == CoordinateFileKind::SDF) {
             MdlMol tmdl = sdf_recovery[cache_idx];
+            customizeDataItems(&tmdl, ij_label, *unique_topologies[i],
+                               sc.getRestraintReference(cache_idx), repcon);
             tmdl.impartCoordinates(poly_ps.exportCoordinates(like_confs[i][j]));
+            updateDataItemReadouts(&tmdl, sc, emin, like_confs[i][j]);
             tmdl.writeMdl(fname, MdlMolVersion::V2000, pr_protocol);
             tmdl.writeDataItems(fname, PrintSituation::APPEND);
           }
@@ -189,7 +201,12 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
       case CoordinateFileKind::AMBER_INPCRD:
       case CoordinateFileKind::AMBER_ASCII_RST:
       case CoordinateFileKind::AMBER_NETCDF_RST:
-        fname = before + "_" + std::to_string(j - poly_psr.common_ag_bounds[i]) + "." + after;
+        if (like_confs[i].size() <= 1) {
+          fname = before + "." + after;
+        }
+        else {
+          fname = before + "_" + std::to_string(j) + "." + after;
+        }
         poly_ps.printTrajectory(std::vector<int>(1, like_confs[i][j]), fname, 0.0,
                                 sc.getTrajectoryKind(cache_idx), sc.getPrintingProtocol());
         break;
