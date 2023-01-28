@@ -218,7 +218,7 @@ int main(int argc, const char* argv[]) {
                                                                 ui.getConformerNamelistInfo());
 
   // Print the best conformations for each topological system.
-  printResults(sandbox, best_confs, emin, sc, sdf_recovery, ui.getFilesNamelistInfo());
+  printResults(sandbox, best_confs, emin, sc, sdf_recovery, ui.getReportNamelistInfo());
 
   // Print timings results
   master_timer.printResults();

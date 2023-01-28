@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "mdlmol_refinement.h"
@@ -6,16 +7,21 @@
 namespace stormm {
 namespace structure {
 
+using constants::CaseSensitivity;
 using parse::NumberFormat;
 using parse::realToString;
-
+using parse::strcmpCased;
+  
 //-------------------------------------------------------------------------------------------------
 void customizeDataItems(MdlMol *mol_entry, const std::string &label, const AtomGraph &ag,
                         const RestraintApparatus &ra, const ReportControls &repcon) {
   const int nreq = repcon.getSDFileDataRequestCount();
   const std::vector<MdlMolDataRequest>& reqs = repcon.getSDFileDataRequests();
   for (int i = 0; i < nreq; i++) {
-    mol_entry->addDataItem(reqs[i], ag, ra);
+    if (reqs[i].getSystemLabel() == label ||
+        strcmpCased(reqs[i].getSystemLabel(), "ALL", CaseSensitivity::NO)) {
+      mol_entry->addDataItem(reqs[i], ag, ra);
+    }
   }
 }
 

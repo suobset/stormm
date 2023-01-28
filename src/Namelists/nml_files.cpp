@@ -893,14 +893,14 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                 "from systems classified under the same label should be fused into a single file "
                 "of the specified format.  By default (\"AUTO\"), this fusion will apply to "
                 "checkpoint files when the format is something that can accept multiple frames "
-                "(e.g. SDF or AMBER_NETCDF), but not to trajectory files under any "
-                "circumstances.  Set to ON / ACTIVE to activate an aggressive fusion of all "
+                "(e.g. SDF or AMBER_NETCDF), but multiple traajectories will not be grouped into "
+                "the same file.  Set to ON / ACTIVE to activate an aggressive fusion of all "
                 "trajectory files produced under the same label, in addition to checkpoint files "
                 "(again, if the checkpoint file format is suitable).  The order of frames in a "
                 "fused trajectory will proceed { A1, B1, C1, D1, A2, B2, C2, D2, A3, ... }, where "
                 "A, B, C, and D are the individual systems grouped under a single label and 1, 2, "
                 "... represent the frame numbers.  Set this to OFF to de-activate fusion of "
-                "checkpoint files and keep trajectories from becoming fused as well.");
+                "checkpoint files even if the specified format would support it.");
   t_nml.addHelp("correct_sdf", "Correct minor issues in the naming conventions of .sdf file "
                 "data items.  Set to one of \"modify\", \"correct\", or \"yes\" to activate this "
                 "behavior (input is case-insensitive).  By default, .sdf file details will not be "

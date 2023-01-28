@@ -6,8 +6,8 @@
 #include "copyright.h"
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_conformer.h"
-#include "../../../src/Namelists/nml_files.h"
 #include "../../../src/Namelists/nml_minimize.h"
+#include "../../../src/Namelists/nml_report.h"
 #include "../../../src/Potential/scorecard.h"
 #include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
@@ -21,7 +21,7 @@ namespace analysis {
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::namelist::ConformerControls;
-using stormm::namelist::FilesControls;
+using stormm::namelist::ReportControls;
 using stormm::namelist::default_minimize_clash_r0;
 using stormm::namelist::default_minimize_clash_ratio;
 using stormm::structure::ClashReport;
@@ -55,10 +55,11 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
 /// \param emin          Energy tracking with histories from each minimization
 /// \param sc            The cache of all systems read from disk
 /// \param sdf_recovery  Vector of recovered MdlMol objects for each system reach from disk
-/// \param fcon          Control data from a &files namelist in the user input
+/// \param repcon        Control data from a &report namelist in the user input, to specify
+///                      modifications to SD files
 void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &best_confs,
                   const ScoreCard &emin, const SystemCache &sc,
-                  const std::vector<MdlMol> &sdf_recovery, const FilesControls &fcon);
+                  const std::vector<MdlMol> &sdf_recovery, const ReportControls &repcon);
 
 } // namespace analysis
 } // namespace conf_app
