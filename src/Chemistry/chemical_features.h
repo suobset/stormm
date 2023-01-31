@@ -9,6 +9,7 @@
 #include "Trajectory/phasespace.h"
 #include "UnitTesting/stopwatch.h"
 #include "chemistry_enumerators.h"
+#include "match_bonding_pattern.h"
 
 namespace stormm {
 namespace chemistry {
@@ -522,7 +523,19 @@ public:
   std::vector<double> getFreeElectrons(int low_index, int high_index) const;
   std::vector<double> getFreeElectrons() const;  
   /// \}
+
+  /// \brief Return the formal charges for a representative Lewis structure of the molecules in
+  ///        this topology.
+  const std::vector<int>& getZeroKelvinFormalCharges() const;
+
+  /// \brief Return the bond orders for a representative Lewis structure of the molecules in this
+  ///        topology.
+  const std::vector<int>& getZeroKelvinBondOrders() const;
   
+  /// \brief Return the free electron content of atoms in a representative Lewis structure of the
+  ///        molecules in this topology.
+  const std::vector<int>& getZeroKelvinFreeElectrons() const;
+
   /// \brief Return the ring inclusion specifications for one or more atoms in the system.
   ///
   /// Overloaded:
@@ -601,6 +614,9 @@ public:
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;
 
+  /// \brief Get a const pointer to the object itself in host memory.
+  const ChemicalFeatures* getSelfPointer() const;
+  
   /// \brief Get the abstract.
   ///
   /// \param tier  Extract pointers to data on either the CPU host or GPU device
@@ -765,6 +781,19 @@ private:
 
   /// Double-precision data, targeted by the POINTER-kind Hybrid<double> objects above
   Hybrid<double> double_data;
+
+  /// Formal charges of a representative Lewis structure preserved from the octet-rule-based
+  /// methods used to construct the resonance-averaged formal charges, bond orders, and free
+  /// electron counts on each atom.  This is useful in printing SD files and other formats that
+  /// require formal charges and bond orders, but inaccessible to the GPU as it is much less
+  /// useful in subsequent calculations.
+  std::vector<int> zerok_formal_charges;
+
+  /// Bond orders of the representative Lewis structure
+  std::vector<int> zerok_bond_orders;
+
+  /// Free electron content, per atom, of the representative Lewis structure
+  std::vector<int> zerok_free_electrons;
   
   /// Pointer to the topology that this object describes (needed, if not just for reference, to
   /// obtain the actual atom indices by the various bonds enumerated in some of the lists above)
@@ -1018,6 +1047,24 @@ bool scoreChiralBranches(const std::vector<std::vector<BondedNode>> &links,
 /// \param branch_c_atom  Index of the lowest priority branch, aside from the root branch
 int getChiralOrientation(const CoordinateFrameReader &cfr, int center_atom, int root_atom,
                          int branch_a_atom, int branch_c_atom, int branch_d_atom);
+
+/// \brief Beginning with two distinct atoms in a molecule within a topology, proceed throughout
+///        the molecular bonding pattern verifying that the atoms one encounters when stepping
+///        outward from each atom have identical properties.
+///
+/// Overloaded:
+///   - Accept a ChemicalFeatures object from which to extract critical information.  This calls
+///     previous definitions of the function found in match_bonding_pattern.h.
+///
+/// \param ag              System topology
+/// \param chemfe          Chemical details of the system, containing formal charges, bond orders,
+///                        free electron counts, and ring inclusions
+/// \param atom_a          The first atom to compare   
+/// \param atom_b          The second atom to compare
+/// \{
+bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, int atom_a,
+                         int atom_b);
+/// \}
 
 } // namespace chemistry
 } // namespace stormm

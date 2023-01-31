@@ -6,6 +6,38 @@ namespace structure {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+MdlMol::MdlMol(const ChemicalFeatures *chemfe, const T* xcrd, const T* ycrd, const T* zcrd,
+               const double inv_scale, const int molecule_index) :
+  MdlMol(ExceptionResponse::SILENT)
+{
+  const AtomGraph *ag = chemfe->getTopologyPointer();
+  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  allocate(cdk, nbk, molecule_index);
+
+  // Fill in the coordinates
+  impartCoordinates(xcrd, ycrd, zcrd, inv_scale, cdk, molecule_index);
+
+  // Fill in additional arrays
+  transferTopologicalDetails(chemfe, molecule_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+MdlMol::MdlMol(const ChemicalFeatures *chemfe, const T* xcrd, const T* ycrd, const T* zcrd,
+               const int molecule_index) :
+  MdlMol(chemfe, xcrd, ycrd, zcrd, 1.0, molecule_index)
+{
+  // Check that the data type was a floating-point type
+  if (isFloatingPointScalarType<T>() == false) {
+    rtErr("Data from integral types is for fixed-precision representations and must be "
+          "accompanied by a scaling factor to take the values back into real, internal units.",
+          "MdlMol");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void MdlMol::impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
                                const double scale_factor) {
   if (scale_factor != 1.0) {
@@ -20,6 +52,40 @@ void MdlMol::impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
       coordinates[i].x = xcrd[i];
       coordinates[i].y = ycrd[i];
       coordinates[i].z = zcrd[i];
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void MdlMol::impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
+                               const double scale_factor, const ChemicalDetailsKit &cdk,
+                               const int molecule_index) {
+  if (molecule_index < 0 || molecule_index >= cdk.nmol) {
+    rtErr("Molecule index " + std::to_string(molecule_index) + " is invalid for a topology with " +
+          std::to_string(cdk.nmol) + " molecules.", "MdlMol", "impartCoordinates");
+  }
+  const int llim = cdk.mol_limits[molecule_index];
+  const int hlim = cdk.mol_limits[molecule_index + 1];
+  if (hlim - llim != atom_count) {
+    rtErr("Molecule " + std::to_string(molecule_index) + " with " + std::to_string(hlim - llim) +
+          " atoms is incompatible with an MDL MOL object of " +	std::to_string(atom_count) +
+          " atoms.", "MdlMol", "impartCoordinates");
+  }
+  if (scale_factor != 1.0) {
+    for (int i = llim; i < hlim; i++) {
+      const int iatom = cdk.mol_contents[i];
+      coordinates[i - llim].x = xcrd[iatom] * scale_factor;
+      coordinates[i - llim].y = ycrd[iatom] * scale_factor;
+      coordinates[i - llim].z = zcrd[iatom] * scale_factor;
+    }
+  }
+  else {
+    for (int i = llim; i < hlim; i++) {
+      const int iatom = cdk.mol_contents[i];
+      coordinates[i - llim].x = xcrd[iatom];
+      coordinates[i - llim].y = ycrd[iatom];
+      coordinates[i - llim].z = zcrd[iatom];
     }
   }
 }
