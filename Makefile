@@ -16,6 +16,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Chemistry/atom_equivalence.cpp \
 		   $(SRCDIR)/Chemistry/chemical_features.cpp \
 		   $(SRCDIR)/Chemistry/indigo.cpp \
+		   $(SRCDIR)/Chemistry/match_bonding_pattern.cpp \
 		   $(SRCDIR)/Chemistry/znumber.cpp \
 		   $(SRCDIR)/Constants/behavior.cpp \
 		   $(SRCDIR)/Constants/generalized_born.cpp \
@@ -153,6 +154,9 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Chemistry/atom_equivalence.h \
 		     $(SRCDIR)/Chemistry/chemical_features.h \
 		     $(SRCDIR)/Chemistry/indigo.h \
+		     $(SRCDIR)/Chemistry/match_bonding_pattern.h \
+		     $(SRCDIR)/Chemistry/periodic_table.h \
+		     $(SRCDIR)/Chemistry/znumber.h \
 		     $(SRCDIR)/Constants/behavior.h \
 		     $(SRCDIR)/Constants/fixed_precision.h \
 		     $(SRCDIR)/Constants/generalized_born.h \
@@ -363,6 +367,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Chemistry/atom_equivalence.o \
 		  $(SRCDIR)/Chemistry/chemical_features.o \
 		  $(SRCDIR)/Chemistry/indigo.o \
+		  $(SRCDIR)/Chemistry/match_bonding_pattern.o \
 		  $(SRCDIR)/Chemistry/znumber.o \
 		  $(SRCDIR)/Constants/behavior.o \
 		  $(SRCDIR)/Constants/generalized_born.o \

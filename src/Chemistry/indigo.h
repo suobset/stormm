@@ -345,6 +345,28 @@ public:
 
   /// \brief Return the number of free electrons on each atom in the system's ground state.
   std::vector<CombineIDp> getGroundStateFreeElectrons() const;
+
+  /// \brief Return the system's ground state formal charges, taking only a single representation
+  ///        of each bond and formal charge state.  This equates to a single Lewis structure (out
+  ///        of many), with the lowest or tied-for-lowest energy state at 0K.  This will produce
+  ///        integral formal charges, suitable for an SD file.  The topological index of each atom
+  ///        is given in the "x" member while the formal charge is given in the "y" member of each
+  ///        tuple in the output array.
+  std::vector<int2> getZeroKelvinFormalCharges() const;
+
+  /// \brief Return the system's ground state bond orders, taking only a single representation of
+  ///        each bond and formal charge state.  As with getZeroKelvinFormalCharges() above, this
+  ///        will produce a single Lewis structure with integral bond orders.  The topological
+  ///        index of each atom is given in the "x" member while the bond order is given in the "y"
+  ///        member of each tuple in the output array.
+  std::vector<int2> getZeroKelvinBondOrders() const;
+
+  /// \brief Return the system's ground state electron content, taking only a single representation
+  ///        of each bond and formal charge state.  As with getZeroKelvinFormalCharges() above,
+  ///        this will produce a single Lewis structure with integral bond orders.  The topological
+  ///        index of each atom is given in the "x" member while the bond order is given in the "y"
+  ///        member of each tuple in the output array.
+  std::vector<int2> getZeroKelvinFreeElectrons() const;
   
   /// \brief Return the system's ground state energy
   double getGroundStateEnergy() const;  
@@ -411,6 +433,15 @@ private:
   /// Bond orders on all atoms in the ground states
   std::vector<double> ground_state_free_electrons;
 
+  /// Formal charges on all atoms in the single lowest-energy state of each molecule
+  std::vector<double> zerok_formal_charges;
+
+  /// Orders of all bonds in the single lowest-energy state of each molecule
+  std::vector<double> zerok_bond_orders;
+
+  /// Free electron content all atoms in the single lowest-energy state of each molecule
+  std::vector<double> zerok_free_electrons;
+
   /// Pointer to the original topology
   const AtomGraph *ag_pointer;
 
@@ -424,7 +455,10 @@ private:
   ///                       Otherwise the values times the probability will be added to the
   ///                       existing totals.
   /// \param probability    Boltzmann weight of this state among others that might contribute
-  double addToGroundState(const IndigoAtomCenter &ac, int state_index, int accumulation = 0,
+  double addToGroundState(const IndigoAtomCenter &ac, int state_index,
+                          std::vector<double> *acc_formal_charges,
+                          std::vector<double> *acc_bond_orders,
+                          std::vector<double> *acc_free_electrons, int accumulation = 0,
                           double probability = 1.0);
 };
 

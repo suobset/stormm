@@ -8,7 +8,9 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Chemistry/znumber.h"
+#include "Chemistry/chemical_features.h"
 #include "Constants/behavior.h"
+#include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "FileManagement/file_util.h"
 #include "Parsing/ascii_numbers.h"
@@ -18,6 +20,7 @@
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
@@ -34,16 +37,22 @@ namespace structure {
 
 using card::HybridTargetLevel;
 using chemistry::symbolToZNumber;
+using chemistry::ChemicalFeatures;
 using constants::CartesianDimension;
 using constants::CaseSensitivity;
 using constants::ExceptionResponse;
+using data_types::isFloatingPointScalarType;
 using diskutil::PrintSituation;
 using energy::StateVariable;
 using parse::TextFile;
 using restraints::RestraintApparatus;
 using synthesis::Condensate;
+using synthesis::CondensateReader;
 using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
 using topology::AtomGraph;
+using topology::ChemicalDetailsKit;
+using topology::NonbondedKit;
 using trajectory::CoordinateCycle;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
@@ -116,17 +125,74 @@ public:
   ///                        items.
   /// \{
   MdlMol(ExceptionResponse policy_in = ExceptionResponse::WARN);
+
   MdlMol(const std::string &filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
          ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
+
   MdlMol(const char* filename, ExceptionResponse policy_in = ExceptionResponse::WARN,
          ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
+
   MdlMol(const TextFile &tf, int line_start = 0, int line_end = -1,
          CaseSensitivity capitalization = CaseSensitivity::YES,
          ExceptionResponse policy_in = ExceptionResponse::WARN,
          ModificationPolicy dimod_policy = ModificationPolicy::DO_NOT_MODIFY,
          ExceptionResponse dimod_notify = ExceptionResponse::WARN);
+
+  template <typename T>
+  MdlMol(const ChemicalFeatures *chemfe, const T* xcrd, const T* ycrd, const T* zcrd,
+         double inv_scale, int molecule_index = 0);
+
+  template <typename T>
+  MdlMol(const ChemicalFeatures *chemfe, const T* xcrd, const T* ycrd, const T* zcrd,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const llint* xcrd, const llint* ycrd, const llint* zcrd,
+         const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf, double inv_scale,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const CoordinateFrameReader cfr, int molecule_index = 0);
+  
+  MdlMol(const ChemicalFeatures *chemfe, const CoordinateFrame *cf, int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures &chemfe, const CoordinateFrame &cf, int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const PhaseSpaceReader psr, int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const PhaseSpace *ps, int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures &chemfe, const PhaseSpace &ps, int molecule_index = 0);
+
+  template <typename T>
+  MdlMol(const ChemicalFeatures *chemfe, const CoordinateSeriesReader<T> csr, int frame_index,
+         int molecule_index = 0);
+
+  template <typename T>
+  MdlMol(const ChemicalFeatures *chemfe, const CoordinateSeries<T> *cs, int frame_index,
+         int molecule_index = 0);
+
+  template <typename T>
+  MdlMol(const ChemicalFeatures &chemfe, const CoordinateSeries<T> &cs, int frame_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const PsSynthesisReader poly_psr, int system_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const PhaseSpaceSynthesis *poly_ps, int system_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures &chemfe, const PhaseSpaceSynthesis &poly_ps, int system_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const CondensateReader *cdnsr, int system_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures *chemfe, const Condensate *cdns, int system_index,
+         int molecule_index = 0);
+
+  MdlMol(const ChemicalFeatures &chemfe, const Condensate &cdns, int system_index,
+         int molecule_index = 0);
   /// \}
 
   /// \brief Default copy and move constructors, as well as assignment operators, are appropriate
@@ -217,24 +283,46 @@ public:
   ///   - Present a CoordinateFrame object, or abstract thereof
   ///   - Present a CoordinateSeries object, or abstract thereof, with a frame index number
   ///
-  /// \param xcrd          Cartesian X coordinates of all particles, trusted to describe a number
-  ///                      of atoms equal to that found in the MdlMol and in the same order
-  /// \param ycrd          Cartesian Y coordinates of all particles
-  /// \param zcrd          Cartesian Z coordinates of all particles
-  /// \param scale_factor  The scaling factor by which to multiply coordinates in order to take
-  ///                      them into units of Angstroms
-  /// \param ps            Coordinates to transfer
-  /// \param cf            Coordinates to transfer
-  /// \param cs            A series of frames, one containing the coordinates to transfer
-  /// \param poly_ps       A complex collection of systems containing coordinates to transfer
-  /// \param frame_index   Frame within the coordinate series to transfer
-  /// \param system_index  System within the phase space synthesis to transfer
-  /// \param tier          Indicate whether to obtain coordinates from either the CPU host or
-  ///                      GPU device memory
+  /// \param xcrd            Cartesian X coordinates of all particles, trusted to describe a number
+  ///                        of atoms equal to that found in the MdlMol and in the same order
+  ///                        unless supplemented with a ChemicalDetailsKit and molecule index,
+  ///                        which can indicate the proper subset and indices of the atomic
+  ///                        coordinates to use
+  /// \param ycrd            Cartesian Y coordinates of all particles
+  /// \param zcrd            Cartesian Z coordinates of all particles
+  /// \param xcrd_ovrf       Overflow bits for Cartesian X coordinates of all particles
+  /// \param ycrd_ovrf       Overflow bits for Cartesian Y coordinates of all particles
+  /// \param zcrd_ovrf       Overflow bits for Cartesian Z coordinates of all particles
+  /// \param scale_factor    The scaling factor by which to multiply coordinates in order to take
+  ///                        them into units of Angstroms (in general, this is the inverse scaling
+  ///                        factor found in the abstracts of fixed-precision coordinate objects)
+  /// \param cdk             Contains indices of the atoms of interest within the (likely larger)
+  ///                        arrays provided
+  /// \param molecule_index  Index of the molecule of interest within some larger topology
+  /// \param ps              Coordinates to transfer
+  /// \param cf              Coordinates to transfer
+  /// \param cs              A series of frames, one containing the coordinates to transfer
+  /// \param poly_ps         A complex collection of systems containing coordinates to transfer
+  /// \param frame_index     Frame within the coordinate series to transfer
+  /// \param system_index    System within the phase space synthesis to transfer
+  /// \param tier            Indicate whether to obtain coordinates from either the CPU host or
+  ///                        GPU device memory
   /// \{
   template <typename T> void impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
                                                double scale_factor);
 
+  template <typename T> void impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
+                                               double scale_factor, const ChemicalDetailsKit &cdk,
+                                               int molecule_index);
+  
+  void impartCoordinates(const llint* xcrd, const llint* ycrd, const llint* zcrd,
+                         const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                         double scale_factor);
+
+  void impartCoordinates(const llint* xcrd, const llint* ycrd, const llint* zcrd,
+                         const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                         double scale_factor, const ChemicalDetailsKit &cdk, int molecule_index);
+  
   void impartCoordinates(const PhaseSpaceReader &psr);
 
   void impartCoordinates(const PhaseSpaceWriter &psw);
@@ -405,7 +493,7 @@ public:
 private:
 
   // Items describing quantities of information (most of them from the counts line)
-  ExceptionResponse policy;   ///<
+  ExceptionResponse policy;   ///< Action to take if errors in an input file are encountered
   MdlMolVersion version_no;   ///< The format in which this entry was read (does not necessarily
                               ///<   dictate the version in which it will be written)
   int atom_count;             ///< The number of atoms in the molecule
@@ -502,9 +590,20 @@ private:
   /// by adding a data item indicating an external registry number.
   std::string external_regno;
   
-  /// \brief Allocate space for information in amounts described on the MOL entry's counts line.
+  /// \brief Allocate space for information inthe object.
+  ///
+  /// Overloaded:
+  ///   - Allocate as described on the MOL entry's counts line
+  ///   - Allocate as described in topology abstracts
+  ///
+  /// \param cdk      Chemical details of the system to model
+  /// \param vk       Valence parameters and connections of the system to model
+  /// \param mol_idx  Index of the molecule within the topology
+  /// \{
   void allocate();
-
+  void allocate(const ChemicalDetailsKit &cdk, const NonbondedKit<double> &nbk, int mol_idx = 0);
+  /// \}
+  
   /// \brief Produce the correct code for an atom's isotopic shift.  While the number in the atoms
   ///        block of the V2000 format most often corresponds to the value in the actual array,
   ///        there are extreme isotopes (> +4 or < -3) that place a zero in the atom block and
@@ -597,6 +696,15 @@ private:
   /// \param item_index  The item of interest
   /// \param caller      Name of the calling function (for backtracing purposes)
   void checkDataItemIndex(int item_index, const char* caller) const;
+
+  /// \brief Transfer information from topology and chemical features objects to complete details
+  ///        of the MDL MOL entry.  This function assumes that the object's internal arrays for
+  ///        atomic properties have been allocated (resized) to their full lengths, and that the
+  ///        objec'ts array of bonds have been reserved to accommodate its final length.
+  ///
+  /// \param chemfe          The chemical features of the system, containing a topology pointer
+  /// \param molecule_index  Index of the molecule of interest within the topology
+  void transferTopologicalDetails(const ChemicalFeatures *chemfe, int molecule_index = 0);
 };
 
 /// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.

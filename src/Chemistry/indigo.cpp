@@ -12,6 +12,7 @@
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "indigo.h"
+#include "match_bonding_pattern.h"
 #include "periodic_table.h"
 
 namespace stormm {
@@ -25,6 +26,7 @@ using math::PrefixSumType;
 using math::roundUp;
 using math::sum;
 using parse::char4ToString;
+using parse::realToString;
 using topology::ChemicalDetailsKit;
 using topology::ValenceKit;
 using topology::NonbondedKit;
@@ -1119,7 +1121,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     atom_connect_bounds{}, atom_relevant_bonds{}, atom_bond_partners{}, atom_scores{},
     bond_scores{}, valence_electrons{}, atom_centers{}, mutable_fragments{},
     ground_state_formal_charges{}, ground_state_bond_orders{}, ground_state_free_electrons{},
-    ag_pointer{ag_in}
+    zerok_formal_charges{}, zerok_bond_orders{}, zerok_free_electrons{}, ag_pointer{ag_in}
 {
   // Get the number of real atoms in the molecule.  Filter out virtual sites and raise an error
   // if atoms that the scoring function does not cover are encountered.
@@ -1295,6 +1297,9 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     ground_state_formal_charges.resize(atom_count, 0.0);
     ground_state_bond_orders.resize(bond_count, 0.0);
     ground_state_free_electrons.resize(atom_count, 0.0);
+    zerok_formal_charges.resize(atom_count, 0.0);
+    zerok_bond_orders.resize(bond_count, 0.0);
+    zerok_free_electrons.resize(atom_count, 0.0);
     return;
   }
 
@@ -1417,12 +1422,18 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   ground_state_formal_charges.resize(atom_count, 0.0);
   ground_state_bond_orders.resize(bond_count, 0.0);
   ground_state_free_electrons.resize(atom_count, 0.0);
+  zerok_formal_charges.resize(atom_count, 0.0);
+  zerok_bond_orders.resize(bond_count, 0.0);
+  zerok_free_electrons.resize(atom_count, 0.0);
   double total_score = 0.0;
   for (int i = 0; i < atom_count; i++) {
     if (atom_centers[i].getStateCount() > 1) {
       continue;
     }
-    total_score += addToGroundState(atom_centers[i], 0);
+    total_score += addToGroundState(atom_centers[i], 0, &ground_state_formal_charges,
+                                    &ground_state_bond_orders, &ground_state_free_electrons);
+    addToGroundState(atom_centers[i], 0, &zerok_formal_charges, &zerok_bond_orders,
+                     &zerok_free_electrons);
   }
   
   // Obtain Boltzmann-weighted average energies for each fragment's charge state with degenerate
@@ -1648,7 +1659,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       }
     } while (frag_settings[0] < max_frag_settings[0]);
   }
-
+  
   // Incorporate fragments into the solution with their best detected charge states.  This
   // requires re-working the energetics for the best state.
   for (int i = 0; i < fragment_count; i++) {
@@ -1688,8 +1699,134 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       const std::vector<int2> t_stt = mutable_fragments[i].getState(best_states[j].y);
       const int n_center = t_stt.size();
       for (int k = 0; k < n_center; k++) {
-        total_score += addToGroundState(atom_centers[t_stt[k].x], t_stt[k].y, j, fs_prob);
+        total_score += addToGroundState(atom_centers[t_stt[k].x], t_stt[k].y,
+                                        &ground_state_formal_charges, &ground_state_bond_orders,
+                                        &ground_state_free_electrons, j, fs_prob);
       }
+    }
+  }
+  
+  // Build a singular Lewis structure based on the lowest or first tied-for-lowest energy state of
+  // each fragment.  Declare vectors that can be used for scratch work in determining symmetric
+  // atoms (and thus the preferred states to use for placing formal charges and double or triple
+  // bonds) here, and allocate them the first time any fragment is encountered with charge and
+  // ambiguity in how that charge might be placed.
+  std::vector<int> a_idx_tree, b_idx_tree, a_zn_tree, b_zn_tree, a_coverage, b_coverage;
+  std::vector<double> a_fc_tree, b_fc_tree, a_fe_tree, b_fe_tree;
+  std::vector<ullint> a_ri_tree, b_ri_tree;
+  std::vector<ChiralOrientation> a_ch_tree, b_ch_tree;
+  std::vector<double> found_formal_charges, found_free_electrons;
+  std::vector<ullint> mock_ring_inclusions;
+  std::vector<ChiralOrientation> mock_chiralities;
+  bool symm_work_allocated = false; 
+  for (int i = 0; i < fragment_count; i++) {
+    const int ibest_q = q_options[options_bounds[i] + best_settings[i]];
+    const std::vector<int2> best_states = mutable_fragments[i].getStatesBearingCharge(ibest_q);
+
+    // If this state contains a net charge in its most favorable form, count the number of states
+    // bearing that charge and determine which, if any, place the charge on a non-symmetric atom.
+    // Such a form will be preferred.
+    int best_choice_idx = 0;
+    const int nchoice = best_states.size();
+    const int n_center = mutable_fragments[i].getCenterCount();
+    if (ibest_q != 0 && nchoice > 2) {
+      if (symm_work_allocated == false) {
+        symm_work_allocated = true;
+        const size_t natom = ag_pointer->getAtomCount();
+
+        // The ring inclusions and chiralities may or may not be known already, but do not include
+        // them in the symmetry detection.  It is enough to use the newly found formal charges and
+        // free electron content of each topological atom.
+        mock_ring_inclusions.resize(natom, 0LLU);
+        mock_chiralities.resize(natom, ChiralOrientation::NONE);
+        const std::vector<CombineIDp> tmp_fc = getGroundStateFormalCharges();
+        const std::vector<CombineIDp> tmp_fe = getGroundStateFreeElectrons();
+        found_formal_charges.resize(natom, 0.0);
+        found_free_electrons.resize(natom, 0.0);
+        const size_t jlim = tmp_fc.size();
+        for (size_t j = 0; j < jlim; j++) {
+          found_formal_charges[tmp_fc[j].x] = tmp_fc[j].y;
+          found_free_electrons[tmp_fe[j].x] = tmp_fe[j].y;
+        }
+        a_idx_tree.resize(natom);
+        b_idx_tree.resize(natom);
+        a_zn_tree.resize(natom);
+        b_zn_tree.resize(natom);
+        a_fc_tree.resize(natom);
+        b_fc_tree.resize(natom);
+        a_fe_tree.resize(natom);
+        b_fe_tree.resize(natom);
+        a_ri_tree.resize(natom);
+        b_ri_tree.resize(natom);
+        a_ch_tree.resize(natom);
+        b_ch_tree.resize(natom);
+        a_coverage.resize(natom);
+        b_coverage.resize(natom);
+      }
+
+      const std::vector<int2> zero_stt = mutable_fragments[i].getState(best_states[0].y);
+      std::vector<int> tmp_ranks(n_center, -1);
+      int rankno = 0;
+      for (int k = 0; k < n_center; k++) {
+        if (tmp_ranks[k] >= 0) {
+          continue;
+        }
+        tmp_ranks[k] = rankno;
+        for (int m = k + 1; m < n_center; m++) {
+          if (matchBondingPattern(ag_pointer, found_formal_charges, found_free_electrons,
+                                  mock_ring_inclusions, mock_chiralities, zero_stt[k].x,
+                                  zero_stt[m].x, &a_idx_tree, &b_idx_tree, &a_zn_tree, &b_zn_tree,
+                                  &a_fc_tree, &b_fc_tree, &a_fe_tree, &b_fe_tree, &a_ri_tree,
+                                  &b_ri_tree, &a_ch_tree, &b_ch_tree, &a_coverage, &b_coverage)) {
+            tmp_ranks[m] = rankno;
+          }
+        }
+        rankno++;
+      }
+      std::vector<int> tmp_charges(n_center);
+      std::vector<bool> tmp_checked(n_center);
+      std::vector<int> tmp_qstates(n_center);
+      int best_choice_symm;
+      for (int j = 0; j < nchoice; j++) {
+        const std::vector<int2> j_stt = mutable_fragments[i].getState(best_states[j].y);
+        for (int k = 0; k < n_center; k++) {
+          tmp_charges[k] = static_cast<int>(atom_centers[j_stt[k].x].getState(j_stt[k].y) & 0xf) +
+                           minimum_formal_charge;
+        }
+        int symm_score = 0;
+        for (int k = 0; k < n_center; k++) {
+          tmp_checked[k] = false;
+        }
+        for (int k = 0; k < n_center; k++) {
+          if (tmp_checked[k]) {
+            continue;
+          }
+          tmp_qstates.resize(1);
+          tmp_qstates[0] = tmp_charges[k];
+          for (int m = k + 1; m < n_center; m++) {
+            if (tmp_ranks[m] == tmp_ranks[k]) {
+              const size_t n_qstates = tmp_qstates.size();
+              bool qstate_found = false;
+              for (size_t pos = 0; pos < n_qstates; pos++) {
+                qstate_found = (qstate_found || (tmp_charges[m] == tmp_qstates[pos]));
+              }
+              if (! qstate_found) {
+                tmp_qstates.push_back(tmp_charges[m]);
+              }
+            }
+          }
+          symm_score += static_cast<int>(tmp_qstates.size()) - 1;
+        }
+        if (j == 0 || symm_score < best_choice_symm) {
+          best_choice_symm = symm_score;
+          best_choice_idx = j;
+        }
+      }
+    }
+    const std::vector<int2> t_stt = mutable_fragments[i].getState(best_states[best_choice_idx].y);
+    for (int j = 0; j < n_center; j++) {
+      addToGroundState(atom_centers[t_stt[j].x], t_stt[j].y, &zerok_formal_charges,
+                       &zerok_bond_orders, &zerok_free_electrons);
     }
   }
 
@@ -1743,14 +1880,69 @@ std::vector<CombineIDp> IndigoTable::getGroundStateFreeElectrons() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int2> IndigoTable::getZeroKelvinFormalCharges() const {
+  std::vector<int2> result(atom_count);
+  for (int i = 0; i < atom_count; i++) {
+    if (fabs(round(zerok_formal_charges[i]) - zerok_formal_charges[i]) > 0.01) {
+      rtErr("The zero-Kelvin formal charge on atom " +
+            char4ToString(ag_pointer->getAtomName(real_atom_map[i])) + " is non-integral (" +
+            realToString(zerok_formal_charges[i]) + ").", "IndigoTable",
+            "getZeroKelvinFormalCharges");
+    }
+    result[i] = { real_atom_map[i], static_cast<int>(round(zerok_formal_charges[i])) };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int2> IndigoTable::getZeroKelvinBondOrders() const {
+  std::vector<int2> result(bond_count);
+  for (int i = 0; i < bond_count; i++) {
+    if (fabs(round(zerok_bond_orders[i]) - zerok_bond_orders[i]) > 0.01) {
+      const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+      const int atom_i = vk.bond_i_atoms[real_bond_map[i]];
+      const int atom_j = vk.bond_j_atoms[real_bond_map[i]];
+      rtErr("The zero-Kelvin bond order connectind atoms " +
+            char4ToString(ag_pointer->getAtomName(atom_i)) + " and " +
+            char4ToString(ag_pointer->getAtomName(atom_j)) + " is non-integral (" +
+            realToString(zerok_bond_orders[i]) + ").", "IndigoTable",
+            "getZeroKelvinFormalCharges");
+    }
+    result[i] = { real_bond_map[i], static_cast<int>(round(zerok_bond_orders[i])) };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int2> IndigoTable::getZeroKelvinFreeElectrons() const {
+  std::vector<int2> result(atom_count);
+  for (int i = 0; i < atom_count; i++) {
+    if (fabs(round(zerok_formal_charges[i]) - zerok_formal_charges[i]) > 0.01) {
+      rtErr("The zero-Kelvin free electron content on atom " +
+            char4ToString(ag_pointer->getAtomName(real_atom_map[i])) + " is non-integral (" +
+            realToString(zerok_free_electrons[i]) + ").", "IndigoTable",
+            "getZeroKelvinFreeElectrons");
+    }
+    result[i] = { real_atom_map[i], static_cast<int>(round(zerok_free_electrons[i])) };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 double IndigoTable::getGroundStateEnergy() const {
   return ground_state_energy;
 }
 
 //-------------------------------------------------------------------------------------------------
 double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state_index,
+                                     std::vector<double> *acc_formal_charges,
+                                     std::vector<double> *acc_bond_orders,
+                                     std::vector<double> *acc_free_electrons,
                                      const int accumulation, const double probability) {
   const uint t_stt = ac.getState(state_index);
+  double* acc_fc_ptr = acc_formal_charges->data();
+  double* acc_bo_ptr = acc_bond_orders->data();
+  double* acc_fe_ptr = acc_free_electrons->data();
 
   // Adding an int to an unsigned int would "promote" the int to unsigned and create a HUGE
   // charge if the formal charge is intended to be negative.  Re-cast the unsigned int from the
@@ -1759,10 +1951,10 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
                        probability;
   const int ac_idx = ac.getIndigoTableIndex();
   if (accumulation == 0) {
-    ground_state_formal_charges[ac_idx] = q_inc;
+    acc_fc_ptr[ac_idx] = q_inc;
   }
   else {
-    ground_state_formal_charges[ac_idx] += q_inc;
+    acc_fc_ptr[ac_idx] += q_inc;
   }
   const int nbonds = ac.getPartnerCount();
   double valence_e = 0.0;
@@ -1770,7 +1962,7 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
     const int local_bond_idx = ac.getRelevantBond(i);
 
     // Re-cast the unsigned integer direct to double here, as no other int value is being added
-    const double tbo = static_cast<double>((t_stt >> (2*i + formal_charge_bits)) & 0x3);
+    const double tbo = static_cast<double>((t_stt >> ((2 * i) + formal_charge_bits)) & 0x3);
     valence_e += tbo * 2.0;
     
     // Check whether this atom center should be the one to dictate the bond order accumulation in
@@ -1781,16 +1973,16 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
     
     const double b_inc = tbo * probability;
     if (accumulation == 0) {
-      ground_state_bond_orders[local_bond_idx] = b_inc;
+      acc_bo_ptr[local_bond_idx] = b_inc;
     }
     else {
-      ground_state_bond_orders[local_bond_idx] += b_inc;
+      acc_bo_ptr[local_bond_idx] += b_inc;
     }
   }
   const int znum = ag_pointer->getAtomicNumber(real_atom_map[ac_idx]);
   switch (znum) {
   case 1:
-    ground_state_free_electrons[ac_idx] += (2.0 - valence_e) * probability;
+    acc_fe_ptr[ac_idx] += (2.0 - valence_e) * probability;
     break;
   case 6:
   case 7:
@@ -1798,12 +1990,12 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
   case 9:
   case 17:
   case 35:
-    ground_state_free_electrons[ac_idx] += (8.0 - valence_e) * probability;
+    acc_fe_ptr[ac_idx] += (8.0 - valence_e) * probability;
     break;
   case 15:
     {
       const double target_valence_e = (nbonds >= 3) ? 10.0 : 8.0;
-      ground_state_free_electrons[ac_idx] += (target_valence_e - valence_e) * probability;
+      acc_fe_ptr[ac_idx] += (target_valence_e - valence_e) * probability;
     }
     break;
   }

@@ -3,10 +3,12 @@
 #include "Constants/scaling.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/mixed_types.h"
+#include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "Topology/atomgraph_analysis.h"
 #include "UnitTesting/approx.h"
 #include "chemical_features.h"
@@ -16,7 +18,7 @@ namespace stormm {
 namespace chemistry {
   
 using card::HybridKind;
-using topology::TorsionKind;
+using diskutil::getBaseName;
 using math::accumulateBitmask;
 using math::addScalarToVector;
 using math::crossProduct;
@@ -28,10 +30,13 @@ using math::project;
 using math::readBitFromMask;
 using math::reduceUniqueValues;
 using math::roundUp;
+using math::sum;
 using math::unsetBitInMask;
+using parse::char4ToString;
 using testing::Approx;
 using topology::colorConnectivity;
 using topology::selectRotatingAtoms;
+using topology::TorsionKind;
 using trajectory::CoordinateFrameReader;
 
 //-------------------------------------------------------------------------------------------------
@@ -421,6 +426,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     int_data{HybridKind::ARRAY, "chemfe_int"},
     mutable_group_data{HybridKind::ARRAY, "chemfe_muta_int"},
     double_data{HybridKind::ARRAY, "chemfe_double"},
+    zerok_formal_charges{},
+    zerok_bond_orders{},
+    zerok_free_electrons{},
     ag_pointer{ag_in},
     timer{timer_in}
 {
@@ -463,7 +471,10 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   formal_charges.setPointer(&double_data, 0, padded_atom_count);
   free_electrons.setPointer(&double_data, padded_atom_count, padded_atom_count);
   bond_orders.setPointer(&double_data, 2 * padded_atom_count, roundUp(vk.nbond, warp_size_int));
-  
+  zerok_formal_charges.resize(padded_atom_count);
+  zerok_free_electrons.resize(padded_atom_count);
+  zerok_bond_orders.resize(bond_orders.size());
+
   // Draw a Lewis structure and record the results.  The formal_charges, bond orders, and
   // free_electrons arrays can now be allocated.  Lewis structures will be drawn for each unique
   // molecule and copied otherwise, but that requires a list of all unique molecules.
@@ -615,6 +626,9 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     int_data{original.int_data},
     mutable_group_data{original.mutable_group_data},
     double_data{original.double_data},
+    zerok_formal_charges{original.zerok_formal_charges},
+    zerok_bond_orders{original.zerok_bond_orders},
+    zerok_free_electrons{original.zerok_free_electrons},
     ag_pointer{original.ag_pointer}
 {
   repairPointers();
@@ -667,6 +681,9 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     int_data{std::move(original.int_data)},
     mutable_group_data{std::move(original.mutable_group_data)},
     double_data{std::move(original.double_data)},
+    zerok_formal_charges{std::move(original.zerok_formal_charges)},
+    zerok_bond_orders{std::move(original.zerok_bond_orders)},
+    zerok_free_electrons{std::move(original.zerok_free_electrons)},
     ag_pointer{std::move(original.ag_pointer)}
 {}
 
@@ -724,6 +741,9 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   int_data = other.int_data;
   mutable_group_data = other.mutable_group_data;
   double_data = other.double_data;
+  zerok_formal_charges = other.zerok_formal_charges;
+  zerok_bond_orders = other.zerok_bond_orders;
+  zerok_free_electrons = other.zerok_free_electrons;
   ag_pointer = other.ag_pointer;
   repairPointers();
   return *this;
@@ -783,6 +803,9 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
   int_data = std::move(other.int_data);
   mutable_group_data = std::move(other.mutable_group_data);
   double_data = std::move(other.double_data);
+  zerok_formal_charges = std::move(other.zerok_formal_charges);
+  zerok_bond_orders = std::move(other.zerok_bond_orders);
+  zerok_free_electrons = std::move(other.zerok_free_electrons);
   ag_pointer = std::move(other.ag_pointer);
   return *this;
 }
@@ -1446,14 +1469,14 @@ void ChemicalFeatures::drawLewisStructures(const ValenceKit<double> &vk,
       // The molecules have been found to be the same.
       mol_index[j].x = nmi;
       mol_index[j].y = j_llim - i_llim;
-      mol_index[j].z = vk.bond_asgn_terms[cdk.mol_contents[j_llim]] -
-                       vk.bond_asgn_terms[cdk.mol_contents[i_llim]];
+      mol_index[j].z = vk.bond_asgn_terms[vk.bond_asgn_bounds[cdk.mol_contents[j_llim]]] -
+                       vk.bond_asgn_terms[vk.bond_asgn_bounds[cdk.mol_contents[i_llim]]];
     }
 
     // Increment the number of molecules
     nmi++;
   }
-
+  
   // Proceed through the list of molecules, using the pre-determined molecular matches.
   std::vector<bool> ls_covered(cdk.nmol, false);
   for (int i = 0; i < cdk.nmol; i++) {
@@ -1464,17 +1487,56 @@ void ChemicalFeatures::drawLewisStructures(const ValenceKit<double> &vk,
     const std::vector<CombineIDp> fc = idg_tab.getGroundStateFormalCharges();
     const std::vector<CombineIDp> bo = idg_tab.getGroundStateBondOrders();
     const std::vector<CombineIDp> fe = idg_tab.getGroundStateFreeElectrons();
+    const std::vector<int2> zk_fc = idg_tab.getZeroKelvinFormalCharges();
+    const std::vector<int2> zk_bo = idg_tab.getZeroKelvinBondOrders();
+    const std::vector<int2> zk_fe = idg_tab.getZeroKelvinFreeElectrons();
     const int match_idx = mol_index[i].x;
     for (int j = i; j < cdk.nmol; j++) {
       if (mol_index[j].x == match_idx) {
         for (size_t k = 0; k < fc.size(); k++) {
           formal_charges.putHost(fc[k].y, fc[k].x + mol_index[j].y);
+          zerok_formal_charges[zk_fc[k].x + mol_index[j].y] = zk_fc[k].y;
         }
         for (size_t k = 0; k < bo.size(); k++) {
-          bond_orders.putHost(bo[k].y, bo[k].x + mol_index[j].z);
+
+          // Find the atoms to which the original instance of the bond applied, then the atoms to
+          // which the bond's cognate in the current residue applies.
+          const int orig_i_atom = vk.bond_i_atoms[bo[k].x];
+          const int orig_j_atom = vk.bond_j_atoms[bo[k].x];
+          const int next_i_atom = orig_i_atom + mol_index[j].y;
+          const int next_j_atom = orig_j_atom + mol_index[j].y;
+
+          // Find the index of the new bond
+          int next_bond_index = -1;
+          for (int m = vk.bond_asgn_bounds[next_i_atom]; m < vk.bond_asgn_bounds[next_i_atom + 1];
+               m++) {
+            if (vk.bond_asgn_atoms[m] == next_j_atom) {
+              next_bond_index = vk.bond_asgn_terms[m];
+              break;
+            }
+          }
+          if (next_bond_index == -1) {
+            for (int m = vk.bond_asgn_bounds[next_j_atom];
+                 m < vk.bond_asgn_bounds[next_j_atom + 1]; m++) {
+              if (vk.bond_asgn_atoms[m] == next_i_atom) {
+                next_bond_index = vk.bond_asgn_terms[m];
+                break;
+              }
+            }
+          }
+          if (next_bond_index == -1) {
+            rtErr("No bond in molecule " + std::to_string(j + 1) + " could be identified as a "
+                  "cognate to the bond between atoms " +
+                  char4ToString(ag_pointer->getAtomName(orig_i_atom)) + " and " +
+                  char4ToString(ag_pointer->getAtomName(orig_j_atom)) + " of molecule " +
+                  std::to_string(i + 1) + ".", "ChemicalFeatures", "DrawLewisStructures");
+          }
+          bond_orders.putHost(bo[k].y, next_bond_index);
+          zerok_bond_orders[next_bond_index] = zk_bo[k].y;
         }
         for (size_t k = 0; k < fe.size(); k++) {
           free_electrons.putHost(fe[k].y, fe[k].x + mol_index[j].y);
+          zerok_free_electrons[zk_fe[k].x + mol_index[j].y] = zk_fe[k].y;
         }
         ls_covered[j] = true;
       }      
@@ -2761,6 +2823,21 @@ std::vector<double> ChemicalFeatures::getFreeElectrons() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<int>& ChemicalFeatures::getZeroKelvinFormalCharges() const {
+  return zerok_formal_charges;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& ChemicalFeatures::getZeroKelvinBondOrders() const {
+  return zerok_bond_orders;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& ChemicalFeatures::getZeroKelvinFreeElectrons() const {
+  return zerok_free_electrons;
+}
+
+//-------------------------------------------------------------------------------------------------
 ullint ChemicalFeatures::getRingInclusion(const int atom_index) const {
   return ring_inclusion.readHost(atom_index);
 }
@@ -2900,6 +2977,11 @@ ChiralInversionProtocol ChemicalFeatures::getChiralInversionMethods(const int in
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* ChemicalFeatures::getTopologyPointer() const {
   return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+const ChemicalFeatures* ChemicalFeatures::getSelfPointer() const {
+  return this;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3127,9 +3209,16 @@ int getChiralOrientation(const CoordinateFrameReader &cfr, const int center_atom
 
   // L- (S-) chirality occurs when the cross product of ra and rb, as well as the cross product of
   // rb and rc, following the right hand rule, point towards r_root.  However, L- chirality is
-  // given a convention of + (as most amino acids, which have chiral centers, are exepcted to be
+  // given a convention of + (as most amino acids, which have chiral centers, are expected to be
   // L-chiral).
   return ((2 * (dot(acrb, r_root, 3) < 0.0 && dot(bcrc, r_root, 3))) - 1);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, const int atom_a,
+                         const int atom_b) {
+  return matchBondingPattern(ag, chemfe.getFormalCharges(), chemfe.getFreeElectrons(),
+                             chemfe.getRingInclusion(), chemfe.getAtomChirality(), atom_a, atom_b);
 }
 
 } // namespace chemistry

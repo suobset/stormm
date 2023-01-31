@@ -29,6 +29,7 @@ using stormm::data_types::char4;
 #endif
 using stormm::data_types::ullint;
 using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
@@ -250,17 +251,37 @@ int main(const int argc, const char* argv[]) {
   }
   bool ch_unwritten = true;
   section(2);
+  const TestPriority check_lewis_struct = (do_snps == TestPriority::CRITICAL) ?
+                                          TestPriority::NON_CRITICAL : TestPriority::ABORT;
   for (size_t i = 0; i < nsys; i++) {
     snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
              std::to_string(i), 1.0e-6, "Formal charges computed for the system described by " +
              sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    snapshot(fc_name, polyNumericVector(sys_chem[i].getZeroKelvinFormalCharges()),
+             std::string("fczk_") + std::to_string(i), 1.0e-6, "Formal charges computed for a "
+             "representative state of the system described by " + sys_ag[i].getFileName() +
+             " do not meet expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::INTEGER,
+             PrintSituation::APPEND, check_lewis_struct);
+    check(sum<double>(sys_chem[i].getZeroKelvinFormalCharges()), RelationalOperator::EQUAL,
+          sum<double>(sys_chem[i].getFormalCharges()), "The sum of formal charges computed for a "
+          "representative Lewis structure and the resonance structure of " +
+          getBaseName(sys_ag[i].getFileName()) + " do not agree.", do_tests);
     snapshot(bo_name, polyNumericVector(sys_chem[i].getBondOrders()), std::string("bo_") +
              std::to_string(i), 1.0e-6, "Bond orders computed for the system described by " +
              sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    snapshot(bo_name, polyNumericVector(sys_chem[i].getZeroKelvinBondOrders()),
+             std::string("bozk_") + std::to_string(i), 1.0e-6, "Bond orders computed for a "
+             "representative state of the system described by " + sys_ag[i].getFileName() +
+             " do not meet expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::INTEGER,
+             PrintSituation::APPEND, check_lewis_struct);
+    check(sum<double>(sys_chem[i].getZeroKelvinBondOrders()), RelationalOperator::EQUAL,
+          sum<double>(sys_chem[i].getBondOrders()), "The sum of all bond orders computed for a "
+          "representative Lewis structure and the resonance structure of " +
+          getBaseName(sys_ag[i].getFileName()) + " do not agree.", do_tests);
     if (sys_chem[i].getChiralCenterCount() > 0) {
       snapshot(ch_name, polyNumericVector(sys_chem[i].getChiralCenters()), std::string("chcen_") +
                std::to_string(i), 1.0e-6, "Chiral centers detected for the system described by " +
