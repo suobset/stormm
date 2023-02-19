@@ -45,3 +45,9 @@ This should be a comment, but placed here to ensure that test outside of a namel
   dihedral { -ti N  -tj CX -tk OH -tl HO -phi 0.0 -n 2 }
   urey_bradley { -ti O2 -tj C -tk O2 -k 50.0 -l0 1.94 }
 &end
+
+// Conformer search
+&conformer
+  trial_limit 10, final_states 6,
+  core_mask { atoms "@N,CA,C & !(:ACE,NME)" },
+&end

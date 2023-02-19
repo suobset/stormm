@@ -14,6 +14,7 @@
 #include "../../../src/Random/random.h"
 #include "../../../src/Restraints/restraint_apparatus.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
+#include "../../../src/Synthesis/synthesis_cache_map.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph.h"
 #include "../../../src/Topology/atomgraph_abstracts.h"
@@ -37,6 +38,7 @@ using stormm::restraints::RestraintApparatus;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::structure::MdlMol;
 using stormm::synthesis::PhaseSpaceSynthesis;
+using stormm::synthesis::SynthesisCacheMap;
 using stormm::synthesis::SystemCache;
 using stormm::testing::StopWatch;
 using stormm::topology::AtomGraph;
@@ -164,9 +166,12 @@ std::vector<int> calculateReplicaCounts(const ConformerControls &conf_input,
 /// \param replica_counts  Numbers of each system to include in the synthesis, based on rotamer
 ///                        counts determined in the calculateReplicaCounts() above.
 /// \param sc              The cache of systems, supply ChemicalFeatures for each of them
+/// \param scmap           Map between the systems cache built from user input and the synthesis
+///                        constructed inside this function (filled and returned)
 /// \param tm              Timer to record the wall time spent on various setup procedures
 PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts,
-                                          const SystemCache &sc, StopWatch *tm);
+                                          const SystemCache &sc, SynthesisCacheMap *scmap,
+                                          StopWatch *tm);
 
 /// \brief Build a list of restraint apparatus pointers for the synthesis of all system replicas.
 ///        Parameter descriptors follow from buildReplicaWorkspace() above.

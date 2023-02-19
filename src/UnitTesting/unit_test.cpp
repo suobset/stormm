@@ -548,7 +548,7 @@ void printTestSummary(const TestVerbosity tv) {
 
 //-------------------------------------------------------------------------------------------------
 int countGlobalTestFailures() {
-  return gbl_test_results.getOverallFailureCount();
+  return gbl_test_results.getOverallFailureCount() + gbl_test_results.getOverallSkipCount();
 }
 
 //-------------------------------------------------------------------------------------------------

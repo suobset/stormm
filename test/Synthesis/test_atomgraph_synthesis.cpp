@@ -375,7 +375,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 8 };
   AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT,
                              null_gpu, &timer);
-  const StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
+  const StaticExclusionMaskSynthesis poly_se(poly_ag.getUniqueTopologies(),
                                              poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   
@@ -520,7 +520,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<int> system_list = { 0, 1, 2, 3, 4, 4, 4, 4, 4, 4 };
   AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, system_list, system_list,
                                   ExceptionResponse::SILENT, null_gpu, &timer);
-  const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getTopologyPointers(),
+  const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getUniqueTopologies(),
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);

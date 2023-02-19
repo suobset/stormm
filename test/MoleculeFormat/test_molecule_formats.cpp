@@ -9,13 +9,17 @@
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::constants;
 using namespace stormm::diskutil;
 using namespace stormm::errors;
+using namespace stormm::parse;
 using namespace stormm::review;
 using namespace stormm::structure;
+using namespace stormm::trajectory;
 using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
@@ -103,6 +107,42 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> real_storage_ans = { 0.1, 814.232, 97.354, -3.245 };
   check(real_storage_list, RelationalOperator::EQUAL, real_storage_ans, "A list of real numbers "
         "pulled from an SD file data item does not meet expectations.", do_tests);
+
+  // Create an SD file de novo
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::vector<std::string> sys_names = { "trpcage", "symmetry_L1", "symmetry_L1_vs",
+                                               "bromobenzene_vs_iso", "symmetry_C3_in_water" };
+  TestSystemManager tsm(base_top_name, "top", sys_names, base_crd_name, "inpcrd", sys_names);
+  std::vector<int> recon_atom_counts(tsm.getSystemCount());
+  std::vector<int> recon_bond_counts(tsm.getSystemCount());
+  const std::vector<int>  recon_atom_counts_ans = { 304, 28, 28, 12, 25 };
+  const std::vector<int>  recon_bond_counts_ans = { 310, 30, 30, 12, 26 };
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    CoordinateFrame sysi_cf = tsm.exportCoordinateFrame(i);
+    MdlMol sysi_mdl(tsm.getTopologyPointer(i), sysi_cf);
+    TextFile sysi_tf(sysi_mdl.writeMdl(MdlMolVersion::V2000), TextOrigin::RAM);
+    MdlMol sysi_mdl_reconstructed(sysi_tf);
+    recon_atom_counts[i] = sysi_mdl_reconstructed.getAtomCount();
+    recon_bond_counts[i] = sysi_mdl_reconstructed.getBondCount();
+
+    // Check the Trp-cage formal charges, which have been placed in a property.
+    if (sys_names[i] == "trpcage") {
+      check(sysi_mdl_reconstructed.getFormalCharge(302) == -1 ||
+            sysi_mdl_reconstructed.getFormalCharge(303) == -1, "One of the terminal carboxylate "
+            "oxygens of Trp-cage should have a formal charge of -1.", tsm.getTestingStatus());
+      check(sysi_mdl_reconstructed.getFormalCharge(151) == 1, "The lysine head group charge on a "
+            "residue in Trp-cage should have a formal charge of +1.", tsm.getTestingStatus());
+      CHECK_THROWS_SOFT(sysi_mdl_reconstructed.getFormalCharge(10000), "A bogus atom index was "
+                        "permitted into a formal charge query.", tsm.getTestingStatus());
+    }
+  }
+  check(recon_atom_counts, RelationalOperator::EQUAL, recon_atom_counts_ans, "Atom counts "
+        "recovered from MDL MOL objects built from topology and CoordinateFrame objects do not "
+        "meet expectations.", tsm.getTestingStatus());
+  check(recon_bond_counts, RelationalOperator::EQUAL, recon_bond_counts_ans, "Bond counts "
+        "recovered from MDL MOL objects built from topology and CoordinateFrame objects do not "
+        "meet expectations.", tsm.getTestingStatus());
   
   // Print results
   printTestSummary(oe.getVerbosity());

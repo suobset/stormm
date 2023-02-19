@@ -4,8 +4,10 @@
 
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "Constants/symbol_values.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "Parsing/textfile.h"
 
 namespace stormm {
@@ -14,24 +16,53 @@ namespace namelist {
 using constants::ExceptionResponse;
 using parse::TextFile;
 using parse::WrapTextSearch;
+using synthesis::SystemGrouping;
 
 /// \brief Default input settings for the &conformer namelist
 /// \{
-constexpr int default_conf_rotation_samples     = 3;
-constexpr int default_conf_max_rotatable_bonds  = 4;
-constexpr int default_conf_max_seeding_attempts = 3;
-constexpr int default_conf_max_system_trials    = 16384;
-constexpr int default_conf_running_states       = 16;
-constexpr int default_conf_final_states         = 100;
-constexpr int default_conf_reshuffle_iterations = 0;
-constexpr int active_states_limit               = 524288;
-constexpr double default_conf_rmsd_tolerance    = 1.5;
-constexpr double default_conf_core_restraint    = 16.0;
-constexpr char default_conf_chirality[]         = "false";
-constexpr char default_conf_cis_trans[]         = "false";
-constexpr char default_conf_stop_hbonds[]       = "false";
+constexpr int default_conf_rotation_samples       = 3;
+constexpr int default_conf_cis_trans_samples      = 2;
+constexpr int default_conf_max_rotatable_bonds    = 4;
+constexpr int default_conf_max_seeding_attempts   = 3;
+constexpr int default_conf_max_system_trials      = 16384;
+constexpr int default_conf_running_states         = 16;
+constexpr int default_conf_final_states           = 100;
+constexpr int default_conf_reshuffle_iterations   = 0;
+constexpr int active_states_limit                 = 524288;
+constexpr double default_conf_rmsd_tolerance      = 1.5;
+constexpr double default_conf_core_restraint      = 16.0;
+constexpr char default_conf_chirality[]           = "false";
+constexpr char default_conf_cis_trans[]           = "false";
+constexpr char default_conf_stop_hbonds[]         = "false";
+constexpr char default_conf_output_grouping[]     = "system";
+constexpr char default_conf_sampling_effort[]     = "light";
+constexpr char default_conf_rotation_set_zero[]   = "60.0";
+constexpr char default_conf_rotation_set_one[]    = "180.0";
+constexpr char default_conf_rotation_set_two[]    = "-60.0";
+constexpr char default_conf_cis_trans_set_zero[]  = "0.0";
+constexpr char default_conf_cis_trans_set_one[]   = "180.0";
 /// \}
 
+/// \brief List the various general levels for system sampling.  The maximum number of trials per
+///        system will be capped at a user-specifiable quantity given by the "max_system_trials"
+///        keyword, or some value determined on a system-by-system basis determined by one of the
+///        enumerations herein.
+enum class SamplingIntensity {
+  MINIMAL,    ///< Sample each rotamer with a user-specified number of torsion angles across the
+              ///<   rotatable bond ("rotation_samples").
+  LIGHT,      ///< Sample each pair of nearby rotamers, cis-trans isomerizations, and chiral
+              ///<   centers, applying all combinations of torsion angles with the sampling density
+              ///<   given by the "rotation_samples" keyword.  For each state, other degrees of
+              ///<   freedom will be set randomly.
+  HEAVY,      ///< Sample each pair of nearby rotamers, applying all combinations of torsion angles
+              ///<   with the sampling density given by the "rotation_samples" keyword up to four
+              ///<   times, pending the availability of other degrees of freedom which can be set
+              ///<   randomly to generate unique starting conditions.
+  EXHAUSTIVE  ///< Sample all possible combinations of rotamers, isomerizable cis-trans bonds, and
+              ///<   invertible chiral centers, up to the hard limit set forth by the
+              ///<   "max_system_trials" keyword.
+};
+  
 /// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
 class ConformerControls {
 public:
@@ -104,6 +135,15 @@ public:
   /// \brief Get the number of samples to apply to each explicitly sampled rotatable bond.
   int getRotationSampleCount() const;
 
+  /// \brief Get the number of samples to apply to each explicitly sampled cis-trans isomeric bond.
+  int getCisTransSampleCount() const;
+
+  /// \brief Get the list of rotational angle values to sample about each rotatable bond.
+  const std::vector<double>& getRotationSampleValues() const;
+
+  /// \brief Get the list of rotational angle values to sample about each cis-trans isomeric bond.
+  const std::vector<double>& getCisTransSampleValues() const;
+
   /// \brief Get the maximum number of rotatable bonds to sample.
   int getRotatableBondLimit() const;
 
@@ -114,35 +154,19 @@ public:
   ///        initial state provided by the user will be subject to this limit, so if the limit
   ///        is 5000 and one molecule has two initial states listed in the input deck, the total
   ///        number of conformations sampled will be no greater than 10000.
-  int getSystemTrialCount() const;
+  int getMaximumTrialLimit() const;
   
   /// \brief Get the positional root mean squared deviation that will distinguish each reported
   ///        confomer.
   double getRMSDTolerance() const;
 
-  /// \brief Validate the restraining potential that will define the common core.
-  void validateCoreRestraint() const;
-  
-  /// \brief Validate input pertaining to chiral sampling .
-  ///
-  /// \param directive  The keyword setting for chirality sampling (must be 'true' or 'false',
-  ///                   without case sensitivity)
-  void validateSampleChirality(const std::string &directive) const;
+  /// \brief Get the output grouping strategy, indicating whether to take the specified number of
+  ///        final states for each system entered by the user, for each label group spanning one
+  ///        or more systems, or for each unique topology spanning one or more systems.
+  SystemGrouping getGroupingMethod() const;
 
-  /// \brief Validate input pertaining to sampling cis- and trans- states of molecules.
-  ///
-  /// \param directive  The keyword setting for cis- and trans- sampling (must be 'true' or
-  ///                   'false', without case sensitivity)
-  void validateSampleCisTrans(const std::string &directive) const;
-
-  /// \brief Validate input pertaining to hydrogen bonding prevention.
-  ///
-  /// \param directive  The keyword setting for cis- and trans- sampling (must be 'true' or
-  ///                   'false', without case sensitivity)
-  void validatePreventHBonds(const std::string &directive) const;  
-  
-  /// \brief Validate the replica counts and criteria for distinguishing unique conformers.
-  void validateStateCounts();
+  /// \brief Get a general sampling strategy from the user.
+  SamplingIntensity getSamplingIntensity() const;
   
 private:
   ExceptionResponse policy;         ///< Set the behavior when bad inputs are encountered.  DIE =
@@ -171,15 +195,81 @@ private:
                                     ///<   from forming during energy minimizations
   int running_states;               ///< Number of states to try minimizing at one time
   int final_states;                 ///< Number of final states to collect
-  int rotation_samples;             ///< Number of times to sample about a rotatable bond
+  int rotation_sample_count;        ///< Number of times to sample about a rotatable bond
   int rotatable_bond_limit;         ///< Maximum number of rotatable bonds to explicitly sample
+  int cis_trans_sample_count;       ///< Number of times to sample about a cis-trans isomeric bond
   int max_seeding_attempts;         ///< Maximum number of attempts to make in seeding each
                                     ///<   conformer.  If the seeding fails, the conformer will be
                                     ///<   left in its original state from the user input.
-  int system_trials;                ///< Maximum number of distinct minimizations to attempt with
+  int maximum_trial_limit;          ///< Maximum number of distinct minimizations to attempt with
                                     ///<   one molecule
   double rmsd_tolerance;            ///< Minimum mass-weighted root-mean squared deviation between
                                     ///<   unique conformers
+  std::string group_method;         ///< String indicating the way in which to group trials from
+                                    ///<   one or more user-specified system inputs when selecting
+                                    ///<   output conformations
+  std::string sample_effort;        ///< String indicating the degree of effort to exert on any
+                                    ///<   particular compound based on the number or combinations
+                                    ///<   of rotatable bonds, chiral centers, or isomeriable
+                                    ///<   cis-trans bonds
+
+  /// The specific values at which to set each rotatable bond for initial poses.
+  std::vector<double> rotation_sample_values;
+
+  /// The specific values at which to set each cis-trans isomeric bond for initial poses.
+  std::vector<double> cis_trans_sample_values;
+
+  /// \brief Validate the restraining potential that will define the common core.
+  void validateCoreRestraint() const;
+  
+  /// \brief Validate input pertaining to chiral sampling.
+  ///
+  /// \param directive  The keyword setting for chirality sampling (must be 'true' or 'false',
+  ///                   without case sensitivity)
+  void validateSampleChirality(const std::string &directive) const;
+
+  /// \brief Validate input pertaining to sampling cis- and trans- states of molecules.
+  ///
+  /// \param directive  The keyword setting for cis- and trans- sampling (must be 'true' or
+  ///                   'false', without case sensitivity)
+  void validateSampleCisTrans(const std::string &directive) const;
+
+  /// \brief Validate input pertaining to hydrogen bonding prevention.
+  ///
+  /// \param directive  The keyword setting for cis- and trans- sampling (must be 'true' or
+  ///                   'false', without case sensitivity)
+  void validatePreventHBonds(const std::string &directive) const;  
+  
+  /// \brief Validate the replica counts and criteria for distinguishing unique conformers.
+  void validateStateCounts();
+
+  /// \brief Validate the manner in which to group systems for analysis purposes.
+  void validateGroupingMethod();
+
+  /// \brief Validate the level of effort to be invested in sampling any given molecule.
+  void validateSamplingIntensity();
+
+  /// \brief Process values for setting the angle about each rotatable bond or cis-trans isomeric
+  ///        bond from the namelist object.  Store the values in the appropriate vector and
+  ///        length counter.  Length counters are provided separately to give the user more options
+  ///        as to how to specify the array of angles.
+  ///
+  /// \param sample_count   The number of rotatory samples to attempt.  Set and returned.
+  /// \param count_keyword  Keyword associated with the sample_count integer
+  /// \param sample_values  Array of values for all rotation angles to be sampled.  Filled and
+  ///                       returned.
+  /// \param value_keyword  Keyword associated with the sample_values array
+  /// \param value_stride   The amount to stride forward when sampling values around the rotation
+  ///                       circle with automated sample delineation, given in units of degrees.
+  ///                       120 for rotatable bonds and 180 for cis-trans isomeric bonds.
+  /// \param value_notch    The amount by which to perturb the circular orbit with each successive
+  ///                       rotation, to prevent successive orbits from creating the same set of
+  ///                       samples.  10 for rotatable bonds and 5 for cis-trans isomeric bonds.  
+  /// \param t_nml          Contains user input from a &conformer namelist
+  void processSamplingValues(int *sample_count, const std::string &count_keyword,
+                             std::vector<double> *sample_values, const std::string &value_keyword,
+                             double value_stride, double value_notch,
+                             const NamelistEmulator &t_nml);
 };
 
 /// \brief Free function to read the &conformer namelist.  This works in analogous fashion to
@@ -201,6 +291,16 @@ private:
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
                                 ExceptionResponse policy = ExceptionResponse::DIE,
                                 WrapTextSearch wrap = WrapTextSearch::NO);
+
+/// \brief Return a human-readable string describing each level of sampling effort.
+///
+/// \param input  The sampling effort enumeration
+std::string getEnumerationName(SamplingIntensity input);
+
+/// \brief Interpret string input to recognize a specific level of sampling effort.
+///
+/// \param input  The human-readable sampling keyword input
+SamplingIntensity translateSamplingIntensity(const std::string &input);
   
 } // namespace namelist
 } // namespace stormm

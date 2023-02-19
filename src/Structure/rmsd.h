@@ -10,6 +10,9 @@
 #include "Math/summation.h"
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Synthesis/synthesis_abstracts.h"
+#include "Synthesis/synthesis_cache_map.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
@@ -34,6 +37,10 @@ using synthesis::Condensate;
 using synthesis::CondensateReader;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisReader;
+using synthesis::SyNonbondedKit;
+using synthesis::SynthesisCacheMap;
+using synthesis::SynthesisMapReader;
+using synthesis::SystemGrouping;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
@@ -50,21 +57,25 @@ using trajectory::PhaseSpaceWriter;
 /// Overloaded:
 ///   - Include only the plan and the synthesis itself
 ///   - Also include a condensed copy of the synthesis coordinates
+///   - Also include a synthesis cache map relating systems back to original user specifications
 ///
-/// \param rplan      Plan for computing RMSD values for any topology included in the synthesis
-/// \param snapshots  The synthesis of coordinates
-/// \param cdns       Condensed form of the coordinate synthesis
-/// \param result     Vector that shall hold the results (not modified herein, simply passed in to
-///                   check its size)
-/// \param process    The kind of RMSD calculations to perform
+/// \param rplan         Plan for computing RMSD values for any topology included in the synthesis
+/// \param snapshots     The synthesis of coordinates
+/// \param cdns          Condensed form of the coordinate synthesis
+/// \param result        Vector that shall hold the results (not modified herein, simply passed in
+///                      to check its size)
+/// \param process       The kind of RMSD calculations to perform
+/// \param organization  The manner in which systems within the underlying synthesis are grouped
+///                      for RMSD comparisons
 /// \{
 template <typename T>
 void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-                        const Hybrid<T> *result, RMSDTask process);
+                        const Hybrid<T> *result, RMSDTask process, SystemGrouping organization);
 
 template <typename T>
 void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-                        const Condensate &cdns, const Hybrid<T> *result, RMSDTask process);
+                        const Condensate &cdns, const Hybrid<T> *result, RMSDTask process,
+                        SystemGrouping organization);
 /// \}
 
 /// \brief Compute the positional RMSD between two sets of coordinates.
@@ -193,18 +204,21 @@ void rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots, Hybrid<T>
 
 template <typename T>
 void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
-          const Hybrid<int> &reference_frames, Hybrid<T> *result);
+          const Hybrid<int> &reference_frames, Hybrid<T> *result,
+          SystemGrouping organization = SystemGrouping::TOPOLOGY);
 
 template <typename T>
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, Hybrid<T> *result);
+void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, Hybrid<T> *result,
+          SystemGrouping organization = SystemGrouping::TOPOLOGY);
 
 template <typename T>
 void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
-          const Hybrid<int> &reference_frames, Hybrid<T> *result);
+          const Hybrid<int> &reference_frames, Hybrid<T> *result,
+          SystemGrouping organization = SystemGrouping::TOPOLOGY);
 
 template <typename T>
 void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
-          Hybrid<T> *result);
+          Hybrid<T> *result, SystemGrouping organization = SystemGrouping::TOPOLOGY);
 /// \}
 
 } // namespace structure

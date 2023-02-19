@@ -77,6 +77,13 @@ public:
   std::vector<T> getState() const;
   /// \}
 
+  /// \brief Get a vector of all possible states for one of the variables.
+  ///
+  /// \param var_index  Index of the variable of interest
+  /// \{
+  std::vector<T> getPossibleStates(int var_index) const;
+  /// \}
+
   /// \brief Get the exact number of permutations count for this object.
   llint getExactPermutationCount() const;
 

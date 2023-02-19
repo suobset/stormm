@@ -6,6 +6,7 @@
 #include "../../../src/DataTypes/stormm_vector_types.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/Math/rounding.h"
+#include "../../../src/Math/series_ops.h"
 #include "../../../src/Math/summation.h"
 #include "../../../src/MoleculeFormat/molecule_parsing.h"
 #include "../../../src/Parsing/parse.h"
@@ -28,12 +29,14 @@ using stormm::data_types::double2;
 using stormm::diskutil::getBaseName;
 using stormm::errors::rtErr;
 using stormm::errors::rtWarn;
+using stormm::math::incrementingSeries;
 using stormm::math::prefixSumInPlace;
 using stormm::math::PrefixSumType;
 using stormm::math::roundUp;
 using stormm::math::sum;
 using stormm::math::loadScalarStateValues;
 using stormm::namelist::ConformerControls;
+using stormm::namelist::SamplingIntensity;
 using stormm::parse::char4ToString;
 using stormm::structure::detectClash;
 using stormm::structure::flipChiralCenter;
@@ -238,34 +241,48 @@ CoordinateFrame forgeConformation(const CoordinateFrame &cf, const AtomGraph *ag
 //-------------------------------------------------------------------------------------------------
 std::vector<int> calculateReplicaCounts(const ConformerControls &conf_input,
                                         const SystemCache &sc, StopWatch *tm) {
+  
   const double ln_rb = log(conf_input.getRotationSampleCount());
   const double ln_two = log(2.0);
-  const double ln_max_states = log(conf_input.getSystemTrialCount());
+  const double ln_max_states = log(conf_input.getMaximumTrialLimit());
 
   // Apply the topology-based counts to each system
   const int nsys = sc.getSystemCount();
   std::vector<int> result(nsys);
+  const SamplingIntensity effort = conf_input.getSamplingIntensity();
   for (int i = 0; i < nsys; i++) {
     const ChemicalFeatures& ichemfe = sc.getFeaturesReference(i);
-    double ln_count = (ln_rb * static_cast<double>(ichemfe.getRotatableBondCount())) +
-                      (ln_two * static_cast<double>(ichemfe.getCisTransBondCount()));
-    const std::vector<ChiralInversionProtocol> chiral_ops = ichemfe.getChiralInversionMethods();
-    const size_t nchir = chiral_ops.size();
-    for (size_t j = 0; j < nchir; j++) {
-      switch (chiral_ops[j]) {
-      case ChiralInversionProtocol::ROTATE:
-      case ChiralInversionProtocol::REFLECT:
-        ln_count += ln_two;
-        break;
-      case ChiralInversionProtocol::DO_NOT_INVERT:
-        break;
+    double ln_count;
+    switch (effort) {
+    case SamplingIntensity::MINIMAL:
+      
+      break;
+    case SamplingIntensity::LIGHT:
+      break;
+    case SamplingIntensity::HEAVY:
+      break;
+    case SamplingIntensity::EXHAUSTIVE:
+      double ln_count = (ln_rb * static_cast<double>(ichemfe.getRotatableBondCount())) +
+                        (ln_two * static_cast<double>(ichemfe.getCisTransBondCount()));
+      const std::vector<ChiralInversionProtocol> chiral_ops = ichemfe.getChiralInversionMethods();
+      const size_t nchir = chiral_ops.size();
+      for (size_t j = 0; j < nchir; j++) {
+        switch (chiral_ops[j]) {
+        case ChiralInversionProtocol::ROTATE:
+        case ChiralInversionProtocol::REFLECT:
+          ln_count += ln_two;
+          break;
+        case ChiralInversionProtocol::DO_NOT_INVERT:
+          break;
+        }
       }
-    }
-    if (ln_count < ln_max_states) {
-      result[i] = ceil(exp(ln_count));
-    }
-    else {
-      result[i] = conf_input.getSystemTrialCount();
+      if (ln_count <= ln_max_states) {
+        result[i] = ceil(exp(ln_count));
+      }
+      else {
+        result[i] = conf_input.getMaximumTrialLimit();
+      }
+      break;
     }
   }
   tm->assignTime(tm_coordinate_expansion);
@@ -274,7 +291,8 @@ std::vector<int> calculateReplicaCounts(const ConformerControls &conf_input,
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts,
-                                          const SystemCache &sc, StopWatch *tm) {
+                                          const SystemCache &sc, SynthesisCacheMap *scmap,
+                                          StopWatch *tm) {
   const int n_proto_sys = replica_counts.size();
   if (n_proto_sys != sc.getSystemCount()) {
     rtErr("Replica counts were provided for " + std::to_string(replica_counts.size()) +
@@ -293,8 +311,11 @@ PhaseSpaceSynthesis buildReplicaWorkspace(const std::vector<int> &replica_counts
       rep_con++;
     }
   }
+  PhaseSpaceSynthesis result(proto_coords, topology_pointers, index_key);
+  scmap->setCache(index_key, sc.getSelfPointer());
+  scmap->setSynthesis(result);
   tm->assignTime(tm_coordinate_expansion);
-  return PhaseSpaceSynthesis(proto_coords, topology_pointers, index_key);
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -391,17 +412,17 @@ void expandConformers(PhaseSpaceSynthesis *poly_ps, const std::vector<int> &repl
     const double ln_choices = ptrack.getLogPermutationCount();
     SamplingStrategy strat;
     int conformations_per_case;
-    if (ln_choices < log(conf_input.getSystemTrialCount())) {
+    if (ln_choices < log(conf_input.getMaximumTrialLimit())) {
       conformations_per_case = ptrack.getExactPermutationCount();
       strat = SamplingStrategy::FULL;
     }
     else if (computeLocalPermutations(permutation_limits, isomerizers, iag_ptr) <
-             static_cast<double>(conf_input.getSystemTrialCount())) {
-      conformations_per_case = conf_input.getSystemTrialCount();
+             static_cast<double>(conf_input.getMaximumTrialLimit())) {
+      conformations_per_case = conf_input.getMaximumTrialLimit();
       strat = SamplingStrategy::LIMITED;
     }
     else {
-      conformations_per_case = conf_input.getSystemTrialCount();
+      conformations_per_case = conf_input.getMaximumTrialLimit();
       strat = SamplingStrategy::SPARSE;
     }
     if (conformations_per_case != replica_bounds[i + 1] - replica_bounds[i]) {

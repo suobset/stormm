@@ -130,6 +130,37 @@ enum class CondensateSource {
   SERIES      ///< The coordinates came from a CoordinateSeries
 };
 
+/// \brief List the possible ways that systems from a synthesis can be grouped.
+enum class SystemGrouping {
+  SOURCE,     ///< Group systems arising from the same input coordinate set and topology, in the
+              ///<   context of a SystemCache system created from a user-specified "-sys" keyword
+              ///<   entry.  Multile replicas spawned from the same "-sys" entry will be grouped
+              ///<   together.
+  TOPOLOGY,   ///< Group systems by the unique topologies representing them.
+  LABEL       ///< Group systems by the label group representing them (this may not be feasible for
+              ///<   all analyses, if the analysis requires that the systems also share a topology
+              ///<   and the label groups happen to span multiple topologies).
+};
+
+/// \brief Get a human-readable string for one of the enumerator settings.  Various overloads of
+///        this function here and in other libraries seve different enumerators.
+///
+/// \param input  The enumeration of interest
+/// \{
+std::string getEnumerationName(NbwuKind input);
+std::string getEnumerationName(VwuTask input);
+std::string getEnumerationName(VwuGoal input);
+std::string getEnumerationName(InitializationTask input);
+std::string getEnumerationName(CondensateSource input);
+std::string getEnumerationName(SystemGrouping input);
+/// \}
+
+/// \brief Translate a control string into one of the accepted system grouping protocols.  The
+///        process is case-insensitive.
+///
+/// \param input_string  Control string of interest
+SystemGrouping translateSystemGrouping(const std::string &input_string);
+  
 } // namespace synthesis
 } // namespace stormm
 

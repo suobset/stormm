@@ -215,7 +215,8 @@ __global__ void __launch_bounds__(tiny_block_size, 1)
 RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader poly_psr,
                      const int* reference_frames, TCALC* result) {
 
-  // Determine whether the request is for RMSD calculations to reference structures or 
+  // Determine whether the request is for RMSD calculations to reference structures or instead
+  // for an all-to-all RMSD matrix.
   
   const int warps_per_block = (blockDim.x >> warp_bits);
   const int warp_idx = (threadIdx.x >> warp_bits);
@@ -526,7 +527,7 @@ RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader
       WARP_REDUCE_DOWN(rmsd_acc);
       if (lane_idx == 0) {
         rmsd_acc = SQRT_FUNC(rmsd_acc * total_mass);
-        result[rplanr.atr_starts[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
+        result[rplanr.atr_starts_top[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
       }
     }
     break;
@@ -600,7 +601,7 @@ RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader
       WARP_REDUCE_DOWN(total_mass);
       if (lane_idx == 0) {
         rmsd_acc = SQRT_FUNC(rmsd_acc / total_mass);
-        result[rplanr.atr_starts[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
+        result[rplanr.atr_starts_top[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
       }
     }
     break;    

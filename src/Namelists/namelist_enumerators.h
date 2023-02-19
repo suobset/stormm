@@ -52,7 +52,7 @@ enum class SubkeyRequirement {
 /// \brief Return a string corresponding to the namelist data type enumerations.
 ///
 /// \param param_type  The type of namelist keyword in question
-std::string getNamelistTypeName(NamelistType param_type);
+std::string getEnumerationName(NamelistType param_type);
 
 /// \brief Return a string corresponding to an input status setting.
 ///

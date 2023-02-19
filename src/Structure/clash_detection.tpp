@@ -64,9 +64,9 @@ bool trivialClashCheck(const std::vector<Tcalc> &cachi_xcrd, const std::vector<T
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                        const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                        const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
-                        const Tcalc vdw_ratio, const Tcalc inv_scale, ClashReport *summary) {
+                        const NonbondedKit<Tcalc> &nbk, const StaticExclusionMaskReader &maskr,
+                        const Tcalc elec_limit, const Tcalc vdw_ratio, const Tcalc inv_scale,
+                        ClashReport *summary) {
 
   // Determine the calculation type and a maximum distance parameter
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
@@ -186,10 +186,128 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord>
+int3 clashGridDecomposition(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                            const int natom, double3 *grid_origin, double3 *grid_lengths) {
+  
+  // Use the atom count to set an upper limit as to the number of grid cells.  The minimum is 512
+  // (a grid of 8 x 8 x 8, or some rearrangement of that many cells), the maximum will be
+  // determined by placing up to sixteen atoms in each cell.
+  const llint max_cells = std::max(natom / 16, 216);
+  Tcoord min_x = xcrd[0];
+  Tcoord max_x = xcrd[0];
+  Tcoord min_y = ycrd[0];
+  Tcoord max_y = ycrd[0];
+  Tcoord min_z = zcrd[0];
+  Tcoord max_z = zcrd[0];
+  for (int i = 1; i < natom; i++) {
+    min_x = std::min(xcrd[i], min_x);
+    max_x = std::max(xcrd[i], max_x);
+    min_y = std::min(ycrd[i], min_y);
+    max_y = std::max(ycrd[i], max_y);
+    min_z = std::min(zcrd[i], min_z);
+    max_z = std::max(zcrd[i], max_z);
+  }
+  grid_origin->x = min_x;
+  grid_origin->y = min_y;
+  grid_origin->z = min_z;
+  grid_lengths->x = max_x - min_x;
+  grid_lengths->y = max_y - min_y;
+  grid_lengths->z = max_z - min_z;
+
+  // Find the manner in which the grid cells can be partitioned which makes them as close as
+  // possible to cubes.
+  const Tcoord len_x = max_x - min_x;
+  const Tcoord len_y = max_y - min_y;
+  const Tcoord len_z = max_z - min_z;
+  const Tcoord ratio_xy = len_y / len_x;
+  const Tcoord ratio_xz = len_z / len_x;
+  const Tcoord prod_ratio_xyz = ratio_xy * ratio_xz;
+  const Tcoord dmax_cells = max_cells;
+  const int guess_xdim = round(cbrt(dmax_cells / prod_ratio_xyz));
+  llint min_diff = max_cells;
+  int3 result;
+  for (int i = guess_xdim - 2; i < guess_xdim + 2; i++) {
+    if (i < 1) {
+      continue;
+    }
+    llint nx = i;
+    llint ny = round(i * ratio_xy);
+    llint nz = round(i * ratio_xz);
+    const llint nxyz  = nx * ny * nz;
+    const llint ndiff = llabs(max_cells - nxyz);
+    if (ndiff < min_diff || min_diff == max_cells) {
+      min_diff = ndiff;
+      result.x = nx;
+      result.y = ny;
+      result.z = nz;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+bool clashCellToCell(const int icell_othr, const int jcell_othr, const int kcell_othr,
+                     const int icell_home, const int jcell_home, const int kcell_home,
+                     const int3 grid_cells, const Tcoord* xcrd, const Tcoord* ycrd,
+                     const Tcoord* zcrd, const std::vector<int> &cell_contents,
+                     const std::vector<int> &cell_content_bounds, const NonbondedKit<Tcalc> &nbk,
+                     const StaticExclusionMask *mask, const Tcalc elec_limit,
+                     const Tcalc vdw_ratio, const Tcalc inv_scale, ClashReport *summary) {
+
+  // Bail out immediately if the "other" cell is off the grid (non-periodic boundary conditions are
+  // assumed).  The home cell is assumed to be on the grid.
+  if (icell_othr < 0 || icell_othr >= grid_cells.x || jcell_othr < 0 ||
+      jcell_othr >= grid_cells.y || kcell_othr < 0 || kcell_othr >= grid_cells.z) {
+    return false;
+  }
+
+  // Determine the two cell indices
+  const int home_idx = (((kcell_home * grid_cells.y) + jcell_home) * grid_cells.x) + icell_home;
+  const int othr_idx = (((kcell_othr * grid_cells.y) + jcell_othr) * grid_cells.x) + icell_othr;
+
+  // Loop over all atoms in each cell
+  bool result = false;
+  bool tcalc_is_double = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index);
+  const int ilim = cell_content_bounds[home_idx + 1];
+  const Tcalc sq_elec = elec_limit * elec_limit;
+  for (int i = cell_content_bounds[home_idx]; i < ilim; i++) {
+    const int iatom  = cell_contents[i];
+    const int iljidx = nbk.lj_idx[iatom];
+    const Tcalc ixloc = xcrd[iatom];
+    const Tcalc iyloc = ycrd[iatom];
+    const Tcalc izloc = zcrd[iatom];
+    const int jlim = cell_content_bounds[othr_idx + 1];
+    for (int j = cell_content_bounds[othr_idx]; j < jlim; j++) {
+      const int jatom = cell_contents[j];
+      const Tcalc dij_xloc = xcrd[jatom] - ixloc;
+      const Tcalc dij_yloc = ycrd[jatom] - iyloc;
+      const Tcalc dij_zloc = zcrd[jatom] - izloc;
+      const Tcalc sq_dist = (dij_xloc * dij_xloc) + (dij_yloc * dij_yloc) + (dij_zloc * dij_zloc);
+      const int jljidx = nbk.lj_idx[jatom];
+      const Tcalc ij_sigma = vdw_ratio * nbk.lj_sigma[(iljidx * nbk.n_lj_types) + jljidx];
+      if (sq_dist < ij_sigma * ij_sigma || sq_dist < sq_elec) {
+
+        // Check that this non-bonded interaction, which appears to be clashing, is not in fact an
+        // exclusion.
+        if (mask->testExclusion(iatom, jatom) == false) {
+          result = true;
+          if (summary != nullptr) {
+            summary->addClash(iatom, jatom, (tcalc_is_double) ? sqrt(sq_dist) : sqrtf(sq_dist));
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit,
                  const Tcalc vdw_ratio, const Tcalc inv_scale, ClashReport *summary) {
 
   // Set the summary to make use of the supplied clash limits.  In many cases this will overwrite
@@ -206,23 +324,97 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
   
   // Do the direct calculation if the size is very small
   if (nbk.natom < clash_direct_calculation_size_limit) {
-    clash_found = directClashTesting(xcrd, ycrd, zcrd, vk, nbk, maskr, vdw_ratio, elec_limit,
+    clash_found = directClashTesting(xcrd, ycrd, zcrd, nbk, mask->data(), vdw_ratio, elec_limit,
                                      inv_scale, summary);
   }
   else {
-
-    // CHECK
-    clash_found = directClashTesting(xcrd, ycrd, zcrd, vk, nbk, maskr, vdw_ratio, elec_limit,
-                                     inv_scale, summary);
-    // END CHECK
     
     // Find the largest clashing distance.
     const Tcalc max_clash = maxClashingDistance<Tcalc>(nbk, elec_limit, vdw_ratio);
     if (max_clash >= constants::tiny) {
 
       // Design a grid based on the maximum clash distance.  In order to be worthwhile, the grid
-      // cells must be at least max_clash thick between all parallel faces, and more than five
-      // grid cells in all directions
+      // cells must be at least max_clash thick between all parallel faces, and six or more
+      // grid cells in all directions.
+      double3 grid_origin, grid_lengths;
+      const int3 grid_cells = clashGridDecomposition<Tcoord>(xcrd, ycrd, zcrd, nbk.natom,
+                                                             &grid_origin, &grid_lengths);
+      const double3 dgrid_cells = { static_cast<double>(grid_cells.x),
+                                    static_cast<double>(grid_cells.y),
+                                    static_cast<double>(grid_cells.z) };
+      const int ncell = grid_cells.x * grid_cells.y * grid_cells.z;
+      std::vector<int> cell_content_bounds(ncell + 1, 0);
+      std::vector<int> cell_homes(nbk.natom);
+      std::vector<int> cell_contents(nbk.natom);
+      for (int i = 0; i < nbk.natom; i++) {
+        const int icellx = ((xcrd[i] - grid_origin.x) / grid_lengths.x) * dgrid_cells.x;
+        const int icelly = ((ycrd[i] - grid_origin.y) / grid_lengths.y) * dgrid_cells.y;
+        const int icellz = ((zcrd[i] - grid_origin.z) / grid_lengths.z) * dgrid_cells.z;
+        cell_homes[i] = (((icellz * grid_cells.y) + icelly) * grid_cells.x) + icellx;
+      }
+      indexingArray(cell_homes, &cell_contents, &cell_content_bounds);
+      for (int i = 0; i < grid_cells.x; i++) {
+        for (int j = 0; j < grid_cells.y; j++) {
+          for (int k = 0; k < grid_cells.z; k++) {
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1, j - 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1,     j, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1, j + 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(    i, j - 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(    i,     j, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(    i, j + 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i + 1, j - 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i + 1,     j, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i + 1, j + 1, k - 1, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1, j - 1,     k, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1,     j,     k, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(i - 1, j + 1,     k, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(    i, j - 1,     k, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+            clash_found = (clash_found ||
+                           clashCellToCell(    i,     j,     k, i, j, k, grid_cells, xcrd, ycrd,
+                                           zcrd, cell_contents, cell_content_bounds, nbk, mask,
+                                           vdw_ratio, elec_limit, inv_scale, summary));
+          }
+        }
+      }
     }
   }
 
@@ -274,13 +466,13 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMaskReader &maskr, const double elec_limit,
+                 const StaticExclusionMask *mask, const double elec_limit,
                  const Tcalc vdw_ratio, ClashReport *summary) {
   const size_t padded_atoms = roundUp(csr.natom, warp_size_int);
   const size_t atom_start = frame * padded_atoms;
   const size_t xfrm_start = frame * roundUp<size_t>(9, warp_size_zu);
   return detectClash(&csr.xcrd[atom_start], &csr.ycrd[atom_start], &csr.zcrd[atom_start], vk, nbk,
-                     maskr, elec_limit, vdw_ratio, csr.inv_gpos_scale, summary);
+                     mask, elec_limit, vdw_ratio, csr.inv_gpos_scale, summary);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -291,13 +483,13 @@ bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const Atom
   const size_t ct = std::type_index(typeid(Tcalc)).hash_code();
   if (ct == float_type_index) {
     return detectClash<Tcoord, float>(cs->data(), frame, ag->getSinglePrecisionValenceKit(),
-                                      ag->getSinglePrecisionNonbondedKit(), mask->data(),
-                                      elec_limit, vdw_ratio, summary);
+                                      ag->getSinglePrecisionNonbondedKit(), mask, elec_limit,
+                                      vdw_ratio, summary);
   }
   else {
     return detectClash<Tcoord, double>(cs->data(), frame, ag->getDoublePrecisionValenceKit(),
-                                       ag->getDoublePrecisionNonbondedKit(), mask->data(),
-                                       elec_limit, vdw_ratio, summary);
+                                       ag->getDoublePrecisionNonbondedKit(), mask, elec_limit,
+                                       vdw_ratio, summary);
   }
 }
 
@@ -331,17 +523,17 @@ bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const Atom
 template <typename Tcalc>
 bool detectClash(const CondensateReader &cdnsr, const int system_index,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMaskReader &maskr, const Tcalc elec_limit,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit,
                  const Tcalc vdw_ratio, ClashReport *summary) {
   const size_t atom_start = cdnsr.atom_starts[system_index];
   switch (cdnsr.mode) {
   case PrecisionModel::DOUBLE:
     return detectClash<double, Tcalc>(&cdnsr.xcrd[atom_start], &cdnsr.ycrd[atom_start],
-                                      &cdnsr.zcrd[atom_start], vk, nbk, maskr, elec_limit,
+                                      &cdnsr.zcrd[atom_start], vk, nbk, mask, elec_limit,
                                       vdw_ratio, 1.0, summary);
   case PrecisionModel::SINGLE:
     return detectClash<float, Tcalc>(&cdnsr.xcrd_sp[atom_start], &cdnsr.ycrd_sp[atom_start],
-                                     &cdnsr.zcrd_sp[atom_start], vk, nbk, maskr, elec_limit,
+                                     &cdnsr.zcrd_sp[atom_start], vk, nbk, mask, elec_limit,
                                      vdw_ratio, 1.0, summary);
   }
   __builtin_unreachable();

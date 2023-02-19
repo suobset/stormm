@@ -392,7 +392,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                   AtomicRadiusSet::MBONDI3 : AtomicRadiusSet::BONDI;
     poly_ag.setImplicitSolventModel(ism_choice, ngb_tables, radii);
   }
-  StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(), mol_id_vec);
+  StaticExclusionMaskSynthesis poly_se(poly_ag.getUniqueTopologies(), mol_id_vec);
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_ptr_vec, mol_id_vec, gpos_bits, 24, 40, frc_bits);
     

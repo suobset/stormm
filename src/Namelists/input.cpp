@@ -280,7 +280,7 @@ int readNamelist(const TextFile &tf, NamelistEmulator *nml, const int start_line
     // one by one, not knowing what they actually are.  Developers are not expected to access
     // namelist keywords by their indices in a list.
     const int n_entries = nml->getKeywordEntries(nml->getKeyword(i));
-    if (n_entries > 1) {
+    if (n_entries > 1 && nml->getKeywordStatus(nml->getKeyword(i)) != InputStatus::DEFAULT) {
       rtErr("Namelist \"" + nml->getTitle() + "\" seems to already contain user-specified data.  "
             "There are " + std::to_string(n_entries) + " entries for keyword " +
             nml->getKeyword(i) + ".", "readNamelist");

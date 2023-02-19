@@ -1,11 +1,16 @@
 #!/bin/bash
 
 echo "&files" > cgen.in
-for SYS in  gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_gly gly_lys \
-            gly_phe gly_pro gly_trp gly_tyr ; do
+for SYS in gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_phe gly_pro \
+           gly_trp gly_tyr ; do
   echo "  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/${SYS}.top" >> cgen.in
   echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd " >> cgen.in
-  echo "         -x conf_${SYS}.crd x_kind AMBER_CRD }" >> cgen.in
+  echo "         -x conf_${SYS}.crd x_kind SDF -label ${SYS} }" >> cgen.in
+done
+for SYS in gly_lys gly_gly ; do
+  echo "  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/${SYS}.top" >> cgen.in
+  echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd " >> cgen.in
+  echo "         -x conf_${SYS}.crd x_kind SDF -label ${SYS}_part2 }" >> cgen.in
 done
 cat >> cgen.in << EOF
   -x conf.crd
@@ -14,7 +19,7 @@ cat >> cgen.in << EOF
 
 &conformer
   rotation_samples 6,
-  max_system_trials 8, final_states 2,
+  trial_limit 10, final_states 6,
   core_mask { atoms "@N,CA,C & !(:ACE,NME)" }
 &end
 
@@ -23,12 +28,19 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 50, cdcyc 50, maxcyc 200, ntpr = 1,
+  ncyc 50, cdcyc 0, maxcyc 200, ntpr = 1,
   clash_vdw_ratio 0.65,
 &end
 
 &random
   igseed 9183025
+&end
+
+&report
+  sdf_item { -title total_energy    -label ALL -energy TOTAL_ENERGY }
+  sdf_item { -title dihedral_energy -label ALL -energy PROPER_DIHEDRAL }
+  sdf_item { -title elec_energy     -label ALL -energy ELECTROSTATIC_NONBONDED }
+  sdf_item { -title elec_14_energy  -label ALL -energy ELECTROSTATIC_NEAR }
 &end
 EOF
 
@@ -37,7 +49,7 @@ cat >> cgen.in << EOF
 EOF
 
 if [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda ] ; then
-  ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda -i cgen.in -warn
+  ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda -O -i cgen.in -warn
 elif [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm ] ; then
-  ${STORMM_BUILD}/apps/Conf/conformer.stormm -i cgen.in -warn
+  ${STORMM_BUILD}/apps/Conf/conformer.stormm -O -i cgen.in -warn
 fi

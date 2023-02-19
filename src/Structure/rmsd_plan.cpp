@@ -17,10 +17,15 @@ using chemistry::ChemicalDetailsKit;
 using chemistry::ChemicalFeatures;
 using diskutil::getBaseName;
 using math::roundUp;
+using synthesis::SynthesisMapReader;
   
 //-------------------------------------------------------------------------------------------------
-RMSDPlan::RMSDPlan(const RMSDMethod strategy_in, const double rmf_in) :
-    plan_count{0}, general_strategy{strategy_in}, required_mass_fraction{rmf_in},
+RMSDPlan::RMSDPlan(const RMSDMethod strategy_in, const double rmf_in,
+		   const PhaseSpaceSynthesis *poly_ps_in, const SystemCache *sc_in,
+		   const SynthesisCacheMap *scmap_in) :
+    plan_count{0}, rmsd_space_src{0}, rmsd_space_top{0}, rmsd_space_lbl{0}, rmsd_pair_space_src{0},
+    rmsd_pair_space_top{0}, rmsd_pair_space_lbl{0}, general_strategy{strategy_in},
+    required_mass_fraction{rmf_in},
     masses{HybridKind::ARRAY, "rplan_masses"},
     sp_masses{HybridKind::ARRAY, "rplan_masses_sp"},
     atom_counts{HybridKind::ARRAY, "rplan_atom_counts"},
@@ -37,9 +42,16 @@ RMSDPlan::RMSDPlan(const RMSDMethod strategy_in, const double rmf_in) :
     symmetry_depth{HybridKind::ARRAY, "rplan_depths"},
     symmetry_group_membership{HybridKind::ARRAY, "rplan_membership"},
     symmetry_group_membership_bounds{HybridKind::ARRAY, "rplan_mmb_bounds"},
-    frame_counts{HybridKind::ARRAY, "rplan_counts"},
-    all_to_all_offsets{HybridKind::ARRAY, "rplan_alltoall"},
-    ag_pointers{}
+    all_to_ref_offsets_src{HybridKind::ARRAY, "rplan_alltoall_src"},
+    all_to_ref_offsets_top{HybridKind::ARRAY, "rplan_alltoall_top"},
+    all_to_ref_offsets_lbl{HybridKind::ARRAY, "rplan_alltoall_lbl"},
+    all_to_all_offsets_src{HybridKind::ARRAY, "rplan_alltoall_src"},
+    all_to_all_offsets_top{HybridKind::ARRAY, "rplan_alltoall_top"},
+    all_to_all_offsets_lbl{HybridKind::ARRAY, "rplan_alltoall_lbl"},
+    ag_pointers{},
+    poly_ps_ptr{const_cast<PhaseSpaceSynthesis*>(poly_ps_in)},
+    sc_ptr{const_cast<SystemCache*>(sc_in)},
+    scmap_ptr{const_cast<SynthesisCacheMap*>(scmap_in)}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -78,40 +90,40 @@ RMSDPlan::RMSDPlan(const AtomEquivalence &eq_in, const RMSDMethod strategy_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, const RMSDMethod strategy_in,
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in, const RMSDMethod strategy_in,
                    const double rmf_in, const GpuDetails &gpu, const int low_mol_idx,
                    const int high_mol_idx) :
-    RMSDPlan(strategy_in, rmf_in)
+    RMSDPlan(strategy_in, rmf_in, poly_ps_in)
 {
   // There will be as many plans as the PhaseSpaceSynthesis has unique topologies.  It will be
   // assumed that a common range of molecules (again, defaulting to the first molecule) applies to
   // the desired RMSD calculations across all systems.
-  ag_pointers = poly_ps_in.getUniqueTopologies();
+  ag_pointers = poly_ps_in->getUniqueTopologies();
   plan_count = ag_pointers.size();
-  const std::vector<int>& sys_top_indices = poly_ps_in.getUniqueTopologyExampleIndices();
+  const std::vector<int>& sys_top_indices = poly_ps_in->getUniqueTopologyExampleIndices();
   std::vector<AtomEquivalence> eq_tables;
   eq_tables.reserve(plan_count);
   for (int i = 0; i < plan_count; i++) {
-    const CoordinateFrame cf_example = poly_ps_in.exportCoordinates(sys_top_indices[i]);
+    const CoordinateFrame cf_example = poly_ps_in->exportCoordinates(sys_top_indices[i]);
     ChemicalFeatures chemfe(ag_pointers[i], cf_example);
     eq_tables.emplace_back(chemfe, nullptr, low_mol_idx, high_mol_idx);
   }
   chartSymmetryGroups(eq_tables);
 
   // Infer the number of frames from the synthesis object
-  formatResults(poly_ps_in);
+  formatResults();
 }
 
 //-------------------------------------------------------------------------------------------------
-RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in,
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in,
                    const std::vector<AtomEquivalence> &eq_list_in, const RMSDMethod strategy_in,
                    const double rmf_in, const GpuDetails &gpu) :
-    RMSDPlan(strategy_in, rmf_in)
+    RMSDPlan(strategy_in, rmf_in, poly_ps_in)
 {
   // Check that there are enough plans to cover the various topologies in the synthesis, and the
   // topologies referenced by each plan should match those in the synthesis, at least in terms of
   // the atom counts.
-  ag_pointers = poly_ps_in.getUniqueTopologies();
+  ag_pointers = poly_ps_in->getUniqueTopologies();
   if (ag_pointers.size() != eq_list_in.size()) {
     rtErr("One atom equivalence object must be provided for each unique topology in the "
           "synthesis.  " + std::to_string(ag_pointers.size()) + " unique topologies were "
@@ -132,8 +144,43 @@ RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in,
     }
   }
   chartSymmetryGroups(eq_list_in);
-  formatResults(poly_ps_in);
+  formatResults();
 }
+
+//-------------------------------------------------------------------------------------------------
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, const RMSDMethod strategy_in,
+                   const double rmf_in, const GpuDetails &gpu, const int low_mol_idx,
+                   const int high_mol_idx) :
+    RMSDPlan(poly_ps_in.getSelfPointer(), strategy_in, rmf_in, gpu, low_mol_idx, high_mol_idx)
+{}
+
+//-------------------------------------------------------------------------------------------------
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in,
+                   const std::vector<AtomEquivalence> &eq_list_in, const RMSDMethod strategy_in,
+                   const double rmf_in, const GpuDetails &gpu) :
+    RMSDPlan(poly_ps_in.getSelfPointer(), eq_list_in, strategy_in, rmf_in, gpu)
+{}
+
+//-------------------------------------------------------------------------------------------------
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in, const SystemCache *sc_in,
+                   const SynthesisCacheMap *scmap_in, const RMSDMethod strategy_in,
+                   const double rmf_in, const GpuDetails &gpu, const int low_mol_idx,
+                   const int high_mol_idx) :
+    RMSDPlan(poly_ps_in, strategy_in, rmf_in, gpu, low_mol_idx, high_mol_idx)
+{
+  sc_ptr = const_cast<SystemCache*>(sc_in);
+  scmap_ptr = const_cast<SynthesisCacheMap*>(scmap_in);
+  formatResults();
+}
+
+//-------------------------------------------------------------------------------------------------
+RMSDPlan::RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, const SystemCache &sc_in,
+                   const SynthesisCacheMap &scmap_in, const RMSDMethod strategy_in,
+                   const double rmf_in, const GpuDetails &gpu, const int low_mol_idx,
+                   const int high_mol_idx) :
+  RMSDPlan(poly_ps_in.getSelfPointer(), sc_in.getSelfPointer(), scmap_in.getSelfPointer(),
+           strategy_in, rmf_in, gpu, low_mol_idx, high_mol_idx)
+{}
 
 //-------------------------------------------------------------------------------------------------
 int RMSDPlan::getPlanCount() const {
@@ -141,28 +188,163 @@ int RMSDPlan::getPlanCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-size_t RMSDPlan::getReferenceRMSDSize() const {
-  return total_rmsd_scores;
+int RMSDPlan::getPlanIndex(const int index, const SystemGrouping organization) const {
+  validatePartitionIndex(index, organization, "getSystemGroup");  
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    {
+      const SynthesisMapReader scmapr = scmap_ptr->data();
+      const int synthesis_index = scmapr.csystem_proj[scmapr.csystem_bounds[index]];
+      return poly_ps_ptr->getUniqueTopologyIndex(synthesis_index);
+    }
+    break;
+  case SystemGrouping::TOPOLOGY:
+    return index;
+  case SystemGrouping::LABEL:
+    {
+      const SynthesisMapReader scmapr = scmap_ptr->data();
+      const int synthesis_index = scmapr.clabel_proj[scmapr.clabel_bounds[index]];
+      return poly_ps_ptr->getUniqueTopologyIndex(synthesis_index);
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-size_t RMSDPlan::getRMSDMatrixSize() const {
-  return total_rmsd_pair_scores;
+size_t RMSDPlan::getOutputSize(const RMSDTask task, const SystemGrouping organization) const {
+  validateOutputType(organization);
+  switch (task) {
+  case RMSDTask::REFERENCE:
+    switch (organization) {
+    case SystemGrouping::SOURCE:
+      return rmsd_space_src;
+    case SystemGrouping::TOPOLOGY:
+      return rmsd_space_top;
+    case SystemGrouping::LABEL:
+      return rmsd_space_lbl;
+    }
+    break;
+  case RMSDTask::MATRIX:
+    switch (organization) {
+    case SystemGrouping::SOURCE:
+      return rmsd_pair_space_src;
+    case SystemGrouping::TOPOLOGY:
+      return rmsd_pair_space_top;
+    case SystemGrouping::LABEL:
+      return rmsd_pair_space_lbl;
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-size_t RMSDPlan::getReferenceRMSDStart(const int plan_index) const {
-  return all_to_ref_offsets.readHost(plan_index);
+int RMSDPlan::getPartitionCount(const SystemGrouping organization) const {
+  validateOutputType(organization);
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return sc_ptr->getSystemCount();
+  case SystemGrouping::TOPOLOGY:
+    return poly_ps_ptr->getUniqueTopologyCount();
+  case SystemGrouping::LABEL:
+    return sc_ptr->getLabelCount();
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-size_t RMSDPlan::getRMSDMatrixStart(const int plan_index) const {
-  return all_to_all_offsets.readHost(plan_index);
+size_t RMSDPlan::getOutputStart(const int index, const RMSDTask task,
+                                const SystemGrouping organization) const {
+
+  // Skip the output type validation, as it will have already been performed in order to allocate
+  // the proper size of output array.
+  switch (task) {
+  case RMSDTask::REFERENCE:
+    switch (organization) {
+    case SystemGrouping::SOURCE:
+      return all_to_ref_offsets_src.readHost(index);
+    case SystemGrouping::TOPOLOGY:
+      return all_to_ref_offsets_top.readHost(index);
+    case SystemGrouping::LABEL:
+      return all_to_ref_offsets_lbl.readHost(index);
+    }
+    break;
+  case RMSDTask::MATRIX:
+    switch (organization) {
+    case SystemGrouping::SOURCE:
+      return all_to_all_offsets_src.readHost(index);
+    case SystemGrouping::TOPOLOGY:
+      return all_to_all_offsets_top.readHost(index);
+    case SystemGrouping::LABEL:
+      return all_to_all_offsets_lbl.readHost(index);
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-int RMSDPlan::getFrameCount(const int plan_index) const {
-  return frame_counts.readHost(plan_index);
+int RMSDPlan::getFrameCount(const int index, const SystemGrouping organization) const {
+  if (poly_ps_ptr == nullptr) {
+    rtErr("Frame counts are only available if the plan references a synthesis, and possibly "
+          "a systems cache.", "RMSDPlan", "getFrameCount");
+  }
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+  case SystemGrouping::LABEL:
+    if (sc_ptr == nullptr || scmap_ptr == nullptr) {
+      rtErr("A system cache and map to the synthesis must be present in order to obtain a frame "
+            "count for a specific -sys { ... } entry.", "RMSDPlan", "getFrameCount");
+    }
+    return scmap_ptr->getTotalProjection(index, organization);
+  case SystemGrouping::TOPOLOGY:
+    return poly_ps_ptr->getTopologyInstanceCount(index);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> RMSDPlan::getSystemGroup(const int index,
+                                          const SystemGrouping organization) const {
+  validatePartitionIndex(index, organization, "getSystemGroup");
+  std::vector<int> result;
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    {
+      const SynthesisMapReader scmapr = scmap_ptr->data();
+      const int llim = scmapr.csystem_bounds[index];
+      const int hlim = scmapr.csystem_bounds[index + 1];
+      result.resize(hlim - llim);
+      for (int i = llim; i < hlim; i++) {
+        result[i - llim] = scmapr.csystem_proj[i];
+      }
+    }
+    break;
+  case SystemGrouping::TOPOLOGY:
+    {
+      const PsSynthesisReader poly_psr = poly_ps_ptr->data();
+      const int llim = poly_psr.common_ag_bounds[index];
+      const int hlim = poly_psr.common_ag_bounds[index + 1];
+      result.resize(hlim - llim);
+      for (int i = llim; i < hlim; i++) {
+        result[i - llim] = poly_psr.common_ag_list[i];
+      }
+    }
+    break;
+  case SystemGrouping::LABEL:
+    {
+      const SynthesisMapReader scmapr = scmap_ptr->data();
+      const int llim = scmapr.clabel_bounds[index];
+      const int hlim = scmapr.clabel_bounds[index + 1];
+      result.resize(hlim - llim);
+      for (int i = llim; i < hlim; i++) {
+        result[i - llim] = scmapr.clabel_proj[i];
+      }
+    }
+    break;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -177,13 +359,13 @@ double RMSDPlan::getRequiredMassFraction() const {
 
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* RMSDPlan::getTopologyPointer(const int plan_index) const {
-  validatePlanIndex(plan_index, "getTopologyPointer");
+  validatePartitionIndex(plan_index, "getTopologyPointer");
   return ag_pointers[plan_index];
 }
 
 //-------------------------------------------------------------------------------------------------
 RMSDAlignmentProtocol RMSDPlan::getAlignmentProtocol(const int plan_index) const {
-  validatePlanIndex(plan_index, "getAlignmentProtocol");
+  validatePartitionIndex(plan_index, "getAlignmentProtocol");
   return static_cast<RMSDAlignmentProtocol>(alignment_protocols.readHost(plan_index));
 }
 
@@ -195,8 +377,13 @@ const RMSDPlanReader<double> RMSDPlan::dpData(const HybridTargetLevel tier) cons
                                 asymmetric_core_counts.data(tier),
                                 asymmetric_core_starts.data(tier),
                                 symmetry_group_atoms.data(tier), symmetry_group_bounds.data(tier),
-                                symmetry_group_ranges.data(tier), frame_counts.data(tier),
-                                all_to_ref_offsets.data(tier), all_to_all_offsets.data(tier));
+                                symmetry_group_ranges.data(tier),
+                                all_to_ref_offsets_src.data(tier),
+                                all_to_ref_offsets_top.data(tier),
+                                all_to_ref_offsets_lbl.data(tier),
+                                all_to_all_offsets_src.data(tier),
+                                all_to_all_offsets_top.data(tier),
+                                all_to_all_offsets_lbl.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -207,53 +394,85 @@ const RMSDPlanReader<float> RMSDPlan::spData(const HybridTargetLevel tier) const
                                asymmetric_core_atoms.data(tier), asymmetric_core_counts.data(tier),
                                asymmetric_core_starts.data(tier), symmetry_group_atoms.data(tier),
                                symmetry_group_bounds.data(tier), symmetry_group_ranges.data(tier),
-                               frame_counts.data(tier), all_to_ref_offsets.data(tier),
-                               all_to_all_offsets.data(tier));
+                               all_to_ref_offsets_src.data(tier),
+                               all_to_ref_offsets_top.data(tier),
+                               all_to_ref_offsets_lbl.data(tier),
+                               all_to_all_offsets_src.data(tier),
+                               all_to_all_offsets_top.data(tier),
+                               all_to_all_offsets_lbl.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-void RMSDPlan::formatResults(const int frame_count) {
-  if (plan_count != 1) {
-    rtErr("A specific number of frames can only be allocated for a single plan, not " +
-          std::to_string(plan_count) + ".", "RMSDPlan", "formatResults");
-  }
-  frame_counts.resize(1);
-  frame_counts.putHost(frame_count, 0);
-  all_to_ref_offsets.resize(1);
-  all_to_ref_offsets.putHost(0, 0);
-  const ullint ull_fc = frame_count;
-  all_to_all_offsets.resize(1);
-  all_to_all_offsets.putHost(0, 0);
-  total_rmsd_scores = frame_count;
-  total_rmsd_pair_scores = ull_fc * (ull_fc - 1LLU) / 2;
+const PhaseSpaceSynthesis* RMSDPlan::getCoordinateSynthesisPointer() const {
+  return poly_ps_ptr;
 }
 
 //-------------------------------------------------------------------------------------------------
-void RMSDPlan::formatResults(const PhaseSpaceSynthesis &poly_ps) {
-  if (poly_ps.getUniqueTopologyCount() != plan_count) {
-    rtErr("A collection of " + std::to_string(plan_count) + " plans cannot serve a "
-          "PhaseSpaceSynthesis object based on " +
-          std::to_string(poly_ps.getUniqueTopologyCount()) + " unique topologies.", "RMSDPlan",
-          "formatResults");
+const SystemCache* RMSDPlan::getCachePointer() const {
+  return sc_ptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+const SynthesisCacheMap* RMSDPlan::getSynthesisMapPointer() const {
+  return scmap_ptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::formatResults(const int frame_count_in) {
+
+  if (poly_ps_ptr == nullptr) {
+    
+    // First case: no synthesis has been provided.  There must be one and only one plan.
+    if (plan_count != 1) {
+      rtErr("A specific number of frames can only be allocated for a single plan, not " +
+            std::to_string(plan_count) + ".", "RMSDPlan", "formatResults");
+    }
+    all_to_ref_offsets_src.resize(0);
+    all_to_ref_offsets_top.resize(1);
+    all_to_ref_offsets_lbl.resize(0);
+    all_to_ref_offsets_top.putHost(0, 0);
+    const ullint ull_fc = frame_count_in;
+    all_to_all_offsets_src.resize(0);
+    all_to_all_offsets_top.resize(1);
+    all_to_all_offsets_lbl.resize(0);
+    all_to_all_offsets_top.putHost(0, 0);
+    rmsd_space_src = 0;
+    rmsd_space_top = frame_count_in;
+    rmsd_space_lbl = 0;
+    rmsd_pair_space_src = 0;
+    rmsd_pair_space_top = ull_fc * (ull_fc - 1LLU) / 2;
+    rmsd_pair_space_lbl = 0;
   }
-  frame_counts.resize(plan_count);
-  all_to_ref_offsets.resize(plan_count);
-  all_to_all_offsets.resize(plan_count);
-  int* fc_ptr = frame_counts.data();
-  int* atr_ptr = all_to_ref_offsets.data();
-  size_t* ata_ptr = all_to_all_offsets.data();
-  int atr_offset_counter = 0;
-  size_t ata_offset_counter = 0;
-  for (int i = 0; i < plan_count; i++) {
-    fc_ptr[i]  = poly_ps.getTopologyInstanceCount(i);
-    atr_ptr[i] = atr_offset_counter;
-    atr_offset_counter += roundUp(fc_ptr[i], warp_size_int);
-    const size_t zu_instance_count = fc_ptr[i];
-    ata_ptr[i] = ata_offset_counter;
-    ata_offset_counter += roundUp(zu_instance_count * (zu_instance_count - 1) / 2, warp_size_zu);
+  else {
+
+    // Second case: a synthesis is provided.
+    if (poly_ps_ptr->getUniqueTopologyCount() != plan_count) {
+      rtErr("A collection of " + std::to_string(plan_count) + " plans cannot serve a "
+            "PhaseSpaceSynthesis object based on " +
+            std::to_string(poly_ps_ptr->getUniqueTopologyCount()) + " unique topologies.",
+            "RMSDPlan", "formatResults");
+    }
+
+    // Two sub-cases exist: one in which the synthesis stands alone, and another where a systems
+    // cache is provided along with a map to indicate how it relates to the synthesis.  In either
+    // case, provisions will be made to group structures in the synthesis by the topologies guiding
+    // them.
+    computeResultOffsets(SystemGrouping::TOPOLOGY);
+    if (sc_ptr == nullptr && scmap_ptr == nullptr) {
+      all_to_ref_offsets_src.resize(0);
+      all_to_ref_offsets_lbl.resize(0);
+      all_to_all_offsets_src.resize(0);
+      all_to_all_offsets_lbl.resize(0);
+      rmsd_space_src = 0;
+      rmsd_space_lbl = 0;
+      rmsd_pair_space_src = 0;
+      rmsd_pair_space_lbl = 0;
+    }
+    else {
+      computeResultOffsets(SystemGrouping::SOURCE);
+      computeResultOffsets(SystemGrouping::LABEL);
+    }
   }
-  total_rmsd_scores = atr_offset_counter;
-  total_rmsd_pair_scores = ata_offset_counter;
 }
 
 #ifdef STORMM_USE_HPC
@@ -275,9 +494,12 @@ void RMSDPlan::upload() {
   symmetry_depth.upload();
   symmetry_group_membership.upload();
   symmetry_group_membership_bounds.upload();
-  frame_counts.upload();
-  all_to_ref_offsets.upload();
-  all_to_all_offsets.upload();
+  all_to_ref_offsets_src.upload();
+  all_to_ref_offsets_top.upload();
+  all_to_ref_offsets_lbl.upload();
+  all_to_all_offsets_src.upload();
+  all_to_all_offsets_top.upload();
+  all_to_all_offsets_lbl.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -298,17 +520,124 @@ void RMSDPlan::download() {
   symmetry_depth.download();
   symmetry_group_membership.download();
   symmetry_group_membership_bounds.download();
-  frame_counts.download();
-  all_to_ref_offsets.download();
-  all_to_all_offsets.download();
+  all_to_ref_offsets_src.download();
+  all_to_ref_offsets_top.download();
+  all_to_ref_offsets_lbl.download();
+  all_to_all_offsets_src.download();
+  all_to_all_offsets_top.download();
+  all_to_all_offsets_lbl.download();
 }
 #endif
 
 //-------------------------------------------------------------------------------------------------
-void RMSDPlan::validatePlanIndex(const int plan_index, const char* caller) const {
-  if (plan_index < 0 || plan_index >= plan_count) {
-    rtErr("A plan index of " + std::to_string(plan_index) + " is invalid for a collection of " +
-          std::to_string(plan_count) + " unique systems.", "RMSDPlan", caller);
+void RMSDPlan::addSystemCache(const SystemCache *sc, const SynthesisCacheMap *scmap) {
+  sc_ptr = const_cast<SystemCache*>(sc);
+  scmap_ptr = const_cast<SynthesisCacheMap*>(scmap);
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::addSystemCache(const SystemCache &sc, const SynthesisCacheMap &scmap) {
+  addSystemCache(sc.getSelfPointer(), scmap.getSelfPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::validateOutputType(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+  case SystemGrouping::LABEL:
+    if (poly_ps_ptr == nullptr) {
+      rtErr("A plan must refer to a synthesis in order to make meaningful groupings of systems "
+            "other than simply comparing those that share the same topology.", "RMSDPlan",
+            "getOutputSize");
+    }
+    if (scmap_ptr == nullptr || sc_ptr == nullptr) {
+      rtErr("In order to group systems by anything other than the topologies guiding them, a "
+            "SystemCache and SynthesisCacheMap must be present in order to trace systems in the "
+            "synthesis back to user input.", "RMSDPlan", "getOutputSize");
+    }
+    break;
+  case SystemGrouping::TOPOLOGY:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::validatePartitionIndex(const int index, const char* caller) const {
+  if (index < 0 || index >= plan_count) {
+    rtErr("A plan index of " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(plan_count) + " unique topological systems.", "RMSDPlan", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::validatePartitionIndex(const int index, const SystemGrouping organization,
+                                      const char* caller) const {
+  if (index < 0 || index > getPartitionCount(organization)) {
+    rtErr(getEnumerationName(organization) + " index " + std::to_string(index) + " is invalid "
+          "for a systems cache / synthesis with " +
+          std::to_string(getPartitionCount(organization)) + " distinct partitions.", "RMSDPlan",
+          caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void RMSDPlan::computeResultOffsets(const SystemGrouping organization) {
+  int item_count;
+  size_t *atr_ptr, *ata_ptr;
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    item_count = sc_ptr->getSystemCount();
+    all_to_ref_offsets_src.resize(item_count);
+    all_to_all_offsets_src.resize(item_count);
+    atr_ptr = all_to_ref_offsets_src.data();
+    ata_ptr = all_to_all_offsets_src.data();
+    break;
+  case SystemGrouping::TOPOLOGY:
+    item_count = plan_count;
+    all_to_ref_offsets_top.resize(item_count);
+    all_to_all_offsets_top.resize(item_count);
+    atr_ptr = all_to_ref_offsets_top.data();
+    ata_ptr = all_to_all_offsets_top.data();
+    break;
+  case SystemGrouping::LABEL:
+    item_count = sc_ptr->getLabelCount();
+    all_to_ref_offsets_lbl.resize(item_count);
+    all_to_all_offsets_lbl.resize(item_count);
+    atr_ptr = all_to_ref_offsets_lbl.data();
+    ata_ptr = all_to_all_offsets_lbl.data();
+    break;
+  }
+  size_t atr_offset_counter = 0;
+  size_t ata_offset_counter = 0;
+  for (int i = 0; i < item_count; i++) {
+    atr_ptr[i] = atr_offset_counter;
+    size_t i_fc;
+    switch (organization) {
+    case SystemGrouping::SOURCE:
+    case SystemGrouping::LABEL:
+      i_fc = scmap_ptr->getTotalProjection(i, organization);
+      break;
+    case SystemGrouping::TOPOLOGY:
+      i_fc = poly_ps_ptr->getTopologyInstanceCount(i);
+      break;
+    }
+    atr_offset_counter += roundUp(i_fc, warp_size_zu);
+    ata_ptr[i] = ata_offset_counter;
+    ata_offset_counter += roundUp(i_fc * (i_fc - 1) / 2, warp_size_zu);
+  }
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    rmsd_space_src = atr_offset_counter;
+    rmsd_pair_space_src = ata_offset_counter;
+    break;
+  case SystemGrouping::TOPOLOGY:
+    rmsd_space_top = atr_offset_counter;
+    rmsd_pair_space_top = ata_offset_counter;
+    break;
+  case SystemGrouping::LABEL:
+    rmsd_space_lbl = atr_offset_counter;
+    rmsd_pair_space_lbl = ata_offset_counter;
+    break;
   }
 }
 

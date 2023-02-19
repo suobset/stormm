@@ -80,7 +80,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> trpi_ag_vec(1, &trpi_ag);
   const std::vector<int> trpi_tiling(1, 0);
   AtomGraphSynthesis trpi_poly_ag(trpi_ag_vec, trpi_tiling, ExceptionResponse::WARN, gpu, &timer);
-  StaticExclusionMaskSynthesis trpi_poly_se(trpi_poly_ag.getTopologyPointers(),
+  StaticExclusionMaskSynthesis trpi_poly_se(trpi_poly_ag.getUniqueTopologies(),
                                             trpi_poly_ag.getTopologyIndices());
   trpi_poly_ag.loadNonbondedWorkUnits(trpi_poly_se, InitializationTask::GB_LANGEVIN_DYNAMICS, 15,
                                       gpu);

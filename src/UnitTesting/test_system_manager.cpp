@@ -270,5 +270,50 @@ const std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() const {
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis TestSystemManager::exportPhaseSpaceSynthesis(const std::vector<int> &index_key,
+                                                                 const double perturbation_sigma,
+                                                                 const int xrs_seed,
+                                                                 const int scale_bits) {
+  std::vector<AtomGraph*> ag_pointers(system_count);
+  for (size_t i = 0; i < system_count; i++) {
+    ag_pointers[i] = &all_topologies[i];
+  }
+  PhaseSpaceSynthesis result(all_coordinates, ag_pointers, index_key, scale_bits);
+  PsSynthesisWriter resr = result.data();
+  Xoshiro256ppGenerator xrs(xrs_seed);
+  if (fabs(perturbation_sigma) > constants::tiny);
+  const double rscale = perturbation_sigma * resr.gpos_scale;
+  for (int i = 0; i < resr.system_count; i++) {
+    const int llim = resr.atom_starts[i];
+    const int hlim = resr.atom_starts[i] + resr.atom_counts[i];
+    for (int j = llim; j < hlim; j++) {
+      const int95_t xpert = hostDoubleToInt95(rscale * xrs.gaussianRandomNumber());
+      const int95_t ypert = hostDoubleToInt95(rscale * xrs.gaussianRandomNumber());
+      const int95_t zpert = hostDoubleToInt95(rscale * xrs.gaussianRandomNumber());
+      const int95_t xnew = hostSplitFPSum(xpert, resr.xcrd[j], resr.xcrd_ovrf[j]);
+      const int95_t ynew = hostSplitFPSum(ypert, resr.ycrd[j], resr.ycrd_ovrf[j]);
+      const int95_t znew = hostSplitFPSum(zpert, resr.zcrd[j], resr.zcrd_ovrf[j]);
+      resr.xcrd[j]      = xnew.x;
+      resr.xcrd_ovrf[j] = xnew.y;
+      resr.ycrd[j]      = ynew.x;
+      resr.ycrd_ovrf[j] = ynew.y;
+      resr.zcrd[j]      = znew.x;
+      resr.zcrd_ovrf[j] = znew.y;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraphSynthesis TestSystemManager::exportAtomGraphSynthesis(const std::vector<int> &index_key) {
+  std::vector<AtomGraph*> ag_pointers(system_count);
+  for (size_t i = 0; i < system_count; i++) {
+    ag_pointers[i] = &all_topologies[i];
+  }
+  AtomGraphSynthesis result(ag_pointers, index_key);
+  return result;
+}
+
 } // namespace testing
 } // namespace stormm

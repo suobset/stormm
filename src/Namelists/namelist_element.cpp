@@ -232,7 +232,7 @@ const std::string& NamelistElement::getSubLabel(const size_t index) const {
     return sub_keys[index];
   }
   else {
-    rtErr("Keyword \"" + label + "\" carries \"" + getNamelistTypeName(kind) + "\" data with " +
+    rtErr("Keyword \"" + label + "\" carries \"" + getEnumerationName(kind) + "\" data with " +
           std::to_string(sub_keys.size()) + " elements.  Access to sub-key " +
           std::to_string(index) + " is invalid.", "NamelistElement", "getSubLabel");
   }
@@ -252,7 +252,7 @@ NamelistType NamelistElement::getKind(const std::string &sub_key_query) const {
   case NamelistType::INTEGER:
   case NamelistType::REAL:
   case NamelistType::STRING:
-    rtErr("Keyword \"" + label + "\" is a " + getNamelistTypeName(kind) + " with none of "
+    rtErr("Keyword \"" + label + "\" is a " + getEnumerationName(kind) + " with none of "
           "its own member variables.", "NamelistElement", "getKind");
   case NamelistType::STRUCT:
     break;
@@ -275,7 +275,7 @@ void NamelistElement::setPolicy(ExceptionResponse policy_in) {
 //-------------------------------------------------------------------------------------------------
 void NamelistElement::reportNamelistTypeProblem(const std::string &caller,
                                                 const std::string &data_type) const {
-  std::string nl_typestr = getNamelistTypeName(kind);
+  std::string nl_typestr = getEnumerationName(kind);
   std::string term_str;
   switch (kind) {
   case NamelistType::INTEGER:
@@ -499,6 +499,50 @@ void NamelistElement::badInputResponse(const std::string &errmsg, const char* ca
 }
 
 //-------------------------------------------------------------------------------------------------
+void NamelistElement::addDefaultValue(const std::string &next_default) {
+
+  // Check that user-specified values have not already been entered
+  if (next_entry_index > 0) {
+    rtErr("Additional default values may not be specified after user input has already been "
+          "accepted in the \"" + label + "\" keyword.  This indicates a problem with the program, "
+          "not the usage.", "NamelistElement", "addDefaultValue");
+  }
+  if (accept_multiple_values == false) {
+    rtErr("The keyword \"" + label + "\" does not accept multiple values, and thus cannot accept "
+          "multiple default values.", "NamelistElement", "addDefaultValue");
+  }
+  switch (kind) {
+  case NamelistType::INTEGER:
+    int_values.resize(entry_count + 1);
+    if (verifyContents(next_default, NumberFormat::INTEGER)) {      
+      int_values[entry_count] = stoi(next_default);
+      entry_count++;
+    }
+    else {
+      rtErr("Invalid default input \"" + next_default + "\" to " + getEnumerationName(kind) +
+            " keyword \"" + label + "\".", "NamelistElement", "addDefaultValue");
+    }
+    break;
+  case NamelistType::REAL:
+    real_values.resize(entry_count + 1);
+    if (verifyContents(next_default, NumberFormat::STANDARD_REAL) ||
+        verifyContents(next_default, NumberFormat::SCIENTIFIC)) {
+      real_values[entry_count] = stod(next_default);
+      entry_count++;
+    }
+    else {
+      rtErr("Invalid default input \"" + next_default + "\" to " + getEnumerationName(kind) +
+            " keyword \"" + label + "\".", "NamelistElement", "addDefaultValue");
+    }
+    break;
+  case NamelistType::STRING:
+    string_values.resize(entry_count + 1);
+    string_values[entry_count] = next_default;
+    entry_count++;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void NamelistElement::setIntValue(const int value) {
   if (kind != NamelistType::INTEGER) {
     reportNamelistTypeProblem("setIntValue", "int");
@@ -718,7 +762,7 @@ int NamelistElement::validateSubKey(const std::string &sub_key_query, const Name
     rtErr("The namelist element \"" + label + "\" contains no sub-element \"" + sub_key_query +
           "\".", "NameListElement", caller.c_str());
   }
-  std::string data_type = getNamelistTypeName(nmlt);
+  std::string data_type = getEnumerationName(nmlt);
   switch (nmlt) {
   case NamelistType::INTEGER:
   case NamelistType::REAL:

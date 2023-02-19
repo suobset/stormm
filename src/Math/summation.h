@@ -39,7 +39,7 @@ enum class PrefixSumType {
 /// \{
 template <typename TBase>
 void prefixSumInPlace(TBase* vdata, const size_t n_elements, const PrefixSumType style,
-                      const char* caller);
+                      const char* caller = nullptr);
 
 template <typename TBase>
 void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style,

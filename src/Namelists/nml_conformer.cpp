@@ -3,6 +3,8 @@
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
+#include "Structure/local_arrangement.h"
+#include "Structure/structure_enumerators.h"
 #include "nml_conformer.h"
 
 namespace stormm {
@@ -20,7 +22,10 @@ using parse::NumberFormat;
 using parse::realToString;
 using parse::strcmpCased;
 using parse::WrapTextSearch;
-
+using structure::imageValue;
+using structure::ImagingMethod;
+using synthesis::translateSystemGrouping;
+  
 //-------------------------------------------------------------------------------------------------
 ConformerControls::ConformerControls(const ExceptionResponse policy_in,
                                      const WrapTextSearch wrap) :
@@ -29,11 +34,15 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in,
     sample_chirality{false}, sample_cis_trans{false}, prevent_hbonds{false},
     running_states{default_conf_running_states},
     final_states{default_conf_final_states},
-    rotation_samples{default_conf_rotation_samples},
+    rotation_sample_count{default_conf_rotation_samples},
     rotatable_bond_limit{default_conf_max_rotatable_bonds},
+    cis_trans_sample_count{default_conf_cis_trans_samples},
     max_seeding_attempts{default_conf_max_seeding_attempts},
-    system_trials{default_conf_max_system_trials},
-    rmsd_tolerance{default_conf_rmsd_tolerance}
+    maximum_trial_limit{default_conf_max_system_trials},
+    rmsd_tolerance{default_conf_rmsd_tolerance},
+    group_method{default_conf_output_grouping},
+    sample_effort{default_conf_sampling_effort},
+    rotation_sample_values{}, cis_trans_sample_values{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -96,12 +105,19 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
                                CaseSensitivity::NO);
   running_states = t_nml.getIntValue("running_states");
   final_states = t_nml.getIntValue("final_states");
-  rotation_samples = t_nml.getIntValue("rotation_samples");
   rotatable_bond_limit = t_nml.getIntValue("max_rotatable_bonds");
   max_seeding_attempts = t_nml.getIntValue("max_seeding_attempts");
-  system_trials = t_nml.getIntValue("max_system_trials");
+  maximum_trial_limit = t_nml.getIntValue("trial_limit");
   rmsd_tolerance = t_nml.getRealValue("rmsd_tol");
+  group_method = t_nml.getStringValue("grouping");
+  sample_effort = t_nml.getStringValue("effort");
 
+  // Pull in the rotatable bond and cis-trans isomeric bond samples
+  processSamplingValues(&rotation_sample_count, "rotation_sample_count", &rotation_sample_values,
+                        "rotation_sample", 120.0, 10.0, t_nml);
+  processSamplingValues(&cis_trans_sample_count, "cis_trans_sample_count",
+                        &cis_trans_sample_values, "cis_trans_sample", 180.0, 5.0, t_nml);
+  
   // Validate input
   validateSampleChirality(t_nml.getStringValue("sample_chirality"));
   validateSampleCisTrans(t_nml.getStringValue("sample_cis_trans"));
@@ -166,7 +182,22 @@ int ConformerControls::getFinalStateCount() const {
 
 //-------------------------------------------------------------------------------------------------
 int ConformerControls::getRotationSampleCount() const {
-  return rotation_samples;
+  return rotation_sample_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ConformerControls::getCisTransSampleCount() const {
+  return cis_trans_sample_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<double>& ConformerControls::getRotationSampleValues() const {
+  return rotation_sample_values;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<double>& ConformerControls::getCisTransSampleValues() const {
+  return cis_trans_sample_values;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -180,13 +211,23 @@ int ConformerControls::getMaxSeedingAttempts() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int ConformerControls::getSystemTrialCount() const {
-  return system_trials;
+int ConformerControls::getMaximumTrialLimit() const {
+  return maximum_trial_limit;
 }
 
 //-------------------------------------------------------------------------------------------------
 double ConformerControls::getRMSDTolerance() const {
   return rmsd_tolerance;
+}
+
+//-------------------------------------------------------------------------------------------------
+SystemGrouping ConformerControls::getGroupingMethod() const {
+  return translateSystemGrouping(group_method);
+}
+
+//-------------------------------------------------------------------------------------------------
+SamplingIntensity ConformerControls::getSamplingIntensity() const {
+  return translateSamplingIntensity(sample_effort);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -209,7 +250,8 @@ void ConformerControls::validateCoreRestraint() const {
 
 //-------------------------------------------------------------------------------------------------
 void ConformerControls::validateSampleChirality(const std::string &directive) const {
-  if (strcmpCased(directive, "true") == false && strcmpCased(directive, "false") == false) {
+  if (strcmpCased(directive, "true", CaseSensitivity::NO) == false &&
+      strcmpCased(directive, "false", CaseSensitivity::NO) == false) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The sample_chirality keyword accepts input of 'true' or 'false'.  Input " +
@@ -227,7 +269,8 @@ void ConformerControls::validateSampleChirality(const std::string &directive) co
 
 //-------------------------------------------------------------------------------------------------
 void ConformerControls::validateSampleCisTrans(const std::string &directive) const {
-  if (strcmpCased(directive, "true") == false && strcmpCased(directive, "false") == false) {
+  if (strcmpCased(directive, "true", CaseSensitivity::NO) == false &&
+      strcmpCased(directive, "false", CaseSensitivity::NO) == false) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The sample_cis_trans keyword accepts input of 'true' or 'false'.  Input " +
@@ -245,7 +288,8 @@ void ConformerControls::validateSampleCisTrans(const std::string &directive) con
 
 //-------------------------------------------------------------------------------------------------
 void ConformerControls::validatePreventHBonds(const std::string &directive) const {
-  if (strcmpCased(directive, "true") == false && strcmpCased(directive, "false") == false) {
+  if (strcmpCased(directive, "true", CaseSensitivity::NO) == false &&
+      strcmpCased(directive, "false", CaseSensitivity::NO) == false) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The prevent_hbonds keyword accepts input of 'true' or 'false' to apply restraints "
@@ -281,36 +325,38 @@ void ConformerControls::validateStateCounts() {
       break;
     }
   }
-  if (system_trials > active_states_limit) {
+  if (maximum_trial_limit > active_states_limit) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The number of energy minimizations for a single system (" +
-            std::to_string(system_trials) + ") cannot exceed the maximum allowed number of " +
-            std::to_string(active_states_limit) + ".", "ConformerControls", "validateStateCounts");
+            std::to_string(maximum_trial_limit) + ") cannot exceed the maximum allowed number "
+            "of " + std::to_string(active_states_limit) + ".", "ConformerControls",
+            "validateStateCounts");
     case ExceptionResponse::WARN:
       rtWarn("The number of energy minimizations for a single system (" +
-             std::to_string(system_trials) + ") cannot exceed the maximum allowed number of " +
-             std::to_string(active_states_limit) + " and will be reduced.", "ConformerControls",
-             "validateStateCounts");
-      system_trials = active_states_limit;
+             std::to_string(maximum_trial_limit) + ") cannot exceed the maximum allowed number "
+             "of " + std::to_string(active_states_limit) + " and will be reduced.",
+             "ConformerControls", "validateStateCounts");
+      maximum_trial_limit = active_states_limit;
       break;
     case ExceptionResponse::SILENT:
       break;
     }
   }
-  if (final_states > system_trials) {
+  if (final_states > maximum_trial_limit) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The number of final states (" + std::to_string(final_states) + ") cannot exceed the "
             "number of energy minimizations evaluated per system (" +
-            std::to_string(system_trials) + ").", "ConformerControls", "validateStateCounts");
+            std::to_string(maximum_trial_limit) + ").", "ConformerControls",
+            "validateStateCounts");
     case ExceptionResponse::WARN:
       rtWarn("The number of final states (" + std::to_string(final_states) + ") cannot exceed the "
              "number of energy minimizations evaluated per system (" +
-             std::to_string(system_trials) + ") and will be reduced.", "ConformerControls",
+             std::to_string(maximum_trial_limit) + ") and will be reduced.", "ConformerControls",
              "validateStateCounts");
-      final_states = system_trials;
-      break;      
+      final_states = maximum_trial_limit;
+      break;
     case ExceptionResponse::SILENT:
       break;
     }
@@ -327,6 +373,130 @@ void ConformerControls::validateStateCounts() {
     case ExceptionResponse::SILENT:
       break;
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateGroupingMethod() {
+  if (strcmpCased(group_method, "system", CaseSensitivity::NO) == false &&
+      strcmpCased(group_method, "source", CaseSensitivity::NO) == false &&
+      strcmpCased(group_method, "sys", CaseSensitivity::NO) == false &&
+      strcmpCased(group_method, "topology", CaseSensitivity::NO) == false &&
+      strcmpCased(group_method, "label", CaseSensitivity::NO) == false) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid system grouping method \"" + group_method + "\".", "ConformerControls",
+            "validateGroupingMethod");
+    case ExceptionResponse::WARN:
+      rtWarn("Invalid system grouping method \"" + group_method + "\".  System grouping will be "
+             "set to \"" + std::string(default_conf_output_grouping) + "\".", "ConformerControls",
+             "validateGroupingMethod");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    group_method = std::string(default_conf_output_grouping);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateSamplingIntensity() {
+  if (strcmpCased(sample_effort, "minimal", CaseSensitivity::NO) == false &&
+      strcmpCased(sample_effort, "light", CaseSensitivity::NO) == false &&
+      strcmpCased(sample_effort, "heavy", CaseSensitivity::NO) == false &&
+      strcmpCased(sample_effort, "exhaustive", CaseSensitivity::NO) == false) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid sampling intensity setting \"" + sample_effort + "\".", "ConformerControls",
+            "validateSamplingIntensity");
+    case ExceptionResponse::WARN:
+      rtWarn("Invalid sampling intensity setting \"" + sample_effort + "\".  Sampling effort will "
+             "be set to \"" + std::string(default_conf_sampling_effort) + "\".",
+             "ConformerControls", "validateSamplingIntensity");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    sample_effort = std::string(default_conf_sampling_effort);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::processSamplingValues(int *sample_count, const std::string &count_keyword,
+                                              std::vector<double> *sample_values,
+                                              const std::string &value_keyword,
+                                              const double value_stride, const double value_notch,
+                                              const NamelistEmulator &t_nml) {
+  double* val_ptr;
+  
+  // If the defaults for the rotation sample values are present and the user has specified a number
+  // of rotation samples other than the default of three, there is an incongruity in the array of
+  // rotatable bond angle values and the number of values to sample.  Fill that gap by ignoring the
+  // default values and selecting a range of values commensurate with the user's specifications.
+  // If, instead, the user has specified specific values to sample but not the number of them, make
+  // the number equal to the length of the specified array.  If the user has specified neither, the
+  // defaults line up.  If the user has specified both, and the number is not the length of the
+  // array, raise an exception or warning depending on the policy.
+  if (t_nml.getKeywordStatus(count_keyword) == InputStatus::DEFAULT) {
+    *sample_count = t_nml.getKeywordEntries(value_keyword);
+    sample_values->resize(*sample_count);
+    val_ptr = sample_values->data();
+    for (int i = 0; i < *sample_count; i++) {
+      val_ptr[i] = t_nml.getRealValue(value_keyword, i);
+    }
+  }
+  else {
+    *sample_count = t_nml.getIntValue(count_keyword);
+    if (t_nml.getKeywordStatus(value_keyword) == InputStatus::DEFAULT) {
+      sample_values->resize(*sample_count);
+      double curr_val = 180.0;
+      double cval_inc = 0.0;
+      const int stride_count = round(360.0 / value_stride);
+      val_ptr = sample_values->data();
+      for (int i = 0; i < *sample_count; i++) {
+        val_ptr[i] = curr_val;
+        curr_val += value_stride;
+        if (i % stride_count == 0) {
+          curr_val += cval_inc;
+          cval_inc = -(cval_inc + value_notch);
+        }
+      }
+    }
+    else {
+      if (t_nml.getKeywordEntries(value_keyword) != *sample_count) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("The number of samples specified (" + std::to_string(*sample_count) + ") does not "
+                "match the number of specific sampling values provided (" +
+                std::to_string(t_nml.getKeywordEntries(value_keyword)) + ") for \"" +
+                count_keyword + "\" / \"" + value_keyword + "\".", "ConformerControls");
+        case ExceptionResponse::WARN:
+          rtWarn("The number of samples specified (" + std::to_string(*sample_count) + ") does "
+                 "not match the number of specific sampling values provided (" +
+                 std::to_string(t_nml.getKeywordEntries(value_keyword)) + ") for \"" +
+                 count_keyword + "\" / \"" + value_keyword + "\".  Values from the list will be "
+                 "taken.", "ConformerControls");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      *sample_count = t_nml.getKeywordEntries(value_keyword);
+      sample_values->resize(*sample_count);
+      val_ptr = sample_values->data();
+      for (int i = 0; i < *sample_count; i++) {
+        val_ptr[i] = t_nml.getRealValue(value_keyword, i);
+      }
+    }
+  }
+
+  // Convert all rotation sampling values to radians for compatibility with internal units.
+  // Re-image the values for clarity.  By this point, the length of the values array and the
+  // recorded count should be the same.
+  val_ptr = sample_values->data();
+  for (size_t i = 0; i < *sample_count; i++) {
+    val_ptr[i] *= symbols::pi / 180.0;
+    val_ptr[i] = imageValue(val_ptr[i], symbols::twopi, ImagingMethod::MINIMUM_IMAGE);    
   }
 }
 
@@ -391,16 +561,28 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                    std::to_string(default_conf_running_states)));
   t_nml.addKeyword(NamelistElement("final_states", NamelistType::INTEGER,
                                    std::to_string(default_conf_final_states)));
-  t_nml.addKeyword(NamelistElement("rotation_samples", NamelistType::INTEGER,
+  t_nml.addKeyword(NamelistElement("rotation_sample_count", NamelistType::INTEGER,
                                    std::to_string(default_conf_rotation_samples)));
   t_nml.addKeyword(NamelistElement("max_rotatable_bonds", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_rotatable_bonds)));
+  t_nml.addKeyword(NamelistElement("cis_trans_sample_count", NamelistType::INTEGER,
+                                   std::to_string(default_conf_cis_trans_samples)));
+  t_nml.addKeyword(NamelistElement("rotation_sample", NamelistType::REAL,
+                                   std::string(default_conf_rotation_set_zero),
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
+  t_nml.addKeyword(NamelistElement("cis_trans_sample", NamelistType::REAL,
+                                   std::string(default_conf_cis_trans_set_zero),
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("max_seeding_attempts", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_seeding_attempts)));
-  t_nml.addKeyword(NamelistElement("max_system_trials", NamelistType::INTEGER,
+  t_nml.addKeyword(NamelistElement("trial_limit", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_system_trials)));
   t_nml.addKeyword(NamelistElement("rmsd_tol", NamelistType::REAL,
                                    std::to_string(default_conf_rmsd_tolerance)));
+  t_nml.addKeyword(NamelistElement("grouping", NamelistType::STRING,
+                                   std::string(default_conf_output_grouping)));
+  t_nml.addKeyword(NamelistElement("effort", NamelistType::STRING,
+                                   std::string(default_conf_sampling_effort)));
   t_nml.addHelp("core_mask", "Atom mask for common core atoms.  These atoms will be held in a "
                 "rigid configuration during energy minimization and other sampling operations.");
   t_nml.addHelp("sample_chirality", "Sample chiral states of identifiable chiral centers.  "
@@ -415,29 +597,87 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "order to generate a smaller set of final states.");
   t_nml.addHelp("final_states", "Number of final, energy-minimized states to accept as unique "
                 "conformers.");
-  t_nml.addHelp("rotation_samples", "Number of samples to apply to each rotatable bond.  "
+  t_nml.addHelp("rotation_sample_count", "Number of samples to apply to each rotatable bond.  "
                 "Locations for the samples will be chosen based on the detected minima along each "
                 "bond's rotation profile.");
   t_nml.addHelp("max_rotatable_bonds", "The maximum number of rotatable bonds to explicitly "
                 "sample.  This quickly runs into a combinatorial problem, but there is a "
                 "guardrail in the max_system_trials keyword.");
+  t_nml.addHelp("cis_trans_sample_count", "Number of samples to apply to each cis-trans isomeric "
+                "bond.  Locations for the samples will be chosen based on the detected minima "
+                "along each bond's rotation profile.");
+  t_nml.addHelp("rotation_sample", "A specific value of rotatable bonds to sample, given in units "
+                "of degrees.  Repeated entries are accepted.  The default values include 60, 180, "
+                "and -60 degrees.");
+  t_nml.addHelp("cis_trans_sample", "A specific value of cis-trans isomeric bonds to sample, "
+                "given in units of degrees.  Repeated entries are accepted.  The default values "
+                "include 0 and 180 degrees.");
   t_nml.addHelp("max_seeding_attempts", "If a conformer's initial configuration contains a clash "
                 "between atoms (their van-der Waals radii are violated), randomization of the "
                 "configuration will occur for this number of attempts.  If, after exhausting this "
                 "provision, a stable configuration still cannot be found, the input configuration "
                 "will be accepted as the initial coordinates for subsequent energy "
                 "minimizations.");
-  t_nml.addHelp("max_system_trials", "The maximum number of trials that will be made for each "
+  t_nml.addHelp("trial_limit", "The maximum number of trials that will be made for each "
                 "system.  Explicit sampling of chirality, cis-trans isomers, and then rotatable "
                 "bonds will proceed in that priority, but the maximum number of sampled states "
                 "will be cut off at this value.");
   t_nml.addHelp("rmsd_tol", "Positional, mass-weighted root-mean squared deviation between "
                 "conformers required to declare uniqueness.");
+  t_nml.addHelp("grouping", "An indication of how to group systems when selecting the best "
+                "conformers for output.  Acceptable values include \"system\", \"source\", or "
+                "\"sys\" (produce outputs for each system defined by a '-sys' keyword in the "
+                "&files namelist), \"topology\" (group all systems sharing the same topology "
+                "file), or \"label\" ( group all systems marked with the same label group, as "
+                "defined in the &files namelist).");
+  t_nml.addHelp("effort", "Specifies the approximate level of effort, measured in terms of the "
+                "number of independent minimization attempts starting from unique configurations, "
+                "that will be applied to find optimal structures in each molecule.");
+
+  // Add more default values to the rotation_sample and cis_trans_sample keywords.
+  t_nml.addDefaultValue("rotation_sample", std::string(default_conf_rotation_set_one));
+  t_nml.addDefaultValue("rotation_sample", std::string(default_conf_rotation_set_two));
+  t_nml.addDefaultValue("cis_trans_sample", std::string(default_conf_cis_trans_set_one));
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   return t_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(SamplingIntensity input) {
+  switch (input) {
+  case SamplingIntensity::MINIMAL:
+    return std::string("MINIMAL");
+  case SamplingIntensity::LIGHT:
+    return std::string("LIGHT");
+  case SamplingIntensity::HEAVY:
+    return std::string("HEAVY");
+  case SamplingIntensity::EXHAUSTIVE:
+    return std::string("EXHAUSTIVE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+SamplingIntensity translateSamplingIntensity(const std::string &input) {
+  if (strcmpCased(input, std::string("minimal"), CaseSensitivity::NO)) {
+    return SamplingIntensity::MINIMAL;
+  }
+  else if (strcmpCased(input, std::string("light"), CaseSensitivity::NO)) {
+    return SamplingIntensity::LIGHT;
+  }
+  else if (strcmpCased(input, std::string("heavy"), CaseSensitivity::NO)) {
+    return SamplingIntensity::HEAVY;
+  }
+  else if (strcmpCased(input, std::string("exhaustive"), CaseSensitivity::NO)) {
+    return SamplingIntensity::EXHAUSTIVE;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid sampling intensity.", "translateSamplingIntensity");
+  }
+  __builtin_unreachable();
 }
 
 } // namespace namelist

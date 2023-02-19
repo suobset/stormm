@@ -162,6 +162,15 @@ public:
   ///        always throw runtime errors.
   void badInputResponse(const std::string &errmsg, const char* caller);
 
+  /// \brief Include an additional value as a default setting for a particular keyword.  This
+  ///        enables a single keyword to have a default series of values.  The supplied value will
+  ///        be interpreted according to the type of the element.
+  ///
+  /// \param next_default  The extra default value to include
+  /// \{
+  void addDefaultValue(const std::string &next_default);
+  /// \}
+  
   /// \brief Set an integer value within this namelist element.  This function will check to ensure
   ///        that the element expects an int.
   ///

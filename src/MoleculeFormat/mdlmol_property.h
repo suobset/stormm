@@ -191,9 +191,9 @@ private:
   /// into C / C++ array indexing.
   std::vector<MolObjIndexKind> entry_adjustment;
 
-  std::vector<int> int_data;                 ///< Data for all entries, ordered for entries A, B,
-                                             ///<   and C with depth 3: { A1, A2, A3, B1, B2, B3,
-                                             ///<   C1, C2, C3 }
+  std::vector<int> int_data;                 ///< Data for all entries, ordered by entries and
+                                             ///<   by depth.  For entries A, B, and C with depth
+                                             ///<   3: { A1, A2, A3, B1, B2, B3, C1, C2, C3 }.
   std::vector<double> real_data;             ///< Real-valued information for the property.  If a
                                              ///<   component of an entry is REAL, the
                                              ///<   corresponding value in int_data will refer to

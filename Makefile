@@ -108,6 +108,8 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
+		   $(SRCDIR)/Synthesis/synthesis_enumerators.cpp \
+		   $(SRCDIR)/Synthesis/synthesis_permutor.cpp \
 		   $(SRCDIR)/Synthesis/systemcache.cpp \
 		   $(SRCDIR)/Synthesis/valence_workunit.cpp \
 		   $(SRCDIR)/Topology/amber_prmtop_util.cpp \
@@ -270,6 +272,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Synthesis/static_mask_synthesis.h \
 		     $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		     $(SRCDIR)/Synthesis/synthesis_enumerators.h \
+		     $(SRCDIR)/Synthesis/synthesis_permutor.h \
 		     $(SRCDIR)/Synthesis/systemcache.h \
 		     $(SRCDIR)/Synthesis/valence_workunit.h \
 		     $(SRCDIR)/Topology/amber_prmtop_util.h \
@@ -306,6 +309,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 # STORMM C++ template source files
 STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Constants/generalized_born.tpp \
+		   $(SRCDIR)/Chemistry/chemical_features.tpp \
 		   $(SRCDIR)/DataTypes/common_types.tpp \
 		   $(SRCDIR)/DataTypes/stormm_vector_types.tpp \
 		   $(SRCDIR)/Math/matrix.tpp \
@@ -357,6 +361,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Trajectory/thermostat.tpp \
 		   $(SRCDIR)/Trajectory/write_annotated_frame.tpp \
 		   $(SRCDIR)/UnitTesting/approx.tpp \
+		   $(SRCDIR)/UnitTesting/test_system_manager.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp
 
 # STORMM C++ object files
@@ -459,6 +464,8 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		  $(SRCDIR)/Synthesis/nonbonded_workunit.o \
 		  $(SRCDIR)/Synthesis/static_mask_synthesis.o \
+		  $(SRCDIR)/Synthesis/synthesis_enumerators.o \
+		  $(SRCDIR)/Synthesis/synthesis_permutor.o \
 		  $(SRCDIR)/Synthesis/systemcache.o \
 		  $(SRCDIR)/Synthesis/valence_workunit.o \
 		  $(SRCDIR)/Topology/amber_prmtop_util.o \

@@ -8,6 +8,9 @@
 #include "Accelerator/gpu_details.h"
 #include "Chemistry/atom_equivalence.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Synthesis/synthesis_cache_map.h"
+#include "Synthesis/synthesis_enumerators.h"
+#include "Synthesis/systemcache.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
@@ -23,6 +26,9 @@ using card::HybridTargetLevel;
 using chemistry::AtomEquivalence;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisReader;
+using synthesis::SynthesisCacheMap;
+using synthesis::SystemCache;
+using synthesis::SystemGrouping;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using trajectory::CoordinateFrame;
@@ -44,8 +50,9 @@ template <typename T> struct RMSDPlanReader {
                  const int* alignment_steps_in, const int* core_atoms_in,
                  const int* core_counts_in, const int* core_starts_in, const int* symm_atoms_in,
                  const int4* symm_bounds_in, const int2* symm_ranges_in,
-                 const int* frame_counts_in, const int* atr_starts_in,
-                 const size_t* ata_starts_in);
+                 const size_t* atr_starts_in_src, const size_t* atr_starts_in_top,
+                 const size_t* atr_starts_in_lbl, const size_t* ata_starts_in_src,
+                 const size_t* ata_starts_in_top, const size_t* ata_starts_in_lbl);
   
   /// \brief The presence of const members will implicitly delete the copy and move assignment
   ///        operators, but the default copy and move constructors will apply.
@@ -78,12 +85,14 @@ template <typename T> struct RMSDPlanReader {
   const int2* symm_ranges;     ///< Bounds array on the symmetric atom bounds array--indicating the
                                ///<   lower and upper limits of symmetric atom numbered groups in
                                ///<   each system in the "x" and "y" members of each tuple.
-  const int* frame_counts;     ///< The number of frames referencing each unique topology handled
-                               ///<   by this plan
-  const int* atr_starts;       ///< Starting indices of the results array for storing reference
-                               ///<   RMSD calculation results based on each topology
-  const size_t* ata_starts;    ///< Starting indices of the results array for storing all-to-all
-                               ///<   matrix RMSD calculation results based on each topology
+
+  // The following arrays pretain to different layouts for batched RMSD calculations.
+  const size_t* atr_starts_src;  ///< All-to-reference by system cache -sys { ... } declarations
+  const size_t* atr_starts_top;  ///< All-to-reference by topology
+  const size_t* atr_starts_lbl;  ///< All-to-reference by label group
+  const size_t* ata_starts_src;  ///< All-to-all by system cache -sys { ... } declarations
+  const size_t* ata_starts_top;  ///< All-to-all by topology
+  const size_t* ata_starts_lbl;  ///< All-to-all by label group
 };
   
 /// \brief Collect instructions for one or more systems (intend to work with any coordinate object,
@@ -116,7 +125,9 @@ public:
   ///                      by the lower index, should be assessed.
   /// \{
   RMSDPlan(RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
-           double rmf_in = default_required_mass_fraction);
+           double rmf_in = default_required_mass_fraction,
+           const PhaseSpaceSynthesis *poly_ps_in = nullptr, const SystemCache *sc_in = nullptr,
+           const SynthesisCacheMap *scmap_in = nullptr);
 
   RMSDPlan(const AtomGraph &ag_in, const CoordinateFrame &cf_in,
            RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
@@ -126,6 +137,14 @@ public:
   RMSDPlan(const AtomEquivalence &eq_in, RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
            double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu);
   
+  RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in, RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
+           double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu,
+           int low_mol_idx = 0, int high_mol_idx = -1);
+
+  RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in, const std::vector<AtomEquivalence> &eq_list_in,
+           RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
+           double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu);
+
   RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
            double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu,
            int low_mol_idx = 0, int high_mol_idx = -1);
@@ -133,6 +152,18 @@ public:
   RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, const std::vector<AtomEquivalence> &eq_list_in,
            RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
            double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu);
+
+  RMSDPlan(const PhaseSpaceSynthesis *poly_ps_in, const SystemCache *sc_in,
+           const SynthesisCacheMap *scmap_in,
+           const RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
+           const double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu,
+           const int low_mol_idx = 0, const int high_mol_idx = -1);
+
+  RMSDPlan(const PhaseSpaceSynthesis &poly_ps_in, const SystemCache &sc_in,
+           const SynthesisCacheMap &scmap_in,
+           const RMSDMethod strategy_in = RMSDMethod::ALIGN_MASS,
+           const double rmf_in = default_required_mass_fraction, const GpuDetails &gpu = null_gpu,
+           const int low_mol_idx = 0, const int high_mol_idx = -1);
   /// \}
 
   /// \brief With no POINTER-kind Hybrid or pointers to its own member variables to repair, and no
@@ -151,30 +182,52 @@ public:
   /// \brief Get the number of plans kept within this object.
   int getPlanCount() const;
 
+  /// \brief Get the plan index applicable to a specific grouping of systems (this assumes that all
+  ///        systems in the group have a valid interpretation by a single plan, and if that is not
+  ///        the case the result will be undefined).
+  ///
+  /// \param index         Index of the grouping from one of the internal lists
+  /// \param organization  The manner in which systems are grouped
+  int getPlanIndex(int index, SystemGrouping organization) const;
+  
   /// \brief Get the size of the vector of RMSD results for all frames to a single reference, for
   ///        size considerations on an array of results.
-  size_t getReferenceRMSDSize() const;
-  
-  /// \brief Get the size of the array filled with RMSD matrix results for all frames to a single
-  ///        reference, for size considerations on an array of results.
-  size_t getRMSDMatrixSize() const;
+  ///
+  /// \param task          Specify all-to-one or all-to-all RMSD calculations
+  /// \param organization  The manner in which systems shall be grouped
+  size_t getOutputSize(RMSDTask task,
+                       SystemGrouping organization = SystemGrouping::TOPOLOGY) const;
 
+  /// \brief Get the number of partitions into which the output shall be divided based on a
+  ///        requested method of grouping the systems.
+  ///
+  /// \param organization  The grouping method of interest
+  int getPartitionCount(SystemGrouping organization) const;
+  
   /// \brief Get the starting index for catalogging RMSD calculations to a reference structure.
   ///
-  /// \param plan_index  The system / plan of interest
-  size_t getReferenceRMSDStart(const int plan_index) const;
-  
-  /// \brief Get the starting index for catalogging matrix RMSD calculations.
-  ///
-  /// \param plan_index  The system / plan of interest
-  size_t getRMSDMatrixStart(const int plan_index) const;
+  /// \param index         Index of the system / plan / label of interest
+  /// \param task          Compute all-to-one or all-to-all RMSD
+  /// \param organization  The manner in which groups are defined to compare structures within each
+  ///                      group
+  size_t getOutputStart(int index, RMSDTask task,
+                        SystemGrouping organization = SystemGrouping::TOPOLOGY) const;
 
   /// \brief Get the number of frames making use of a particular plan, matching the reference RMSD
   ///        bounds set forth in the plan.
   ///
-  /// \param plan_index  The system / plan of interest
-  int getFrameCount(const int plan_index) const;
-  
+  /// \param index         Index of the system / plan of interest
+  /// \param organization  The manner in which groups are defined to compare structures within each
+  ///                      group
+  int getFrameCount(int index, SystemGrouping organization) const;
+
+  /// \brief Get a list of all frames of a synthesis that fall into a specific partition (e.g. a
+  ///        label group, those sharing a topology).
+  ///
+  /// \param index         Index of the partition of interest
+  /// \param organization  The manner of partitioning / grouping systems from the synthesis
+  std::vector<int> getSystemGroup(int index, SystemGrouping organization) const;
+
   /// \brief Get the general, prescribed strategy for computing RMSDs.
   RMSDMethod getGeneralStrategy() const;
 
@@ -204,20 +257,23 @@ public:
   /// \param tier  Get pointers at the level of the CPU host or GPU device
   const RMSDPlanReader<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get the coordinate synthesis pointer.
+  const PhaseSpaceSynthesis* getCoordinateSynthesisPointer() const;
+
+  /// \brief Get the system cache pointer.
+  const SystemCache* getCachePointer() const;
+
+  /// \brief Get a pointer to the map between the cache and the coordinate synthesis.
+  const SynthesisCacheMap* getSynthesisMapPointer() const;
+
   /// \brief Resize the results arrays to accommodate a given number of RMSD calculations, or an
   ///        assortment of frames.
   ///
-  /// \param frame_count  A trusted number of frames to allocate for
-  /// \param cs           A set of cooordinate frames (the number of frames in the series will be
-  ///                     taken as the resizing value)
-  /// \param poly_ps      A synthesis of many systems
-  /// \{
-  void formatResults(int frame_count);
+  /// \param frame_count  A trusted number of frames to allocate for, if no synthesis is available
+  void formatResults(int frame_count = 0);
 
   template <typename T>
   void formatResults(const CoordinateSeries<T> &cs);
-  
-  void formatResults(const PhaseSpaceSynthesis &poly_ps);
   /// \}
 
 #ifdef STORMM_USE_HPC
@@ -227,15 +283,40 @@ public:
   /// \brief Download the object's contents from the GPU device.
   void download();
 #endif
+
+  /// \brief Attach a SystemCache and map between the cache and the synthesis to the object.
+  ///
+  /// Overloaded:
+  ///   - Specify the cache and map by const pointer
+  ///   - Specify the cache and map by const reference
+  ///
+  /// \param sc     The system cache, reflecting user specified input coordinates and topologies
+  /// \param scmap  The map between the synthesis and the system cache
+  /// \{
+  void addSystemCache(const SystemCache *sc, const SynthesisCacheMap *scmap);
+  void addSystemCache(const SystemCache &sc, const SynthesisCacheMap &scmap);
+  /// \}
   
 private:
-  int plan_count;                      ///< The number of distinct plans, one per system that this
-                                       ///<   object is to serve
-  int total_rmsd_scores;               ///< The number of RMSD scores that the plan anticipates to
-                                       ///<   be computed.
-  size_t total_rmsd_pair_scores;       ///< The number of pairwise RMSD scores between frames of
-                                       ///<   the same system that the plan anticipates to be
-                                       ///<   computed.
+  
+  /// The number of distinct plans, one per unique topology this object is established to serve
+  int plan_count;
+
+  // The following member variables store space requirements for computing RMSD to reference
+  // structures within specific groupings from the associated synthesis.
+  size_t rmsd_space_src;  ///< Group systems by their sources in -sys keywords from user input
+                          ///<   (systems within the linked SystemCache object)
+  size_t rmsd_space_top;  ///< Group systems by the topologies guiding them.
+  size_t rmsd_space_lbl;  ///< Group systems by their attached labels.
+
+  // The following member variables store space requirements for computing pairwise RMSD values
+  // among structures of specific groupings from the associated synthesis.
+  size_t rmsd_pair_space_src;  ///< Group systems by their sources in -sys keywords from user input
+                               ///<   (systems within the linked SystemCache object)
+  size_t rmsd_pair_space_top;  ///< Group systems by the topologies guiding them.
+  size_t rmsd_pair_space_lbl;  ///< Group systems by their attached labels.
+
+  // Additional directives and arrays pertinent to each individual plan
   RMSDMethod general_strategy;         ///< Align systems by mass (ALIGN_MASS) or by coordinates of
                                        ///<   all particles (ALIGN_GEOM), no do not align and take
                                        ///<   the mass-weighted (NO_ALIGN_MASS) or the
@@ -248,7 +329,7 @@ private:
   Hybrid<int> atom_starts;             ///< Starting indices of each unique system in the masses
                                        ///<   and sp_masses arrays.  The masses are padded up to
                                        ///<   the warp size in each system.
-  Hybrid<int> asymmetric_core_atoms;   ///< Atoms found in ach system's asymmetric core, given in
+  Hybrid<int> asymmetric_core_atoms;   ///< Atoms found in each system's asymmetric core, given in
                                        ///<   terms of the system's own topological indices.
   Hybrid<int> asymmetric_core_counts;  ///< Atom counts in each system's core, not part of any of
                                        ///<   its symmetry-related groups
@@ -336,31 +417,71 @@ private:
   /// In the padded spaces between systems, that relationship will not hold, but it is simply
   /// illustrative.
   Hybrid<ullint> symmetry_group_membership_bounds;
-
-  /// The number of frames based on each plan (each plan pertains to a particular topology).  While
-  /// the frames for multiple plans are not guaranteed to exist back-to-back in a
-  /// PhaseSpaceSynthesis object, the object will contain lists of its systems that enumerate the
-  /// indices corresponding to each topology.
-  Hybrid<int> frame_counts;
-
-  /// Offsets for results from each frame for each unique topology, if computing RMSDs of all
-  /// frames to a reference structure.
-  Hybrid<int> all_to_ref_offsets;
   
+  /// Offsets for results from each frame for each unique topology, if computing RMSDs of all
+  /// frames to a reference structure.  Extensions match the member variables above for sizes of
+  /// various groupings.
+  /// \{
+  Hybrid<size_t> all_to_ref_offsets_src;
+  Hybrid<size_t> all_to_ref_offsets_top;
+  Hybrid<size_t> all_to_ref_offsets_lbl;
+  /// \}
+
   /// When computing all-to-all RMSD matrices for each system, the results are organized in
   /// segments of (Ni * (Ni - 1) / 2) numbers each, the lower triangles of matrices whee Ni is the
   /// number of frames using each unique topology or plan.  The position of the RMSD result for
-  /// frames i and j (for i < j) is given by ((j - 1) * (j - 2) / 2) + i.
-  Hybrid<size_t> all_to_all_offsets;
+  /// frames i and j (for i < j) is given by ((j - 1) * (j - 2) / 2) + i.  Extensions match the
+  /// member variables above for sizes of various groupings.
+  /// \{
+  Hybrid<size_t> all_to_all_offsets_src;
+  Hybrid<size_t> all_to_all_offsets_top;
+  Hybrid<size_t> all_to_all_offsets_lbl;
+  /// \}
   
   /// List of all topologies described by this plan
   std::vector<AtomGraph*> ag_pointers; 
 
+  /// A pointer to the coordinate synthesis upon which the plan is based (if this is the nullptr,
+  /// then there is no synthesis for the plan and the number of unique systems will be expected to
+  /// be one).
+  PhaseSpaceSynthesis *poly_ps_ptr;
+
+  /// A pointer to the systems cache upon which the synthesis might be based (if this is the
+  /// nullptr, there is no cache available and meta-data on systems cannot be used in devising
+  /// plans for which systems shall be compared).  This is only valid if a synthesis pointer is
+  /// provided.
+  SystemCache *sc_ptr;
+
+  /// Map between the systems cache and the associated synthesis
+  SynthesisCacheMap *scmap_ptr;
+
+  /// \brief Validate the spread of RMSD calculations to be performed.  This performs a check to
+  ///        ensure that, for certain spreads, a synthesis is present and that a mapping between
+  ///        that synthesis and the original user input, complete with metadata, is available.
+  ///
+  /// \param organization  The layout in which systems are grouped to perform all-to-all or
+  ///                      all-to-one RMSD calculations
+  void validateOutputType(const SystemGrouping organization) const;
+  
   /// \brief Validate the plan index.
   ///
-  /// \param plan_index  Index of the plan that will be requested
-  /// \param caller      Name of the calling function
-  void validatePlanIndex(int plan_index, const char* caller = nullptr) const;
+  /// Overloaded:
+  ///   - Provide just the index (the partition we be assumed to be a topology plan)
+  ///   - Provide the index and manner of grouping systems
+  ///
+  /// \param index         Index of the plan that will be requested
+  /// \param caller        Name of the calling function
+  /// \param organization  The manner of partitioning systems within the synthesis
+  /// \{
+  void validatePartitionIndex(int index, const char* caller = nullptr) const;
+  void validatePartitionIndex(int index, SystemGrouping organization,
+                              const char* caller = nullptr) const;
+  /// \}
+
+  /// \brief Lay out the offsets for RMSD computations based on one of several groupings.
+  ///
+  /// \param organization  The manner in which systems are grouped
+  void computeResultOffsets(SystemGrouping organization);
   
   /// \brief Resize the storage arrays and add groups of symmetry-related atoms to the object's
   ///        Hybrid arrays.

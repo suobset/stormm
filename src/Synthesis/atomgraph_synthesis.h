@@ -104,7 +104,7 @@ public:
   /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis
-  int getTopologyCount() const;
+  int getUniqueTopologyCount() const;
 
   /// \brief Get a topology pointer for a specific system contained within the synthesis.
   ///
@@ -120,7 +120,7 @@ public:
 
   /// \brief Get a const reference to the list of all pointers for unique topologies making up
   ///        this synthesis.
-  const std::vector<AtomGraph*>& getTopologyPointers() const;
+  const std::vector<AtomGraph*>& getUniqueTopologies() const;
 
   /// \brief Get a const reference to the list of all topology indices, indicating the topologies
   ///        describing each systems contained within this synthesis.
@@ -360,6 +360,10 @@ public:
   SyAtomUpdateKit<float, float2, float4>
   getSinglePrecisionAtomUpdateKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a const pointer to the object itself, useful for retrieving a valid pointer when
+  ///        the object is available as a const reference.
+  const AtomGraphSynthesis* getSelfPointer() const;
+  
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object
   void upload();

@@ -47,6 +47,7 @@ using stormm::review::stormmSplash;
 using stormm::structure::rotateCoordinates;
 using stormm::structure::rmsd;
 using stormm::structure::RMSDMethod;
+using stormm::structure::RMSDTask;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::UnitCellType;
@@ -263,8 +264,8 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
       }
     }
     item_rplan.formatResults(item_series);
-    Hybrid<double> item_rmsds(item_rplan.getReferenceRMSDSize());
-    Hybrid<double> item_pair_rmsds(item_rplan.getRMSDMatrixSize());
+    Hybrid<double> item_rmsds(item_rplan.getOutputSize(RMSDTask::REFERENCE));
+    Hybrid<double> item_pair_rmsds(item_rplan.getOutputSize(RMSDTask::MATRIX));
     rmsd(item_rplan, item_cf, item_series, &item_rmsds);
     rmsd(item_rplan, item_series, &item_pair_rmsds);
 
@@ -308,8 +309,8 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
   }
   PhaseSpaceSynthesis poly_ps(shuffled_ps, shuffled_ag, 40);
   const RMSDPlan poly_rplan(poly_ps, approach);
-  Hybrid<double> poly_rmsds(poly_rplan.getReferenceRMSDSize());
-  Hybrid<double> poly_pair_rmsds(poly_rplan.getRMSDMatrixSize());
+  Hybrid<double> poly_rmsds(poly_rplan.getOutputSize(RMSDTask::REFERENCE));
+  Hybrid<double> poly_pair_rmsds(poly_rplan.getOutputSize(RMSDTask::MATRIX));
   Hybrid<int> sys_example_idx(poly_ps.getUniqueTopologyExampleIndices());
   rmsd(poly_rplan, poly_ps, sys_example_idx, &poly_rmsds);
   rmsd(poly_rplan, poly_ps, &poly_pair_rmsds);

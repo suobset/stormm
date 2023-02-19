@@ -36,6 +36,14 @@ std::vector<int> massToZNumber(const std::vector<double> &masses) {
 }
 
 //-------------------------------------------------------------------------------------------------
+double zNumberToNaturalMass(const int z) {
+  if (z < 0 || z >= element_maximum_count) {
+    rtErr("No mass is known for element " + std::to_string(z) + ".", "zNumberToNaturalMass");
+  }
+  return elemental_masses[z];
+}
+
+//-------------------------------------------------------------------------------------------------
 char2 zNumberToSymbol(const int atomic_number) {
   if (atomic_number < 0) {
     rtWarn("Atomic number " + std::to_string(atomic_number) + " is invalid and will be "
