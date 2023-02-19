@@ -148,10 +148,6 @@ public:
   MdlMol(const ChemicalFeatures *chemfe, const T* xcrd, const T* ycrd, const T* zcrd,
          int molecule_index = 0);
 
-  MdlMol(const ChemicalFeatures *chemfe, const llint* xcrd, const llint* ycrd, const llint* zcrd,
-         const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf, double inv_scale,
-         int molecule_index = 0);
-
   MdlMol(const ChemicalFeatures *chemfe, const CoordinateFrameReader cfr, int molecule_index = 0);
   
   MdlMol(const ChemicalFeatures *chemfe, const CoordinateFrame *cf, int molecule_index = 0);
@@ -371,7 +367,21 @@ public:
   void impartCoordinates(const PhaseSpaceSynthesis &poly_ps, int system_index,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-  
+
+  /// \brief Add a property to the object.  Properties must follow a list of pre-approved BIOVIA
+  ///        codes, but provide a means of extending the V2000 format to include information found
+  ///        in the V3000 format.
+  ///
+  /// Overloaded:
+  ///   - Provide the property by pointer
+  ///   - Provide the property by reference
+  ///
+  /// \param mmprop  The property to add
+  /// /{
+  void addProperty(const MdlMolProperty *mmprop);
+  void addProperty(const MdlMolProperty &mmprop);
+  /// \}
+
   /// \brief Add a data item to the object.  These data items follow the classifications set forth
   ///        in the DataRequestKind enumerator (see molecule_format_enumerators.h).  Each overload
   ///        is designed to serve a particular case.
@@ -589,8 +599,14 @@ private:
   /// An external registry number for the molecule.  This can be imparted explicitly, or imparted
   /// by adding a data item indicating an external registry number.
   std::string external_regno;
+
+  /// \brief Validate the index of an atom query.
+  ///
+  /// \param index   The atom of interest, numbering starts from zero
+  /// \param caller  Name of the calling function
+  void validateAtomIndex(int index, const char* caller) const;
   
-  /// \brief Allocate space for information inthe object.
+  /// \brief Allocate space for information in the object.
   ///
   /// Overloaded:
   ///   - Allocate as described on the MOL entry's counts line
@@ -697,6 +713,15 @@ private:
   /// \param caller      Name of the calling function (for backtracing purposes)
   void checkDataItemIndex(int item_index, const char* caller) const;
 
+  /// \brief Create a property for one of the common atom / integer combination lists (i.e. M  CHG)
+  ///        and add it to the MDL MOL entry.
+  ///
+  /// \param notable_data  List of atom indices and property pairs.  The atom indices need not be
+  ///                      inflated by one, as they are going "straight into the bloodstream"
+  ///                      rather than passing through filters in the MdlMolProperty constructor.
+  /// \param prcode        The property code, i.e. { 'C', 'H', 'G', 'M' }
+  void addAtomIntProperty(const std::vector<int2> &notable_data, const char4 prcode);
+  
   /// \brief Transfer information from topology and chemical features objects to complete details
   ///        of the MDL MOL entry.  This function assumes that the object's internal arrays for
   ///        atomic properties have been allocated (resized) to their full lengths, and that the

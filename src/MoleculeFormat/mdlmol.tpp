@@ -61,32 +61,51 @@ template <typename T>
 void MdlMol::impartCoordinates(const T* xcrd, const T* ycrd, const T* zcrd,
                                const double scale_factor, const ChemicalDetailsKit &cdk,
                                const int molecule_index) {
+  
+  const int llim = cdk.mol_limits[molecule_index];
+  const int hlim = cdk.mol_limits[molecule_index + 1];
   if (molecule_index < 0 || molecule_index >= cdk.nmol) {
     rtErr("Molecule index " + std::to_string(molecule_index) + " is invalid for a topology with " +
           std::to_string(cdk.nmol) + " molecules.", "MdlMol", "impartCoordinates");
   }
-  const int llim = cdk.mol_limits[molecule_index];
-  const int hlim = cdk.mol_limits[molecule_index + 1];
-  if (hlim - llim != atom_count) {
-    rtErr("Molecule " + std::to_string(molecule_index) + " with " + std::to_string(hlim - llim) +
-          " atoms is incompatible with an MDL MOL object of " +	std::to_string(atom_count) +
-          " atoms.", "MdlMol", "impartCoordinates");
-  }
+  bool problem = false;
+  int atomcon = 0;
   if (scale_factor != 1.0) {
     for (int i = llim; i < hlim; i++) {
       const int iatom = cdk.mol_contents[i];
-      coordinates[i - llim].x = xcrd[iatom] * scale_factor;
-      coordinates[i - llim].y = ycrd[iatom] * scale_factor;
-      coordinates[i - llim].z = zcrd[iatom] * scale_factor;
+      if (cdk.z_numbers[iatom] > 0) {
+        if (atomcon >= atom_count) {
+          problem = true;
+        }
+        else {
+          coordinates[atomcon].x = xcrd[iatom] * scale_factor;
+          coordinates[atomcon].y = ycrd[iatom] * scale_factor;
+          coordinates[atomcon].z = zcrd[iatom] * scale_factor;
+          atomcon++;
+        }
+      }
     }
   }
   else {
     for (int i = llim; i < hlim; i++) {
       const int iatom = cdk.mol_contents[i];
-      coordinates[i - llim].x = xcrd[iatom];
-      coordinates[i - llim].y = ycrd[iatom];
-      coordinates[i - llim].z = zcrd[iatom];
+      if (cdk.z_numbers[iatom] > 0) {
+        if (atomcon >= atom_count) {
+          problem = true;
+        }
+        else {
+          coordinates[atomcon].x = xcrd[iatom];
+          coordinates[atomcon].y = ycrd[iatom];
+          coordinates[atomcon].z = zcrd[iatom];
+          atomcon++;
+        }
+      }
     }
+  }
+  if (problem) {
+    rtErr("Molecule " + std::to_string(molecule_index) + " with " + std::to_string(hlim - llim) +
+          " total particles has more real atoms than would be compatible with an MDL MOL object "
+          "of " + std::to_string(atom_count) + " atoms.", "MdlMol", "impartCoordinates");
   }
 }
 

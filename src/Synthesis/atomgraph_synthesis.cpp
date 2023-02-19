@@ -3215,7 +3215,7 @@ void AtomGraphSynthesis::loadReductionWorkUnits(const GpuDetails &gpu) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int AtomGraphSynthesis::getTopologyCount() const {
+int AtomGraphSynthesis::getUniqueTopologyCount() const {
   return topology_count;
 }
 
@@ -3240,7 +3240,7 @@ const std::vector<AtomGraph*> AtomGraphSynthesis::getSystemTopologyPointer() con
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph*>& AtomGraphSynthesis::getTopologyPointers() const {
+const std::vector<AtomGraph*>& AtomGraphSynthesis::getUniqueTopologies() const {
   return topologies;
 }
 
@@ -3643,6 +3643,10 @@ AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier
                                  cnst_instructions.data(tier), vwu_manipulation_masks.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+const AtomGraphSynthesis* AtomGraphSynthesis::getSelfPointer() const {
+  return this;
+}
 
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------

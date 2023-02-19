@@ -115,17 +115,14 @@ int TextFile::getLineCount() const {
 int TextFile::getLineLimits(const int index) const {
   if (index < 0 || index > line_count) {
     rtErr("Text file " + orig_file + " has " + std::to_string(line_count) + " lines, " +
-          std::to_string(index) + " requested.", "TextFile", "getLinePointer");
+          std::to_string(index) + " requested.", "TextFile", "getLineLimits");
   }
   return line_limits[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 int TextFile::getLineLength(const int index) const {
-  if (index < 0 || index >= line_count) {
-    rtErr("Text file " + orig_file + " has " + std::to_string(line_count) + " lines, " +
-          std::to_string(index) + " requested.", "TextFile", "getLinePointer");
-  }
+  validateLineIndex(index, "getLineLength");
   return line_limits[index + 1] - line_limits[index];
 }
 
@@ -135,16 +132,26 @@ char TextFile::getChar(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string TextFile::getLineAsString(const int line_index) const {
+  validateLineIndex(line_index, "getLineAsString");
+  std::string result;
+  const int llim = line_limits[line_index];
+  const int hlim = line_limits[line_index + 1];
+  result.reserve(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result += text[i];
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 const char* TextFile::getTextPointer(const int index) const {
   return &text[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 const char* TextFile::getLinePointer(const int line_index) const {
-  if (line_index < 0 || line_index >= line_count) {
-    rtErr("Text file " + orig_file + " has " + std::to_string(line_count) + " lines, " +
-          std::to_string(line_index) + " requested.", "TextFile", "getLinePointer");
-  }
+  validateLineIndex(line_index, "getLinePointer");
   return &text[line_limits[line_index]];
 }
 
@@ -174,6 +181,14 @@ char4 TextFile::extractChar4(const int line_number, const int start_pos,
   const char* text_ptr = &text[line_limits[line_number] + start_pos];
   return { (actual_length > 0) ? text_ptr[0] : ' ', (actual_length > 1) ? text_ptr[1] : ' ',
            (actual_length > 2) ? text_ptr[2] : ' ', (actual_length > 3) ? text_ptr[3] : ' ' };
+}
+
+//-------------------------------------------------------------------------------------------------
+void TextFile::validateLineIndex(const int index, const char* caller) const {
+  if (index < 0 || index >= line_count) {
+    rtErr("Text file " + orig_file + " has " + std::to_string(line_count) + " lines, " +
+          std::to_string(index) + " requested.", "TextFile", caller);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -222,11 +237,7 @@ void TextFile::linesFromString(const std::string &text_in) {
 //-------------------------------------------------------------------------------------------------
 int TextFile::checkAvailableLength(const int line_number, const int start_pos,
                                    const int string_length) const {
-  if (line_number >= line_count || line_number < 0) {
-    rtErr("The text file originating in " + orig_file + " has " + std::to_string(line_count) +
-          " lines and cannot return text from line " + std::to_string(line_number) + ".",
-          "TextFile", "checkAvailableLength");
-  }
+  validateLineIndex(line_number, "checkAvailableLength");
   const int available_chars = line_limits[line_number + 1] - line_limits[line_number];
   if (start_pos > available_chars || start_pos + string_length > available_chars) {
     rtErr("Line " + std::to_string(line_number) + " of text file " + orig_file + " has " +

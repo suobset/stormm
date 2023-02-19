@@ -82,6 +82,9 @@ public:
 
   /// \brief Get the total number of failures across all sections.
   int getOverallFailureCount() const;
+
+  /// \brief Get the total number of skipped tests across all sections.
+  int getOverallSkipCount() const;
   
 private:
   int current_section;                ///< Index of the current section, for which successes and

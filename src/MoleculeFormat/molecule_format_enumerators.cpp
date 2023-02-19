@@ -53,6 +53,7 @@ MdlMolPropertyKind translateMdlMolPropertyKind(char4 input) {
   else if (input == char4({ 'R', 'E', 'G', 'M' })) return MdlMolPropertyKind::LARGE_REGNO;
   else if (input == char4({ 'S', 'B', 'T', 'M' })) return MdlMolPropertyKind::SGROUP_BRACKET_STYLE;
   else if (input == char4({ 'S', 'K', 'P', 'S' })) return MdlMolPropertyKind::SKIP;
+  else if (input == char4({ ' ', ' ', ' ', ' ' })) return MdlMolPropertyKind::NONE;
   else {
     const std::string str_code = std::to_string(input.w) + "  " + std::to_string(input.x) +
                                  std::to_string(input.y) + std::to_string(input.z);

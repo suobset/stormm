@@ -203,7 +203,7 @@ int main(const int argc, const char* argv[]) {
 
   // Test file name mechanics
   section(6);
-  const std::string jungle = oe.getStormmHomePath() + osc + "its" + osc + "a" + osc + "jungle" +
+  const std::string jungle = oe.getStormmSourcePath() + osc + "its" + osc + "a" + osc + "jungle" +
                              osc + "out" + osc + "there.book";
   check(getBaseName(jungle), RelationalOperator::EQUAL, std::string("there.book"), "The base "
         "name of a file path is not returned correctly.");

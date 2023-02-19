@@ -11,41 +11,76 @@ using numerics::globalpos_scale_nonoverflow_bits;
 
 //-------------------------------------------------------------------------------------------------
 CondensateWriter::CondensateWriter(const PrecisionModel mode_in, const CondensateSource basis_in,
-                                   const int system_count_in, const int natr_insr_in,
-                                   const int nata_insr_in, const size_t* atom_starts_in,
+                                   const int system_count_in, const int natr_insr_src_in,
+                                   const int natr_insr_top_in, const int natr_insr_lbl_in,
+                                   const int nata_insr_src_in, const int nata_insr_top_in,
+                                   const int nata_insr_lbl_in, const size_t* atom_starts_in,
                                    const int* atom_counts_in, float* xcrd_sp_in, float* ycrd_sp_in,
                                    float* zcrd_sp_in, double* xcrd_in, double* ycrd_in,
                                    double* zcrd_in, double* umat_in, double* invu_in,
-                                   const int4* atr_insr_in, const int4* ata_insr_in) :
-    mode{mode_in}, basis{basis_in}, system_count{system_count_in}, natr_insr{natr_insr_in},
-    nata_insr{nata_insr_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+                                   const int4* atr_insr_src_in, const int4* atr_insr_top_in,
+                                   const int4* atr_insr_lbl_in, const int* atr_group_src_in,
+                                   const int* atr_group_top_in, const int* atr_group_lbl_in,
+                                   const int4* ata_insr_src_in, const int4* ata_insr_top_in,
+                                   const int4* ata_insr_lbl_in, const int* ata_group_src_in,
+                                   const int* ata_group_top_in, const int* ata_group_lbl_in) :
+    mode{mode_in}, basis{basis_in}, system_count{system_count_in}, natr_insr_src{natr_insr_src_in},
+    natr_insr_top{natr_insr_top_in}, natr_insr_lbl{natr_insr_lbl_in},
+    nata_insr_src{nata_insr_src_in}, nata_insr_top{nata_insr_top_in},
+    nata_insr_lbl{nata_insr_lbl_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
     xcrd_sp{xcrd_sp_in}, ycrd_sp{ycrd_sp_in}, zcrd_sp{zcrd_sp_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
-    zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, atr_insr{atr_insr_in}, ata_insr{ata_insr_in}
+    zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, atr_insr_src{atr_insr_src_in},
+    atr_insr_top{atr_insr_top_in}, atr_insr_lbl{atr_insr_lbl_in}, atr_group_src{atr_group_src_in},
+    atr_group_top{atr_group_top_in}, atr_group_lbl{atr_group_lbl_in},
+    ata_insr_src{ata_insr_src_in}, ata_insr_top{ata_insr_top_in}, ata_insr_lbl{ata_insr_lbl_in},
+    ata_group_src{ata_group_src_in}, ata_group_top{ata_group_top_in},
+    ata_group_lbl{ata_group_lbl_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 CondensateReader::CondensateReader(const PrecisionModel mode_in, const CondensateSource basis_in,
-                                   const int system_count_in, const int natr_insr_in,
-                                   const int nata_insr_in, const size_t* atom_starts_in,
+                                   const int system_count_in, const int natr_insr_src_in,
+                                   const int natr_insr_top_in, const int natr_insr_lbl_in,
+                                   const int nata_insr_src_in, const int nata_insr_top_in,
+                                   const int nata_insr_lbl_in, const size_t* atom_starts_in,
                                    const int* atom_counts_in, const float* xcrd_sp_in,
                                    const float* ycrd_sp_in, const float* zcrd_sp_in,
                                    const double* xcrd_in, const double* ycrd_in,
                                    const double* zcrd_in, const double* umat_in,
-                                   const double* invu_in, const int4* atr_insr_in,
-                                   const int4* ata_insr_in) :
-    mode{mode_in}, basis{basis_in}, system_count{system_count_in}, natr_insr{natr_insr_in},
-    nata_insr{nata_insr_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+                                   const double* invu_in, const int4* atr_insr_src_in,
+                                   const int4* atr_insr_top_in, const int4* atr_insr_lbl_in,
+                                   const int* atr_group_src_in, const int* atr_group_top_in,
+                                   const int* atr_group_lbl_in, const int4* ata_insr_src_in,
+                                   const int4* ata_insr_top_in, const int4* ata_insr_lbl_in,
+                                   const int* ata_group_src_in, const int* ata_group_top_in,
+                                   const int* ata_group_lbl_in) :
+    mode{mode_in}, basis{basis_in}, system_count{system_count_in}, natr_insr_src{natr_insr_src_in},
+    natr_insr_top{natr_insr_top_in}, natr_insr_lbl{natr_insr_lbl_in},
+    nata_insr_src{nata_insr_src_in}, nata_insr_top{nata_insr_top_in},
+    nata_insr_lbl{nata_insr_lbl_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
     xcrd_sp{xcrd_sp_in}, ycrd_sp{ycrd_sp_in}, zcrd_sp{zcrd_sp_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
-    zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, atr_insr{atr_insr_in}, ata_insr{ata_insr_in}
+    zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, atr_insr_src{atr_insr_src_in},
+    atr_insr_top{atr_insr_top_in}, atr_insr_lbl{atr_insr_lbl_in}, atr_group_src{atr_group_src_in},
+    atr_group_top{atr_group_top_in}, atr_group_lbl{atr_group_lbl_in},
+    ata_insr_src{ata_insr_src_in}, ata_insr_top{ata_insr_top_in}, ata_insr_lbl{ata_insr_lbl_in},
+    ata_group_src{ata_group_src_in}, ata_group_top{ata_group_top_in},
+    ata_group_lbl{ata_group_lbl_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 CondensateReader::CondensateReader(const CondensateWriter &cdw) :
-    mode{cdw.mode}, basis{cdw.basis}, system_count{cdw.system_count}, natr_insr{cdw.natr_insr},
-    nata_insr{cdw.nata_insr}, atom_starts{cdw.atom_starts}, atom_counts{cdw.atom_counts},
-    xcrd_sp{cdw.xcrd_sp}, ycrd_sp{cdw.ycrd_sp}, zcrd_sp{cdw.zcrd_sp}, xcrd{cdw.xcrd},
-    ycrd{cdw.ycrd}, zcrd{cdw.zcrd}, umat{cdw.umat}, invu{cdw.invu}, atr_insr{cdw.atr_insr},
-    ata_insr{cdw.ata_insr}
+    mode{cdw.mode}, basis{cdw.basis}, system_count{cdw.system_count},
+    natr_insr_src{cdw.natr_insr_src}, natr_insr_top{cdw.natr_insr_top},
+    natr_insr_lbl{cdw.natr_insr_lbl}, nata_insr_src{cdw.nata_insr_src},
+    nata_insr_top{cdw.nata_insr_top}, nata_insr_lbl{cdw.nata_insr_lbl},
+    atom_starts{cdw.atom_starts}, atom_counts{cdw.atom_counts}, xcrd_sp{cdw.xcrd_sp},
+    ycrd_sp{cdw.ycrd_sp}, zcrd_sp{cdw.zcrd_sp}, xcrd{cdw.xcrd}, ycrd{cdw.ycrd}, zcrd{cdw.zcrd},
+    umat{cdw.umat}, invu{cdw.invu}, atr_insr_src{cdw.atr_insr_src}, atr_insr_top{cdw.atr_insr_top},
+    atr_insr_lbl{cdw.atr_insr_lbl}, atr_group_src{cdw.atr_group_src},
+    atr_group_top{cdw.atr_group_top}, atr_group_lbl{cdw.atr_group_lbl},
+    ata_insr_src{cdw.ata_insr_src}, ata_insr_top{cdw.ata_insr_top}, ata_insr_lbl{cdw.ata_insr_lbl},
+    ata_group_src{cdw.ata_group_src}, ata_group_top{cdw.ata_group_top},
+    ata_group_lbl{cdw.ata_group_lbl}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -54,8 +89,8 @@ Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionMod
     mode{mode_in}, basis{CondensateSource::SYNTHESIS},
     system_count{0},
     holds_own_data{false}, csptr_data_type{0},
-    atr_instruction_count{0},
-    ata_instruction_count{0},
+    atr_instruction_count_src{0}, atr_instruction_count_top{0}, atr_instruction_count_lbl{0},
+    ata_instruction_count_src{0}, ata_instruction_count_top{0}, ata_instruction_count_lbl{0},
     atom_starts{HybridKind::ARRAY, "cdns_atom_starts"},
     atom_counts{HybridKind::ARRAY, "cdns_atom_counts"},
     x_coordinates_sp{HybridKind::POINTER, "cdns_xcrd_sp"},
@@ -66,8 +101,18 @@ Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionMod
     z_coordinates{HybridKind::POINTER, "cdns_zcrd"},
     umat{HybridKind::POINTER, "cdns_umat"},
     invu{HybridKind::POINTER, "cdns_invu"},
-    atr_instructions{HybridKind::ARRAY, "cdns_atr_insr"},
-    ata_instructions{HybridKind::ARRAY, "cdns_ata_insr"},
+    atr_instructions_src{HybridKind::ARRAY, "cdns_atr_insr_src"},
+    atr_instructions_top{HybridKind::ARRAY, "cdns_atr_insr_top"},
+    atr_instructions_lbl{HybridKind::ARRAY, "cdns_atr_insr_lbl"},
+    atr_instruction_groups_src{HybridKind::ARRAY, "cdns_atr_group_src"},
+    atr_instruction_groups_top{HybridKind::ARRAY, "cdns_atr_group_top"},
+    atr_instruction_groups_lbl{HybridKind::ARRAY, "cdns_atr_group_lbl"},
+    ata_instructions_src{HybridKind::ARRAY, "cdns_ata_insr_src"},
+    ata_instructions_top{HybridKind::ARRAY, "cdns_ata_insr_top"},
+    ata_instructions_lbl{HybridKind::ARRAY, "cdns_ata_insr_lbl"},
+    ata_instruction_groups_src{HybridKind::ARRAY, "cdns_ata_group_src"},
+    ata_instruction_groups_top{HybridKind::ARRAY, "cdns_ata_group_top"},
+    ata_instruction_groups_lbl{HybridKind::ARRAY, "cdns_ata_group_lbl"},
     pps_ptr{const_cast<PhaseSpaceSynthesis*>(poly_ps_in)},
     cs_ptr{nullptr},
     float_data{HybridKind::ARRAY, "cdns_floats"},
@@ -83,8 +128,12 @@ Condensate::Condensate(const Condensate &original) :
     system_count{original.system_count},
     holds_own_data{original.holds_own_data},
     csptr_data_type{original.csptr_data_type},
-    atr_instruction_count{original.atr_instruction_count},
-    ata_instruction_count{original.ata_instruction_count},
+    atr_instruction_count_src{original.atr_instruction_count_src},
+    atr_instruction_count_top{original.atr_instruction_count_top},
+    atr_instruction_count_lbl{original.atr_instruction_count_lbl},
+    ata_instruction_count_src{original.ata_instruction_count_src},
+    ata_instruction_count_top{original.ata_instruction_count_top},
+    ata_instruction_count_lbl{original.ata_instruction_count_lbl},
     atom_starts{original.atom_starts},
     atom_counts{original.atom_counts},
     x_coordinates_sp{original.x_coordinates_sp},
@@ -95,8 +144,18 @@ Condensate::Condensate(const Condensate &original) :
     z_coordinates{original.z_coordinates},
     umat{original.umat},
     invu{original.invu},
-    atr_instructions{original.atr_instructions},
-    ata_instructions{original.ata_instructions},
+    atr_instructions_src{original.atr_instructions_src},
+    atr_instructions_top{original.atr_instructions_top},
+    atr_instructions_lbl{original.atr_instructions_lbl},
+    atr_instruction_groups_src{original.atr_instruction_groups_src},
+    atr_instruction_groups_top{original.atr_instruction_groups_top},
+    atr_instruction_groups_lbl{original.atr_instruction_groups_lbl},
+    ata_instructions_src{original.ata_instructions_src},
+    ata_instructions_top{original.ata_instructions_top},
+    ata_instructions_lbl{original.ata_instructions_lbl},
+    ata_instruction_groups_src{original.ata_instruction_groups_src},
+    ata_instruction_groups_top{original.ata_instruction_groups_top},
+    ata_instruction_groups_lbl{original.ata_instruction_groups_lbl},
     pps_ptr{original.pps_ptr},
     cs_ptr{original.cs_ptr},
     float_data{original.float_data},
@@ -112,8 +171,12 @@ Condensate::Condensate(Condensate &&original) :
     system_count{original.system_count},
     holds_own_data{original.holds_own_data},
     csptr_data_type{original.csptr_data_type},
-    atr_instruction_count{original.atr_instruction_count},
-    ata_instruction_count{original.ata_instruction_count},
+    atr_instruction_count_src{original.atr_instruction_count_src},
+    atr_instruction_count_top{original.atr_instruction_count_top},
+    atr_instruction_count_lbl{original.atr_instruction_count_lbl},
+    ata_instruction_count_src{original.ata_instruction_count_src},
+    ata_instruction_count_top{original.ata_instruction_count_top},
+    ata_instruction_count_lbl{original.ata_instruction_count_lbl},
     atom_starts{std::move(original.atom_starts)},
     atom_counts{std::move(original.atom_counts)},
     x_coordinates_sp{std::move(original.x_coordinates_sp)},
@@ -124,8 +187,18 @@ Condensate::Condensate(Condensate &&original) :
     z_coordinates{std::move(original.z_coordinates)},
     umat{std::move(original.umat)},
     invu{std::move(original.invu)},
-    atr_instructions{std::move(original.atr_instructions)},
-    ata_instructions{std::move(original.ata_instructions)},
+    atr_instructions_src{std::move(original.atr_instructions_src)},
+    atr_instructions_top{std::move(original.atr_instructions_top)},
+    atr_instructions_lbl{std::move(original.atr_instructions_lbl)},
+    atr_instruction_groups_src{std::move(original.atr_instruction_groups_src)},
+    atr_instruction_groups_top{std::move(original.atr_instruction_groups_top)},
+    atr_instruction_groups_lbl{std::move(original.atr_instruction_groups_lbl)},
+    ata_instructions_src{std::move(original.ata_instructions_src)},
+    ata_instructions_top{std::move(original.ata_instructions_top)},
+    ata_instructions_lbl{std::move(original.ata_instructions_lbl)},
+    ata_instruction_groups_src{std::move(original.ata_instruction_groups_src)},
+    ata_instruction_groups_top{std::move(original.ata_instruction_groups_top)},
+    ata_instruction_groups_lbl{std::move(original.ata_instruction_groups_lbl)},
     pps_ptr{original.pps_ptr},
     cs_ptr{original.cs_ptr},
     float_data{std::move(original.float_data)},
@@ -146,8 +219,12 @@ Condensate& Condensate::operator=(const Condensate &other) {
   system_count = other.system_count;
   holds_own_data = other.holds_own_data;
   csptr_data_type = other.csptr_data_type;
-  atr_instruction_count = other.atr_instruction_count;
-  ata_instruction_count = other.ata_instruction_count;
+  atr_instruction_count_src = other.atr_instruction_count_src;
+  atr_instruction_count_top = other.atr_instruction_count_top;
+  atr_instruction_count_lbl = other.atr_instruction_count_lbl;
+  ata_instruction_count_src = other.ata_instruction_count_src;
+  ata_instruction_count_top = other.ata_instruction_count_top;
+  ata_instruction_count_lbl = other.ata_instruction_count_lbl;
   atom_starts = other.atom_starts;
   atom_counts = other.atom_counts;
   x_coordinates_sp = other.x_coordinates_sp;
@@ -158,8 +235,18 @@ Condensate& Condensate::operator=(const Condensate &other) {
   z_coordinates = other.z_coordinates;
   umat = other.umat;
   invu = other.invu;
-  atr_instructions = other.atr_instructions;
-  ata_instructions = other.ata_instructions;
+  atr_instructions_src = other.atr_instructions_src;
+  atr_instructions_top = other.atr_instructions_top;
+  atr_instructions_lbl = other.atr_instructions_lbl;
+  atr_instruction_groups_src = other.atr_instruction_groups_src;
+  atr_instruction_groups_top = other.atr_instruction_groups_top;
+  atr_instruction_groups_lbl = other.atr_instruction_groups_lbl;
+  ata_instructions_src = other.ata_instructions_src;
+  ata_instructions_top = other.ata_instructions_top;
+  ata_instructions_lbl = other.ata_instructions_lbl;
+  ata_instruction_groups_src = other.ata_instruction_groups_src;
+  ata_instruction_groups_top = other.ata_instruction_groups_top;
+  ata_instruction_groups_lbl = other.ata_instruction_groups_lbl;
   pps_ptr = other.pps_ptr;
   cs_ptr = other.cs_ptr;
   float_data = other.float_data;
@@ -184,8 +271,12 @@ Condensate& Condensate::operator=(Condensate &&other) {
   system_count = other.system_count;
   holds_own_data = other.holds_own_data;
   csptr_data_type = other.csptr_data_type;
-  atr_instruction_count = other.atr_instruction_count;
-  ata_instruction_count = other.ata_instruction_count;
+  atr_instruction_count_src = other.atr_instruction_count_src;
+  atr_instruction_count_top = other.atr_instruction_count_top;
+  atr_instruction_count_lbl = other.atr_instruction_count_lbl;
+  ata_instruction_count_src = other.ata_instruction_count_src;
+  ata_instruction_count_top = other.ata_instruction_count_top;
+  ata_instruction_count_lbl = other.ata_instruction_count_lbl;
   atom_starts = std::move(other.atom_starts);
   atom_counts = std::move(other.atom_counts);
   x_coordinates_sp = std::move(other.x_coordinates_sp);
@@ -196,13 +287,22 @@ Condensate& Condensate::operator=(Condensate &&other) {
   z_coordinates = std::move(other.z_coordinates);
   umat = std::move(other.umat);
   invu = std::move(other.invu);
-  atr_instructions = std::move(other.atr_instructions);
-  ata_instructions = std::move(other.ata_instructions);
+  atr_instructions_src = std::move(other.atr_instructions_src);
+  atr_instructions_top = std::move(other.atr_instructions_top);
+  atr_instructions_lbl = std::move(other.atr_instructions_lbl);
+  atr_instruction_groups_src = std::move(other.atr_instruction_groups_src);
+  atr_instruction_groups_top = std::move(other.atr_instruction_groups_top);
+  atr_instruction_groups_lbl = std::move(other.atr_instruction_groups_lbl);
+  ata_instructions_src = std::move(other.ata_instructions_src);
+  ata_instructions_top = std::move(other.ata_instructions_top);
+  ata_instructions_lbl = std::move(other.ata_instructions_lbl);
+  ata_instruction_groups_src = std::move(other.ata_instruction_groups_src);
+  ata_instruction_groups_top = std::move(other.ata_instruction_groups_top);
+  ata_instruction_groups_lbl = std::move(other.ata_instruction_groups_lbl);
   pps_ptr = std::move(other.pps_ptr);
   cs_ptr = std::move(other.cs_ptr);
   float_data = std::move(other.float_data);
   double_data = std::move(other.double_data);
-
   return *this;
 }
 
@@ -233,13 +333,81 @@ bool Condensate::ownsCoordinates() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int Condensate::getATRInstructionCount() const {
-  return atr_instruction_count;
+int Condensate::getATRInstructionCount(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return atr_instruction_count_src;
+  case SystemGrouping::TOPOLOGY:
+    return atr_instruction_count_top;
+  case SystemGrouping::LABEL:
+    return atr_instruction_count_lbl;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-int Condensate::getATAInstructionCount() const {
-  return ata_instruction_count;
+int Condensate::getATAInstructionCount(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return ata_instruction_count_src;
+  case SystemGrouping::TOPOLOGY:
+    return ata_instruction_count_top;
+  case SystemGrouping::LABEL:
+    return ata_instruction_count_lbl;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int4> Condensate::getATRInstructions(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return atr_instructions_src.readHost();
+  case SystemGrouping::TOPOLOGY:
+    return atr_instructions_top.readHost();
+  case SystemGrouping::LABEL:
+    return atr_instructions_lbl.readHost();
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> Condensate::getATRInstructionGroups(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return atr_instruction_groups_src.readHost();
+  case SystemGrouping::TOPOLOGY:
+    return atr_instruction_groups_top.readHost();
+  case SystemGrouping::LABEL:
+    return atr_instruction_groups_lbl.readHost();
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int4> Condensate::getATAInstructions(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return ata_instructions_src.readHost();
+  case SystemGrouping::TOPOLOGY:
+    return ata_instructions_top.readHost();
+  case SystemGrouping::LABEL:
+    return ata_instructions_lbl.readHost();
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> Condensate::getATAInstructionGroups(const SystemGrouping organization) const {
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    return ata_instruction_groups_src.readHost();
+  case SystemGrouping::TOPOLOGY:
+    return ata_instruction_groups_top.readHost();
+  case SystemGrouping::LABEL:
+    return ata_instruction_groups_lbl.readHost();
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -249,24 +417,42 @@ const PhaseSpaceSynthesis* Condensate::getSynthesisPointer() const {
 
 //-------------------------------------------------------------------------------------------------
 const CondensateReader Condensate::data(const HybridTargetLevel tier) const {
-  return CondensateReader(mode, basis, system_count, atr_instruction_count, ata_instruction_count,
-                          atom_starts.data(tier), atom_counts.data(tier),
-                          x_coordinates_sp.data(tier), y_coordinates_sp.data(tier),
-                          z_coordinates_sp.data(tier), x_coordinates.data(tier),
-                          y_coordinates.data(tier), z_coordinates.data(tier), umat.data(tier),
-                          invu.data(tier), atr_instructions.data(tier),
-                          ata_instructions.data(tier));
+  return CondensateReader(mode, basis, system_count, atr_instruction_count_src,
+                          atr_instruction_count_top, atr_instruction_count_lbl,
+                          ata_instruction_count_src, ata_instruction_count_top,
+                          ata_instruction_count_lbl, atom_starts.data(tier),
+                          atom_counts.data(tier), x_coordinates_sp.data(tier),
+                          y_coordinates_sp.data(tier), z_coordinates_sp.data(tier),
+                          x_coordinates.data(tier), y_coordinates.data(tier),
+                          z_coordinates.data(tier), umat.data(tier), invu.data(tier),
+                          atr_instructions_src.data(tier), atr_instructions_top.data(tier),
+                          atr_instructions_lbl.data(tier), atr_instruction_groups_src.data(tier),
+                          atr_instruction_groups_top.data(tier),
+                          atr_instruction_groups_lbl.data(tier), ata_instructions_src.data(tier),
+                          ata_instructions_top.data(tier), ata_instructions_lbl.data(tier),
+                          ata_instruction_groups_src.data(tier),
+                          ata_instruction_groups_top.data(tier),
+                          ata_instruction_groups_lbl.data(tier));
 };  
 
 //-------------------------------------------------------------------------------------------------
 CondensateWriter Condensate::data(const HybridTargetLevel tier) {
-  return CondensateWriter(mode, basis, system_count, atr_instruction_count, ata_instruction_count,
-                          atom_starts.data(tier), atom_counts.data(tier),
-                          x_coordinates_sp.data(tier), y_coordinates_sp.data(tier),
-                          z_coordinates_sp.data(tier), x_coordinates.data(tier),
-                          y_coordinates.data(tier), z_coordinates.data(tier), umat.data(tier),
-                          invu.data(tier), atr_instructions.data(tier),
-                          ata_instructions.data(tier));
+  return CondensateWriter(mode, basis, system_count, atr_instruction_count_src,
+                          atr_instruction_count_top, atr_instruction_count_lbl,
+                          ata_instruction_count_src, ata_instruction_count_top,
+                          ata_instruction_count_lbl, atom_starts.data(tier),
+                          atom_counts.data(tier), x_coordinates_sp.data(tier),
+                          y_coordinates_sp.data(tier), z_coordinates_sp.data(tier),
+                          x_coordinates.data(tier), y_coordinates.data(tier),
+                          z_coordinates.data(tier), umat.data(tier), invu.data(tier),
+                          atr_instructions_src.data(tier), atr_instructions_top.data(tier),
+                          atr_instructions_lbl.data(tier), atr_instruction_groups_src.data(tier),
+                          atr_instruction_groups_top.data(tier),
+                          atr_instruction_groups_lbl.data(tier), ata_instructions_src.data(tier),
+                          ata_instructions_top.data(tier), ata_instructions_lbl.data(tier),
+                          ata_instruction_groups_src.data(tier),
+                          ata_instruction_groups_top.data(tier),
+                          ata_instruction_groups_lbl.data(tier));
 };
 
 #ifdef STORMM_USE_HPC
@@ -274,8 +460,18 @@ CondensateWriter Condensate::data(const HybridTargetLevel tier) {
 void Condensate::upload() {
   atom_starts.upload();
   atom_counts.upload();
-  atr_instructions.upload();
-  ata_instructions.upload();
+  atr_instructions_src.upload();
+  atr_instructions_top.upload();
+  atr_instructions_lbl.upload();
+  atr_instruction_groups_src.upload();
+  atr_instruction_groups_top.upload();
+  atr_instruction_groups_lbl.upload();
+  ata_instructions_src.upload();
+  ata_instructions_top.upload();
+  ata_instructions_lbl.upload();
+  ata_instruction_groups_src.upload();
+  ata_instruction_groups_top.upload();
+  ata_instruction_groups_lbl.upload();
   float_data.upload();
   double_data.upload();
 }
@@ -284,8 +480,18 @@ void Condensate::upload() {
 void Condensate::download() {
   atom_starts.download();
   atom_counts.download();
-  atr_instructions.download();
-  ata_instructions.download();
+  atr_instructions_src.download();
+  atr_instructions_top.download();
+  atr_instructions_lbl.download();
+  atr_instruction_groups_src.download();
+  atr_instruction_groups_top.download();
+  atr_instruction_groups_lbl.download();
+  ata_instructions_src.download();
+  ata_instructions_top.download();
+  ata_instructions_lbl.download();
+  ata_instruction_groups_src.download();
+  ata_instruction_groups_top.download();
+  ata_instruction_groups_lbl.download();
   float_data.download();
   double_data.download();
 }
@@ -316,10 +522,24 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
     z_coordinates_sp.setPointer(&float_data, 0, 0);
     umat.setPointer(&double_data, 0, 0);
     invu.setPointer(&double_data, 0, 0);
-    atr_instruction_count = 0;
-    ata_instruction_count = 0;
-    atr_instructions.resize(0);
-    ata_instructions.resize(0);
+    atr_instruction_count_src = 0;
+    atr_instruction_count_top = 0;
+    atr_instruction_count_lbl = 0;
+    ata_instruction_count_src = 0;
+    ata_instruction_count_top = 0;
+    ata_instruction_count_lbl = 0;
+    atr_instructions_src.resize(0);
+    atr_instructions_top.resize(0);
+    atr_instructions_lbl.resize(0);
+    atr_instruction_groups_src.resize(0);
+    atr_instruction_groups_top.resize(0);
+    atr_instruction_groups_lbl.resize(0);
+    ata_instructions_src.resize(0);
+    ata_instructions_top.resize(0);
+    ata_instructions_lbl.resize(0);
+    ata_instruction_groups_src.resize(0);
+    ata_instruction_groups_top.resize(0);
+    ata_instruction_groups_lbl.resize(0);
     return;
   }
 
@@ -374,102 +594,9 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
   }
 
   // Map the work units.  Condensates based on CoordinateSeries objects have a similar process,
-  // but with only one topology to consider it becomes different enough that that builder has its
-  // own code.
-  if (gpu != null_gpu) {
-
-    // Estimate the number of comparisons for the all-to-reference and all-to-all cases based on
-    // the raw number of systems using each topology.
-    llint np_atr = poly_psr.system_count;
-    llint np_ata = 0LL;
-    for (int i = 0; i < poly_psr.unique_topology_count; i++) {
-      const llint nsys = poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i];
-      np_ata += nsys * nsys;
-    }
-    const llint nsmp = gpu.getSMPCount();
-    np_atr = roundUp(np_atr, nsmp) / nsmp;
-    np_atr = roundUp(np_atr, static_cast<llint>(medium_block_size / warp_size_int));
-    if (np_ata > 32768) {
-      np_ata = 16;
-    }
-    else {
-      np_ata = 8;
-    }
-
-    // The preferred sizes of each work unit are now determined.  Lay out as many work units as are
-    // needed to cover all replicas of all systems.
-    llint nwu_atr = 0LL;
-    llint nwu_ata = 0LL;
-    for (int i = 0; i < poly_psr.unique_topology_count; i++) {
-      const llint nsys = poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i];
-      nwu_atr += roundUp(nsys, np_atr) / np_atr;
-      const llint ata_strides = roundUp(nsys, np_ata) / np_ata;
-      nwu_ata += ata_strides * (ata_strides + 1LL) / 2LL;      
-    }
-    atr_instruction_count = nwu_atr;
-    ata_instruction_count = nwu_ata;
-    atr_instructions.resize(atr_instruction_count);
-    ata_instructions.resize(ata_instruction_count);
-    int4* atr_insr_ptr = atr_instructions.data();
-    int4* ata_insr_ptr = ata_instructions.data();
-    int atr_insr_idx = 0;
-    int ata_insr_idx = 0;
-    for (int i = 0; i < poly_psr.unique_topology_count; i++) {
-      const int nsys = poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i];
-      const int inp_atr = np_atr;
-      const int inp_ata = np_ata;
-      const int atr_strides = roundUp(nsys, inp_atr) / np_atr;
-      const int ata_strides = roundUp(nsys, inp_ata) / np_ata;
-      for (int j = 0; j < atr_strides; j++) {
-        const int rdims = std::min(nsys - (j * inp_atr), inp_atr);
-        const int4 rtmp = { j * inp_atr, 0, i, rdims };
-        atr_insr_ptr[atr_insr_idx] = rtmp;
-        atr_insr_idx++;
-      }
-      for (int j = 0; j < ata_strides; j++) {
-        const int xdims = std::min(nsys - (j * inp_ata), inp_ata);
-        for (int k = 0; k <= j; k++) {
-          const int ydims = std::min(nsys - (k * inp_ata), inp_ata);
-          const int4 mtmp = { j * inp_ata, k * inp_ata, i, ((ydims << 16) | xdims) };
-          ata_insr_ptr[ata_insr_idx] = mtmp;
-          ata_insr_idx++;
-        }
-      }
-    }
-  }
-  else {
-
-    // If there is no GPU available, all work will be done on the CPU.  Allocate one work unit per
-    // system for either case.
-    atr_instruction_count = 0;
-    ata_instruction_count = 0;
-    for (int i = 0; i < poly_psr.unique_topology_count; i++) {
-      const int ni_sys = poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i];
-      const int atr_strides = roundUp(ni_sys, 1024) / 1024;
-      atr_instruction_count += atr_strides;
-      ata_instruction_count += atr_strides * (atr_strides + 1) / 2;
-    }
-    atr_instructions.resize(atr_instruction_count);
-    ata_instructions.resize(ata_instruction_count);
-    int4* atr_insr_ptr = atr_instructions.data();
-    int4* ata_insr_ptr = ata_instructions.data();
-    int ata_insr_idx = 0;
-    for (int i = 0; i < poly_psr.unique_topology_count; i++) {
-      const int ni_sys = poly_psr.common_ag_bounds[i + 1] - poly_psr.common_ag_bounds[i];
-      const int atr_strides = roundUp(ni_sys, 1024) / 1024;
-      for (int j = 0; j < atr_strides; j++) {
-        const int xdim = std::min(ni_sys - (j * 1024), 1024);
-        const int4 rtmp = { j * 1024, 0, i, xdim };
-        atr_insr_ptr[i] = rtmp;
-        for (int k = 0; k <= j; k++) {
-          const int ydim = (k == j) ? xdim : 1024;
-          const int4 mtmp = { j * 1024, k * 1024, i, ((ydim << 16) | xdim) };
-          ata_insr_ptr[ata_insr_idx] = mtmp;
-          ata_insr_idx++;
-        }
-      }
-    }
-  }
+  // but with many topologies to consider the PhaseSpaceSynthesis is different enough that the
+  // builder has its own code.
+  computeTopologyWorkUnits(gpu);
   update();
 }
 
@@ -477,6 +604,41 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
 void Condensate::rebuild(const PhaseSpaceSynthesis &poly_ps_in, const PrecisionModel mode_in,
                          const GpuDetails &gpu) {
   rebuild(poly_ps_in.getSelfPointer(), mode_in, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+void Condensate::setWorkUnits(const int* system_list, const int* bounds_list, const int partitions,
+                              const SystemGrouping organization, const GpuDetails &gpu) {
+  if (pps_ptr == nullptr) {
+    rtErr("Work units (other than those for a partition by topology, which is automatic for any "
+          "Condensate object) may not be computed without building based on a coordinate "
+          "synthesis.", "Condensate", "setWorkUnits");
+  }
+  const PsSynthesisReader poly_psr = pps_ptr->data();
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    generateWorkUnits(system_list, poly_psr.unique_ag_idx, bounds_list, partitions,
+                      &atr_instructions_src, &atr_instruction_groups_src, &ata_instructions_src,
+                      &ata_instruction_groups_src, &atr_instruction_count_src,
+                      &ata_instruction_count_src, gpu);
+    break;
+  case SystemGrouping::TOPOLOGY:
+    rtErr("Work units for a partition of the systems based on a topology are automatically "
+          "comuted when building from any synthesis.", "Condensate", "setWorkUnits");
+  case SystemGrouping::LABEL:
+    generateWorkUnits(system_list, poly_psr.unique_ag_idx, bounds_list, partitions,
+                      &atr_instructions_lbl, &atr_instruction_groups_lbl, &ata_instructions_lbl,
+                      &ata_instruction_groups_lbl, &atr_instruction_count_lbl,
+                      &ata_instruction_count_lbl, gpu);
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void Condensate::setWorkUnits(const std::vector<int> &system_list,
+                              const std::vector<int> &bounds_list,
+                              const SystemGrouping organization, const GpuDetails &gpu) {
+  setWorkUnits(system_list.data(), bounds_list.data(), bounds_list.size() - 1, organization, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -587,6 +749,100 @@ void Condensate::repairPointers() {
     invu.swapTarget(&double_data);
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+void Condensate::generateWorkUnits(const int* system_list, const int* topology_index_list,
+                                   const int* bounds_list, const int partitions,
+                                   Hybrid<int4> *atr_instructions,
+                                   Hybrid<int> *atr_instruction_groups,
+                                   Hybrid<int4> *ata_instructions,
+                                   Hybrid<int> *ata_instruction_groups, int *atr_instruction_count,
+                                   int *ata_instruction_count, const GpuDetails &gpu) {
+  const int system_count = bounds_list[partitions];
   
+  // Compute the number of warps on the GPU and the number of bits per unsigned int
+  const llint gpu_nwarp = (gpu == null_gpu) ?
+                          large_block_size / warp_size_int :
+                          gpu.getSMPCount() * (gpu.getMaxThreadsPerBlock() / warp_size_int);
+  const int uint_bits = sizeof(uint) * 8;
+  const int half_int_bits = uint_bits / 2;
+  const llint np_atr = system_count;
+  llint np_ata = 0LL;
+  for (int i = 0; i < partitions; i++) {
+    const llint ni = bounds_list[i + 1] - bounds_list[i];
+    np_ata += ni * ni;
+  }
+  llint atr_per_warp = ceil(static_cast<double>(np_atr) / static_cast<double>(gpu_nwarp));
+  atr_per_warp = std::min(static_cast<llint>(uint_bits), atr_per_warp);
+  llint ata_per_warp = ceil(static_cast<double>(np_ata) / static_cast<double>(gpu_nwarp));
+  const int ata_stride = std::min(static_cast<llint>(half_int_bits),
+                                  static_cast<llint>(ceil(sqrt(ata_per_warp))));;
+  ata_per_warp = ata_stride * ata_stride;
+  
+  // Lay out a temporary array for all-to-one instructions
+  std::vector<int4> tmp_atr_instructions;
+  std::vector<int> tmp_atr_instruction_groups;
+  tmp_atr_instructions.reserve((np_atr / atr_per_warp) + partitions);
+  tmp_atr_instruction_groups.reserve(tmp_atr_instructions.size());
+  for (int i = 0; i < partitions; i++) {
+    const int group_lower_bound = bounds_list[i];
+    const int group_upper_bound = bounds_list[i + 1];
+    const int top_idx = topology_index_list[system_list[group_lower_bound]];
+    for (int j = group_lower_bound; j < group_upper_bound; j += atr_per_warp) {
+      const int nrep = std::min(static_cast<int>(atr_per_warp), group_upper_bound - j);
+      tmp_atr_instructions.push_back({ j - group_lower_bound, i, top_idx, nrep });
+      tmp_atr_instruction_groups.push_back(i);
+    }
+  }
+  *atr_instruction_count = tmp_atr_instructions.size();
+
+  // Lay out a temporary array for all-to-all instructions.
+  std::vector<int4> tmp_ata_instructions;
+  std::vector<int> tmp_ata_instruction_groups;
+  size_t ata_instruction_guess = 0;
+  for (int i = 0; i < partitions; i++) {
+    const size_t nstride = (bounds_list[i + 1] - bounds_list[i] + ata_stride - 1) / ata_stride;
+    ata_instruction_guess += nstride * (nstride + 1) / 2;
+  }
+  tmp_ata_instructions.reserve(ata_instruction_guess);
+  tmp_ata_instruction_groups.reserve(ata_instruction_guess);
+  for (int i = 0; i < partitions; i++) {
+    const int group_lower_bound = bounds_list[i];
+    const int group_upper_bound = bounds_list[i + 1];
+    const int top_idx = topology_index_list[system_list[group_lower_bound]];
+    for (int j = group_lower_bound; j < group_upper_bound; j += ata_stride) {
+      const int njrep = (j + ata_stride < group_upper_bound) ? ata_stride : group_upper_bound - j;
+      for (int k = group_lower_bound; k <= j; k += ata_stride) {
+        const int nkrep = (k + ata_stride < group_upper_bound) ? ata_stride :
+                                                                 group_upper_bound - k;
+        tmp_ata_instructions.push_back({ j - group_lower_bound, k - group_lower_bound, top_idx,
+                                         (nkrep << half_int_bits) | njrep });
+        tmp_ata_instruction_groups.push_back(i);
+      }
+    }
+  }
+  *ata_instruction_count = tmp_ata_instructions.size();
+
+  // Load the temporary arrays into the object.
+  atr_instructions->resize(*atr_instruction_count);
+  ata_instructions->resize(*ata_instruction_count);
+  atr_instructions->putHost(tmp_atr_instructions);
+  ata_instructions->putHost(tmp_ata_instructions);
+  atr_instruction_groups->resize(*atr_instruction_count);
+  ata_instruction_groups->resize(*ata_instruction_count);
+  atr_instruction_groups->putHost(tmp_atr_instruction_groups);
+  ata_instruction_groups->putHost(tmp_ata_instruction_groups);
+}
+
+//-------------------------------------------------------------------------------------------------
+void Condensate::computeTopologyWorkUnits(const GpuDetails &gpu) {
+  const PsSynthesisReader poly_psr = pps_ptr->data();
+  generateWorkUnits(poly_psr.common_ag_list, poly_psr.unique_ag_idx, poly_psr.common_ag_bounds,
+                    poly_psr.unique_topology_count, &atr_instructions_top,
+                    &atr_instruction_groups_top, &ata_instructions_top,
+                    &ata_instruction_groups_top, &atr_instruction_count_top,
+                    &ata_instruction_count_top, gpu);
+}
+
 } // namespace synthesis
 } // namespace stormm

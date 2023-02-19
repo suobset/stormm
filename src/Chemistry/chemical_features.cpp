@@ -1,5 +1,7 @@
 #include <algorithm>
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/mixed_types.h"
@@ -7,7 +9,6 @@
 #include "Math/rounding.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
-#include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Topology/atomgraph_analysis.h"
 #include "UnitTesting/approx.h"
@@ -18,20 +19,18 @@ namespace stormm {
 namespace chemistry {
   
 using card::HybridKind;
+using constants::PrecisionModel;
 using diskutil::getBaseName;
 using math::accumulateBitmask;
 using math::addScalarToVector;
-using math::crossProduct;
-using math::dot;
 using math::numberSeriesToBitMask;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
-using math::project;
 using math::readBitFromMask;
 using math::reduceUniqueValues;
-using math::roundUp;
 using math::sum;
 using math::unsetBitInMask;
+using numerics::globalpos_scale_nonoverflow_bits;
 using parse::char4ToString;
 using testing::Approx;
 using topology::colorConnectivity;
@@ -288,6 +287,22 @@ void IsomerPlan::eraseMovingAtoms() {
 }
 
 //-------------------------------------------------------------------------------------------------
+CoupledEdit::CoupledEdit(const ConformationEdit edit_in, const int index_in) :
+    edit{edit_in}, index{index_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoupledEdit::CoupledEdit(const int2 data_in) :
+    edit{static_cast<ConformationEdit>(data_in.x)}, index{data_in.y}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoupledEdit CoupledEdit::operator=(const int2 &other) {
+  CoupledEdit result(other);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 ChemicalFeaturesReader::ChemicalFeaturesReader(const int atom_count_in,
                                                const int planar_atom_count_in,
                                                const int ring_count_in,
@@ -306,6 +321,7 @@ ChemicalFeaturesReader::ChemicalFeaturesReader(const int atom_count_in,
                                                const int max_ring_size_in,
                                                const double temperature_in,
                                                const bool rotating_groups_mapped_in,
+                                               const bool chiralities_computed_in,
                                                const int* planar_centers_in,
                                                const int* ring_atoms_in,
                                                const int* ring_atom_bounds_in,
@@ -338,10 +354,11 @@ ChemicalFeaturesReader::ChemicalFeaturesReader(const int atom_count_in,
     cis_trans_bond_count{cis_trans_bond_count_in}, double_bond_count{double_bond_count_in},
     triple_bond_count{triple_bond_count_in}, max_ring_size{max_ring_size_in},
     temperature{temperature_in}, rotating_groups_mapped{rotating_groups_mapped_in},
-    planar_centers{planar_centers_in}, ring_atoms{ring_atoms_in},
-    ring_atom_bounds{ring_atom_bounds_in}, aromatic_pi_electrons{aromatic_pi_electrons_in},
-    aromatic_groups{aromatic_groups_in}, aromatic_group_bounds{aromatic_group_bounds_in},
-    polar_hydrogens{polar_hydrogens_in}, hydrogen_bond_donors{hydrogen_bond_donors_in},
+    chiralities_computed{chiralities_computed_in}, planar_centers{planar_centers_in},
+    ring_atoms{ring_atoms_in}, ring_atom_bounds{ring_atom_bounds_in},
+    aromatic_pi_electrons{aromatic_pi_electrons_in}, aromatic_groups{aromatic_groups_in},
+    aromatic_group_bounds{aromatic_group_bounds_in}, polar_hydrogens{polar_hydrogens_in},
+    hydrogen_bond_donors{hydrogen_bond_donors_in},
     hydrogen_bond_acceptors{hydrogen_bond_acceptors_in}, chiral_centers{chiral_centers_in},
     chiral_inversion_methods{chiral_inversion_methods_in}, rotatable_groups{rotatable_groups_in},
     rotatable_group_bounds{rotatable_group_bounds_in}, cis_trans_groups{cis_trans_groups_in},
@@ -352,53 +369,16 @@ ChemicalFeaturesReader::ChemicalFeaturesReader(const int atom_count_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures() :
-    atom_count{0}, planar_atom_count{0}, ring_count{0}, fused_ring_count{0},
-    twistable_ring_count{0}, conjugated_group_count{0}, aromatic_group_count{0},
-    polar_hydrogen_count{0}, hbond_donor_count{0}, hbond_acceptor_count{0}, chiral_center_count{0},
-    rotatable_bond_count{0}, cis_trans_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
-    max_ring_size{0},
-    temperature{0.0}, rotating_groups_mapped{false},
-    planar_centers{HybridKind::POINTER, "chemfe_planarity"},
-    ring_inclusion{HybridKind::ARRAY, "chemfe_rings"},
-    ring_atom_bounds{HybridKind::POINTER, "chemfe_ring_bounds"},
-    ring_atoms{HybridKind::POINTER, "chemfe_ring_atoms"},
-    aromatic_group_bounds{HybridKind::POINTER, "chemfe_arom_bounds"},
-    aromatic_pi_electrons{HybridKind::POINTER, "chemfe_pi_elec"},
-    aromatic_groups{HybridKind::POINTER, "chemfe_arom_groups"},
-    polar_hydrogens{HybridKind::POINTER, "chemfe_polar_h"},
-    hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
-    hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
-    chiral_arm_atoms{HybridKind::ARRAY, "chemfe_chiral_arms"},
-    chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
-    chiral_inversion_methods{HybridKind::POINTER, "chemfe_chiral_meth"},
-    rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
-    rotatable_group_bounds{HybridKind::POINTER, "chemfe_rotator_bounds"},
-    cis_trans_groups{HybridKind::POINTER, "chemfe_cistrans"},
-    cis_trans_group_bounds{HybridKind::POINTER, "chemfe_cistrans_bounds"},
-    invertible_groups{HybridKind::POINTER, "chemfe_invertors"},
-    invertible_group_bounds{HybridKind::POINTER, "chemfe_invertor_bounds"},
-    anchor_a_branches{HybridKind::POINTER, "chemfe_anchor_i"},
-    anchor_b_branches{HybridKind::POINTER, "chemfe_anchor_ii"},
-    formal_charges{HybridKind::POINTER, "chemfe_formal_charges"},
-    bond_orders{HybridKind::POINTER, "chemfe_bond_orders"},
-    free_electrons{HybridKind::POINTER, "chemfe_free_e"},
-    int_data{HybridKind::ARRAY, "chemfe_int"},
-    mutable_group_data{HybridKind::ARRAY, "chemfe_muta_int"},
-    double_data{HybridKind::ARRAY, "chemfe_double"},
-    ag_pointer{nullptr},
-    timer{nullptr}
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
-                                   const MapRotatableGroups map_group_in,
+ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const MapRotatableGroups map_groups_in,
                                    const double temperature_in, StopWatch *timer_in) :
-    atom_count{ag_in->getAtomCount()}, planar_atom_count{0}, ring_count{0}, fused_ring_count{0},
-    twistable_ring_count{0}, conjugated_group_count{0}, aromatic_group_count{0},
-    polar_hydrogen_count{0}, hbond_donor_count{0}, hbond_acceptor_count{0}, chiral_center_count{0},
-    rotatable_bond_count{0}, cis_trans_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
-    max_ring_size{8 * sizeof(ullint)}, temperature{temperature_in}, rotating_groups_mapped{false},
+    atom_count{(ag_in == nullptr) ? 0 : ag_in->getAtomCount()}, planar_atom_count{0},
+    ring_count{0}, fused_ring_count{0}, twistable_ring_count{0}, conjugated_group_count{0},
+    aromatic_group_count{0}, polar_hydrogen_count{0}, hbond_donor_count{0},
+    hbond_acceptor_count{0}, chiral_center_count{0}, rotatable_bond_count{0},
+    cis_trans_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
+    max_ring_size{8 * sizeof(ullint)}, temperature{temperature_in},
+    rotating_groups_mapped{false},
+    chiralities_computed{false},
     planar_centers{HybridKind::POINTER, "chemfe_planarity"},
     ring_inclusion{HybridKind::ARRAY, "chemfe_rings"},
     ring_atom_bounds{HybridKind::POINTER, "chemfe_ring_bounds"},
@@ -429,12 +409,304 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     zerok_formal_charges{},
     zerok_bond_orders{},
     zerok_free_electrons{},
-    ag_pointer{ag_in},
+    bond_in_ring{},
+    ag_pointer{const_cast<AtomGraph*>(ag_in)},
     timer{timer_in}
 {
+  if (ag_in == nullptr) {
+    return;
+  }
+  analyzeTopology(map_groups_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
+                                   const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in, map_groups_in, temperature_in, timer_in)
+{
+  // Correct the chiral centers' orientations
+  findChiralOrientations(cfr);
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
+                                   const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in, cf.data(), map_groups_in, temperature_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
+                                   const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in, CoordinateFrameReader(ps), map_groups_in, temperature_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const CoordinateFrame &cf,
+                                   const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in.getSelfPointer(), cf, map_groups_in, temperature_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const PhaseSpace &ps,
+                                   const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in.getSelfPointer(), CoordinateFrameReader(ps), map_groups_in,
+                     temperature_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
+    atom_count{original.atom_count},
+    planar_atom_count{original.planar_atom_count},
+    ring_count{original.ring_count},
+    fused_ring_count{original.fused_ring_count},
+    twistable_ring_count{original.twistable_ring_count},
+    conjugated_group_count{original.conjugated_group_count},
+    aromatic_group_count{original.aromatic_group_count},
+    polar_hydrogen_count{original.polar_hydrogen_count},
+    hbond_donor_count{original.hbond_donor_count},
+    hbond_acceptor_count{original.hbond_acceptor_count},
+    chiral_center_count{original.chiral_center_count},
+    rotatable_bond_count{original.rotatable_bond_count},
+    cis_trans_bond_count{original.cis_trans_bond_count},
+    double_bond_count{original.double_bond_count},
+    triple_bond_count{original.triple_bond_count},
+    max_ring_size{original.max_ring_size},
+    temperature{original.temperature},
+    rotating_groups_mapped{original.rotating_groups_mapped},
+    chiralities_computed{original.chiralities_computed},
+    planar_centers{original.planar_centers},
+    ring_inclusion{original.ring_inclusion},
+    ring_atom_bounds{original.ring_atom_bounds},
+    ring_atoms{original.ring_atoms},
+    aromatic_group_bounds{original.aromatic_group_bounds},
+    aromatic_pi_electrons{original.aromatic_pi_electrons},
+    aromatic_groups{original.aromatic_groups},
+    polar_hydrogens{original.polar_hydrogens},
+    hydrogen_bond_donors{original.hydrogen_bond_donors},
+    hydrogen_bond_acceptors{original.hydrogen_bond_acceptors},
+    chiral_arm_atoms{original.chiral_arm_atoms},
+    chiral_centers{original.chiral_centers},
+    chiral_inversion_methods{original.chiral_inversion_methods},
+    rotatable_groups{original.rotatable_groups},
+    rotatable_group_bounds{original.rotatable_group_bounds},
+    cis_trans_groups{original.cis_trans_groups},
+    cis_trans_group_bounds{original.cis_trans_group_bounds},
+    invertible_groups{original.invertible_groups},
+    invertible_group_bounds{original.invertible_group_bounds},
+    anchor_a_branches{original.anchor_a_branches},
+    anchor_b_branches{original.anchor_b_branches},
+    formal_charges{original.formal_charges},
+    bond_orders{original.bond_orders},
+    free_electrons{original.free_electrons},
+    int_data{original.int_data},
+    mutable_group_data{original.mutable_group_data},
+    double_data{original.double_data},
+    zerok_formal_charges{original.zerok_formal_charges},
+    zerok_bond_orders{original.zerok_bond_orders},
+    zerok_free_electrons{original.zerok_free_electrons},
+    bond_in_ring{original.bond_in_ring},
+    ag_pointer{original.ag_pointer},
+    timer{original.timer}
+{
+  repairPointers();
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
+    atom_count{original.atom_count},
+    planar_atom_count{original.planar_atom_count},
+    ring_count{original.ring_count},
+    fused_ring_count{original.fused_ring_count},
+    twistable_ring_count{original.twistable_ring_count},
+    conjugated_group_count{original.conjugated_group_count},
+    aromatic_group_count{original.aromatic_group_count},
+    polar_hydrogen_count{original.polar_hydrogen_count},
+    hbond_donor_count{original.hbond_donor_count},
+    hbond_acceptor_count{original.hbond_acceptor_count},
+    chiral_center_count{original.chiral_center_count},
+    rotatable_bond_count{original.rotatable_bond_count},
+    cis_trans_bond_count{original.cis_trans_bond_count},
+    double_bond_count{original.double_bond_count},
+    triple_bond_count{original.triple_bond_count},
+    max_ring_size{original.max_ring_size},
+    temperature{original.temperature},
+    rotating_groups_mapped{original.rotating_groups_mapped},
+    chiralities_computed{original.chiralities_computed},
+    planar_centers{std::move(original.planar_centers)},
+    ring_inclusion{std::move(original.ring_inclusion)},
+    ring_atom_bounds{std::move(original.ring_atom_bounds)},
+    ring_atoms{std::move(original.ring_atoms)},
+    aromatic_group_bounds{std::move(original.aromatic_group_bounds)},
+    aromatic_pi_electrons{std::move(original.aromatic_pi_electrons)},
+    aromatic_groups{std::move(original.aromatic_groups)},
+    polar_hydrogens{std::move(original.polar_hydrogens)},
+    hydrogen_bond_donors{std::move(original.hydrogen_bond_donors)},
+    hydrogen_bond_acceptors{std::move(original.hydrogen_bond_acceptors)},
+    chiral_arm_atoms{std::move(original.chiral_arm_atoms)},
+    chiral_centers{std::move(original.chiral_centers)},
+    chiral_inversion_methods{std::move(original.chiral_inversion_methods)},
+    rotatable_groups{std::move(original.rotatable_groups)},
+    rotatable_group_bounds{std::move(original.rotatable_group_bounds)},
+    cis_trans_groups{std::move(original.cis_trans_groups)},
+    cis_trans_group_bounds{std::move(original.cis_trans_group_bounds)},
+    invertible_groups{std::move(original.invertible_groups)},
+    invertible_group_bounds{std::move(original.invertible_group_bounds)},
+    anchor_a_branches{std::move(original.anchor_a_branches)},
+    anchor_b_branches{std::move(original.anchor_b_branches)},
+    formal_charges{std::move(original.formal_charges)},
+    bond_orders{std::move(original.bond_orders)},
+    free_electrons{std::move(original.free_electrons)},
+    int_data{std::move(original.int_data)},
+    mutable_group_data{std::move(original.mutable_group_data)},
+    double_data{std::move(original.double_data)},
+    zerok_formal_charges{std::move(original.zerok_formal_charges)},
+    zerok_bond_orders{std::move(original.zerok_bond_orders)},
+    zerok_free_electrons{std::move(original.zerok_free_electrons)},
+    bond_in_ring{std::move(original.bond_in_ring)},
+    ag_pointer{original.ag_pointer},
+    timer{original.timer}
+{}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Copy elements of the other object
+  atom_count = other.atom_count;
+  planar_atom_count = other.planar_atom_count;
+  ring_count = other.ring_count;
+  fused_ring_count = other.fused_ring_count;
+  twistable_ring_count = other.twistable_ring_count;
+  conjugated_group_count = other.conjugated_group_count;
+  aromatic_group_count = other.aromatic_group_count;
+  polar_hydrogen_count = other.polar_hydrogen_count;
+  hbond_donor_count = other.hbond_donor_count;
+  hbond_acceptor_count = other.hbond_acceptor_count;
+  chiral_center_count = other.chiral_center_count;
+  rotatable_bond_count = other.rotatable_bond_count;
+  cis_trans_bond_count = other.cis_trans_bond_count;
+  double_bond_count = other.double_bond_count;
+  triple_bond_count = other.triple_bond_count;
+  max_ring_size = other.max_ring_size;
+  temperature = other.temperature;
+  rotating_groups_mapped = other.rotating_groups_mapped;
+  chiralities_computed = other.chiralities_computed;
+  planar_centers = other.planar_centers;
+  ring_inclusion = other.ring_inclusion;
+  ring_atom_bounds = other.ring_atom_bounds;
+  ring_atoms = other.ring_atoms;
+  aromatic_group_bounds = other.aromatic_group_bounds;
+  aromatic_pi_electrons = other.aromatic_pi_electrons;
+  aromatic_groups = other.aromatic_groups;
+  polar_hydrogens = other.polar_hydrogens;
+  hydrogen_bond_donors = other.hydrogen_bond_donors;
+  hydrogen_bond_acceptors = other.hydrogen_bond_acceptors;
+  chiral_arm_atoms = other.chiral_arm_atoms;
+  chiral_centers = other.chiral_centers;
+  chiral_inversion_methods = other.chiral_inversion_methods;
+  rotatable_groups = other.rotatable_groups;
+  rotatable_group_bounds = other.rotatable_group_bounds;
+  cis_trans_groups = other.cis_trans_groups;
+  cis_trans_group_bounds = other.cis_trans_group_bounds;
+  invertible_groups = other.invertible_groups;
+  invertible_group_bounds = other.invertible_group_bounds;
+  anchor_a_branches = other.anchor_a_branches;
+  anchor_b_branches = other.anchor_b_branches;
+  formal_charges = other.formal_charges;
+  bond_orders = other.bond_orders;
+  free_electrons = other.free_electrons;
+  int_data = other.int_data;
+  mutable_group_data = other.mutable_group_data;
+  double_data = other.double_data;
+  zerok_formal_charges = other.zerok_formal_charges;
+  zerok_bond_orders = other.zerok_bond_orders;
+  zerok_free_electrons = other.zerok_free_electrons;
+  bond_in_ring = other.bond_in_ring;
+  ag_pointer = other.ag_pointer;
+  timer = other.timer;
+  repairPointers();
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Copy elements of the other object
+  atom_count = other.atom_count;
+  planar_atom_count = other.planar_atom_count;
+  ring_count = other.ring_count;
+  fused_ring_count = other.fused_ring_count;
+  twistable_ring_count = other.twistable_ring_count;
+  conjugated_group_count = other.conjugated_group_count;
+  polar_hydrogen_count = other.polar_hydrogen_count;
+  hbond_donor_count = other.hbond_donor_count;
+  hbond_acceptor_count = other.hbond_acceptor_count;
+  aromatic_group_count = other.aromatic_group_count;
+  chiral_center_count = other.chiral_center_count;
+  rotatable_bond_count = other.rotatable_bond_count;
+  cis_trans_bond_count = other.cis_trans_bond_count;
+  double_bond_count = other.double_bond_count;
+  triple_bond_count = other.triple_bond_count;
+  max_ring_size = other.max_ring_size;
+  temperature = other.temperature;
+  rotating_groups_mapped = other.rotating_groups_mapped;
+  chiralities_computed = other.chiralities_computed;
+  planar_centers = std::move(other.planar_centers);
+  ring_inclusion = std::move(other.ring_inclusion);
+  ring_atom_bounds = std::move(other.ring_atom_bounds);
+  ring_atoms = std::move(other.ring_atoms);
+  aromatic_group_bounds = std::move(other.aromatic_group_bounds);
+  aromatic_pi_electrons = std::move(other.aromatic_pi_electrons);
+  aromatic_groups = std::move(other.aromatic_groups);
+  polar_hydrogens = std::move(other.polar_hydrogens);
+  hydrogen_bond_donors = std::move(other.hydrogen_bond_donors);
+  hydrogen_bond_acceptors = std::move(other.hydrogen_bond_acceptors);
+  chiral_arm_atoms = std::move(other.chiral_arm_atoms);
+  chiral_centers = std::move(other.chiral_centers);
+  chiral_inversion_methods = std::move(other.chiral_inversion_methods);
+  rotatable_groups = std::move(other.rotatable_groups);
+  rotatable_group_bounds = std::move(other.rotatable_group_bounds);
+  cis_trans_groups = std::move(other.cis_trans_groups);
+  cis_trans_group_bounds = std::move(other.cis_trans_group_bounds);
+  invertible_groups = std::move(other.invertible_groups);
+  invertible_group_bounds = std::move(other.invertible_group_bounds);
+  anchor_a_branches = std::move(other.anchor_a_branches);
+  anchor_b_branches = std::move(other.anchor_b_branches);
+  formal_charges = std::move(other.formal_charges);
+  bond_orders = std::move(other.bond_orders);
+  free_electrons = std::move(other.free_electrons);
+  int_data = std::move(other.int_data);
+  mutable_group_data = std::move(other.mutable_group_data);
+  double_data = std::move(other.double_data);
+  zerok_formal_charges = std::move(other.zerok_formal_charges);
+  zerok_bond_orders = std::move(other.zerok_bond_orders);
+  zerok_free_electrons = std::move(other.zerok_free_electrons);
+  bond_in_ring = std::move(other.bond_in_ring);
+  ag_pointer = other.ag_pointer;
+  timer = other.timer;
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::analyzeTopology(const MapRotatableGroups map_groups_in) {
+
   // Set up the StopWatch and obtain indices of the relevant timing bins
   int chemfe_misc_timing, ring_trace_timing, aromatic_group_timing, lewis_timing;
-  int rotatable_bond_timing, chiral_center_timing, chiral_branch_timing;
+  int chiral_center_timing;
   if (timer != nullptr) {
     timer->assignTime(0);
     chemfe_misc_timing = timer->addCategory("[ChemicalFeatures] Miscellaneous");
@@ -463,11 +735,28 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ring_inclusion.resize(atom_count);
   ring_inclusion.putHost(tmp_ring_inclusion);
   ring_count = static_cast<int>(tmp_ring_atom_bounds.size()) - 1;
-  
+
+  // Prepare a table of atoms that are part of rings
+  bond_in_ring.resize(vk.nbond, false);
+  for (int i = 0; i < ring_count; i++) {
+    for (int j = tmp_ring_atom_bounds[i]; j < tmp_ring_atom_bounds[i + 1]; j++) {
+      const int jatom = tmp_ring_atoms[j];
+      for (int k = vk.bond_asgn_bounds[jatom]; k < vk.bond_asgn_bounds[jatom + 1]; k++) {
+        const int katom = vk.bond_asgn_atoms[k];
+        bool tb_in_ring = false;
+        for (int m = tmp_ring_atom_bounds[i]; m < tmp_ring_atom_bounds[i + 1]; m++) {
+          tb_in_ring = (tb_in_ring || katom == tmp_ring_atoms[m]);
+        }
+        bond_in_ring[vk.bond_asgn_terms[k]] = (bond_in_ring[vk.bond_asgn_terms[k]] || tb_in_ring);
+      }
+    }
+  }
+
   // Allocate the double-precision real data that will result from Lewis structure determination
   const int padded_atom_count = roundUp(atom_count, warp_size_int);
   const int ndbl = 2 * padded_atom_count + roundUp(vk.nbond, warp_size_int);
   double_data.resize(ndbl);
+  double_data.shrinkToFit();
   formal_charges.setPointer(&double_data, 0, padded_atom_count);
   free_electrons.setPointer(&double_data, padded_atom_count, padded_atom_count);
   bond_orders.setPointer(&double_data, 2 * padded_atom_count, roundUp(vk.nbond, warp_size_int));
@@ -521,6 +810,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                       roundUp(tmp_hydrogen_bond_donors.size(), warp_size_zu) +
                       roundUp(tmp_hydrogen_bond_acceptors.size(), warp_size_zu);
   int_data.resize(nint);
+  int_data.shrinkToFit();
   size_t ic = planar_centers.putHost(&int_data, tmp_planar_centers, 0, warp_size_zu);
   ic = ring_atom_bounds.putHost(&int_data, tmp_ring_atom_bounds, ic, warp_size_zu);
   ic = ring_atoms.putHost(&int_data, tmp_ring_atoms, ic, warp_size_zu);
@@ -534,13 +824,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = chiral_inversion_methods.putHost(&int_data, tmp_chiral_inversion_methods, ic, warp_size_zu);
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
 
-  // Correct the chiral centers' orientations
-  findChiralOrientations(cfr);
-  if (timer != nullptr) timer->assignTime(chiral_center_timing);
-
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
-  switch (map_group_in) {
+  switch (map_groups_in) {
   case MapRotatableGroups::YES:
     findRotatableBondGroups(timer);
     break;
@@ -548,266 +834,6 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     allocateMutableData({}, {}, {}, {}, {}, {}, {}, {});
     break;
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
-                                   const MapRotatableGroups map_group_in,
-                                   const double temperature_in, StopWatch *timer_in) :
-  ChemicalFeatures(ag_in, cf.data(), map_group_in, temperature_in, timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
-                                   const MapRotatableGroups map_group_in,
-                                   const double temperature_in, StopWatch *timer_in) :
-  ChemicalFeatures(ag_in, CoordinateFrameReader(ps), map_group_in, temperature_in, timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const CoordinateFrame &cf,
-                                   const MapRotatableGroups map_group_in,
-                                   const double temperature_in, StopWatch *timer_in) :
-  ChemicalFeatures(ag_in.getSelfPointer(), cf, map_group_in, temperature_in, timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const PhaseSpace &ps,
-                                   const MapRotatableGroups map_group_in,
-                                   const double temperature_in, StopWatch *timer_in) :
-  ChemicalFeatures(ag_in.getSelfPointer(), CoordinateFrameReader(ps), map_group_in, temperature_in,
-                   timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
-    atom_count{original.atom_count},
-    planar_atom_count{original.planar_atom_count},
-    ring_count{original.ring_count},
-    fused_ring_count{original.fused_ring_count},
-    twistable_ring_count{original.twistable_ring_count},
-    conjugated_group_count{original.conjugated_group_count},
-    aromatic_group_count{original.aromatic_group_count},
-    polar_hydrogen_count{original.polar_hydrogen_count},
-    hbond_donor_count{original.hbond_donor_count},
-    hbond_acceptor_count{original.hbond_acceptor_count},
-    chiral_center_count{original.chiral_center_count},
-    rotatable_bond_count{original.rotatable_bond_count},
-    cis_trans_bond_count{original.cis_trans_bond_count},
-    double_bond_count{original.double_bond_count},
-    triple_bond_count{original.triple_bond_count},
-    max_ring_size{original.max_ring_size},
-    temperature{original.temperature},
-    rotating_groups_mapped{original.rotating_groups_mapped},
-    planar_centers{original.planar_centers},
-    ring_inclusion{original.ring_inclusion},
-    ring_atom_bounds{original.ring_atom_bounds},
-    ring_atoms{original.ring_atoms},
-    aromatic_group_bounds{original.aromatic_group_bounds},
-    aromatic_pi_electrons{original.aromatic_pi_electrons},
-    aromatic_groups{original.aromatic_groups},
-    polar_hydrogens{original.polar_hydrogens},
-    hydrogen_bond_donors{original.hydrogen_bond_donors},
-    hydrogen_bond_acceptors{original.hydrogen_bond_acceptors},
-    chiral_arm_atoms{original.chiral_arm_atoms},
-    chiral_centers{original.chiral_centers},
-    chiral_inversion_methods{original.chiral_inversion_methods},
-    rotatable_groups{original.rotatable_groups},
-    rotatable_group_bounds{original.rotatable_group_bounds},
-    cis_trans_groups{original.cis_trans_groups},
-    cis_trans_group_bounds{original.cis_trans_group_bounds},
-    invertible_groups{original.invertible_groups},
-    invertible_group_bounds{original.invertible_group_bounds},
-    anchor_a_branches{original.anchor_a_branches},
-    anchor_b_branches{original.anchor_b_branches},
-    formal_charges{original.formal_charges},
-    bond_orders{original.bond_orders},
-    free_electrons{original.free_electrons},
-    int_data{original.int_data},
-    mutable_group_data{original.mutable_group_data},
-    double_data{original.double_data},
-    zerok_formal_charges{original.zerok_formal_charges},
-    zerok_bond_orders{original.zerok_bond_orders},
-    zerok_free_electrons{original.zerok_free_electrons},
-    ag_pointer{original.ag_pointer}
-{
-  repairPointers();
-}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
-    atom_count{original.atom_count},
-    planar_atom_count{original.planar_atom_count},
-    ring_count{original.ring_count},
-    fused_ring_count{original.fused_ring_count},
-    twistable_ring_count{original.twistable_ring_count},
-    conjugated_group_count{original.conjugated_group_count},
-    aromatic_group_count{original.aromatic_group_count},
-    polar_hydrogen_count{original.polar_hydrogen_count},
-    hbond_donor_count{original.hbond_donor_count},
-    hbond_acceptor_count{original.hbond_acceptor_count},
-    chiral_center_count{original.chiral_center_count},
-    rotatable_bond_count{original.rotatable_bond_count},
-    cis_trans_bond_count{original.cis_trans_bond_count},
-    double_bond_count{original.double_bond_count},
-    triple_bond_count{original.triple_bond_count},
-    max_ring_size{original.max_ring_size},
-    temperature{original.temperature},
-    rotating_groups_mapped{original.rotating_groups_mapped},
-    planar_centers{std::move(original.planar_centers)},
-    ring_inclusion{std::move(original.ring_inclusion)},
-    ring_atom_bounds{std::move(original.ring_atom_bounds)},
-    ring_atoms{std::move(original.ring_atoms)},
-    aromatic_group_bounds{std::move(original.aromatic_group_bounds)},
-    aromatic_pi_electrons{std::move(original.aromatic_pi_electrons)},
-    aromatic_groups{std::move(original.aromatic_groups)},
-    polar_hydrogens{std::move(original.polar_hydrogens)},
-    hydrogen_bond_donors{std::move(original.hydrogen_bond_donors)},
-    hydrogen_bond_acceptors{std::move(original.hydrogen_bond_acceptors)},
-    chiral_arm_atoms{std::move(original.chiral_arm_atoms)},
-    chiral_centers{std::move(original.chiral_centers)},
-    chiral_inversion_methods{std::move(original.chiral_inversion_methods)},
-    rotatable_groups{std::move(original.rotatable_groups)},
-    rotatable_group_bounds{std::move(original.rotatable_group_bounds)},
-    cis_trans_groups{std::move(original.cis_trans_groups)},
-    cis_trans_group_bounds{std::move(original.cis_trans_group_bounds)},
-    invertible_groups{std::move(original.invertible_groups)},
-    invertible_group_bounds{std::move(original.invertible_group_bounds)},
-    anchor_a_branches{std::move(original.anchor_a_branches)},
-    anchor_b_branches{std::move(original.anchor_b_branches)},
-    formal_charges{std::move(original.formal_charges)},
-    bond_orders{std::move(original.bond_orders)},
-    free_electrons{std::move(original.free_electrons)},
-    int_data{std::move(original.int_data)},
-    mutable_group_data{std::move(original.mutable_group_data)},
-    double_data{std::move(original.double_data)},
-    zerok_formal_charges{std::move(original.zerok_formal_charges)},
-    zerok_bond_orders{std::move(original.zerok_bond_orders)},
-    zerok_free_electrons{std::move(original.zerok_free_electrons)},
-    ag_pointer{std::move(original.ag_pointer)}
-{}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
-
-  // Guard against self assignment
-  if (this == &other) {
-    return *this;
-  }
-
-  // Copy elements of the other object
-  atom_count = other.atom_count;
-  planar_atom_count = other.planar_atom_count;
-  ring_count = other.ring_count;
-  fused_ring_count = other.fused_ring_count;
-  twistable_ring_count = other.twistable_ring_count;
-  conjugated_group_count = other.conjugated_group_count;
-  aromatic_group_count = other.aromatic_group_count;
-  polar_hydrogen_count = other.polar_hydrogen_count;
-  hbond_donor_count = other.hbond_donor_count;
-  hbond_acceptor_count = other.hbond_acceptor_count;
-  chiral_center_count = other.chiral_center_count;
-  rotatable_bond_count = other.rotatable_bond_count;
-  cis_trans_bond_count = other.cis_trans_bond_count;
-  double_bond_count = other.double_bond_count;
-  triple_bond_count = other.triple_bond_count;
-  max_ring_size = other.max_ring_size;
-  temperature = other.temperature;
-  rotating_groups_mapped = other.rotating_groups_mapped;
-  planar_centers = other.planar_centers;
-  ring_inclusion = other.ring_inclusion;
-  ring_atom_bounds = other.ring_atom_bounds;
-  ring_atoms = other.ring_atoms;
-  aromatic_group_bounds = other.aromatic_group_bounds;
-  aromatic_pi_electrons = other.aromatic_pi_electrons;
-  aromatic_groups = other.aromatic_groups;
-  polar_hydrogens = other.polar_hydrogens;
-  hydrogen_bond_donors = other.hydrogen_bond_donors;
-  hydrogen_bond_acceptors = other.hydrogen_bond_acceptors;
-  chiral_arm_atoms = other.chiral_arm_atoms;
-  chiral_centers = other.chiral_centers;
-  chiral_inversion_methods = other.chiral_inversion_methods;
-  rotatable_groups = other.rotatable_groups;
-  rotatable_group_bounds = other.rotatable_group_bounds;
-  cis_trans_groups = other.cis_trans_groups;
-  cis_trans_group_bounds = other.cis_trans_group_bounds;
-  invertible_groups = other.invertible_groups;
-  invertible_group_bounds = other.invertible_group_bounds;
-  anchor_a_branches = other.anchor_a_branches;
-  anchor_b_branches = other.anchor_b_branches;
-  formal_charges = other.formal_charges;
-  bond_orders = other.bond_orders;
-  free_electrons = other.free_electrons;
-  int_data = other.int_data;
-  mutable_group_data = other.mutable_group_data;
-  double_data = other.double_data;
-  zerok_formal_charges = other.zerok_formal_charges;
-  zerok_bond_orders = other.zerok_bond_orders;
-  zerok_free_electrons = other.zerok_free_electrons;
-  ag_pointer = other.ag_pointer;
-  repairPointers();
-  return *this;
-}
-
-//-------------------------------------------------------------------------------------------------
-ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
-
-  // Guard against self assignment
-  if (this == &other) {
-    return *this;
-  }
-
-  // Copy elements of the other object
-  atom_count = other.atom_count;
-  planar_atom_count = other.planar_atom_count;
-  ring_count = other.ring_count;
-  fused_ring_count = other.fused_ring_count;
-  twistable_ring_count = other.twistable_ring_count;
-  conjugated_group_count = other.conjugated_group_count;
-  polar_hydrogen_count = other.polar_hydrogen_count;
-  hbond_donor_count = other.hbond_donor_count;
-  hbond_acceptor_count = other.hbond_acceptor_count;
-  aromatic_group_count = other.aromatic_group_count;
-  chiral_center_count = other.chiral_center_count;
-  rotatable_bond_count = other.rotatable_bond_count;
-  cis_trans_bond_count = other.cis_trans_bond_count;
-  double_bond_count = other.double_bond_count;
-  triple_bond_count = other.triple_bond_count;
-  max_ring_size = other.max_ring_size;
-  temperature = other.temperature;
-  rotating_groups_mapped = other.rotating_groups_mapped;
-  planar_centers = std::move(other.planar_centers);
-  ring_inclusion = std::move(other.ring_inclusion);
-  ring_atom_bounds = std::move(other.ring_atom_bounds);
-  ring_atoms = std::move(other.ring_atoms);
-  aromatic_group_bounds = std::move(other.aromatic_group_bounds);
-  aromatic_pi_electrons = std::move(other.aromatic_pi_electrons);
-  aromatic_groups = std::move(other.aromatic_groups);
-  polar_hydrogens = std::move(other.polar_hydrogens);
-  hydrogen_bond_donors = std::move(other.hydrogen_bond_donors);
-  hydrogen_bond_acceptors = std::move(other.hydrogen_bond_acceptors);
-  chiral_arm_atoms = std::move(other.chiral_arm_atoms);
-  chiral_centers = std::move(other.chiral_centers);
-  chiral_inversion_methods = std::move(other.chiral_inversion_methods);
-  rotatable_groups = std::move(other.rotatable_groups);
-  rotatable_group_bounds = std::move(other.rotatable_group_bounds);
-  cis_trans_groups = std::move(other.cis_trans_groups);
-  cis_trans_group_bounds = std::move(other.cis_trans_group_bounds);
-  invertible_groups = std::move(other.invertible_groups);
-  invertible_group_bounds = std::move(other.invertible_group_bounds);
-  anchor_a_branches = std::move(other.anchor_a_branches);
-  anchor_b_branches = std::move(other.anchor_b_branches);
-  formal_charges = std::move(other.formal_charges);
-  bond_orders = std::move(other.bond_orders);
-  free_electrons = std::move(other.free_electrons);
-  int_data = std::move(other.int_data);
-  mutable_group_data = std::move(other.mutable_group_data);
-  double_data = std::move(other.double_data);
-  zerok_formal_charges = std::move(other.zerok_formal_charges);
-  zerok_bond_orders = std::move(other.zerok_bond_orders);
-  zerok_free_electrons = std::move(other.zerok_free_electrons);
-  ag_pointer = std::move(other.ag_pointer);
-  return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2122,22 +2148,6 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
                                           std::vector<int> *tmp_cis_trans_groups,
                                           std::vector<int> *tmp_cis_trans_group_bounds) {
   
-  // Prepare a table of atoms that are part of rings
-  std::vector<bool> bond_in_ring(vk.nbond, false);
-  for (int i = 0; i < ring_count; i++) {
-    for (int j = ring_atom_bounds[i]; j < ring_atom_bounds[i + 1]; j++) {
-      const int jatom = ring_atoms[j];
-      for (int k = vk.bond_asgn_bounds[jatom]; k < vk.bond_asgn_bounds[jatom + 1]; k++) {
-        const int katom = vk.bond_asgn_atoms[k];
-        bool tb_in_ring = false;
-        for (int m = ring_atom_bounds[i]; m < ring_atom_bounds[i + 1]; m++) {
-          tb_in_ring = (tb_in_ring || katom == ring_atoms[m]);
-        }
-        bond_in_ring[vk.bond_asgn_terms[k]] = (bond_in_ring[vk.bond_asgn_terms[k]] || tb_in_ring);
-      }
-    }
-  }
-  
   // Scan over all bonds and accumulate a result
   Approx near_one(1.0, 0.21);
   std::vector<int2> rotators, cistrans;
@@ -2591,6 +2601,16 @@ int ChemicalFeatures::getCisTransBondCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool ChemicalFeatures::rotatableGroupsMapped() const {
+  return rotating_groups_mapped;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ChemicalFeatures::chiralitiesComputed() const {
+  return chiralities_computed;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<uint> ChemicalFeatures::getRingMask(const int min_ring_size,
                                                 const int max_ring_size) const {
   const int n_bits = sizeof(uint) * 8;
@@ -2712,6 +2732,11 @@ std::vector<int> ChemicalFeatures::getChiralCenters(const ChiralOrientation dire
     break;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int4> ChemicalFeatures::getChiralArmBaseAtoms() const {
+  return chiral_arm_atoms.readHost();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2854,6 +2879,45 @@ std::vector<ullint> ChemicalFeatures::getRingInclusion() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool ChemicalFeatures::bondIsInRing(const int atom_i, const int atom_j) const {
+
+  // Check that the two atoms are valid and form a bond
+  if (atom_i < 0 || atom_i >= atom_count || atom_j < 0 || atom_j >= atom_count) {
+    rtErr("Atom indices " + std::to_string(atom_i) + " and " + std::to_string(atom_j) + " are "
+          "invalid for a topology with " + std::to_string(atom_count) + " atoms.",
+          "ChemicalFeatures", "bondIsInRing");
+  }
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  const int ai_lim = vk.bond_asgn_bounds[atom_i + 1];
+  const int aj_lim = vk.bond_asgn_bounds[atom_j + 1];
+  for (int i = vk.bond_asgn_bounds[atom_i]; i < ai_lim; i++) {
+    if (vk.bond_asgn_atoms[i] == atom_j) {
+      return bond_in_ring[vk.bond_asgn_terms[i]];
+    }
+  }
+  for (int i = vk.bond_asgn_bounds[atom_j]; i < aj_lim; i++) {
+    if (vk.bond_asgn_atoms[i] == atom_i) {
+      return bond_in_ring[vk.bond_asgn_terms[i]];
+    }
+  }
+  rtErr("No bond between atoms " + char4ToString(ag_pointer->getAtomName(atom_i)) + " (index " +
+        std::to_string(atom_i) + ") and " + char4ToString(ag_pointer->getAtomName(atom_j)) +
+        " (index " + std::to_string(atom_j) + ") exists in topology " +
+        getBaseName(ag_pointer->getFileName()) + ".", "ChemicalFeatures", "bondIsInRing");
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ChemicalFeatures::bondIsInRing(const int bond_index) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  if (bond_index < 0 || bond_index >= vk.nbond) {
+    rtErr("Bond index " + std::to_string(bond_index) + " is invalid for a topology of " +
+          std::to_string(vk.nbond) + " bonds.", "ChemicalFeatures", "bondIsInRing");
+  }
+  return bond_in_ring[bond_index];
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<IsomerPlan> ChemicalFeatures::getRotatableBondGroups() const {
   std::vector<IsomerPlan> result;
   result.reserve(rotatable_bond_count);
@@ -2991,11 +3055,11 @@ ChemicalFeaturesReader ChemicalFeatures::data(const HybridTargetLevel tier) cons
                                 polar_hydrogen_count, hbond_donor_count, hbond_acceptor_count,
                                 chiral_center_count, rotatable_bond_count, cis_trans_bond_count,
                                 double_bond_count, triple_bond_count, max_ring_size, temperature,
-                                rotating_groups_mapped, planar_centers.data(tier),
-                                ring_atoms.data(tier), ring_atom_bounds.data(tier),
-                                aromatic_pi_electrons.data(tier), aromatic_groups.data(tier),
-                                aromatic_group_bounds.data(tier), polar_hydrogens.data(tier),
-                                hydrogen_bond_donors.data(tier),
+                                rotating_groups_mapped, chiralities_computed,
+                                planar_centers.data(tier), ring_atoms.data(tier),
+                                ring_atom_bounds.data(tier), aromatic_pi_electrons.data(tier),
+                                aromatic_groups.data(tier), aromatic_group_bounds.data(tier),
+                                polar_hydrogens.data(tier), hydrogen_bond_donors.data(tier),
                                 hydrogen_bond_acceptors.data(tier), chiral_centers.data(tier),
                                 chiral_inversion_methods.data(tier), rotatable_groups.data(tier),
                                 rotatable_group_bounds.data(tier), cis_trans_groups.data(tier),
@@ -3007,6 +3071,10 @@ ChemicalFeaturesReader ChemicalFeatures::data(const HybridTargetLevel tier) cons
 
 //-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::findChiralOrientations(const CoordinateFrameReader &cfr) {
+  int chiral_center_timing;
+  if (timer != nullptr) {
+    chiral_center_timing = timer->addCategory("[ChemicalFeatures] Chiral center detection");
+  }
   const int4* arm_ptr = chiral_arm_atoms.data();
   for (int i = 0; i < chiral_center_count; i++) {
     const int chatom = abs(chiral_centers.readHost(i) - 1);
@@ -3017,6 +3085,7 @@ void ChemicalFeatures::findChiralOrientations(const CoordinateFrameReader &cfr) 
     // abiguity of zero and -zero), then contribute the result.
     chiral_centers.putHost(chiral_direction * (chatom + 1), i);
   }
+  if (timer != nullptr) timer->assignTime(chiral_center_timing);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3176,42 +3245,118 @@ bool scoreChiralBranches(const std::vector<std::vector<BondedNode>> &links,
 int getChiralOrientation(const CoordinateFrameReader &cfr, const int center_atom,
                          const int root_atom, const int branch_a_atom, const int branch_b_atom,
                          const int branch_c_atom) {
+  return getChiralOrientation(cfr.xcrd, cfr.ycrd, cfr.zcrd, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
+}
 
-  // Collect coordinates
-  double ra[3], rb[3], rc[3], r_root[3], prja[3], prjb[3], prjc[3], acrb[3], bcrc[3];
-  const double cax = cfr.xcrd[center_atom];
-  const double cay = cfr.ycrd[center_atom];
-  const double caz = cfr.zcrd[center_atom];
-  ra[0] = cfr.xcrd[branch_a_atom] - cax;
-  ra[1] = cfr.ycrd[branch_a_atom] - cay;
-  ra[2] = cfr.zcrd[branch_a_atom] - caz;
-  rb[0] = cfr.xcrd[branch_b_atom] - cax;
-  rb[1] = cfr.ycrd[branch_b_atom] - cay;
-  rb[2] = cfr.zcrd[branch_b_atom] - caz;
-  rc[0] = cfr.xcrd[branch_c_atom] - cax;
-  rc[1] = cfr.ycrd[branch_c_atom] - cay;
-  rc[2] = cfr.zcrd[branch_c_atom] - caz;
-  r_root[0] = cfr.xcrd[root_atom] - cax;
-  r_root[1] = cfr.ycrd[root_atom] - cay;
-  r_root[2] = cfr.zcrd[root_atom] - caz;
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const CoordinateFrame *cf, const int center_atom, const int root_atom,
+                         const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(cf->data(), center_atom, root_atom, branch_a_atom, branch_b_atom,
+                              branch_c_atom);
+}
 
-  // Remove the projections of each higher priority branch onto the lowest priority branch.
-  project(ra, r_root, prja, 3);
-  project(rb, r_root, prjb, 3);
-  project(rc, r_root, prjc, 3);
-  for (int i = 0; i < 3; i++) {
-    ra[i] -= prja[i];
-    rb[i] -= prjb[i];
-    rc[i] -= prjc[i];
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const CoordinateFrame &cf, const int center_atom,
+                         const int root_atom, const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(cf.data(), center_atom, root_atom, branch_a_atom, branch_b_atom,
+                              branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PhaseSpaceReader &psr, const int center_atom, const int root_atom,
+                         const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(psr.xcrd, psr.ycrd, psr.zcrd, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PhaseSpace *ps, const int center_atom, const int root_atom,
+                         const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(ps->data(), center_atom, root_atom, branch_a_atom, branch_b_atom,
+                              branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PhaseSpace &ps, const int center_atom, const int root_atom,
+                         const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(ps.data(), center_atom, root_atom, branch_a_atom, branch_b_atom,
+                              branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const CondensateReader &cdnsr, const int system_index,
+                         const int center_atom, const int root_atom, const int branch_a_atom,
+                         const int branch_b_atom, const int branch_c_atom) {
+  const size_t offset = cdnsr.atom_starts[system_index];
+  switch (cdnsr.mode) {
+  case PrecisionModel::DOUBLE:
+    return getChiralOrientation(&cdnsr.xcrd[offset], &cdnsr.ycrd[offset], &cdnsr.zcrd[offset],
+                                center_atom, root_atom, branch_a_atom, branch_b_atom,
+                                branch_c_atom);
+  case PrecisionModel::SINGLE:
+    return getChiralOrientation(&cdnsr.xcrd_sp[offset], &cdnsr.ycrd_sp[offset],
+                                &cdnsr.zcrd_sp[offset], center_atom, root_atom, branch_a_atom,
+                                branch_b_atom, branch_c_atom);
   }
-  crossProduct(ra, rb, acrb);
-  crossProduct(rb, rc, bcrc);
+  __builtin_unreachable();
+}
 
-  // L- (S-) chirality occurs when the cross product of ra and rb, as well as the cross product of
-  // rb and rc, following the right hand rule, point towards r_root.  However, L- chirality is
-  // given a convention of + (as most amino acids, which have chiral centers, are expected to be
-  // L-chiral).
-  return ((2 * (dot(acrb, r_root, 3) < 0.0 && dot(bcrc, r_root, 3))) - 1);
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const Condensate *cdns, const int system_index, const int center_atom,
+                         const int root_atom, const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(cdns->data(), system_index, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const Condensate &cdns, const int system_index, const int center_atom,
+                         const int root_atom, const int branch_a_atom, const int branch_b_atom,
+                         const int branch_c_atom) {
+  return getChiralOrientation(cdns.data(), system_index, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PsSynthesisReader &poly_psr, const int system_index,
+                         const int center_atom, const int root_atom, const int branch_a_atom,
+                         const int branch_b_atom, const int branch_c_atom) {
+  const size_t offset = poly_psr.atom_starts[system_index];
+  if (poly_psr.gpos_bits >= globalpos_scale_nonoverflow_bits) {
+    return getChiralOrientation<llint>(&poly_psr.xcrd[offset], &poly_psr.ycrd[offset],
+                                       &poly_psr.zcrd[offset], &poly_psr.xcrd_ovrf[offset],
+                                       &poly_psr.ycrd_ovrf[offset], &poly_psr.zcrd_ovrf[offset],
+                                       center_atom, root_atom, branch_a_atom, branch_b_atom,
+                                       branch_c_atom, poly_psr.inv_gpos_scale);
+  }
+  else {
+    return getChiralOrientation<llint>(&poly_psr.xcrd[offset], &poly_psr.ycrd[offset],
+                                       &poly_psr.zcrd[offset], nullptr, nullptr, nullptr,
+                                       center_atom, root_atom, branch_a_atom, branch_b_atom,
+                                       branch_c_atom, poly_psr.inv_gpos_scale);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PhaseSpaceSynthesis *poly_ps, const int system_index,
+                         const int center_atom, const int root_atom, const int branch_a_atom,
+                         const int branch_b_atom, const int branch_c_atom) {
+  return getChiralOrientation(poly_ps->data(), system_index, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getChiralOrientation(const PhaseSpaceSynthesis &poly_ps, const int system_index,
+                         const int center_atom, const int root_atom, const int branch_a_atom,
+                         const int branch_b_atom, const int branch_c_atom) {
+  return getChiralOrientation(poly_ps.data(), system_index, center_atom, root_atom, branch_a_atom,
+                              branch_b_atom, branch_c_atom);
 }
 
 //-------------------------------------------------------------------------------------------------

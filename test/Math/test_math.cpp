@@ -9,6 +9,7 @@
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/multiplication.h"
 #include "../../src/Math/rounding.h"
+#include "../../src/Math/series_ops.h"
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/tickcounter.h"
@@ -749,7 +750,32 @@ int main(const int argc, const char* argv[]) {
   CHECK_THROWS(seriesProduct<int>(ipoly_product), "The product of a triple-length series of "
                "integers was computed, despite the fact that it would overflow the integer "
                "format.");
-  
+
+  // Check series formation capabilities
+  const std::vector<int> inc_eight = incrementingSeries(0, 8, 1);
+  const std::vector<int> inc_eight_ans = { 0, 1, 2, 3, 4, 5, 6, 7 };
+  check(inc_eight, RelationalOperator::EQUAL, inc_eight_ans, "An incrementing series of eight "
+        "values was not formed correctly.");
+  const std::vector<int> inc_fourteen = incrementingSeries(0, 14, 2);
+  const std::vector<int> inc_fourteen_ans = { 0, 2, 4, 6, 8, 10, 12 };
+  check(inc_fourteen, RelationalOperator::EQUAL, inc_fourteen_ans, "An incrementing series of "
+        "seven values and intervals of two was not formed correctly.");
+  const std::vector<int> dec_eight = incrementingSeries(8, 0, 1);
+  const std::vector<int> dec_eight_ans = { 8, 7, 6, 5, 4, 3, 2, 1 };
+  check(dec_eight, RelationalOperator::EQUAL, dec_eight_ans, "A decrementing series of eight "
+        "values was not formed correctly.");
+  const std::vector<int> mixed_ints = { 0, 1, 2, 3, 4, 4, 2, 2, 3, 1, 0, 0, 1, 2, 3, 1, 0 };
+  const std::vector<int> locations_ans = { 0, 10, 11, 16, 1, 9, 12, 15, 2, 6, 7, 13, 3, 8, 14, 4,
+                                           5 };
+  const std::vector<int> location_bounds_ans = { 0, 4, 8, 12, 15, 17 };
+  std::vector<int> locations(17);
+  std::vector<int> location_bounds(6);
+  indexingArray(mixed_ints, &locations, &location_bounds, 5);
+  check(locations, RelationalOperator::EQUAL, locations_ans, "A series of mixed integers was not "
+        "processed correctly to reveal the locations of various values.");
+  check(location_bounds, RelationalOperator::EQUAL, location_bounds_ans, "The bounds array for "
+        "locations of a series of mixed integers was not formed correctly.");
+
   // Verify that the internal random number generation is consistent with expectations.  Create
   // three generators, the first two initialized in the same way (which thus should track one
   // another precisely) and the third initialized to a different value (which should decorrelate
@@ -780,8 +806,8 @@ int main(const int argc, const char* argv[]) {
         "value of a normal distribution of random numbers is incorrect.");
 
   // Additional checks, using the file reference system
-  const std::string randoms_snp = oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() +
-                                  "Math" + osSeparator() + "randoms.m";
+  const std::string randoms_snp = oe.getStormmSourcePath() + osSeparator() + "test" +
+                                  osSeparator() + "Math" + osSeparator() + "randoms.m";
   TestPriority snp_found = (getDrivePathType(randoms_snp) == DrivePathType::FILE) ?
                            TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
@@ -789,12 +815,12 @@ int main(const int argc, const char* argv[]) {
            "environment variable and make sure it indicates the root source directory where src/ "
            "and test/ can be found.  Some subsequent tests will be skipped.", "test_math");
   }
-  snapshot(oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() + "Math" +
+  snapshot(oe.getStormmSourcePath() + osSeparator() + "test" + osSeparator() + "Math" +
            osSeparator() + "randoms.m", polyNumericVector(result_c), "rngvec", 1.0e-4,
            "Series of random numbers created by the ran2 method does not conform to expectations.",
            oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE,
            snp_found);
-  
+
   // Check scrambled linear random number generators
   Xoroshiro128pGenerator xrs128p(798031);
   Xoshiro256ppGenerator xrs256pp(901835);
@@ -1379,7 +1405,7 @@ int main(const int argc, const char* argv[]) {
   check(dten_state, RelationalOperator::EQUAL, dten_state_ans, "A TIckCounter does not return "
         "the expected state after some advancement.");
 
-  // Check tricubic interpolation mechanics
+  // Check tricubic interpolation mechanics.
   section(6);
   const Hybrid<double> tcmat = getTricubicMatrix();
   bool all_integer = true;

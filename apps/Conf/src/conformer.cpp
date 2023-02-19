@@ -29,6 +29,7 @@
 #include "../../../src/Synthesis/condensate.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/static_mask_synthesis.h"
+#include "../../../src/Synthesis/synthesis_cache_map.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
 #include "../../../src/Trajectory/coordinate_copy.h"
@@ -126,8 +127,9 @@ int main(int argc, const char* argv[]) {
   // calculations.
   setGenerativeConditions(ui, &sc, sdf_recovery, &master_timer);
   const std::vector<int> replica_counts = calculateReplicaCounts(ui.getConformerNamelistInfo(),
-                                                                 sc, &master_timer);  
-  PhaseSpaceSynthesis sandbox = buildReplicaWorkspace(replica_counts, sc, &master_timer);
+                                                                 sc, &master_timer);
+  SynthesisCacheMap scmap;
+  PhaseSpaceSynthesis sandbox = buildReplicaWorkspace(replica_counts, sc, &scmap, &master_timer);
   const std::vector<AtomGraph*> unique_topologies = sandbox.getUniqueTopologies();
   const std::vector<int> conformer_topology_indices = sandbox.getUniqueTopologyIndices();
   const std::vector<AtomGraph*> replica_topologies = sandbox.getSystemTopologyPointer();
@@ -141,7 +143,7 @@ int main(int argc, const char* argv[]) {
   AtomGraphSynthesis sandbox_ag(unique_topologies, replica_restraints, conformer_topology_indices, 
                                 incrementingSeries<int>(0, replica_restraints.size(), 1));
 #ifdef STORMM_USE_HPC
-  StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getTopologyPointers(),
+  StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getUniqueTopologies(),
                                             sandbox_ag.getTopologyIndices());
 #endif
   // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
@@ -214,11 +216,13 @@ int main(int argc, const char* argv[]) {
   // map of the viable minima for various conformations.
 
   // Get a vector of the best conformations by their indices in the synthesis.
-  const std::vector<int> best_confs = filterMinimizedStructures(sandbox, sandbox_masks, emin,
+  const std::vector<int> best_confs = filterMinimizedStructures(sandbox, sandbox_masks, sc, scmap,
+                                                                emin,
                                                                 ui.getConformerNamelistInfo());
 
   // Print the best conformations for each topological system.
-  printResults(sandbox, best_confs, emin, sc, sdf_recovery, ui.getReportNamelistInfo());
+  printResults(sandbox, best_confs, emin, sc, scmap, sdf_recovery, ui.getConformerNamelistInfo(),
+               ui.getReportNamelistInfo());
 
   // Print timings results
   master_timer.printResults();

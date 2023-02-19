@@ -4,8 +4,15 @@
 
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "DataTypes/common_types.h"
+#include "DataTypes/stormm_vector_types.h"
+#include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Topology/atomgraph.h"
+#include "Synthesis/condensate.h"
+#include "Synthesis/phasespace_synthesis.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "UnitTesting/stopwatch.h"
 #include "chemistry_enumerators.h"
@@ -16,6 +23,17 @@ namespace chemistry {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using data_types::isFloatingPointScalarType;
+using math::crossProduct;
+using math::dot;
+using math::project;
+using math::roundUp;
+using numerics::hostInt95Sum;
+using numerics::hostInt95ToDouble;
+using synthesis::Condensate;
+using synthesis::CondensateReader;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
 using testing::StopWatch;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
@@ -23,7 +41,10 @@ using topology::NonbondedKit;
 using topology::ValenceKit;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesReader;
 using trajectory::PhaseSpace;
+using trajectory::PhaseSpaceReader;
 
 /// \brief The maximum number of nodes permitted in the tree searches of fused ring systems
 constexpr int max_fused_ring_tree_size = 33554432;
@@ -50,7 +71,7 @@ public:
   /// \brief Set this as the next link in the chain, or as the chain initiator.
   ///
   /// Overloaded:
-  ///   - Optionally accept the index of the previous node for traceback purposes
+  ///   - Optionally accept the index of the previous node for traceback purposes.
   ///
   /// \param previous_in      Index of the previous BondedNode leading to this one, or -1 if this
   ///                         is intended to be the chain initiator
@@ -130,7 +151,7 @@ private:
   uint rings_completed;      ///< Bitmask indicating, in the nth bit, whether a ring has been
                              ///<   completed by following the nth branch
 };
-  
+
 /// \brief A shorthand form of a conformational degree of freedom, which could be a rotable bond,
 ///        cis-trans invertible bond, or chiral center.
 class IsomerPlan {
@@ -194,8 +215,8 @@ public:
 
   /// \brief Get the index of an individual moving atom from within this plan.
   ///
-  // \param index  Index of the atom of interest within the plan (the topological index of the
-  ///              atom will be returned)
+  /// \param index  Index of the atom of interest within the plan (the topological index of the
+  ///               atom will be returned)
   int getMovingAtom(const size_t index) const;
   
   /// \brief Get a const reference to the stored list of atoms that move as a consequence of the
@@ -231,6 +252,38 @@ private:
                                         ///<   isomerization applies
 };
 
+/// \brief A pairing of some process (a ConformationEdit, being a rotation about a bond, flipping
+///        groups across an isomeric cis-trans bond, or inversion of a chiral center) with an
+///        integer index to indicate its association with some list or group.  This struct serves
+///        the SynthesisPermutor (see synthesis_permutor.h and the synthesis namespace) as well as
+///        the IsomerPlan object (see above).  In Hybrid objects, it is transmutable with int2.
+struct CoupledEdit {
+public:
+
+  /// An explicit statement of the default constructor, plus additional constructors based on the
+  /// related int2 type.
+  /// \{
+  CoupledEdit(ConformationEdit edit_in, int index_in);
+  CoupledEdit(int2 data_in);
+  /// \}
+  
+  /// \brief The copy and move constructors, as well as assignment operators, can take their
+  ///        default forms.
+  /// \{
+  CoupledEdit(const CoupledEdit &original) = default;
+  CoupledEdit(CoupledEdit &&original) = default;
+  CoupledEdit& operator=(const CoupledEdit &other) = default;
+  CoupledEdit& operator=(CoupledEdit &&other) = default;
+  /// \}
+
+  /// \brief Overload the assignment operator to permit communication back and forth with int2.
+  CoupledEdit operator=(const int2 &other);
+  
+  ConformationEdit edit;  ///< The process (this will put the index in context: does it apply to
+      	      	      	  ///<   a connected rotatable bond, cis-trans bond, or a chiral center?
+  int index;              ///< Index of the connected feature from whatever appropriate list
+};
+
 /// \brief Abstract of the chemical features object: this is about as complex as an object with a
 ///        single abstract should get.
 struct ChemicalFeaturesReader {
@@ -244,18 +297,19 @@ struct ChemicalFeaturesReader {
                          int rotatable_bond_count_in, int cis_trans_bond_count_in,
                          int double_bond_count_in, int triple_bond_count_in,
                          int max_ring_size_in, double temperature_in,
-                         bool rotating_groups_mapped_in, const int* planar_centers_in,
-                         const int* ring_atoms_in, const int* ring_atom_bounds_in,
-                         const int* aromatic_pi_electrons_in, const int* aromatic_groups_in,
-                         const int* aromatic_group_bounds_in, const int* polar_hydrogens_in,
-                         const int* hydrogen_bond_donors_in, const int* hydrogen_bond_acceptors_in,
-                         const int* chiral_centers_in, const int* chiral_inversion_methods_in,
-                         const int* rotatable_groups_in, const int* rotatable_group_bounds_in,
-                         const int* cis_trans_groups_in, const int* cis_trans_group_bounds_in,
-                         const int* invertible_groups_in, const int* invertible_group_bounds_in,
-                         const int4* chiral_arm_atoms_in, const double* formal_charges_in,
-                         const double* bond_orders_in, const double* free_electrons_in,
-                         const ullint* ring_inclusion_in, const AtomGraph *ag_pointer_in);
+                         bool rotating_groups_mapped_in, bool chiralities_computed_in,
+                         const int* planar_centers_in, const int* ring_atoms_in,
+                         const int* ring_atom_bounds_in, const int* aromatic_pi_electrons_in,
+                         const int* aromatic_groups_in, const int* aromatic_group_bounds_in,
+                         const int* polar_hydrogens_in, const int* hydrogen_bond_donors_in,
+                         const int* hydrogen_bond_acceptors_in, const int* chiral_centers_in,
+                         const int* chiral_inversion_methods_in, const int* rotatable_groups_in,
+                         const int* rotatable_group_bounds_in, const int* cis_trans_groups_in,
+                         const int* cis_trans_group_bounds_in, const int* invertible_groups_in,
+                         const int* invertible_group_bounds_in, const int4* chiral_arm_atoms_in,
+                         const double* formal_charges_in, const double* bond_orders_in,
+                         const double* free_electrons_in, const ullint* ring_inclusion_in,
+                         const AtomGraph *ag_pointer_in);
 
   /// \brief The default copy and move constructors are acceptable, but assignment operators are
   ///        implicitly deleted due to the presence of const elements.
@@ -286,6 +340,8 @@ struct ChemicalFeaturesReader {
   const double temperature;           ///< Temperature at which resonance structures were computed
   const bool rotating_groups_mapped;  ///< Indicate whether the rotatable groups of the system
                                       ///<   (as well as chiral inversion groups) have been mapped
+  const bool chiralities_computed;    ///< Indicate whether the chiral centers of the system have
+                                      ///<   been determined
 
   // Lists of atom indices and atom properties (see the parent object for detailed descriptions)
   const int* planar_centers;            ///< Topological indices of atoms with enforced planarity
@@ -339,9 +395,8 @@ public:
   ///
   /// Overloaded:
   ///   - Create a blank object
-  ///   - Create with a light CoordinateFrame object
-  ///   - Create with a heavy-duty PhaseSpace object holding the coordinates (this will just be
-  ///     stripped down to a CoordinateFrame object)
+  ///   - Create a with a topology only
+  ///   - Create with a topology and one of the basic (single-system) coordinate objects
   ///
   /// \param ag_in           Pointer to the system topology.  This topology will not be modified by
   ///                        submitting it to this constructor, but it is needed as a constant
@@ -350,33 +405,35 @@ public:
   ///                        pointer).
   /// \param cfr             Coordinates of the system
   /// \param ps              Coordinates of the system (a CoordinateFrameReader will be extracted)
-  /// \param map_group_in    Indicator of whether to map rotatable groups (this is an O(N^2)
+  /// \param map_groups_in   Indicator of whether to map rotatable groups (this is an O(N^2)
   ///                        algorithm in memory as well as computation, as larger structures will
   ///                        have more rotatable bonds and the entirety of the structure must be
   ///                        traced in relation to each of them)
   /// \param temperature_in  Temperature at which to take Boltzmann weights of different resonance
   ///                        states
   /// \{
-  ChemicalFeatures();
+  ChemicalFeatures(const AtomGraph *ag_in = nullptr,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
-                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
-                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
-                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph &ag_in, const CoordinateFrame &cf,
-                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph &ag_in, const PhaseSpace &ps,
-                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
   /// \}
 
@@ -438,6 +495,13 @@ public:
   /// \brief Get the number of bonds involved in cis-trans isomerization.
   int getCisTransBondCount() const;
 
+  /// \brief Indicate whether the rotatable groups (including rotatable bonds as well as cis-trans
+  ///        bonds) have been computed.
+  bool rotatableGroupsMapped() const;
+  
+  /// \brief Indicate whether chiralities have been determined for this set of chemical features.
+  bool chiralitiesComputed() const;
+  
   /// \brief Return a mask of rings within a given size range for this system.
   ///
   /// \param min_ring_size  The minimum number of atoms in the rings that will be reported
@@ -476,6 +540,11 @@ public:
   /// \param direction  Preferred chiral orientation of the centers to return (D-, L-, or both)
   std::vector<int> getChiralCenters(ChiralOrientation direction = ChiralOrientation::NONE) const;
 
+  /// \brief Get the bases of each arm for all chiral centers.  The result returns the lowest
+  ///        priority arm in the "x" member, the highest in the "y" member, and the second- and
+  ///        third-highest priority arms in the "z" and "w" members of each tuple, respectively.
+  std::vector<int4> getChiralArmBaseAtoms() const;
+  
   /// \brief Return the chiral orientations for one or more atoms in the system.
   ///
   /// Overloaded:
@@ -483,7 +552,7 @@ public:
   ///   - Get the chiral orientations for a range of atoms
   ///   - Get the chiral orientations for all atoms
   ///
-  /// \param atom_index  The one atom of interest
+  /// \param atom_index  The one atom of interest, based on the topological ordering
   /// \param low_index   The start of a series of atoms for which to get ring inclusions
   /// \param high_index  The upper limit of a series of atoms for which to get ring inclusions
   /// \{
@@ -552,6 +621,22 @@ public:
   std::vector<ullint> getRingInclusion() const;
   /// \}
 
+  /// \brief Return whether a bond in the system is in a ring group or not.
+  ///
+  /// Overloaded:
+  ///   - Provide the two atoms at either endpoint of the bond (checked for existence of an actual
+  ///     bond)
+  ///   - Provide the topological index of the bond (faster method if a means of interpreting the
+  ///     context of each bond is prepared)
+  ///
+  /// \param atom_i      Topological index of the first atom in the bond
+  /// \param atom_j      Topological index of the second atom in the bond
+  /// \param bond_index  Topological index of the bond of interest
+  /// \{
+  bool bondIsInRing(int atom_i, int atom_j) const;
+  bool bondIsInRing(int bond_index) const;
+  /// \}
+  
   /// \brief Get the atom endpoints of a rotatable bond.  The bond root atom is returned in the x
   ///        member of the tuple, the pivot atom (the second atom, closest to atoms that will turn)
   ///        is listed in the y member.
@@ -663,6 +748,8 @@ private:
   double temperature;          ///< The temperature at which these chemical features were
                                ///<   determined (this can influence the Lewis structure)
   bool rotating_groups_mapped; ///< Flag to indicate that rotating groups have been mapped
+  bool chiralities_computed;   ///< Flag to indicate that chiral centers have been identified and
+                               ///<   designated (R- or S-)
   
   /// List of atoms which constitute planar centers (needs no bounds array, simply a list of
   /// unique atoms at the centers of improper dihedrals)
@@ -686,7 +773,7 @@ private:
   /// ring_atom_bounds[k] and the size of the ring can be computed by referencing
   /// ring_atom_bonds[k + 1].
   Hybrid<int> ring_atoms;
-
+  
   /// Bounds array for the aromatic atoms list below
   Hybrid<int> aromatic_group_bounds;
 
@@ -794,14 +881,24 @@ private:
 
   /// Free electron content, per atom, of the representative Lewis structure
   std::vector<int> zerok_free_electrons;
+
+  /// Array to indicate whether each bond in the topology is part of any ring system.
+  std::vector<bool> bond_in_ring;
   
   /// Pointer to the topology that this object describes (needed, if not just for reference, to
   /// obtain the actual atom indices by the various bonds enumerated in some of the lists above)
-  const AtomGraph *ag_pointer;
+  AtomGraph *ag_pointer;
 
   /// Pointer to a timings object that, if not nullptr, will record the operations of this object
   /// and help profile its contributions to the total wall time.
   StopWatch *timer;
+
+  /// \brief Impart the details of a topology onto the object.  This includes detecting which atoms
+  ///        will have chirality and how to invert those centers if necessary, but does not compute
+  ///        the chirality of those atoms (use the findChiralOrientations() member function).
+  ///
+  /// \param map_groups_in  Indicate whether to map rotable bond (and invertible center) groups
+  void analyzeTopology(MapRotatableGroups map_groups_in);
   
   /// \brief Find all planar atoms in the system based on improper dihedral terms.  This prepares
   ///        data arrays that will later be loaded into the ChemicalFeatures object, but does not
@@ -1035,18 +1132,78 @@ bool scoreChiralBranches(const std::vector<std::vector<BondedNode>> &links,
                          std::vector<int> *parallel_growth);
 
 /// \brief Determine the orientation of a chiral center given the priorities of its various
-///        branches.  Only the first atom of each branch is critical at this point.  Return +11 for
+///        branches.  Only the first atom of each branch is critical at this point.  Return +1 for
 ///        L-chiral centers (S-) or -1 for D-chiral (R-) centers.  This is then used as a
 ///        multiplier for the chiral center atom index in subsequent masks or atom retrievals.
 ///
+/// Overloaded:
+///   - Supply any type of coordinate object, by const pointer or by const reference
+///   - Compute in the native precision level of the object (the demarcation between L- and D-
+///     chirality should be sufficiently large in nearly all cases that there is no chance of
+///     ambiguity based on the precision model)
+///
 /// \param cfr            Coordinates of the entire system
+/// \param cf             Coordinates of the entire system
+/// \param psr            Coordinates of the entire system
+/// \param ps             Coordinates of the entire system
 /// \param center_atom    Index of the center atom
 /// \param root_atom      Index of the "root" atom--the very lowest priority branch
 /// \param branch_a_atom  Index of the highest priority branch
 /// \param branch_b_atom  Index of the next highest priority branch
 /// \param branch_c_atom  Index of the lowest priority branch, aside from the root branch
+/// \{
+template <typename T>
+int getChiralOrientation(const T* xcrd, const T* ycrd, const T* zcrd, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+                         
 int getChiralOrientation(const CoordinateFrameReader &cfr, int center_atom, int root_atom,
-                         int branch_a_atom, int branch_c_atom, int branch_d_atom);
+                         int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const CoordinateFrame *cf, int center_atom, int root_atom,
+                         int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const CoordinateFrame &cf, int center_atom, int root_atom,
+                         int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PhaseSpaceReader &psr, int center_atom, int root_atom,
+                         int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PhaseSpace *ps, int center_atom, int root_atom, int branch_a_atom,
+                         int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PhaseSpace &ps, int center_atom, int root_atom, int branch_a_atom,
+                         int branch_b_atom, int branch_c_atom);
+
+template <typename T>
+int getChiralOrientation(const CoordinateSeriesReader<T> &csr, size_t frame_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+template <typename T>
+int getChiralOrientation(const CoordinateSeries<T> *cs, size_t frame_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+template <typename T>
+int getChiralOrientation(const CoordinateSeries<T> &cs, size_t frame_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const CondensateReader &cdnsr, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const Condensate *cdns, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const Condensate &cdns, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PsSynthesisReader &poly_psr, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PhaseSpaceSynthesis *poly_ps, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+
+int getChiralOrientation(const PhaseSpaceSynthesis &poly_ps, int system_index, int center_atom,
+                         int root_atom, int branch_a_atom, int branch_b_atom, int branch_c_atom);
+/// \}
 
 /// \brief Beginning with two distinct atoms in a molecule within a topology, proceed throughout
 ///        the molecular bonding pattern verifying that the atoms one encounters when stepping
@@ -1068,5 +1225,7 @@ bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, in
 
 } // namespace chemistry
 } // namespace stormm
+
+#include "chemical_features.tpp"
 
 #endif

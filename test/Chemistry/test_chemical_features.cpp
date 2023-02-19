@@ -404,8 +404,16 @@ int main(const int argc, const char* argv[]) {
         "The number of cis-trans isomerization sites detected in polycyclic systems does not meet "
         "expectations. (There should be no bonds capable of cis-trans isomerization.)", do_rings);
 
+  // Try creating some chemical features objects from just the topologies (no coordinates)
+  std::vector<ChemicalFeatures> sys_chem_agonly;
+  sys_chem_agonly.reserve(nsys);
+  for (int i = 0; i < nsys; i++) {
+    sys_chem_agonly.emplace_back(&sys_ag[i], mapg_no, 300.0, &timer);
+  }
+
   // Try creating a chemical features object, then mapping rotatable groups post-facto
   std::vector<ChemicalFeatures> sys_chem_pf;
+  sys_chem_pf.reserve(nsys);
   for (int i = 0; i < nsys; i++) {
     sys_chem_pf.emplace_back(&sys_ag[i], CoordinateFrameReader(sys_ps[i]), mapg_no, 300.0,
                              &timer);

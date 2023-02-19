@@ -36,11 +36,11 @@ SystemCache::SystemCache(const ExceptionResponse policy_in,
     label_count{0}, restraint_count{0}, file_merger_protocol{TrajectoryFusion::AUTO},
     topology_cache{}, coordinates_cache{}, label_cache{}, features_cache{}, restraints_cache{},
     static_masks_cache{}, forward_masks_cache{}, topology_indices{}, label_indices{},
-    label_degeneracy{}, label_subindices{}, restraint_indices{}, example_indices{},
-    topology_cases{}, topology_case_bounds{}, system_input_coordinate_names{},
-    system_trajectory_names{}, system_checkpoint_names{}, system_labels{}, label_cases{},
-    label_case_bounds{}, system_input_coordinate_kinds{}, system_trajectory_kinds{},
-    system_checkpoint_kinds{}
+    label_degeneracy{}, trajectory_subindices{}, trajectory_degeneracy{}, checkpoint_subindices{},
+    checkpoint_degeneracy{}, restraint_indices{}, example_indices{}, topology_cases{},
+    topology_case_bounds{}, system_input_coordinate_names{}, system_trajectory_names{},
+    system_checkpoint_names{}, system_labels{}, label_cases{}, label_case_bounds{},
+    system_input_coordinate_kinds{}, system_trajectory_kinds{}, system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -661,7 +661,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       }
     }
   }
-
+  
   // Collect examples of all systems, taking the first system in the list to use each topology
   // as the example of coordinates for that topology.
   topology_count = topology_cache.size();
@@ -712,12 +712,11 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
     label_cache.push_back(system_labels[i]);
     label_count += 1;
   }
+
+  // Count the degeneracy of multiple systems under each label
   label_degeneracy.resize(label_count, 0);
-  label_subindices.resize(system_count);
   for (int i = 0; i < system_count; i++) {
-    const int current_count = label_degeneracy[label_indices[i]];
-    label_subindices[i] = current_count;
-    label_degeneracy[label_indices[i]] = current_count + 1;
+    label_degeneracy[label_indices[i]] += 1;
   }
   label_cases.resize(system_count);
   label_case_bounds.resize(label_count + 1);
@@ -732,6 +731,52 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
     const int ilcc = label_case_counters[ilbl_idx]; 
     label_cases[ilcc] = i;
     label_case_counters[ilbl_idx] = ilcc + 1;
+  }
+
+  // Loop over all systems, computing sub-indices for each degenerate trajectory and checkpoint
+  // name should the user require that different systems feed into individual outputs.
+  trajectory_subindices.resize(system_count);
+  trajectory_degeneracy.resize(system_count);
+  checkpoint_subindices.resize(system_count);
+  checkpoint_degeneracy.resize(system_count);
+  std::vector<bool> traj_coverage(system_count, false);
+  std::vector<bool> chkp_coverage(system_count, false);
+  std::vector<int> common_name_indices;
+  for (int i = 0; i < system_count; i++) {
+    if (traj_coverage[i] == false) {
+      trajectory_subindices[i] = 0;
+      int traj_counter = 1;
+      common_name_indices.resize(1);
+      common_name_indices[0] = i;
+      for (int j = i + 1; j < system_count; j++) {
+        if (system_trajectory_names[j] == system_trajectory_names[i]) {
+          trajectory_subindices[j] = traj_counter;
+          traj_counter++;
+          traj_coverage[j] = true;
+          common_name_indices.push_back(j);
+        }
+      }
+      for (int j = 0; j < traj_counter; j++) {
+        trajectory_degeneracy[common_name_indices[j]] = traj_counter;
+      }
+    }
+    if (chkp_coverage[i] == false) {
+      checkpoint_subindices[i] = 0;
+      int chkp_counter = 1;
+      common_name_indices.resize(1);
+      common_name_indices[0] = i;
+      for (int j = i + 1; j < system_count; j++) {
+        if (system_checkpoint_names[j] == system_checkpoint_names[i]) {
+          checkpoint_subindices[j] = chkp_counter;
+          chkp_counter++;
+          chkp_coverage[j] = true;
+          common_name_indices.push_back(j);
+        }
+      }
+      for (int j = 0; j < chkp_counter; j++) {
+        checkpoint_degeneracy[common_name_indices[j]] = chkp_counter;
+      }
+    }
   }
   
   // Create ChemicalFeatures objects to pair with each system--the majority of the work in
@@ -960,9 +1005,36 @@ const AtomGraph& SystemCache::getTopologyReference(const int topology_index) con
 }
 
 //-------------------------------------------------------------------------------------------------
+int SystemCache::getTopologyCacheIndex(const AtomGraph *ag) const {
+
+  // Try matching the topology to an object in memory by its pointer.
+  for (int i = 0; i < topology_count; i++) {
+    if (ag == &topology_cache[i]) {
+      return i;
+    }
+  }
+
+  // Try matching the topology by its original file name.
+  const std::string query_topname = ag->getFileName();
+  for (int i = 0; i < topology_count; i++) {
+    if (topology_cache[i].getFileName() == query_topname) {
+      return i;
+    }
+  }
+
+  // Return the failed result.
+  return topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getTopologyCacheIndex(const AtomGraph &ag) const {
+  return getTopologyCacheIndex(ag.getSelfPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
 const std::vector<AtomGraph*>
 SystemCache::getTopologiesMatchingLabel(const std::string &query_label) const {
-  const std::vector<int> matches = matchSystemIndices(query_label);
+  const std::vector<int> matches = getMatchingSystemIndices(query_label);
   const size_t nmatch = matches.size();
   std::vector<bool> is_included(topology_count, false);
   for (size_t i = 0; i < nmatch; i++) {
@@ -980,7 +1052,7 @@ SystemCache::getTopologiesMatchingLabel(const std::string &query_label) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<AtomGraph*> SystemCache::getTopologiesMatchingLabel(const std::string &query_label) {
-  const std::vector<int> matches = matchSystemIndices(query_label);
+  const std::vector<int> matches = getMatchingSystemIndices(query_label);
   const size_t nmatch = matches.size();
   std::vector<bool> is_included(topology_count, false);
   for (size_t i = 0; i < nmatch; i++) {
@@ -998,7 +1070,7 @@ std::vector<AtomGraph*> SystemCache::getTopologiesMatchingLabel(const std::strin
 
 //-------------------------------------------------------------------------------------------------
 std::vector<std::string> SystemCache::getLabelsMatchingTopology(const AtomGraph *query_ag) const {
-  const std::vector<int> matches = matchSystemIndices(query_ag);
+  const std::vector<int> matches = getMatchingSystemIndices(query_ag);
   const size_t nmatch = matches.size();
   std::vector<bool> is_included(label_count, false);
   for (size_t i = 0; i < nmatch; i++) {
@@ -1020,8 +1092,102 @@ std::vector<std::string> SystemCache::getLabelsMatchingTopology(const AtomGraph 
 }
 
 //-------------------------------------------------------------------------------------------------
+int SystemCache::getLabelCacheIndex(const std::string &query) const {
+  for (int i = 0; i < label_count; i++) {
+    if (label_cache[i] == query) {
+      return i;
+    }
+  }
+  return label_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph* query_ag,
+                                                       const std::string &query_label) const {
+
+  // Match the topology by its pointer
+  const int top_idx = getTopologyCacheIndex(query_ag);
+
+  // Raise an exception if the topology still could not be matched.
+  if (top_idx == topology_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A topology originating from file " + getBaseName(query_ag->getFileName()) +
+            " could not be matched to any in the cache of " + std::to_string(topology_count) +
+            " topologies.", "SystemCache", "getMatchingSystemIndices");
+    case ExceptionResponse::WARN:
+      rtWarn("A topology originating from file " + getBaseName(query_ag->getFileName()) +
+            " could not be matched to any in the cache of " + std::to_string(topology_count) +
+            " topologies.  No result will be returned.", "SystemCache",
+             "getMatchingSystemIndices");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  
+  // Find all matching cases.
+  std::vector<int> result;
+  for (int i = topology_case_bounds[top_idx]; i < topology_case_bounds[top_idx + 1]; i++) {
+    if (system_labels[topology_cases[i]] == query_label) {
+      result.push_back(topology_cases[i]);
+    }
+  }
+  if (result.size() == 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No topology originating in file " + getBaseName(query_ag->getFileName()) + " could "
+            "be matched to label " + query_label + ".", "SystemCache", "getMatchingSystemIndices");
+    case ExceptionResponse::WARN:
+      rtWarn("No topology originating in file " + getBaseName(query_ag->getFileName()) + " could "
+             "be matched to label " + query_label + ".", "SystemCache",
+             "getMatchingSystemIndices");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph& query_ag,
+                                                       const std::string &query_label) const {
+  return getMatchingSystemIndices(query_ag.getSelfPointer(), query_label);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph* query_ag) const {
+  const int top_idx = getTopologyCacheIndex(query_ag);
+  const int llim = topology_case_bounds[top_idx];
+  const int hlim = topology_case_bounds[top_idx + 1];
+  std::vector<int> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = topology_cases[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph& query_ag) const {
+  return getMatchingSystemIndices(query_ag.getSelfPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getMatchingSystemIndices(const std::string &query_label) const {
+  const int label_idx = getLabelCacheIndex(query_label);
+  const int llim = label_case_bounds[label_idx];
+  const int hlim = label_case_bounds[label_idx + 1];
+  std::vector<int> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = label_cases[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag) const {
-  const std::vector<int> sys_idx = matchSystemIndices(query_ag);
+  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag);
   if (sys_idx.size() == 0) {
     rtErr("No system was found matching the topology originating in file " +
           getBaseName(query_ag->getFileName()) + ".", "SystemCache", "getInputCoordinatesKind");
@@ -1032,7 +1198,7 @@ int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag) const {
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag,
                                              const std::string &query_label) const {
-  const std::vector<int> sys_idx = matchSystemIndices(query_ag, query_label);
+  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag, query_label);
   if (sys_idx.size() == 0) {
     rtErr("No system was found matching the topology originating in file " +
           getBaseName(query_ag->getFileName()) + " and label \"" + query_label + "\".",
@@ -1043,7 +1209,7 @@ int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag,
 
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getFirstMatchingSystemIndex(const std::string &query_label) const {
-  const std::vector<int> sys_idx = matchSystemIndices(query_label);
+  const std::vector<int> sys_idx = getMatchingSystemIndices(query_label);
   if (sys_idx.size() == 0) {
     rtErr("No system was found matching label \"" + query_label + "\".", "SystemCache",
           "getInputCoordinatesKind");
@@ -1376,29 +1542,29 @@ std::string SystemCache::getTrajectoryName(const int system_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getTrajectoryName(const AtomGraph *query_ag) const {
+const std::string& SystemCache::getTrajectoryName(const AtomGraph *query_ag) const {
   return system_trajectory_names[getFirstMatchingSystemIndex(query_ag)];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getTrajectoryName(const AtomGraph &query_ag) const {
+const std::string& SystemCache::getTrajectoryName(const AtomGraph &query_ag) const {
   return getTrajectoryName(query_ag.getSelfPointer());
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getTrajectoryName(const AtomGraph *query_ag,
+const std::string& SystemCache::getTrajectoryName(const AtomGraph *query_ag,
                                                   const std::string &query_label) const {
   return system_trajectory_names[getFirstMatchingSystemIndex(query_ag, query_label)];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getTrajectoryName(const AtomGraph &query_ag,
+const std::string& SystemCache::getTrajectoryName(const AtomGraph &query_ag,
                                                   const std::string &query_label) const {
   return getTrajectoryName(query_ag.getSelfPointer(), query_label);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getTrajectoryName(const std::string &query_label) const {
+const std::string& SystemCache::getTrajectoryName(const std::string &query_label) const {
   return system_trajectory_names[getFirstMatchingSystemIndex(query_label)];
 }
 
@@ -1410,34 +1576,39 @@ std::string SystemCache::getCheckpointName(const int system_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getCheckpointName(const AtomGraph *query_ag) const {
+const std::string& SystemCache::getCheckpointName(const AtomGraph *query_ag) const {
   return system_checkpoint_names[getFirstMatchingSystemIndex(query_ag)];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getCheckpointName(const AtomGraph &query_ag) const {
+const std::string& SystemCache::getCheckpointName(const AtomGraph &query_ag) const {
   return getCheckpointName(query_ag.getSelfPointer());
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getCheckpointName(const AtomGraph *query_ag,
-                                           const std::string &query_label) const {
+const std::string& SystemCache::getCheckpointName(const AtomGraph *query_ag,
+                                                  const std::string &query_label) const {
   return system_checkpoint_names[getFirstMatchingSystemIndex(query_ag, query_label)];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getCheckpointName(const AtomGraph &query_ag,
-                                           const std::string &query_label) const {
+const std::string& SystemCache::getCheckpointName(const AtomGraph &query_ag,
+                                                  const std::string &query_label) const {
   return getCheckpointName(query_ag.getSelfPointer(), query_label);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getCheckpointName(const std::string &query_label) const {
+const std::string& SystemCache::getCheckpointName(const std::string &query_label) const {
   return system_checkpoint_names[getFirstMatchingSystemIndex(query_label)];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string SystemCache::getSystemLabel(const int system_index) const {
+int SystemCache::getSystemLabelIndex(int system_index) const {
+  return label_indices[system_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& SystemCache::getSystemLabel(const int system_index) const {
   checkSystemBounds(system_index, "getSystemLabel");
   return system_labels[system_index];
 }
@@ -1553,12 +1724,25 @@ PrintSituation SystemCache::getPrintingProtocol(const CoordinateFileRole purpose
 
     // If the system is the first of those grouped under a particular label, return the original
     // expectation.  Otherwise, set the printing to append to the growing file.
-    return (label_subindices[system_index] > 0) ? PrintSituation::APPEND : expectation;
+    switch (purpose) {
+    case CoordinateFileRole::INITIATE:
+      rtErr("No printing protocol is available for input coordinates.", "SystemCache",
+            "getPrintingProtocol");
+    case CoordinateFileRole::TRAJECTORY:
+      return (trajectory_subindices[system_index] > 0) ? PrintSituation::APPEND : expectation;
+    case CoordinateFileRole::CHECKPOINT:
+      return (checkpoint_subindices[system_index] > 0) ? PrintSituation::APPEND : expectation;
+    }
   }
   else {
     return expectation;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const SystemCache* SystemCache::getSelfPointer() const {
+  return this;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1610,7 +1794,7 @@ bool SystemCache::determineFileMerger(const CoordinateFileRole purpose,
         return false;
       case CoordinateFileKind::UNKNOWN:
         rtErr("The format of an output file in the role of " + getEnumerationName(purpose) +
-              " must be known.", "SystemCache", "nondegenerateName");
+              " must be known.", "SystemCache", "determineFileMerger");
       }
       break;
     }
@@ -1637,7 +1821,7 @@ bool SystemCache::determineFileMerger(const CoordinateFileRole purpose,
         return false;
       case CoordinateFileKind::UNKNOWN:
         rtErr("The format of an output file in the role of " + getEnumerationName(purpose) +
-              " must be known.", "SystemCache", "nondegenerateName");
+              " must be known.", "SystemCache", "determineFileMerger");
       }
       break;
     }
@@ -1652,12 +1836,23 @@ std::string SystemCache::nondegenerateName(const std::string &fname_in,
                                            const int system_index) const {
 
   // The system does not need a non-degenerate name if there is only one system under the label,
-  // or if the output is a checkpoint and the output format is suitable for multiple frames.
-  const int label_idx = label_indices[system_index];
-  const int label_deg = label_degeneracy[label_idx];
+  // if the systems use the same topology and the file has a trajectory format, or if the output
+  // is a checkpoint and the output format is suitable for multiple frames.
+  int outfile_idx, outfile_deg;
+  switch (purpose) {
+  case CoordinateFileRole::INITIATE:
+    return fname_in;
+  case CoordinateFileRole::TRAJECTORY:
+    outfile_idx = trajectory_subindices[system_index];
+    outfile_deg = trajectory_degeneracy[system_index];
+    break;
+  case CoordinateFileRole::CHECKPOINT:
+    outfile_idx = checkpoint_subindices[system_index];
+    outfile_deg = checkpoint_degeneracy[system_index];
+    break;
+  }
   std::string result;
-  if (label_deg > 1 && determineFileMerger(purpose, system_index) == false) {
-    const int label_pos = label_subindices[system_index];
+  if (outfile_deg > 1 && determineFileMerger(purpose, system_index) == false) {
     int last_slash = 0;
     int last_dot = 0;
     const char osc = osSeparator();
@@ -1673,136 +1868,17 @@ std::string SystemCache::nondegenerateName(const std::string &fname_in,
       }
     }
     if (last_dot > last_slash) {
-      result = fname_in.substr(0, last_dot) + "_" + std::to_string(label_pos) +
+      result = fname_in.substr(0, last_dot) + "_" + std::to_string(outfile_idx) +
                fname_in.substr(last_dot, fname_in.size());
     }
     else {
-      result = fname_in + "_" + std::to_string(label_pos);
+      result = fname_in + "_" + std::to_string(outfile_idx);
     }
   }
   else {
     result = fname_in;
   }
   return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> SystemCache::matchSystemIndices(const AtomGraph* query_ag,
-                                                 const std::string &query_label) const {
-
-  // Match the topology by its pointer
-  const int top_idx = getTopologyCacheIndex(query_ag);
-
-  // Raise an exception if the topology still could not be matched.
-  if (top_idx == topology_count) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("A topology originating from file " + getBaseName(query_ag->getFileName()) +
-            " could not be matched to any in the cache of " + std::to_string(topology_count) +
-            " topologies.", "SystemCache", "matchSystemIndices");
-    case ExceptionResponse::WARN:
-      rtWarn("A topology originating from file " + getBaseName(query_ag->getFileName()) +
-            " could not be matched to any in the cache of " + std::to_string(topology_count) +
-            " topologies.  No result will be returned.", "SystemCache", "matchSystemIndices");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-
-  // Find all matching cases.
-  std::vector<int> result;
-  for (int i = topology_case_bounds[top_idx]; i < topology_case_bounds[top_idx + 1]; i++) {
-    if (system_labels[topology_cases[i]] == query_label) {
-      result.push_back(topology_cases[i]);
-    }
-  }
-  if (result.size() == 0) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("No topology originating in file " + getBaseName(query_ag->getFileName()) + " could "
-            "be matched to label " + query_label + ".", "SystemCache", "matchSystemIndices");
-    case ExceptionResponse::WARN:
-      rtWarn("No topology originating in file " + getBaseName(query_ag->getFileName()) + " could "
-             "be matched to label " + query_label + ".", "SystemCache", "matchSystemIndices");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> SystemCache::matchSystemIndices(const AtomGraph& query_ag,
-                                                 const std::string &query_label) const {
-  return matchSystemIndices(query_ag.getSelfPointer(), query_label);
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> SystemCache::matchSystemIndices(const AtomGraph* query_ag) const {
-  const int top_idx = getTopologyCacheIndex(query_ag);
-  const int llim = topology_case_bounds[top_idx];
-  const int hlim = topology_case_bounds[top_idx + 1];
-  std::vector<int> result(hlim - llim);
-  for (int i = llim; i < hlim; i++) {
-    result[i - llim] = topology_cases[i];
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> SystemCache::matchSystemIndices(const AtomGraph& query_ag) const {
-  return matchSystemIndices(query_ag.getSelfPointer());
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> SystemCache::matchSystemIndices(const std::string &query_label) const {
-  const int label_idx = getLabelCacheIndex(query_label);
-  const int llim = label_case_bounds[label_idx];
-  const int hlim = label_case_bounds[label_idx + 1];
-  std::vector<int> result(hlim - llim);
-  for (int i = llim; i < hlim; i++) {
-    result[i - llim] = label_cases[i];
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-int SystemCache::getTopologyCacheIndex(const AtomGraph *ag) const {
-
-  // Try matching the topology to an object in memory by its pointer.
-  for (int i = 0; i < topology_count; i++) {
-    if (ag == &topology_cache[i]) {
-      return i;
-    }
-  }
-
-  // Try matching the topology by its original file name.
-  const std::string query_topname = ag->getFileName();
-  for (int i = 0; i < topology_count; i++) {
-    if (topology_cache[i].getFileName() == query_topname) {
-      return i;
-    }
-  }
-
-  // Return the failed result.
-  return topology_count;
-}
-
-//-------------------------------------------------------------------------------------------------
-int SystemCache::getTopologyCacheIndex(const AtomGraph &ag) const {
-  return getTopologyCacheIndex(ag.getSelfPointer());
-}
-
-//-------------------------------------------------------------------------------------------------
-int SystemCache::getLabelCacheIndex(const std::string &query) const {
-  for (int i = 0; i < label_count; i++) {
-    if (label_cache[i] == query) {
-      return i;
-    }
-  }
-  return label_count;
 }
 
 } // namespace synthesis

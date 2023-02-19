@@ -5,7 +5,7 @@ namespace stormm {
 namespace namelist {
 
 //-------------------------------------------------------------------------------------------------
-std::string getNamelistTypeName(const NamelistType param_type) {
+std::string getEnumerationName(const NamelistType param_type) {
   switch (param_type) {
   case NamelistType::INTEGER:
     return std::string("INTEGER");

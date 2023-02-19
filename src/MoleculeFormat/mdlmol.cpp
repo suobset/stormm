@@ -1,5 +1,6 @@
 #include <cmath>
 #include "copyright.h"
+#include "Chemistry/chemistry_enumerators.h"
 #include "Chemistry/znumber.h"
 #include "FileManagement/file_listing.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -10,8 +11,11 @@ namespace stormm {
 namespace structure {
 
 using chemistry::ChemicalFeaturesReader;
+using chemistry::ChiralOrientation;
+using chemistry::zNumberToNaturalMass;
 using chemistry::zNumberToSymbol;
 using diskutil::getBaseName;
+using parse::char4ToString;
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::readRealValue;
@@ -29,13 +33,14 @@ using trajectory::writeFrame;
 //-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const ExceptionResponse policy_in):
     policy{policy_in}, version_no{MdlMolVersion::V2000}, atom_count{0}, bond_count{0},
-    list_count{0}, sgroup_count{0}, constraint_count{0}, chirality{MolObjChirality::ACHIRAL},
-    registry_number{-1}, data_item_count{0}, property_formal_charges{false},
-    property_radicals{false}, property_isotopes{false}, property_element_lists{false},
-    coordinates{}, atomic_symbols{}, atomic_numbers{}, formal_charges{}, isotopic_shifts{},
-    parities{}, implicit_hydrogens{}, stereo_considerations{}, valence_connections{},
-    atom_atom_mapping_count{}, orientation_stability{}, bonds{}, element_lists{}, stext_entries{},
-    properties{}, title{""}, software_details{""}, general_comment{""}
+    list_count{0}, stext_entry_count{0}, properties_count{0}, sgroup_count{0}, constraint_count{0},
+    chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, data_item_count{0},
+    property_formal_charges{false}, property_radicals{false}, property_isotopes{false},
+    property_element_lists{false}, coordinates{}, atomic_symbols{}, atomic_numbers{},
+    formal_charges{}, isotopic_shifts{}, parities{}, implicit_hydrogens{}, stereo_considerations{},
+    valence_connections{}, atom_atom_mapping_count{}, orientation_stability{}, bonds{},
+    element_lists{}, stext_entries{}, properties{}, title{""}, software_details{""},
+    general_comment{""}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -330,22 +335,6 @@ MdlMol::MdlMol(const char* filename, const ExceptionResponse policy_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMol::MdlMol(const ChemicalFeatures *chemfe, const llint* xcrd,
-               const llint* ycrd, const llint* zcrd, const int* xcrd_ovrf, const int* ycrd_ovrf,
-               const int* zcrd_ovrf, double inv_scale, const int molecule_index) :
-    MdlMol(ExceptionResponse::SILENT)
-{
-  const AtomGraph *ag = chemfe->getTopologyPointer();
-  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
-  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  allocate(cdk, nbk, molecule_index);
-
-  // Fill in the coordinates
-  impartCoordinates(xcrd, ycrd, zcrd, xcrd_ovrf, ycrd_ovrf, zcrd_ovrf, inv_scale, cdk,
-                    molecule_index);
-}
-
-//-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const ChemicalFeatures *chemfe, const CoordinateFrameReader cfr,
                const int molecule_index) :
     MdlMol(chemfe, cfr.xcrd, cfr.ycrd, cfr.zcrd, molecule_index)
@@ -384,9 +373,33 @@ MdlMol::MdlMol(const ChemicalFeatures &chemfe, const PhaseSpace &ps,
 //-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const ChemicalFeatures *chemfe, const PsSynthesisReader poly_psr,
                const int system_index, const int molecule_index) :
-    MdlMol(chemfe, poly_psr.xcrd, poly_psr.ycrd, poly_psr.zcrd, poly_psr.xcrd_ovrf,
-           poly_psr.ycrd_ovrf, poly_psr.zcrd_ovrf, poly_psr.inv_gpos_scale, molecule_index)
-{}
+    MdlMol(ExceptionResponse::SILENT)
+{
+  // Check that the system index and system size are valid
+  if (system_index < 0 || system_index >= poly_psr.system_count) {
+    rtErr("System index " + std::to_string(system_index) + " is invalid for a synthesis of " +
+          std::to_string(poly_psr.system_count) + " systems.");
+  }
+  const AtomGraph *ag = chemfe->getTopologyPointer();
+  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
+  if (cdk.natom != poly_psr.atom_counts[system_index]) {
+    rtErr("System " + std::to_string(system_index) + " contains " +
+          std::to_string(poly_psr.atom_counts[system_index]) + " atoms, whereas the topology "
+          "expects " + std::to_string(cdk.natom) + ".", "MdlMol");
+  }
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  allocate(cdk, nbk, molecule_index);
+
+  // Fill in details from the topology
+  transferTopologicalDetails(chemfe, molecule_index);
+  
+  // Fill in the coordinates
+  const size_t init_index = poly_psr.atom_starts[system_index];
+  impartCoordinates(&poly_psr.xcrd[init_index], &poly_psr.ycrd[init_index],
+                    &poly_psr.zcrd[init_index], &poly_psr.xcrd_ovrf[init_index],
+                    &poly_psr.ycrd_ovrf[init_index], &poly_psr.zcrd_ovrf[init_index],
+                    poly_psr.inv_gpos_scale, cdk, molecule_index);
+}
 
 //-------------------------------------------------------------------------------------------------
 MdlMol::MdlMol(const ChemicalFeatures *chemfe, const PhaseSpaceSynthesis *poly_ps,
@@ -480,6 +493,7 @@ CoordinateFrame MdlMol::exportCoordinateFrame() const {
 
 //-------------------------------------------------------------------------------------------------
 char4 MdlMol::getAtomSymbol(const int index) const {
+  validateAtomIndex(index, "getAtomSymbol");
   return atomic_symbols[index];
 }
 
@@ -490,6 +504,7 @@ const std::vector<char4>& MdlMol::getAtomSymbols() const {
 
 //-------------------------------------------------------------------------------------------------
 int MdlMol::getAtomicNumber(const int index) const {
+  validateAtomIndex(index, "getAtomicNumber");
   return atomic_numbers[index];
 }
 
@@ -500,6 +515,7 @@ const std::vector<int>& MdlMol::getAtomicNumbers() const {
 
 //-------------------------------------------------------------------------------------------------
 int MdlMol::getFormalCharge(const int index) const {
+  validateAtomIndex(index, "getFormalCharge");
   return formal_charges[index];
 }
 
@@ -535,11 +551,20 @@ void MdlMol::impartCoordinates(const llint* xcrd, const llint* ycrd, const llint
           " atoms is incompatible with an MDL MOL object of " + std::to_string(atom_count) +
           " atoms.", "MdlMol", "impartCoordinates");
   }
+  int atomcon = 0;
   for (int i = llim; i < hlim; i++) {
-    const int iatom = cdk.mol_contents[i]; 
-    coordinates[i - llim].x = hostInt95ToDouble(xcrd[iatom], xcrd_ovrf[iatom]) * scale_factor;
-    coordinates[i - llim].y = hostInt95ToDouble(ycrd[iatom], ycrd_ovrf[iatom]) * scale_factor;
-    coordinates[i - llim].z = hostInt95ToDouble(zcrd[iatom], zcrd_ovrf[iatom]) * scale_factor;
+    const int iatom = cdk.mol_contents[i];
+    if (cdk.z_numbers[iatom] > 0) {
+      if (atomcon >= atom_count) {
+        rtErr("Data from integral types is for fixed-precision representations and must be "
+              "accompanied by a scaling factor to take the values back into real, internal units.",
+              "MdlMol");
+      }
+      coordinates[atomcon].x = hostInt95ToDouble(xcrd[iatom], xcrd_ovrf[iatom]) * scale_factor;
+      coordinates[atomcon].y = hostInt95ToDouble(ycrd[iatom], ycrd_ovrf[iatom]) * scale_factor;
+      coordinates[atomcon].z = hostInt95ToDouble(zcrd[iatom], zcrd_ovrf[iatom]) * scale_factor;
+      atomcon++;
+    }
   }
 }
 
@@ -591,6 +616,76 @@ void MdlMol::impartCoordinates(const CoordinateFrame *cf, const HybridTargetLeve
 //-------------------------------------------------------------------------------------------------
 void MdlMol::impartCoordinates(const CoordinateFrame &cf, const HybridTargetLevel tier) {
   impartCoordinates(cf.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::addProperty(const MdlMolProperty &mmprop) {
+  bool update_needed = false;
+  properties.push_back(mmprop);
+  switch (mmprop.getKind()) {
+  case MdlMolPropertyKind::CHARGE:
+    property_formal_charges = true;
+    update_needed = true;
+    break;
+  case MdlMolPropertyKind::RADICAL:
+    property_radicals = true;
+    update_needed = true;
+    break;
+  case MdlMolPropertyKind::ISOTOPE:
+    property_isotopes = true;
+    update_needed = true;
+    break;
+  case MdlMolPropertyKind::ATOM_LIST:
+    property_element_lists = true;
+    update_needed = true;
+    break;
+  case MdlMolPropertyKind::ATOM_ALIAS:
+  case MdlMolPropertyKind::ATOM_VALUE:
+  case MdlMolPropertyKind::GROUP_ABBREVIATION:
+  case MdlMolPropertyKind::SGROUP_SUBSCRIPT:
+  case MdlMolPropertyKind::SGROUP_BOND_VECTOR:
+  case MdlMolPropertyKind::SGROUP_FIELD:
+  case MdlMolPropertyKind::SGROUP_DISPLAY:
+  case MdlMolPropertyKind::SGROUP_DATA:
+  case MdlMolPropertyKind::SPATIAL_FEATURE:
+  case MdlMolPropertyKind::PHANTOM_ATOM:
+  case MdlMolPropertyKind::SGROUP_CLASS:
+  case MdlMolPropertyKind::LARGE_REGNO:
+  case MdlMolPropertyKind::SGROUP_EXPANSION:
+  case MdlMolPropertyKind::SGROUP_ATOM_LIST:
+  case MdlMolPropertyKind::SGROUP_BOND_LIST:
+  case MdlMolPropertyKind::MG_PARENT_ATOM_LIST:
+  case MdlMolPropertyKind::RING_BOND_COUNT:
+  case MdlMolPropertyKind::SUBSTITUTION_COUNT:
+  case MdlMolPropertyKind::UNSATURATED_COUNT:
+  case MdlMolPropertyKind::RGROUP_LABEL_LOCATION:
+  case MdlMolPropertyKind::SGROUP_TYPE:
+  case MdlMolPropertyKind::SGROUP_SUBTYPE:
+  case MdlMolPropertyKind::SGROUP_LABELS:
+  case MdlMolPropertyKind::SGROUP_CONNECTIVITY:
+  case MdlMolPropertyKind::SGROUP_HIERARCHY:
+  case MdlMolPropertyKind::SGROUP_COMP_NUMBER:
+  case MdlMolPropertyKind::SGROUP_BRACKET_STYLE:
+  case MdlMolPropertyKind::SGROUP_CORRESPONENCE:
+  case MdlMolPropertyKind::SGROUP_ATTACH_POINT:
+  case MdlMolPropertyKind::LINK_ATOM:
+  case MdlMolPropertyKind::SGROUP_DISPLAY_INFO:
+  case MdlMolPropertyKind::ATTACHMENT_POINT:
+  case MdlMolPropertyKind::ATTACHMENT_ORDER:
+  case MdlMolPropertyKind::RGROUP_LOGIC:
+  case MdlMolPropertyKind::SKIP:
+  case MdlMolPropertyKind::NONE:
+    break;
+  }
+  if (update_needed) {
+    updateV2kAtomAttributes();
+  }
+  properties_count += 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MdlMol::addProperty(const MdlMolProperty *mmprop) {
+  addProperty(*mmprop);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1161,6 +1256,14 @@ std::string MdlMol::writeDataItems(const int mol_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+void MdlMol::validateAtomIndex(const int index, const char* caller) const {
+  if (index < 0 || index >= atom_count) {
+    rtErr("Atom index " + std::to_string(index) + " is out of bounds for an MDL MOL entry with " +
+          std::to_string(atom_count) + " atoms.", "MdlMol", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMol::allocate() {
 
   // Atom property fields are resized and then set as part of a loop in the parent MdlMol
@@ -1193,6 +1296,10 @@ void MdlMol::allocate(const ChemicalDetailsKit &cdk, const NonbondedKit<double> 
                       const int molecule_index) {
 
   // Determine the number of atoms and bonds in the molecule
+  if (molecule_index < 0 || molecule_index >= cdk.nmol) {
+    rtErr("Molecule index " + std::to_string(molecule_index) + " is invalid for a topology with " +
+          std::to_string(cdk.nmol) + " molecules.", "MdlMol", "allocate");
+  }
   const int hlim = cdk.mol_limits[molecule_index + 1];
   const int llim = cdk.mol_limits[molecule_index];
   int tmp_atoms = 0;
@@ -1215,19 +1322,13 @@ void MdlMol::allocate(const ChemicalDetailsKit &cdk, const NonbondedKit<double> 
   hydrogenation_protocol.resize(atom_count);
   orientation_stability.resize(atom_count);
   
-  // Determine the number of bonds in the molecule and fill in some aspects of the atoms array
+  // Determine the number of bonds in the molecule
   int tmp_bonds = 0;
   for (int i = llim; i < hlim; i++) {
     if (cdk.z_numbers[i] <= 0) {
       continue;
     }
     const int atom_idx = cdk.mol_contents[i];
-    atomic_numbers[i - llim] = cdk.z_numbers[i];
-    const char2 isymb = zNumberToSymbol(cdk.z_numbers[i]);
-    atomic_symbols[i - llim].x = isymb.x;
-    atomic_symbols[i - llim].y = isymb.y;
-    atomic_symbols[i - llim].z = ' ';
-    atomic_symbols[i - llim].w = ' ';
     int nconn = 0;
     for (int j = nbk.nb12_bounds[atom_idx]; j < nbk.nb12_bounds[atom_idx + 1]; j++) {
       nconn += (cdk.z_numbers[nbk.nb12x[j]] > 0);
@@ -1540,10 +1641,27 @@ void MdlMol::checkDataItemIndex(const int item_index, const char* caller) const 
 }
 
 //-------------------------------------------------------------------------------------------------
+void MdlMol::addAtomIntProperty(const std::vector<int2> &notable_data, const char4 prcode) {
+  const size_t nd_count = notable_data.size();
+  if (nd_count > 0) {
+    std::vector<int> int_data_in(2 * nd_count);
+    for (size_t i = 0; i < nd_count; i++) {
+      int_data_in[(2 * i)    ] = notable_data[i].x;
+      int_data_in[(2 * i) + 1] = notable_data[i].y;
+    }
+    const MdlMolProperty qprop(prcode, -1, nd_count, 2, false, -1, 6, 9, { 0, 4, 8 },
+                               { MolObjPropField::INTEGER, MolObjPropField::INTEGER },
+                               { MolObjIndexKind::ATOM, MolObjIndexKind::OTHER }, int_data_in);
+    addProperty(qprop);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMol::transferTopologicalDetails(const ChemicalFeatures *chemfe, const int molecule_index) {
   const AtomGraph *ag = chemfe->getTopologyPointer();
   const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
   const ChemicalFeaturesReader chemfer = chemfe->data();
   const int llim = cdk.mol_limits[molecule_index];
   const int hlim = cdk.mol_limits[molecule_index + 1];
@@ -1554,13 +1672,13 @@ void MdlMol::transferTopologicalDetails(const ChemicalFeatures *chemfe, const in
   // indices in the topology (x member) and in the MDL mol object, taking the molecule's minimum
   // index as an offset to avoid having to allocate huge amounts of memory in order to transfer,
   // say, a single ligand out of a very large simulation.
-  int min_idx = cdk.natom;
-  int max_idx = 0;
+  int min_top_idx = cdk.natom;
+  int max_top_idx = 0;
   for (int i = llim; i < hlim; i++) {
-    min_idx = std::min(cdk.mol_contents[i], min_idx);
-    max_idx = std::max(cdk.mol_contents[i], max_idx);
+    min_top_idx = std::min(cdk.mol_contents[i], min_top_idx);
+    max_top_idx = std::max(cdk.mol_contents[i], max_top_idx);
   }
-  std::vector<int> top2mol_map(max_idx - min_idx, -1);
+  std::vector<int> top2mol_map(max_top_idx - min_top_idx + 1, -1);
   std::vector<int> mol2top_map(atom_count);
   int mol_atom_idx = 0;
   for (int i = llim; i < hlim; i++) {
@@ -1568,17 +1686,115 @@ void MdlMol::transferTopologicalDetails(const ChemicalFeatures *chemfe, const in
       continue;
     }
     mol2top_map[mol_atom_idx] = cdk.mol_contents[i];
-    top2mol_map[cdk.mol_contents[i]] = mol_atom_idx;
+    top2mol_map[cdk.mol_contents[i] - min_top_idx] = mol_atom_idx;
     mol_atom_idx++;
   }
 
   // Add formal charges
+  const std::vector<int>& fc_viewer = chemfe->getZeroKelvinFormalCharges();
+  const std::vector<int>& fe_viewer = chemfe->getZeroKelvinFreeElectrons();
+  std::vector<int2> nonzero_formal_charges;
+  std::vector<int2> noteworthy_radicals;
+  std::vector<int2> nonzero_isotopic_shifts;
   for (int i = 0; i < atom_count; i++) {
     const int top_idx = mol2top_map[i];
-    formal_charges[i] = chemfer.formal_charges[top_idx];
+    atomic_numbers[i] = cdk.z_numbers[top_idx];
+    const char2 isymb = zNumberToSymbol(cdk.z_numbers[top_idx]);
+    atomic_symbols[i].x = isymb.x;
+    atomic_symbols[i].y = isymb.y;
+    atomic_symbols[i].z = ' ';
+    atomic_symbols[i].w = ' ';
+    formal_charges[i] = fc_viewer[top_idx];
+    if (formal_charges[i] != 0) {
+      nonzero_formal_charges.push_back({ i, formal_charges[i] });
+    }
     radicals[i] = (fabs(chemfer.free_electrons[top_idx] - 1.0) < 0.1) ? RadicalState::SINGLET :
                                                                         RadicalState::NONE;
-    isotopic_shifts[i] = 0;
+    if (radicals[i] != RadicalState::NONE) {
+      noteworthy_radicals.push_back({ i, static_cast<int>(radicals[i]) });
+    }
+    isotopic_shifts[i] = round(cdk.masses[top_idx] - zNumberToNaturalMass(cdk.z_numbers[top_idx]));
+    if (isotopic_shifts[i]) {
+      nonzero_isotopic_shifts.push_back({ i, isotopic_shifts[i] });
+    }
+    switch (chemfe->getAtomChirality(top_idx)) {
+    case ChiralOrientation::NONE:
+      if (chemfe->chiralitiesComputed()) {
+        parities[i] = MolObjAtomStereo::NOT_STEREO;
+        stereo_considerations[i] = false;
+      }
+      else {
+
+        // If the chiralities of atoms are not known, say that each atom has stereo considerations
+        // if it has four bonds to it.
+        if (valence_connections[i] == 4) {
+          parities[i] = MolObjAtomStereo::UNMARKED;
+          stereo_considerations[i] = true;
+        }
+        else {
+          parities[i] = MolObjAtomStereo::NOT_STEREO;
+          stereo_considerations[i] = false;
+        }
+      }
+      break;
+    case ChiralOrientation::RECTUS:
+      parities[i] = MolObjAtomStereo::EVEN;
+      stereo_considerations[i] = true;
+      break;
+    case ChiralOrientation::SINISTER:
+      parities[i] = MolObjAtomStereo::ODD;
+      stereo_considerations[i] = true;
+      break;
+    }
+    implicit_hydrogens[i] = 0;
+    atom_atom_mapping_count[i] = 0;
+    exact_change_enforced[i] = false;
+    hydrogenation_protocol[i] = HydrogenAssignment::DO_NOT_HYDROGENATE;
+    orientation_stability[i] = StereoRetention::NOT_APPLIED;
+  }
+
+  // Create properties for significant formal charges, radicals, and isotopic shifts.
+  addAtomIntProperty(nonzero_formal_charges, { 'C', 'H', 'G', 'M' });
+  addAtomIntProperty(noteworthy_radicals, { 'R', 'A', 'D', 'M' });
+  addAtomIntProperty(nonzero_isotopic_shifts, { 'I', 'S', 'O', 'M' });
+  
+  // Loop over all atoms of the molecule, adding bonds which are relevant to the MDL MOL entry.
+  const std::vector<int>& bo_viewer = chemfe->getZeroKelvinBondOrders();
+  for (int i = llim; i < hlim; i++) {
+    const int itop_idx = cdk.mol_contents[i];
+    if (cdk.z_numbers[itop_idx] <= 0) {
+      continue;
+    }
+    const int imol_idx = top2mol_map[itop_idx - min_top_idx];
+    for (int j = vk.bond_asgn_bounds[itop_idx]; j < vk.bond_asgn_bounds[itop_idx + 1]; j++) {
+      const int jtop_idx = vk.bond_asgn_atoms[j];
+      if (cdk.z_numbers[jtop_idx] <= 0) {
+        continue;
+      }
+      const int jmol_idx = top2mol_map[jtop_idx - min_top_idx];
+      MdlMolBondOrder ij_order;
+      switch(bo_viewer[vk.bond_asgn_terms[j]]) {
+      case 1:
+        ij_order = MdlMolBondOrder::SINGLE;
+        break;
+
+      case 2:
+        ij_order = MdlMolBondOrder::DOUBLE;
+        break;
+      case 3:
+        ij_order = MdlMolBondOrder::TRIPLE;
+        break;
+      default:
+        rtErr("A bond of order " + std::to_string(bo_viewer[vk.bond_asgn_terms[j]]) +
+              " (between atoms " + char4ToString(cdk.atom_names[itop_idx]) + " and " +
+              char4ToString(cdk.atom_names[jtop_idx]) + ") has no cognate in the MDL MOL "
+              "designations.", "MdlMol", "transferTopologicalDetails");
+      }
+      MolObjRingState ij_ring_state =  (chemfe->bondIsInRing(vk.bond_asgn_terms[j])) ?
+                                       MolObjRingState::RING : MolObjRingState::CHAIN;
+      bonds.emplace_back(imol_idx, jmol_idx, ij_order, MdlMolBondStereo::NOT_STEREO,
+                         ij_ring_state, MolObjReactionCenter::NON_CENTER);
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+#include <regex>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,6 +12,7 @@
 #include "../../src/Math/statistics.h"
 #include "../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../src/Namelists/input.h"
+#include "../../src/Namelists/nml_conformer.h"
 #include "../../src/Namelists/nml_ffmorph.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_minimize.h"
@@ -102,6 +104,9 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   else if (strcmpCased(nml_name, "report")) {
     CHECK_THROWS(ReportControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
   }
+  else if (strcmpCased(nml_name, "conformer")) {
+    CHECK_THROWS(ConformerControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
+  }
   else {
     rtErr("The namelist &" + nml_name + " does not pair with any known case.", "test_namelists");
   }
@@ -145,8 +150,11 @@ int main(const int argc, const char* argv[]) {
   section("Test the &restraint namelist");
 
   // Section 7
+  section("The the &conformer namelist");
+  
+  // Section 8
   section("Test the &report namelist");
-
+  
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any STORMM app
   section(1);
@@ -155,7 +163,20 @@ int main(const int argc, const char* argv[]) {
   const std::string main_file = input_base + osc + "testrun.in";
   const bool input_exists = (getDrivePathType(main_file) == DrivePathType::FILE);
   const TestPriority do_tests = (input_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  const TextFile tf = (input_exists) ? TextFile(main_file) : TextFile();
+
+  // Read the input text from disk and fill in the $STORMM_SOURCE paths to ensure that it works on
+  // any system, regardless of the installation and build paths.
+  const TextFile tf_disk = (input_exists) ? TextFile(main_file) : TextFile();
+  std::string input_str = "";
+  for (int i = 0; i < tf_disk.getLineCount(); i++) {
+    std::string tfd_line = tf_disk.getLineAsString(i);
+    tfd_line = std::regex_replace(tfd_line, std::regex(std::string("test/Namelists/topol/")),
+                                  input_base + osc + "topol" + osc);
+    tfd_line = std::regex_replace(tfd_line, std::regex(std::string("test/Namelists/coord/")),
+                                  input_base + osc + "coord" + osc);
+    input_str += tfd_line + "\n";
+  }
+  const TextFile tf(input_str, TextOrigin::RAM);
   int start_line = 0;
   FilesControls filcon(tf, &start_line);
   const int nfreetop = filcon.getFreeTopologyCount();
@@ -352,9 +373,84 @@ int main(const int argc, const char* argv[]) {
         "restraint targets, and possibly other aspects of the restraints, do not match the "
         "structures to which they were assigned.", tsm.getTestingStatus());
 
+  // The conformer namelist contains keywords with multiple default values.
+  section(7);
+  start_line = 0;
+  ConformerControls confcon(tf, &start_line, &found_nml);
+  check(confcon.getRotationSampleValues().size(), RelationalOperator::EQUAL, 3, "The number of "
+        "rotation sampling defaults in the &conformer namelist is incorrect.");
+  const std::string conf_nml_a("&conformer\n  trial_limit 10, final_states 6,\n  "
+                               "core_mask { atoms \"@N,CA,C & !(:ACE,NME)\" },\n  "
+                               "rotation_sample 65.2, rotation_sample 181.8,\n  "
+                               "rotation_sample -68.7, rotation_sample 58.3,\n  "
+                               "rotation_sample -179.6,\n&end");
+  const TextFile confinpa_tf(conf_nml_a, TextOrigin::RAM);
+  start_line = 0;
+  ConformerControls confcon_a(confinpa_tf, &start_line, nullptr);
+  check(confcon_a.getRotationSampleValues().size(), RelationalOperator::EQUAL, 5, "The number of "
+        "rotation sampling values in the &conformer namelist is incorrect once more than the "
+        "default number have been added.");
+  const std::string conf_nml_b("&conformer\n  trial_limit 10, final_states 6,\n  "
+                               "core_mask { atoms \"@N,CA,C & !(:ACE,NME)\" },\n  "
+                               "rotation_sample 65.0, rotation_sample 178.9,\n&end");
+  const TextFile confinpb_tf(conf_nml_b, TextOrigin::RAM);
+  start_line = 0;
+  ConformerControls confcon_b(confinpb_tf, &start_line, nullptr);
+  check(confcon_b.getRotationSampleValues().size(), RelationalOperator::EQUAL, 2, "The number of "
+        "rotation sampling values in the &conformer namelist is incorrect when fewer than the "
+        "default number have been included.");
+  std::vector<double> all_rotation_settings;
+  const std::vector<double> rsamp   = confcon.getRotationSampleValues();
+  const std::vector<double> rsamp_a = confcon_a.getRotationSampleValues();
+  const std::vector<double> rsamp_b = confcon_b.getRotationSampleValues();
+  all_rotation_settings.insert(all_rotation_settings.end(), rsamp.begin(), rsamp.end());
+  all_rotation_settings.insert(all_rotation_settings.end(), rsamp_a.begin(), rsamp_a.end());
+  all_rotation_settings.insert(all_rotation_settings.end(), rsamp_b.begin(), rsamp_b.end());
+  std::vector<double> all_rotation_settings_ans = { 60.0, -180.0, -60.0, 65.2, -178.2, -68.7,
+                                                    58.3, -179.6, 65.0, 178.9 };
+  for (size_t i = 0; i < all_rotation_settings_ans.size(); i++) {
+    all_rotation_settings_ans[i] *= stormm::symbols::pi / 180.0;
+    const double idiff = all_rotation_settings_ans[i] - all_rotation_settings[i];
+
+    // Correct for possible platform-specific rounding issues that should not change the validity
+    // of the rotation angles.
+    if (fabs(idiff - stormm::symbols::twopi) < 1.0e-6) {
+      all_rotation_settings_ans[i] -= stormm::symbols::twopi;
+    }
+    else if (fabs(idiff + stormm::symbols::twopi) < 1.0e-6) {
+      all_rotation_settings_ans[i] += stormm::symbols::twopi;
+    }
+  }
+  check(all_rotation_settings, RelationalOperator::EQUAL, all_rotation_settings_ans,
+        "The rotation angles found for a series of namelists do not meet expectations.", do_tests);
+  testBadNamelist("conformer", "rotation_sample_count 5, rotation_sample 150.7", "A &conformer "
+                  "namelist specifying five rotation samples and one specific value was "
+                  "accepted");
+  testBadNamelist("conformer", "cis_trans_sample_count 5, cis_trans_sample 150.7", "A &conformer "
+                  "namelist specifying five rotation samples and one specific value was "
+                  "accepted");
+  testBadNamelist("conformer", "cis_trans_sample_count 4, cis_trans_sample 150.7, "
+                  "cis_trans_sample 1.6, cis_trans_sample -0.5, cis_trans_sample 178.2, "
+                  "cis_trans_sample 0.2", "A &conformer namelist specifying four rotation samples "
+                  "and five specific values was accepted");
+  const std::string conf_nml_c("&conformer\n  trial_limit 10, final_states 6,\n  "
+                               "core_mask { atoms \"@N,CA,C & !(:ACE,NME)\" },\n  "
+                               "rotation_sample 179.0, rotation_sample 179.5,\n  "
+                               "rotation_sample 60.7, rotation_sample -59.3,\n  "
+                               "cis_trans_sample 181.4\n&end\n");
+  const TextFile confinpc_tf(conf_nml_c, TextOrigin::RAM);
+  start_line = 0;
+  ConformerControls confcon_c(confinpc_tf, &start_line, nullptr);
+  check(confcon_c.getCisTransSampleValues(), RelationalOperator::EQUAL,
+        std::vector<double>(1, -178.6 * stormm::symbols::pi / 180.0), "The number of cis-trans "
+        "sampling values in the &conformer namelist is incorrect when fewer than the default "
+        "number have been included.");
+  check(confcon_c.getCoreAtomMask(), RelationalOperator::EQUAL, "@N,CA,C & !(:ACE,NME)",
+        "The core atom mask of a &conformer namelist is not transcribed correctly.");
+  
   // The report namelist needs to be able to convey information for an SD file, among other
   // features of the output.
-  section(7);
+  section(8);
   const std::string rep_nml_a("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
                               "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -energy "
                               "HarmonicAngle }\n  energy bond\n  energy angle\n  scope full  "

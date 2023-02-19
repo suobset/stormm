@@ -38,6 +38,7 @@
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
 #include "../../src/Synthesis/synthesis_abstracts.h"
+#include "../../src/Synthesis/synthesis_cache_map.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
@@ -1079,7 +1080,7 @@ int main(const int argc, const char* argv[]) {
     }
   }
   PhaseSpaceSynthesis psynth(psv, agv);   
-
+  
   // Try extracting a system from it
   PhaseSpace tip3p_ps_copy(tip3p_ps.getAtomCount(), tip3p_ps.getUnitCellType());
   psynth.extractSystem(&tip3p_ps_copy, 3);
@@ -1129,6 +1130,45 @@ int main(const int argc, const char* argv[]) {
         do_tests);
   check(psynth_w.time_step, RelationalOperator::EQUAL, 1.0, "The time step was not correctly "
         "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
+
+  // Create a SystemCache containing all of the systems of the first synthesis, plus meta data.
+  std::string mock_sysc_deck("&files\n");
+  mock_sysc_deck += "  -sys { -c " + tip3p_crd_name + " -p " + tip3p_top_name + 
+                    " -label water -x tip3p_output.crd -r tip3p_output.rst }";
+  mock_sysc_deck += "  -sys { -c " + tip4p_crd_name + " -p " + tip4p_top_name +
+                    " -label water -x tip4p_output.crd -r tip4p_output.rst }";
+  mock_sysc_deck += "  -sys { -c " + trpcage_crd_name + " -p " + trpcage_top_name +
+                    " -label protein  -x trpcage_output.crd -r trpcage_output.rst }";
+  mock_sysc_deck += "  -sys { -c " + tip3p_crd_name + " -p " + tip3p_top_name + 
+                    " -label steam -x steam_output.crd -r steam_output.rst }";
+  mock_sysc_deck += "  -sys { -c " + tip4p_crd_name + " -p " + tip4p_top_name +
+                    " -label steam -x steam_output.crd -r steam_output.rst }";
+  mock_sysc_deck += "&end\n";
+  const TextFile mock_sysc_tf(mock_sysc_deck, TextOrigin::RAM);
+  start_line = 0;
+  const FilesControls mock_sysc_fcon(mock_sysc_tf, &start_line);
+  SystemCache mock_sysc(mock_sysc_fcon, ExceptionResponse::SILENT);
+  SynthesisCacheMap mock_map({ 0, 1, 2, 3, 4, 0, 3, 1, 2 }, &mock_sysc);
+  mock_map.setSynthesis(psynth);
+  const std::vector<int> tip3p_derivations   = mock_map.getTopologyGroup(&tip3p_ag);
+  const std::vector<int> tip4p_derivations   = mock_map.getTopologyGroup(&tip4p_ag);
+  const std::vector<int> steam_derivations   = mock_map.getLabelGroup("steam");
+  const std::vector<int> protein_derivations = mock_map.getLabelGroup("protein");
+  const std::vector<int> trpcage_derivations = mock_map.getTopologyGroup(&trpcage_ag);
+  const std::vector<int> tip3p_derivations_ans = { 0, 3, 5, 6 };
+  const std::vector<int> tip4p_derivations_ans = { 1, 4, 7 };
+  const std::vector<int> steam_derivations_ans = { 3, 4, 6 };
+  check(tip3p_derivations, RelationalOperator::EQUAL, tip3p_derivations_ans, "Systems derived "
+        "from the TIP3P topology were not correctly identified by the map.");
+  check(tip4p_derivations, RelationalOperator::EQUAL, tip4p_derivations_ans, "Systems derived "
+        "from the TIP3P topology were not correctly identified by the map.");
+  check(steam_derivations, RelationalOperator::EQUAL, steam_derivations_ans, "Systems associated "
+        "with the 'steam' label were not correctly identified by the map.");
+  check(protein_derivations, RelationalOperator::EQUAL, trpcage_derivations, "Systems associated "
+        "with the 'protein' label should match those associated with the Trp-cage topology in the "
+        "map.");
+  
+  // Make a second coordinate synthesis, this time with different fixed-precision settings
   PhaseSpaceSynthesis psynth2(psv, agv, std::vector<Thermostat>(1), std::vector<Barostat>(1),
                               2.5, 24, 25, 40, 28);
   PsSynthesisWriter psynth_w2 = psynth2.data();

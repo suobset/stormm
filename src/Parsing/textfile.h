@@ -105,6 +105,11 @@ public:
   /// \param index   The character index, as ascertained by line limits and some offset
   char getChar(int index) const;
 
+  /// \brief Get a line from the file as a string.
+  ///
+  /// \param line_index  The line of interest, indexing starting from zero
+  std::string getLineAsString(int line_index) const;
+  
   /// \brief Get a char pointer to a specific index in the object.
   ///
   /// \param index   The character index, as ascertained by line limits and some offset
@@ -112,7 +117,7 @@ public:
 
   /// \brief Get a char pointer to a specific line in the object.
   ///
-  /// \param line_index  The line index
+  /// \param line_index  The line of interest, indexing starting from zero
   const char* getLinePointer(int line_index) const;
   
   /// \brief Get an abstract of a text file's CPU-RAM representation, for ease of use.
@@ -173,6 +178,13 @@ private:
   /// The text, sans carriage returns (see line limits to determine their locations)
   std::vector<char> text;
 
+  /// \brief Validate a requested line index.  Raise an error, along with the calling function name
+  ///        for tracing purposes, if the index is not valid.
+  ///
+  /// \param index   The line of interest (indexing starts at zero)
+  /// \param caller  Name of the calling function
+  void validateLineIndex(int index, const char* caller) const;
+  
   /// \brief Set the name of the corresponding file based on the characteristics of several
   ///        constructor input variables.
   ///

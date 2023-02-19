@@ -128,77 +128,26 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
     }
     break;
   }
+  computeWorkUnits(cs_in, gpu);
   update(cs_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void Condensate::listWorkInstructions(const CoordinateSeries<T> *cs_in, const GpuDetails &gpu) {
-  const CoordinateSeriesReader<T> csr = cs_in->data();
-  if (gpu != null_gpu) {
+void Condensate::computeWorkUnits(const CoordinateSeries<T> *cs_in, const GpuDetails &gpu) {
+  const std::vector<int> cs_bounds = { 0, cs_in->getFrameCount() };
+  const std::vector<int> cs_contents = incrementingSeries(0, cs_in->getFrameCount());
+  const std::vector<int> all_zeros(cs_in->getFrameCount(), 0);
+  generateWorkUnits(cs_contents.data(), all_zeros.data(), cs_bounds.data(), 1,
+                    &atr_instructions_top, &atr_instruction_groups_top, &ata_instructions_top,
+                    &ata_instruction_groups_top, &atr_instruction_count_top,
+                    &ata_instruction_count_top, gpu);
 
-    // Estimate the number of comparisons for the all-to-reference and all-to-all cases based on
-    // the raw number of systems using each topology.
-    const llint nframe_ll = csr.nframe;
-    llint np_atr = nframe_ll;
-    llint np_ata = np_atr * np_atr;
-    const llint nsmp = gpu.getSMPCount();
-    np_atr = roundUp(np_atr, nsmp) / nsmp;
-    np_atr = roundUp(np_atr, static_cast<llint>(medium_block_size / warp_size_int));
-    if (np_ata > 32768) {
-      np_ata = 16;
-    }
-    else {
-      np_ata = 8;
-    }
-    const int atr_strides = roundUp(nframe_ll, np_atr) / np_atr;
-    const int nwu_atr = atr_strides;
-    const int ata_strides = roundUp(nframe_ll, np_ata) / np_ata; 
-    const llint nwu_ata = static_cast<llint>(ata_strides) *
-                          (static_cast<llint>(ata_strides) + 1LL) / 2LL;
-    atr_instruction_count = nwu_atr;
-    ata_instruction_count = nwu_ata;
-    atr_instructions.resize(atr_instruction_count);
-    ata_instructions.resize(ata_instruction_count);
-    int4* atr_insr_ptr = atr_instructions.data();
-    int4* ata_insr_ptr = ata_instructions.data();
-    const int inp_atr = np_atr;
-    for (int i = 0; i < atr_strides; i++) {
-      const int rdims = std::min(csr.nframe - (i * inp_atr), inp_atr);
-      const int4 rtmp = { i * inp_atr, 0, 0, rdims };
-      atr_insr_ptr[i] = rtmp;
-    }
-    size_t ata_insr_idx = 0;
-    const int inp_ata = np_ata;
-    for (int i = 0LL; i < ata_strides; i++) {
-      const int xdims = std::min(csr.nframe - (i * np_ata), np_ata);
-      for (int j = 0; j <= i; j++) {
-        const int ydims = std::min(csr.nframe - (j * inp_ata), inp_ata);
-        const int4 mtmp = { i * inp_ata, j * inp_ata, 0, ((ydims << 16) | xdims) };
-        ata_insr_ptr[ata_insr_idx] = mtmp;
-        ata_insr_idx++;
-      }
-    }
-  }
-  else {
-    atr_instruction_count = roundUp(csr.nframe, 1024) / 1024;
-    ata_instruction_count = atr_instruction_count * (atr_instruction_count + 1) / 2;
-    atr_instructions.resize(atr_instruction_count);
-    ata_instructions.resize(ata_instruction_count);
-    int4* atr_insr_ptr = atr_instructions.data();
-    int4* ata_insr_ptr = ata_instructions.data();
-    int ata_insr_idx = 0;
-    for (int i = 0; i < atr_instruction_count; i++) {
-      const int xdim = std::min(csr.nframe - (i * 1024), 1024);
-      const int4 rtmp = { i * 1024, 0, i, xdim };
-      for (int j = 0; j <= i; j++) {
-        const int ydim = (j == i) ? xdim : 1024;
-        const int4 mtmp = { i * 1024, j * 1024, 0, ((ydim << 16) | xdim) };
-        ata_insr_ptr[ata_insr_idx] = mtmp;
-        ata_insr_idx++;
-      }
-    }
-  }
+  // There are no source- or label-specific instructions for a coordinate series, only a synthesis
+  atr_instruction_count_src = 0;
+  atr_instruction_count_lbl = 0;
+  ata_instruction_count_src = 0;
+  ata_instruction_count_lbl = 0;
 }
 
 //-------------------------------------------------------------------------------------------------

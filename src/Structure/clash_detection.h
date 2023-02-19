@@ -8,6 +8,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
+#include "Math/series_ops.h"
 #include "Namelists/nml_minimize.h"
 #include "Potential/static_exclusionmask.h"
 #include "Reporting/error_format.h"
@@ -31,6 +32,7 @@ using energy::supertile_length;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
 using math::roundUp;
+using math::indexingArray;
 using namelist::default_minimize_clash_ratio;
 using namelist::default_minimize_clash_r0;
 using synthesis::Condensate;
@@ -274,12 +276,25 @@ bool trivialClashCheck(const std::vector<Tcalc> &cachi_xcrd, const std::vector<T
 /// \param inv_scale   Inverse scaling factor for converting coordinates into Angstrom units
 template <typename Tcoord, typename Tcalc>
 bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                        const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                        const StaticExclusionMaskReader &maskr,
+                        const NonbondedKit<Tcalc> &nbk, const StaticExclusionMaskReader &maskr,
                         Tcalc elec_limit = default_minimize_clash_r0,
                         Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
                         ClashReport *summary = nullptr);
 
+/// \brief Compute the number of grid cells (and, incidentally, the origin and box lengths) of an
+///        orthorhombic grid to be used in neighbbor list decomposition for clash detection within
+///        non-periodic systems.
+///
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param natom         The number of atoms in the system, trusted length of xcrd, ycrd, and zcrd
+/// \param grid_origin   The Cartesian coordinates of the grid origin
+/// \param grid_lengths  Lengths of each orthonormal grid edge
+template <typename Tcoord>
+int3 clashGridDecomposition(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                            const int natom, double3 *grid_origin, double3 *grid_lengths);
+  
 /// \brief Detect a van-der Waals clash between particles based on a minimum required ratio against
 ///        any given pair's non-bonded sigma ratio.  Return TRUE if a clash is found, FALSE if not.
 ///
@@ -306,13 +321,12 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMaskReader &maskr,
-                 Tcalc elec_limit = default_minimize_clash_r0,
+                 const StaticExclusionMask &mask, Tcalc elec_limit = default_minimize_clash_r0,
                  Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
                  ClashReport *summary = nullptr);
 
 bool detectClash(const CoordinateFrameReader &cfr, const ValenceKit<double> &vk,
-                 const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
+                 const NonbondedKit<double> &nbk, const StaticExclusionMask *mask,
                  double elec_limit = default_minimize_clash_r0,
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
@@ -331,7 +345,7 @@ bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExc
                  ClashReport *summary);
 
 bool detectClash(const PhaseSpaceReader &psr, const ValenceKit<double> &vk,
-                 const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
+                 const NonbondedKit<double> &nbk, const StaticExclusionMask *mask,
                  double elec_limit = default_minimize_clash_r0,
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
@@ -351,7 +365,7 @@ bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusio
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, int frame, const ValenceKit<Tcalc> &vk,
-                 const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &maskr,
+                 const NonbondedKit<double> &nbk, const StaticExclusionMask *mask,
                  Tcalc elec_limit = default_minimize_clash_r0,
                  Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
                  ClashReport *summary = nullptr);
@@ -379,8 +393,7 @@ bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const Atom
 template <typename Tcalc>
 bool detectClash(const CondensateReader &cdnsr, const int system_index,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMaskReader &maskr,
-                 Tcalc elec_limit = default_minimize_clash_r0,
+                 const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
                  Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,

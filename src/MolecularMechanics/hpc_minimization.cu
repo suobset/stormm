@@ -682,7 +682,7 @@ extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynth
   case NbwuKind::TILE_GROUPS:
   case NbwuKind::SUPERTILES:
     {
-      const StaticExclusionMaskSynthesis poly_se(poly_ag->getTopologyPointers(),
+      const StaticExclusionMaskSynthesis poly_se(poly_ag->getUniqueTopologies(),
                                                  poly_ag->getTopologyIndices());
       poly_ag->loadNonbondedWorkUnits(poly_se);
       return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec,

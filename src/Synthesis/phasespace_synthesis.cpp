@@ -236,7 +236,6 @@ PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<std::string> &label_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
                                          const double time_step_in,
@@ -319,8 +318,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     llint_data{HybridKind::ARRAY, "labframe_llint"},
     double_data{HybridKind::ARRAY, "labframe_double"},
     topologies{ag_list},
-    unique_topologies{},
-    system_labels{label_list}
+    unique_topologies{}
 {
   // Check validity of input
   if (ag_list.size() != ps_list.size()) {
@@ -560,22 +558,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(ps_list, ag_list,
-                        std::vector<std::string>(ps_list.size(), std::string("")), heat_baths_in,
-                        pistons_in, time_step_in, globalpos_scale_bits_in, localpos_scale_bits_in,
-                        velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &index_key,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
@@ -585,7 +567,23 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        std::vector<std::string>(index_key.size(), std::string("")),
+                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<int> &ps_index_key,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &ag_index_key,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
                         heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
@@ -593,115 +591,30 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<std::string> &label_list,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(ps_list, ag_list, { Thermostat() }, { Barostat() }, 1.0,
+                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
+                        force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &index_key,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        tileVector(label_list, index_key), heat_baths_in, pistons_in, time_step_in,
-                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
-                        force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<int> &ps_index_key,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<int> &ag_index_key,
-                                         const std::vector<std::string> &label_list,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        (label_list.size() == 1) ?
-                        std::vector<std::string>(ps_index_key.size(), label_list[0]) : label_list,
-                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<std::string> &label_list,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(ps_list, ag_list, label_list, { Thermostat() }, { Barostat() }, 1.0,
-                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
-                        force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(ps_list, ag_list,
-                        std::vector<std::string>(ps_list.size(), std::string("")),
                         { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<int> &index_key,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        std::vector<std::string>(index_key.size(), std::string("")),
-                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<std::string> &label_list,
-                                         const std::vector<int> &index_key,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        tileVector(label_list, index_key), { Thermostat() }, { Barostat() }, 1.0,
-                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
-                        force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<int> &ps_index_key,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<int> &ag_index_key,
-                                         const std::vector<std::string> &label_list,
-                                         const std::vector<int> &label_index_key,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        tileVector(label_list, label_index_key), { Thermostat() }, { Barostat() },
-                        1.0, globalpos_scale_bits_in, localpos_scale_bits_in,
-                        velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<int> &ps_index_key,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &ag_index_key,
@@ -710,7 +623,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        std::vector<std::string>(ps_index_key.size(), std::string("")),
                         { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
@@ -792,8 +704,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     llint_data{original.llint_data},
     double_data{original.double_data},
     topologies{original.topologies},
-    unique_topologies{original.unique_topologies},
-    system_labels{original.system_labels}
+    unique_topologies{original.unique_topologies}
 {
   // The allocate function again handles pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
@@ -883,8 +794,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     llint_data{std::move(original.llint_data)},
     double_data{std::move(original.double_data)},
     topologies{std::move(original.topologies)},
-    unique_topologies{std::move(original.unique_topologies)},
-    system_labels{std::move(original.system_labels)}
+    unique_topologies{std::move(original.unique_topologies)}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -989,12 +899,6 @@ std::vector<int> PhaseSpaceSynthesis::getSystemIndicesByTopology(const int topol
     result[i - llim] = sti_ptr[i];
   }
   return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& PhaseSpaceSynthesis::getSystemLabel(const int system_index) const {
-  validateSystemIndex(system_index, "getSystemLabel");  
-  return system_labels[system_index];
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -251,7 +251,7 @@ const std::string& NamelistEmulator::getHelp(const std::string &keyword_query,
   }
   if (keywords[p_index].kind != NamelistType::STRUCT) {
     rtErr("The keyword \"" + keyword_query + "\" is a " +
-          getNamelistTypeName(keywords[p_index].kind) + " keyword.  Only STRUCTs can produce user "
+          getEnumerationName(keywords[p_index].kind) + " keyword.  Only STRUCTs can produce user "
           "documentation on sub-keys such as \"" + sub_key + "\".", "NamelistEmulator", "getHelp");
   }
   const size_t member_index = findStringInVector(keywords[p_index].sub_keys, sub_key);
@@ -273,8 +273,8 @@ void NamelistEmulator::addKeyword(const std::vector<NamelistElement> &new_keys) 
     for (int j = 0; j < n_stored; j++) {
       if (new_keys[i].label == keywords[j].label) {
         rtErr("Namelist \"" + title + "\" already has a " +
-              getNamelistTypeName(keywords[j].kind) + " keyword " + keywords[j].label +
-              ".  A " + getNamelistTypeName(new_keys[i].kind) + " keyword of the same name cannot "
+              getEnumerationName(keywords[j].kind) + " keyword " + keywords[j].label +
+              ".  A " + getEnumerationName(new_keys[i].kind) + " keyword of the same name cannot "
               "be added.", "NamelistEmulator", "addKeyword");
       }
     }
@@ -292,6 +292,25 @@ void NamelistEmulator::addKeywords(const std::vector<NamelistElement> &new_keys)
 void NamelistEmulator::addKeyword(const NamelistElement &new_key) {
   std::vector<NamelistElement> new_keys(1, new_key);
   addKeyword(new_keys);
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::addDefaultValue(const std::string &key, const std::string &next_default) {
+  const size_t param_index = findIndexByKeyword(key);
+  if (param_index >= keywords.size()) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Namelist \"" + title + "\" has no keyword \"" + key + "\".", "NamelistEmulator",
+            "addDefaultValue");
+    case ExceptionResponse::WARN:
+      rtWarn("Namelist \"" + title + "\" has no keyword \"" + key + "\".", "NamelistEmulator",
+             "addDefaultValue");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  keywords[param_index].addDefaultValue(next_default);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -350,11 +369,11 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &v
     switch(policy) {
     case ExceptionResponse::DIE:
       rtErr("Keyword \"" + key + "\" in namelist \"" + title + "\" accepts " +
-            getNamelistTypeName(param_type) + " values.  " + value + " is invalid.",
+            getEnumerationName(param_type) + " values.  " + value + " is invalid.",
             "NamelistEmulator", "assignElement");
     case ExceptionResponse::WARN:
       rtWarn("Keyword \"" + key + "\" in namelist \"" + title + "\" accepts " +
-             getNamelistTypeName(param_type) + " values.  " + value + " is invalid and no new "
+             getEnumerationName(param_type) + " values.  " + value + " is invalid and no new "
              "value will be assigned.", "NamelistEmulator", "assignElement");
       return 0;
     case ExceptionResponse::SILENT:
@@ -422,11 +441,11 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &s
         switch(policy) {
         case ExceptionResponse::DIE:
           rtErr("In namelist \"" + title + "\", keyword \"" + key + "\", sub-key \"" +
-                sub_key + "\" accepts " + getNamelistTypeName(subtype) + " values.  " +
+                sub_key + "\" accepts " + getEnumerationName(subtype) + " values.  " +
                 value + " is invalid.", "NamelistEmulator", "assignElement");
         case ExceptionResponse::WARN:
           rtWarn("In namelist \"" + title + "\", keyword \"" + key + "\", sub-key \"" +
-                 sub_key + "\" accepts " + getNamelistTypeName(subtype) + " values.  " +
+                 sub_key + "\" accepts " + getEnumerationName(subtype) + " values.  " +
                  value + " is invalid and no new value will be assigned.", "NamelistEmulator",
                  "assignElement");
           return 0;
@@ -439,7 +458,7 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &s
   case NamelistType::INTEGER:
   case NamelistType::REAL:
   case NamelistType::STRING:
-    rtErr(getNamelistTypeName(param_type) + " keyword \"" + key +
+    rtErr(getEnumerationName(param_type) + " keyword \"" + key +
           "\" should never be handled in this context.", "NamelistEmulator", "assignElement");
   }
   return 1;
@@ -549,7 +568,7 @@ void NamelistEmulator::addHelp(const std::string &key, const std::string &sub_ke
   }
   if (keywords[p_index].kind != NamelistType::STRUCT) {
     rtErr("The keyword \"" + key + "\" accepts an " +
-          getNamelistTypeName(keywords[p_index].kind) + " input.  It must be a STRUCT in "
+          getEnumerationName(keywords[p_index].kind) + " input.  It must be a STRUCT in "
           "order to incorporate documentation for a member variable's documentation.");
   }
   const size_t member_index = findStringInVector(keywords[p_index].sub_keys, sub_key);
@@ -588,7 +607,7 @@ void NamelistEmulator::categorizeKeyword(const std::string &key,
 //-------------------------------------------------------------------------------------------------
 void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name_width) const {
   printf(" - %-*.*s : %s\n", name_width, name_width, keywords[p_idx].label.c_str(),
-         terminalFormat("[" + getNamelistTypeName(keywords[p_idx].kind) + "] " +
+         terminalFormat("[" + getEnumerationName(keywords[p_idx].kind) + "] " +
                         keywords[p_idx].help_message, "", "", 6 + name_width,
                         0, 6 + name_width, 0, RTMessageKind::TABULAR).c_str());
   if (keywords[p_idx].kind == NamelistType::STRUCT) {
@@ -600,7 +619,7 @@ void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name
     for (int i = 0; i < keywords[p_idx].template_size; i++) {
       printf("   * %-*.*s : %s\n", member_width, member_width,
              keywords[p_idx].sub_keys[i].c_str(),
-             terminalFormat("[" + getNamelistTypeName(keywords[p_idx].sub_kinds[i]) + "] " +
+             terminalFormat("[" + getEnumerationName(keywords[p_idx].sub_kinds[i]) + "] " +
                             keywords[p_idx].sub_help_messages[i], "", "", 8 + member_width, 0,
                             8 + member_width, 0, RTMessageKind::TABULAR).c_str());
     }
@@ -655,7 +674,7 @@ void NamelistEmulator::printContents() const {
   for (size_t i = 0; i < keywords.size(); i++) {
     NamelistType i_kind = keywords[i].kind;
     key_width = std::max(key_width, static_cast<int>(keywords[i].label.size()) + 2);
-    kind_width = std::max(kind_width, static_cast<int>(getNamelistTypeName(i_kind).size()));
+    kind_width = std::max(kind_width, static_cast<int>(getEnumerationName(i_kind).size()));
     const int i_entry_count = keywords[i].getEntryCount();
     if (i_kind == NamelistType::STRING) {
       for (int j = 0; j < i_entry_count; j++) {
@@ -666,7 +685,7 @@ void NamelistEmulator::printContents() const {
     if (i_kind == NamelistType::STRUCT) {
       for (size_t j = 0; j < keywords[i].getTemplateSize(); j++) {
         NamelistType j_kind = keywords[i].sub_kinds[j];
-        kind_width = std::max(kind_width, static_cast<int>(getNamelistTypeName(j_kind).size()));
+        kind_width = std::max(kind_width, static_cast<int>(getEnumerationName(j_kind).size()));
         key_width = std::max(key_width, static_cast<int>(keywords[i].sub_keys[j].size()) + 3);
         if (j_kind == NamelistType::STRING) {
           for (int k = 0; k < i_entry_count; k++) {
@@ -703,7 +722,7 @@ void NamelistEmulator::printContents() const {
 
     // Print the first value with a full description
     printf(" %-*.*s | %*.*s | ", key_width, key_width, keywords[i].getLabel().c_str(), kind_width,
-           kind_width, getNamelistTypeName(keywords[i].getKind()).c_str());
+           kind_width, getEnumerationName(keywords[i].getKind()).c_str());
     switch (keywords[i].getKind()) {
     case NamelistType::INTEGER:
       if (keywords[i].getEstablishment() == InputStatus::MISSING) {
@@ -752,7 +771,7 @@ void NamelistEmulator::printContents() const {
     if (keywords[i].getKind() == NamelistType::STRUCT) {
       for (int j = 0; j < keywords[i].getTemplateSize(); j++) {
         const std::string ij_key = keywords[i].getSubLabel(j);
-        const std::string ij_kind = lowercase(getNamelistTypeName(keywords[i].sub_kinds[j]));
+        const std::string ij_kind = lowercase(getEnumerationName(keywords[i].sub_kinds[j]));
         printf("  - %-*.*s | %*.*s | ", key_width - 3, key_width - 3, ij_key.c_str(), kind_width,
                kind_width, ij_kind.c_str());
         switch (keywords[i].sub_kinds[j]) {

@@ -451,7 +451,7 @@ int main(const int argc, const char* argv[]) {
   }
   AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointer(), topology_indices,
                              ExceptionResponse::WARN, gpu, &timer);
-  StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
+  StaticExclusionMaskSynthesis poly_se(poly_ag.getUniqueTopologies(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer());
@@ -609,7 +609,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> big_top_indices = { 0, 1, 2 };
   AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT, gpu,
                                  &timer);
-  StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getTopologyPointers(),
+  StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getUniqueTopologies(),
                                            big_poly_ag.getTopologyIndices());
   big_poly_ag.loadNonbondedWorkUnits(big_poly_se);
   KernelManager big_launcher(gpu, big_poly_ag);
@@ -766,7 +766,7 @@ int main(const int argc, const char* argv[]) {
                                           34, 72);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling, ligand_tiling,
                                     ExceptionResponse::WARN, gpu, &timer);
-  StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getTopologyPointers(),
+  StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getUniqueTopologies(),
                                               ligand_poly_ag.getTopologyIndices());
   ligand_poly_ag.loadNonbondedWorkUnits(ligand_poly_se);
   KernelManager ligand_launcher(gpu, ligand_poly_ag);

@@ -179,6 +179,14 @@ public:
   void addKeyword(const NamelistElement &new_key);
   /// \}
 
+  /// \brief Add a value to one keyword's default settings.  This enables a single keyword to have
+  ///        a collection of default values.  The keyword will be checked to ensure that it permits
+  ///        multiple values.
+  ///
+  /// \param key           The keyword of interest
+  /// \param next_default  The new value to include, as a string, to be re-interpreted as necessary
+  void addDefaultValue(const std::string &key, const std::string &next_default);
+  
   /// \brief Assign values to elements of each particular NamelistType.  These overloaded functions
   ///        can be called from anywhere, but constructors making control objects for programs
   ///        using the STORMM libraries are the ideal place to use them.  They in turn call the

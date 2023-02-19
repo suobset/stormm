@@ -55,7 +55,7 @@ enum class MdlMolBondStereo {
   NOT_STEREO = 0, UP = 1, CIS_OR_TRANS = 3, EITHER = 4, DOWN = 6
 };
 
-/// \brief Enumerate different steroe parity settings for an atom
+/// \brief Enumerate different stereo parity settings for an atom
 enum class MolObjAtomStereo {
   NOT_STEREO = 0, ODD = 1, EVEN = 2, UNMARKED = 3
 };
@@ -158,8 +158,9 @@ enum class MdlMolPropertyKind {
   SGROUP_CLASS,           ///< The class of an S-group
   LARGE_REGNO,            ///< The registry number
   SGROUP_BRACKET_STYLE,   ///< Style of the S-group bracket
-  SKIP                    ///< Indicator that a certain number of lines in the file should be
+  SKIP,                   ///< Indicator that a certain number of lines in the file should be
                           ///<   skipped (the lines will be retained as data lines in the property)
+  NONE                    ///< No property is indicated (all for characters in the type are blank)
 };
 
 /// \brief Enumerate the types of data that property fields could contain

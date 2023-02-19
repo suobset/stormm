@@ -6,19 +6,35 @@
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
+#include "Constants/scaling.h"
 #include "FileManagement/file_listing.h"
+#include "Math/rounding.h"
+#include "Numerics/split_fixed_precision.h"
+#include "Random/random.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 
 namespace stormm {
 namespace testing {
 
 using constants::ExceptionResponse;
+using math::roundUp;
+using numerics::hostDoubleToInt95;
+using numerics::hostSplitFPSum;
+using random::Xoshiro256ppGenerator;
+using synthesis::Condensate;
+using synthesis::AtomGraphSynthesis;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisWriter;
 using topology::AtomGraph;
 using trajectory::CoordinateFrame;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
   
 /// \brief Provide the means to read a series of topology and coordinate files, then organize them
@@ -129,6 +145,34 @@ public:
   std::vector<AtomGraph*> getTopologyPointer();
   const std::vector<AtomGraph*> getTopologyPointer() const;
   /// \}
+
+  /// \brief Get a coordinate series out of the object, based on one system from its repository.
+  ///
+  /// \param base_system         
+  /// \param frame_count         The number of frames in the series, each a copy of the original
+  ///                            coordinate set
+  /// \param perturbation_sigma  The Gaussian width by which to perturb coordinates
+  /// \param xrs_seed            Random number generator seed
+  /// \param scale_bits          The number of bits after the decimal to include, if the data type
+  ///                            of the coordinate series is integral (fixed precision)
+  template <typename T>
+  CoordinateSeries<T> exportCoordinateSeries(const int base_system, int frame_count,
+                                             double perturbation_sigma = 0.0,
+                                             int xrs_seed = 915083, int scale_bits = 0);
+
+  /// \brief Get a synthesis of coordinates with fixed-precision storage ready for positions,
+  ///        velocities, and forces.  Parameter descriptions follow from getCoordinateSeries()
+  ///        above, with the addition of:
+  ///
+  /// \param index_key  A series of system indices from within the TestSystemManager with which
+  ///                   to compose the synthesis.  Topologies and coordinates will be drawn upon.
+  PhaseSpaceSynthesis exportPhaseSpaceSynthesis(const std::vector<int> &index_key,
+                                                double perturbation_sigma = 0.0,
+                                                int xrs_seed = 7108262, int scale_bits = 40);
+
+  /// \brief Get a synthesis of topologies based on a series of system indices from the manager.
+  ///        Descriptions of parameters follow from getPhaseSpaceSynthesis() above.
+  AtomGraphSynthesis exportAtomGraphSynthesis(const std::vector<int> &index_key);
   
 private:
   int system_count;              ///< The number of systems managed by this object
@@ -169,5 +213,7 @@ private:
 
 } // namespace testing
 } // namespace stormm
+
+#include "test_system_manager.tpp"
 
 #endif

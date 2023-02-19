@@ -19,6 +19,11 @@ using constants::CaseSensitivity;
 /// \param masses  Masses of the atoms in question
 std::vector<int> massToZNumber(const std::vector<double> &masses);
 
+/// \brief Obain the natural abundance-averaged mass of an element based on its atomic number.
+///
+/// \param z  The atomic number of interest
+double zNumberToNaturalMass(int z);
+
 /// \brief Convert a series of atomic numbers to element symbols from the periodic table
 ///
 /// Overloaded:

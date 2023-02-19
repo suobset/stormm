@@ -96,6 +96,18 @@ std::vector<T> TickCounter<T>::getState() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+std::vector<T> TickCounter<T>::getPossibleStates(const int var_index) const {
+  std::vector<T> result(state_limits[var_index]);
+  const int llim = state_value_bounds[var_index];
+  const int hlim = state_value_bounds[var_index + 1];
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = state_values[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 llint TickCounter<T>::getExactPermutationCount() const {
   if (getLogPermutationCount() >= static_cast<double>((sizeof(llint) * 8LLU) - 1LLU) * log(2.0)) {
     rtErr("There are too many permutations to represent as a long long integer.", "TickCounter",
@@ -255,6 +267,13 @@ void TickCounter<T>::loadStateValues(const std::vector<T> &state_values_in, int 
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+void TickCounter<T>::loadStateValues(const std::vector<std::vector<T>> &state_values_in) {
+
+
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> template <typename Trng>
 void TickCounter<T>::randomize(Trng *xrs) {
   randomize(xrs, std::vector<bool>(variable_count, true));
@@ -306,8 +325,8 @@ void TickCounter<T>::variableBoundsCheck(const int var_index) const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename T2>
-void loadStateValues(TickCounter<T> *tc, const std::vector<T2> &ranges,
-                     const std::vector<T> &periodic_boundaries) {
+void loadScalarStateValues(TickCounter<T> *tc, const std::vector<T2> &ranges,
+                           const std::vector<T> &periodic_boundaries) {
   const size_t nvar = tc->getVariableCount();
   if (ranges.size() != nvar) {
     rtErr("There must be a range provided for each variable in the TickCounter (" +

@@ -6,9 +6,10 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
-#include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
+#include "summation.h"
+#include "vector_ops.h"
 
 namespace stormm {
 namespace math {
@@ -97,6 +98,38 @@ template <typename T> std::vector<T> extractIndexedValues(const std::vector<T> &
 template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &original_values,
                                                           const std::vector<int> reduced_indices,
                                                           const int reduced_length = 0);
+/// \}
+
+/// \brief Given a series of integers in the range [ 0, ... N ), count the quantities of each
+///        integer.  Produce a new series with the indices of all elements in the original series
+///        whose value is 0, followed by the indices of all elements whose value is 1, ..., N-1.
+///        Fill a series of bounds [ 0, N ] (N + 1 elements in length) with the bounds of the
+///        indexing array for locating 0, 1, ..., N-1 in the original array.
+///
+/// Overloaded:
+///   - Provide C-style arrays with a trused length and maximum value 
+///   - Provide Standard Template Library vectors
+///   - Provide Hybrid objects
+///
+/// \param raw_values       
+/// \param value_locations  Array of indices in raw_values wherein instances of each value 0,
+///                         1, ... N-1 can be found
+/// \param value_bounds     Bounds array for value_locations, filled and returned
+/// \param value_count      Trusted length of the raw_values array (if C-style arrays are provided)
+/// \param value_limit      One less than the trusted length of the value_bounds array (this is for
+///                         checking purposes, or in special cases limiting the organization to
+///                         values in a specific range).  This is the upper limit of values that
+///                         will be catalogged: the range becomes [ 0 ... value_limit ).
+/// \{
+template <typename T> void indexingArray(const T* raw_values, T* value_locations, T* value_bounds,
+                                         size_t value_count, size_t value_limit);
+
+template <typename T> void indexingArray(const std::vector<T> &raw_values,
+                                         std::vector<T> *value_locations,
+                                         std::vector<T> *value_bounds, size_t value_limit = 0);
+
+template <typename T> void indexingArray(const Hybrid<T> &raw_values, Hybrid<T> *value_locations,
+                                         Hybrid<T> *value_bounds, size_t value_limit = 0);
 /// \}
 
 } // namespace math

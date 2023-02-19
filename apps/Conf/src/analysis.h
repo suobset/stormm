@@ -12,6 +12,7 @@
 #include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
+#include "../../../src/Synthesis/synthesis_cache_map.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/local_arrangement.h"
 
@@ -29,7 +30,9 @@ using stormm::structure::MdlMol;
 using stormm::synthesis::Condensate;
 using stormm::synthesis::PhaseSpaceSynthesis;
 using stormm::synthesis::PsSynthesisReader;
+using stormm::synthesis::SynthesisCacheMap;
 using stormm::synthesis::SystemCache;
+using stormm::synthesis::SystemGrouping;
     
 /// \brief Compute the angles made by each rotatable bond.  This will compute the angle based on
 ///        the highest Z-number atoms attached to either end of the bond (not counting the atoms at
@@ -39,11 +42,15 @@ using stormm::synthesis::SystemCache;
 /// \brief Filter structures to obtain the ones with the best energies separated by some minimum
 ///        positional RMSD threshold.
 ///
-/// \param poly_ps  The synthesis of coordinates, holding all of the energy-minimized structures
-/// \param emin     The minimum energy values and history
-/// \param confcon  Conformer namelist user input
+/// \param poly_ps        Synthesis of coordinates, holding all of the energy-minimized structures
+/// \param poly_ps_masks  Exclusions for each unique topology within the synthesis
+/// \param sc             Cache of systems used to seed the synthesis
+/// \param scmap          Map between the systems cache and the working synthesis
+/// \param emin           The minimum energy values and history
+/// \param confcon        Conformer namelist user input
 std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
                                            const std::vector<StaticExclusionMask> &poly_ps_masks,
+                                           const SystemCache &sc, const SynthesisCacheMap &scmap,
                                            const ScoreCard &emin,
                                            const ConformerControls &confcon);
 
@@ -54,12 +61,15 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
 /// \param best_confs    List of the best configurations
 /// \param emin          Energy tracking with histories from each minimization
 /// \param sc            The cache of all systems read from disk
+/// \param scmap         Map between the systems cache and the working synthesis
 /// \param sdf_recovery  Vector of recovered MdlMol objects for each system reach from disk
+/// \param confcon       Conformer namelist user input
 /// \param repcon        Control data from a &report namelist in the user input, to specify
 ///                      modifications to SD files
 void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &best_confs,
-                  const ScoreCard &emin, const SystemCache &sc,
-                  const std::vector<MdlMol> &sdf_recovery, const ReportControls &repcon);
+                  const ScoreCard &emin, const SystemCache &sc, const SynthesisCacheMap &scmap,
+                  const std::vector<MdlMol> &sdf_recovery, const ConformerControls &confcon,
+                  const ReportControls &repcon);
 
 } // namespace analysis
 } // namespace conf_app

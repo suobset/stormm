@@ -10,7 +10,7 @@ template <typename T> std::vector<T> incrementingSeries(const T start_value, con
   const T zero = 0;
   const T actual_increment = (end_value - start_value > zero) ?  std::abs(increment) :
                                                                 -std::abs(increment);
-  std::vector<T> result((end_value - start_value) / increment);
+  std::vector<T> result(std::abs((end_value - start_value) / increment));
   T v = start_value;
   const size_t nval = result.size();
   for (size_t i = 0; i < nval; i++) {
@@ -54,6 +54,57 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
                                                           const int reduced_length) {
   return extractIndexedValues(original_values.data(), original_values.size(), reduced_indices,
                               reduced_length);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void indexingArray(const T* raw_values, T* value_locations, T* value_bounds,
+                                         const size_t value_count, const size_t value_limit) {
+
+  // Zero the bounds array
+  for (size_t i = 0; i <= value_limit; i++) {
+    value_bounds[i] = 0;
+  }
+
+  // Loop over the raw values and tally their quantities
+  for (size_t i = 0; i < value_count; i++) {
+    const size_t rvi = raw_values[i];
+    if (rvi < value_limit) {
+      value_bounds[rvi] += 1;
+    }
+  }
+  prefixSumInPlace(value_bounds, value_limit + 1, PrefixSumType::EXCLUSIVE, "indexingArray");
+
+  // Loop back over all values and sort them into the result.  Use the bounds array to guide the
+  // indexing, then rewind it after the locations have been catalogged.
+  for (size_t i = 0; i < value_count; i++) {
+    const size_t rvi = raw_values[i];
+    if (rvi < value_limit) {
+      const T vbi = value_bounds[rvi];
+      value_locations[vbi] = i;
+      value_bounds[rvi] = vbi + 1;
+    }
+  }
+  for (size_t i = value_limit; i > 0; i--) {
+    value_bounds[i] = value_bounds[i - 1];
+  }
+  value_bounds[0] = 0;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void indexingArray(const std::vector<T> &raw_values,
+                                         std::vector<T> *value_locations,
+                                         std::vector<T> *value_bounds, size_t value_limit) {
+  const size_t actual_value_limit = (value_limit == 0) ? value_bounds->size() - 1 : value_limit;
+  indexingArray(raw_values.data(), value_locations->data(), value_bounds->data(),
+                raw_values.size(), actual_value_limit);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void indexingArray(const Hybrid<T> &raw_values, Hybrid<T> *value_locations,
+                                         Hybrid<T> *value_bounds, size_t value_limit) {
+  const size_t actual_value_limit = (value_limit == 0) ? value_bounds->size() - 1 : value_limit;
+  indexingArray(raw_values.data(), value_locations->data(), value_bounds->data(),
+                raw_values.size(), actual_value_limit);
 }
 
 } // namespace math
