@@ -5,8 +5,10 @@
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/scorecard.h"
@@ -14,46 +16,51 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Structure/clash_detection.h"
 #include "../../src/Structure/global_manipulation.h"
 #include "../../src/Structure/isomerization.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/rmsd.h"
 #include "../../src/Structure/rmsd_plan.h"
 #include "../../src/Structure/structure_enumerators.h"
+#include "../../src/Synthesis/condensate.h"
+#include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/synthesis_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_copy.h"
 #include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/approx.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using stormm::chemistry::AtomEquivalence;
-using stormm::chemistry::ChemicalFeatures;
-using stormm::chemistry::MapRotatableGroups;
-using stormm::chemistry::IsomerPlan;
 using stormm::constants::tiny;
 using stormm::constants::warp_size_int;
 using stormm::constants::warp_size_zu;
+#ifndef STORMM_USE_HPC
+using stormm::data_types::int4;
+#endif
 using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::energy::evaluateBondTerms;
 using stormm::energy::evaluateAngleTerms;
 using stormm::energy::ScoreCard;
 using stormm::errors::rtWarn;
-using stormm::math::computeBoxTransform;
+using stormm::parse::char4ToString;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
-using stormm::structure::rotateCoordinates;
-using stormm::structure::rmsd;
-using stormm::structure::RMSDMethod;
-using stormm::structure::RMSDTask;
-using stormm::topology::AtomGraph;
-using stormm::topology::ChemicalDetailsKit;
-using stormm::topology::UnitCellType;
-using stormm::topology::ValenceKit;
+using stormm::stmath::computeBoxTransform;
+using stormm::stmath::meanUnsignedError;
+using stormm::symbols::twopi;
+using stormm::symbols::pi;
+using namespace stormm::chemistry;
 using namespace stormm::structure;
+using namespace stormm::synthesis;
 using namespace stormm::testing;
+using namespace stormm::topology;
 using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
@@ -182,9 +189,25 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
   int invcpos = 0;
   std::vector<double> inverted_crd(3 * nchiral * (cdk.mol_limits[1] - cdk.mol_limits[0]));
   std::vector<double> repos_dev(nchiral), ubond_dev(nchiral);
+  const std::vector<int4> cbase = chemfe.getChiralArmBaseAtoms();
   for (int i = 0; i < nchiral; i++) {
+    const int orig_chiral_orientation = getChiralOrientation(inversion_copy, centers[i],
+                                                             cbase[i].x, cbase[i].y, cbase[i].z,
+                                                             cbase[i].w);
     flipChiralCenter(&inversion_copy, i, centers, protocols, inv_grp);
-
+    const int new_chiral_orientation = getChiralOrientation(inversion_copy, centers[i], cbase[i].x,
+                                                            cbase[i].y, cbase[i].z, cbase[i].w);
+    if (chemfe.getChiralInversionMethods(i) != ChiralInversionProtocol::DO_NOT_INVERT) {
+      check(orig_chiral_orientation * new_chiral_orientation == -1, "Chiral center " +
+            std::to_string(i) + ", between atoms " + char4ToString(cdk.atom_names[cbase[i].x]) +
+            ", " + char4ToString(cdk.atom_names[cbase[i].y]) + ", " +
+            char4ToString(cdk.atom_names[cbase[i].z]) + ", and " +
+            char4ToString(cdk.atom_names[cbase[i].w]) + " surrounding atom " +
+            char4ToString(cdk.atom_names[centers[i]]) + " in the topology based on " +
+            getBaseName(ag.getFileName()) + ", was not inverted as it should have "
+            "been.", do_tests);
+    }
+    
     // Record the positions of atoms in the first molecule
     for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
       inverted_crd[invcpos] = psw.xcrd[cdk.mol_contents[j]];
@@ -227,6 +250,286 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run a series of tests comparing various structural manipulations across different coordinate
+// objects.
+//
+// Arguments:
+//   cfv:         An array of coordinate sets
+//   psv:         Array of PhaseSpace objects, velocities and forces being irrelevant
+//   hr_poly_ps:  High-resolution synthesis, a collection of systems matching cfv and psv
+//   lr_poly_ps:  Low-resolution synthesis, similar to hr_poly_ps
+//   cdns_hr:     Condensate based on one of the syntheses
+//   tsm:         Cache of test systems, provided to produce a signal about the testing status
+//   effect:      Descriptor of the global coordinate change operation
+//   lp_mue_tol:  Mean unsigned error tolerance for manipulations in low-precision syntheses
+//   lp_abs_tol:  Absolute tolerance for manipulations in low-precision synthesis representations
+//-------------------------------------------------------------------------------------------------
+void testStructuralCorrespondence(const std::vector<CoordinateFrame> &cfv,
+                                  const std::vector<PhaseSpace> &psv,
+                                  const PhaseSpaceSynthesis &hr_poly_ps,
+                                  const PhaseSpaceSynthesis &lr_poly_ps,
+                                  const Condensate &cdns_hr, const TestSystemManager &tsm,
+                                  const std::string &effect, const double lp_mue_tol = 1.0e-6,
+                                  const double lp_abs_tol = 1.0e-5) {
+  const int ntrials = cfv.size();
+  std::vector<double> cf_ps_mue(ntrials);
+  std::vector<double> cf_ps_abs(ntrials);
+  std::vector<double> cf_hsyn_mue(ntrials);
+  std::vector<double> cf_hsyn_abs(ntrials);
+  std::vector<double> cf_lsyn_mue(ntrials);
+  std::vector<double> cf_lsyn_abs(ntrials);
+  std::vector<double> cf_hcdns_mue(ntrials);
+  std::vector<double> cf_hcdns_abs(ntrials);
+  for (int i = 0; i < ntrials; i++) {
+    const std::vector<double> cf_xyz = cfv[i].getInterlacedCoordinates();
+    const std::vector<double> ps_xyz = cfv[i].getInterlacedCoordinates();
+    const std::vector<double> hpoly_ps_xyz = hr_poly_ps.getInterlacedCoordinates(i);
+    const std::vector<double> lpoly_ps_xyz = lr_poly_ps.getInterlacedCoordinates(i);
+    const std::vector<double> hcdns_xyz = cdns_hr.getInterlacedCoordinates(i);
+    cf_ps_mue[i] = meanUnsignedError(cf_xyz, ps_xyz);
+    cf_ps_abs[i] = maxAbsoluteDifference(cf_xyz, ps_xyz);
+    cf_hsyn_mue[i] = meanUnsignedError(cf_xyz, hpoly_ps_xyz);
+    cf_hsyn_abs[i] = maxAbsoluteDifference(cf_xyz, hpoly_ps_xyz);
+    cf_lsyn_mue[i] = meanUnsignedError(cf_xyz, lpoly_ps_xyz);
+    cf_lsyn_abs[i] = maxAbsoluteDifference(cf_xyz, lpoly_ps_xyz);
+    cf_hcdns_mue[i] = meanUnsignedError(cf_xyz, hcdns_xyz);
+    cf_hcdns_abs[i] = maxAbsoluteDifference(cf_xyz, hcdns_xyz);
+  }
+  const Approx zero_target(std::vector<double>(ntrials, 0.0));
+  check(cf_ps_mue, RelationalOperator::EQUAL, zero_target.margin(tiny), "The mean unsigned "
+        "error due to " + effect + " in the CoordinateFrame and PhaseSpace objects is "
+        "unexpectedly large.", tsm.getTestingStatus());
+  check(cf_ps_abs, RelationalOperator::EQUAL, zero_target.margin(1.0e-8), "The maximum "
+        "deviation due to " + effect + " in the CoordinateFrame and PhaseSpace objects is "
+        "unexpectedly large.", tsm.getTestingStatus());
+  check(cf_hsyn_mue, RelationalOperator::EQUAL, zero_target.margin(tiny), "The mean unsigned "
+        "error due to " + effect + " in the CoordinateFrame and high-precision "
+        "PhaseSpaceSynthesis objects is unexpectedly large.", tsm.getTestingStatus());
+  check(cf_hsyn_abs, RelationalOperator::EQUAL, zero_target.margin(1.0e-8), "The maximum "
+        "deviation due to " + effect + " in the CoordinateFrame and high-precision "
+        "PhaseSpaceSynthesis objects is unexpectedly large.", tsm.getTestingStatus());
+  check(cf_lsyn_mue, RelationalOperator::EQUAL, zero_target.margin(lp_mue_tol), "The mean "
+        "unsigned error due to " + effect + " in the CoordinateFrame and low-precision "
+        "PhaseSpaceSynthesis objects is unexpectedly large.", tsm.getTestingStatus());
+  check(cf_lsyn_abs, RelationalOperator::EQUAL, zero_target.margin(lp_abs_tol), "The maximum "
+        "deviation due to " + effect + " in the CoordinateFrame and low-precision "
+        "PhaseSpaceSynthesis objects is unexpectedly large.", tsm.getTestingStatus());
+  check(cf_hcdns_mue, RelationalOperator::EQUAL, zero_target.margin(tiny), "The mean unsigned "
+        "error due to " + effect + " in the CoordinateFrame and high-precision Condensate "
+        "objects is unexpectedly large.", tsm.getTestingStatus());
+  check(cf_hcdns_abs, RelationalOperator::EQUAL, zero_target.margin(1.0e-8), "The maximum "
+        "deviation due to " + effect + " in the CoordinateFrame and high-precision Condensate "
+        "objects is unexpectedly large.", tsm.getTestingStatus());
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check rotational, translational, and chiral sampling operations using a synthesis of structures.
+// In the functions above, operations on individual frames are tested in typical double-precision
+// arithmetic.  Here, the various operations are performed on each coordinate representation and
+// compared to one another.
+//
+// Arguments:
+//   tsm:         Manager object for multiple test systems
+//   igseed:      Random number generator seed value
+//   ntrials:     The number of different systems to attempt perturbing, and to place in each
+//                synthesis object
+//   nrot_perm:   Number of bond rotations to perform on each structure with such features
+//   nctx_perm:   Number of cis-trans flips to perform on each structure with such features
+//   ninv_perm:   Number of chiral inversions to perform on each structure with such features
+//   lp_mue_tol:  Mean unsigned error tolerance for manipulations in low-precision syntheses
+//   lp_abs_tol:  Absolute tolerance for manipulations in low-precision synthesis representations
+//-------------------------------------------------------------------------------------------------
+void checkStructureManipulation(const TestSystemManager &tsm, const int igseed,
+                                const int ntrials = 8, const int nrot_perm = 16,
+                                const int nctx_perm = 4, const int ninv_perm = 1,
+                                const double lp_mue_tol = 1.0e-6,
+                                const double lp_abs_tol = 1.0e-5) {
+
+  // Boot up a random number generator.
+  Xoshiro256ppGenerator xrs(igseed);
+  
+  // Extract random systems and make single-system, single-structure coordinate objects.
+  std::vector<int> sequence(ntrials);
+  for (int i = 0; i < ntrials; i++) {
+    sequence[i] = xrs.uniformRandomNumber() * tsm.getSystemCount();
+  }
+  std::vector<CoordinateFrame> cfv;
+  std::vector<PhaseSpace> psv;
+  std::vector<AtomGraph*> agv(ntrials);
+  std::vector<ChemicalFeatures> chemv;
+  cfv.reserve(ntrials);
+  psv.reserve(ntrials);
+  chemv.reserve(ntrials);
+  for (int i = 0; i < ntrials; i++) {
+    cfv.push_back(tsm.exportCoordinateFrame(sequence[i]));
+    psv.push_back(tsm.exportPhaseSpace(sequence[i]));
+    agv[i] = const_cast<AtomGraph*>(tsm.getTopologyPointer(sequence[i]));
+    chemv.emplace_back(agv[i], cfv[i], MapRotatableGroups::YES);
+  }
+  std::vector<CoordinateFrame> w_cfv = cfv;
+  std::vector<PhaseSpace> w_psv = psv;
+  
+  // Prepare a coordinate series for a random system and produce a condensate based on that.
+  const int series_no = xrs.uniformRandomNumber() * tsm.getSystemCount();
+  CoordinateSeries<float> cs(tsm.exportCoordinateFrame(series_no), 4);
+  Condensate cdns_cs(cs, PrecisionModel::SINGLE);
+  const AtomGraph& ag_for_cs = tsm.getTopologyReference(series_no);
+  
+  // Prepare a high-resolution synthesis and a condensate based on that.
+  PhaseSpaceSynthesis  hr_poly_ps = tsm.exportPhaseSpaceSynthesis(sequence, 0.0, 10983, 48);
+  PhaseSpaceSynthesis whr_poly_ps = tsm.exportPhaseSpaceSynthesis(sequence, 0.0, 10983, 48);
+  Condensate cdns_hr(hr_poly_ps, PrecisionModel::DOUBLE);
+  Condensate cdns_whr(whr_poly_ps, PrecisionModel::DOUBLE);
+
+  // Prepare a low-resolution synthesis.
+  PhaseSpaceSynthesis  lr_poly_ps = tsm.exportPhaseSpaceSynthesis(sequence, 0.0, 10983, 24);
+  PhaseSpaceSynthesis wlr_poly_ps = tsm.exportPhaseSpaceSynthesis(sequence, 0.0, 10983, 24);
+
+  // Select a sequence of bond rotations, cis-trans flips, and chiral inversions for each
+  // structure.  Apply them to each individual frame, or a randomly selected frame from each
+  // each synthesis object, then compare the results.
+  std::vector<int> rotg_counts(ntrials);
+  std::vector<int> ctxg_counts(ntrials);
+  std::vector<int> invg_counts(ntrials);
+
+  // Perform bond rotations on each structure.
+  for (int i = 0; i < ntrials; i++) {
+    const int n_rotg = chemv[i].getRotatableBondCount();
+    std::vector<int> rot_groups(nrot_perm);
+    std::vector<double> rot_changes(nrot_perm);
+    rotg_counts[i] = n_rotg;
+    if (n_rotg > 0) {
+      for (int j = 0; j < nrot_perm; j++) {
+        rot_groups[j] = xrs.uniformRandomNumber() * static_cast<double>(n_rotg);
+        rot_changes[j] = xrs.gaussianRandomNumber() * twopi;
+      }
+      const std::vector<IsomerPlan> rotg_moves = chemv[i].getRotatableBondGroups();
+      for (int j = 0; j < nrot_perm; j++) {
+        const size_t rgj = rot_groups[j];
+        rotateAboutBond(&w_cfv[i], rotg_moves[rgj].getRootAtom(), rotg_moves[rgj].getPivotAtom(),
+                        rotg_moves[rgj].getMovingAtoms(), rot_changes[j]);
+        rotateAboutBond(&w_psv[i], rotg_moves[rgj].getRootAtom(), rotg_moves[rgj].getPivotAtom(),
+                        rotg_moves[rgj].getMovingAtoms(), rot_changes[j]);
+        rotateAboutBond<double>(&whr_poly_ps, i, rotg_moves[rgj].getRootAtom(),
+                                rotg_moves[rgj].getPivotAtom(), rotg_moves[rgj].getMovingAtoms(),
+                                rot_changes[j]);
+        rotateAboutBond<float>(&wlr_poly_ps, i, rotg_moves[rgj].getRootAtom(),
+                               rotg_moves[rgj].getPivotAtom(), rotg_moves[rgj].getMovingAtoms(),
+                               rot_changes[j]);
+        rotateAboutBond<double>(&cdns_whr, i, rotg_moves[rgj].getRootAtom(),
+                                rotg_moves[rgj].getPivotAtom(), rotg_moves[rgj].getMovingAtoms(),
+                                rot_changes[j]);
+      }
+    }
+  }
+  if (sum<int>(rotg_counts) > 0) {
+    testStructuralCorrespondence(w_cfv, w_psv, whr_poly_ps, wlr_poly_ps, cdns_whr, tsm,
+                                 "bond rotation", lp_mue_tol, lp_abs_tol);
+  }
+
+  // Reset the writeable coordinate objects to prevent errors in the previous tests from cascading
+  // into subsequent tests.
+  for (int i = 0; i < ntrials; i++) {
+    coordCopy(&w_cfv[i], cfv[i]);
+    coordCopy(&w_psv[i], psv[i]);
+    coordCopy(&whr_poly_ps, i, hr_poly_ps, i);
+    coordCopy(&wlr_poly_ps, i, lr_poly_ps, i);
+    coordCopy(&cdns_whr, i, cdns_hr, i);
+  }
+
+  // Perform cis-transisomerizations, with slight perturbations to prevent two flips from returning
+  // a structure to its starting point.
+  for (int i = 0; i < ntrials; i++) {
+    const int n_ctxg = chemv[i].getCisTransBondCount();
+    std::vector<int> ctx_groups(nctx_perm);
+    std::vector<double> ctx_changes(nctx_perm);  
+    ctxg_counts[i] = n_ctxg;
+    if (n_ctxg > 0) {
+      for (int j = 0; j < nctx_perm; j++) {
+        ctx_groups[j] = xrs.uniformRandomNumber() * static_cast<double>(n_ctxg);
+        ctx_changes[j] = (round(xrs.uniformRandomNumber() * 3.0) +
+                          (xrs.uniformRandomNumber() * 0.1)) * pi;
+      }
+      const std::vector<IsomerPlan> ctxg_moves = chemv[i].getCisTransIsomerizationGroups();
+      for (int j = 0; j < nctx_perm; j++) {
+        const size_t cgj = ctx_groups[j];
+        rotateAboutBond(&w_cfv[i], ctxg_moves[cgj].getRootAtom(), ctxg_moves[cgj].getPivotAtom(),
+                        ctxg_moves[cgj].getMovingAtoms(), ctx_changes[j]);
+        rotateAboutBond(&w_psv[i], ctxg_moves[cgj].getRootAtom(), ctxg_moves[cgj].getPivotAtom(),
+                        ctxg_moves[cgj].getMovingAtoms(), ctx_changes[j]);
+        rotateAboutBond<double>(&whr_poly_ps, i, ctxg_moves[cgj].getRootAtom(),
+                                ctxg_moves[cgj].getPivotAtom(), ctxg_moves[cgj].getMovingAtoms(),
+                                ctx_changes[j]);
+        rotateAboutBond<float>(&wlr_poly_ps, i, ctxg_moves[cgj].getRootAtom(),
+                               ctxg_moves[cgj].getPivotAtom(), ctxg_moves[cgj].getMovingAtoms(),
+                               ctx_changes[j]);
+        rotateAboutBond<double>(&cdns_whr, i, ctxg_moves[cgj].getRootAtom(),
+                                ctxg_moves[cgj].getPivotAtom(), ctxg_moves[cgj].getMovingAtoms(),
+                                ctx_changes[j]);        
+      }
+    }
+  }
+  if (sum<int>(ctxg_counts) > 0) {
+    testStructuralCorrespondence(w_cfv, w_psv, whr_poly_ps, wlr_poly_ps, cdns_whr, tsm,
+                                 "cis-trans isomerization", lp_mue_tol, lp_abs_tol);
+  }
+
+  // Reset the writeable coordinate objects to prevent errors in the previous tests from cascading
+  // into subsequent tests.
+  for (int i = 0; i < ntrials; i++) {
+    coordCopy(&w_cfv[i], cfv[i]);
+    coordCopy(&w_psv[i], psv[i]);
+    coordCopy(&whr_poly_ps, i, hr_poly_ps, i);
+    coordCopy(&wlr_poly_ps, i, lr_poly_ps, i);
+    coordCopy(&cdns_whr, i, cdns_hr, i);
+  }
+
+  // Perform chiral inversions.
+  for (int i = 0; i < ntrials; i++) {
+    const int n_invg = chemv[i].getChiralCenterCount();
+    std::vector<int> inv_groups(ninv_perm);
+    std::vector<ChiralOrientation> inv_changes(ninv_perm);
+    invg_counts[i] = n_invg;
+    if (n_invg > 0) {
+      for (int j = 0; j < ninv_perm; j++) {
+        inv_groups[j] = xrs.uniformRandomNumber() * static_cast<double>(n_invg);
+        switch (chemv[i].getChiralInversionMethods(inv_groups[j])) {
+        case ChiralInversionProtocol::ROTATE:
+        case ChiralInversionProtocol::REFLECT:
+          inv_changes[j] = (xrs.uniformRandomNumber() < 0.5) ? ChiralOrientation::RECTUS :
+                                                               ChiralOrientation::SINISTER;
+          break;
+        case ChiralInversionProtocol::DO_NOT_INVERT:
+
+          // Use the non-assigned value here to denote the lack of an instruction for changing
+          // the chirality of a group that indeed has chirality but is not supposed to change.
+          inv_changes[j] = ChiralOrientation::NONE;
+          break;
+        }
+      }
+      const std::vector<IsomerPlan> invg_moves = chemv[i].getChiralInversionGroups();
+      const std::vector<int> invg_centers = chemv[i].getChiralCenters();
+      const std::vector<ChiralInversionProtocol> invg_protocols =
+        chemv[i].getChiralInversionMethods();
+      for (int j = 0; j < ninv_perm; j++) {
+        flipChiralCenter(&w_cfv[i], inv_groups[j], invg_centers, invg_protocols, invg_moves);
+        flipChiralCenter(&w_psv[i], inv_groups[j], invg_centers, invg_protocols, invg_moves);
+        flipChiralCenter<double>(&whr_poly_ps, i, inv_groups[j], invg_centers, invg_protocols,
+                                 invg_moves);
+        flipChiralCenter<float>(&wlr_poly_ps, i, inv_groups[j], invg_centers, invg_protocols,
+                                invg_moves);
+        flipChiralCenter<double>(&cdns_whr, i, inv_groups[j], invg_centers, invg_protocols,
+                                 invg_moves);
+      }
+    }
+  }
+  if (sum<int>(invg_counts) > 0) {
+    testStructuralCorrespondence(w_cfv, w_psv, whr_poly_ps, wlr_poly_ps, cdns_whr, tsm,
+                                 "chiral inversion", lp_mue_tol, lp_abs_tol);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // Test the RMSD calculation guide on a variety of structures.  This will takes lists of system
 // topologies and coordinates, replicate each to varying degrees, and apply a small perturbation
 // plus rotational and translational motion to make RMSD calculations and alignments meaningful.
@@ -246,6 +549,7 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
                    const std::vector<int> &frame_counts = { 16, 14, 8, 7, 19 },
                    const int default_frame_count = 16) {
   std::vector<CoordinateSeries<double>> structure_pile;
+  const SystemGrouping top_grp = SystemGrouping::TOPOLOGY;
   for (size_t item = 0; item < ag_list.size(); item++) {
     const CoordinateFrame item_cf(ps_list[item]);
     const AtomEquivalence item_eq(ag_list[item], item_cf);
@@ -263,11 +567,11 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
         item_seriesw.zcrd[ij_pos] += 0.25 * (0.5 - xrs.uniformRandomNumber());
       }
     }
-    item_rplan.formatResults(item_series);
-    Hybrid<double> item_rmsds(item_rplan.getOutputSize(RMSDTask::REFERENCE));
-    Hybrid<double> item_pair_rmsds(item_rplan.getOutputSize(RMSDTask::MATRIX));
-    rmsd(item_rplan, item_cf, item_series, &item_rmsds);
-    rmsd(item_rplan, item_series, &item_pair_rmsds);
+    ComparisonGuide item_cg(item_series, ag_list[item]);
+    Hybrid<double> item_rmsds(item_cg.getAllToReferenceOutputSize());
+    Hybrid<double> item_pair_rmsds(item_cg.getSymmetryEquivalentPairOutputSize(top_grp));
+    rmsd(item_cg, item_rplan, item_cf, item_series, &item_rmsds);
+    rmsd(item_cg, item_rplan, item_series, &item_pair_rmsds);
 
     // Check basic features of the RMSDPlan object
     if (item == 0 && ps_list.size() == 1) {
@@ -309,11 +613,12 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
   }
   PhaseSpaceSynthesis poly_ps(shuffled_ps, shuffled_ag, 40);
   const RMSDPlan poly_rplan(poly_ps, approach);
-  Hybrid<double> poly_rmsds(poly_rplan.getOutputSize(RMSDTask::REFERENCE));
-  Hybrid<double> poly_pair_rmsds(poly_rplan.getOutputSize(RMSDTask::MATRIX));
+  const ComparisonGuide poly_cg(poly_ps);
+  Hybrid<double> poly_rmsds(poly_cg.getAllToReferenceOutputSize());
+  Hybrid<double> poly_pair_rmsds(poly_cg.getSymmetryEquivalentPairOutputSize(top_grp));
   Hybrid<int> sys_example_idx(poly_ps.getUniqueTopologyExampleIndices());
-  rmsd(poly_rplan, poly_ps, sys_example_idx, &poly_rmsds);
-  rmsd(poly_rplan, poly_ps, &poly_pair_rmsds);
+  rmsd(poly_cg, poly_rplan, poly_ps, sys_example_idx, &poly_rmsds);
+  rmsd(poly_cg, poly_rplan, poly_ps, &poly_pair_rmsds);
   std::vector<double> replica_rmsds, replica_pair_rmsds;
   for (size_t i = 0; i < ag_list.size(); i++) {
     const ChemicalDetailsKit icdk = ag_list[i].getChemicalDetailsKit();
@@ -326,10 +631,6 @@ void testRMSDGuide(const std::vector<AtomGraph> &ag_list, const std::vector<Phas
     for (int j = 1; j < jlim; j++) {
       const CoordinateFrame cf_ij = structure_pile[i].exportFrame(j);
       replica_rmsds.push_back(rmsd(irefr, cf_ij.data(), icdk, approach));
-    }
-    const int padded_jlim = roundUp(jlim, warp_size_int);
-    for (int j = jlim; j < padded_jlim; j++) {
-      replica_rmsds.push_back(0.0);
     }
 
     // Recompute the RMSD matrices
@@ -373,11 +674,14 @@ int main(const int argc, const char* argv[]) {
   section("Selected chiral inversions");
 
   // Section 3
-  section("Test RMSD calculations");
+  section("RMSD calculations");
 
   // Section 4
-  section("Test symmetry-reduced RMSD");
+  section("Symmetry-reduced RMSD");
 
+  // Section 5
+  section("Clash detection");
+  
   // Get a handful of realistic systems
   const char osc = osSeparator();
   const std::string base_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -448,6 +752,23 @@ int main(const int argc, const char* argv[]) {
   checkChiralSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_chir_iso");
   checkChiralSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_chir_iso");
 
+  // Check global structural manipulations on all coordinate objects.
+  const std::string pro_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
+                                   osc + "topol";
+  const std::string pro_crd_path = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
+                                   osc + "coord";
+  const std::vector<std::string> pro_names = { "gly_phe", "tyr", "gly_lys", "ala", "gly_pro",
+                                               "arg", "gly_arg" };
+  TestSystemManager pro_tsm(pro_top_path, "top", pro_names, pro_crd_path, "inpcrd", pro_names);
+  checkStructureManipulation(pro_tsm, 39583203, 12);
+  const std::vector<std::string> drug_names = { "med_1", "symmetry_L1_vs", "drug_example_iso",
+                                                "med_2", "stereo_L1", "stereo_L1_vs", "med_4",
+                                                "med_3", "bromobenzene_iso", "symmetry_C2",
+                                                "symmetry_C3", "symmetry_C6" };
+  TestSystemManager drug_tsm(base_top_path, "top", drug_names, base_crd_path, "inpcrd",
+                             drug_names);
+  checkStructureManipulation(drug_tsm, 39583203, 17, 16, 4, 1, 3.0e-5, 1.2e-4);
+
   // Test RMSD computations on simple structures
   section(3);
   CoordinateFrame starfish_a(7);
@@ -498,6 +819,61 @@ int main(const int argc, const char* argv[]) {
   testRMSDGuide({ lig2_ag }, { lig2_ps }, RMSDMethod::ALIGN_MASS, do_tests);
   testRMSDGuide({ lig1_ag, lig2_ag, trpc_ag, }, { lig1_ps, lig2_ps, trpc_ps },
                 RMSDMethod::ALIGN_MASS, do_tests);
+
+  // Test clash detection
+  section(5);
+  const std::string example_top_path = oe.getStormmSourcePath() + osc + "test" + osc +
+                                       "Namelists" + osc + "topol";
+  const std::string example_crd_path = oe.getStormmSourcePath() + osc + "test" + osc +
+                                       "Namelists" + osc + "coord";
+  const std::vector<std::string> sysnames = { "arg", "gly_phe", "lys" };
+  TestSystemManager clashers(example_top_path, "top", sysnames, example_crd_path, "inpcrd",
+                             sysnames);
+  std::vector<ClashReport> impacts;
+  std::vector<int> busted;
+  const std::vector<int> busted_ans = { 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0 };
+  bool all_ok = true;
+  Xoshiro256ppGenerator xrs(15923);
+  for (int rpos = 0; rpos < 36; rpos++) {
+    const double alpha = twopi * (xrs.uniformRandomNumber() - 0.5);
+    const double beta  = twopi * (xrs.uniformRandomNumber() - 0.5);
+    const double gamma = twopi * (xrs.uniformRandomNumber() - 0.5);
+    for (size_t i = 0; i < sysnames.size(); i++) {
+      const std::string clash_crd_name = oe.getStormmSourcePath() + osc + "test" + osc +
+                                         "Structure" + osc + "clash_" + sysnames[i] + ".crd";
+      const bool clsh_file_exists = (getDrivePathType(clash_crd_name) == DrivePathType::FILE);
+      const TestPriority do_clshi = (clsh_file_exists) ? TestPriority::CRITICAL :
+                                                         TestPriority::ABORT;
+      const AtomGraph iag = clashers.getTopologyReference(i);
+      const StaticExclusionMask imask(iag);
+      CoordinateSeries<double> ics(iag.getAtomCount());
+      if (clsh_file_exists) {
+        ics.importFromFile(clash_crd_name);
+      }
+      const int nfrm = ics.getFrameCount();
+      for (int j = 0; j < nfrm; j++) {
+        impacts.emplace_back();
+        busted.push_back(detectClash(ics, j, iag, imask, default_minimize_clash_r0,
+                                     default_minimize_clash_ratio, &impacts[impacts.size() - 1]));
+
+        // Rotate coordinates in preparation for another round.
+        rotateCoordinates(&ics, j, iag, alpha, beta, gamma);
+      }
+    }
+    if (rpos == 0) {
+      check(busted, RelationalOperator::EQUAL, busted_ans, "Clashes are not detected where "
+            "expected in various coordiante series.", clashers.getTestingStatus());
+    }
+    else {
+      for (size_t i = 0; i < busted_ans.size(); i++) {
+        all_ok = (all_ok && busted[i] == busted_ans[i]);        
+      }
+    }
+    busted.resize(0);
+    impacts.resize(0);
+  }
+  check(all_ok, "Clashes are not detected after certain rotations of systems that clearly contain "
+        "conflicting atoms.", clashers.getTestingStatus());
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

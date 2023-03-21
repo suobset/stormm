@@ -9,7 +9,7 @@
 namespace stormm {
 namespace parse {
 
-using math::sum;
+using stmath::sum;
 
 //-------------------------------------------------------------------------------------------------
 void tableHorizontalRule(const std::vector<int> &column_widths, const BorderFormat borders,

@@ -15,7 +15,8 @@ namespace restraints {
 using chemistry::ChemicalFeatures;
 using chemistry::MaskTraversalMode;
 using restraints::BoundedRestraint;
-using structure::dihedral_angle;
+using structure::dihedralAngle;
+using structure::imageCoordinates;
 using structure::imageValue;
 using structure::ImagingMethod;
 using symbols::twopi;
@@ -226,8 +227,8 @@ applyDistanceRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cf
       double dx = ref_cfr.xcrd[atom_j] - ref_cfr.xcrd[atom_i];
       double dy = ref_cfr.ycrd[atom_j] - ref_cfr.ycrd[atom_i];
       double dz = ref_cfr.zcrd[atom_j] - ref_cfr.zcrd[atom_i];
-      imageCoordinates(&dx, &dy, &dz, ref_cfr.umat, ref_cfr.invu, ref_cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
+      imageCoordinates<double, double>(&dx, &dy, &dz, ref_cfr.umat, ref_cfr.invu,
+                                       ref_cfr.unit_cell, ImagingMethod::MINIMUM_IMAGE);
       const double target = sqrt((dx * dx) + (dy * dy) + (dz * dz));
       if (target < cutoff) {
         const double r1 = 0.0;
@@ -301,7 +302,7 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
           }
         }
       }
-      const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr);
+      const double current_value = dihedralAngle(atom_i, atom_j, atom_k, atom_l, cfr);
       const double r1 = current_value - flat_bottom_half_width - harmonic_width;
       const double r2 = current_value - flat_bottom_half_width;
       const double r3 = current_value + flat_bottom_half_width;

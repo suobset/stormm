@@ -7,6 +7,7 @@
 #include "Constants/symbol_values.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"
+#include "Structure/structure_enumerators.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Parsing/textfile.h"
 
@@ -16,7 +17,9 @@ namespace namelist {
 using constants::ExceptionResponse;
 using parse::TextFile;
 using parse::WrapTextSearch;
+using structure::SamplingIntensity;
 using synthesis::SystemGrouping;
+using synthesis::VariableTorsionAdjustment;
 
 /// \brief Default input settings for the &conformer namelist
 /// \{
@@ -24,11 +27,14 @@ constexpr int default_conf_rotation_samples       = 3;
 constexpr int default_conf_cis_trans_samples      = 2;
 constexpr int default_conf_max_rotatable_bonds    = 4;
 constexpr int default_conf_max_seeding_attempts   = 3;
+constexpr int default_conf_clash_pairs            = 0;
 constexpr int default_conf_max_system_trials      = 16384;
+constexpr int default_conf_sample_trials          = 512;
 constexpr int default_conf_running_states         = 16;
 constexpr int default_conf_final_states           = 100;
 constexpr int default_conf_reshuffle_iterations   = 0;
 constexpr int active_states_limit                 = 524288;
+constexpr int seeding_attempts_limit              = 100;
 constexpr double default_conf_rmsd_tolerance      = 1.5;
 constexpr double default_conf_core_restraint      = 16.0;
 constexpr char default_conf_chirality[]           = "false";
@@ -36,33 +42,16 @@ constexpr char default_conf_cis_trans[]           = "false";
 constexpr char default_conf_stop_hbonds[]         = "false";
 constexpr char default_conf_output_grouping[]     = "system";
 constexpr char default_conf_sampling_effort[]     = "light";
+constexpr char default_conf_adjustment_method[]   = "none";
 constexpr char default_conf_rotation_set_zero[]   = "60.0";
 constexpr char default_conf_rotation_set_one[]    = "180.0";
 constexpr char default_conf_rotation_set_two[]    = "-60.0";
 constexpr char default_conf_cis_trans_set_zero[]  = "0.0";
 constexpr char default_conf_cis_trans_set_one[]   = "180.0";
+constexpr char default_conf_rotation_snap[]       = "10.0";
+constexpr char default_conf_cis_trans_snap[]      = "5.0";
 /// \}
 
-/// \brief List the various general levels for system sampling.  The maximum number of trials per
-///        system will be capped at a user-specifiable quantity given by the "max_system_trials"
-///        keyword, or some value determined on a system-by-system basis determined by one of the
-///        enumerations herein.
-enum class SamplingIntensity {
-  MINIMAL,    ///< Sample each rotamer with a user-specified number of torsion angles across the
-              ///<   rotatable bond ("rotation_samples").
-  LIGHT,      ///< Sample each pair of nearby rotamers, cis-trans isomerizations, and chiral
-              ///<   centers, applying all combinations of torsion angles with the sampling density
-              ///<   given by the "rotation_samples" keyword.  For each state, other degrees of
-              ///<   freedom will be set randomly.
-  HEAVY,      ///< Sample each pair of nearby rotamers, applying all combinations of torsion angles
-              ///<   with the sampling density given by the "rotation_samples" keyword up to four
-              ///<   times, pending the availability of other degrees of freedom which can be set
-              ///<   randomly to generate unique starting conditions.
-  EXHAUSTIVE  ///< Sample all possible combinations of rotamers, isomerizable cis-trans bonds, and
-              ///<   invertible chiral centers, up to the hard limit set forth by the
-              ///<   "max_system_trials" keyword.
-};
-  
 /// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
 class ConformerControls {
 public:
@@ -150,6 +139,15 @@ public:
   /// \brief Get the maximum number of conformer seeding attempts
   int getMaxSeedingAttempts() const;
 
+  /// \brief Get the number of clashing pairs of atoms that can be seen in a structure before it is
+  ///        declared to contain too much internal conflict and a clash is reported.
+  int getClashPairTolerance() const;
+  
+  /// \brief Get the maximum number of sampling trials that will be permitted across the various
+  ///        systems when attempting to sample the viable rotameric states of each bond and other
+  ///        possible isomerizations of each compound.  This applies on a per-system basis.
+  int getSamplingTrialLimit() const;
+
   /// \brief Get the maximum number of minimizations to attempt with any one molecule.  Each
   ///        initial state provided by the user will be subject to this limit, so if the limit
   ///        is 5000 and one molecule has two initial states listed in the input deck, the total
@@ -167,6 +165,17 @@ public:
 
   /// \brief Get a general sampling strategy from the user.
   SamplingIntensity getSamplingIntensity() const;
+
+  /// \brief Get the tolerance for snapping rotatable bond settings to consensus values.
+  double getRotatableBondSnapThreshold() const;
+
+  /// \brief Get the tolerance for snapping cis-trans isomeric bond settings to consensus values.
+  double getCisTransBondSnapThreshold() const;
+
+  /// \brief Get the torsion angle adjustment strategy (applies to rotatable and cis-trans
+  ///        isomeric bonds) used in reconciling general settings to the known values emerging from
+  ///        a collection of structures for each molecule.
+  VariableTorsionAdjustment getTorsionAdjustmentProtocol() const;
   
 private:
   ExceptionResponse policy;         ///< Set the behavior when bad inputs are encountered.  DIE =
@@ -201,6 +210,14 @@ private:
   int max_seeding_attempts;         ///< Maximum number of attempts to make in seeding each
                                     ///<   conformer.  If the seeding fails, the conformer will be
                                     ///<   left in its original state from the user input.
+  int clash_pair_tolerance;         ///< The number of clashing pairs that will be permitted in any
+                                    ///<   given structure before the internal conflicts force the
+                                    ///<   program to randomize whatever components it can and
+                                    ///<   reassess the structure.
+  int sampling_trial_limit;         ///< The maximum number of trials per system to run for rotamer
+                                    ///<   and cis-trans bond settings exploration, which will be
+                                    ///<   interpreted in light of the total number of systems in
+                                    ///<   the calculation.
   int maximum_trial_limit;          ///< Maximum number of distinct minimizations to attempt with
                                     ///<   one molecule
   double rmsd_tolerance;            ///< Minimum mass-weighted root-mean squared deviation between
@@ -212,6 +229,14 @@ private:
                                     ///<   particular compound based on the number or combinations
                                     ///<   of rotatable bonds, chiral centers, or isomeriable
                                     ///<   cis-trans bonds
+  double rotation_snap_threshold;   ///< The threshold below which rotatable bond angle settings
+                                    ///<   are to be snapped to nearby consensus values found in a
+                                    ///<   collection of conformations.
+  double cis_trans_snap_threshold;  ///< The threshold below which cis-trans isomeric bond angle
+                                    ///<   settings are to be snapped to nearby consensus values
+                                    ///<   found in a collection of conformations.
+  std::string adjustment_method;    ///< The method for adjusting torsion angle settings (whether
+                                    ///<   for rotatable or cis-trans isomeric bond settings)
 
   /// The specific values at which to set each rotatable bond for initial poses.
   std::vector<double> rotation_sample_values;
@@ -246,9 +271,29 @@ private:
   /// \brief Validate the manner in which to group systems for analysis purposes.
   void validateGroupingMethod();
 
+  /// \brief Validate the number of seeding attempts to be made with each conformer.
+  void validateSeedingAttempts();
+
+  /// \brief Validate the number of clashing atom pairs that will be tolerated before a seeded
+  ///        confomation is deemed unfixable and must be re-seeded before further refinement can
+  ///        take place.
+  void validateClashCounts();
+  
   /// \brief Validate the level of effort to be invested in sampling any given molecule.
   void validateSamplingIntensity();
 
+  /// \brief Validate the snapping threshold for either rotatable bond or cis-trans isomeric bond
+  ///        settings.
+  ///
+  /// \param snap_setting  The snapping threshold to validate, ensuring that it lies in the range
+  ///                      [ 0, 2pi ).  May be modified and returned if the setting is invalid and
+  ///                      the exception handling permits. 
+  /// \param desc          A description of the threshold to validate
+  void validateTorsionSnapping(double *snap_setting, const std::string &desc) const;
+
+  /// \brief Validate the string used to specify the torsion adjustment protocol.
+  void validateTorsionAdjustmentProtocol();
+  
   /// \brief Process values for setting the angle about each rotatable bond or cis-trans isomeric
   ///        bond from the namelist object.  Store the values in the appropriate vector and
   ///        length counter.  Length counters are provided separately to give the user more options
@@ -291,16 +336,6 @@ private:
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
                                 ExceptionResponse policy = ExceptionResponse::DIE,
                                 WrapTextSearch wrap = WrapTextSearch::NO);
-
-/// \brief Return a human-readable string describing each level of sampling effort.
-///
-/// \param input  The sampling effort enumeration
-std::string getEnumerationName(SamplingIntensity input);
-
-/// \brief Interpret string input to recognize a specific level of sampling effort.
-///
-/// \param input  The human-readable sampling keyword input
-SamplingIntensity translateSamplingIntensity(const std::string &input);
   
 } // namespace namelist
 } // namespace stormm

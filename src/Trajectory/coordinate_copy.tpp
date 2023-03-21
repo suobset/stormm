@@ -270,9 +270,9 @@ void copyCoordinateXYZ(llint* xdest, int* xdest_ovrf, llint* ydest, int* ydest_o
     // Again, handle the long long integer format with a special case as it is the only type that
     // might lose bits in a conversion via double-precision numbers.
     for (int i = 0; i < natom; i++) {
-      const int95_t xo = { xorig[i], 0 };
-      const int95_t yo = { yorig[i], 0 };
-      const int95_t zo = { zorig[i], 0 };
+      const int95_t xo = { static_cast<llint>(xorig[i]), 0 };
+      const int95_t yo = { static_cast<llint>(yorig[i]), 0 };
+      const int95_t zo = { static_cast<llint>(zorig[i]), 0 };
       const int95_t xn = hostChangeFPBits(xo, orig_bits, dest_bits);
       const int95_t yn = hostChangeFPBits(yo, orig_bits, dest_bits);
       const int95_t zn = hostChangeFPBits(zo, orig_bits, dest_bits);
@@ -402,7 +402,7 @@ void coordCopy(CoordinateSeriesWriter<T> *destination, const size_t frame_dest,
       const size_t dest_xfrm_start = frame_dest * xfrm_stride;
       const size_t orig_bdim_start = index_orig * bdim_stride;
       const size_t orig_xfrm_start = index_orig * xfrm_stride;
-      copyBoxInformation(&destination->boxdims[dest_bdim_start],
+      copyBoxInformation(&destination->boxdim[dest_bdim_start],
                          &destination->umat[dest_xfrm_start], &destination->invu[dest_xfrm_start],
                          &origin.boxdims[orig_bdim_start], &origin.umat[orig_xfrm_start],
                          &origin.invu[orig_xfrm_start]);
@@ -454,8 +454,8 @@ void coordCopy(CoordinateSeriesWriter<T> *destination, size_t frame_dest,
   const size_t orig_atom_start = origin.atom_starts[index_orig];
   const size_t dest_bdim_start = frame_dest * roundUp<size_t>(6, warp_size_int);
   const size_t dest_xfrm_start = frame_dest * roundUp<size_t>(9, warp_size_int);
-  copyBoxDimensions(&destination->boxdims[dest_bdim_start], &destination->umat[dest_xfrm_start],
-                    &destination->invu[dest_xfrm_start], origin, index_orig);
+  copyBoxInformation(&destination->boxdim[dest_bdim_start], &destination->umat[dest_xfrm_start],
+                     &destination->invu[dest_xfrm_start], origin, index_orig);
   switch (origin.mode) {
   case PrecisionModel::DOUBLE:
     copyCoordinateXYZ(&destination->xcrd[dest_atom_start], &destination->ycrd[dest_atom_start],

@@ -13,11 +13,11 @@ namespace topology {
 
 using card::HybridTargetLevel;
 using card::HybridKind;
-using math::getSubsetIndexPattern;
-using math::extractIndexedValues;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::sum;
+using stmath::getSubsetIndexPattern;
+using stmath::extractIndexedValues;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::sum;
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph() :

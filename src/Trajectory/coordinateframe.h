@@ -2,6 +2,9 @@
 #ifndef STORMM_COORDINATE_FRAME_H
 #define STORMM_COORDINATE_FRAME_H
 
+#include <typeinfo>
+#include <typeindex>
+#include <sys/types.h>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
@@ -324,6 +327,10 @@ private:
   void allocate();
 };
 
+/// \brief Define the type index for the CoordinateFrame object.
+static const size_t coordinateframe_type_index =
+  std::type_index(typeid(CoordinateFrame)).hash_code();
+  
 /// \brief Read a series of frames from a trajectory file.
 ///
 /// Overloaded:
@@ -372,5 +379,10 @@ std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const in
 
 #include "coordinateframe.tpp"
 
-#endif
+// As with common types and STORMM vector types, define the type indices for general use in the
+// STORMM namespace.
+namespace stormm {
+using trajectory::coordinateframe_type_index;
+} // namespace stormm
 
+#endif

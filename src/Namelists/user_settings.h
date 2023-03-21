@@ -69,7 +69,10 @@ struct UserSettings {
 
   /// \brief Get the name of the input file.
   std::string getInputFileName() const;
-  
+
+  /// \brief Detect whether a &files namelist was present
+  bool getFilesPresence() const;
+
   /// \brief Detect whether a &minimize namelist was present
   bool getMinimizePresence() const;
 
@@ -131,6 +134,7 @@ private:
 
   ExceptionResponse policy;     ///< Action in the event of bad input
   PrintSituation print_policy;  ///< Policy to take with regard to general output files
+  bool has_files_nml;           ///< Indicate the presence of a &files namelist in the input
   bool has_minimize_nml;        ///< Indicate the presence of a &minimize namelist in the input
   bool has_solvent_nml;         ///< Indicate the presence of a &solvent namelist in the input
   bool has_random_nml;          ///< Indicate the presence of a &random namelist in the input

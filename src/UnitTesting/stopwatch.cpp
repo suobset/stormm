@@ -13,7 +13,7 @@
 namespace stormm {
 namespace testing {
 
-using math::sum;
+using stmath::sum;
 using parse::BorderFormat;
 using parse::findStringInVector;
 using parse::polyNumericVector;
@@ -255,7 +255,7 @@ void StopWatch::printResults(const double precision) {
   
   for (int i = 0; i < print_count; i++) {
     mean_ctg_times[i] = print_total_times[i] / static_cast<double>(print_samples[i]);
-    std_ctg_times[i] = math::running_stdev(print_squared_times[i], print_total_times[i],
+    std_ctg_times[i] = stmath::running_stdev(print_squared_times[i], print_total_times[i],
                                            print_samples[i]);
   }
   std::vector<NumberFormat> fmt_key(6, NumberFormat::STANDARD_REAL);

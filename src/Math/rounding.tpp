@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T roundUp(T jagged, T increment) {
@@ -83,5 +83,5 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
   __builtin_unreachable();
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

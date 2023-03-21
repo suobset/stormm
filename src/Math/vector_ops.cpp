@@ -2,7 +2,7 @@
 #include "vector_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 void accumulateBitmask(uint* va, const size_t pos) {
@@ -148,5 +148,5 @@ int readBitFromMask(const std::vector<ushort> &va, const size_t pos) {
   return readBitFromMask(va.data(), pos);
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

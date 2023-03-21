@@ -49,10 +49,18 @@ enum class SubkeyRequirement {
              ///<   certain STRUCT options
 };
 
-/// \brief Return a string corresponding to the namelist data type enumerations.
+/// \brief Return a string corresponding to the namelist data type enumerations.  Various overloads
+///        of this function are also found in other libraries.
 ///
-/// \param param_type  The type of namelist keyword in question
-std::string getEnumerationName(NamelistType param_type);
+/// \param input  The type of namelist keyword in question
+/// \{
+std::string getEnumerationName(NamelistType input);
+std::string getEnumerationName(InputRepeats input);
+std::string getEnumerationName(DefaultIsObligatory input);
+std::string getEnumerationName(InputStatus input);
+std::string getEnumerationName(RestraintAnchoring input);
+std::string getEnumerationName(SubkeyRequirement input);
+/// \}
 
 /// \brief Return a string corresponding to an input status setting.
 ///

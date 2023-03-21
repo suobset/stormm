@@ -9,7 +9,7 @@ namespace stormm {
 namespace restraints {
 
 using card::HybridKind;
-using math::roundUp;
+using stmath::roundUp;
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(const AtomGraph *ag_in) :

@@ -2,7 +2,7 @@
 #include "matrix_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 void checkArraySizeToMatrixRank(const size_t actual_rank, const size_t rank, const size_t s_a,
@@ -57,5 +57,5 @@ void checkArraySizeToMatrixRank(const size_t actual_rank, const size_t rank, con
   }
 }
   
-} // namespace math
+} // namespace stmath
 } // namespace stormm

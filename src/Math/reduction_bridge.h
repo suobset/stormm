@@ -7,7 +7,7 @@
 #include "Constants/behavior.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
@@ -61,7 +61,7 @@ private:
   Hybrid<double> storage;   ///< ARRAY-kind Hybrid object targeted by all of the preceding objects
 };
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #endif

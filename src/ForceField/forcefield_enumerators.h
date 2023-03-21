@@ -38,7 +38,7 @@ enum class ParameterKind {
 /// \brief Get the string interpretation of a ParameterKind enumeration.
 ///
 /// \param kind  The enumeration of interest
-std::string getParameterKindName(ParameterKind kind);
+std::string getEnumerationName(ParameterKind kind);
   
 } // namespace modeling
 } // namespace stormm

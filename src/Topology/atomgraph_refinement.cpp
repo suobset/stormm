@@ -19,14 +19,14 @@ namespace topology {
 
 using chemistry::massToZNumber;
 using card::HybridTargetLevel;
-using math::crossProduct;
-using math::magnitude;
-using math::matrixMultiply;
-using math::maxValue;
-using math::minValue;
-using math::PrefixSumType;
-using math::prefixSumInPlace;
-using math::sum;
+using stmath::crossProduct;
+using stmath::magnitude;
+using stmath::matrixMultiply;
+using stmath::maxValue;
+using stmath::minValue;
+using stmath::PrefixSumType;
+using stmath::prefixSumInPlace;
+using stmath::sum;
 using parse::char4ToString;
 using parse::NumberFormat;
 using parse::PolyNumeric;
@@ -2213,7 +2213,7 @@ void mapMolecules(const int atom_count, int *molecule_count, const Map1234 &all_
                   std::vector<int> *molecule_membership, std::vector<int> *molecule_limits,
                   std::vector<int> *molecule_contents) {
   *molecule_membership = traceBondedPatterns(all_nb_excl);
-  const int local_molecule_count = math::maxValue(*molecule_membership) + 1;
+  const int local_molecule_count = stmath::maxValue(*molecule_membership) + 1;
   molecule_limits->resize(local_molecule_count + 1, 0);
   molecule_contents->resize(atom_count, -1);
   int* tml_data = molecule_limits->data();

@@ -19,7 +19,7 @@ using card::HybridKind;
 using card::HybridTargetLevel;
 using constants::giga_zu;
 using data_types::isFloatingPointScalarType;
-using math::roundUp;
+using stmath::roundUp;
 
 /// \brief Constants for the "ran2" pseudo-random number generator
 /// \{

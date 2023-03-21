@@ -77,9 +77,98 @@ void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc alp
   // rotation.  Dereferencing the pointer is not costly so long as the abstract contains only
   // constants and pointers.
   if (vsk != nullptr) {
-    placeVirtualSites<double, double>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                      *vsk);
+    placeVirtualSites<Tcoord, Tcalc>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                     *vsk);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+void rotateCoordinates(CoordinateSeriesWriter<Tcoord> *csw, const size_t frame_index,
+                       const VirtualSiteKit<Tcalc> &vsk, const Tcalc alpha, const Tcalc beta,
+                       const Tcalc gamma, const int lower_limit, const int upper_limit) {
+  const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit : csw->natom;
+  const size_t atom_start = static_cast<size_t>(roundUp(csw->natom, warp_size_int)) * frame_index;
+  rotateCoordinates<Tcoord, Tcalc>(&csw->xcrd[atom_start], &csw->ycrd[atom_start],
+                                   &csw->zcrd[atom_start], alpha, beta, gamma, lower_limit,
+                                   actual_upper_limit);
+  placeVirtualSites<Tcoord, Tcalc>(&csw->xcrd[atom_start], &csw->ycrd[atom_start],
+                                   &csw->zcrd[atom_start], nullptr, nullptr, UnitCellType::NONE,
+                                   vsk);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+void rotateCoordinates(CoordinateSeries<Tcoord> *cs, const size_t frame_index, const AtomGraph &ag,
+                       const Tcalc alpha, const Tcalc beta, const Tcalc gamma,
+                       const int lower_limit, const int upper_limit) {
+
+  // The calculation type is either single- or double-precision
+  CoordinateSeriesWriter<Tcoord> csw = cs->data();
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+    rotateCoordinates<Tcoord, double>(&csw, frame_index, vsk, alpha, beta, gamma, lower_limit,
+                                      upper_limit);
+  }
+  else {
+    const VirtualSiteKit<float> vsk = ag.getSinglePrecisionVirtualSiteKit();
+    rotateCoordinates<Tcoord, float>(&csw, frame_index, vsk, alpha, beta, gamma, lower_limit,
+                                     upper_limit);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void rotateCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index, const Tcalc alpha,
+                       const Tcalc beta, const Tcalc gamma, const int lower_limit,
+                       const int upper_limit) {
+  const AtomGraph *ag = poly_ps->getSystemTopologyPointer();
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+    CoordinateFrame cf = poly_ps->exportCoordinates(system_index);
+    CoordinateFrameWriter cfr = cf.data();
+    const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit : cfr.natom;
+    rotateCoordinates<double, double>(cfr.xcrd, cfr.ycrd, cfr.zcrd, alpha, beta, gamma,
+                                      lower_limit, actual_upper_limit, &vsk);
+    poly_ps->import(cf, system_index, TrajectoryKind::POSITIONS);
+  }
+  else {
+    const VirtualSiteKit<float> vsk = ag->getSinglePrecisionVirtualSiteKit();
+    CoordinateFrame cf = poly_ps->exportCoordinates(system_index);
+    CoordinateFrameWriter cfr = cf.data();
+    const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit : cfr.natom;
+    rotateCoordinates<double, float>(cfr.xcrd, cfr.ycrd, cfr.zcrd, alpha, beta, gamma,
+                                      lower_limit, actual_upper_limit, &vsk);
+    poly_ps->import(cf, system_index, TrajectoryKind::POSITIONS);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void rotateCoordinates(CondensateWriter *cdnsw, const int system_index,
+                       const VirtualSiteKit<Tcalc> &vsk, const Tcalc alpha, const Tcalc beta,
+                       const Tcalc gamma, const int lower_limit, const int upper_limit) {
+  const size_t atom_start = cdnsw->atom_starts[system_index];
+  const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit :
+                                                               cdnsw->atom_counts[system_index];
+  switch (cdnsw->mode) {
+  case PrecisionModel::DOUBLE:
+    rotateCoordinates<double, Tcalc>(&cdnsw->xcrd[atom_start], &cdnsw->ycrd[atom_start],
+                                     &cdnsw->zcrd[atom_start], alpha, beta, gamma, lower_limit,
+                                     actual_upper_limit);
+    placeVirtualSites<double, Tcalc>(&cdnsw->xcrd[atom_start], &cdnsw->ycrd[atom_start],
+                                     &cdnsw->zcrd[atom_start], nullptr, nullptr,
+                                     UnitCellType::NONE, vsk);
+    break;
+  case PrecisionModel::SINGLE:
+    rotateCoordinates<float, Tcalc>(&cdnsw->xcrd_sp[atom_start], &cdnsw->ycrd_sp[atom_start],
+                                    &cdnsw->zcrd_sp[atom_start], alpha, beta, gamma,
+                                    lower_limit, actual_upper_limit);
+    placeVirtualSites<float, Tcalc>(&cdnsw->xcrd_sp[atom_start], &cdnsw->ycrd_sp[atom_start],
+                                    &cdnsw->zcrd_sp[atom_start], nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
+    break;
+  }  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -108,8 +197,110 @@ void translateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc 
   // rotation.  Dereferencing the pointer is not costly so long as the abstract contains only
   // constants and pointers.
   if (vsk != nullptr) {
-    placeVirtualSites<double, double>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                      *vsk);
+    placeVirtualSites<Tcoord, Tcalc>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                     *vsk);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void translateCoordinates(PsSynthesisWriter *poly_psw, const int system_index,
+                          const VirtualSiteKit<Tcalc> &vsk, const Tcalc xmove,
+                          const Tcalc ymove, const Tcalc zmove, const int lower_limit,
+                          const int upper_limit) {
+  const int llim = poly_psw->atom_starts[system_index] + lower_limit;
+  const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit :
+                                                               poly_psw->atom_counts[system_index];
+  const int hlim = poly_psw->atom_starts[system_index] + actual_upper_limit;
+
+  // Translate the coordinates for the selected atoms
+  const int95_t ixmove = hostDoubleToInt95(xmove * poly_psw->gpos_scale);
+  const int95_t iymove = hostDoubleToInt95(ymove * poly_psw->gpos_scale);
+  const int95_t izmove = hostDoubleToInt95(zmove * poly_psw->gpos_scale);
+  for (int i = llim; i < hlim; i++) {
+    const int95_t xnew = hostSplitFPSum(ixmove, poly_psw->xcrd[i], poly_psw->xcrd_ovrf[i]);
+    const int95_t ynew = hostSplitFPSum(iymove, poly_psw->ycrd[i], poly_psw->ycrd_ovrf[i]);
+    const int95_t znew = hostSplitFPSum(izmove, poly_psw->zcrd[i], poly_psw->zcrd_ovrf[i]);
+    poly_psw->xcrd[i]      = xnew.x;
+    poly_psw->xcrd_ovrf[i] = xnew.y;
+    poly_psw->ycrd[i]      = ynew.x;
+    poly_psw->ycrd_ovrf[i] = ynew.y;
+    poly_psw->zcrd[i]      = znew.x;
+    poly_psw->zcrd_ovrf[i] = znew.y;
+  }
+
+  // Reposition the virtual sites
+  const int natom = poly_psw->atom_counts[system_index];
+  CoordinateFrame cf(natom);
+  CoordinateFrameWriter cfw = cf.data();
+  for (int i = 0; i < natom; i++) {
+    cfw.xcrd[i] = hostInt95ToDouble(poly_psw->xcrd[i], poly_psw->xcrd_ovrf[i]) *
+                  poly_psw->inv_gpos_scale;
+    cfw.ycrd[i] = hostInt95ToDouble(poly_psw->ycrd[i], poly_psw->ycrd_ovrf[i]) *
+                  poly_psw->inv_gpos_scale;
+    cfw.zcrd[i] = hostInt95ToDouble(poly_psw->zcrd[i], poly_psw->zcrd_ovrf[i]) *
+                  poly_psw->inv_gpos_scale;
+  }
+  placeVirtualSites<double, Tcalc>(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr,
+                                   UnitCellType::NONE, vsk);
+  for (int i = 0; i < vsk.nsite; i++) {
+    const int vs_idx = vsk.vs_atoms[i];
+    const int95_t xvs_new = hostDoubleToInt95(cfw.xcrd[vs_idx] * poly_psw->gpos_scale);
+    const int95_t yvs_new = hostDoubleToInt95(cfw.ycrd[vs_idx] * poly_psw->gpos_scale);
+    const int95_t zvs_new = hostDoubleToInt95(cfw.zcrd[vs_idx] * poly_psw->gpos_scale);
+    poly_psw->xcrd[i]      = xvs_new.x;
+    poly_psw->xcrd_ovrf[i] = xvs_new.y;
+    poly_psw->ycrd[i]      = yvs_new.x;
+    poly_psw->ycrd_ovrf[i] = yvs_new.y;
+    poly_psw->zcrd[i]      = zvs_new.x;
+    poly_psw->zcrd_ovrf[i] = zvs_new.y;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void translateCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index, const Tcalc xmove,
+                          const Tcalc ymove, const Tcalc zmove, const int lower_limit,
+                          const int upper_limit) {
+  const AtomGraph *ag = poly_ps->getSystemTopologyPointer(system_index);
+  PsSynthesisWriter poly_psw = poly_ps->data();
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+    translateCoordinates(&poly_psw, system_index, vsk, xmove, ymove, zmove, lower_limit,
+                         upper_limit);
+  }
+  else {
+    const VirtualSiteKit<float> vsk = ag->getSinglePrecisionVirtualSiteKit();
+    translateCoordinates(&poly_psw, system_index, vsk, xmove, ymove, zmove, lower_limit,
+                         upper_limit);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void translateCoordinates(CondensateWriter *cdnsw, const int system_index,
+                          const VirtualSiteKit<Tcalc> &vsk, const Tcalc xmove, const Tcalc ymove,
+                          const Tcalc zmove, const int lower_limit, const int upper_limit) {
+  const size_t atom_start = cdnsw->atom_starts[system_index];
+  const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit :
+                                                               cdnsw->atom_counts[system_index];
+  switch (cdnsw->mode) {
+  case PrecisionModel::DOUBLE:
+    translateCoordinates<double, Tcalc>(&cdnsw->xcrd[atom_start], &cdnsw->ycrd[atom_start],
+                                        &cdnsw->zcrd[atom_start], xmove, ymove, zmove, lower_limit,
+                                        actual_upper_limit);
+    placeVirtualSites<double, Tcalc>(&cdnsw->xcrd[atom_start], &cdnsw->ycrd[atom_start],
+                                     &cdnsw->zcrd[atom_start], nullptr, nullptr,
+                                     UnitCellType::NONE, vsk);
+    break;
+  case PrecisionModel::SINGLE:
+    translateCoordinates<float, Tcalc>(&cdnsw->xcrd_sp[atom_start], &cdnsw->ycrd_sp[atom_start],
+                                       &cdnsw->zcrd_sp[atom_start], xmove, ymove, zmove,
+                                       lower_limit, actual_upper_limit);
+    placeVirtualSites<float, Tcalc>(&cdnsw->xcrd_sp[atom_start], &cdnsw->ycrd_sp[atom_start],
+                                    &cdnsw->zcrd_sp[atom_start], nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
+    break;
   }
 }
 

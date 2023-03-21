@@ -13,7 +13,7 @@
 #include "reduction_workunit.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using numerics::max_llint_accumulation;
 
@@ -109,7 +109,7 @@ void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
                    const ReductionStage process = ReductionStage::ALL_REDUCE,
                    const ReductionGoal purpose = ReductionGoal::NORMALIZE);
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "reduction.tpp"

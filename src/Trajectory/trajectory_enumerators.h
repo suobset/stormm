@@ -4,14 +4,9 @@
 
 #include <string>
 #include "copyright.h"
-#include "FileManagement/file_util.h"
-#include "Parsing/textfile.h"
 
 namespace stormm {
 namespace trajectory {
-
-using diskutil::DataFormat;
-using parse::TextFile;
 
 /// \brief Options for the type of coordinate file to write
 enum class CoordinateFileKind {
@@ -100,40 +95,20 @@ std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind);
 /// \param key       The enumerator instance of interest
 /// \param cpkind    The enumerator instance of interest
 /// \param protocol  The enumerator instance of interest
+/// \param input     The enumerator instance of interest
 /// \{
 std::string getEnumerationName(CoordinateFileKind cfkind);
 std::string getEnumerationName(AncdfVariable key);
 std::string getEnumerationName(CoordinateFileRole cpkind);
 std::string getEnumerationName(TrajectoryFusion protocol);
-std::string getEnumerationName(TrajectoryKind);
+std::string getEnumerationName(TrajectoryKind input);
 std::string getEnumerationName(CoordinateCycle orientation);
 /// \}
 
-/// \brief Get the nature of a trajectory file based on the stated format (this will return
-///        binary or ASCII based on the stated trajectory file kind)
-///
-/// \param cfkind  The trajectory file kind
-DataFormat getTrajectoryFormat(CoordinateFileKind cfkind);
-  
 /// \brief Translate a string into one of the CoordinateFileKind enumerations.
 ///
 /// \param name_in  The string to translate
 CoordinateFileKind translateCoordinateFileKind(const std::string &name_in);
-
-/// \brief Detect various coordinate file types.
-///
-/// Overloaded:
-///   - Work from the file name
-///   - Work from a pre-translated TextFile object
-///
-/// \param file_name  Name of the file to test
-/// \param caller     Name of the calling function (optional)
-/// \param tf         Text of an asci--format file already translated into RAM
-/// \{
-CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
-                                            const std::string &caller = std::string(""));
-CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
-/// \}
 
 /// \brief Translate the AncdfVariable enumeration.  This provides keywords to serve as landmarks
 ///        in an Amber binary trajectory or restart file.

@@ -18,19 +18,21 @@
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
 #include "../../../src/Namelists/user_settings.h"
+#include "../../../src/Parsing/parse.h"
 #include "../../../src/Potential/scorecard.h"
 #include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Random/random.h"
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Reporting/reporting_enumerators.h"
-#include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/condensate.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/static_mask_synthesis.h"
 #include "../../../src/Synthesis/synthesis_cache_map.h"
+#include "../../../src/Synthesis/synthesis_permutor.h"
 #include "../../../src/Synthesis/systemcache.h"
+#include "../../../src/Topology/atomgraph_abstracts.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
 #include "../../../src/Trajectory/coordinate_copy.h"
 #include "../../../src/UnitTesting/stopwatch.h"
@@ -46,9 +48,10 @@ using namespace stormm::diskutil;
 using namespace stormm::display;
 using namespace stormm::energy;
 using namespace stormm::errors;
-using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::namelist;
+using namespace stormm::parse;
+using namespace stormm::stmath;
 using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::trajectory;
@@ -95,11 +98,12 @@ int main(int argc, const char* argv[]) {
   }
 
   // Wall time tracking
-  StopWatch master_timer("Master timings for conformer.omni");
+  StopWatch master_timer("Master timings for conformer.stormm");
   master_timer.addCategory(tm_input_parsing);
-  master_timer.addCategory(tm_feature_detection);
+  master_timer.addCategory(tm_work_unit_building);
   master_timer.addCategory(tm_coordinate_expansion);
-  master_timer.addCategory("Energy minimization");
+  master_timer.addCategory(tm_energy_minimization);
+  master_timer.addCategory(tm_conformer_selection);
 
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::CONFORMER);
@@ -116,39 +120,36 @@ int main(int argc, const char* argv[]) {
   Xoshiro256ppGenerator xrs(rngcon.getRandomSeed(), rngcon.getWarmupCycleCount());
   
   // Read topologies and coordinate files
-  std::vector<MdlMol> sdf_recovery;
-  SystemCache sc(ui.getFilesNamelistInfo(), &sdf_recovery, ui.getExceptionBehavior(),
-                 MapRotatableGroups::NO, ui.getPrintingPolicy(), &master_timer);
   master_timer.assignTime(1);
+  SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(),
+                 MapRotatableGroups::NO, ui.getPrintingPolicy());
+  master_timer.assignTime(tm_input_parsing);
   
   // Prepare the workspace for multiple rounds of refinement.  Establish the conditions for
   // generative modeling.  Create non-bonded exclusions masks for each topology in CPU (and, if
   // applicable, GPU) applications to facilitate clash detection routines and later energy
   // calculations.
-  setGenerativeConditions(ui, &sc, sdf_recovery, &master_timer);
-  const std::vector<int> replica_counts = calculateReplicaCounts(ui.getConformerNamelistInfo(),
-                                                                 sc, &master_timer);
-  SynthesisCacheMap scmap;
-  PhaseSpaceSynthesis sandbox = buildReplicaWorkspace(replica_counts, sc, &scmap, &master_timer);
+  setGenerativeConditions(ui, &sc, &master_timer);
+  SynthesisCacheMap sandbox_map;
+  SynthesisPermutor sandbox_prm;
+  PhaseSpaceSynthesis sandbox = buildSamplingWorkspace(sc, ui.getConformerNamelistInfo(),
+                                                       ui.getMinimizeNamelistInfo(), &xrs,
+                                                       &sandbox_map, &sandbox_prm, &master_timer);
   const std::vector<AtomGraph*> unique_topologies = sandbox.getUniqueTopologies();
-  const std::vector<int> conformer_topology_indices = sandbox.getUniqueTopologyIndices();
-  const std::vector<AtomGraph*> replica_topologies = sandbox.getSystemTopologyPointer();
-  const std::vector<RestraintApparatus*> replica_restraints =
-    buildReplicaRestraints(replica_counts, sc, &master_timer);
-  if (replica_topologies.size() != replica_restraints.size()) {
+  const std::vector<int> sandbox_topology_indices = sandbox.getUniqueTopologyIndices();
+  const std::vector<AtomGraph*> sandbox_topologies = sandbox.getSystemTopologyPointer();
+  const std::vector<RestraintApparatus*> sandbox_restraints = buildReplicaRestraints(sandbox_map);
+  if (sandbox_topologies.size() != sandbox_restraints.size()) {
     rtErr("Replica topology and restraint apparatus pointer vectors must contain the same number "
-          "of elements (" + std::to_string(replica_topologies.size()) + " / " +
-          std::to_string(replica_restraints.size()) + ").", "main");
+          "of elements (" + std::to_string(sandbox_topologies.size()) + " / " +
+          std::to_string(sandbox_restraints.size()) + ").", "main");
   }
-  AtomGraphSynthesis sandbox_ag(unique_topologies, replica_restraints, conformer_topology_indices, 
-                                incrementingSeries<int>(0, replica_restraints.size(), 1));
+  AtomGraphSynthesis sandbox_ag(unique_topologies, sandbox_restraints, sandbox_topology_indices, 
+                                incrementingSeries<int>(0, sandbox.getSystemCount(), 1));
 #ifdef STORMM_USE_HPC
   StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getUniqueTopologies(),
                                             sandbox_ag.getTopologyIndices());
 #endif
-  // Parse the rotatable bonds, cis-trans isomers, and chiral centers in each system to prepare
-  // a much larger list of all the possible conformers that each system might be able to access.
-  expandConformers(&sandbox, replica_counts, ui, sc, &xrs, &master_timer);
   
   // Complete the work unit construction.  Upload data to the GPU, if applicable.
 #ifdef STORMM_USE_HPC
@@ -170,7 +171,6 @@ int main(int argc, const char* argv[]) {
   sandbox_sems.upload();
   sandbox.upload();
 #endif
-  master_timer.assignTime(3);
 
   // Loop over all systems and perform energy minimizations.
   const PrecisionControls preccon = ui.getPrecisionNamelistInfo();
@@ -179,6 +179,7 @@ int main(int argc, const char* argv[]) {
   for (int i = 0; i < unique_topologies.size(); i++) {
     sandbox_masks.emplace_back(unique_topologies[i]);
   }
+  master_timer.assignTime(tm_work_unit_building);
 #ifdef STORMM_USE_HPC
   ScoreCard emin = launchMinimization(sandbox_ag, sandbox_sems, &sandbox,
                                       ui.getMinimizeNamelistInfo(), gpu,
@@ -196,12 +197,12 @@ int main(int argc, const char* argv[]) {
     // Subsequent analyses can focus on the synthesis.
     PhaseSpace psi = sandbox.exportSystem(i);
     const AtomGraph *agi = sandbox_ag.getSystemTopologyPointer(i);
-    ScoreCard emin_i = minimize(&psi, agi, sandbox_masks[conformer_topology_indices[i]], mincon);
+    ScoreCard emin_i = minimize(&psi, agi, sandbox_masks[sandbox_topology_indices[i]], mincon);
     emin.import(emin_i, i, 0);
     coordCopy(&sandbox, i, psi);
   }
 #endif
-  master_timer.assignTime(4);
+  master_timer.assignTime(tm_energy_minimization);
 
   // Download the results from the HPC device, if applicable
 #ifdef STORMM_USE_HPC
@@ -212,16 +213,61 @@ int main(int argc, const char* argv[]) {
   Condensate sandbox_snapshot(sandbox);
 #endif
 
+  // CHECK
+#if 0
+  const SynthesisMapReader scmapr = sandbox_map.data();
+  const SyPermutorKit syperk = sandbox_prm.dpData();
+  for (int i = 0; i < sc.getSystemCount(); i++) {
+    const ChemicalDetailsKit cdk = sc.getSystemTopologyPointer(i)->getChemicalDetailsKit();
+    printf("System %2d spawns -> [\n", i);
+    int jtrack = 0;
+    for (int j = scmapr.csystem_bounds[i]; j < scmapr.csystem_bounds[i + 1]; j++) {
+      printf(" %4d", scmapr.csystem_proj[j]);
+      jtrack++;
+      if (jtrack == 18) {
+        jtrack = 0;
+        printf("\n");
+      }
+    }
+    if (jtrack > 0) {
+      printf("\n");
+    }
+    printf("];\n");
+    printf("Definitions %2d = [\n", i);
+    for (int j = syperk.prm_rot_grp_bounds[i]; j < syperk.prm_rot_grp_bounds[i + 1]; j++) {
+      printf("  %4.4s %4.4s %4.4s %4.4s\n",
+             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].x]).c_str(),
+             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].y]).c_str(),
+             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].z]).c_str(),
+             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].w]).c_str());
+    }
+    printf("Angles %2d = [\n", i);
+    for (int j = scmapr.csystem_bounds[i]; j < scmapr.csystem_bounds[i + 1]; j++) {
+      for (int k = syperk.prm_rot_grp_bounds[i]; k < syperk.prm_rot_grp_bounds[i + 1]; k++) {
+        printf("  %7.4lf", dihedralAngle<double>(syperk.rot_bond_markers[k].x,
+                                                 syperk.rot_bond_markers[k].y,
+                                                 syperk.rot_bond_markers[k].z,
+                                                 syperk.rot_bond_markers[k].w, sandbox,
+                                                 scmapr.csystem_proj[j]));
+      }
+      printf("\n");
+    }
+    printf("];\n");
+  }
+#endif
+  // END CHECK
+  
   // For each rotatable bond, compute the value obtained in each conformer.  This will produce a
   // map of the viable minima for various conformations.
-
+  
   // Get a vector of the best conformations by their indices in the synthesis.
-  const std::vector<int> best_confs = filterMinimizedStructures(sandbox, sandbox_masks, sc, scmap,
-                                                                emin,
+  const std::vector<int> best_confs = filterMinimizedStructures(sandbox, sandbox_masks, sc,
+                                                                sandbox_map, emin,
                                                                 ui.getConformerNamelistInfo());
+  master_timer.assignTime(tm_conformer_selection);
 
   // Print the best conformations for each topological system.
-  printResults(sandbox, best_confs, emin, sc, scmap, sdf_recovery, ui.getConformerNamelistInfo(),
+  printResults(sandbox, best_confs, emin, sc, sandbox_map, ui.getConformerNamelistInfo(),
                ui.getReportNamelistInfo());
 
   // Print timings results

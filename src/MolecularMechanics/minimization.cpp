@@ -5,8 +5,8 @@ namespace stormm {
 namespace mm {
 
 using energy::EvaluateForce;
-using math::invertSquareMatrix;
-using math::matrixVectorMultiply;
+using stmath::invertSquareMatrix;
+using stmath::matrixVectorMultiply;
 using structure::placeVirtualSites;
 using structure::transmitVirtualSiteForces;
   

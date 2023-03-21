@@ -2,6 +2,9 @@
 #ifndef STORMM_PHASESPACE_SYNTHESIS_H
 #define STORMM_PHASESPACE_SYNTHESIS_H
 
+#include <typeinfo>
+#include <typeindex>
+#include <sys/types.h>
 #include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
@@ -26,11 +29,12 @@ using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using diskutil::PrintSituation;
-using math::roundUp;
+using stmath::roundUp;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
+using numerics::globalpos_scale_nonoverflow_bits;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::Barostat;
@@ -627,6 +631,30 @@ public:
                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
+  /// \brief Get the interlaced X, Y, and Z coordinates of one system in particular.  The result
+  ///        is comparable to the getInterlacedCoordinates() functions held by CoordinateFrame and
+  ///        PhaseSpace objects.  The result will be provided in internal units of Angstroms (for
+  ///        positions), Angstroms per femtosecond (for velocities), or kcal/mol-A (for forces).
+  ///
+  /// Overloaded:
+  ///   - Provide the stage of the coordinate cycle from which to obtain coordinates
+  ///   - Assume that the PRIMARY stage of the coordinate cycle is desired
+  ///
+  /// \param index        Index of the system of interest within the synthesis
+  /// \param trajkind     Type of coordinates to copy
+  /// \param orientation  Stage of the coordinate cycle from which to obtain coordinates
+  /// \param tier         The level (host or device) at which to get the data
+  /// \{
+  std::vector<double>
+  getInterlacedCoordinates(int index, CoordinateCycle orientation,
+                           TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  getInterlacedCoordinates(int index, TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+  
   /// \brief Initialize the forces within a PhaseSpaceSynthesis object.  This is the analog of the
   ///        eponymous function in the PhaseSpace object.
   ///
@@ -730,56 +758,83 @@ public:
   ///                           its own scaling factor.
   /// \param frame_index        Index of a CoordinateSeries object to be transferred
   /// \{
+  void import(const PhaseSpaceReader &psr, int system_index, CoordinateCycle orientation,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   void import(const PhaseSpaceReader &psr, int system_index,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void import(const PhaseSpaceWriter &psw, int system_index, CoordinateCycle orientation,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   void import(const PhaseSpaceWriter &psw, int system_index,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void import(const PhaseSpace &ps, int system_index, CoordinateCycle orientation,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   void import(const PhaseSpace &ps, int system_index,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  void import(const CoordinateFrameReader &cfr, int system_index, CoordinateCycle orientation,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   void import(const CoordinateFrameReader &cfr, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
-  
+
+  void import(const CoordinateFrameWriter &cfw, int system_index, CoordinateCycle orientation,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   void import(const CoordinateFrameWriter &cfw, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
-  
+
+  void import(const CoordinateFrame &cf, int system_index, CoordinateCycle orientation,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   void import(const CoordinateFrame &cf, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
-  
+
   template <typename T>
   void import(const T* x_import, const T* y_import, const T* z_import, const double* box_xform_in,
               const double* inverse_xform_in, const double* box_dimensions_in, int system_index,
-              double inverse_scaling_factor = 1.0, TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              CoordinateCycle orientation, double inverse_scaling_factor = 1.0,
+              TrajectoryKind kind = TrajectoryKind::POSITIONS,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
+              CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
   void import(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
+              CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
   void import(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+              HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
+              CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
   void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   
@@ -956,9 +1011,19 @@ private:
   void validateSystemIndex(int index, const char* caller = nullptr) const;
 };
 
+/// \brief Define the type index for the PhaseSpaceSynthesis object.
+static const size_t phasespace_synthesis_type_index =
+  std::type_index(typeid(PhaseSpaceSynthesis)).hash_code();
+
 } // namespace trajectory
 } // namespace stormm
 
 #include "phasespace_synthesis.tpp"
+
+// As with common types and STORMM vector types, define the type indices for general use in the
+// STORMM namespace.
+namespace stormm {
+using synthesis::phasespace_synthesis_type_index;
+} // namespace stormm
 
 #endif

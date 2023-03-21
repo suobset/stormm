@@ -9,12 +9,12 @@
 namespace stormm {
 namespace testing {
 
-using math::maxValue;
-using math::mean;
-using math::meanUnsignedError;
-using math::pearson;
-using math::variance;
-using math::VarianceMethod;
+using stmath::maxValue;
+using stmath::mean;
+using stmath::meanUnsignedError;
+using stmath::pearson;
+using stmath::variance;
+using stmath::VarianceMethod;
 using parse::realDecimalPlaces;
 using parse::realToString;
 

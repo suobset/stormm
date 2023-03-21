@@ -98,11 +98,11 @@ std::string getEnumerationName(const InitializationTask input) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const CondensateSource input) {
+std::string getEnumerationName(const StructureSource input) {
   switch (input) {
-  case CondensateSource::SYNTHESIS:
+  case StructureSource::SYNTHESIS:
     return std::string("SYNTHESIS");
-  case CondensateSource::SERIES:
+  case StructureSource::SERIES:
     return std::string("SERIES");
   }
   __builtin_unreachable();
@@ -120,7 +120,22 @@ std::string getEnumerationName(const SystemGrouping input) {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const VariableTorsionAdjustment input) {
+  switch (input) {
+  case VariableTorsionAdjustment::ADJUST_NEARBY_VALUES:
+    return std::string("ADJUST_NEARBY_VALUES");
+  case VariableTorsionAdjustment::RESTRICT_TO_NEARBY_VALUES:
+    return std::string("RESTRICT_TO_NEARBY_VALUES");
+  case VariableTorsionAdjustment::CLUSTER_AND_APPLY_VALUES:
+    return std::string("CLUSTER_AND_APPLY_VALUES");
+  case VariableTorsionAdjustment::DO_NOT_CHANGE:
+    return std::string("DO_NOT_CHANGE");
+  }
+  __builtin_unreachable();
+}
+
 //-------------------------------------------------------------------------------------------------
 SystemGrouping translateSystemGrouping(const std::string &input_string) {
   if (strcmpCased(input_string, "system", CaseSensitivity::NO) ||
@@ -137,6 +152,27 @@ SystemGrouping translateSystemGrouping(const std::string &input_string) {
   else {
     rtErr("The input \"" + input_string + "\" is not a valid system grouping.",
           "translateSystemGrouping");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+VariableTorsionAdjustment translateVariableTorsionAdjustment(const std::string &input_string) {
+  if (strcmpCased(input_string, "adjust", CaseSensitivity::NO)) {
+    return VariableTorsionAdjustment::ADJUST_NEARBY_VALUES;
+  }
+  else if (strcmpCased(input_string, "restrict", CaseSensitivity::NO)) {
+    return VariableTorsionAdjustment::RESTRICT_TO_NEARBY_VALUES;
+  }
+  else if (strcmpCased(input_string, "cluster", CaseSensitivity::NO)) {
+    return VariableTorsionAdjustment::CLUSTER_AND_APPLY_VALUES;
+  }
+  else if (strcmpCased(input_string, "none", CaseSensitivity::NO)) {
+    return VariableTorsionAdjustment::DO_NOT_CHANGE;
+  }
+  else {
+    rtErr("The input \"" + input_string + "\" is not a valid torsion adjustment protocol.",
+          "translateVariableTorsionAdjustment");
   }
   __builtin_unreachable();
 }

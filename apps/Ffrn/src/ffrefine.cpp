@@ -72,14 +72,14 @@ int main(int argc, const char* argv[]) {
   UserSettings ui(argc, argv, AppName::FFREFINE);
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
-  std::vector<MdlMol> sdf_recovery;
   SystemCache sysc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
-                   &sdf_recovery, ui.getExceptionBehavior(), MapRotatableGroups::YES,
-                   ui.getPrintingPolicy(), &timer);
+                   ui.getExceptionBehavior(), MapRotatableGroups::YES, ui.getPrintingPolicy(),
+                   &timer);
+  const int system_count = sysc.getSystemCount();
+  std::vector<MdlMol> sdf_recovery = sysc.getStructureDataEntry();
   customizeDataItems(&sdf_recovery, sysc, ui.getReportNamelistInfo());
 
   // Perform minimizations as requested.
-  const int system_count = sysc.getSystemCount();
   const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
   const int mini_timings = timer.addCategory("Minimization");
   std::vector<ScoreCard> all_mme;
@@ -87,11 +87,11 @@ int main(int argc, const char* argv[]) {
     all_mme.reserve(system_count);
     for (int i = 0; i < system_count; i++) {
       PhaseSpace *ps = sysc.getCoordinatePointer(i);
-      const RestraintApparatus& ra = sysc.getRestraintReference(i);
+      const RestraintApparatus& ra = sysc.getRestraints(i);
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
-        all_mme.emplace_back(minimize(ps, sysc.getSystemTopologyReference(i), ra,
-                                      sysc.getSystemStaticMaskReference(i), mincon));
+        all_mme.emplace_back(minimize(ps, sysc.getSystemTopology(i), ra,
+                                      sysc.getSystemStaticMask(i), mincon));
         timer.assignTime(mini_timings);
       case UnitCellType::ORTHORHOMBIC:
       case UnitCellType::TRICLINIC:
@@ -103,7 +103,7 @@ int main(int argc, const char* argv[]) {
   // Print restart files from energy minimization
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
-      const PhaseSpace ps = sysc.getCoordinateReference(i);
+      const PhaseSpace ps = sysc.getCoordinates(i);
       switch (sysc.getCheckpointKind(i)) {
       case CoordinateFileKind::AMBER_CRD:
       case CoordinateFileKind::AMBER_INPCRD:

@@ -30,7 +30,7 @@ kCondensateUpdate(CondensateWriter cdw, const PsSynthesisReader poly_psr) {
     double xi = poly_psr.xcrd[i];
     double yi = poly_psr.ycrd[i];
     double zi = poly_psr.zcrd[i];
-    if (poly_psr.gpos_bits >= globalpos_scale_nonoverflow_bits) {
+    if (poly_psr.gpos_bits > globalpos_scale_nonoverflow_bits) {
       xi += (double)(poly_psr.xcrd_ovrf[i]) * max_llint_accumulation;
       yi += (double)(poly_psr.ycrd_ovrf[i]) * max_llint_accumulation;
       zi += (double)(poly_psr.zcrd_ovrf[i]) * max_llint_accumulation;

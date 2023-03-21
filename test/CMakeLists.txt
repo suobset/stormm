@@ -7,6 +7,7 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Parsing/test_parse.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Parsing/test_input.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Namelists/test_namelists.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_clustering.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_math.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_numerics.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_amber_prmtop.cpp
@@ -17,9 +18,10 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Structure/test_local_arrangement.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Structure/test_isomerization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Structure/test_mesh_construction.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_condensate.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_synthesis.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_atomgraph_synthesis.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_condensate.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_small_molecules.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Synthesis/test_synthesis.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Potential/test_valence_evaluation.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Potential/test_nonbonded_evaluation.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Potential/test_generalized_born.cpp

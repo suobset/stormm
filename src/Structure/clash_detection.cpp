@@ -224,6 +224,7 @@ void ClashReport::addClash(const int atom_i, const int atom_j, const double dist
 
 //-------------------------------------------------------------------------------------------------
 void ClashReport::clear() {
+  clash_count = 0;
   pairs.resize(0);
   distances.resize(0);
   kinds.resize(0);
@@ -353,39 +354,6 @@ bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusio
                  ClashReport *summary) {
   return detectClash(ps->data(), ag->getDoublePrecisionValenceKit(),
                      ag->getDoublePrecisionNonbondedKit(), mask,
-                     summary->getMinimumDistance(), summary->getMinimumSigmaRatio(), summary);
-}
-
-//-------------------------------------------------------------------------------------------------
-bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
-                 const StaticExclusionMask *mask, const double elec_limit,
-                 const double vdw_ratio, ClashReport *summary) {
-  return detectClash(cdns->data(), system_index, ag->getDoublePrecisionValenceKit(),
-                     ag->getDoublePrecisionNonbondedKit(), mask, elec_limit, vdw_ratio, summary);
-}
-
-//-------------------------------------------------------------------------------------------------
-bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
-                 const StaticExclusionMask &mask, const double elec_limit,
-                 const double vdw_ratio, ClashReport *summary) {
-  return detectClash(cdns.data(), system_index, ag.getDoublePrecisionValenceKit(),
-                     ag.getDoublePrecisionNonbondedKit(), mask.getSelfPointer(), elec_limit,
-                     vdw_ratio, summary);
-}
-
-//-------------------------------------------------------------------------------------------------
-bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
-                 const StaticExclusionMask *mask, ClashReport *summary) {
-  return detectClash(cdns->data(), system_index, ag->getDoublePrecisionValenceKit(),
-                     ag->getDoublePrecisionNonbondedKit(), mask, summary->getMinimumDistance(),
-                     summary->getMinimumSigmaRatio(), summary);
-}
-
-//-------------------------------------------------------------------------------------------------
-bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
-                 const StaticExclusionMask &mask, ClashReport *summary) {
-  return detectClash(cdns.data(), system_index, ag.getDoublePrecisionValenceKit(),
-                     ag.getDoublePrecisionNonbondedKit(), mask.getSelfPointer(),
                      summary->getMinimumDistance(), summary->getMinimumSigmaRatio(), summary);
 }
 

@@ -106,10 +106,14 @@ enum class ClashResponse {
 ///
 /// \param input  The enumeration of interest
 /// \{
+std::string getEnumerationName(EvaluateForce input);
+std::string getEnumerationName(EvaluateEnergy input);
+std::string getEnumerationName(EvaluateVirial input);
 std::string getEnumerationName(DihedralStyle input);
 std::string getEnumerationName(StateVariable input);
 std::string getEnumerationName(NonbondedPotential input);
 std::string getEnumerationName(VdwCombiningRule input);
+std::string getEnumerationName(ClashResponse input);
 /// \}
 
 } // namespace energy

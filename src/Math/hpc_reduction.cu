@@ -8,7 +8,7 @@
 #include "hpc_reduction.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using constants::twice_warp_bits_mask_int;
 using numerics::max_int_accumulation;

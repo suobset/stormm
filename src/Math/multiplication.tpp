@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> double logProduct(const T* values, const size_t length) {
@@ -123,5 +123,5 @@ template <typename Tprod, typename Tbase> Tprod seriesProduct(const Hybrid<Tbase
   return seriesProduct<Tprod, Tbase>(va.data(), va.size());
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

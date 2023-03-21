@@ -23,6 +23,9 @@ Condensate::Condensate(const CoordinateSeries<T> &cs_in, const PrecisionModel mo
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 const CoordinateSeries<T>* Condensate::getSeriesPointer() const {
+  if (cs_ptr == nullptr) {
+    rtErr("No CoordinateSeries is referenced.", "Condensate", "getSeriesPointer");
+  }
   return reinterpret_cast<CoordinateSeries<T>*>(cs_ptr);
 }
 
@@ -30,7 +33,7 @@ const CoordinateSeries<T>* Condensate::getSeriesPointer() const {
 template <typename T>
 void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel mode_in,
                          const GpuDetails &gpu) {
-  basis = CondensateSource::SERIES;
+  basis = StructureSource::SERIES;
 
   // Reinterpret the templated CoordinatesSeries<T> pointer as a CoordinateSeries of an arbitrary
   // type.  This prevents the Condensate class as a whole from taking on a template requirement.
@@ -38,9 +41,10 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
   cs_ptr = reinterpret_cast<CoordinateSeries<int>*>(const_cast<CoordinateSeries<T>*>(cs_in));
   pps_ptr = nullptr;
   csptr_data_type = std::type_index(typeid(T)).hash_code();
-  basis = CondensateSource::SERIES;
+  basis = StructureSource::SERIES;
   const CoordinateSeriesReader<T> csr = cs_in->data();
   system_count = csr.nframe;
+  unit_cell = csr.unit_cell;
   atom_starts.resize(system_count);
   atom_counts.resize(system_count);
   size_t* atom_starts_ptr = atom_starts.data();
@@ -128,26 +132,7 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
     }
     break;
   }
-  computeWorkUnits(cs_in, gpu);
   update(cs_in);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-void Condensate::computeWorkUnits(const CoordinateSeries<T> *cs_in, const GpuDetails &gpu) {
-  const std::vector<int> cs_bounds = { 0, cs_in->getFrameCount() };
-  const std::vector<int> cs_contents = incrementingSeries(0, cs_in->getFrameCount());
-  const std::vector<int> all_zeros(cs_in->getFrameCount(), 0);
-  generateWorkUnits(cs_contents.data(), all_zeros.data(), cs_bounds.data(), 1,
-                    &atr_instructions_top, &atr_instruction_groups_top, &ata_instructions_top,
-                    &ata_instruction_groups_top, &atr_instruction_count_top,
-                    &ata_instruction_count_top, gpu);
-
-  // There are no source- or label-specific instructions for a coordinate series, only a synthesis
-  atr_instruction_count_src = 0;
-  atr_instruction_count_lbl = 0;
-  ata_instruction_count_src = 0;
-  ata_instruction_count_lbl = 0;
 }
 
 //-------------------------------------------------------------------------------------------------

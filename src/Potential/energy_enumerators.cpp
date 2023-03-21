@@ -10,6 +10,39 @@ using constants::CaseSensitivity;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const EvaluateForce input) {
+  switch (input) {
+  case EvaluateForce::NO:
+    return std::string("NO");
+  case EvaluateForce::YES:
+    return std::string("YES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const EvaluateEnergy input) {
+  switch (input) {
+  case EvaluateEnergy::NO:
+    return std::string("NO");
+  case EvaluateEnergy::YES:
+    return std::string("YES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const EvaluateVirial input) {
+  switch (input) {
+  case EvaluateVirial::NO:
+    return std::string("NO");
+  case EvaluateVirial::YES:
+    return std::string("YES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const DihedralStyle input) {
   switch (input) {
   case DihedralStyle::COSINE:
@@ -109,6 +142,17 @@ std::string getEnumerationName(const VdwCombiningRule input) {
     return std::string("GEOMETRIC");
   case VdwCombiningRule::NBFIX:
     return std::string("NBFIX");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ClashResponse input) {
+  switch (input) {
+  case ClashResponse::NONE:
+    return std::string("NONE");
+  case ClashResponse::FORGIVE:
+    return std::string("FORGIVE");
   }
   __builtin_unreachable();
 }

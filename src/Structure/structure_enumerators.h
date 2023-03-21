@@ -2,6 +2,7 @@
 #ifndef STORMM_STRUCTURE_ENUMERATORS_H
 #define STORMM_STRUCTURE_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
@@ -80,7 +81,56 @@ enum class ClashKind {
   PURE_DISTANCE   ///< The distance between two particles is less than the minimum absolute
                   ///<   distance allowed before a clash is declared
 };
+
+/// \brief List the various general levels for system sampling.  The maximum number of trials per
+///        system will be capped at a user-specifiable quantity given by the "max_system_trials"
+///        keyword, or some value determined on a system-by-system basis determined by one of the
+///        enumerations herein.
+enum class SamplingIntensity {
+  MINIMAL,    ///< Sample each rotamer with a user-specified number of torsion angles across the
+              ///<   rotatable bond ("rotation_samples").
+  LIGHT,      ///< Sample each pair of nearby rotamers, cis-trans isomerizations, and chiral
+              ///<   centers, applying all combinations of torsion angles with the sampling density
+              ///<   given by the "rotation_samples" keyword.  For each state, other degrees of
+              ///<   freedom will be set randomly.
+  HEAVY,      ///< Sample each pair of nearby rotamers, applying all combinations of torsion angles
+              ///<   with the sampling density given by the "rotation_samples" keyword up to four
+              ///<   times, pending the availability of other degrees of freedom which can be set
+              ///<   randomly to generate unique starting conditions.
+  EXHAUSTIVE  ///< Sample all possible combinations of rotamers, isomerizable cis-trans bonds, and
+              ///<   invertible chiral centers, up to the hard limit set forth by the
+              ///<   "max_system_trials" keyword.
+};
+
+/// \brief Enumerate the types of boundary conditions for a system or range of values.
+enum class BoundaryCondition {
+  ISOLATED,  ///< There are no boundaries on the range--the variables are isolated in infinite
+             ///<   space with no re-imaging considerations.
+  PERIODIC   ///< There is a defined length to the space in which variables reside, and to exceed
+             ///<   one limit of the range is to re-enter starting at the opposite limit.
+};
   
+/// \brief Return a human-readable string describing each enumerated value.  The enumerator in the
+///        argument determines the overload to be used.
+///
+/// \param input  The enumeration of interest
+/// \{
+std::string getEnumerationName(ImagingMethod input);
+std::string getEnumerationName(RMSDMethod input);
+std::string getEnumerationName(RMSDAlignmentProtocol input);
+std::string getEnumerationName(RMSDTask input);
+std::string getEnumerationName(VirtualSiteActivity input);
+std::string getEnumerationName(GridDetail input);
+std::string getEnumerationName(ClashKind input);
+std::string getEnumerationName(SamplingIntensity input);
+std::string getEnumerationName(BoundaryCondition input);
+/// \}
+
+/// \brief Interpret string input to recognize a specific level of sampling effort.
+///
+/// \param input  The human-readable sampling keyword input
+SamplingIntensity translateSamplingIntensity(const std::string &input);
+
 } // namespace structure
 } // namespace stormm
 

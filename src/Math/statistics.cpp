@@ -3,7 +3,7 @@
 #include "statistics.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 double running_variance(const double sum_of_squares, const double sum_of_values,

@@ -2,6 +2,7 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "FileManagement/file_listing.h"
+#include "FileManagement/file_util.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
 #include "MoleculeFormat/molecule_file_io.h"
@@ -13,10 +14,13 @@ namespace stormm {
 namespace trajectory {
 
 using constants::CartesianDimension;
+using diskutil::DataFormat;
+using diskutil::detectCoordinateFileKind;
+using diskutil::getTrajectoryFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-using math::extractBoxDimensions;
-using math::roundUp;
+using stmath::extractBoxDimensions;
+using stmath::roundUp;
 using parse::TextFileReader;
 using structure::extractSdfCoordinates;
 

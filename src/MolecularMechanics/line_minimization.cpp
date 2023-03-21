@@ -8,7 +8,7 @@ namespace stormm {
 namespace mm {
 
 using card::HybridKind;
-using math::roundUp;
+using stmath::roundUp;
 
 //-------------------------------------------------------------------------------------------------
 LinMinWriter::LinMinWriter(const int nsys_in, double* l_move_in, double* s_move_in,

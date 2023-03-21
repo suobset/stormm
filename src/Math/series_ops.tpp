@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> incrementingSeries(const T start_value, const T end_value,
@@ -57,15 +57,18 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void indexingArray(const T* raw_values, T* value_locations, T* value_bounds,
-                                         const size_t value_count, const size_t value_limit) {
+template <typename Tdata, typename Tloc>
+void indexingArray(const Tdata* raw_values, Tloc* value_locations, Tloc* value_bounds,
+                   const size_t value_count, const size_t value_limit) {
 
   // Zero the bounds array
   for (size_t i = 0; i <= value_limit; i++) {
     value_bounds[i] = 0;
   }
 
-  // Loop over the raw values and tally their quantities
+  // Loop over the raw values and tally their quantities.  Cast the raw_values elements to size_t
+  // in order to perform the safety check and prepare for indexing the proper element of the bounds
+  // array.
   for (size_t i = 0; i < value_count; i++) {
     const size_t rvi = raw_values[i];
     if (rvi < value_limit) {
@@ -79,7 +82,7 @@ template <typename T> void indexingArray(const T* raw_values, T* value_locations
   for (size_t i = 0; i < value_count; i++) {
     const size_t rvi = raw_values[i];
     if (rvi < value_limit) {
-      const T vbi = value_bounds[rvi];
+      const Tloc vbi = value_bounds[rvi];
       value_locations[vbi] = i;
       value_bounds[rvi] = vbi + 1;
     }
@@ -91,21 +94,22 @@ template <typename T> void indexingArray(const T* raw_values, T* value_locations
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void indexingArray(const std::vector<T> &raw_values,
-                                         std::vector<T> *value_locations,
-                                         std::vector<T> *value_bounds, size_t value_limit) {
+template <typename Tdata, typename Tloc>
+void indexingArray(const std::vector<Tdata> &raw_values, std::vector<Tloc> *value_locations,
+                   std::vector<Tloc> *value_bounds, size_t value_limit) {
   const size_t actual_value_limit = (value_limit == 0) ? value_bounds->size() - 1 : value_limit;
   indexingArray(raw_values.data(), value_locations->data(), value_bounds->data(),
                 raw_values.size(), actual_value_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void indexingArray(const Hybrid<T> &raw_values, Hybrid<T> *value_locations,
-                                         Hybrid<T> *value_bounds, size_t value_limit) {
+template <typename Tdata, typename Tloc>
+void indexingArray(const Hybrid<Tdata> &raw_values, Hybrid<Tloc> *value_locations,
+                   Hybrid<Tloc> *value_bounds, size_t value_limit) {
   const size_t actual_value_limit = (value_limit == 0) ? value_bounds->size() - 1 : value_limit;
   indexingArray(raw_values.data(), value_locations->data(), value_bounds->data(),
                 raw_values.size(), actual_value_limit);
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

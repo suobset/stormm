@@ -33,7 +33,7 @@ using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
-using stormm::math::maxValue;
+using stormm::stmath::maxValue;
 using stormm::parse::polyNumericVector;
 using stormm::parse::NumberFormat;
 using stormm::parse::operator!=;

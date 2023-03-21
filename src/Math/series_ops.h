@@ -12,7 +12,7 @@
 #include "vector_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using parse::NumberFormat;
@@ -111,9 +111,9 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 ///   - Provide Standard Template Library vectors
 ///   - Provide Hybrid objects
 ///
-/// \param raw_values       
+/// \param raw_values       Array of values, each element in the range [ 0, ..., N )
 /// \param value_locations  Array of indices in raw_values wherein instances of each value 0,
-///                         1, ... N-1 can be found
+///                         1, ... N-1 can be found, filled and returned
 /// \param value_bounds     Bounds array for value_locations, filled and returned
 /// \param value_count      Trusted length of the raw_values array (if C-style arrays are provided)
 /// \param value_limit      One less than the trusted length of the value_bounds array (this is for
@@ -121,18 +121,20 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 ///                         values in a specific range).  This is the upper limit of values that
 ///                         will be catalogged: the range becomes [ 0 ... value_limit ).
 /// \{
-template <typename T> void indexingArray(const T* raw_values, T* value_locations, T* value_bounds,
-                                         size_t value_count, size_t value_limit);
+template <typename Tdata, typename Tloc>
+void indexingArray(const Tdata* raw_values, Tloc* value_locations, Tloc* value_bounds,
+                   size_t value_count, size_t value_limit);
 
-template <typename T> void indexingArray(const std::vector<T> &raw_values,
-                                         std::vector<T> *value_locations,
-                                         std::vector<T> *value_bounds, size_t value_limit = 0);
+template <typename Tdata, typename Tloc>
+void indexingArray(const std::vector<Tdata> &raw_values, std::vector<Tloc> *value_locations,
+                   std::vector<Tloc> *value_bounds, size_t value_limit = 0);
 
-template <typename T> void indexingArray(const Hybrid<T> &raw_values, Hybrid<T> *value_locations,
-                                         Hybrid<T> *value_bounds, size_t value_limit = 0);
+template <typename Tdata, typename Tloc>
+void indexingArray(const Hybrid<Tdata> &raw_values, Hybrid<Tloc> *value_locations,
+                   Hybrid<Tloc> *value_bounds, size_t value_limit = 0);
 /// \}
-
-} // namespace math
+  
+} // namespace stmath
 } // namespace stormm
 
 #include "series_ops.tpp"

@@ -1,8 +1,8 @@
 // -*-c++-*-
 
-using stormm::math::sum;
-using stormm::math::mean;
-using stormm::math::maxAbsValue;
+using stormm::stmath::sum;
+using stormm::stmath::mean;
+using stormm::stmath::maxAbsValue;
 using stormm::constants::tiny;
 using stormm::topology::BondTerm;
 

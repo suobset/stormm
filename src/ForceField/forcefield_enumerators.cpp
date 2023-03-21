@@ -6,7 +6,7 @@ namespace stormm {
 namespace modeling {
 
 //-------------------------------------------------------------------------------------------------
-std::string getParameterKindName(const ParameterKind kind) {
+std::string getEnumerationName(const ParameterKind kind) {
   switch (kind) {
   case ParameterKind::BOND:
     return std::string("harmonic bond");

@@ -48,9 +48,9 @@ using stormm::diskutil::osSeparator;
 using stormm::energy::StateVariable;
 using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
-using stormm::math::mean;
-using stormm::math::variance;
-using stormm::math::VarianceMethod;
+using stormm::stmath::mean;
+using stormm::stmath::variance;
+using stormm::stmath::VarianceMethod;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
@@ -1240,7 +1240,8 @@ int main(const int argc, const char* argv[]) {
     for (int j = 0; j < nrot; j++) {
       coordCopy(&icfw, ipsr, TrajectoryKind::POSITIONS);
       rotateAboutBond(icfw.xcrd, icfw.ycrd, icfw.zcrd, irgroups[j].getRootAtom(),
-                      irgroups[j].getPivotAtom(), irgroups[j].getMovingAtoms(),
+                      irgroups[j].getPivotAtom(), irgroups[j].getMovingAtoms().data(),
+                      irgroups[j].getMovingAtoms().size(),
                       xrs.uniformRandomNumber() * stormm::symbols::twopi);
     }
   }

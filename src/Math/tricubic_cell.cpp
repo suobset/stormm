@@ -3,7 +3,7 @@
 #include "tricubic_cell.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 Hybrid<double> getTricubicMatrix() {
@@ -55,5 +55,5 @@ Hybrid<double> getTricubicMatrix() {
   return result;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

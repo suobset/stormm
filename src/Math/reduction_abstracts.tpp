@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -64,5 +64,5 @@ GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, const int* x_read_
     x_write_ovrf{x_write_ovrf_in}, y_write_ovrf{y_write_ovrf_in}, z_write_ovrf{z_write_ovrf_in}
 {}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

@@ -36,7 +36,7 @@ using namespace stormm::constants;
 using namespace stormm::errors;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::mm;
 using namespace stormm::numerics;
 using namespace stormm::parse;
@@ -243,27 +243,27 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
     AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
     for (int j = 0; j < 5; j++) {
       const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
-      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                         AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                         AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                         AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                         AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
 
       // Only do double-precision calculations for low replica numbers--this can be strenuous on
       // many architectures, particularly in the non-bonded kernel.
       if (ncopy < 10) {
-        replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
+        replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                          PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                           AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-        replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
+        replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
+                          PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                           AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       }
     }

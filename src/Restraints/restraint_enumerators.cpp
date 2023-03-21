@@ -10,6 +10,23 @@ using constants::CaseSensitivity;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const RestraintEnsemble input) {
+  switch (input) {
+  case RestraintEnsemble::SPECIFIC_ATOMS:
+    return std::string("SPECIFIC_ATOMS");
+  case RestraintEnsemble::PREVENT_HBONDS:
+    return std::string("PREVENT_HBONDS");
+  case RestraintEnsemble::PRESERVE_HEAVY_DIHEDRALS:
+    return std::string("PRESERVE_HEAVY_DIHEDRALS");
+  case RestraintEnsemble::PRESERVE_POSITIONS:
+    return std::string("PRESERVE_POSITIONS");
+  case RestraintEnsemble::PRESERVE_DISTANCES:
+    return std::string("PRESERVE_DISTANCES");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 RestraintEnsemble translateRestraintEnsemble(const std::string &rst_group) {
   if (strcmpCased(rst_group, "hydrogen_bonds", CaseSensitivity::NO) ||
       strcmpCased(rst_group, "hydrogenbonds", CaseSensitivity::NO) ||

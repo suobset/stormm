@@ -24,10 +24,10 @@ namespace chemistry {
 using card::Hybrid;
 using card::HybridTargetLevel;
 using data_types::isFloatingPointScalarType;
-using math::crossProduct;
-using math::dot;
-using math::project;
-using math::roundUp;
+using stmath::crossProduct;
+using stmath::dot;
+using stmath::project;
+using stmath::roundUp;
 using numerics::hostInt95Sum;
 using numerics::hostInt95ToDouble;
 using synthesis::Condensate;
@@ -263,6 +263,7 @@ public:
   /// An explicit statement of the default constructor, plus additional constructors based on the
   /// related int2 type.
   /// \{
+  CoupledEdit();
   CoupledEdit(ConformationEdit edit_in, int index_in);
   CoupledEdit(int2 data_in);
   /// \}
@@ -395,7 +396,7 @@ public:
   ///
   /// Overloaded:
   ///   - Create a blank object
-  ///   - Create a with a topology only
+  ///   - Create a with a topology only (provided by const pointer or by const reference)
   ///   - Create with a topology and one of the basic (single-system) coordinate objects
   ///
   /// \param ag_in           Pointer to the system topology.  This topology will not be modified by
@@ -416,6 +417,10 @@ public:
                    MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
+  ChemicalFeatures(const AtomGraph &ag_in,
+                   MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
+  
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
                    MapRotatableGroups map_groups_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0, StopWatch *timer_in = nullptr);
@@ -672,15 +677,6 @@ public:
   ///        This re-uses the IsomerPlan struct, this time casting the root and pivot atoms as
   ///        the origins of the heaviest and second-heaviest branches, respectively, which will
   ///        again not move even as the rest of the atoms rotate.
-  ///
-  /// Overloaded:
-  ///   - Get all invertible groups connected to chiral centers without re-ordering the list.
-  ///   - Get a list of all invertible groups with fewer than a given number of dependent atoms
-  ///     in a particular molecule (the system may have more than one molecule)
-  ///
-  /// \param cutoff     The maximum number of dependents for a chiral center 
-  /// \param mol_index  The molecule for which to obtain chiral center inversion groups
-  ///                   system may contain more than one molecule)
   std::vector<IsomerPlan> getChiralInversionGroups() const;
   
   /// \brief Get the means for inverting one or more chiral centers.
@@ -1222,6 +1218,17 @@ int getChiralOrientation(const PhaseSpaceSynthesis &poly_ps, int system_index, i
 bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, int atom_a,
                          int atom_b);
 /// \}
+
+/// \brief Determine whether two ways of isomerizing a molecule are linked, whether by sharing an
+///        atom in the chiral center or rotatable bond, or by having any of those atoms be, in
+///        turn, bonded to one another.
+///
+/// \param isomerizers  List of atom groups involved in each isomer creation for the molecule
+/// \param permi        The first origin of isomerization and thus permutations
+/// \param permj        The second origin of isomerization and thus permutations
+/// \param nbk          Contains the non-bonded exclusions, including bonded exclusions
+bool permutationsAreLinked(const std::vector<IsomerPlan> &isomerizers, int permi, int permj,
+                           const NonbondedKit<double> &nbk);
 
 } // namespace chemistry
 } // namespace stormm

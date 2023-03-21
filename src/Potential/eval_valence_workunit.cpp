@@ -7,8 +7,8 @@
 namespace stormm {
 namespace energy {
 
-using math::crossProduct;
-using math::readBitFromMask;
+using stmath::crossProduct;
+using stmath::readBitFromMask;
 using topology::TorsionKind;
 using trajectory::PhaseSpaceReader;
 using trajectory::PhaseSpaceWriter;

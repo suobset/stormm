@@ -17,7 +17,7 @@ using card::GpuDetails;
 using energy::StaticExclusionMask;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
-using math::sum;
+using stmath::sum;
   
 /// \brief The maximum number of imported atoms in a "small" nonbonded block (256 threads)
 constexpr int small_block_max_atoms = 320;

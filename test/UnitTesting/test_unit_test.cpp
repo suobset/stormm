@@ -3,9 +3,12 @@
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_util.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/series_ops.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Synthesis/atomgraph_synthesis.h"
+#include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/coordinate_series.h"
@@ -20,6 +23,7 @@ using stormm::constants::warp_size_int;
 using stormm::data_types::int4;
 #endif
 using stormm::errors::rtWarn;
+using stormm::stmath::incrementingSeries;
 using stormm::parse::polyNumericVector;
 using stormm::random::Ran2Generator;
 using stormm::random::Xoshiro256ppGenerator;
@@ -241,8 +245,80 @@ int main(const int argc, const char* argv[]) {
   const double noise_roundoff = meanUnsignedError(frm_one_xyz, frm_one_xyz_main);
   check(noise_roundoff, RelationalOperator::LESS_THAN, 1.0e-7, "The TestSystemManager does not "
         "introduce the expected noise into a CoordinateSeries when requested.",
-        tsm.getTestingStatus());  
-  
+        tsm.getTestingStatus());
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis({ 0, 1, 2, 3, 0, 2, 3, 1 });
+  check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, 8, "The atomgraph synthesis created "
+        "by the TestSystemManager object does not contain the expected number of systems.",
+        tsm.getTestingStatus());
+  check(poly_ag.getUniqueTopologyCount(), RelationalOperator::EQUAL, 4, "The atomgraph synthesis "
+        "created by the TestSystemManager object does not contain the expected number of unique "
+        "topologies.", tsm.getTestingStatus());
+  check(poly_ag.getSystemTopologyPointer(6)->getAtomCount(), RelationalOperator::EQUAL,
+        tsm.getTopologyPointer(3)->getAtomCount(), "The topologies present in the synthesis "
+        "created by the TestSystemManager do not meet expectations.", tsm.getTestingStatus());
+
+  // Try making a system manager with missing components.   The tests below rely on the original,
+  // complete tsm variable to execute as this manager contains all of the components that *should*
+  // be present.
+  std::vector<std::string> bad_sysnames = sysnames;
+  bad_sysnames.push_back("this_does_not_exist.nope");
+  TestSystemManager bad_tsm(base_top_name, top_name_ext, bad_sysnames, base_crd_name, crd_name_ext,
+                            bad_sysnames, ExceptionResponse::SILENT);
+  check(bad_tsm.getTestingStatus() == TestPriority::ABORT, "A TestSystemManager with missing "
+        "components returns TestPriority::" + getEnumerationName(bad_tsm.getTestingStatus()) +
+        " when it should signal " + getEnumerationName(TestPriority::ABORT) + ".",
+        tsm.getTestingStatus());
+  check(bad_tsm.getTestingStatus(3) == TestPriority::CRITICAL, "A TestSystemManager with missing "
+        "components returns " + getEnumerationName(bad_tsm.getTestingStatus(3)) + " for a "
+        "specific system, but should return " + getEnumerationName(TestPriority::CRITICAL) + ".",
+        tsm.getTestingStatus());
+  TestSystemManager ign_tsm(base_top_name, top_name_ext, bad_sysnames, base_crd_name, crd_name_ext,
+                            bad_sysnames, ExceptionResponse::SILENT, TestPriority::NON_CRITICAL);
+  check(ign_tsm.getTestingStatus(4) == TestPriority::NON_CRITICAL, "A TestSystemManager with "
+        "missing components returns " + getEnumerationName(bad_tsm.getTestingStatus(4)) +
+        "for tests on a missing system, but should return " +
+        getEnumerationName(TestPriority::NON_CRITICAL) + ".", tsm.getTestingStatus());
+
+  // Test synthesis production from the TestSystemManager
+  std::vector<std::string> small_mols = { "symmetry_C1", "bromobenzene_iso", "bromobenzene_vs",
+                                          "drug_example_dry", "drug_example", "trpcage",
+                                          "trpcage_in_water", "ubiquitin", "med_1",
+                                          "symmetry_C2_in_water", "med_3",
+                                          "symmetry_C3_in_water", "dna" };
+  TestSystemManager smol_tsm(base_top_name, top_name_ext, small_mols, base_crd_name, crd_name_ext,
+                             small_mols, ExceptionResponse::SILENT);
+  const std::vector<UnitCellType> pbc_unit_cells = { UnitCellType::ORTHORHOMBIC,
+                                                     UnitCellType::TRICLINIC };
+  AtomGraphSynthesis all_pbc = smol_tsm.exportAtomGraphSynthesis(pbc_unit_cells);
+  AtomGraphSynthesis all_iso = smol_tsm.exportAtomGraphSynthesis(UnitCellType::NONE);
+  check(all_pbc.getSystemCount(), RelationalOperator::EQUAL, 7, "The number of systems with "
+        "periodic boundary conditions extracted from a TestSystemManager does not meet "
+        "expectations.", smol_tsm.getTestingStatus());
+  check(all_iso.getSystemCount(), RelationalOperator::EQUAL, 6, "The number of systems with "
+        "isolated boundary conditions extracted from a TestSystemManager does not meet "
+        "expectations.", smol_tsm.getTestingStatus());
+  PhaseSpaceSynthesis all_pbc_sys = smol_tsm.exportPhaseSpaceSynthesis(pbc_unit_cells);
+  PhaseSpaceSynthesis all_iso_sys = smol_tsm.exportPhaseSpaceSynthesis(UnitCellType::NONE);
+  check(all_pbc.getSystemCount(), RelationalOperator::EQUAL, all_pbc_sys.getSystemCount(),
+        "The coordinate and topology syntheses produced by a TestSystemManager have dissimilar "
+        "numbers of systems in periodic boundary conditions.", smol_tsm.getTestingStatus());
+  check(all_iso.getSystemCount(), RelationalOperator::EQUAL, all_iso_sys.getSystemCount(),
+        "The coordinate and topology syntheses produced by a TestSystemManager have dissimilar "
+        "numbers of systems in isolated boundary conditions.", smol_tsm.getTestingStatus());
+  std::vector<int> pbc_atom_counts_ag(all_pbc.getSystemCount());
+  std::vector<int> pbc_atom_counts_ps(all_pbc.getSystemCount());
+  for (size_t i = 0; i < all_pbc.getSystemCount(); i++) {
+    pbc_atom_counts_ag[i] = (all_pbc.getSystemTopologyPointer(i)->getAtomCount());
+    pbc_atom_counts_ps[i] = (all_pbc_sys.getSystemTopologyPointer(i)->getAtomCount());
+  }
+  check(pbc_atom_counts_ag, RelationalOperator::EQUAL, pbc_atom_counts_ps, "The number of atoms "
+        "in systems with periodic boundary conditions differ in the topology and coordinate "
+        "syntheses.", smol_tsm.getTestingStatus());
+  CHECK_THROWS_SOFT(AtomGraphSynthesis bad_poly_ag =
+                    smol_tsm.exportAtomGraphSynthesis(incrementingSeries(0, 13)), "A topology "
+                    "synthesis containing systems with mismatched boundary conditions was created "
+                    "by the TestSystemManager.",  smol_tsm.getTestingStatus());
+
   // Test the benchmarking 
   section_timer.addCategory(unitTestSectionName(3) + ", Part A");
   section(4);

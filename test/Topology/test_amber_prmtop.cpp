@@ -21,7 +21,7 @@ using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
-using stormm::math::sum;
+using stormm::stmath::sum;
 using stormm::parse::polyNumericVector;
 using stormm::parse::stringToChar4;
 using stormm::parse::TextFile;
@@ -1059,7 +1059,7 @@ int main(const int argc, const char* argv[]) {
     const bool wcmp = (all_top_exist) ?
                       (identifyWaterModel(*dry_topologies[i]) == WaterModel::NONE) : false;
     check(wcmp, "Some sort of water (" +
-          getWaterModelName(identifyWaterModel(*dry_topologies[i])) + ") was identified in " +
+          getEnumerationName(identifyWaterModel(*dry_topologies[i])) + ") was identified in " +
           dry_topologies[i]->getFileName() + ", which should have no water.", top_check);
   }
   const std::vector<AtomGraph*> wet_topologies = { &tip3p, &tip4p, &tip4p_error, &tip5p,
@@ -1074,8 +1074,8 @@ int main(const int argc, const char* argv[]) {
     const bool wcmp = (all_top_exist) ?
                       (identifyWaterModel(*wet_topologies[i]) == water_types[i]) : false;
     check(wcmp, "Topology " + wet_topologies[i]->getFileName() + " was found to have " +
-          getWaterModelName(identifyWaterModel(*wet_topologies[i])) + " water, but it contains " +
-          getWaterModelName(water_types[i]) + ".", top_check);
+          getEnumerationName(identifyWaterModel(*wet_topologies[i])) + " water, but it contains " +
+          getEnumerationName(water_types[i]) + ".", top_check);
   }
 
   // Test traps for bad input

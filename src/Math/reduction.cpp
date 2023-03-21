@@ -4,7 +4,7 @@
 #include "reduction.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 double gatherNormalization(const GenericRdSubstrate<llint> rsbs, const int start_pos,
@@ -224,5 +224,5 @@ void scatterCenterOnZero(GenericRdSubstrate<llint> rsbs, const double tsum_x, co
   }
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

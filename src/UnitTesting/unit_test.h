@@ -71,11 +71,11 @@ using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
 using data_types::isFloatingPointScalarType;
-using math::sum;
-using math::maxAbsoluteDifference;
-using math::maxRelativeDifference;
-using math::meanUnsignedError;
-using math::relativeRmsError;
+using stmath::sum;
+using stmath::maxAbsoluteDifference;
+using stmath::maxRelativeDifference;
+using stmath::meanUnsignedError;
+using stmath::relativeRmsError;
 using parse::NumberFormat;
 using parse::polyNumericVector;
 

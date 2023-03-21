@@ -3,6 +3,7 @@
 #define STORMM_STRUCTURE_RMSD_H
 
 #include "copyright.h"
+#include "Analysis/comparison_guide.h"
 #include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
@@ -24,13 +25,14 @@
 namespace stormm {
 namespace structure {
 
+using analysis::ComparisonGuide;
 using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
-using math::EigenWork;
-using math::jacobiEigensolver;
-using math::realSymmEigensolver;
-using math::roundUp;
-using math::sum;
+using stmath::EigenWork;
+using stmath::jacobiEigensolver;
+using stmath::realSymmEigensolver;
+using stmath::roundUp;
+using stmath::sum;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using synthesis::Condensate;
@@ -59,6 +61,7 @@ using trajectory::PhaseSpaceWriter;
 ///   - Also include a condensed copy of the synthesis coordinates
 ///   - Also include a synthesis cache map relating systems back to original user specifications
 ///
+/// \param cg            Guide for comparing structures within the synthesis
 /// \param rplan         Plan for computing RMSD values for any topology included in the synthesis
 /// \param snapshots     The synthesis of coordinates
 /// \param cdns          Condensed form of the coordinate synthesis
@@ -69,13 +72,14 @@ using trajectory::PhaseSpaceWriter;
 ///                      for RMSD comparisons
 /// \{
 template <typename T>
-void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-                        const Hybrid<T> *result, RMSDTask process, SystemGrouping organization);
+void checkCompatibility(const ComparisonGuide &cg, const RMSDPlan &rplan,
+                        const PhaseSpaceSynthesis &poly_ps, const Hybrid<T> *result,
+                        RMSDTask process, SystemGrouping organization);
 
 template <typename T>
-void checkCompatibility(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-                        const Condensate &cdns, const Hybrid<T> *result, RMSDTask process,
-                        SystemGrouping organization);
+void checkCompatibility(const ComparisonGuide &cg, const RMSDPlan &rplan,
+                        const PhaseSpaceSynthesis &poly_ps, const Condensate &cdns,
+                        const Hybrid<T> *result, RMSDTask process, SystemGrouping organization);
 /// \}
 
 /// \brief Compute the positional RMSD between two sets of coordinates.
@@ -175,50 +179,55 @@ Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const size_t frame_a, const size_
            const AtomGraph &ag, const RMSDMethod method, const int lower_limit,
            const int upper_limit);
 
-double rmsd(const RMSDPlan &rplan, const CoordinateFrameReader &reference,
-            const CoordinateFrameReader &snapshot);
+double rmsd(const RMSDPlan &rplan, const PhaseSpaceReader &reference,
+            const PhaseSpaceReader &snapshot);
+
+double rmsd(const RMSDPlan &rplan, const PhaseSpace &reference, const PhaseSpace &snapshot);
+
+double rmsd(const RMSDPlan &rplan,
+            const CoordinateFrameReader &reference, const CoordinateFrameReader &snapshot);
 
 double rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
             const CoordinateFrame &snapshot);
 
-double rmsd(const RMSDPlan &rplan, const PhaseSpace &reference, const PhaseSpace &snapshot);
+template <typename T>
+std::vector<double> rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan,
+                         const CoordinateFrame &reference, const CoordinateSeries<T> &snapshots);
 
 template <typename T>
-std::vector<double> rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
-                         const CoordinateSeries<T> &snapshots);
+std::vector<double> rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan,
+                         const CoordinateSeries<T> &snapshots, int reference_frame);
 
 template <typename T>
-std::vector<double> rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots,
-                         int reference_frame);
-
-template <typename T>
-void rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const CoordinateFrame &reference,
           const CoordinateSeries<T> &snapshots, Hybrid<T> *result);
 
 template <typename T>
-void rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots, int reference_frame,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots,
+          int reference_frame, Hybrid<T> *result);
+
+template <typename T>
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots,
           Hybrid<T> *result);
 
 template <typename T>
-void rmsd(const RMSDPlan &rplan, const CoordinateSeries<T> &snapshots, Hybrid<T> *result);
-
-template <typename T>
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
           const Hybrid<int> &reference_frames, Hybrid<T> *result,
           SystemGrouping organization = SystemGrouping::TOPOLOGY);
 
 template <typename T>
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, Hybrid<T> *result,
-          SystemGrouping organization = SystemGrouping::TOPOLOGY);
-
-template <typename T>
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
-          const Hybrid<int> &reference_frames, Hybrid<T> *result,
-          SystemGrouping organization = SystemGrouping::TOPOLOGY);
-
-template <typename T>
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots, const Condensate &cdns,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
           Hybrid<T> *result, SystemGrouping organization = SystemGrouping::TOPOLOGY);
+
+template <typename T>
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
+          const Condensate &cdns, const Hybrid<int> &reference_frames, Hybrid<T> *result,
+          SystemGrouping organization = SystemGrouping::TOPOLOGY);
+
+template <typename T>
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &snapshots,
+          const Condensate &cdns, Hybrid<T> *result,
+          SystemGrouping organization = SystemGrouping::TOPOLOGY);
 /// \}
 
 } // namespace structure

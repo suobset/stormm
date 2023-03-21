@@ -6,6 +6,7 @@
 #endif
 #include "copyright.h"
 #include "Constants/hpc_bounds.h"
+#include "DataTypes/casting_ops.h"
 #include "FileManagement/file_listing.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
@@ -23,16 +24,17 @@ namespace synthesis {
 
 using card::HybridKind;
 using card::getEnumerationName;
+using data_types::constCastVector;
 using diskutil::splitPath;
 using diskutil::DataFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-using math::invertSquareMatrix;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::roundUp;
-using math::sum;
-using math::tileVector;
+using stmath::invertSquareMatrix;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::roundUp;
+using stmath::sum;
+using stmath::tileVector;
 using numerics::checkGlobalPositionBits;
 using numerics::checkLocalPositionBits;
 using numerics::checkVelocityBits;
@@ -1665,12 +1667,17 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       rsw.boxdim[i] = bdim_buffer[i];
     }
   }
-  if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
-    std::vector<int> x_ovrf_buffer, y_ovrf_buffer, z_ovrf_buffer;
-    switch (tier) {
-    case HybridTargetLevel::HOST:
-      switch (trajkind) {
-      case TrajectoryKind::POSITIONS:
+
+  // If the fixed-precision scaling is such that overflow buffers might be engaged, process the
+  // additional information.
+  std::vector<int> x_ovrf_buffer, y_ovrf_buffer, z_ovrf_buffer;
+  bool overflow_found = false;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_coord_overflow.readHost(astart, rsw.natom);
@@ -1683,8 +1690,11 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_coordinate_overflow.readHost(astart, rsw.natom);
           break;
         }
-        break;
-      case TrajectoryKind::VELOCITIES:
+      }
+      break;
+    case TrajectoryKind::VELOCITIES:
+      if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_velocity_overflow.readHost(astart, rsw.natom);
@@ -1697,8 +1707,11 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_velocity_overflow.readHost(astart, rsw.natom);
           break;
         }
-        break;
-      case TrajectoryKind::FORCES:
+      }
+      break;
+    case TrajectoryKind::FORCES:
+      if (force_scale_bits > force_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_force_overflow.readHost(astart, rsw.natom);
@@ -1711,13 +1724,16 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_force_overflow.readHost(astart, rsw.natom);
           break;
         }
-        break;
       }
       break;
+    }
+    break;
 #ifdef STORMM_USE_HPC
-    case HybridTargetLevel::DEVICE:
-      switch (trajkind) {
-      case TrajectoryKind::POSITIONS:
+  case HybridTargetLevel::DEVICE:
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_coord_overflow.readDevice(astart, rsw.natom);
@@ -1730,8 +1746,11 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_coordinate_overflow.readDevice(astart, rsw.natom);
           break;
         }
-        break;
-      case TrajectoryKind::VELOCITIES:
+      }
+      break;
+    case TrajectoryKind::VELOCITIES:
+      if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_velocity_overflow.readDevice(astart, rsw.natom);
@@ -1744,8 +1763,11 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_velocity_overflow.readDevice(astart, rsw.natom);
           break;
         }
-        break;
-      case TrajectoryKind::FORCES:
+      }
+      break;
+    case TrajectoryKind::FORCES:
+      if (force_scale_bits > force_scale_nonoverflow_bits) {
+        overflow_found = true;
         switch (orientation) {
         case CoordinateCycle::ALTERNATE:
           x_ovrf_buffer = x_alt_force_overflow.readDevice(astart, rsw.natom);
@@ -1758,17 +1780,19 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
           z_ovrf_buffer = z_force_overflow.readDevice(astart, rsw.natom);
           break;
         }
-        break;
       }
       break;
-#endif
     }
+    break;
+#endif
+  }
+  if (overflow_found) {
     const double ovrf_deflation = deflation * max_llint_accumulation;
     for (int i = 0; i < rsw.natom; i++) {
       rsw.xcrd[i] += static_cast<double>(x_ovrf_buffer[i]) * ovrf_deflation;
       rsw.ycrd[i] += static_cast<double>(y_ovrf_buffer[i]) * ovrf_deflation;
       rsw.zcrd[i] += static_cast<double>(z_ovrf_buffer[i]) * ovrf_deflation;
-    }  
+    }
   }
   return result;
 }
@@ -1778,6 +1802,240 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
                                                        const TrajectoryKind trajkind,
                                                        const HybridTargetLevel tier) const {
   return exportCoordinates(index, cycle_position, trajkind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double>
+PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateCycle orientation,
+                                              const TrajectoryKind trajkind,
+                                              const HybridTargetLevel tier) const {
+  validateSystemIndex(index, "getInterlacedCoordinates");
+  const size_t natom = atom_counts.readHost(index);
+  const size_t atom_offset = atom_starts.readHost(index);
+  std::vector<double> result(3LLU * natom);
+  std::vector<llint> xdata, ydata, zdata;
+  std::vector<int> xovrf, yovrf, zovrf;
+  bool overflow_found = false;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_coordinates.readHost(atom_offset, natom);
+        ydata = y_alt_coordinates.readHost(atom_offset, natom);
+        zdata = z_alt_coordinates.readHost(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_coordinates.readHost(atom_offset, natom);
+        ydata = y_coordinates.readHost(atom_offset, natom);
+        zdata = z_coordinates.readHost(atom_offset, natom);
+        break;
+      }
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_coord_overflow.readHost(atom_offset, natom);
+          yovrf = y_alt_coord_overflow.readHost(atom_offset, natom);
+          zovrf = z_alt_coord_overflow.readHost(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_coordinate_overflow.readHost(atom_offset, natom);
+          yovrf = y_coordinate_overflow.readHost(atom_offset, natom);
+          zovrf = z_coordinate_overflow.readHost(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    case TrajectoryKind::VELOCITIES:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_velocities.readHost(atom_offset, natom);
+        ydata = y_alt_velocities.readHost(atom_offset, natom);
+        zdata = z_alt_velocities.readHost(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_velocities.readHost(atom_offset, natom);
+        ydata = y_velocities.readHost(atom_offset, natom);
+        zdata = z_velocities.readHost(atom_offset, natom);
+        break;
+      }
+      if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_velocity_overflow.readHost(atom_offset, natom);
+          yovrf = y_alt_velocity_overflow.readHost(atom_offset, natom);
+          zovrf = z_alt_velocity_overflow.readHost(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_velocity_overflow.readHost(atom_offset, natom);
+          yovrf = y_velocity_overflow.readHost(atom_offset, natom);
+          zovrf = z_velocity_overflow.readHost(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    case TrajectoryKind::FORCES:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_forces.readHost(atom_offset, natom);
+        ydata = y_alt_forces.readHost(atom_offset, natom);
+        zdata = z_alt_forces.readHost(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_forces.readHost(atom_offset, natom);
+        ydata = y_forces.readHost(atom_offset, natom);
+        zdata = z_forces.readHost(atom_offset, natom);
+        break;
+      }
+      if (force_scale_bits <= force_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_force_overflow.readHost(atom_offset, natom);
+          yovrf = y_alt_force_overflow.readHost(atom_offset, natom);
+          zovrf = z_alt_force_overflow.readHost(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_force_overflow.readHost(atom_offset, natom);
+          yovrf = y_force_overflow.readHost(atom_offset, natom);
+          zovrf = z_force_overflow.readHost(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_coordinates.readDevice(atom_offset, natom);
+        ydata = y_alt_coordinates.readDevice(atom_offset, natom);
+        zdata = z_alt_coordinates.readDevice(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_coordinates.readDevice(atom_offset, natom);
+        ydata = y_coordinates.readDevice(atom_offset, natom);
+        zdata = z_coordinates.readDevice(atom_offset, natom);
+        break;
+      }
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_coord_overflow.readDevice(atom_offset, natom);
+          yovrf = y_alt_coord_overflow.readDevice(atom_offset, natom);
+          zovrf = z_alt_coord_overflow.readDevice(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_coordinate_overflow.readDevice(atom_offset, natom);
+          yovrf = y_coordinate_overflow.readDevice(atom_offset, natom);
+          zovrf = z_coordinate_overflow.readDevice(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    case TrajectoryKind::VELOCITIES:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_velocities.readDevice(atom_offset, natom);
+        ydata = y_alt_velocities.readDevice(atom_offset, natom);
+        zdata = z_alt_velocities.readDevice(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_velocities.readDevice(atom_offset, natom);
+        ydata = y_velocities.readDevice(atom_offset, natom);
+        zdata = z_velocities.readDevice(atom_offset, natom);
+        break;
+      }
+      if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_velocity_overflow.readDevice(atom_offset, natom);
+          yovrf = y_alt_velocity_overflow.readDevice(atom_offset, natom);
+          zovrf = z_alt_velocity_overflow.readDevice(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_velocity_overflow.readDevice(atom_offset, natom);
+          yovrf = y_velocity_overflow.readDevice(atom_offset, natom);
+          zovrf = z_velocity_overflow.readDevice(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    case TrajectoryKind::FORCES:
+      switch (orientation) {
+      case CoordinateCycle::ALTERNATE:
+        xdata = x_alt_forces.readDevice(atom_offset, natom);
+        ydata = y_alt_forces.readDevice(atom_offset, natom);
+        zdata = z_alt_forces.readDevice(atom_offset, natom);
+        break;
+      case CoordinateCycle::PRIMARY:
+        xdata = x_forces.readDevice(atom_offset, natom);
+        ydata = y_forces.readDevice(atom_offset, natom);
+        zdata = z_forces.readDevice(atom_offset, natom);
+        break;
+      }
+      if (force_scale_bits <= force_scale_nonoverflow_bits) {
+        overflow_found = true;
+        switch (orientation) {
+        case CoordinateCycle::ALTERNATE:
+          xovrf = x_alt_force_overflow.readDevice(atom_offset, natom);
+          yovrf = y_alt_force_overflow.readDevice(atom_offset, natom);
+          zovrf = z_alt_force_overflow.readDevice(atom_offset, natom);
+          break;
+        case CoordinateCycle::PRIMARY:
+          xovrf = x_force_overflow.readDevice(atom_offset, natom);
+          yovrf = y_force_overflow.readDevice(atom_offset, natom);
+          zovrf = z_force_overflow.readDevice(atom_offset, natom);
+          break;
+        }
+      }
+      break;
+    }
+    break;
+#endif
+  }
+  double deflation;
+  switch (trajkind) {
+  case TrajectoryKind::POSITIONS:
+    deflation = inverse_globalpos_scale;
+    break;
+  case TrajectoryKind::VELOCITIES:
+    deflation = inverse_velocity_scale;
+    break;
+  case TrajectoryKind::FORCES:
+    deflation = inverse_force_scale;
+    break;
+  }
+  if (overflow_found) {
+    for (int i = 0; i < natom; i++) {
+      result[(3 * i)    ] = hostInt95ToDouble(xdata[i], xovrf[i]) * deflation;
+      result[(3 * i) + 1] = hostInt95ToDouble(ydata[i], yovrf[i]) * deflation;
+      result[(3 * i) + 2] = hostInt95ToDouble(zdata[i], zovrf[i]) * deflation;
+    }
+  }
+  else {
+    for (int i = 0; i < natom; i++) {
+      result[(3 * i)    ] = static_cast<double>(xdata[i]) * deflation;
+      result[(3 * i) + 1] = static_cast<double>(ydata[i]) * deflation;
+      result[(3 * i) + 2] = static_cast<double>(zdata[i]) * deflation;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double>
+PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const TrajectoryKind trajkind,
+                                              const HybridTargetLevel tier) const {
+  return getInterlacedCoordinates(index, cycle_position, trajkind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2143,15 +2401,14 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_index,
-                                 const CoordinateCycle orientation,
-                                 const HybridTargetLevel tier) {
+                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
   CoordinateCycle focus = orientation;
-  import(psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.boxdim, system_index, 1.0,
-         TrajectoryKind::POSITIONS, focus, tier);
-  import(psr.xvel, psr.yvel, psr.zvel, nullptr, nullptr, nullptr, system_index, 1.0,
-         TrajectoryKind::VELOCITIES, focus, tier);
-  import(psr.xfrc, psr.yfrc, psr.zfrc, nullptr, nullptr, nullptr, system_index, 1.0,
-         TrajectoryKind::FORCES, focus, tier);
+  import(psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.boxdim, system_index, focus, 1.0,
+         TrajectoryKind::POSITIONS, tier);
+  import(psr.xvel, psr.yvel, psr.zvel, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+         TrajectoryKind::VELOCITIES, tier);
+  import(psr.xfrc, psr.yfrc, psr.zfrc, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+         TrajectoryKind::FORCES, tier);
   switch (orientation) {
   case CoordinateCycle::ALTERNATE:
     focus = CoordinateCycle::PRIMARY;
@@ -2161,47 +2418,82 @@ void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_i
     break;
   }
   import(psr.xalt, psr.yalt, psr.zalt, psr.umat_alt, psr.invu_alt, psr.boxdim_alt, system_index,
-         1.0, TrajectoryKind::POSITIONS, focus, tier);
-  import(psr.vxalt, psr.vyalt, psr.vzalt, nullptr, nullptr, nullptr, system_index, 1.0,
-         TrajectoryKind::VELOCITIES, focus, tier);
-  import(psr.fxalt, psr.fyalt, psr.fzalt, nullptr, nullptr, nullptr, system_index, 1.0,
-         TrajectoryKind::FORCES, focus, tier);
+         focus, 1.0, TrajectoryKind::POSITIONS, tier);
+  import(psr.vxalt, psr.vyalt, psr.vzalt, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+         TrajectoryKind::VELOCITIES, tier);
+  import(psr.fxalt, psr.fyalt, psr.fzalt, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+         TrajectoryKind::FORCES, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_index,
+                                 const HybridTargetLevel tier) {
+  import(psr, system_index, cycle_position, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::import(const PhaseSpaceWriter &psw, const int system_index,
-                                 const CoordinateCycle orientation,
+                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
+  import(PhaseSpaceReader(psw), system_index, orientation, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const PhaseSpaceWriter &psw, const int system_index,
                                  const HybridTargetLevel tier) {
-  import(psw, system_index, orientation, tier);
+  import(PhaseSpaceReader(psw), system_index, cycle_position, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::import(const PhaseSpace &ps, const int system_index,
-                                 const CoordinateCycle orientation,
-                                 const HybridTargetLevel tier) {
+                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
   import(ps.data(tier), system_index, orientation, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrameReader &cfr, const int system_index,
-                                 const TrajectoryKind kind, const CoordinateCycle orientation,
+void PhaseSpaceSynthesis::import(const PhaseSpace &ps, const int system_index,
                                  const HybridTargetLevel tier) {
-  import(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index, 1.0, kind,
-         orientation, tier);
+  import(ps.data(tier), system_index, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const CoordinateFrameReader &cfr, const int system_index,
+                                 const CoordinateCycle orientation, const TrajectoryKind kind,
+                                 const HybridTargetLevel tier) {
+  import(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
+         orientation, 1.0, kind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const CoordinateFrameReader &cfr, const int system_index,
+                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
+  import(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
+         cycle_position, 1.0, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::import(const CoordinateFrameWriter &cfw, const int system_index,
-                                 const TrajectoryKind kind, const CoordinateCycle orientation,
+                                 const CoordinateCycle orientation, const TrajectoryKind kind,
                                  const HybridTargetLevel tier) {
-  import(cfw, system_index, kind, orientation, tier);
+  import(cfw, system_index, orientation, kind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const CoordinateFrameWriter &cfw, const int system_index,
+                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
+  import(cfw, system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::import(const CoordinateFrame &cf, const int system_index,
-                                 const TrajectoryKind kind, const CoordinateCycle orientation,
+                                 const CoordinateCycle orientation, const TrajectoryKind kind,
                                  const HybridTargetLevel tier) {
-  import(cf.data(tier), system_index, kind, orientation, tier);
+  import(cf.data(tier), system_index, orientation, kind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::import(const CoordinateFrame &cf, const int system_index,
+                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
+  import(cf.data(tier), system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------

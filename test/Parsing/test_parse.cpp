@@ -12,7 +12,7 @@ using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
-using stormm::math::sum;
+using stormm::stmath::sum;
 using stormm::review::stormmSplash;
 using stormm::topology::amberPrmtopData;
 

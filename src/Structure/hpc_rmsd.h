@@ -8,6 +8,7 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Accelerator/kernel_manager.h"
+#include "Analysis/comparison_guide.h"
 #include "Constants/behavior.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "rmsd_plan.h"
@@ -15,6 +16,7 @@
 namespace stormm {
 namespace structure {
 
+using analysis::ComparisonGuide;
 using card::Hybrid;
 using card::KernelManager;
 using constants::PrecisionModel;
@@ -29,6 +31,8 @@ cudaFuncAttributes queryRMSDKernelRequirements(PrecisionModel prec, RMSDTask ord
 
 /// \brief Compute positional RMSDs using HPC resources.
 ///
+/// \param cg                Instructions for carrying out structure-to-structure comparisons and
+///                          computing necessary RMSD results
 /// \param rplan             Plan appropriate to the coordinate synthesis encompassing system
 ///                          sizes, counts, atomic masses, and possible structural symmetries
 /// \param poly_ps           Coordinates of many systems with various numbers of replicas, and maps
@@ -41,19 +45,19 @@ cudaFuncAttributes queryRMSDKernelRequirements(PrecisionModel prec, RMSDTask ord
 ///                          use of each topology.
 /// \param launcher          Source of kernel launch parameters
 /// \{
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<double> *result,
           const KernelManager &launcher);
 
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<float> *result,
           const KernelManager &launcher);
 
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps, Hybrid<double> *result,
-          const KernelManager &launcher);
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+          Hybrid<double> *result, const KernelManager &launcher);
 
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps, Hybrid<float> *result,
-          const KernelManager &launcher);
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+          Hybrid<float> *result, const KernelManager &launcher);
 /// \}
 
 } // namespace structure

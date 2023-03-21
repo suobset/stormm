@@ -13,15 +13,15 @@ namespace stormm {
 namespace synthesis {
 
 using constants::small_block_size;
-using math::accumulateBitmask;
-using math::DataOrder;
-using math::locateValue;
-using math::maxValue;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::reduceUniqueValues;
-using math::roundUp;
-using math::sum;
+using stmath::accumulateBitmask;
+using stmath::DataOrder;
+using stmath::locateValue;
+using stmath::maxValue;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::reduceUniqueValues;
+using stmath::roundUp;
+using stmath::sum;
 using parse::char4ToString;
 using topology::extractBoundedListEntries;
 using topology::markAffectorAtoms;

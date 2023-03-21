@@ -11,12 +11,13 @@
 namespace stormm {
 namespace structure {
 
+using analysis::CompGuideKit;
 using constants::PrecisionModel;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
 using constants::warp_size_int;
 using numerics::max_llint_accumulation;
-using math::maximum_ql_iterations;
+using stmath::maximum_ql_iterations;
 
 //-------------------------------------------------------------------------------------------------
 #define TCALC double
@@ -89,39 +90,41 @@ cudaFuncAttributes queryRMSDKernelRequirements(const PrecisionModel prec, const 
 }
 
 //-------------------------------------------------------------------------------------------------
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<double> *result,
           const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::DOUBLE, RMSDTask::REFERENCE);
-  kdComputeRMSDToReference<<<lp.x, lp.y>>>(rplan.dpData(tier), poly_ps.data(tier),
+  kdComputeRMSDToReference<<<lp.x, lp.y>>>(cg.data(tier), rplan.dpData(tier), poly_ps.data(tier),
                                            reference_frames.data(tier), result->data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<float> *result,
           const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::SINGLE, RMSDTask::REFERENCE);
-  kfComputeRMSDToReference<<<lp.x, lp.y>>>(rplan.spData(tier), poly_ps.data(tier),
+  kfComputeRMSDToReference<<<lp.x, lp.y>>>(cg.data(tier), rplan.spData(tier), poly_ps.data(tier),
                                            reference_frames.data(tier), result->data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps, Hybrid<double> *result,
-          const KernelManager &launcher) {
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+          Hybrid<double> *result, const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::DOUBLE, RMSDTask::MATRIX);
-  kdComputeRMSDMatrix<<<lp.x, lp.y>>>(rplan.dpData(tier), poly_ps.data(tier), result->data(tier));
+  kdComputeRMSDMatrix<<<lp.x, lp.y>>>(cg.data(tier), rplan.dpData(tier), poly_ps.data(tier),
+                                      result->data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-void rmsd(const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps, Hybrid<float> *result,
-          const KernelManager &launcher) {
+void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
+          Hybrid<float> *result, const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::SINGLE, RMSDTask::MATRIX);
-  kfComputeRMSDMatrix<<<lp.x, lp.y>>>(rplan.spData(tier), poly_ps.data(tier), result->data(tier));
+  kfComputeRMSDMatrix<<<lp.x, lp.y>>>(cg.data(tier), rplan.spData(tier), poly_ps.data(tier),
+                                      result->data(tier));
 }
 
 } // namespace structure

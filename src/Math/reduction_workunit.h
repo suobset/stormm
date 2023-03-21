@@ -10,7 +10,7 @@
 #include "DataTypes/common_types.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::GpuDetails;
 using card::Hybrid;
@@ -127,7 +127,7 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
                                                        const GpuDetails &gpu,
                                                        int tasks_per_atom = 1);
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #endif

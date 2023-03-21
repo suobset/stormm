@@ -10,7 +10,7 @@
 using stormm::data_types::int4;
 using stormm::data_types::ushort2;
 #endif
-using stormm::math::sum;
+using stormm::stmath::sum;
 using stormm::random::Ran2Generator;
 using stormm::review::stormmSplash;
 using namespace stormm::card;

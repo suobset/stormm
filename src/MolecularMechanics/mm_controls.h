@@ -26,7 +26,7 @@ using constants::PrecisionModel;
 using energy::ClashResponse;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
-using math::ReductionStage;
+using stmath::ReductionStage;
 using namelist::default_dynamics_time_step;
 using namelist::default_minimize_dx0;
 using namelist::default_minimize_maxcyc;

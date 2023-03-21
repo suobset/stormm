@@ -11,7 +11,7 @@ using energy::StaticExclusionMaskReader;
 using energy::supertile_length;
 using energy::tile_length;
 using energy::tiles_per_supertile;
-using math::roundUp;
+using stmath::roundUp;
   
 //-------------------------------------------------------------------------------------------------
 SeMaskSynthesisReader::SeMaskSynthesisReader(const int nsys_in, const int* atom_counts_in,

@@ -7,7 +7,7 @@
 #include "vector_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 ReductionWorkUnit::ReductionWorkUnit(const int atom_start_in, const int atom_end_in,
@@ -215,5 +215,5 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
   return result;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

@@ -17,7 +17,7 @@
 #include "vector_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using constants::ExceptionResponse;
 using card::Hybrid;
@@ -458,7 +458,7 @@ void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
                  const PrintSituation expectation = PrintSituation::APPEND);
 /// \}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "matrix_ops.tpp"

@@ -13,10 +13,10 @@
 namespace stormm {
 namespace energy {
 
-using math::roundUp;
-using math::mean;
-using math::variance;
-using math::VarianceMethod;
+using stmath::roundUp;
+using stmath::mean;
+using stmath::variance;
+using stmath::VarianceMethod;
 using numerics::default_energy_scale_f;
 using numerics::default_energy_scale_lf;
 using numerics::default_inverse_energy_scale_f;

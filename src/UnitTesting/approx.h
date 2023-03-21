@@ -110,9 +110,9 @@ public:
   ///
   /// \param dtol_in  The tolerance to use
   /// \{
-  Approx margin(double dtol_in);
-  Approx tolerance(double dtol_in);
-  Approx tol(double dtol_in);
+  Approx margin(double dtol_in) const;
+  Approx tolerance(double dtol_in) const;
+  Approx tol(double dtol_in) const;
   /// \}
 
   /// \brief Test whether a real-valued scalar is the same as the value held for comparison.

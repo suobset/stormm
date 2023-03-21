@@ -74,9 +74,7 @@ public:
   ///        requires a pairwise map between the synthesis and the cache.  If a synthesis is
   ///        provided, it will be used to check the correspondence.
   /// \{
-  SynthesisCacheMap(const SystemCache *sc_in = nullptr,
-                    const AtomGraphSynthesis *poly_ag_in = nullptr,
-                    const PhaseSpaceSynthesis *poly_ps_in = nullptr);
+  SynthesisCacheMap();
   
   SynthesisCacheMap(const std::vector<int> &cache_origins_in, const SystemCache *sc_in,
                     const AtomGraphSynthesis *poly_ag_in = nullptr,
@@ -231,16 +229,7 @@ public:
   void setSynthesis(const PhaseSpaceSynthesis &poly_ps_in);
   /// \}
 
-  /// \brief Update a Condensate object with work units to perform all-to-reference and all-to-all
-  ///        comparisons based on the system source entries and label groups in the systems cache
-  ///        map.
-  ///
-  /// \param cdns  The coordinate condensate (modified by the routine)
-  /// \param gpu   Details of the GPU in use
-  void setCondensateWorkUnits(Condensate *cdns, const GpuDetails &gpu = null_gpu) const;
-  
 private:
-
   int cache_system_count;                  ///< Number of systems in the cache
   int synthesis_system_count;              ///< Number of systems in the synthesis, and the
                                            ///<   dimension of many of the arrays below
@@ -279,6 +268,9 @@ private:
 
   /// \brief Repair pointers after copy or copy assignment.
   void rebasePointers();
+
+  /// \brief Validate the synthesis and cache system assignments.
+  void validateCorrespondence() const;
 };
   
 } // namespace synthesis

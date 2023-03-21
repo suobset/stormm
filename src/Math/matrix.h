@@ -7,7 +7,7 @@
 #include "Random/random.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::default_hpc_format;
 using card::Hybrid;
@@ -141,7 +141,7 @@ private:
                               ///<   underlying Hybrid array contents
 };
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "matrix.tpp"

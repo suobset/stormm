@@ -8,7 +8,7 @@ namespace stormm {
 namespace mm {
 
 using card::HybridKind;
-using math::ReductionGoal;
+using stmath::ReductionGoal;
 using numerics::AccumulationMethod;
 using synthesis::VwuGoal;
 

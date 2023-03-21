@@ -66,10 +66,19 @@ enum class TmpdirStatus {
   REQUIRED
 };
 
-/// \brief Get a string corresponding to a particular test priority enumeration.
+/// \brief Get a string corresponding to a particular test priority enumeration.  Various overloads
+///        of this function in this and other libraries and namespaces serve different enumerators.
 ///
-/// \param x  The enumeration to translate
-std::string getEnumerationName(TestPriority x);
+/// \param input  The enumeration to translate
+/// \{
+std::string getEnumerationName(ComparisonType input);
+std::string getEnumerationName(CheckResult input);
+std::string getEnumerationName(TestPriority input);
+std::string getEnumerationName(RelationalOperator input);
+std::string getEnumerationName(TestVerbosity input);
+std::string getEnumerationName(SnapshotOperation input);
+std::string getEnumerationName(TmpdirStatus input);
+/// \}
 
 } // namespace testing
 } // namespace stormm

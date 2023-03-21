@@ -5,7 +5,7 @@
 #include "vector_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<uint> numberSeriesToBitMask(const int* number_series, const size_t length,
@@ -60,5 +60,5 @@ std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset, int *n_
   return result;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

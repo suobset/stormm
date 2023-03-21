@@ -7,7 +7,7 @@ namespace stormm {
 namespace energy {
 
 using card::HybridKind;
-using math::roundUp;
+using stmath::roundUp;
   
 //-------------------------------------------------------------------------------------------------
 CacheResource::CacheResource(const int block_limit_in, const int atom_limit_in) :

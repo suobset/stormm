@@ -361,7 +361,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
 //-------------------------------------------------------------------------------------------------
 void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const TrajectoryKind kind,
                const CoordinateCycle orientation, const CoordinateFrameReader &origin) {
-  destination->import(origin, index_dest, kind, orientation);
+  destination->import(origin, index_dest, orientation, kind);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -379,7 +379,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
 //-------------------------------------------------------------------------------------------------
 void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const TrajectoryKind kind,
                const CoordinateCycle orientation, const CoordinateFrame &origin) {
-  destination->import(origin, index_dest, kind, orientation);
+  destination->import(origin, index_dest, orientation, kind);
 }
 
 //-------------------------------------------------------------------------------------------------

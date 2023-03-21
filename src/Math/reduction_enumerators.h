@@ -2,10 +2,11 @@
 #ifndef STORMM_REDUCTION_ENUMERATORS_H
 #define STORMM_REDUCTION_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 /// \brief Enumerate stages of a reduction operation, which can be taken piecemeal or all at once.
 enum class ReductionStage {
@@ -54,8 +55,19 @@ enum class RdwuAbstractMap {
                   ///<   means that the reduction can be done by a single work unit
   SYSTEM_ID       ///< Index of the system to which this reduction pertains
 };
+
+/// \brief Produce a human-readable string to describe each enumeration.  Overloads of this
+///        function are found in other libraries as well.
+///
+/// \param input  The enumerated value to translate
+/// \{
+std::string getEnumerationName(ReductionStage input);
+std::string getEnumerationName(ReductionGoal input);
+std::string getEnumerationName(RdwuPerSystem input);
+std::string getEnumerationName(RdwuAbstractMap input);
+/// \}
   
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #endif

@@ -56,8 +56,8 @@ int main(int argc, const char* argv[]) {
     
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
-        all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
-                                      sc.getSystemStaticMaskReference(i), mincon));
+        all_mme.emplace_back(minimize(ps, sc.getSystemTopology(i), ra, sc.getSystemStaticMask(i),
+                                      mincon));
         timer.assignTime(mini_timings);
       case UnitCellType::ORTHORHOMBIC:
       case UnitCellType::TRICLINIC:
@@ -69,7 +69,7 @@ int main(int argc, const char* argv[]) {
   // Print restart files from energy minimization
   if (mincon.getCheckpointProduction()) {
     for (int i = 0; i < system_count; i++) {
-      const PhaseSpace ps = sc.getCoordinateReference(i);
+      const PhaseSpace ps = sc.getCoordinates(i);
       ps.exportToFile(sc.getCheckpointName(i));
     }
   }

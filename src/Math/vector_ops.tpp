@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void vectorComparisonCheck(const std::vector<T> &va,
@@ -1234,5 +1234,5 @@ std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx
   return result;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

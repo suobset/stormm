@@ -8,7 +8,9 @@
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
+#include "FileManagement/file_enumerators.h"
 #include "FileManagement/file_listing.h"
+#include "FileManagement/file_util.h"
 #include "Math/rounding.h"
 #include "amber_ascii.h"
 #include "coordinateframe.h"
@@ -23,9 +25,14 @@ using card::HybridTargetLevel;
 using constants::CartesianDimension;
 using data_types::isFloatingPointScalarType;
 using data_types::isSignedIntegralScalarType;
+using diskutil::detectCoordinateFileKind;
+using diskutil::DataFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-
+using diskutil::getTrajectoryFormat;
+using numerics::default_trajpos_scale_bits;
+using stmath::roundUp;
+  
 /// \brief A simple list of all the valid type specifiers for coordinate data.  This will be filled
 ///        at runtime based on the type IDs found (see DataTypes/common_types.h).
 struct ValidCoordinateTypes {
@@ -528,7 +535,7 @@ private:
   ///                            to avoid integer overflow.
   void allocate(int new_frame_capacity);
 };
-
+  
 /// \brief Convert a coordinate series from one data type to another.  There are three major data
 ///        types for a CoordinateSeries: double, float, and long long int.  This function has
 ///        numerous branches to make efficient conversions between real and signed integral data

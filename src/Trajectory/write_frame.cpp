@@ -12,7 +12,7 @@
 namespace stormm {
 namespace trajectory {
 
-using math::computeBoxTransform;
+using stmath::computeBoxTransform;
 using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::realToString;

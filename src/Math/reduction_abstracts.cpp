@@ -3,7 +3,7 @@
 #include "reduction_abstracts.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using constants::CartesianDimension;
   
@@ -44,5 +44,5 @@ ConjGradSubstrate::ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBrid
     ConjGradSubstrate(poly_ps->data(tier), rbg, tier)
 {}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

@@ -49,10 +49,7 @@ template <typename T> struct RMSDPlanReader {
                  const T* masses_in, const int* atom_counts_in, const int* atom_starts_in,
                  const int* alignment_steps_in, const int* core_atoms_in,
                  const int* core_counts_in, const int* core_starts_in, const int* symm_atoms_in,
-                 const int4* symm_bounds_in, const int2* symm_ranges_in,
-                 const size_t* atr_starts_in_src, const size_t* atr_starts_in_top,
-                 const size_t* atr_starts_in_lbl, const size_t* ata_starts_in_src,
-                 const size_t* ata_starts_in_top, const size_t* ata_starts_in_lbl);
+                 const int4* symm_bounds_in, const int2* symm_ranges_in);
   
   /// \brief The presence of const members will implicitly delete the copy and move assignment
   ///        operators, but the default copy and move constructors will apply.
@@ -85,14 +82,6 @@ template <typename T> struct RMSDPlanReader {
   const int2* symm_ranges;     ///< Bounds array on the symmetric atom bounds array--indicating the
                                ///<   lower and upper limits of symmetric atom numbered groups in
                                ///<   each system in the "x" and "y" members of each tuple.
-
-  // The following arrays pretain to different layouts for batched RMSD calculations.
-  const size_t* atr_starts_src;  ///< All-to-reference by system cache -sys { ... } declarations
-  const size_t* atr_starts_top;  ///< All-to-reference by topology
-  const size_t* atr_starts_lbl;  ///< All-to-reference by label group
-  const size_t* ata_starts_src;  ///< All-to-all by system cache -sys { ... } declarations
-  const size_t* ata_starts_top;  ///< All-to-all by topology
-  const size_t* ata_starts_lbl;  ///< All-to-all by label group
 };
   
 /// \brief Collect instructions for one or more systems (intend to work with any coordinate object,
@@ -190,44 +179,6 @@ public:
   /// \param organization  The manner in which systems are grouped
   int getPlanIndex(int index, SystemGrouping organization) const;
   
-  /// \brief Get the size of the vector of RMSD results for all frames to a single reference, for
-  ///        size considerations on an array of results.
-  ///
-  /// \param task          Specify all-to-one or all-to-all RMSD calculations
-  /// \param organization  The manner in which systems shall be grouped
-  size_t getOutputSize(RMSDTask task,
-                       SystemGrouping organization = SystemGrouping::TOPOLOGY) const;
-
-  /// \brief Get the number of partitions into which the output shall be divided based on a
-  ///        requested method of grouping the systems.
-  ///
-  /// \param organization  The grouping method of interest
-  int getPartitionCount(SystemGrouping organization) const;
-  
-  /// \brief Get the starting index for catalogging RMSD calculations to a reference structure.
-  ///
-  /// \param index         Index of the system / plan / label of interest
-  /// \param task          Compute all-to-one or all-to-all RMSD
-  /// \param organization  The manner in which groups are defined to compare structures within each
-  ///                      group
-  size_t getOutputStart(int index, RMSDTask task,
-                        SystemGrouping organization = SystemGrouping::TOPOLOGY) const;
-
-  /// \brief Get the number of frames making use of a particular plan, matching the reference RMSD
-  ///        bounds set forth in the plan.
-  ///
-  /// \param index         Index of the system / plan of interest
-  /// \param organization  The manner in which groups are defined to compare structures within each
-  ///                      group
-  int getFrameCount(int index, SystemGrouping organization) const;
-
-  /// \brief Get a list of all frames of a synthesis that fall into a specific partition (e.g. a
-  ///        label group, those sharing a topology).
-  ///
-  /// \param index         Index of the partition of interest
-  /// \param organization  The manner of partitioning / grouping systems from the synthesis
-  std::vector<int> getSystemGroup(int index, SystemGrouping organization) const;
-
   /// \brief Get the general, prescribed strategy for computing RMSDs.
   RMSDMethod getGeneralStrategy() const;
 
@@ -266,16 +217,6 @@ public:
   /// \brief Get a pointer to the map between the cache and the coordinate synthesis.
   const SynthesisCacheMap* getSynthesisMapPointer() const;
 
-  /// \brief Resize the results arrays to accommodate a given number of RMSD calculations, or an
-  ///        assortment of frames.
-  ///
-  /// \param frame_count  A trusted number of frames to allocate for, if no synthesis is available
-  void formatResults(int frame_count = 0);
-
-  template <typename T>
-  void formatResults(const CoordinateSeries<T> &cs);
-  /// \}
-
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents to the GPU device.
   void upload();
@@ -301,20 +242,6 @@ private:
   
   /// The number of distinct plans, one per unique topology this object is established to serve
   int plan_count;
-
-  // The following member variables store space requirements for computing RMSD to reference
-  // structures within specific groupings from the associated synthesis.
-  size_t rmsd_space_src;  ///< Group systems by their sources in -sys keywords from user input
-                          ///<   (systems within the linked SystemCache object)
-  size_t rmsd_space_top;  ///< Group systems by the topologies guiding them.
-  size_t rmsd_space_lbl;  ///< Group systems by their attached labels.
-
-  // The following member variables store space requirements for computing pairwise RMSD values
-  // among structures of specific groupings from the associated synthesis.
-  size_t rmsd_pair_space_src;  ///< Group systems by their sources in -sys keywords from user input
-                               ///<   (systems within the linked SystemCache object)
-  size_t rmsd_pair_space_top;  ///< Group systems by the topologies guiding them.
-  size_t rmsd_pair_space_lbl;  ///< Group systems by their attached labels.
 
   // Additional directives and arrays pertinent to each individual plan
   RMSDMethod general_strategy;         ///< Align systems by mass (ALIGN_MASS) or by coordinates of
@@ -418,26 +345,6 @@ private:
   /// illustrative.
   Hybrid<ullint> symmetry_group_membership_bounds;
   
-  /// Offsets for results from each frame for each unique topology, if computing RMSDs of all
-  /// frames to a reference structure.  Extensions match the member variables above for sizes of
-  /// various groupings.
-  /// \{
-  Hybrid<size_t> all_to_ref_offsets_src;
-  Hybrid<size_t> all_to_ref_offsets_top;
-  Hybrid<size_t> all_to_ref_offsets_lbl;
-  /// \}
-
-  /// When computing all-to-all RMSD matrices for each system, the results are organized in
-  /// segments of (Ni * (Ni - 1) / 2) numbers each, the lower triangles of matrices whee Ni is the
-  /// number of frames using each unique topology or plan.  The position of the RMSD result for
-  /// frames i and j (for i < j) is given by ((j - 1) * (j - 2) / 2) + i.  Extensions match the
-  /// member variables above for sizes of various groupings.
-  /// \{
-  Hybrid<size_t> all_to_all_offsets_src;
-  Hybrid<size_t> all_to_all_offsets_top;
-  Hybrid<size_t> all_to_all_offsets_lbl;
-  /// \}
-  
   /// List of all topologies described by this plan
   std::vector<AtomGraph*> ag_pointers; 
 
@@ -455,34 +362,6 @@ private:
   /// Map between the systems cache and the associated synthesis
   SynthesisCacheMap *scmap_ptr;
 
-  /// \brief Validate the spread of RMSD calculations to be performed.  This performs a check to
-  ///        ensure that, for certain spreads, a synthesis is present and that a mapping between
-  ///        that synthesis and the original user input, complete with metadata, is available.
-  ///
-  /// \param organization  The layout in which systems are grouped to perform all-to-all or
-  ///                      all-to-one RMSD calculations
-  void validateOutputType(const SystemGrouping organization) const;
-  
-  /// \brief Validate the plan index.
-  ///
-  /// Overloaded:
-  ///   - Provide just the index (the partition we be assumed to be a topology plan)
-  ///   - Provide the index and manner of grouping systems
-  ///
-  /// \param index         Index of the plan that will be requested
-  /// \param caller        Name of the calling function
-  /// \param organization  The manner of partitioning systems within the synthesis
-  /// \{
-  void validatePartitionIndex(int index, const char* caller = nullptr) const;
-  void validatePartitionIndex(int index, SystemGrouping organization,
-                              const char* caller = nullptr) const;
-  /// \}
-
-  /// \brief Lay out the offsets for RMSD computations based on one of several groupings.
-  ///
-  /// \param organization  The manner in which systems are grouped
-  void computeResultOffsets(SystemGrouping organization);
-  
   /// \brief Resize the storage arrays and add groups of symmetry-related atoms to the object's
   ///        Hybrid arrays.
   ///

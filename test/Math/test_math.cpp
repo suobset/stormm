@@ -19,6 +19,7 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Structure/structure_enumerators.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -46,8 +47,10 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::RandomNumberMill;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::structure::BoundaryCondition;
 using stormm::symbols::pi;
-using namespace stormm::math;
+using stormm::symbols::twopi;
+using namespace stormm::stmath;
 using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
@@ -1397,7 +1400,7 @@ int main(const int argc, const char* argv[]) {
   loadScalarStateValues(&k_dials, std::vector<double2>({ {0.0, 4.5}, {5.7, 7.8}, {4.5, 12.6} }));
   const std::vector<double> dzero_state = k_dials.getState();
   const std::vector<double> dzero_state_ans = { 0.0, 5.7, 4.5 };
-  check(dzero_state, RelationalOperator::EQUAL, dzero_state_ans, "A TIckCounter does not return "
+  check(dzero_state, RelationalOperator::EQUAL, dzero_state_ans, "A TickCounter does not return "
         "the expected state just after construction.");
   k_dials.advance(10);
   const std::vector<double> dten_state = k_dials.getState();
@@ -1436,7 +1439,7 @@ int main(const int argc, const char* argv[]) {
   }
   tricubicTestBundle(tcmat.readHost(), x_only_coefficients, { 0.5, 1.0, 1.0 });
   tricubicTestBundle(tcmat.readHost(), random_coefficients, { 0.7, 0.9, 1.1 });
-
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

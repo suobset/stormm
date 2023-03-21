@@ -24,11 +24,11 @@ using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::diskutil::PrintSituation;
 using stormm::errors::rtWarn;
-using stormm::math::computeBoxTransform;
-using stormm::math::elementwiseDivide;
-using stormm::math::elementwiseMultiply;
-using stormm::math::extractBoxDimensions;
-using stormm::math::mean;
+using stormm::stmath::computeBoxTransform;
+using stormm::stmath::elementwiseDivide;
+using stormm::stmath::elementwiseMultiply;
+using stormm::stmath::extractBoxDimensions;
+using stormm::stmath::mean;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoroshiro128pGenerator;
@@ -591,7 +591,7 @@ int main(const int argc, const char* argv[]) {
         "original, double-precision data with the expected accuracy.", do_tip5p);
   check(tip5p_cs.getUnitCellType() == tip5p.getUnitCellType(), "A CoordinateSeries object does "
         "not adopt the original PhaseSpace object's unit cell type (" +
-        getUnitCellTypeName(tip5p.getUnitCellType()) + ").", do_tip5p);
+        getEnumerationName(tip5p.getUnitCellType()) + ").", do_tip5p);
   CHECK_THROWS_SOFT(tip5p_cs.pushBack(trpcage), "A CoordinateSeries accepts new coordinates from "
                     "a system with the wrong particle number.", do_tip5p);
   CHECK_THROWS_SOFT(tip5p_cs.importFromFile(tip3p_crd_name), "A CoordinateSeries accepts new "

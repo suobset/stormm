@@ -19,12 +19,12 @@ namespace stormm {
 namespace chemistry {
 
 using card::HybridKind;
-using math::minValue;
-using math::maxValue;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::roundUp;
-using math::sum;
+using stmath::minValue;
+using stmath::maxValue;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::roundUp;
+using stmath::sum;
 using parse::char4ToString;
 using parse::realToString;
 using topology::ChemicalDetailsKit;

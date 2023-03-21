@@ -11,7 +11,7 @@ namespace testing {
 
 using errors::RTMessageKind;
 using errors::terminalFormat;
-using math::sum;
+using stmath::sum;
 using parse::BorderFormat;
 using parse::findStringInVector;
 using parse::NumberFormat;

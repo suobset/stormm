@@ -13,8 +13,8 @@
 namespace stormm {
 namespace topology {
 
-using math::addScalarToVector;
-using math::roundUp;
+using stmath::addScalarToVector;
+using stmath::roundUp;
 using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::TextFile;

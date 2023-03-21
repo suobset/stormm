@@ -11,7 +11,7 @@ template <typename T> Hybrid<T>::Hybrid(const size_t length_in, const char* tag_
     format{format_in},
     length{length_in},
     element_size{sizeof(T)},
-    growth_increment{math::getSmallestLot(sizeof(T), hybrid_byte_increment)},
+    growth_increment{stmath::getSmallestLot(sizeof(T), hybrid_byte_increment)},
     max_capacity{(length == 0 ? growth_increment : roundUp<size_t>(length, growth_increment))},
     pointer_index{0},
     host_data{nullptr},

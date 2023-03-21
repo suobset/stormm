@@ -13,7 +13,7 @@
 #include "summation.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using structure::imageValue;
 using structure::ImagingMethod;
@@ -29,10 +29,11 @@ public:
   /// \brief The constructor takes a series of state counts for each "wheel" in the counter.  The
   ///        initial state can also be provided.
   /// \{
-  explicit TickCounter(const std::vector<int> &state_limits_in);
-
   explicit TickCounter(const std::vector<int> &state_limits_in,
-                       const std::vector<int> &settings_in);
+                       const std::vector<int> &settings_in = std::vector<int>());
+
+  explicit TickCounter(const std::vector<std::vector<T>> &state_values_in,
+                       const std::vector<int> &settings_in = std::vector<int>());
   /// \}
 
   /// \brief The copy and move constructors as well as assignment operators are all valid.
@@ -197,7 +198,7 @@ template <typename T, typename T2>
 void loadScalarStateValues(TickCounter<T> *tc, const std::vector<T2> &ranges);
 /// \}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "tickcounter.tpp"

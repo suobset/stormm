@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
@@ -13,10 +14,14 @@
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
+#include "../../src/Synthesis/condensate.h"
+#include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_analysis.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::small;
@@ -25,6 +30,7 @@ using stormm::constants::tiny;
 using stormm::data_types::double2;
 using stormm::data_types::double3;
 #endif
+using stormm::data_types::llint;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
@@ -33,22 +39,26 @@ using stormm::energy::evaluateNonbondedEnergy;
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
-using stormm::math::computeBoxTransform;
+using stormm::stmath::computeBoxTransform;
 using stormm::random::Xoshiro256ppGenerator;
-using stormm::math::angleBetweenVectors;
-using stormm::math::crossProduct;
-using stormm::math::dot;
-using stormm::math::magnitude;
-using stormm::math::maxAbsValue;
-using stormm::math::maxValue;
-using stormm::math::matrixVectorMultiply;
-using stormm::math::minValue;
-using stormm::math::normalize;
-using stormm::math::perpendicularComponent;
-using stormm::math::pointPlaneDistance;
-using stormm::math::sum;
+using stormm::stmath::angleBetweenVectors;
+using stormm::stmath::crossProduct;
+using stormm::stmath::dot;
+using stormm::stmath::magnitude;
+using stormm::stmath::maxAbsValue;
+using stormm::stmath::maxValue;
+using stormm::stmath::matrixVectorMultiply;
+using stormm::stmath::minValue;
+using stormm::stmath::normalize;
+using stormm::stmath::perpendicularComponent;
+using stormm::stmath::pointPlaneDistance;
+using stormm::stmath::sum;
 using stormm::review::stormmSplash;
 using stormm::symbols::pi;
+using stormm::synthesis::Condensate;
+using stormm::synthesis::CondensateWriter;
+using stormm::synthesis::PhaseSpaceSynthesis;
+using stormm::synthesis::PsSynthesisWriter;
 using stormm::topology::AtomGraph;
 using stormm::topology::listVirtualSiteFrameTypes;
 using stormm::topology::UnitCellType;
@@ -56,6 +66,8 @@ using stormm::topology::VirtualSiteKind;
 using stormm::trajectory::CoordinateFileKind;
 using stormm::trajectory::CoordinateFrame;
 using stormm::trajectory::CoordinateFrameWriter;
+using stormm::trajectory::CoordinateSeries;
+using stormm::trajectory::CoordinateSeriesWriter;
 using stormm::trajectory::TrajectoryKind;
 using namespace stormm::structure;
 using namespace stormm::testing;
@@ -419,6 +431,85 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPr
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check the local geometry calculations for all types of coordinate objects.
+//
+// Arguments:
+//   tsm:        A collection of test systems, including topologies and coordinates, along with
+//               information verifying their availability
+//   uc_choice:  Choices for the unit cell types to test as a group
+//-------------------------------------------------------------------------------------------------
+void checkGeometrics(const TestSystemManager &tsm, const std::vector<UnitCellType> &uc_choice) {
+  const std::vector<int> uc_examples = tsm.getQualifyingSystems(uc_choice);
+  const int n_examples = uc_examples.size();
+  std::vector<CoordinateFrame> tsm_cf;
+  std::vector<PhaseSpace> tsm_ps;
+  std::vector<CoordinateSeries<llint>> tsm_cs;
+  std::vector<int> atom_counts(n_examples);
+  tsm_cf.reserve(n_examples);
+  tsm_ps.reserve(n_examples);
+  tsm_cs.reserve(n_examples);
+  for (int i = 0; i < n_examples; i++) {
+    tsm_cf.push_back(tsm.exportCoordinateFrame(uc_examples[i]));
+    tsm_ps.push_back(tsm.exportPhaseSpace(uc_examples[i]));
+    tsm_cs.push_back(tsm.exportCoordinateSeries<llint>(uc_examples[i], 4, 0.0, 918404, 24));
+    atom_counts[i] = tsm_cf.back().getAtomCount();
+  }
+  PhaseSpaceSynthesis tsm_poly_ps = tsm.exportPhaseSpaceSynthesis(uc_examples, 0.0, 97, 40);
+  Condensate tsm_cdns(tsm_poly_ps, PrecisionModel::DOUBLE);
+  std::vector<double> test_distances(n_examples * 5), test_distances_ans(n_examples * 5);
+  std::vector<double> test_angles(n_examples * 5), test_angles_ans(n_examples * 5);
+  std::vector<double> test_torsions(n_examples * 5), test_torsions_ans(n_examples * 5);
+  for (int i = 0; i < n_examples; i++) {
+    const int quarter_atom = atom_counts[i] / 4;
+    const int halfway_atom = atom_counts[i] / 2;
+    const int thr_qrt_atom = (3 * atom_counts[i]) / 4;
+    test_distances[(n_examples * i)    ] = distance(0, halfway_atom, tsm_cf[i]);
+    test_distances[(n_examples * i) + 1] = distance(0, halfway_atom, tsm_ps[i]);
+    test_distances[(n_examples * i) + 2] = distance<llint, double>(0, halfway_atom,
+                                                                   tsm_cs[i], 3);
+    test_distances[(n_examples * i) + 3] = distance<double>(0, halfway_atom, tsm_poly_ps, i);
+    test_distances[(n_examples * i) + 4] = distance<double>(0, halfway_atom, tsm_cdns, i);
+    for (int j = 0; j < 5; j++) {
+      test_distances_ans[(n_examples * i) + j] = test_distances[(n_examples * i) + j];
+    }
+    test_angles[(n_examples * i)    ] = angle(0, quarter_atom, halfway_atom, tsm_cf[i]);
+    test_angles[(n_examples * i) + 1] = angle(0, quarter_atom, halfway_atom, tsm_ps[i]);
+    test_angles[(n_examples * i) + 2] = angle<llint, double>(0, quarter_atom, halfway_atom,
+                                                             tsm_cs[i], 3);
+    test_angles[(n_examples * i) + 3] = angle<double>(0, quarter_atom, halfway_atom, tsm_poly_ps,
+                                                      i);
+    test_angles[(n_examples * i) + 4] = angle<double>(0, quarter_atom, halfway_atom, tsm_cdns, i);
+    for (int j = 0; j < 5; j++) {
+      test_angles_ans[(n_examples * i) + j] = test_angles[(n_examples * i) + j];
+    }
+    test_torsions[(n_examples * i)    ] = dihedralAngle(0, quarter_atom, halfway_atom,
+                                                        thr_qrt_atom, tsm_cf[i]);
+    test_torsions[(n_examples * i) + 1] = dihedralAngle(0, quarter_atom, halfway_atom,
+                                                        thr_qrt_atom, tsm_ps[i]);
+    test_torsions[(n_examples * i) + 2] = dihedralAngle<llint, double>(0, quarter_atom,
+                                                                       halfway_atom, thr_qrt_atom,
+                                                                       tsm_cs[i], 3);
+    test_torsions[(n_examples * i) + 3] = dihedralAngle<double>(0, quarter_atom, halfway_atom,
+                                                                thr_qrt_atom, tsm_poly_ps, i);
+    test_torsions[(n_examples * i) + 4] = dihedralAngle<double>(0, quarter_atom, halfway_atom,
+                                                                thr_qrt_atom, tsm_cdns, i);
+    for (int j = 0; j < 5; j++) {
+      test_torsions_ans[(n_examples * i) + j] = test_torsions[(n_examples * i) + j];
+    }    
+  }
+  const std::string sys_desc = (uc_choice[0] == UnitCellType::NONE) ? "isolated" : "periodic";
+  check(test_distances, RelationalOperator::EQUAL, Approx(test_distances_ans).margin(1.0e-5),
+        "Distance measurements made in a collection of systems with " + sys_desc + " boundary "
+        "conditions do not meet expectations.", tsm.getTestingStatus(uc_examples));
+  check(test_angles, RelationalOperator::EQUAL, Approx(test_angles_ans).margin(1.0e-5),
+        "Angle measurements made in a collection of systems with " + sys_desc + " boundary "
+        "conditions do not meet expectations.", tsm.getTestingStatus(uc_examples));
+  check(test_torsions, RelationalOperator::EQUAL, Approx(test_torsions_ans).margin(1.0e-5),
+        "Dihedral angle measurements made in a collection of systems with " + sys_desc +
+        " boundary conditions do not meet expectations.", tsm.getTestingStatus(uc_examples));
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -487,22 +578,22 @@ int main(const int argc, const char* argv[]) {
   double x1 = rectilinear_x_crd[0];
   double y1 = rectilinear_y_crd[0];
   double z1 = rectilinear_z_crd[0];
-  imageCoordinates(&x1, &y1, &z1, rectilinear_umat.data(), rectilinear_invu.data(),
-                   UnitCellType::ORTHORHOMBIC, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<double, double>(&x1, &y1, &z1, rectilinear_umat.data(), rectilinear_invu.data(),
+                                   UnitCellType::ORTHORHOMBIC, ImagingMethod::MINIMUM_IMAGE);
   check(std::vector<double>({ x1, y1, z1}), RelationalOperator::EQUAL,
         std::vector<double>({ 5.1, 3.8, -4.9 }), "Re-imaging a single point in a rectilinear box "
         "by the minimum image convention fails.");
-  imageCoordinates(&x1, &y1, &z1, rectilinear_umat.data(), rectilinear_invu.data(),
-                   UnitCellType::ORTHORHOMBIC, ImagingMethod::PRIMARY_UNIT_CELL);
+  imageCoordinates<double, double>(&x1, &y1, &z1, rectilinear_umat.data(), rectilinear_invu.data(),
+                                   UnitCellType::ORTHORHOMBIC, ImagingMethod::PRIMARY_UNIT_CELL);
   check(std::vector<double>({ x1, y1, z1}), RelationalOperator::EQUAL,
         std::vector<double>({ 5.1, 3.8, 13.1 }), "Re-imaging a single point in a rectilinear box "
         "into the primary unit cell (first octant) fails.");
   std::vector<double> rect_x_copy(rectilinear_x_crd);
   std::vector<double> rect_y_copy(rectilinear_y_crd);
   std::vector<double> rect_z_copy(rectilinear_z_crd);
-  imageCoordinates(&rect_x_copy, &rect_y_copy, &rect_z_copy, rectilinear_umat.data(),
-                   rectilinear_invu.data(), UnitCellType::ORTHORHOMBIC,
-                   ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<double, double>(&rect_x_copy, &rect_y_copy, &rect_z_copy,
+                                   rectilinear_umat.data(), rectilinear_invu.data(),
+                                   UnitCellType::ORTHORHOMBIC, ImagingMethod::MINIMUM_IMAGE);
   check(rect_x_copy, RelationalOperator::EQUAL, std::vector<double>({ 5.1, 0.7, -7.1, -2.1 }),
         "Re-imaging rectilinear Cartesian X coordinates by the minimum image convention fails.");  
   check(rect_y_copy, RelationalOperator::EQUAL, std::vector<double>({ 3.8, -3.4, -10.5, -9.4 }),
@@ -522,9 +613,9 @@ int main(const int argc, const char* argv[]) {
   std::vector<double> dense_x_copy(dense_x_crd);
   std::vector<double> dense_y_copy(dense_y_crd);
   std::vector<double> dense_z_copy(dense_z_crd);
-  imageCoordinates(&dense_x_copy, &dense_y_copy, &dense_z_copy, rectilinear_umat.data(),
-                   rectilinear_invu.data(), UnitCellType::ORTHORHOMBIC,
-                   ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<double, double>(&dense_x_copy, &dense_y_copy, &dense_z_copy,
+                                   rectilinear_umat.data(), rectilinear_invu.data(),
+                                   UnitCellType::ORTHORHOMBIC, ImagingMethod::MINIMUM_IMAGE);
   std::vector<double> box_x_disp(npts), box_y_disp(npts), box_z_disp(npts);
   for (int i = 0; i < npts; i++) {
     box_x_disp[i] = (dense_x_copy[i] - dense_x_crd[i]) * rectilinear_umat[0];
@@ -555,9 +646,9 @@ int main(const int argc, const char* argv[]) {
         "the minimum image convention puts some particles outside the minimum expected range.");
   check(max_rect_crd, RelationalOperator::LT, Approx(max_rect_ans).margin(tiny), "Re-imaging by "
         "the minimum image convention puts some particles outside the maximum expected range.");
-  imageCoordinates(&dense_x_copy, &dense_y_copy, &dense_z_copy, rectilinear_umat.data(),
-                   rectilinear_invu.data(), UnitCellType::ORTHORHOMBIC,
-                   ImagingMethod::PRIMARY_UNIT_CELL);
+  imageCoordinates<double, double>(&dense_x_copy, &dense_y_copy, &dense_z_copy,
+                                   rectilinear_umat.data(), rectilinear_invu.data(),
+                                   UnitCellType::ORTHORHOMBIC, ImagingMethod::PRIMARY_UNIT_CELL);
   for (int i = 0; i < npts; i++) {
     box_x_disp[i] = (dense_x_copy[i] - dense_x_crd[i]) * rectilinear_umat[0];
     box_y_disp[i] = (dense_y_copy[i] - dense_y_crd[i]) * rectilinear_umat[4];
@@ -593,8 +684,9 @@ int main(const int argc, const char* argv[]) {
     dense_y_copy[i] = dense_y_crd[i];
     dense_z_copy[i] = dense_z_crd[i];
   }
-  imageCoordinates(&dense_x_copy, &dense_y_copy, &dense_z_copy, triclinic_umat.data(),
-                   triclinic_invu.data(), UnitCellType::TRICLINIC, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<double, double>(&dense_x_copy, &dense_y_copy, &dense_z_copy,
+                                   triclinic_umat.data(), triclinic_invu.data(),
+                                   UnitCellType::TRICLINIC, ImagingMethod::MINIMUM_IMAGE);
   for (int i = 0; i < npts; i++) {
     const double dx = dense_x_copy[i] - dense_x_crd[i];
     const double dy = dense_y_copy[i] - dense_y_crd[i];
@@ -639,9 +731,9 @@ int main(const int argc, const char* argv[]) {
     dense_y_copy[i] = dense_y_crd[i];
     dense_z_copy[i] = dense_z_crd[i];
   }
-  imageCoordinates(&dense_x_copy, &dense_y_copy, &dense_z_copy, triclinic_umat.data(),
-                   triclinic_invu.data(), UnitCellType::TRICLINIC,
-                   ImagingMethod::PRIMARY_UNIT_CELL);
+  imageCoordinates<double, double>(&dense_x_copy, &dense_y_copy, &dense_z_copy,
+                                   triclinic_umat.data(), triclinic_invu.data(),
+                                   UnitCellType::TRICLINIC, ImagingMethod::PRIMARY_UNIT_CELL);
   for (int i = 0; i < npts; i++) {
     const double dx = dense_x_copy[i] - dense_x_crd[i];
     const double dy = dense_y_copy[i] - dense_y_crd[i];
@@ -699,12 +791,40 @@ int main(const int argc, const char* argv[]) {
   cfw.zcrd[22] -= 2.0 * cfw.boxdim[2];
   check(angle(40, 22, 50, drug_cf), RelationalOperator::EQUAL, Approx(1.8791980388).margin(small),
         "The angle made by three atoms in a drug molecule is not computed correctly.");
-  check(dihedral_angle(9, 10, 11, 12, drug_cf), RelationalOperator::EQUAL,
+  check(dihedralAngle(9, 10, 11, 12, drug_cf), RelationalOperator::EQUAL,
         Approx(-3.1069347104).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
-  check(dihedral_angle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
+  check(dihedralAngle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
         Approx(-1.6233704738).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
+  const std::vector<std::string> collection = { "med_1",  "med_3", "symmetry_C1", "tip3p",
+                                                "drug_example_dry", "ubiquitin", "stereo_L1_vs" };
+  TestSystemManager tsm(base_top_path, "top", collection, base_crd_path, "inpcrd", collection);
+  std::vector<CoordinateFrame> tsm_cf;
+  tsm_cf.reserve(tsm.getSystemCount());
+  std::vector<PhaseSpace> tsm_ps;
+  tsm_ps.reserve(tsm.getSystemCount());
+  std::vector<CoordinateSeries<llint>> tsm_cs;
+  tsm_cs.reserve(tsm.getSystemCount());
+  std::vector<int> tsm_atom_counts(tsm.getSystemCount());
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    tsm_cf.push_back(tsm.exportCoordinateFrame(i));
+    tsm_ps.push_back(tsm.exportPhaseSpace(i));
+    tsm_cs.push_back(tsm.exportCoordinateSeries<llint>(i, 4, 0.0, 918404, 24));
+    tsm_atom_counts[i] = tsm_cf.back().getAtomCount();
+  }
+  const std::vector<int> iso_examples = tsm.getQualifyingSystems(UnitCellType::NONE);
+  const std::vector<int> pbc_examples = tsm.getQualifyingSystems({ UnitCellType::ORTHORHOMBIC,
+                                                                   UnitCellType::TRICLINIC });
+  const int n_iso_sys = tsm.getSystemCount(UnitCellType::NONE);
+  const int n_pbc_sys = tsm.getSystemCount({ UnitCellType::ORTHORHOMBIC,
+                                             UnitCellType::TRICLINIC });
+  check(n_iso_sys + n_pbc_sys, RelationalOperator::EQUAL, tsm.getSystemCount(), "The number of "
+        "systems with isolated boundary conditions plus the number with periodic boundary "
+        "conditions does not match the total number of systems in the TestSystemManager.",
+        tsm.getTestingStatus());
+  checkGeometrics(tsm, { UnitCellType::NONE });
+  checkGeometrics(tsm, { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC });
   
   // Check the placement of virtual sites, frame type by frame type.  Scramble and recover the
   // virtual site locations, then place the entire system back in the primary unit cell and

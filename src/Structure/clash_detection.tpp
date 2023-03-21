@@ -72,7 +72,7 @@ bool directClashTesting(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zc
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc max_clash = maxClashingDistance<Tcalc>(nbk, elec_limit, vdw_ratio);
-
+  
   // Lay out a workspace and begin searching
   bool clash_found = false;
   std::vector<Tcalc> cachi_xcrd(tile_length), cachi_ycrd(tile_length), cachi_zcrd(tile_length);
@@ -315,6 +315,8 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
   if (summary != nullptr) {
     summary->setMinimumDistance(elec_limit);
     summary->setMinimumSigmaRatio(vdw_ratio);
+    summary->setTopologyPointer(mask->getTopologyPointer());
+    summary->clear();
   }
   
   // Determine the calculation type
@@ -466,13 +468,14 @@ bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, const size_t frame,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMask *mask, const double elec_limit,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit,
                  const Tcalc vdw_ratio, ClashReport *summary) {
   const size_t padded_atoms = roundUp(csr.natom, warp_size_int);
   const size_t atom_start = frame * padded_atoms;
   const size_t xfrm_start = frame * roundUp<size_t>(9, warp_size_zu);
-  return detectClash(&csr.xcrd[atom_start], &csr.ycrd[atom_start], &csr.zcrd[atom_start], vk, nbk,
-                     mask, elec_limit, vdw_ratio, csr.inv_gpos_scale, summary);
+  return detectClash<Tcoord, Tcalc>(&csr.xcrd[atom_start], &csr.ycrd[atom_start],
+                                    &csr.zcrd[atom_start], vk, nbk, mask, elec_limit, vdw_ratio,
+                                    csr.inv_gpos_scale, summary);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -498,33 +501,148 @@ template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
                  const StaticExclusionMask &mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
                  ClashReport *summary) {
-  return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(), mask,
-                                    elec_limit, vdw_ratio, summary);
+  return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
+                                    mask.getSelfPointer(), elec_limit, vdw_ratio, summary);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const AtomGraph *ag,
                  const StaticExclusionMask *mask, ClashReport *summary) {
-  return detectClash<Tcoord, Tcalc>(cs, frame, ag, mask, summary->getMinimumDistance(),
-                                    summary->getMinimumSigmaRatio(), summary);
+  if (summary == nullptr) {
+    return detectClash<Tcoord, Tcalc>(cs, frame, ag, mask, default_minimize_clash_r0,
+                                      default_minimize_clash_ratio);
+  }
+  else {
+    return detectClash<Tcoord, Tcalc>(cs, frame, ag, mask, summary->getMinimumDistance(),
+                                      summary->getMinimumSigmaRatio(), summary);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
                  const StaticExclusionMask &mask, ClashReport *summary) {
-  return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
-                                    mask.getSelfPointer(), summary->getMinimumDistance(),
-                                    summary->getMinimumSigmaRatio(), summary);
+  if (summary == nullptr) {
+    return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
+                                      mask.getSelfPointer(), default_minimize_clash_r0,
+                                      default_minimize_clash_ratio);
+  }
+  else {
+    return detectClash<Tcoord, Tcalc>(cs.getSelfPointer(), frame, ag.getSelfPointer(),
+                                      mask.getSelfPointer(), summary->getMinimumDistance(),
+                                      summary->getMinimumSigmaRatio(), summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const PsSynthesisReader &poly_psr, const int system_index,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
+  const int atom_start = poly_psr.atom_starts[system_index];
+  const int natom = poly_psr.atom_counts[system_index];
+  const int atom_limit = atom_start + natom;
+  if (poly_psr.gpos_bits <= globalpos_scale_nonoverflow_bits) {
+    std::vector<float> xcrd(natom);
+    std::vector<float> ycrd(natom);
+    std::vector<float> zcrd(natom);
+    for (int i = atom_start; i < atom_limit; i++) {
+      xcrd[i - atom_start] = static_cast<float>(poly_psr.xcrd[i]) * poly_psr.inv_gpos_scale_f;
+      ycrd[i - atom_start] = static_cast<float>(poly_psr.ycrd[i]) * poly_psr.inv_gpos_scale_f;
+      zcrd[i - atom_start] = static_cast<float>(poly_psr.zcrd[i]) * poly_psr.inv_gpos_scale_f;
+    }
+    return detectClash<float, Tcalc>(xcrd.data(), ycrd.data(), zcrd.data(), vk, nbk, mask,
+                                     elec_limit, vdw_ratio, 1.0, summary);
+  }
+  else {
+    std::vector<double> xcrd(natom);
+    std::vector<double> ycrd(natom);
+    std::vector<double> zcrd(natom);
+    for (int i = atom_start; i < atom_limit; i++) {
+      xcrd[i - atom_start] = hostInt95ToDouble(poly_psr.xcrd[i], poly_psr.xcrd_ovrf[i]) *
+                             poly_psr.inv_gpos_scale;
+      ycrd[i - atom_start] = hostInt95ToDouble(poly_psr.ycrd[i], poly_psr.ycrd_ovrf[i]) *
+                             poly_psr.inv_gpos_scale;
+      zcrd[i - atom_start] = hostInt95ToDouble(poly_psr.zcrd[i], poly_psr.zcrd_ovrf[i]) *
+                             poly_psr.inv_gpos_scale;
+    }
+    return detectClash<double, Tcalc>(xcrd.data(), ycrd.data(), zcrd.data(), vk, nbk, mask,
+                                      elec_limit, vdw_ratio, 1.0, summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis *poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
+  const AtomGraph *ag_ptr = poly_ps->getSystemTopologyPointer(system_index);
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    return detectClash<double>(poly_ps->data(), system_index,
+                               ag_ptr->getDoublePrecisionValenceKit(),
+                               ag_ptr->getDoublePrecisionNonbondedKit(), mask, elec_limit,
+                               vdw_ratio, summary);
+  }
+  else {
+    return detectClash<float>(poly_ps->data(), system_index,
+                              ag_ptr->getSinglePrecisionValenceKit(),
+                              ag_ptr->getSinglePrecisionNonbondedKit(), mask, elec_limit,
+                              vdw_ratio, summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis &poly_ps, const int system_index,
+                 const StaticExclusionMask &mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
+  return detectClash<Tcalc>(poly_ps.getSelfPointer(), system_index, mask.getSelfPointer(),
+                            elec_limit, vdw_ratio, summary);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis *poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, ClashReport *summary) {
+  if (summary == nullptr) {
+    return detectClash<Tcalc>(poly_ps, system_index, mask, default_minimize_clash_r0,
+                              default_minimize_clash_ratio);
+  }
+  else {
+    return detectClash<Tcalc>(poly_ps, system_index, mask, summary->getMinimumDistance(),
+                              summary->getMinimumSigmaRatio(), summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis &poly_ps, const int system_index,
+                 const StaticExclusionMask &mask, ClashReport *summary) {
+  if (summary == nullptr) {
+    return detectClash<Tcalc>(poly_ps.getSelfPointer(), system_index, mask.getSelfPointer(),
+                              default_minimize_clash_r0, default_minimize_clash_ratio);
+  }
+  else {
+    return detectClash<Tcalc>(poly_ps.getSelfPointer(), system_index, mask.getSelfPointer(),
+                              summary->getMinimumDistance(), summary->getMinimumSigmaRatio(),
+                              summary);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
 bool detectClash(const CondensateReader &cdnsr, const int system_index,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMask *mask, const Tcalc elec_limit,
-                 const Tcalc vdw_ratio, ClashReport *summary) {
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary) {
   const size_t atom_start = cdnsr.atom_starts[system_index];
   switch (cdnsr.mode) {
   case PrecisionModel::DOUBLE:
@@ -537,6 +655,56 @@ bool detectClash(const CondensateReader &cdnsr, const int system_index,
                                      vdw_ratio, 1.0, summary);
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, const double elec_limit,
+                 const double vdw_ratio, ClashReport *summary) {
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    return detectClash<double>(cdns->data(), system_index, ag->getDoublePrecisionValenceKit(),
+                               ag->getDoublePrecisionNonbondedKit(), mask, elec_limit, vdw_ratio,
+                               summary);
+  }
+  else {
+    return detectClash<float>(cdns->data(), system_index, ag->getSinglePrecisionValenceKit(),
+                              ag->getSinglePrecisionNonbondedKit(), mask, elec_limit, vdw_ratio,
+                              summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, const double elec_limit,
+                 const double vdw_ratio, ClashReport *summary) {
+  return detectClash<Tcalc>(cdns.getSelfPointer(), system_index, ag.getSelfPointer(),
+                            mask.getSelfPointer(), elec_limit, vdw_ratio, summary);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
+                 const StaticExclusionMask *mask, ClashReport *summary) {
+  if (summary == nullptr) {
+    return detectClash<Tcalc>(cdns, system_index, ag, mask, default_minimize_clash_r0,
+                              default_minimize_clash_ratio);
+  }
+  else {
+    return detectClash<Tcalc>(cdns, system_index, ag, mask, summary->getMinimumDistance(),
+                              summary->getMinimumSigmaRatio(), summary);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
+                 const StaticExclusionMask &mask, ClashReport *summary) {
+  return detectClash<Tcalc>(cdns.getSelfPointer(), system_index, ag.getSelfPointer(),
+                            mask.getSelfPointer(), summary);
 }
 
 } // namespace structure

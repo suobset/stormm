@@ -27,11 +27,11 @@ namespace stormm {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
-using math::angleVerification;
-using math::crossProduct;
-using math::matrixMultiply;
-using math::matrixVectorMultiply;
-using math::roundUp;
+using stmath::angleVerification;
+using stmath::crossProduct;
+using stmath::matrixMultiply;
+using stmath::matrixVectorMultiply;
+using stmath::roundUp;
 using restraints::computeRestraintMixture;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;

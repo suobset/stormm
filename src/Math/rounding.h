@@ -9,7 +9,7 @@
 #include "DataTypes/common_types.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using symbols::pi;
 using symbols::pi_f;
@@ -65,7 +65,7 @@ template <typename Tcalc>
 Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
                         const Tcalc* bc, const Tcalc* scr);
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "rounding.tpp"

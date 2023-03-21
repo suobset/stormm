@@ -2,14 +2,15 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-TickCounter<T>::TickCounter(const std::vector<int> &state_limits_in) :
+TickCounter<T>::TickCounter(const std::vector<int> &state_limits_in,
+                            const std::vector<int> &settings_in) :
     variable_count{static_cast<int>(state_limits_in.size())},
     log_permutations{logProduct(state_limits_in)},
-    settings{std::vector<int>(state_limits_in.size(), 0)},
+    settings{settings_in.size() == 0 ? std::vector<int>(state_limits_in.size(), 0) : settings_in},
     state_limits{state_limits_in},
     state_values{}, state_value_bounds{}
 {
@@ -34,18 +35,38 @@ TickCounter<T>::TickCounter(const std::vector<int> &state_limits_in) :
   }
   prefixSumInPlace(&state_value_bounds, PrefixSumType::EXCLUSIVE);
   state_values.resize(state_value_bounds[variable_count]);
+  validateSettings();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-TickCounter<T>::TickCounter(const std::vector<int> &state_limits_in,
+TickCounter<T>::TickCounter(const std::vector<std::vector<T>> &state_values_in,
                             const std::vector<int> &settings_in) :
-    TickCounter(state_limits_in)
+    variable_count{static_cast<int>(state_values_in.size())},
+    log_permutations{0.0},
+    settings{settings_in.size() == 0 ? std::vector<int>(state_values_in.size(), 0) : settings_in},
+    state_limits{}, state_values{}, state_value_bounds{}
 {
+  // Adjust the state limits to conform to the input values
+  int nval = 0;
+  state_limits.resize(state_values_in.size());
+  state_value_bounds.resize(state_values_in.size() + 1);
   for (int i = 0; i < variable_count; i++) {
-    settings[i] = settings_in[i];
+    state_limits[i] = state_values_in[i].size();
+    state_value_bounds[i] = nval;
+    nval += state_values_in[i].size();
   }
-  validateSettings();
+  log_permutations = logProduct(state_limits);
+  state_value_bounds[variable_count] = nval;
+  state_values.resize(nval);
+  nval = 0;
+  for (int i = 0; i < variable_count; i++) {
+    const size_t nval_i = state_values_in[i].size();
+    for (size_t j = 0; j < nval_i; j++) {
+      state_values[nval] = state_values_in[i][j];
+      nval++;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -113,24 +134,38 @@ llint TickCounter<T>::getExactPermutationCount() const {
     rtErr("There are too many permutations to represent as a long long integer.", "TickCounter",
           "getExactPermutationCount");
   }
+  if (variable_count == 0) {
+    return 0LL;
+  }
   return seriesProduct<llint>(state_limits);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 double TickCounter<T>::getApproximatePermutationCount() const {
+  if (variable_count == 0) {
+    return 0.0;
+  }
   return seriesProduct<double>(state_limits);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 double TickCounter<T>::getLogPermutationCount() const {
+  if (variable_count == 0) {
+    return 0.0;
+  }
   return logProduct(state_limits);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void TickCounter<T>::advance(const int steps) {
+
+  // Return immediately if there are no variables to increment.
+  if (variable_count == 0) {
+    return;
+  }
   if (steps == 1) {
     int wheel = 0;
     settings[wheel] += 1;
@@ -177,6 +212,11 @@ void TickCounter<T>::advance(const int steps) {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void TickCounter<T>::reverse(const int steps) {
+
+  // Return immediately if there are no variables to increment.
+  if (variable_count == 0) {
+    return;
+  }
   if (steps == 1) {
     int wheel = 0;
     settings[wheel] -= 1;
@@ -305,6 +345,11 @@ void TickCounter<T>::randomize(Trng *xrs, const std::vector<int> &apply_rng) {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void TickCounter<T>::validateSettings() const {
+  if (settings.size() != state_limits.size()) {
+    rtErr("The number of settings (" + std::to_string(settings.size()) + ") does not equal the "
+          "number of mutable variables (" + std::to_string(state_limits.size()) + ").",
+          "TickCounter", "validateSettings");
+  }
   for (int i = 0; i < variable_count; i++) {
     if (settings[i] >= state_limits[i] || settings[i] < 0) {
       rtErr("Counter variable " + std::to_string(i) + " has a maximum of " +
@@ -372,5 +417,5 @@ void loadScalarStateValues(TickCounter<T> *tc, const std::vector<T2> &ranges) {
   }
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
