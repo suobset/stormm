@@ -48,7 +48,7 @@ using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::structure::distance;
 using stormm::structure::angle;
-using stormm::structure::dihedral_angle;
+using stormm::structure::dihedralAngle;
 using stormm::topology::AtomGraph;
 using namespace stormm::trajectory;
 using namespace stormm::restraints;
@@ -485,7 +485,7 @@ int main(const int argc, const char* argv[]) {
   RestraintApparatus gk_angl_ra(angl_restraints);
   std::vector<BoundedRestraint> dihe_restraints;
   for (int i = 0; i < natom_gk - 4; i += 4) {
-    const double phi_eq = dihedral_angle(i, i + 1, i + 2, i + 3, gk_cfr);
+    const double phi_eq = dihedralAngle(i, i + 1, i + 2, i + 3, gk_cfr);
     dihe_restraints.emplace_back(i, i + 1, i + 2, i + 3, &gk_ag, 1.4, 3.7, phi_eq - 3.0, phi_eq,
                                  phi_eq, phi_eq + 3.0);
   }
@@ -520,7 +520,7 @@ int main(const int argc, const char* argv[]) {
   RestraintApparatus gk_angl_scrm_ra(angl_scramble_restraints);
   std::vector<BoundedRestraint> dihe_scramble_restraints;
   for (int i = 0; i < natom_gk - 4; i += 2) {
-    const double phi_eq = dihedral_angle(i, i + 1, i + 2, i + 3, gk_cfr);
+    const double phi_eq = dihedralAngle(i, i + 1, i + 2, i + 3, gk_cfr);
     const double k2 = 1.1 * (0.5 - xsr.uniformRandomNumber());
     const double k3 = 1.3 * (0.5 - xsr.uniformRandomNumber());
     dihe_scramble_restraints.emplace_back(i, i + 1, i + 2, i + 3, &gk_ag, k2, k3, phi_eq - 0.75,

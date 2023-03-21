@@ -11,7 +11,7 @@
 namespace stormm {
 namespace parse {
 
-using math::SortDirection;
+using stmath::SortDirection;
 
 /// \brief List the possible types of header lines for a formatted table.  This class and the
 ///        functions below output strings that can laterbe fed into any file or output stream.

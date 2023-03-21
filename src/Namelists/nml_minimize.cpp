@@ -218,12 +218,12 @@ void MinimizeControls::validateAuxiliaryCycles(int *cycles_in, const int default
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The cycle count of " + std::to_string(*cycles_in) + " is greater than the stated "
-            "number of total cycles " + std::to_string(total_cycles) + ".", "MinimizeControls",
+            "number of total cycles (" + std::to_string(total_cycles) + ").", "MinimizeControls",
             "validateAuxiliaryCycles");
     case ExceptionResponse::WARN:
       rtWarn("The cycle count of " + std::to_string(*cycles_in) + " is greater than the stated "
-             "number of total cycles " + std::to_string(total_cycles) + " and will be reduced to "
-             "the maximum overall cycle count.", "MinimizeControls", "validateAuxiliaryCycles");
+             "number of total cycles (" + std::to_string(total_cycles) + "), and will be reduced "
+             "to the maximum overall cycle count.", "MinimizeControls", "validateAuxiliaryCycles");
       *cycles_in = total_cycles;
       break;
     case ExceptionResponse::SILENT:

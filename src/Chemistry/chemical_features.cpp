@@ -11,6 +11,7 @@
 #include "Math/summation.h"
 #include "Parsing/parse.h"
 #include "Topology/atomgraph_analysis.h"
+#include "Topology/topology_util.h"
 #include "UnitTesting/approx.h"
 #include "chemical_features.h"
 #include "indigo.h"
@@ -21,19 +22,20 @@ namespace chemistry {
 using card::HybridKind;
 using constants::PrecisionModel;
 using diskutil::getBaseName;
-using math::accumulateBitmask;
-using math::addScalarToVector;
-using math::numberSeriesToBitMask;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::readBitFromMask;
-using math::reduceUniqueValues;
-using math::sum;
-using math::unsetBitInMask;
+using stmath::accumulateBitmask;
+using stmath::addScalarToVector;
+using stmath::numberSeriesToBitMask;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::readBitFromMask;
+using stmath::reduceUniqueValues;
+using stmath::sum;
+using stmath::unsetBitInMask;
 using numerics::globalpos_scale_nonoverflow_bits;
 using parse::char4ToString;
 using testing::Approx;
 using topology::colorConnectivity;
+using topology::isBonded;
 using topology::selectRotatingAtoms;
 using topology::TorsionKind;
 using trajectory::CoordinateFrameReader;
@@ -193,7 +195,7 @@ IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
       const int pivot_max_bound = nbk.nb12_bounds[pivot_atom + 1];
       int max_pivot_z = -1;
       for (int i = pivot_min_bound; i < pivot_max_bound; i++) {
-        if (nbk.nb12x[i] != pivot_atom && cdk.z_numbers[nbk.nb12x[i]] > max_root_z) {
+        if (nbk.nb12x[i] != root_atom && cdk.z_numbers[nbk.nb12x[i]] > max_pivot_z) {
           max_pivot_z = cdk.z_numbers[nbk.nb12x[i]];
           pivot_handle = nbk.nb12x[i];
         }
@@ -285,6 +287,11 @@ void IsomerPlan::addMovingAtoms(const std::vector<int> &new_atom_idx) {
 void IsomerPlan::eraseMovingAtoms() {
   moving_atoms.resize(0);
 }
+
+//-------------------------------------------------------------------------------------------------
+CoupledEdit::CoupledEdit() :
+    edit{ConformationEdit::BOND_ROTATION}, index{0}
+{}
 
 //-------------------------------------------------------------------------------------------------
 CoupledEdit::CoupledEdit(const ConformationEdit edit_in, const int index_in) :
@@ -418,6 +425,12 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const MapRotatableGro
   }
   analyzeTopology(map_groups_in);
 }
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures::ChemicalFeatures(const AtomGraph &ag_in, const MapRotatableGroups map_groups_in,
+                                   const double temperature_in, StopWatch *timer_in) :
+    ChemicalFeatures(ag_in.getSelfPointer(), map_groups_in, temperature_in, timer_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
@@ -2273,10 +2286,12 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
         }
         int brpos = 0;
         int nring = 0;
+        int n_j_vs_encountered = 0;
         for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
 
           // Skip "branches" that are actually virtual sites
           if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
+            n_j_vs_encountered++;
             continue;
           }
 
@@ -2297,9 +2312,16 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
           if (ring_completed) {
             nring++;
             branch_counts[brpos].z = nring;
+            int n_k_vs_encountered = n_j_vs_encountered;
             for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
+
+              // Again, skip "branches" that are actually virtual sites
+              if (cdk.z_numbers[nbk.nb12x[k]] == 0) {
+                n_k_vs_encountered++;
+                continue;
+              }
               if (readBitFromMask(marked[brpos], nbk.nb12x[k])) {
-                const size_t mirror_idx = k - nbk.nb12_bounds[chatom];
+                const size_t mirror_idx = k - nbk.nb12_bounds[chatom] - n_k_vs_encountered;
                 for (size_t m = 0; m < mask_len; m++) {
                   marked[mirror_idx][m] = marked[brpos][m];
                 }
@@ -3328,12 +3350,21 @@ int getChiralOrientation(const PsSynthesisReader &poly_psr, const int system_ind
                          const int center_atom, const int root_atom, const int branch_a_atom,
                          const int branch_b_atom, const int branch_c_atom) {
   const size_t offset = poly_psr.atom_starts[system_index];
-  if (poly_psr.gpos_bits >= globalpos_scale_nonoverflow_bits) {
-    return getChiralOrientation<llint>(&poly_psr.xcrd[offset], &poly_psr.ycrd[offset],
-                                       &poly_psr.zcrd[offset], &poly_psr.xcrd_ovrf[offset],
-                                       &poly_psr.ycrd_ovrf[offset], &poly_psr.zcrd_ovrf[offset],
-                                       center_atom, root_atom, branch_a_atom, branch_b_atom,
-                                       branch_c_atom, poly_psr.inv_gpos_scale);
+  if (poly_psr.gpos_bits > globalpos_scale_nonoverflow_bits) {
+    std::vector<double> tmp_xcrd(5), tmp_ycrd(5), tmp_zcrd(5);
+    std::vector<int> markers = { center_atom, root_atom, branch_a_atom, branch_b_atom,
+      branch_c_atom };
+    for (int i = 0; i < 5; i++) {
+      const size_t im = markers[i] + offset;
+      tmp_xcrd[i] = hostInt95ToDouble(poly_psr.xcrd[im], poly_psr.xcrd_ovrf[im]) *
+                    poly_psr.inv_gpos_scale;
+      tmp_ycrd[i] = hostInt95ToDouble(poly_psr.ycrd[im], poly_psr.ycrd_ovrf[im]) *
+                    poly_psr.inv_gpos_scale;
+      tmp_zcrd[i] = hostInt95ToDouble(poly_psr.zcrd[im], poly_psr.zcrd_ovrf[im]) *
+                    poly_psr.inv_gpos_scale;
+    }
+    return getChiralOrientation<double>(tmp_xcrd.data(), tmp_ycrd.data(), tmp_zcrd.data(),
+                                        0, 1, 2, 3, 4);
   }
   else {
     return getChiralOrientation<llint>(&poly_psr.xcrd[offset], &poly_psr.ycrd[offset],
@@ -3364,6 +3395,45 @@ bool matchBondingPattern(const AtomGraph &ag, const ChemicalFeatures &chemfe, co
                          const int atom_b) {
   return matchBondingPattern(ag, chemfe.getFormalCharges(), chemfe.getFreeElectrons(),
                              chemfe.getRingInclusion(), chemfe.getAtomChirality(), atom_a, atom_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool permutationsAreLinked(const std::vector<IsomerPlan> &isomerizers, const int permi,
+                           const int permj, const NonbondedKit<double> &nbk) {
+  const int root_i = isomerizers[permi].getRootAtom();
+  const int pivt_i = isomerizers[permi].getPivotAtom();
+  const int root_j = isomerizers[permj].getRootAtom();
+  const int pivt_j = isomerizers[permj].getPivotAtom();
+  switch (isomerizers[permi].getMotion()) {
+  case ConformationEdit::BOND_ROTATION:
+  case ConformationEdit::CIS_TRANS_FLIP:
+
+    // If two isomerizations share atoms or have their root and pivot atoms bonded to one
+    // another, consider them coupled and add the product of the number of possible states for
+    // each to the running sum.
+    switch (isomerizers[permj].getMotion()) {
+    case ConformationEdit::BOND_ROTATION:
+    case ConformationEdit::CIS_TRANS_FLIP:
+      return (root_i == root_j || root_i == pivt_j || pivt_i == root_j || pivt_i == pivt_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j) ||
+              isBonded(nbk, pivt_i, root_j) || isBonded(nbk, pivt_i, pivt_j));
+    case ConformationEdit::CHIRAL_INVERSION:
+      return (root_i == root_j || pivt_i == root_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j));
+    }
+    break;
+  case ConformationEdit::CHIRAL_INVERSION:
+    switch (isomerizers[permj].getMotion()) {
+    case ConformationEdit::BOND_ROTATION:
+    case ConformationEdit::CIS_TRANS_FLIP:
+      return (root_i == root_j || root_i == pivt_j ||
+              isBonded(nbk, root_i, root_j) || isBonded(nbk, root_i, pivt_j));
+    case ConformationEdit::CHIRAL_INVERSION:
+      return (root_i == root_j || isBonded(nbk, root_i, root_j));
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 } // namespace chemistry

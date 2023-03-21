@@ -1,6 +1,6 @@
 // -*-c++-*-
-#include "copyright.h"
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace restraints {
@@ -20,6 +20,10 @@ enum class RestraintEnsemble {
                              ///<   towards the same goal as PRESERVE_HEAVY_DIHEDRALS
 };
 
+/// \brief Produce a human-readable string based on an enumerated value.  Various overloads of this
+///        function are found in other libraries and namespaces.
+std::string getEnumerationName(RestraintEnsemble input);
+  
 /// \brief Translate a user input value or other string code into the appropriate RestraintEnsemble
 ///        enumeration.
 ///

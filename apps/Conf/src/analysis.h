@@ -4,6 +4,7 @@
 
 #include <vector>
 #include "copyright.h"
+#include "../../../src/Accelerator/gpu_details.h"
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_conformer.h"
 #include "../../../src/Namelists/nml_minimize.h"
@@ -19,6 +20,7 @@
 namespace conf_app {
 namespace analysis {
 
+using stormm::card::GpuDetails;
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::namelist::ConformerControls;
@@ -48,11 +50,12 @@ using stormm::synthesis::SystemGrouping;
 /// \param scmap          Map between the systems cache and the working synthesis
 /// \param emin           The minimum energy values and history
 /// \param confcon        Conformer namelist user input
+  
 std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
                                            const std::vector<StaticExclusionMask> &poly_ps_masks,
                                            const SystemCache &sc, const SynthesisCacheMap &scmap,
-                                           const ScoreCard &emin,
-                                           const ConformerControls &confcon);
+                                           const ScoreCard &emin, const ConformerControls &confcon,
+                                           const GpuDetails &gpu = null_gpu);
 
 /// \brief Print the best structures for each system, grouped by topology, in accord with user
 ///        input.
@@ -62,14 +65,12 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
 /// \param emin          Energy tracking with histories from each minimization
 /// \param sc            The cache of all systems read from disk
 /// \param scmap         Map between the systems cache and the working synthesis
-/// \param sdf_recovery  Vector of recovered MdlMol objects for each system reach from disk
 /// \param confcon       Conformer namelist user input
 /// \param repcon        Control data from a &report namelist in the user input, to specify
 ///                      modifications to SD files
 void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &best_confs,
                   const ScoreCard &emin, const SystemCache &sc, const SynthesisCacheMap &scmap,
-                  const std::vector<MdlMol> &sdf_recovery, const ConformerControls &confcon,
-                  const ReportControls &repcon);
+                  const ConformerControls &confcon, const ReportControls &repcon);
 
 } // namespace analysis
 } // namespace conf_app

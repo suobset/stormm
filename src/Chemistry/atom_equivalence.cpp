@@ -11,8 +11,8 @@
 namespace stormm {
 namespace chemistry {
 
-using math::prefixSumInPlace;
-using math::PrefixSumType;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
 using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
 

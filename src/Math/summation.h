@@ -10,7 +10,7 @@
 #include "UnitTesting/approx.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
@@ -103,7 +103,7 @@ template <typename TSum, typename TBase>
 TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier = HybridTargetLevel::HOST);
 /// \}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "summation.tpp"

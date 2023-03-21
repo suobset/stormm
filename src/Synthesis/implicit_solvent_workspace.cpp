@@ -7,7 +7,7 @@ namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
-using math::roundUp;
+using stmath::roundUp;
 
 //-------------------------------------------------------------------------------------------------
 ImplicitSolventWorkspace::ImplicitSolventWorkspace(const Hybrid<int> &atom_starts,

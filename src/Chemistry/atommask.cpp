@@ -11,8 +11,8 @@ namespace chemistry {
 
 using card::HybridKind;
 using card::HybridTargetLevel;
-using math::accumulateBitmask;
-using math::readBitFromMask;
+using stmath::accumulateBitmask;
+using stmath::readBitFromMask;
 using parse::char4ToString;
 using parse::NumberFormat;
 using parse::TextGuard;

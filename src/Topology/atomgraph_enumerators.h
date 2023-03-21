@@ -205,15 +205,31 @@ enum class VirtualSiteKind {
             ///<   between frame atoms 2, 3, and 4
 };
   
-/// \brief Produce a string denoting the meaning of a UnitCellType enumeration.
+/// \brief Produce a human-readable string corresponding to the enumeration of interest.  Various
+///        overloads of this function (in this and other libaries and namespaces) serve different
+///        enum class objects.
 ///
-/// \param uc  The type of unit cell
-std::string getUnitCellTypeName(UnitCellType uc); 
-
-/// \brief Produce a string with the name of an implicit solvent model.
-///
-/// \param ism  The implicit solvent model enumeration
-std::string getImplicitSolventModelName(ImplicitSolventModel ism);
+/// \param input  The enumeration of interest
+/// \{
+std::string getEnumerationName(TopologyKind input); 
+std::string getEnumerationName(UnitCellType input); 
+std::string getEnumerationName(MobilitySetting input);
+std::string getEnumerationName(ShakeSetting input);
+std::string getEnumerationName(SettleSetting input);
+std::string getEnumerationName(PerturbationSetting input);
+std::string getEnumerationName(SolventCapSetting input);
+std::string getEnumerationName(PolarizationSetting input);
+std::string getEnumerationName(TopologyRequirement input);
+std::string getEnumerationName(MassForm input);
+std::string getEnumerationName(ConstraintStatus input);
+std::string getEnumerationName(HydrogenContent input);
+std::string getEnumerationName(ForceFieldFamily input);
+std::string getEnumerationName(TorsionKind input);
+std::string getEnumerationName(ImplicitSolventModel input);
+std::string getEnumerationName(AtomicRadiusSet input);
+std::string getEnumerationName(WaterModel input);
+std::string getEnumerationName(VirtualSiteKind input);
+/// \}
 
 /// \brief Translate the numerical input for the implicit solvent model into one of the recognized
 ///        models available in STORMM.  This serves as the validator to the implicit solvent model
@@ -224,11 +240,6 @@ std::string getImplicitSolventModelName(ImplicitSolventModel ism);
 ImplicitSolventModel
 translateImplicitSolventModel(int igb_val, ExceptionResponse policy = ExceptionResponse::DIE);
 
-/// \brief Produce a string with the name of an atomic radius set.
-///
-/// \param rs  The radius set enumeration
-std::string getAtomicRadiusSetName(AtomicRadiusSet rs);
-
 /// \brief Translate string input into one of the enumerated AtomicRadiusSet values.  This serves
 ///        as the validator to the radius set in the SolventControls object.
 ///
@@ -237,20 +248,10 @@ std::string getAtomicRadiusSetName(AtomicRadiusSet rs);
 AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
                                          ExceptionResponse policy = ExceptionResponse::DIE);
 
-/// \brief Produce the name of a water model based on its enumeration.
-///
-/// \param wm  The water model enumerated value
-std::string getWaterModelName(WaterModel wm);
-
 /// \brief Produce the most relevant citation for a water model based on its enumeration.
 ///
 /// \param wm  The water model enumerated value
 Citation getWaterModelCitation(WaterModel wm);
-
-/// \brief Produce the name of a virtual site frame based on its enumeration.
-///
-/// \param vsf  The virtual site frame identifier
-std::string getVirtualSiteFrameName(VirtualSiteKind vsf);
   
 } // namespace topology
 } // namespace stormm

@@ -34,7 +34,7 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           dy = ycrd[frame2_atom] - ycrd[parent_atom];
           dz = zcrd[frame2_atom] - zcrd[parent_atom];
         }
-        imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
         const Tcalc p_f2_factor = vsk.dim1[param_idx];
         if (tcoord_is_sgnint) {
           const Tcalc disp_mult = p_f2_factor * gpos_scale_factor;
@@ -62,7 +62,7 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           dy = ycrd[frame2_atom] - ycrd[parent_atom];
           dz = zcrd[frame2_atom] - zcrd[parent_atom];          
         }
-        imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
         const Tcalc invr = 1.0 / sqrt((dx * dx) + (dy * dy) + (dz * dz));
         const Tcalc p_vs_distance = vsk.dim1[param_idx];
         if (tcoord_is_sgnint) {
@@ -98,8 +98,8 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           dy3 = ycrd[frame3_atom] - ycrd[parent_atom];
           dz3 = zcrd[frame3_atom] - zcrd[parent_atom];
         }
-        imageCoordinates(&dx2, &dy2, &dz2, umat, invu, unit_cell, minimum_image);
-        imageCoordinates(&dx3, &dy3, &dz3, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dx2, &dy2, &dz2, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dx3, &dy3, &dz3, umat, invu, unit_cell, minimum_image);
         const Tcalc p_f2_factor = vsk.dim1[param_idx];
         const Tcalc p_f3_factor = vsk.dim2[param_idx];
         if (tcoord_is_sgnint) {
@@ -134,7 +134,7 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           dy23 = ycrd[frame3_atom] - ycrd[frame2_atom];
           dz23 = zcrd[frame3_atom] - zcrd[frame2_atom];
         }
-        imageCoordinates(&dx23, &dy23, &dz23, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dx23, &dy23, &dz23, umat, invu, unit_cell, minimum_image);
         const Tcalc f2_f3_factor  = vsk.dim2[param_idx];
         Tcoord x_midpoint, y_midpoint, z_midpoint;
         if (tcoord_is_sgnint) {
@@ -159,7 +159,7 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           dym = y_midpoint - ycrd[parent_atom];
           dzm = z_midpoint - zcrd[parent_atom];
         }
-        imageCoordinates(&dxm, &dym, &dzm, umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&dxm, &dym, &dzm, umat, invu, unit_cell, minimum_image);
         const Tcalc invr = 1.0 / sqrt((dxm * dxm) + (dym * dym) + (dzm * dzm));
         const Tcalc p_vs_distance = vsk.dim1[param_idx];
         if (tcoord_is_sgnint) {
@@ -196,8 +196,10 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           f2_f3[1] = ycrd[frame3_atom] - ycrd[frame2_atom];
           f2_f3[2] = zcrd[frame3_atom] - zcrd[frame2_atom];
         }
-        imageCoordinates( &p_f2[0],  &p_f2[1],  &p_f2[2], umat, invu, unit_cell, minimum_image);
-        imageCoordinates(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>( &p_f2[0],  &p_f2[1],  &p_f2[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell,
+                                       minimum_image);
         const Tcalc invr2_p_f2 = 1.0 / ((p_f2[0] * p_f2[0]) + (p_f2[1] * p_f2[1]) +
                                         (p_f2[2] * p_f2[2]));
 
@@ -268,8 +270,10 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           p_f3[1] = ycrd[frame3_atom] - ycrd[parent_atom];
           p_f3[2] = zcrd[frame3_atom] - zcrd[parent_atom];
         }
-        imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell, minimum_image);
-        imageCoordinates(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell,
+                                       minimum_image);
         crossProduct(p_f2, p_f3, pf2_x_pf3);
         const Tcalc pf2_factor = vsk.dim1[param_idx];
         const Tcalc pf3_factor = vsk.dim2[param_idx];
@@ -322,9 +326,12 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
           p_f4[1] = ycrd[frame4_atom] - ycrd[parent_atom];
           p_f4[2] = zcrd[frame4_atom] - zcrd[parent_atom];
         }
-        imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell, minimum_image);
-        imageCoordinates(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell, minimum_image);
-        imageCoordinates(&p_f4[0], &p_f4[1], &p_f4[2], umat, invu, unit_cell, minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f4[0], &p_f4[1], &p_f4[2], umat, invu, unit_cell,
+                                       minimum_image);
         const Tcalc pf3_factor = vsk.dim1[param_idx];
         const Tcalc pf4_factor = vsk.dim2[param_idx];
         pf3_m_pf2[0] = (pf3_factor * p_f3[0]) - p_f2[0];
@@ -452,10 +459,10 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
           p_vs[1] = ycrd[vsite_atom] - ycrd[parent_atom];
           p_vs[2] = zcrd[vsite_atom] - zcrd[parent_atom];
         }
-        imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell,
-                         minimum_image);
-        imageCoordinates(&p_vs[0], &p_vs[1], &p_vs[2], umat, invu, unit_cell,
-                         minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_vs[0], &p_vs[1], &p_vs[2], umat, invu, unit_cell,
+                                       minimum_image);
         const Tcalc invr_p_f2 = (tcalc_is_double) ?
                                 1.0 / sqrt((p_f2[0] * p_f2[0]) + (p_f2[1] * p_f2[1]) +
                                            (p_f2[2] * p_f2[2])) :
@@ -559,12 +566,12 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
           p_mid[1] = ycrd[frame2_atom] - ycrd[parent_atom] + (f2_f3_factor * f2_f3[1]);
           p_mid[2] = zcrd[frame2_atom] - zcrd[parent_atom] + (f2_f3_factor * f2_f3[2]);
         }
-        imageCoordinates(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell,
-                         minimum_image);
-        imageCoordinates(&p_vs[0], &p_vs[1], &p_vs[2], umat, invu, unit_cell,
-                         minimum_image);
-        imageCoordinates(&p_mid[0], &p_mid[1], &p_mid[2], umat, invu, unit_cell,
-                         minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_vs[0], &p_vs[1], &p_vs[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&p_mid[0], &p_mid[1], &p_mid[2], umat, invu, unit_cell,
+                                       minimum_image);
 
         // As with the fixed distance, two-point frame, compute the part of the force on the
         // virtual site that is perpendicular to the parent atom -> virtual site displacement
@@ -629,10 +636,10 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
           f2_f3[1] = ycrd[frame3_atom] - ycrd[frame2_atom];
           f2_f3[2] = zcrd[frame3_atom] - zcrd[frame2_atom];
         }
-        imageCoordinates( &p_f2[0],  &p_f2[1],  &p_f2[2], umat, invu, unit_cell,
-                         minimum_image);
-        imageCoordinates(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell,
-                         minimum_image);
+        imageCoordinates<Tcalc, Tcalc>( &p_f2[0],  &p_f2[1],  &p_f2[2], umat, invu, unit_cell,
+                                       minimum_image);
+        imageCoordinates<Tcalc, Tcalc>(&f2_f3[0], &f2_f3[1], &f2_f3[2], umat, invu, unit_cell,
+                                       minimum_image);
         project(f2_f3, p_f2, f23_t_pf2, 3);
         f23_t_pf2[0] = f2_f3[0] - f23_t_pf2[0];
         f23_t_pf2[1] = f2_f3[1] - f23_t_pf2[1];

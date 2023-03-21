@@ -10,7 +10,7 @@ CoordinateSeries<T> TestSystemManager::exportCoordinateSeries(const int base_sys
                                                               const int frame_count,
                                                               const double perturbation_sigma,
                                                               const int xrs_seed,
-                                                              const int scale_bits) {
+                                                              const int scale_bits) const {
   CoordinateSeries<T> result(exportCoordinateFrame(base_system), frame_count, scale_bits);
   CoordinateSeriesWriter<T> resr = result.data();
   Xoshiro256ppGenerator xrs(xrs_seed);

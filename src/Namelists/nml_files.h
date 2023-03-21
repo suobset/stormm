@@ -235,6 +235,7 @@ public:
   /// \param policy_in         Requested error handling behavior
   /// \param tf                Input file translated into RAM
   /// \param start_line        Line of the input file to begin searching for the &solvent namelist
+  /// \param found_nml         Indication that the namelist was found
   /// \param report_name_in    New default name of the report file (for application-specific
   ///                          naming conventions)
   /// \param coord_base_in     New default base name of trajectory or other coordinate files (for
@@ -260,7 +261,7 @@ public:
   /// \{
   FilesControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
                 WrapTextSearch wrap = WrapTextSearch::NO);
-  FilesControls(const TextFile &tf, int *start_line,
+  FilesControls(const TextFile &tf, int *start_line, bool *found_nml = nullptr,
                 ExceptionResponse policy_in = ExceptionResponse::DIE,
                 WrapTextSearch wrap = WrapTextSearch::NO,
                 const std::vector<std::string> &alternatives = {},
@@ -543,6 +544,7 @@ private:
 /// \param start_line         Line at which to begin scanning the input file for the namelist
 ///                           (this will wrap back to the beginning of the file in search of a
 ///                           unique &files namelist)
+/// \param found              Indication that the namelist was found in the input file
 /// \param sys_keyword_reqs   Requirements for the subkeys of the -sys keyword (constructed based
 ///                           on input to the FilesControls object that calls this function)
 /// \param policy             Reaction to exceptions encountered during namelist reading
@@ -553,7 +555,7 @@ private:
 /// \param crd_output_format  The default type for trajectory files written based on each system
 /// \param crd_chkpt_format   The default type for restart files written based on each system
 NamelistEmulator
-filesInput(const TextFile &tf, int *start_line,
+filesInput(const TextFile &tf, int *start_line, bool *found,
            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
            ExceptionResponse policy = ExceptionResponse::DIE,
            WrapTextSearch wrap = WrapTextSearch::NO,

@@ -43,7 +43,7 @@ using namespace stormm::constants;
 using namespace stormm::errors;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::mm;
 using namespace stormm::numerics;
 using namespace stormm::parse;
@@ -454,10 +454,10 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis poly_se(poly_ag.getUniqueTopologies(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
-  PhaseSpaceSynthesis poly_ps(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer());
-  PhaseSpaceSynthesis poly_ps_dbl(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer(),
+  PhaseSpaceSynthesis poly_ps(sysc.getCoordinates(), sysc.getSystemTopologyPointer());
+  PhaseSpaceSynthesis poly_ps_dbl(sysc.getCoordinates(), sysc.getSystemTopologyPointer(),
                                   36, 24, 34, 40);
-  PhaseSpaceSynthesis poly_ps_sdbl(sysc.getCoordinateReference(), sysc.getSystemTopologyPointer(),
+  PhaseSpaceSynthesis poly_ps_sdbl(sysc.getCoordinates(), sysc.getSystemTopologyPointer(),
                                    72, 24, 34, 72);
   KernelManager launcher(gpu, poly_ag);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
@@ -666,8 +666,8 @@ int main(const int argc, const char* argv[]) {
   for (size_t i = 0; i < amber_isms.size(); i++) {
     poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
     poly_ag.upload();
-    const std::string side_note = "GB model: " + getImplicitSolventModelName(amber_isms[i]) +
-                                  " (" + getAtomicRadiusSetName(appropriate_ism_radii[i]) +
+    const std::string side_note = "GB model: " + getEnumerationName(amber_isms[i]) +
+                                  " (" + getEnumerationName(appropriate_ism_radii[i]) +
                                   " radii).";
     checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, AccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
@@ -689,8 +689,8 @@ int main(const int argc, const char* argv[]) {
   for (size_t i = 0; i < amber_isms.size(); i++) {
     poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
     poly_ag.upload();
-    const std::string side_note = "GB model: " + getImplicitSolventModelName(amber_isms[i]) +
-                                  " (" + getAtomicRadiusSetName(appropriate_ism_radii[i]) +
+    const std::string side_note = "GB model: " + getEnumerationName(amber_isms[i]) +
+                                  " (" + getEnumerationName(appropriate_ism_radii[i]) +
                                   " radii).";
     checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, AccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,

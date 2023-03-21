@@ -11,7 +11,7 @@
 #include "reduction_enumerators.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::HybridTargetLevel;
 using synthesis::AtomGraphSynthesis;
@@ -169,7 +169,7 @@ struct ConjGradSubstrate {
   double* msum_buffer;  ///< Squared sums of remixed forces on all atoms
 };
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "reduction_abstracts.tpp"

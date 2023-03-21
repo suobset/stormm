@@ -4,7 +4,7 @@
 #include "rounding.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using constants::mega;
 
@@ -77,5 +77,5 @@ size_t getPaddedMemorySize(const size_t length, const size_t growth_increment,
   __builtin_unreachable();
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

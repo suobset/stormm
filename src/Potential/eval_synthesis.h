@@ -21,7 +21,7 @@
 namespace stormm {
 namespace energy {
   
-using math::readBitFromMask;
+using stmath::readBitFromMask;
 using synthesis::AtomGraphSynthesis;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::small_block_max_imports;

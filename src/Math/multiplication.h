@@ -12,7 +12,7 @@
 #include "Reporting/error_format.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using data_types::getStormmScalarTypeName;
@@ -59,7 +59,7 @@ template <typename Tprod, typename Tbase> Tprod seriesProduct(const std::vector<
 template <typename Tprod, typename Tbase> Tprod seriesProduct(const Hybrid<Tbase> &va);
 /// \}
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "multiplication.tpp"

@@ -24,8 +24,8 @@ using data_types::getStormmScalarTypeName;
 using data_types::getStormmHpcVectorTypeName;
 using data_types::isScalarType;
 using data_types::isHpcVectorType;
-using math::UniqueValueHandling;
-using math::reduceUniqueValues;
+using stmath::UniqueValueHandling;
+using stmath::reduceUniqueValues;
 
 /// \brief Extract a series of numbers from a bounded list, based on an index.  Return the result
 ///        as a std::vector of integers.  If data from multiple bins is requested, offer an option
@@ -101,6 +101,25 @@ std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetai
 bool isBonded(const NonbondedKit<double> &nbk, int atom_i, int atom_j);
 bool isBonded(const AtomGraph &ag, int atom_i, int atom_j);
 bool isBonded(const AtomGraph *ag, int atom_i, int atom_j);
+/// \}
+
+/// \brief Locate a match for a topology pointer among a list of topology pointers.  If the pointer
+///        cannot be found, look for a topology originating from the same file.  Return the index
+///        the array containing the matching topology.
+///
+/// Overloaded:
+///   - Match a pointer to a topology against an array of topology pointers
+///   - Match a const reference to a topology against an array of topology pointers
+///   - Match a pointer to a topology against an array of topologies
+///   - Match a const reference to a topology against an array of topologies
+///
+/// \param query_ag   The topology pointer to match against the array
+/// \param repo       The array of topology pointers
+/// \{
+int matchTopology(const AtomGraph *query_ag, const std::vector<AtomGraph*> &repo);
+int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph*> &repo);
+int matchTopology(const AtomGraph *query_ag, const std::vector<AtomGraph> &repo);
+int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph> &repo);
 /// \}
 
 } // namespace topology

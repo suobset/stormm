@@ -9,8 +9,8 @@ namespace stormm {
 namespace structure {
 
 using numerics::min_localpos_scale_bits;
-using math::hessianNormalWidths;
-using math::invertSquareMatrix;
+using stmath::hessianNormalWidths;
+using stmath::invertSquareMatrix;
 //-------------------------------------------------------------------------------------------------
 MeshParameters::MeshParameters(const int na_in, const int nb_in, const int nc_in,
                                const double origin_x_in, const double origin_y_in,

@@ -12,7 +12,7 @@
 #include "reduction_enumerators.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::KernelManager;
 using constants::PrecisionModel;

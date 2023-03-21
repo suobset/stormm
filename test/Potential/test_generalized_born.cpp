@@ -501,13 +501,13 @@ int main(const int argc, const char* argv[]) {
                                                                 ngb_tab, 1);
     check(trpi_fsample, RelationalOperator::EQUAL, Approx(trpi_fd).margin(1.0e-4),
           "Forces computed in the Trp-cage system with " +
-          getImplicitSolventModelName(conditions[i]) + " and " +
-          getAtomicRadiusSetName(shapes[i]) + " do not agree with their finite-difference "
+          getEnumerationName(conditions[i]) + " and " +
+          getEnumerationName(shapes[i]) + " do not agree with their finite-difference "
           "approximations.", do_tests);
     check(alad_fsample, RelationalOperator::EQUAL, Approx(alad_fd).margin(1.0e-4),
           "Forces computed in the alanine dipeptide system with " +
-          getImplicitSolventModelName(conditions[i]) + " and " +
-          getAtomicRadiusSetName(shapes[i]) + " do not agree with their finite-difference "
+          getEnumerationName(conditions[i]) + " and " +
+          getEnumerationName(shapes[i]) + " do not agree with their finite-difference "
           "approximations.", do_tests);
   }
 

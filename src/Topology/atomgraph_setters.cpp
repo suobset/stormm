@@ -1068,7 +1068,7 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
 
   // Note the radius set in the topology, if it has indeed changed
   if (pb_radii_set.size() == 0 || radii_set != AtomicRadiusSet::NONE) {
-    pb_radii_set = getAtomicRadiusSetName(radii_set);
+    pb_radii_set = getEnumerationName(radii_set);
   }
 
   // Compute the neck GB indices based on the baseline atomic PB radii.  These values must later

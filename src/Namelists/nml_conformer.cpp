@@ -24,7 +24,9 @@ using parse::strcmpCased;
 using parse::WrapTextSearch;
 using structure::imageValue;
 using structure::ImagingMethod;
+using structure::translateSamplingIntensity;
 using synthesis::translateSystemGrouping;
+using synthesis::translateVariableTorsionAdjustment;
   
 //-------------------------------------------------------------------------------------------------
 ConformerControls::ConformerControls(const ExceptionResponse policy_in,
@@ -38,10 +40,15 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in,
     rotatable_bond_limit{default_conf_max_rotatable_bonds},
     cis_trans_sample_count{default_conf_cis_trans_samples},
     max_seeding_attempts{default_conf_max_seeding_attempts},
+    clash_pair_tolerance{default_conf_clash_pairs},
+    sampling_trial_limit{default_conf_sample_trials},
     maximum_trial_limit{default_conf_max_system_trials},
     rmsd_tolerance{default_conf_rmsd_tolerance},
     group_method{default_conf_output_grouping},
     sample_effort{default_conf_sampling_effort},
+    rotation_snap_threshold{stod(std::string(default_conf_rotation_snap)) * pi / 180.0},
+    cis_trans_snap_threshold{stod(std::string(default_conf_cis_trans_snap)) * pi / 180.0},
+    adjustment_method{default_conf_adjustment_method},
     rotation_sample_values{}, cis_trans_sample_values{}
 {}
 
@@ -107,10 +114,13 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
   final_states = t_nml.getIntValue("final_states");
   rotatable_bond_limit = t_nml.getIntValue("max_rotatable_bonds");
   max_seeding_attempts = t_nml.getIntValue("max_seeding_attempts");
+  clash_pair_tolerance = t_nml.getIntValue("clash_pair_tol");
   maximum_trial_limit = t_nml.getIntValue("trial_limit");
+  sampling_trial_limit = t_nml.getIntValue("local_trial_limit");
   rmsd_tolerance = t_nml.getRealValue("rmsd_tol");
   group_method = t_nml.getStringValue("grouping");
   sample_effort = t_nml.getStringValue("effort");
+  adjustment_method = t_nml.getStringValue("rotamer_adjustment");
 
   // Pull in the rotatable bond and cis-trans isomeric bond samples
   processSamplingValues(&rotation_sample_count, "rotation_sample_count", &rotation_sample_values,
@@ -123,6 +133,13 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
   validateSampleCisTrans(t_nml.getStringValue("sample_cis_trans"));
   validatePreventHBonds(t_nml.getStringValue("prevent_hbonds"));
   validateStateCounts();
+  validateGroupingMethod();
+  validateSeedingAttempts();
+  validateClashCounts();
+  validateSamplingIntensity();
+  validateTorsionAdjustmentProtocol();
+  validateTorsionSnapping(&rotation_snap_threshold, "rotatable bond");
+  validateTorsionSnapping(&cis_trans_snap_threshold, "cis-trans isomeric bond");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -211,6 +228,16 @@ int ConformerControls::getMaxSeedingAttempts() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int ConformerControls::getClashPairTolerance() const {
+  return clash_pair_tolerance;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ConformerControls::getSamplingTrialLimit() const {
+  return sampling_trial_limit;
+}
+
+//-------------------------------------------------------------------------------------------------
 int ConformerControls::getMaximumTrialLimit() const {
   return maximum_trial_limit;
 }
@@ -228,6 +255,21 @@ SystemGrouping ConformerControls::getGroupingMethod() const {
 //-------------------------------------------------------------------------------------------------
 SamplingIntensity ConformerControls::getSamplingIntensity() const {
   return translateSamplingIntensity(sample_effort);
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getRotatableBondSnapThreshold() const {
+  return rotation_snap_threshold;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ConformerControls::getCisTransBondSnapThreshold() const {
+  return cis_trans_snap_threshold;
+}
+
+//-------------------------------------------------------------------------------------------------
+VariableTorsionAdjustment ConformerControls::getTorsionAdjustmentProtocol() const {
+  return translateVariableTorsionAdjustment(adjustment_method);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -377,6 +419,50 @@ void ConformerControls::validateStateCounts() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ConformerControls::validateSeedingAttempts() {
+  if (max_seeding_attempts < 0 || max_seeding_attempts >= seeding_attempts_limit) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The number of conformer seeding attempts (" + std::to_string(max_seeding_attempts) +
+            ") is out of range (0 - 100).", "ConformerControls", "validateSeedingAttempts");
+    case ExceptionResponse::WARN:
+      rtWarn("The number of conformer seeding attempts (" + std::to_string(max_seeding_attempts) +
+             ") is out of range (0 - 100).  The value will be clamped within the appropriate "
+             "range.", "ConformerControls", "validateSeedingAttempts");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    if (max_seeding_attempts < 0) {
+      max_seeding_attempts = 0;
+    }
+    else {
+      max_seeding_attempts = seeding_attempts_limit;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateClashCounts() {
+  if (clash_pair_tolerance < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The allowed number of clashing atom pairs in any given structure is invalid (" +
+            std::to_string(clash_pair_tolerance) + ").", "ConformerControls",
+            "validateClashCounts");
+    case ExceptionResponse::WARN:
+      rtWarn("The allowed number of clashing atom pairs in any given structure is invalid (" +
+             std::to_string(clash_pair_tolerance) + ") and will be reset to zero.",
+             "ConformerControls", "validateClashCounts");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    clash_pair_tolerance = 0;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ConformerControls::validateGroupingMethod() {
   if (strcmpCased(group_method, "system", CaseSensitivity::NO) == false &&
       strcmpCased(group_method, "source", CaseSensitivity::NO) == false &&
@@ -418,6 +504,55 @@ void ConformerControls::validateSamplingIntensity() {
       break;
     }
     sample_effort = std::string(default_conf_sampling_effort);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateTorsionSnapping(double *snap_setting,
+                                                const std::string &desc) const {
+  if (*snap_setting < 0.0 || *snap_setting > symbols::twopi) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A snapping threshold of " +
+            realToString(*snap_setting, 9, 4, NumberFormat::STANDARD_REAL) + " is invalid for " +
+            desc + " torsion angles.", "ConformerControls", "validateTorsionSnapping");
+    case ExceptionResponse::WARN:
+      rtWarn("A snapping threshold of " +
+             realToString(*snap_setting, 9, 4, NumberFormat::STANDARD_REAL) + " is invalid for " +
+             desc + " torsion angles and will be clamped in the range [ 0.0, 360.0 ) degrees.",
+             "ConformerControls", "validateTorsionSnapping");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    if (*snap_setting < 0.0) {
+      *snap_setting = 0.0;
+    }
+    else {
+      *snap_setting = symbols::twopi;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ConformerControls::validateTorsionAdjustmentProtocol() {
+  if (strcmpCased(adjustment_method, "adjust", CaseSensitivity::NO) == false &&
+      strcmpCased(adjustment_method, "restrict", CaseSensitivity::NO) == false &&
+      strcmpCased(adjustment_method, "cluster", CaseSensitivity::NO) == false &&
+      strcmpCased(adjustment_method, "none", CaseSensitivity::NO) == false) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid torsion angle adjustment protocol \"" + adjustment_method + "\".",
+            "ConformerControls", "validateTorsionAdjustmentProtocol");
+    case ExceptionResponse::WARN:
+      rtWarn("Invalid torsion angle adjustment protocol \"" + adjustment_method + "\".  The "
+             "protocol will be set to \"" + std::string(default_conf_adjustment_method) + "\".",
+             "ConformerControls", "validateTorsionAdjustmentProtocol");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    adjustment_method = std::string(default_conf_adjustment_method);
   }
 }
 
@@ -575,16 +710,24 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                    DefaultIsObligatory::NO, InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("max_seeding_attempts", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_seeding_attempts)));
+  t_nml.addKeyword(NamelistElement("clash_pair_tol", NamelistType::INTEGER,
+                                   std::to_string(default_conf_clash_pairs)));
   t_nml.addKeyword(NamelistElement("trial_limit", NamelistType::INTEGER,
                                    std::to_string(default_conf_max_system_trials)));
+  t_nml.addKeyword(NamelistElement("local_trial_limit", NamelistType::INTEGER,
+                                   std::to_string(default_conf_sample_trials)));
   t_nml.addKeyword(NamelistElement("rmsd_tol", NamelistType::REAL,
                                    std::to_string(default_conf_rmsd_tolerance)));
+  t_nml.addKeyword(NamelistElement("rotamer_adjustment", NamelistType::STRING,
+                                   std::string(default_conf_adjustment_method)));
   t_nml.addKeyword(NamelistElement("grouping", NamelistType::STRING,
                                    std::string(default_conf_output_grouping)));
   t_nml.addKeyword(NamelistElement("effort", NamelistType::STRING,
                                    std::string(default_conf_sampling_effort)));
   t_nml.addHelp("core_mask", "Atom mask for common core atoms.  These atoms will be held in a "
                 "rigid configuration during energy minimization and other sampling operations.");
+  t_nml.addHelp("anchor_conf", "An exemplary ligand structure used in aligning the common core "
+                "atoms.");
   t_nml.addHelp("sample_chirality", "Sample chiral states of identifiable chiral centers.  "
                 "Specify 'yes' / 'true' to sample or 'no' / 'false' to decline.");
   t_nml.addHelp("sample_cis_trans", "Sample cis and trans states of double bonds.  Specify "
@@ -618,12 +761,22 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "provision, a stable configuration still cannot be found, the input configuration "
                 "will be accepted as the initial coordinates for subsequent energy "
                 "minimizations.");
+  t_nml.addHelp("clash_pair_tol", "In order to declare a seeded conformer 'clashing', the "
+                "internal conflicts must be great enough that guided minimization with a "
+                "soft-core potential would not be able to resolve the conflicts.  This is the "
+                "number of clashing atom pairs that will be assumed resolvable by the soft-core "
+                "energy minimization.");
   t_nml.addHelp("trial_limit", "The maximum number of trials that will be made for each "
                 "system.  Explicit sampling of chirality, cis-trans isomers, and then rotatable "
                 "bonds will proceed in that priority, but the maximum number of sampled states "
                 "will be cut off at this value.");
+  t_nml.addHelp("local_trial_limit", "The maximum number of trials, per system, to employ when "
+                "doing local sampling of each system to ascertain its preferred torsion angles "
+                "and (possibly) accessible chiral states.");
   t_nml.addHelp("rmsd_tol", "Positional, mass-weighted root-mean squared deviation between "
                 "conformers required to declare uniqueness.");
+  t_nml.addHelp("rotamer_adjustment", "Method for adjusting rotamer settings in light of known "
+                "energy-minimized structures, or other examples of each ligand system.");
   t_nml.addHelp("grouping", "An indication of how to group systems when selecting the best "
                 "conformers for output.  Acceptable values include \"system\", \"source\", or "
                 "\"sys\" (produce outputs for each system defined by a '-sys' keyword in the "
@@ -643,41 +796,6 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
   // for subsequent calls to this function or other namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, wrap, tf.getLineCount(), found);
   return t_nml;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(SamplingIntensity input) {
-  switch (input) {
-  case SamplingIntensity::MINIMAL:
-    return std::string("MINIMAL");
-  case SamplingIntensity::LIGHT:
-    return std::string("LIGHT");
-  case SamplingIntensity::HEAVY:
-    return std::string("HEAVY");
-  case SamplingIntensity::EXHAUSTIVE:
-    return std::string("EXHAUSTIVE");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-SamplingIntensity translateSamplingIntensity(const std::string &input) {
-  if (strcmpCased(input, std::string("minimal"), CaseSensitivity::NO)) {
-    return SamplingIntensity::MINIMAL;
-  }
-  else if (strcmpCased(input, std::string("light"), CaseSensitivity::NO)) {
-    return SamplingIntensity::LIGHT;
-  }
-  else if (strcmpCased(input, std::string("heavy"), CaseSensitivity::NO)) {
-    return SamplingIntensity::HEAVY;
-  }
-  else if (strcmpCased(input, std::string("exhaustive"), CaseSensitivity::NO)) {
-    return SamplingIntensity::EXHAUSTIVE;
-  }
-  else {
-    rtErr("\"" + input + "\" is not a valid sampling intensity.", "translateSamplingIntensity");
-  }
-  __builtin_unreachable();
 }
 
 } // namespace namelist

@@ -73,11 +73,11 @@ using stormm::restraints::RestraintKit;
 using stormm::review::stormmSplash;
 using stormm::structure::distance;
 using stormm::structure::angle;
-using stormm::structure::dihedral_angle;
+using stormm::structure::dihedralAngle;
 using namespace stormm::card;
 using namespace stormm::data_types;
 using namespace stormm::energy;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::numerics;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
@@ -184,7 +184,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
       }
       if (checkNaiveDistance(i, i - 1, cfr) && checkNaiveDistance(j, i - 1, cfr) &&
           checkNaiveDistance(j, j + 1, cfr)) {
-        const double orig_dihedral = dihedral_angle(i, i - 1, j, j + 1, ps) +
+        const double orig_dihedral = dihedralAngle(i, i - 1, j, j + 1, ps) +
                                      (0.8 * (0.5 - my_prng->uniformRandomNumber()));
         mol_rstr.emplace_back(i, i - 1, j, j + 1, &ag, 2.3, 0.9, orig_dihedral - 1.0,
                               orig_dihedral - 0.03, orig_dihedral + 0.03, orig_dihedral + 1.0);
@@ -948,8 +948,8 @@ int main(const int argc, const char* argv[]) {
   std::vector<int> ag_ref_atoms(nsys);
   std::vector<int> ps_ref_atoms(nsys);
   for (int i = 0; i < nsys; i++) {
-    const AtomGraph  &ag_ref = sysc.getSystemTopologyReference(i);
-    const PhaseSpace &ps_ref = sysc.getCoordinateReference(i);
+    const AtomGraph  &ag_ref = sysc.getSystemTopology(i);
+    const PhaseSpace &ps_ref = sysc.getCoordinates(i);
     ag_ref_atoms[i] = ag_ref.getAtomCount();
     ps_ref_atoms[i] = ps_ref.getAtomCount();
   }
@@ -1148,8 +1148,11 @@ int main(const int argc, const char* argv[]) {
   start_line = 0;
   const FilesControls mock_sysc_fcon(mock_sysc_tf, &start_line);
   SystemCache mock_sysc(mock_sysc_fcon, ExceptionResponse::SILENT);
-  SynthesisCacheMap mock_map({ 0, 1, 2, 3, 4, 0, 3, 1, 2 }, &mock_sysc);
-  mock_map.setSynthesis(psynth);
+  const std::vector<int> synth_index = { 0, 1, 2, 3, 4, 0, 3, 1, 2 };
+  SynthesisCacheMap mock_map(synth_index, mock_sysc, psynth);
+  CHECK_THROWS_SOFT(SynthesisCacheMap scmap(tileVector(synth_index, 2), mock_sysc, psynth),
+                    "A SynthesisCacheMap was constructed with an insufficient number of "
+                    "cache-to-synthesis indices.", do_tests);
   const std::vector<int> tip3p_derivations   = mock_map.getTopologyGroup(&tip3p_ag);
   const std::vector<int> tip4p_derivations   = mock_map.getTopologyGroup(&tip4p_ag);
   const std::vector<int> steam_derivations   = mock_map.getLabelGroup("steam");
@@ -1159,14 +1162,14 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> tip4p_derivations_ans = { 1, 4, 7 };
   const std::vector<int> steam_derivations_ans = { 3, 4, 6 };
   check(tip3p_derivations, RelationalOperator::EQUAL, tip3p_derivations_ans, "Systems derived "
-        "from the TIP3P topology were not correctly identified by the map.");
+        "from the TIP3P topology were not correctly identified by the map.", do_tests);
   check(tip4p_derivations, RelationalOperator::EQUAL, tip4p_derivations_ans, "Systems derived "
-        "from the TIP3P topology were not correctly identified by the map.");
+        "from the TIP3P topology were not correctly identified by the map.", do_tests);
   check(steam_derivations, RelationalOperator::EQUAL, steam_derivations_ans, "Systems associated "
-        "with the 'steam' label were not correctly identified by the map.");
+        "with the 'steam' label were not correctly identified by the map.", do_tests);
   check(protein_derivations, RelationalOperator::EQUAL, trpcage_derivations, "Systems associated "
         "with the 'protein' label should match those associated with the Trp-cage topology in the "
-        "map.");
+        "map.", do_tests);
   
   // Make a second coordinate synthesis, this time with different fixed-precision settings
   PhaseSpaceSynthesis psynth2(psv, agv, std::vector<Thermostat>(1), std::vector<Barostat>(1),
@@ -1287,9 +1290,9 @@ int main(const int argc, const char* argv[]) {
   section(3);
   std::vector<RestraintApparatus> ra_vec;
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
-    const int example_system_idx = sysc.getCoordinateExample(i);
+    const int example_system_idx = sysc.getSystemExampleIndex(i);
     const AtomGraph *ag_i = sysc.getTopologyPointer(i);
-    const PhaseSpace &ps_i = sysc.getCoordinateReference(example_system_idx);
+    const PhaseSpace &ps_i = sysc.getCoordinates(example_system_idx);
     const CoordinateFrameReader cfr_i(ps_i);
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
     const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, chemfe_i, cfr_i);
@@ -1301,7 +1304,7 @@ int main(const int argc, const char* argv[]) {
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
     ValenceDelegator vdel(sysc.getTopologyPointer(i), &ra_vec[i]);
     const std::vector<ValenceWorkUnit> vwu_i = buildValenceWorkUnits(&vdel);
-    const AtomGraph &ag_i = sysc.getTopologyReference(i);
+    const AtomGraph &ag_i = sysc.getTopology(i);
     const std::vector<std::vector<int>> fcontrib = getAtomForceContributors(ag_i, ra_vec[i]);
     const ValenceKit<double> vk = ag_i.getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> vsk = ag_i.getDoublePrecisionVirtualSiteKit();
@@ -1322,8 +1325,8 @@ int main(const int argc, const char* argv[]) {
         "alternative method.", do_tests);
 
   // Run diagnotics of the valence work units on a simple system, one with only a single work unit
-  runValenceWorkUnitTests(sysc.getSystemTopologyReference(0).getFileName(),
-                          sysc.getCoordinateReference(0).getFileName(), oe, &my_prng);
+  runValenceWorkUnitTests(sysc.getSystemTopology(0).getFileName(),
+                          sysc.getCoordinates(0).getFileName(), oe, &my_prng);
 
   // Read a larger topology that will be forced to split its contents among several work units
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";

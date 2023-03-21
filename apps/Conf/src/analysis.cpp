@@ -1,34 +1,40 @@
 #include "copyright.h"
 #include "../../../src/Accelerator/hybrid.h"
+#include "../../../src/Analysis/comparison_guide.h"
 #include "../../../src/FileManagement/file_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/Math/summation.h"
 #include "../../../src/MoleculeFormat/mdlmol_refinement.h"
+#include "../../../src/Numerics/split_fixed_precision.h"
 #include "../../../src/Parsing/parse.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/rmsd.h"
 #include "../../../src/Structure/rmsd_plan.h"
 #include "../../../src/Structure/structure_enumerators.h"
+#include "../../../src/Synthesis/condensate.h"
 #include "../../../src/Trajectory/trajectory_enumerators.h"
 #include "analysis.h"
 
 namespace conf_app {
 namespace analysis {
 
+using stormm::analysis::ComparisonGuide;
 using stormm::card::Hybrid;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::PrintSituation;
 using stormm::diskutil::substituteNameExtension;
 using stormm::diskutil::splitPath;
-using stormm::math::sum;
+using stormm::numerics::hostInt95ToDouble;
 using stormm::parse::findStringInVector;
+using stormm::stmath::sum;
 using stormm::structure::customizeDataItems;
 using stormm::structure::detectClash;
 using stormm::structure::RMSDPlan;
 using stormm::structure::RMSDTask;
 using stormm::structure::MdlMolVersion;
 using stormm::structure::updateDataItemReadouts;
+using stormm::synthesis::CondensateWriter;
 using stormm::synthesis::PsSynthesisWriter;
 using stormm::synthesis::SynthesisMapReader;
 using stormm::synthesis::translateSystemGrouping;
@@ -40,9 +46,10 @@ using stormm::trajectory::TrajectoryFusion;
 std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
                                            const std::vector<StaticExclusionMask> &poly_ps_masks,
                                            const SystemCache &sc, const SynthesisCacheMap &scmap,
-                                           const ScoreCard &emin,
-                                           const ConformerControls &confcon) {
+                                           const ScoreCard &emin, const ConformerControls &confcon,
+                                           const GpuDetails &gpu) {
   Condensate cdns(poly_ps);
+  ComparisonGuide cg(cdns, scmap);
   const std::vector<double> efinal = emin.reportTotalEnergies();
   const PsSynthesisReader poly_psr = poly_ps.data();
   const std::vector<AtomGraph*> unique_ag = poly_ps.getUniqueTopologies();
@@ -59,8 +66,8 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
   for (int i = 0; i < poly_psr.system_count; i++) {
     const int iag_idx = poly_psr.unique_ag_idx[i];
     ClashReport clrep(unique_ag[iag_idx]);
-    if (detectClash(&cdns, i, unique_ag[iag_idx], &poly_ps_masks[iag_idx],
-                    default_minimize_clash_r0, default_minimize_clash_ratio, &clrep)) {
+    if (detectClash<double>(&cdns, i, unique_ag[iag_idx], &poly_ps_masks[iag_idx],
+                            default_minimize_clash_r0, default_minimize_clash_ratio, &clrep)) {
       clashing[i] = true;
       nbad++;
     }
@@ -71,10 +78,9 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
   // reached or all conformations have been eliminated.
   const RMSDPlan poly_rplan(poly_ps, sc, scmap);
   const SynthesisMapReader scmapr = scmap.data();
-  Hybrid<double> rmsd_values(poly_rplan.getOutputSize(RMSDTask::REFERENCE, group_method),
-                             "rmsd_val");
+  Hybrid<double> rmsd_values(cg.getAllToReferenceOutputSize(), "rmsd_val");
   double* rmsd_val_ptr = rmsd_values.data();
-  const int n_result_groups = poly_rplan.getPartitionCount(group_method);
+  const int n_result_groups = cg.getPartitionCount(group_method);
   Hybrid<int> reference_frames(n_result_groups, "ref_frame_idx");
   int* ref_frm_ptr = reference_frames.data();
   std::vector<int> successes(n_result_groups * nseek, -1);
@@ -86,6 +92,7 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
   // further consideration.  If no conformers are available within a partition, the search will
   // terminate early.
   for (int rcon = 0; rcon < nseek; rcon++) {
+    std::vector<bool> new_conformer_found(n_result_groups, true);
     for (int i = 0; i < n_result_groups; i++) {
       bool init_e_best = true;
       double e_best;
@@ -137,15 +144,19 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
         successes_per_system[i] = ni_success + 1;
       }
       else {
-        ref_frm_ptr[i] = 0;
+        ref_frm_ptr[i] = group_llim;
+        new_conformer_found[i] = false;
       }
     }
 
     // Compute RMSD values to the lowest-energy structures
-    rmsd(poly_rplan, poly_ps, cdns, reference_frames, &rmsd_values, group_method);
+    rmsd(cg, poly_rplan, poly_ps, cdns, reference_frames, &rmsd_values, group_method);
 
     // Eliminate structures with RMSD too close to the best structure found
     for (int i = 0; i < n_result_groups; i++) {
+      if (new_conformer_found[i] == false) {
+        continue;
+      }
       int* group_index_ptr;
       int group_llim, group_hlim;
       switch (group_method) {
@@ -162,7 +173,7 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
         group_hlim = scmapr.clabel_bounds[i + 1];
         break;
       }
-      int irmsd_track = poly_rplan.getOutputStart(i, RMSDTask::REFERENCE, group_method);
+      int irmsd_track = cg.getAllToOneResultOffset(i, group_method);
       for (int j = group_llim; j < group_hlim; j++) {
         if (rmsd_val_ptr[irmsd_track] < rmsd_tol) {
           int sys_ij;
@@ -199,8 +210,7 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
 //-------------------------------------------------------------------------------------------------
 void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &best_confs,
                   const ScoreCard &emin, const SystemCache &sc, const SynthesisCacheMap &scmap,
-                  const std::vector<MdlMol> &sdf_recovery, const ConformerControls &confcon,
-                  const ReportControls &repcon) {
+                  const ConformerControls &confcon, const ReportControls &repcon) {
 
   // Determine the grouping method
   const SystemGrouping group_method = confcon.getGroupingMethod();
@@ -227,7 +237,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
   const std::vector<AtomGraph*>& unique_topologies = poly_ps.getUniqueTopologies();
   std::vector<std::string> printed_thus_far;
   for (int i = 0; i < n_result_groups; i++) {
-
+    
     // Loop over all conformations sharing this topology.
     for (size_t j = 0; j < like_confs[i].size(); j++) {
       std::string before, after;
@@ -268,19 +278,19 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
           if (sc.getTrajectoryKind(cache_idx) == CoordinateFileKind::SDF) {
 
             // Build the SD file de novo, or use the existing SD file as a template
-            if (sdf_recovery[cache_idx].getAtomCount() == 0) {
+            if (sc.getStructureDataEntryPointer(cache_idx)->getAtomCount() == 0) {
               MdlMol tmdl(sc.getFeaturesPointer(cache_idx), poly_psr, like_confs[i][j], 0);
               customizeDataItems(&tmdl, ij_label, *unique_topologies[i],
-                                 sc.getRestraintReference(cache_idx), repcon);
+                                 sc.getRestraints(cache_idx), repcon);
               updateDataItemReadouts(&tmdl, sc, emin, like_confs[i][j]);
               tmdl.writeMdl(fname, MdlMolVersion::V2000, pr_protocol);
               tmdl.writeDataItems(fname, PrintSituation::APPEND);
             }
             else {
-              MdlMol tmdl = sdf_recovery[cache_idx];
+              MdlMol tmdl = sc.getStructureDataEntry(cache_idx);
               tmdl.impartCoordinates(poly_ps.exportCoordinates(like_confs[i][j]));
               customizeDataItems(&tmdl, ij_label, *unique_topologies[i],
-                                 sc.getRestraintReference(cache_idx), repcon);
+                                 sc.getRestraints(cache_idx), repcon);
               updateDataItemReadouts(&tmdl, sc, emin, like_confs[i][j]);
               tmdl.writeMdl(fname, MdlMolVersion::V2000, pr_protocol);
               tmdl.writeDataItems(fname, PrintSituation::APPEND);

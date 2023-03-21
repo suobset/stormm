@@ -33,7 +33,7 @@ using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::symbols::pi;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::numerics;
 using namespace stormm::testing;
 

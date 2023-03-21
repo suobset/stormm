@@ -36,7 +36,7 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::random::default_xoroshiro128p_scrub;
 using stormm::random::default_xoshiro256pp_scrub;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::hpc_math;
 using namespace stormm::testing;
 

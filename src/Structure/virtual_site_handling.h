@@ -15,9 +15,9 @@
 namespace stormm {
 namespace structure {
 
-using math::dot;
-using math::project;
-using math::crossProduct;
+using stmath::dot;
+using stmath::project;
+using stmath::crossProduct;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using topology::VirtualSiteKind;

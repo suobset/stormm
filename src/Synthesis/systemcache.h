@@ -75,19 +75,6 @@ public:
               PrintSituation expectation_in = PrintSituation::OPEN_NEW);
 
   SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-              std::vector<MdlMol> *sdf_recovery,
-              ExceptionResponse policy_in = ExceptionResponse::DIE,
-              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
-              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
-              StopWatch *timer_in = nullptr);
-
-  SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
-              ExceptionResponse policy_in = ExceptionResponse::DIE,
-              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
-              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
-              StopWatch *timer_in = nullptr);
-
-  SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
               ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
@@ -125,12 +112,11 @@ public:
 
   /// \brief Get the topology index of one of the coordinate sets contained in this cache.  This
   ///        will apply a bounds check to the coordinate index query.  This function should be used
-  ///        to access topologies in the output of a getTopologyReference() or getTopologyPointer()
-  ///        call when the full array is returned without function input arguments.  Calling either
-  ///        getTopologyReference() or getTopologyPointer() with an integer argument implicitly
-  ///        performs the operation of getting the appropriate topology list index, as would be
-  ///        found by this function, and thus returns a reference or pointer to the appropriate
-  ///        topology.
+  ///        to access topologies in the output of a getTopology() or getTopologyPointer() call
+  ///        when the full array is returned without function input arguments.  Calling either
+  ///        getTopology() or getTopologyPointer() with an integer argument implicitly performs the
+  ///        operation of getting the appropriate topology list index, as would be found by this
+  ///        function, and thus returns a reference or pointer to the appropriate topology.
   ///
   /// \param coord_index  Index of the PhaseSpace entry object of interest
   int getSystemTopologyIndex(int coord_index) const;
@@ -139,7 +125,7 @@ public:
   ///        the topologies in the cache describes.
   ///
   /// \param topology_index  Index of the topology of interest
-  int getCoordinateExample(int topology_index) const;
+  int getSystemExampleIndex(int topology_index) const;
   
   /// \brief Get pointers to one or all of the unique topologies from within the compact topology
   ///        cache.
@@ -162,7 +148,7 @@ public:
   ///        on an index into the cache itself.
   ///
   /// \param topology_index  Index of the topology of interes
-  const AtomGraph& getTopologyReference(int topology_index) const;  
+  const AtomGraph& getTopology(int topology_index) const;  
 
   /// \brief Match a topology to one in the cache.  If no match is found, the function will return
   ///        the number of topologies in the cache.
@@ -264,18 +250,8 @@ public:
   /// \brief Return a reference to the topology that describes a particular set of coordinates
   ///        within the SystemCache.  All overloads apply a bounds check.
   ///
-  /// Overloaded:
-  ///   - Return a const reference to the relevant topology in a const SystemCache
-  ///   - Return a non-const reference to the relevant topology in a non-const SystemCache
-  ///   - Return a reference to the entire array of AtomGraph objects (this is a raw take on the
-  ///     underlying topologies and will need to be accessed according to the indexing present in
-  ///     the topology_indices array)
-  ///
-  /// \param index  Index of the PhaseSpace entry of interest
-  /// \{
-  const AtomGraph& getSystemTopologyReference(int index) const;
-  AtomGraph& getSystemTopologyReference(int index);
-  /// \}
+  /// \param index  Index of the coordinate system of interest
+  const AtomGraph& getSystemTopology(int index) const;
   
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
   ///
@@ -301,12 +277,38 @@ public:
   ///
   /// \param index  Index of the system, the PhaseSpace object of interest
   /// \{
-  const PhaseSpace& getCoordinateReference(int index) const;
-  PhaseSpace& getCoordinateReference(int index);
-  const std::vector<PhaseSpace>& getCoordinateReference() const;
-  std::vector<PhaseSpace>& getCoordinateReference();
+  const PhaseSpace& getCoordinates(int index) const;
+  const std::vector<PhaseSpace>& getCoordinates() const;
   /// \}
 
+  /// \brief Get a pointer to one of the MDL MOL objects in the cache.
+  ///
+  /// Overloaded:
+  ///   - Get a pointer to a specific MDL MOL object (this will apply a bounds check)
+  ///   - Get a pointer to the array for all MDL MOL objects (this will not check bounds)
+  ///   - Const and non-const versions of each
+  ///
+  /// \param index  Index of the requested MDL MOL object
+  /// \{
+  const MdlMol* getStructureDataEntryPointer(int index) const;
+  MdlMol* getStructureDataEntryPointer(int index);
+  const std::vector<MdlMol*> getStructureDataEntryPointer() const;
+  std::vector<MdlMol*> getStructureDataEntryPointer();
+  /// \}
+
+  /// \brief Return a reference to one of the MDL MOL entries in the cache.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///   - Return a reference to the entire array of MDL MOL objects
+  ///
+  /// \param index  Index of the system, the MDL MOL object of interest
+  /// \{
+  const MdlMol& getStructureDataEntry(int index) const;
+  const std::vector<MdlMol>& getStructureDataEntry() const;
+  /// \}
+  
   /// \brief Get a pointer to the chemical features for a particular system in the cache.
   ///
   /// Overloaded:
@@ -317,19 +319,14 @@ public:
   /// \{
   const ChemicalFeatures* getFeaturesPointer(int index) const;
   ChemicalFeatures* getFeaturesPointer(int index);
+  const std::vector<ChemicalFeatures*> getFeaturesPointer() const;
+  std::vector<ChemicalFeatures*> getFeaturesPointer();
   /// \}  
 
   /// \brief Get a reference to the chemical features for a particular system in the cache.
   ///
-  /// Overloaded:
-  ///   - Return a const reference to an object in a const SystemCache
-  ///   - Return a non-const reference to an object in a non-const SystemCache
-  ///
   /// \param index  Index of the system  of interest
-  /// \{
-  const ChemicalFeatures& getFeaturesReference(int index) const;
-  ChemicalFeatures& getFeaturesReference(int index);
-  /// \}
+  const ChemicalFeatures& getFeatures(int index) const;
 
   /// \brief Get a pointer to the restraint apparatus for a particular system.
   ///
@@ -345,15 +342,8 @@ public:
 
   /// \brief Get a reference to the restraint apparatus for a particular system.
   ///
-  /// Overloaded:
-  ///   - Return a const reference to an object in a const SystemCache
-  ///   - Return a non-const reference to an object in a non-const SystemCache
-  ///
   /// \param index  Index of the system of interest
-  /// \{
-  const RestraintApparatus& getRestraintReference(int index) const;
-  RestraintApparatus& getRestraintReference(int index);
-  /// \}
+  const RestraintApparatus& getRestraints(int index) const;
 
   /// \brief Get a pointer to the static exclusion mask for a particular system.  These masks
   ///        will only have been calculated for systems with isolated boundary conditions.
@@ -371,15 +361,8 @@ public:
   /// \brief Get a reference to the static exclusion mask for a particular system.  These masks
   ///        will only have been calculated for systems with isolated boundary conditions.
   ///
-  /// Overloaded:
-  ///   - Return a const reference to an object in a const SystemCache
-  ///   - Return a non-const reference to an object in a non-const SystemCache
-  ///
   /// \param index  Index of the system of interest
-  /// \{
-  const StaticExclusionMask& getSystemStaticMaskReference(int index) const;
-  StaticExclusionMask& getSystemStaticMaskReference(int index);
-  /// \}
+  const StaticExclusionMask& getSystemStaticMask(int index) const;
 
   /// \brief Get a pointer to the forward exclusion mask for a particular system.  These masks
   ///        will only have been calculated for systems with periodic boundary conditions.
@@ -397,15 +380,8 @@ public:
   /// \brief Get a reference to the forward exclusion mask for a particular system.  These masks
   ///        will only have been calculated for systems with periodic boundary conditions.
   ///
-  /// Overloaded:
-  ///   - Return a const reference to an object in a const SystemCache
-  ///   - Return a non-const reference to an object in a non-const SystemCache
-  ///
   /// \param index  Index of the system of interest
-  /// \{
-  const ForwardExclusionMask& getSystemForwardMaskReference(int index) const;
-  ForwardExclusionMask& getSystemForwardMaskReference(int index);
-  /// \}
+  const ForwardExclusionMask& getSystemForwardMask(int index) const;
 
   /// \brief Get the number of systems described by a topology of the given index in this cache.
   ///
@@ -627,6 +603,9 @@ private:
   /// coordinates read as part of a MoleculeSystem.
   std::vector<PhaseSpace> coordinates_cache;
 
+  /// An array of MDL MOL entries corresponding to each system read from other sources
+  std::vector<MdlMol> sdf_cache;
+  
   /// A collection of the unique labels across all systems
   std::vector<std::string> label_cache;
   
@@ -718,6 +697,18 @@ private:
   /// \param index   The requested system index
   /// \param caller  Name of the calling function (for backtracing purposes after an error)
   void checkSystemBounds(int index, const char* caller) const;
+
+  /// \brief Check that a requested index is within the number of topologies present in the cache.
+  ///
+  /// \param index   The requested system index
+  /// \param caller  Name of the calling function (for backtracing purposes after an error)
+  void checkTopologyBounds(int index, const char* caller) const;
+
+  /// \brief Check that a requested index is within the number of labels present in the cache.
+  ///
+  /// \param index   The requested system index
+  /// \param caller  Name of the calling function (for backtracing purposes after an error)
+  void checkLabelBounds(int index, const char* caller) const;
 
   /// \brief Determine whether output files from multiple systems should be concatenated or fused.
   ///        This can happen in particular cases:

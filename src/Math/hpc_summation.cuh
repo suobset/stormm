@@ -116,7 +116,7 @@ TSum sum(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &gpu,
          const HybridTargetLevel tier = HybridTargetLevel::DEVICE) {
   switch (tier) {
   case HybridTargetLevel::HOST:
-    return math::sum<TSum>(hb);
+    return stmath::sum<TSum>(hb);
   case HybridTargetLevel::DEVICE:
 
     // Test the provided GPU: is it real?
@@ -256,7 +256,7 @@ TSum sumTuple2(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &
                const HybridTargetLevel tier = HybridTargetLevel::DEVICE) {
   switch (tier) {
   case HybridTargetLevel::HOST:
-    return math::sumTuple2<TSum>(hb);
+    return stmath::sumTuple2<TSum>(hb);
   case HybridTargetLevel::DEVICE:
 
     // Test the provided GPU: is it real?
@@ -412,7 +412,7 @@ TSum sumTuple3(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &
                const HybridTargetLevel tier = HybridTargetLevel::DEVICE) {
   switch (tier) {
   case HybridTargetLevel::HOST:
-    return math::sumTuple3<TSum>(hb);
+    return stmath::sumTuple3<TSum>(hb);
   case HybridTargetLevel::DEVICE:
 
     // Test the provided GPU: is it real?
@@ -585,7 +585,7 @@ TSum sumTuple4(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &
                const HybridTargetLevel tier = HybridTargetLevel::DEVICE) {
   switch (tier) {
   case HybridTargetLevel::HOST:
-    return math::sumTuple4<TSum>(hb);
+    return stmath::sumTuple4<TSum>(hb);
   case HybridTargetLevel::DEVICE:
 
     // Test the provided GPU: is it real?

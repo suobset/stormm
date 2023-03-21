@@ -28,7 +28,6 @@ enum class DataFormat {
 ///        each enumerator.
 /// \{
 std::string getEnumerationName(PrintSituation input);
-
 std::string getEnumerationName(DataFormat input);
 /// \}
 

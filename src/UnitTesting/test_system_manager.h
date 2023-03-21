@@ -14,16 +14,19 @@
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Synthesis/systemcache.h"
 #include "Topology/atomgraph.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
+#include "UnitTesting/test_environment.h"
 
 namespace stormm {
 namespace testing {
 
 using constants::ExceptionResponse;
-using math::roundUp;
+using stmath::roundUp;
 using numerics::hostDoubleToInt95;
 using numerics::hostSplitFPSum;
 using random::Xoshiro256ppGenerator;
@@ -31,7 +34,11 @@ using synthesis::Condensate;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
+using synthesis::SystemCache;
+using testing::TestEnvironment;
 using topology::AtomGraph;
+using topology::UnitCellType;
+using trajectory::CoordinateFileKind;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesWriter;
@@ -80,7 +87,29 @@ public:
   /// \}
 
   /// \brief Get the number of systems in the object.
+  ///
+  /// Overloaded:
+  ///   - Obtain the total number of systems
+  ///   - Obtain the number of systems adhering to selected boundary conditions
+  ///
+  /// \param query_bc  The boundary conditions of interest
+  /// \{
   int getSystemCount() const;
+  int getSystemCount(UnitCellType query_bc) const;
+  int getSystemCount(const std::vector<UnitCellType> &query_bc) const;
+  /// \}
+
+  /// \brief Get a list of all topologies meeting a specific unit cell type.
+  ///
+  /// Overloaded:
+  ///   - Return a list of topologies matching one selected unit cell type.
+  ///   - Return a list of topologies matching any of a list of unit cell types.
+  ///
+  /// \param uc_choice  The unit cell type of interest
+  /// \{
+  std::vector<int> getQualifyingSystems(UnitCellType uc_choice) const;
+  std::vector<int> getQualifyingSystems(const std::vector<UnitCellType> &uc_choice) const;
+  /// \}
   
   /// \brief Return the base path for topologies
   std::string getTopologyBasePath() const;
@@ -102,22 +131,41 @@ public:
 
   /// \brief Get the planned course of action for subsequent tests in the event that a file is
   ///        non-existent, or for any reason unreadable.
+  ///
+  /// Overloaded:
+  ///   - Return a general status for any and all systems covered by the manager
+  ///   - Return a specific status for an individual system by index
+  ///   - Return the overall status for a collections of systems, specified by index
+  ///
+  /// \param index    Index of the system of interest
+  /// \param indices  Indices of the systems of interest
+  /// \{
   TestPriority getTestingStatus() const;
+  TestPriority getTestingStatus(int index) const;
+  TestPriority getTestingStatus(const std::vector<int> &indices) const;
+  /// \}
+
+  /// \brief Get a copy of the coordinates for one system as a CoordinateFrame object.
+  ///
+  /// \param index  The system of interest
+  CoordinateFrame exportCoordinateFrame(int index) const;
 
   /// \brief Get a copy of the coordinates for one system as a PhaseSpace object.
   ///
   /// \param index  The system of interest
   PhaseSpace exportPhaseSpace(int index) const;
   
-  /// \brief Get a copy of the coordinates for one system as a CoordinateFrame object.
+  /// \brief Get a const reference to the coordinates for one or more systems.
+  ///
+  /// Overloaded:
+  ///   - Get a reference to a single coordinate set
+  ///   - Get a const reference to the vector of all coordinate sets
   ///
   /// \param index  The system of interest
-  CoordinateFrame exportCoordinateFrame(int index) const;
-
-  /// \brief Get a const reference to the coordinates for one system.
-  ///
-  /// \param index  The system of interest
+  /// \{
   PhaseSpace& viewCoordinates(int index);
+  const std::vector<PhaseSpace>& viewCoordinates();
+  /// \}
 
   /// \brief Get a const reference to the topology for one or more systems.
   ///
@@ -158,21 +206,82 @@ public:
   template <typename T>
   CoordinateSeries<T> exportCoordinateSeries(const int base_system, int frame_count,
                                              double perturbation_sigma = 0.0,
-                                             int xrs_seed = 915083, int scale_bits = 0);
+                                             int xrs_seed = 915083, int scale_bits = 0) const;
 
   /// \brief Get a synthesis of coordinates with fixed-precision storage ready for positions,
-  ///        velocities, and forces.  Parameter descriptions follow from getCoordinateSeries()
-  ///        above, with the addition of:
+  ///        velocities, and forces.
+  ///
+  /// Overloaded:
+  ///   - Select a list of systems based on their indices within the manager
+  ///   - Select all systems conforming to one or more specific types of unit cell (a critical
+  ///     factor in building a synthesis is that all systems use similar boundary conditions)
+  ///
+  /// Parameter descriptions follow from getCoordinateSeries() above, with the addition of: 
   ///
   /// \param index_key  A series of system indices from within the TestSystemManager with which
   ///                   to compose the synthesis.  Topologies and coordinates will be drawn upon.
+  /// \param uc_choice  The choice or choices of unit cell to select (one instance of each matching
+  ///                   system will be included in the result)
+  /// \{
   PhaseSpaceSynthesis exportPhaseSpaceSynthesis(const std::vector<int> &index_key,
                                                 double perturbation_sigma = 0.0,
-                                                int xrs_seed = 7108262, int scale_bits = 40);
-
+                                                int xrs_seed = 7108262, int scale_bits = 40) const;
+  PhaseSpaceSynthesis exportPhaseSpaceSynthesis(UnitCellType uc_choice) const;
+  PhaseSpaceSynthesis exportPhaseSpaceSynthesis(const std::vector<UnitCellType> &uc_choice) const;
+  /// \}
+  
   /// \brief Get a synthesis of topologies based on a series of system indices from the manager.
-  ///        Descriptions of parameters follow from getPhaseSpaceSynthesis() above.
-  AtomGraphSynthesis exportAtomGraphSynthesis(const std::vector<int> &index_key);
+  ///
+  /// Overloaded:
+  ///   - Select a list of systems based on their indices within the manager
+  ///   - Select all systems conforming to one or more specific types of unit cell (a critical
+  ///     factor in building a synthesis is that all systems use similar boundary conditions)
+  ///
+  /// Descriptions of parameters follow from getPhaseSpaceSynthesis() above, with the addition of:
+  ///
+  /// \param policy  Specify whether to report abnormal input.  In most cases, the
+  ///                AtomGraphSynthesis will report being given a longer list of topologies than
+  ///                was required (unused topologies).  For most testing purposes, this is benign,
+  ///                and should not be raised to the end user's attention.
+  /// \{
+  AtomGraphSynthesis
+  exportAtomGraphSynthesis(const std::vector<int> &index_key,
+                           ExceptionResponse policy = ExceptionResponse::SILENT);
+
+  AtomGraphSynthesis
+  exportAtomGraphSynthesis(UnitCellType uc_choice,
+                           ExceptionResponse policy = ExceptionResponse::SILENT);
+
+  AtomGraphSynthesis
+  exportAtomGraphSynthesis(const std::vector<UnitCellType> &uc_choice,
+                           ExceptionResponse policy = ExceptionResponse::SILENT);
+  /// \}
+
+  /// \brief Produce a SystemCache based on a compilation of the systems read into the manager.
+  ///
+  /// Overloaded:
+  ///   - Accept a list of system indices, and optionally labels to apply
+  ///   - Accept a string input for a &files namelist
+  ///
+  /// \param index_key    A series of system indices from within the TestSystemManager with which
+  ///                     to compose the cache.  Topologies and coordinates will be drawn upon.
+  /// \param x_name_list  A list of trajectory file names for each cache item
+  /// \param x_type_list  A list of file types for each trajectory file to write
+  /// \param r_name_list  A list of restart file names for each cache item
+  /// \param r_type_list  A list of file types for each restart file to write
+  /// \param label_list   A list of labels to apply to each cache item.  If provided, this array
+  ///                     have the same length as index_key.
+  /// \param fnml         A string containing the contents of a &files namelist
+  /// \{
+  SystemCache exportSystemCache(const std::vector<int> &index_key, const TestEnvironment &oe,
+                                const std::vector<std::string> &x_name_list = {},
+                                const std::vector<CoordinateFileKind> &x_type_list = {},
+                                const std::vector<std::string> &r_name_list = {},
+                                const std::vector<CoordinateFileKind> &r_type_list = {},
+                                const std::vector<std::string> &label_list = {});
+
+  SystemCache exportSystemCache(const std::string &fnml);
+  /// \}
   
 private:
   int system_count;              ///< The number of systems managed by this object
@@ -195,6 +304,8 @@ private:
   std::vector<bool> topology_success;         ///< Indications of successful topology parsing
   std::vector<bool> coordinate_exist;         ///< Indications that coordinate files were found
   std::vector<bool> coordinate_success;       ///< Indications of successful coordinate parsing
+  std::vector<bool> compatibility;            ///< Indications that the topologies and coordinates
+                                              ///<   for corresponding systems are compatible
 
   /// All topologies (this array contains empty topologies if the corresponding files were
   /// unreadable)

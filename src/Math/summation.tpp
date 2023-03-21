@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using data_types::isScalarType;
 using data_types::getStormmScalarTypeName;
@@ -227,5 +227,5 @@ TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
   return total;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

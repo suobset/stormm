@@ -4,15 +4,22 @@
 
 #include <cmath>
 #include "copyright.h"
+#include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Reporting/error_format.h"
+#include "Synthesis/condensate.h"
+#include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
-#include "Accelerator/hybrid.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "structure_enumerators.h"
 
@@ -20,15 +27,30 @@ namespace stormm {
 namespace structure {
 
 using card::Hybrid;
+using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
-using math::angleVerification;
-using math::crossProduct;
+using numerics::globalpos_scale_nonoverflow_bits;
+using numerics::hostInt95ToDouble;
+using numerics::hostInt95Sum;
+using stmath::angleVerification;
+using stmath::crossProduct;
+using stmath::roundUp;
+using synthesis::Condensate;
+using synthesis::CondensateReader;
+using synthesis::CondensateWriter;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
+using synthesis::PsSynthesisWriter;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesReader;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceReader;
+using trajectory::PhaseSpaceWriter;
 
 /// \brief Image a single value to a range.
 ///
@@ -57,29 +79,55 @@ Tcoord imageValue(Tcoord x, Tcalc range, ImagingMethod style, Tcalc gpos_scale_f
 /// \param invu               Transformation matrix from fractional coordinates back to real space
 /// \param unit_cell          Shape of the unit cell
 /// \param gpos_scale_factor  Conversion factor for fixed precision coordinates
+/// \param x_ovrf             Overflow bits for Cartesian x coordinates
+/// \param y_ovrf             Overflow bits for Cartesian y coordinates
+/// \param z_ovrf             Overflow bits for Cartesian z coordinates
 /// \{
 template <typename Tcoord, typename Tcalc>
-void imageCoordinates(Tcoord *x, Tcoord *y, Tcoord *z, const Tcalc* umat, const Tcalc* invu,
+void imageCoordinates(Tcoord *x, Tcoord *y, Tcoord *z, const double* umat, const double* invu,
                       UnitCellType unit_cell, ImagingMethod style, Tcalc gpos_scale_factor = 1.0);
 
 template <typename Tcoord, typename Tcalc>
-void imageCoordinates(Tcoord* x, Tcoord* y, Tcoord* z, const int length, const Tcalc* umat,
-                      const Tcalc* invu, UnitCellType unit_cell, ImagingMethod style,
-                      Tcalc gpos_scale_factor = 1.0);
+void imageCoordinates(Tcoord* x, Tcoord* y, Tcoord* z, const int length, const double* umat,
+                      const double* invu, UnitCellType unit_cell, ImagingMethod style,
+                      Tcalc gpos_scale_factor = 1.0, int* xcrd_ovrf = nullptr,
+                      int* ycrd_ovrf = nullptr, int* zcrd_ovrf = nullptr);
 
 template <typename Tcoord, typename Tcalc>
 void imageCoordinates(std::vector<Tcoord> *x, std::vector<Tcoord> *y, std::vector<Tcoord> *z,
-                      const Tcalc* umat, const Tcalc* invu, UnitCellType unit_cell,
+                      const double* umat, const double* invu, UnitCellType unit_cell,
                       ImagingMethod style, Tcalc gpos_scale_factor = 1.0);
 
 template <typename Tcoord, typename Tcalc>
 void imageCoordinates(Hybrid<Tcoord> *x, Hybrid<Tcoord> *y, Hybrid<Tcoord> *z,
-                      const Tcalc* umat, const Tcalc* invu, UnitCellType unit_cell,
+                      const double* umat, const double* invu, UnitCellType unit_cell,
                       ImagingMethod style, Tcalc gpos_scale_factor = 1.0);
+
+void imageCoordinates(CoordinateFrameWriter cfw, ImagingMethod style);
+
+void imageCoordinates(CoordinateFrame *cf, ImagingMethod style);
+
+void imageCoordinates(PhaseSpaceWriter psw, ImagingMethod style);
 
 void imageCoordinates(PhaseSpace *ps, ImagingMethod style);
 
-void imageCoordinates(CoordinateFrame *cf, ImagingMethod style);
+template <typename Tcoord, typename Tcalc>
+void imageCoordinates(CoordinateSeriesWriter<Tcoord> csw, size_t frame_index, ImagingMethod style);
+
+template <typename Tcoord, typename Tcalc>
+void imageCoordinates(CoordinateSeries<Tcoord> *cs, size_t frame_index, ImagingMethod style);
+
+template <typename Tcalc>
+void imageCoordinates(CondensateWriter cdnsw, int system_index, ImagingMethod style);
+
+template <typename Tcalc>
+void imageCoordinates(Condensate *cdns, int system_index, ImagingMethod style);
+
+template <typename Tcalc>
+void imageCoordinates(PsSynthesisWriter poly_psw, int system_index, ImagingMethod style);
+
+template <typename Tcalc>
+void imageCoordinates(PhaseSpaceSynthesis *poly_ps, int system_index, ImagingMethod style);
 /// \}
 
 /// \brief Compute the distance between two points in a coordinate set.  All forms of this
@@ -100,17 +148,55 @@ void imageCoordinates(CoordinateFrame *cf, ImagingMethod style);
 /// \param invu               Transformation matrix from fractional coordinates back to real space
 /// \param unit_cell          Shape of the unit cell
 /// \param gpos_scale_factor  Conversion factor for fixed precision coordinates
+/// \param x_ovrf             Overflow bits for Cartesian x coordinates
+/// \param y_ovrf             Overflow bits for Cartesian y coordinates
+/// \param z_ovrf             Overflow bits for Cartesian z coordinates
 /// \{
 template <typename Tcoord, typename Tcalc>
 Tcalc distance(int atom_i, int atom_j, const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-               const Tcalc* umat, const Tcalc* invu, UnitCellType unit_cell,
-               Tcalc gpos_scale_factor = 1.0);
+               const double* umat, const double* invu, UnitCellType unit_cell,
+               Tcalc gpos_scale_factor = 1.0, const int* xcrd_ovrf = nullptr,
+               const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr);
 
 double distance(int atom_i, int atom_j, const CoordinateFrameReader &cfr);
 
+double distance(int atom_i, int atom_j, const CoordinateFrame *cf);
+
 double distance(int atom_i, int atom_j, const CoordinateFrame &cf);
 
+double distance(int atom_i, int atom_j, const PhaseSpaceReader &psr);
+
+double distance(int atom_i, int atom_j, const PhaseSpace *ps);
+
 double distance(int atom_i, int atom_j, const PhaseSpace &ps);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const CoordinateSeriesReader<Tcoord> &csr,
+               size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const CoordinateSeries<Tcoord> *cs, size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const CoordinateSeries<Tcoord> &cs, size_t frame_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const CondensateReader &cdnsr, int system_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const Condensate *cdns, int system_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const Condensate &cdns, int system_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const PsSynthesisReader &poly_psr, int system_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const PhaseSpaceSynthesis *poly_ps, int system_index);
+
+template <typename Tcalc>
+Tcalc distance(int atom_i, int atom_j, const PhaseSpaceSynthesis &poly_ps, int system_index);
 /// \}
 
 /// \brief Compute the angle between three points in a coordinate set.  All forms of this
@@ -127,14 +213,54 @@ double distance(int atom_i, int atom_j, const PhaseSpace &ps);
 /// \{
 template <typename Tcoord, typename Tcalc>
 Tcalc angle(int atom_i, int atom_j, int atom_k, const Tcoord* xcrd, const Tcoord* ycrd,
-            const Tcoord* zcrd, const Tcalc* umat, const Tcalc* invu, UnitCellType unit_cell,
-            Tcalc gpos_scale_factor = 1.0);
+            const Tcoord* zcrd, const double* umat, const double* invu, UnitCellType unit_cell,
+            Tcalc gpos_scale_factor = 1.0, const int* xcrd_ovrf = nullptr,
+            const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr);
 
 double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrameReader &cfr);
 
+double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrame *cf);
+
 double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrame &cf);
 
+double angle(int atom_i, int atom_j, int atom_k, const PhaseSpaceReader &psr);
+
+double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace *ps);
+
 double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace &ps);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const CoordinateSeriesReader<Tcoord> &csr,
+            size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const CoordinateSeries<Tcoord> *cs,
+            size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const CoordinateSeries<Tcoord> &cs,
+            size_t frame_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const CondensateReader &cdnsr, int system_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const Condensate *cdns, int system_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const Condensate &cdns, int system_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const PsSynthesisReader &poly_psr,
+            int system_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const PhaseSpaceSynthesis *poly_ps,
+            int system_index);
+
+template <typename Tcalc>
+Tcalc angle(int atom_i, int atom_j, int atom_k, const PhaseSpaceSynthesis &poly_ps,
+            int system_index);
 /// \}
 
 /// \brief Compute the dihedral angle between three points in a coordinate set.  All forms of this
@@ -150,16 +276,60 @@ double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace &ps);
 /// Parameters for this function follow from descriptions in distance, above
 /// \{
 template <typename Tcoord, typename Tcalc>
-Tcalc dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoord* xcrd,
-                     const Tcoord* ycrd, const Tcoord* zcrd, const Tcalc* umat,
-                     const Tcalc* invu, UnitCellType unit_cell, Tcalc gpos_scale_factor = 1.0);
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoord* xcrd,
+                    const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                    const double* invu, UnitCellType unit_cell, Tcalc gpos_scale_factor = 1.0,
+                    const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                    const int* zcrd_ovrf = nullptr);
 
-double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
-                      const CoordinateFrameReader &cfr);
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                     const CoordinateFrameReader &cfr);
 
-double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const CoordinateFrame &cf);
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const CoordinateFrame *cf);
 
-double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const PhaseSpace &ps);
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const CoordinateFrame &cf);
+
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const PhaseSpaceReader &cfr);
+
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const PhaseSpace *ps);
+
+double dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const PhaseSpace &ps);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const CoordinateSeriesReader<Tcoord> &csr, size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const CoordinateSeries<Tcoord> *cs, size_t frame_index);
+
+template <typename Tcoord, typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const CoordinateSeries<Tcoord> &cs, size_t frame_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const CondensateReader &cdnsr,
+                    int system_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const Condensate *cdns,
+                    int system_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l, const Condensate &cdns,
+                    int system_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const PsSynthesisReader &poly_psr, int system_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const PhaseSpaceSynthesis *poly_ps, int system_index);
+
+template <typename Tcalc>
+Tcalc dihedralAngle(int atom_i, int atom_j, int atom_k, int atom_l,
+                    const PhaseSpaceSynthesis &poly_ps, int system_index);
 /// \}
 
 } // namespace structure

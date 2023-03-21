@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -244,5 +244,5 @@ void HpcMatrix<T>::download() {
 }
 #endif
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

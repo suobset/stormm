@@ -2,6 +2,7 @@
 #ifndef STORMM_CHEMISTRY_ENUMERATORS_H
 #define STORMM_CHEMISTRY_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
@@ -9,9 +10,9 @@ namespace chemistry {
 
 /// \brief Enumerate the chiral orientations of a center with four unique bonded groups
 enum class ChiralOrientation {
-  RECTUS,    ///< R- or D-chiral
-  SINISTER,  ///< S- or L-chiral
-  NONE       ///< No chirality, or no preference
+  RECTUS = -1,   ///< R- or D-chiral
+  SINISTER = 1,  ///< S- or L-chiral
+  NONE = 2       ///< No chirality, or no preference
 };
 
 /// \brief Enumerate the ways for inverting a chiral center
@@ -60,7 +61,20 @@ enum class EquivalenceSwap {
                    ///<   directional dependence.  For a group wih N equivalent members, this
                    ///<   implies N possible combinations.
 };
- 
+
+/// \brief Produce a human-readable string corresponding to one of the enumerations of the input.
+///        These and other overloads are provided for each enum class.
+///
+/// \param input  The enumerated value of interest
+/// \{
+std::string getEnumerationName(ChiralOrientation input);
+std::string getEnumerationName(ChiralInversionProtocol input);
+std::string getEnumerationName(MapRotatableGroups input);
+std::string getEnumerationName(RotatorCriterion input);
+std::string getEnumerationName(ConformationEdit input);
+std::string getEnumerationName(EquivalenceSwap input);
+/// \}
+
 } // namespace chemistry
 } // namespace stormm
 

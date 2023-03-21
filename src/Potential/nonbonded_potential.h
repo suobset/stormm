@@ -20,7 +20,7 @@ namespace stormm {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
-using math::roundUp;
+using stmath::roundUp;
 using topology::AtomGraph;
 using topology::ImplicitSolventKit;
 using topology::NonbondedKit;

@@ -6,8 +6,8 @@
 namespace stormm {
 namespace topology {
 
-using math::prefixSumInPlace;
-using math::PrefixSumType;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
   
 //-------------------------------------------------------------------------------------------------
 void atomValidityCheck(const int index, const int max_atoms, const char* class_caller,

@@ -94,17 +94,17 @@ void Approx::setTol(const double dtol_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-Approx Approx::margin(const double dtol_in) {
+Approx Approx::margin(const double dtol_in) const {
   return Approx(values, style, dtol_in);
 }
 
 //-------------------------------------------------------------------------------------------------
-Approx Approx::tolerance(const double dtol_in) {
+Approx Approx::tolerance(const double dtol_in) const {
   return Approx(values, style, dtol_in);
 }
 
 //-------------------------------------------------------------------------------------------------
-Approx Approx::tol(const double dtol_in) {
+Approx Approx::tol(const double dtol_in) const {
   return Approx(values, style, dtol_in);
 }
 

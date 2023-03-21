@@ -7,7 +7,7 @@ namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
-using math::indexingArray;
+using stmath::indexingArray;
 
 //-------------------------------------------------------------------------------------------------
 SynthesisMapReader::SynthesisMapReader(const int ncache_in, const int nsynth_in,
@@ -25,9 +25,7 @@ SynthesisMapReader::SynthesisMapReader(const int ncache_in, const int nsynth_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
-SynthesisCacheMap::SynthesisCacheMap(const SystemCache *sc_in,
-                                     const AtomGraphSynthesis *poly_ag_in,
-                                     const PhaseSpaceSynthesis *poly_ps_in) :
+SynthesisCacheMap::SynthesisCacheMap() :
     cache_system_count{0}, synthesis_system_count{0}, cache_label_count{0},
     cache_topology_count{0},
     cache_origins{HybridKind::POINTER, "syncache_orig"},
@@ -40,9 +38,7 @@ SynthesisCacheMap::SynthesisCacheMap(const SystemCache *sc_in,
     topology_projections{HybridKind::POINTER, "syncache_agproj"},
     topology_projection_bounds{HybridKind::POINTER, "syncache_ag_bounds"},
     int_data{HybridKind::ARRAY, "syncache_data"},
-    sc_ptr{const_cast<SystemCache*>(sc_in)},
-    poly_ag_ptr{const_cast<AtomGraphSynthesis*>(poly_ag_in)},
-    poly_ps_ptr{const_cast<PhaseSpaceSynthesis*>(poly_ps_in)}
+    sc_ptr{nullptr}, poly_ag_ptr{nullptr}, poly_ps_ptr{nullptr}
 {}
     
 //-------------------------------------------------------------------------------------------------
@@ -50,28 +46,42 @@ SynthesisCacheMap::SynthesisCacheMap(const std::vector<int> &cache_origins_in,
                                      const SystemCache *sc_in,
                                      const AtomGraphSynthesis *poly_ag_in,
                                      const PhaseSpaceSynthesis *poly_ps_in) :
-    SynthesisCacheMap(sc_in, poly_ag_in, poly_ps_in)
+    SynthesisCacheMap()
 {
   setCache(cache_origins_in, sc_in);
+  if (poly_ag_in != nullptr) {
+    setSynthesis(poly_ag_in);
+  }
+  if (poly_ps_in != nullptr) {
+    setSynthesis(poly_ps_in);
+  }
+  validateCorrespondence();
 }
+
+//-------------------------------------------------------------------------------------------------
+SynthesisCacheMap::SynthesisCacheMap(const std::vector<int> &cache_origins_in,
+                                     const SystemCache &sc_in,
+                                     const AtomGraphSynthesis &poly_ag_in,
+                                     const PhaseSpaceSynthesis &poly_ps_in) :
+    SynthesisCacheMap(cache_origins_in, sc_in.getSelfPointer(), poly_ag_in.getSelfPointer(),
+                      poly_ps_in.getSelfPointer())
+{}
 
 //-------------------------------------------------------------------------------------------------
 SynthesisCacheMap::SynthesisCacheMap(const std::vector<int> &cache_origins_in,
                                      const SystemCache &sc_in,
                                      const PhaseSpaceSynthesis &poly_ps_in) :
-    SynthesisCacheMap(sc_in.getSelfPointer(), nullptr, poly_ps_in.getSelfPointer())
-{
-  setCache(cache_origins_in, sc_in);
-}
+    SynthesisCacheMap(cache_origins_in, sc_in.getSelfPointer(), nullptr,
+                      poly_ps_in.getSelfPointer())
+{}
 
 //-------------------------------------------------------------------------------------------------
 SynthesisCacheMap::SynthesisCacheMap(const std::vector<int> &cache_origins_in,
                                      const SystemCache &sc_in,
                                      const AtomGraphSynthesis &poly_ag_in) :
-    SynthesisCacheMap(sc_in.getSelfPointer(), poly_ag_in.getSelfPointer(), nullptr)
-{
-  setCache(cache_origins_in, sc_in);
-}
+    SynthesisCacheMap(cache_origins_in, sc_in.getSelfPointer(), poly_ag_in.getSelfPointer(),
+                      nullptr)
+{}
 
 //-------------------------------------------------------------------------------------------------
 SynthesisCacheMap::SynthesisCacheMap(const SynthesisCacheMap &original) :
@@ -375,6 +385,7 @@ void SynthesisCacheMap::setCache(const std::vector<int> &cache_origins_in,
 
   // Check that each system index in the cache origins is valid.
   cache_system_count = sc_ptr->getSystemCount();
+  cache_topology_count = sc_ptr->getTopologyCount();
   cache_label_count = sc_ptr->getLabelCount();
   synthesis_system_count = cache_origins_in.size();
   for (int i = 0; i < synthesis_system_count; i++) {
@@ -409,7 +420,7 @@ void SynthesisCacheMap::setCache(const std::vector<int> &cache_origins_in,
   indexingArray(cached_label_indices, &tmp_label_projections, &tmp_label_projection_bounds);
   indexingArray(cached_topology_indices, &tmp_topology_projections,
                 &tmp_topology_projection_bounds);
-
+  
   // Load the index maps
   size_t ic = 0;
   ic = cache_origins.putHost(&int_data, cache_origins_in, ic, warp_size_zu);
@@ -417,11 +428,11 @@ void SynthesisCacheMap::setCache(const std::vector<int> &cache_origins_in,
   ic = label_origins.putHost(&int_data, cached_label_indices, ic, warp_size_zu);
   ic = sys_projections.putHost(&int_data, tmp_sys_projections, ic, warp_size_zu);
   ic = sys_projection_bounds.putHost(&int_data, tmp_sys_projection_bounds, ic, warp_size_zu);
-  ic = label_projections.putHost(&int_data, tmp_label_projections, ic, warp_size_zu);
-  ic = label_projection_bounds.putHost(&int_data, tmp_label_projection_bounds, ic, warp_size_zu);
   ic = topology_projections.putHost(&int_data, tmp_topology_projections, ic, warp_size_zu);
   ic = topology_projection_bounds.putHost(&int_data, tmp_topology_projection_bounds, ic,
                                           warp_size_zu);
+  ic = label_projections.putHost(&int_data, tmp_label_projections, ic, warp_size_zu);
+  ic = label_projection_bounds.putHost(&int_data, tmp_label_projection_bounds, ic, warp_size_zu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -451,25 +462,6 @@ void SynthesisCacheMap::setSynthesis(const PhaseSpaceSynthesis &poly_ps_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void SynthesisCacheMap::setCondensateWorkUnits(Condensate *cdns, const GpuDetails &gpu) const {
-
-  // Check that there is a synthesis involved.
-  if (cdns->getSynthesisPointer() != poly_ps_ptr) {
-    rtErr("The Condensate does not reference the same coordinate synthesis as this system cache "
-          "map.", "SynthesisCacheMap", "setCondensateWorkUnits");
-  }
-  
-  // Each source in the systems cache will have one and only one topology.
-  cdns->setWorkUnits(sys_projections.data(), sys_projection_bounds.data(), cache_system_count,
-                     SystemGrouping::SOURCE, gpu);
-  
-  // Label groups may span multiple topologies, but comparisons are only possible between systems
-  // sharing the same topology.
-  cdns->setWorkUnits(label_projections.data(), label_projection_bounds.data(), cache_label_count,
-                     SystemGrouping::LABEL, gpu);
-}
-  
-//-------------------------------------------------------------------------------------------------
 void SynthesisCacheMap::rebasePointers() {
   cache_origins.swapTarget(&int_data);
   topology_origins.swapTarget(&int_data);
@@ -480,6 +472,58 @@ void SynthesisCacheMap::rebasePointers() {
   label_projection_bounds.swapTarget(&int_data);
   topology_projections.swapTarget(&int_data);
   topology_projection_bounds.swapTarget(&int_data);
+}
+
+//-------------------------------------------------------------------------------------------------
+void SynthesisCacheMap::validateCorrespondence() const {
+
+  // Check that the cache origins of each system match those of the system in either synthesis.
+  if (sc_ptr == nullptr) {
+    rtErr("A systems cache must be referenced.", "SynthesisCacheMap", "validateCorrespondence");
+  }
+  if (poly_ps_ptr == nullptr && poly_ag_ptr == nullptr) {
+    rtErr("A coordinate or topology synthesis must be referenced.", "SynthesisCacheMap",
+          "validateCorrespondence");
+  }
+  const int* cache_orig_ptr = cache_origins.data();
+  if (poly_ps_ptr != nullptr) {
+    if (poly_ps_ptr->getSystemCount() != synthesis_system_count) {
+      rtErr("The coordinate synthesis contains " + std::to_string(poly_ps_ptr->getSystemCount()) +
+            " systems, whereas the map understands the origins of " +
+            std::to_string(synthesis_system_count) + ".", "SynthesisCacheMap",
+            "validateCorrespondence");
+    }
+    for (int i = 0; i < synthesis_system_count; i++) {
+      const AtomGraph* cache_top = sc_ptr->getSystemTopologyPointer(cache_orig_ptr[i]);
+      const AtomGraph* synth_top = poly_ps_ptr->getSystemTopologyPointer(i);
+      if (cache_top != synth_top && cache_top->getFileName() != synth_top->getFileName()) {
+        rtErr("Coordinate synthesis system " + std::to_string(i) + ", mapped to cache system " +
+              std::to_string(cache_orig_ptr[i]) + ", references a topology originating in file " +
+              synth_top->getFileName() + " while cache references a topology originating in "
+              "file " + cache_top->getFileName() + ".", "SynthesisCacheMap",
+              "validateCorrespondence");
+      }
+    }
+  }
+  if (poly_ag_ptr != nullptr) {
+    if (poly_ag_ptr->getSystemCount() != synthesis_system_count) {
+      rtErr("The topology synthesis contains " + std::to_string(poly_ps_ptr->getSystemCount()) +
+            " systems, whereas the map understands the origins of " +
+            std::to_string(synthesis_system_count) + ".", "SynthesisCacheMap",
+            "validateCorrespondence");
+    }
+    for (int i = 0; i < synthesis_system_count; i++) {
+      const AtomGraph* cache_top = sc_ptr->getSystemTopologyPointer(cache_orig_ptr[i]);
+      const AtomGraph* synth_top = poly_ag_ptr->getSystemTopologyPointer(i);
+      if (cache_top != synth_top && cache_top->getFileName() != synth_top->getFileName()) {
+        rtErr("Topology synthesis system " + std::to_string(i) + ", mapped to cache system " +
+              std::to_string(cache_orig_ptr[i]) + ", references a topology originating in file " +
+              synth_top->getFileName() + " while cache references a topology originating in "
+              "file " + cache_top->getFileName() + ".", "SynthesisCacheMap",
+              "validateCorrespondence");
+      }
+    }
+  }
 }
 
 } // namespace synthesis

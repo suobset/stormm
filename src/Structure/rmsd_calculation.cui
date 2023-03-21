@@ -212,8 +212,9 @@ TCALC4 devcQuaternion(const TCALC aa, const TCALC ab, const TCALC ac,
 //                      which to store results
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(tiny_block_size, 1)
-RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader poly_psr,
-                     const int* reference_frames, TCALC* result) {
+RMSD_REF_KERNEL_NAME(const CompGuideKit cgk, const RMSDPlanReader<TCALC> rplanr,
+                     const PsSynthesisReader poly_psr, const int* reference_frames,
+                     TCALC* result) {
 
   // Determine whether the request is for RMSD calculations to reference structures or instead
   // for an all-to-all RMSD matrix.
@@ -527,7 +528,7 @@ RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader
       WARP_REDUCE_DOWN(rmsd_acc);
       if (lane_idx == 0) {
         rmsd_acc = SQRT_FUNC(rmsd_acc * total_mass);
-        result[rplanr.atr_starts_top[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
+        result[cgk.top_grp_bounds[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
       }
     }
     break;
@@ -601,7 +602,7 @@ RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader
       WARP_REDUCE_DOWN(total_mass);
       if (lane_idx == 0) {
         rmsd_acc = SQRT_FUNC(rmsd_acc / total_mass);
-        result[rplanr.atr_starts_top[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
+        result[cgk.top_grp_bounds[plan_idx] + poly_psr.replica_idx[pos]] = rmsd_acc;
       }
     }
     break;    
@@ -610,7 +611,7 @@ RMSD_REF_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(medium_block_size, 1)
-RMSD_MAT_KERNEL_NAME(const RMSDPlanReader<TCALC> rplanr, const PsSynthesisReader poly_psr,
-                     TCALC* result) {
+RMSD_MAT_KERNEL_NAME(const CompGuideKit cgk, const RMSDPlanReader<TCALC> rplanr,
+                     const PsSynthesisReader poly_psr, TCALC* result) {
 
 }

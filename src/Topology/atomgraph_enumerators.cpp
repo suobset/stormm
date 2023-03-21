@@ -9,8 +9,169 @@ namespace topology {
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
-std::string getUnitCellTypeName(const UnitCellType uc) {
-  switch (uc) {
+std::string getEnumerationName(const TopologyKind input) {
+  switch (input) {
+  case TopologyKind::AMBER:
+    return std::string("AMBER");
+  case TopologyKind::CHARMM:
+    return std::string("CHARMM");
+  case TopologyKind::GROMACS:
+    return std::string("GROMACS");
+  case TopologyKind::OPENMM:
+    return std::string("OPENMM");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TopologyDescriptor input) {
+  switch (input) {
+  case TopologyDescriptor::ATOM_COUNT:
+    return std::string("ATOM_COUNT");
+  case TopologyDescriptor::ATOM_TYPE_COUNT:
+    return std::string("ATOM_TYPE_COUNT");
+  case TopologyDescriptor::BONDS_WITH_HYDROGEN:
+    return std::string("BONDS_WITH_HYDROGEN");
+  case TopologyDescriptor::BONDS_WITHOUT_HYDROGEN:
+    return std::string("BONDS_WITHOUT_HYDROGEN");
+  case TopologyDescriptor::ANGLES_WITH_HYDROGEN:
+    return std::string("ANGLES_WITH_HYDROGEN");
+  case TopologyDescriptor::ANGLES_WITHOUT_HYDROGEN:
+    return std::string("ANGLES_WITHOUT_HYDROGEN");
+  case TopologyDescriptor::DIHEDRALS_WITH_HYDROGEN:
+    return std::string("DIHEDRALS_WITH_HYDROGEN");
+  case TopologyDescriptor::DIHEDRALS_WITHOUT_HYDROGEN:
+    return std::string("DIHEDRALS_WITHOUT_HYDROGEN");
+  case TopologyDescriptor::NHPARM_UNUSED:
+    return std::string("NHPARM_UNUSED");
+  case TopologyDescriptor::ADDLES_CREATED:
+    return std::string("ADDLES_CREATED");
+  case TopologyDescriptor::TOTAL_EXCLUDED_ATOMS:
+    return std::string("TOTAL_EXCLUDED_ATOMS");
+  case TopologyDescriptor::RESIDUE_COUNT:
+    return std::string("RESIUDE_COUNT");
+  case TopologyDescriptor::NBONA_UNUSED:
+    return std::string("NBONA_UNUSED");
+  case TopologyDescriptor::NTHETA_UNUSED:
+    return std::string("NTHETA_UNUSED");
+  case TopologyDescriptor::NPHIA_UNUSED:
+    return std::string("NPHIA_UNUSED");
+  case TopologyDescriptor::BOND_TYPE_COUNT:
+    return std::string("BOND_TYPE_COUNT");
+  case TopologyDescriptor::ANGLE_TYPE_COUNT:
+    return std::string("ANGLE_TYPE_COUNT");
+  case TopologyDescriptor::DIHEDRAL_TYPE_COUNT:
+    return std::string("DIHEDRAL_TYPE_COUNT");
+  case TopologyDescriptor::NATYP_UNUSED:
+    return std::string("NATYPE_UNUSED");
+  case TopologyDescriptor::NPHB_UNUSED:
+    return std::string("NPHB_UNUSED");
+  case TopologyDescriptor::PERTURBATION:
+    return std::string("PERTURBATION");
+  case TopologyDescriptor::BOND_PERTURBATIONS:
+    return std::string("BOND_PERTURBATIONS");
+  case TopologyDescriptor::ANGLE_PERTURBATIONS:
+    return std::string("ANGLE_PERTURBATIONS");
+  case TopologyDescriptor::DIHEDRAL_PERTURBATIONS:
+    return std::string("DIHEDRAL_PERTURBATIONS");
+  case TopologyDescriptor::BONDS_IN_PERTURBED_GROUP:
+    return std::string("BONDS_IN_PERTURBED_GROUP");
+  case TopologyDescriptor::ANGLES_IN_PERTURBED_GROUP:
+    return std::string("ANGLES_IN_PERTURBED_GROUP");
+  case TopologyDescriptor::DIHEDRALS_IN_PERTURBED_GROUP:
+    return std::string("DIHEDRALS_IN_PERTURBED_GROUP");
+  case TopologyDescriptor::BOX_TYPE_INDEX:
+    return std::string("BOX_TYPE_INDEX");
+  case TopologyDescriptor::ATOM_COUNT_LARGEST_RESIDUE:
+    return std::string("ATOM_COUNT_LARGEST_RESIDUE");
+  case TopologyDescriptor::CAP:
+    return std::string("CAP");
+  case TopologyDescriptor::EXTRA_POINT_COUNT:
+    return std::string("EXTRA_POINT_COUNT");
+  case TopologyDescriptor::PIMD_SLICE_COUNT:
+    return std::string("PIMD_SLICE_COUNT");
+  case TopologyDescriptor::N_VALUES:
+    return std::string("N_VALUES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SanderDescriptor input) {
+  switch (input) {
+  case SanderDescriptor::NATOM:
+    return std::string("NATOM");
+  case SanderDescriptor::NTYPES:
+    return std::string("NTYPES");
+  case SanderDescriptor::NBONH:
+    return std::string("NBONH");
+  case SanderDescriptor::MBONA:
+    return std::string("MBONA");
+  case SanderDescriptor::NTHETH:
+    return std::string("NTHETH");
+  case SanderDescriptor::MTHETA:
+    return std::string("MTHETA");
+  case SanderDescriptor::NPHIH:
+    return std::string("NPHIH");
+  case SanderDescriptor::MPHIA:
+    return std::string("MPHIA");
+  case SanderDescriptor::NHPARM:
+    return std::string("NHPARM");
+  case SanderDescriptor::NPARM:
+    return std::string("NPARM");
+  case SanderDescriptor::NNB:
+    return std::string("NNB");
+  case SanderDescriptor::NRES:
+    return std::string("NRES");
+  case SanderDescriptor::NBONA:
+    return std::string("NBONA");
+  case SanderDescriptor::NTHETA:
+    return std::string("NTHETA");
+  case SanderDescriptor::NPHIA:
+    return std::string("NPHIA");
+  case SanderDescriptor::NUMBND:
+    return std::string("NUMBND");
+  case SanderDescriptor::NUMANG:
+    return std::string("NUMANG");
+  case SanderDescriptor::NPTRA:
+    return std::string("NPTRA");
+  case SanderDescriptor::NATYP:
+    return std::string("NATYP");
+  case SanderDescriptor::NPHB:
+    return std::string("NPHB");
+  case SanderDescriptor::IFPERT:
+    return std::string("IFPERT");
+  case SanderDescriptor::NBPER:
+    return std::string("NBPER");
+  case SanderDescriptor::NGPER:
+    return std::string("NGPER");
+  case SanderDescriptor::NDPER:
+    return std::string("NDPER");
+  case SanderDescriptor::MBPER:
+    return std::string("NBPER");
+  case SanderDescriptor::MGPER:
+    return std::string("MGPER");
+  case SanderDescriptor::MDPER:
+    return std::string("MDPER");
+  case SanderDescriptor::IFBOX:
+    return std::string("IFBOX");
+  case SanderDescriptor::NMXRS:
+    return std::string("NMXRS");
+  case SanderDescriptor::IFCAP:
+    return std::string("IFCAP");
+  case SanderDescriptor::NUMEXTRA:
+    return std::string("NMEXTRA");
+  case SanderDescriptor::NCOPY:
+    return std::string("NCOPY");
+  case SanderDescriptor::N_VALUES:
+    return std::string("N_VALUES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const UnitCellType input) {
+  switch (input) {
   case UnitCellType::NONE:
     return std::string("Isolated system (free in space)");
   case UnitCellType::ORTHORHOMBIC:
@@ -22,8 +183,150 @@ std::string getUnitCellTypeName(const UnitCellType uc) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getImplicitSolventModelName(const ImplicitSolventModel ism) {
-  switch (ism) {
+std::string getEnumerationName(const MobilitySetting input) {
+  switch (input) {
+  case MobilitySetting::OFF:
+    return std::string("OFF");
+  case MobilitySetting::ON:
+    return std::string("ON");
+  case MobilitySetting::TOGGLE:
+    return std::string("TOGGLE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ShakeSetting input) {
+  switch (input) {
+  case ShakeSetting::OFF:
+    return std::string("OFF");
+  case ShakeSetting::ON:
+    return std::string("ON");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SettleSetting input) {
+  switch (input) {
+  case SettleSetting::OFF:
+    return std::string("OFF");
+  case SettleSetting::ON:
+    return std::string("ON");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const PerturbationSetting input) {
+  switch (input) {
+  case PerturbationSetting::OFF:
+    return std::string("OFF");
+  case PerturbationSetting::ON:
+    return std::string("ON");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SolventCapSetting input) {
+  switch (input) {
+  case SolventCapSetting::OFF:
+    return std::string("OFF");
+  case SolventCapSetting::ON:
+    return std::string("ON");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const PolarizationSetting input) {
+  switch (input) {
+  case PolarizationSetting::OFF:
+    return std::string("OFF");
+  case PolarizationSetting::ON:
+    return std::string("ON");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TopologyRequirement input) {
+  switch (input) {
+  case TopologyRequirement::OPTIONAL:
+    return std::string("OPTIONAL");
+  case TopologyRequirement::ESSENTIAL:
+    return std::string("ESSENTIAL");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MassForm input) {
+  switch (input) {
+  case MassForm::ORDINARY:
+    return std::string("ORDINARY");
+  case MassForm::INVERSE:
+    return std::string("INVERSE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ConstraintStatus input) {
+  switch (input) {
+  case ConstraintStatus::FREE:
+    return std::string("FREE");
+  case ConstraintStatus::CONSTRAINED:
+    return std::string("CONSTRAINED");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const HydrogenContent input) {
+  switch (input) {
+  case HydrogenContent::NO_HYDROGEN:
+    return std::string("NO_HYDROGEN");
+  case HydrogenContent::HAS_HYDROGEN:
+    return std::string("HAS_HYDROGEN");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ForceFieldFamily input) {
+  switch (input) {
+  case ForceFieldFamily::BASIC:
+    return std::string("BASIC");
+  case ForceFieldFamily::AMBER:
+    return std::string("AMBER");
+  case ForceFieldFamily::CHARMM:
+    return std::string("CHARMM");
+  case ForceFieldFamily::OPENMM:
+    return std::string("OPENMM");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TorsionKind input) {
+  switch (input) {
+  case TorsionKind::PROPER:
+    return std::string("PROPER");
+  case TorsionKind::PROPER_NO_14:
+    return std::string("PROPER_NO_14");
+  case TorsionKind::IMPROPER:
+    return std::string("IMPROPER");
+  case TorsionKind::IMPROPER_NO_14:
+    return std::string("IMPROPER_NO_14");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ImplicitSolventModel input) {
+  switch (input) {
   case ImplicitSolventModel::NONE:
     return std::string("no implicit solvent");
   case ImplicitSolventModel::HCT_GB:
@@ -41,41 +344,8 @@ std::string getImplicitSolventModelName(const ImplicitSolventModel ism) {
 }
 
 //-------------------------------------------------------------------------------------------------
-ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
-                                                   const ExceptionResponse policy) {
-  switch (igb_val) {
-  case 0:
-  case 6:
-    return ImplicitSolventModel::NONE;
-  case 1:
-    return ImplicitSolventModel::HCT_GB;
-  case 2:
-    return ImplicitSolventModel::OBC_GB;
-  case 5:
-    return ImplicitSolventModel::OBC_GB_II;
-  case 7:
-    return ImplicitSolventModel::NECK_GB;
-  case 8:
-    return ImplicitSolventModel::NECK_GB_II;
-  default:
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
-            "translateImplicitSolventModel");
-    case ExceptionResponse::WARN:
-      rtWarn("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".  The "
-             "model will be set to NONE instead.", "translateImplicitSolventModel");
-      return ImplicitSolventModel::NONE;
-    case ExceptionResponse::SILENT:
-      return ImplicitSolventModel::NONE;
-    }
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getAtomicRadiusSetName(const AtomicRadiusSet rs) {
-  switch (rs) {
+std::string getEnumerationName(const AtomicRadiusSet input) {
+  switch (input) {
   case AtomicRadiusSet::NONE:
     return std::string("no atomic radii");
   case AtomicRadiusSet::BONDI:
@@ -95,47 +365,8 @@ std::string getAtomicRadiusSetName(const AtomicRadiusSet rs) {
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
-                                         const ExceptionResponse policy) {
-  if (strcmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::BONDI;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::AMBER6;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI2;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI3;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::PARSE;
-  }
-  else if (strcmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::NONE;
-  }
-  else {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("Unrecognized atomic radius set " + pb_radii_in + ".", "translatePBRadiiSet");
-    case ExceptionResponse::WARN:
-      rtWarn("Unrecognized atomic radius set " + pb_radii_in + ".  The radius set will be NONE.",
-             "translatePBRadiiSet");
-      return AtomicRadiusSet::NONE;
-    case ExceptionResponse::SILENT:
-      return AtomicRadiusSet::NONE;
-    }
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getWaterModelName(const WaterModel wm) {
-  switch (wm) {
+std::string getEnumerationName(const WaterModel input) {
+  switch (input) {
   case WaterModel::NONE:
     return std::string("No water model");
   case WaterModel::UNKNOWN:
@@ -193,8 +424,103 @@ std::string getWaterModelName(const WaterModel wm) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const VirtualSiteKind input) {
+  switch (input) {
+  case VirtualSiteKind::FLEX_2:
+    return std::string("Flex-2 / FlexDis2");
+  case VirtualSiteKind::FIXED_2:
+    return std::string("FD-2 / FixedDis2");
+  case VirtualSiteKind::FLEX_3:
+    return std::string("Flex-3 / FlexDis3");
+  case VirtualSiteKind::FIXED_3:
+    return std::string("FD-3 / FixedDis3");
+  case VirtualSiteKind::FAD_3:
+    return std::string("FAD-3 / FixAnglDis");
+  case VirtualSiteKind::OUT_3:
+    return std::string("Out-3 / OutOfPlane");
+  case VirtualSiteKind::FIXED_4:
+    return std::string("FD-4 / FourPoint");
+  case VirtualSiteKind::NONE:
+    break;
+  }
+  return std::string("No detected frame type.");
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
+                                                   const ExceptionResponse policy) {
+  switch (igb_val) {
+  case 0:
+  case 6:
+    return ImplicitSolventModel::NONE;
+  case 1:
+    return ImplicitSolventModel::HCT_GB;
+  case 2:
+    return ImplicitSolventModel::OBC_GB;
+  case 5:
+    return ImplicitSolventModel::OBC_GB_II;
+  case 7:
+    return ImplicitSolventModel::NECK_GB;
+  case 8:
+    return ImplicitSolventModel::NECK_GB_II;
+  default:
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
+            "translateImplicitSolventModel");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".  The "
+             "model will be set to NONE instead.", "translateImplicitSolventModel");
+      return ImplicitSolventModel::NONE;
+    case ExceptionResponse::SILENT:
+      return ImplicitSolventModel::NONE;
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
+                                         const ExceptionResponse policy) {
+  if (strcmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::BONDI;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::AMBER6;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI2;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI3;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::PARSE;
+  }
+  else if (strcmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::NONE;
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized atomic radius set " + pb_radii_in + ".", "translatePBRadiiSet");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized atomic radius set " + pb_radii_in + ".  The radius set will be NONE.",
+             "translatePBRadiiSet");
+      return AtomicRadiusSet::NONE;
+    case ExceptionResponse::SILENT:
+      return AtomicRadiusSet::NONE;
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 Citation getWaterModelCitation(const WaterModel wm) {
-  Citation cite("Primary reference for " + getWaterModelName(wm));
+  Citation cite("Primary reference for " + getEnumerationName(wm));
   switch (wm) {
   case WaterModel::NONE:
   case WaterModel::UNKNOWN:
@@ -423,29 +749,6 @@ Citation getWaterModelCitation(const WaterModel wm) {
     return cite;
   }
   __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getVirtualSiteFrameName(const VirtualSiteKind vsf) {
-  switch (vsf) {
-  case VirtualSiteKind::FLEX_2:
-    return std::string("Flex-2 / FlexDis2");
-  case VirtualSiteKind::FIXED_2:
-    return std::string("FD-2 / FixedDis2");
-  case VirtualSiteKind::FLEX_3:
-    return std::string("Flex-3 / FlexDis3");
-  case VirtualSiteKind::FIXED_3:
-    return std::string("FD-3 / FixedDis3");
-  case VirtualSiteKind::FAD_3:
-    return std::string("FAD-3 / FixAnglDis");
-  case VirtualSiteKind::OUT_3:
-    return std::string("Out-3 / OutOfPlane");
-  case VirtualSiteKind::FIXED_4:
-    return std::string("FD-4 / FourPoint");
-  case VirtualSiteKind::NONE:
-    break;
-  }
-  return std::string("No detected frame type.");
 }
 
 } // namespace topology

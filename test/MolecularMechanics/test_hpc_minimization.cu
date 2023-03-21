@@ -46,7 +46,7 @@ using namespace stormm::data_types;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
 using namespace stormm::errors;
-using namespace stormm::math;
+using namespace stormm::stmath;
 using namespace stormm::mm;
 using namespace stormm::parse;
 using namespace stormm::random;

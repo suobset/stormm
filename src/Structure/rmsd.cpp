@@ -69,5 +69,34 @@ double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const Atom
                               cfr_b.zcrd, cdk.masses, method, lower_limit, actual_upper_limit);
 }
 
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const PhaseSpaceReader &reference,
+            const PhaseSpaceReader &snapshot) {
+  const ChemicalDetailsKit cdk = rplan.getTopologyPointer(0)->getChemicalDetailsKit();
+  return rmsd<double, double>(reference.xcrd, reference.ycrd, reference.zcrd, snapshot.xcrd,
+                              snapshot.ycrd, snapshot.zcrd, cdk.masses, rplan.getGeneralStrategy(),
+                              0, snapshot.natom);
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const PhaseSpace &reference, const PhaseSpace &snapshot) {
+  return rmsd(rplan, reference.data(), snapshot.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const CoordinateFrameReader &reference,
+            const CoordinateFrameReader &snapshot) {
+  const ChemicalDetailsKit cdk = rplan.getTopologyPointer(0)->getChemicalDetailsKit();
+  return rmsd<double, double>(reference.xcrd, reference.ycrd, reference.zcrd, snapshot.xcrd,
+                              snapshot.ycrd, snapshot.zcrd, cdk.masses, rplan.getGeneralStrategy(),
+                              0, snapshot.natom);
+}
+
+//-------------------------------------------------------------------------------------------------
+double rmsd(const RMSDPlan &rplan, const CoordinateFrame &reference,
+            const CoordinateFrame &snapshot) {
+  return rmsd(rplan, reference.data(), snapshot.data());
+}
+
 } // namespace structure
 } // namespace stormm

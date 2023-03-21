@@ -13,10 +13,10 @@ using energy::StaticExclusionMaskReader;
 using energy::supertile_length;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
-using math::accumulateBitmask;
-using math::findBin;
-using math::reduceUniqueValues;
-using math::roundUp;
+using stmath::accumulateBitmask;
+using stmath::findBin;
+using stmath::reduceUniqueValues;
+using stmath::roundUp;
   
 //-------------------------------------------------------------------------------------------------
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,

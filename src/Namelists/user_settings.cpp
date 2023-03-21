@@ -31,7 +31,7 @@ using trajectory::translateCoordinateFileKind;
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
-    has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
+    has_files_nml{false}, has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
     has_precision_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
     has_ffmorph_nml{false}, has_report_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
@@ -139,8 +139,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     break;
   }
   int start_line = 0;
-  file_io_input = FilesControls(inp_tf, &start_line, policy, WrapTextSearch::NO, alternatives,
-                                sys_reqs);
+  file_io_input = FilesControls(inp_tf, &start_line, &has_files_nml, policy, WrapTextSearch::NO,
+                                alternatives, sys_reqs);
   start_line = 0;
   line_min_input = MinimizeControls(inp_tf, &start_line, &has_minimize_nml, policy);
   start_line = 0;
@@ -217,6 +217,11 @@ ExceptionResponse UserSettings::getExceptionBehavior() const {
 //-------------------------------------------------------------------------------------------------
 std::string UserSettings::getInputFileName() const {
   return input_file;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getFilesPresence() const {
+  return has_files_nml;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -99,7 +99,7 @@ MdlMolProperty::MdlMolProperty(const TextFile &tf, const int line_number, int *l
   case MdlMolPropertyKind::SGROUP_BRACKET_STYLE:
     max_entries = 8;
     break;
-  case MdlMolPropertyKind::SGROUP_CORRESPONENCE:
+  case MdlMolPropertyKind::SGROUP_CORRESPONDENCE:
   case MdlMolPropertyKind::SGROUP_ATTACH_POINT:
     max_entries = 6;
     break;
@@ -230,7 +230,7 @@ MdlMolProperty::MdlMolProperty(const TextFile &tf, const int line_number, int *l
     entry_read_start_pos = 10;
     entry_data_bounds = { 0, tf.getLineLength(line_number) - 11 };
     break;
-  case MdlMolPropertyKind::SGROUP_CORRESPONENCE:
+  case MdlMolPropertyKind::SGROUP_CORRESPONDENCE:
     substrate_unrecognized = readSubstrateIndex(line_ptr);
     entry_count_unrecognized = readEntryCount(line_ptr, 10);
     entry_detail = std::vector<MolObjPropField>(3, MolObjPropField::INTEGER);
@@ -410,7 +410,7 @@ MdlMolProperty::MdlMolProperty(const TextFile &tf, const int line_number, int *l
   case MdlMolPropertyKind::SGROUP_ATOM_LIST:
   case MdlMolPropertyKind::SGROUP_BOND_LIST:
   case MdlMolPropertyKind::MG_PARENT_ATOM_LIST:
-  case MdlMolPropertyKind::SGROUP_CORRESPONENCE:
+  case MdlMolPropertyKind::SGROUP_CORRESPONDENCE:
   case MdlMolPropertyKind::SGROUP_DISPLAY_INFO:
   case MdlMolPropertyKind::SGROUP_BOND_VECTOR:
   case MdlMolPropertyKind::SGROUP_FIELD:

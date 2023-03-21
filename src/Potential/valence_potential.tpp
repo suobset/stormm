@@ -24,7 +24,8 @@ Tcalc evalHarmonicStretch(const int i_atom, const int j_atom, const Tcalc stiffn
     dy = ycrd[j_atom] - ycrd[i_atom];
     dz = zcrd[j_atom] - zcrd[i_atom];
   }
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
   const Tcalc dr = (tcalc_ct == double_type_index) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                                      sqrtf((dx * dx) + (dy * dy) + (dz * dz));
   const Tcalc dl = dr - equilibrium;
@@ -152,8 +153,10 @@ Tcalc evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
     bc[1] = ycrd[k_atom] - ycrd[j_atom];
     bc[2] = zcrd[k_atom] - zcrd[j_atom];
   }
-  imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
 
   // On to the angle force computation
   const Tcalc mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
@@ -308,9 +311,12 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
     cd[1] = ycrd[l_atom] - ycrd[k_atom];
     cd[2] = zcrd[l_atom] - zcrd[k_atom];
   }
-  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
 
   // Compute cross products and then the angle between the planes
   crossProduct(ab, bc, crabbc);
@@ -696,10 +702,14 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     de[1] = ycrd[m_atom] - ycrd[l_atom];
     de[2] = zcrd[m_atom] - zcrd[l_atom];
   }
-  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&de[0], &de[1], &de[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&de[0], &de[1], &de[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
     
   // Compute the first dihedral
   crossProduct(ab, bc, crabbc);
@@ -1104,7 +1114,8 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
     dy = ycrd[l_atom] - ycrd[i_atom];
     dz = zcrd[l_atom] - zcrd[i_atom];
   }
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
   const int ilj_t = lj_param_idx[i_atom];
   const int jlj_t = lj_param_idx[l_atom] + ljtab_offset;
   const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
@@ -1340,7 +1351,8 @@ Tcalc evalPosnRestraint(const int p_atom, const int step_number, const int init_
     dy = ycrd[p_atom] - ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
     dz = zcrd[p_atom] - ((mixwt.x * init_z) + (mixwt.y * finl_z));
   }
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
   const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
   const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
@@ -1414,7 +1426,8 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const int step_numbe
     dy = ycrd[j_atom] - ycrd[i_atom];
     dz = zcrd[j_atom] - zcrd[i_atom];
   }
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
   const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
   const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
@@ -1481,8 +1494,10 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
     bc[1] = ycrd[k_atom] - ycrd[j_atom];
     bc[2] = zcrd[k_atom] - zcrd[j_atom];
   }
-  imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
 
   // On to the angle force computation
   const Tcalc mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
@@ -1579,9 +1594,12 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
     cd[1] = ycrd[l_atom] - ycrd[k_atom];
     cd[2] = zcrd[l_atom] - zcrd[k_atom];
   }
-  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates<Tcalc, Tcalc>(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
 
   // Compute cross products and then the angle between the planes
   crossProduct(ab, bc, crabbc);

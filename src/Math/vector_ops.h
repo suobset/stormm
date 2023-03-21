@@ -20,7 +20,7 @@
 #include "statistics.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using constants::ExceptionResponse;
@@ -673,7 +673,7 @@ std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx
 
 /// \brief Construct a vector based on a regular series of 
   
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "vector_ops.tpp"

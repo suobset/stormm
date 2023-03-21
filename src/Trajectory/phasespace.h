@@ -2,6 +2,9 @@
 #ifndef STORMM_PHASE_SPACE_H
 #define STORMM_PHASE_SPACE_H
 
+#include <typeinfo>
+#include <typeindex>
+#include <sys/types.h>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
@@ -16,7 +19,7 @@ namespace trajectory {
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::CartesianDimension;
-using math::computeBoxTransform;
+using stmath::computeBoxTransform;
 using topology::AtomGraph;
 using topology::UnitCellType;
 
@@ -591,6 +594,9 @@ private:
   void allocate();
 };
 
+/// \brief Define the type index for the PhaseSpace object.
+static const size_t phasespace_type_index = std::type_index(typeid(PhaseSpace)).hash_code();
+
 /// \brief Interpret the inverse transformation matrix to determine whether a unit cell exists, and
 ///        if it is rectilinear or not.
 ///
@@ -620,5 +626,11 @@ std::vector<double> interlaceXYZ(const double* xptr, const double* yptr, const d
 } // namespace stormm
 
 #include "phasespace.tpp"
+
+// As with common types and STORMM vector types, define the type indices for general use in the
+// STORMM namespace.
+namespace stormm {
+using trajectory::phasespace_type_index;
+} // namespace stormm
 
 #endif

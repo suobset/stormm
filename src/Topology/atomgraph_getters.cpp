@@ -12,8 +12,8 @@ namespace stormm {
 namespace topology {
 
 using card::HybridTargetLevel;
-using math::findBin;
-using math::locateValue;
+using stmath::findBin;
+using stmath::locateValue;
 using parse::char4ToString;
   
 //-------------------------------------------------------------------------------------------------

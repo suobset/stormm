@@ -5,7 +5,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 /// \brief Enumerate various statistical methods for computing the variance of a sequence of
 ///        n numbers (i.e. as presented in a std::vector).
@@ -75,7 +75,7 @@ double running_coefficient_of_variation(double sum_of_squares, double sum_of_val
 /// \param sample_count    The number of samples in the data
 double running_normalized_rmsd(double sum_of_squares, double sum_of_values, int sample_count);
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #endif

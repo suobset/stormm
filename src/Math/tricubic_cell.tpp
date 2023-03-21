@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -403,5 +403,5 @@ template <typename T> T TricubicCell<T>::evaluate(const T x, const T y, const T 
   return result;
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

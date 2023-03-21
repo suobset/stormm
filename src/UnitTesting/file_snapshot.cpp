@@ -23,8 +23,8 @@ using parse::readNumberSeries;
 using parse::separateText;
 using parse::TextFileReader;
 using parse::TextOrigin;
-using math::maxAbsValue;
-using math::minValue;
+using stmath::maxAbsValue;
+using stmath::minValue;
 
 //-------------------------------------------------------------------------------------------------
 std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &label) {
@@ -170,7 +170,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
 
   // Open the output file
   std::ofstream foutp = openOutputFile(filename, expectation, "Write a snapshot of data for " +
-                                       label + ".");
+                                       label);
 
   // Vectors that can hold a proper interpretation of the content
   std::vector<int> icontent;

@@ -29,8 +29,8 @@ namespace card {
 using constants::ExceptionResponse;
 using constants::mega;
 using errors::rtErr;
-using math::roundUp;
-using math::getPaddedMemorySize;
+using stmath::roundUp;
+using stmath::getPaddedMemorySize;
 using parse::PolyNumeric;
 
 /// \brief Symbols for each of the Hybrid array formats

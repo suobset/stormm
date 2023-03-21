@@ -31,9 +31,8 @@ void customizeDataItems(std::vector<MdlMol> *mol_entries, const SystemCache &sys
   const int nmol = mol_entries->size();
   MdlMol* ment_data = mol_entries->data();
   for (int i = 0; i < nmol; i++) {
-    customizeDataItems(&ment_data[i], sysc.getSystemLabel(i),
-                       sysc.getSystemTopologyReference(i), sysc.getRestraintReference(i),
-                       repcon);
+    customizeDataItems(&ment_data[i], sysc.getSystemLabel(i), sysc.getSystemTopology(i),
+                       sysc.getRestraints(i), repcon);
   }
 }
 

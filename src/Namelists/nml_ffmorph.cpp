@@ -6,6 +6,7 @@
 namespace stormm {
 namespace namelist {
 
+using modeling::getEnumerationName;
 using parse::stringToChar4;
 using parse::char4ToString;
 
@@ -390,7 +391,7 @@ ForceFieldElement FFMorphControls::getModelEdit(const ParameterKind kind, const 
   const int nedits = getEditCount(kind);
   if (index >= nedits) {
     rtErr("Index " + std::to_string(index) + " was requested from an array of " +
-          std::to_string(nedits) + " stated edits for " + getParameterKindName(kind) +
+          std::to_string(nedits) + " stated edits for " + getEnumerationName(kind) +
           " parameters.", "FFMorphControls", "getModelEdit");
   }
   switch (kind) {

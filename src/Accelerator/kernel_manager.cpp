@@ -23,14 +23,14 @@ using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using energy::queryBornRadiiKernelRequirements;
 using energy::queryBornDerivativeKernelRequirements;
-using math::queryReductionKernelRequirements;
-using math::optReductionKernelSubdivision;
+using stmath::queryReductionKernelRequirements;
+using stmath::optReductionKernelSubdivision;
 using structure::queryRMSDKernelRequirements;
 using structure::queryVirtualSiteKernelRequirements;
 using synthesis::optValenceKernelSubdivision;
 using synthesis::optVirtualSiteKernelSubdivision;
 #endif
-using math::findBin;
+using stmath::findBin;
 using parse::CaseSensitivity;
 using parse::strcmpCased;
 

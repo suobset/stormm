@@ -6,7 +6,7 @@
 namespace stormm {
 namespace chemistry {
 
-using math::sum;
+using stmath::sum;
 using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
   

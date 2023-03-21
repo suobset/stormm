@@ -3,6 +3,8 @@
 #define STORMM_ISOMERIZATION_H
 
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "DataTypes/common_types.h"
@@ -11,6 +13,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
+#include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
 
 namespace stormm {
@@ -19,8 +22,12 @@ namespace structure {
 using chemistry::ChemicalFeatures;
 using chemistry::ChiralInversionProtocol;
 using chemistry::IsomerPlan;
+using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
-using math::roundUp;
+using numerics::globalpos_scale_nonoverflow_bits;
+using stmath::roundUp;
+using synthesis::Condensate;
+using synthesis::CondensateWriter;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using topology::AtomGraph;
@@ -72,7 +79,7 @@ using trajectory::PhaseSpaceWriter;
 /// \{
 template <typename Tcoord, typename Tcalc>
 void rotateAboutBond(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, Tcalc rotation_angle,
+                     const int* moving_atoms, int moving_atom_count, Tcalc rotation_angle,
                      Tcalc globalpos_scale_factor = 1.0);
 
 void rotateAboutBond(CoordinateFrame *cf, int atom_i, int atom_j,
@@ -87,18 +94,28 @@ void rotateAboutBond(PhaseSpace *ps, int atom_i, int atom_j, const std::vector<i
 void rotateAboutBond(PhaseSpaceWriter psw, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, double rotation_angle);
 
-void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, double rotation_angle);
-
-void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, double rotation_angle);
-
 template <typename Tcoord, typename Tcalc>
 void rotateAboutBond(CoordinateSeries<Tcoord> *cs, int frame_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, Tcalc rotation_angle);
 
 template <typename Tcoord, typename Tcalc>
 void rotateAboutBond(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int atom_i, int atom_j,
+                     const int* moving_atoms, int moving_atom_count, Tcalc rotation_angle);
+
+template <typename Tcalc>
+void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, Tcalc rotation_angle);
+
+template <typename Tcalc>
+void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, int atom_j,
+                     const int* moving_atoms, int moving_atom_count, Tcalc rotation_angle);
+
+template <typename Tcalc>
+void rotateAboutBond(Condensate *cdns, int system_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, Tcalc rotation_angle);
+  
+template <typename Tcalc>
+void rotateAboutBond(CondensateWriter cdnsw, int system_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, Tcalc rotation_angle);
 /// \}
 
@@ -158,16 +175,6 @@ void flipChiralCenter(PhaseSpaceWriter psw, int center_idx, const std::vector<in
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<IsomerPlan> &inversion_groups);
 
-void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int center_idx,
-                      const std::vector<int> &chiral_centers,
-                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<IsomerPlan> &inversion_groups);
-
-void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int center_idx,
-                      const std::vector<int> &chiral_centers,
-                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<IsomerPlan> &inversion_groups);
-
 template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeries<Tcoord> *cs, int frame_index, int center_idx,
                       const std::vector<int> &chiral_centers,
@@ -176,6 +183,30 @@ void flipChiralCenter(CoordinateSeries<Tcoord> *cs, int frame_index, int center_
 
 template <typename Tcoord, typename Tcalc>
 void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<IsomerPlan> &inversion_groups);
+
+template <typename Tcalc>
+void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<IsomerPlan> &inversion_groups);
+
+template <typename Tcalc>
+void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<IsomerPlan> &inversion_groups);
+
+template <typename Tcalc>
+void flipChiralCenter(Condensate *cdns, int system_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<IsomerPlan> &inversion_groups);
+
+template <typename Tcalc>
+void flipChiralCenter(CondensateWriter cdnsw, int system_index, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<IsomerPlan> &inversion_groups);

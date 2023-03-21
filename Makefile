@@ -12,9 +12,11 @@ LIBDIR=lib
 STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Accelerator/kernel_manager.cpp \
+		   $(SRCDIR)/Analysis/comparison_guide.cpp \
 		   $(SRCDIR)/Chemistry/atommask.cpp \
 		   $(SRCDIR)/Chemistry/atom_equivalence.cpp \
 		   $(SRCDIR)/Chemistry/chemical_features.cpp \
+		   $(SRCDIR)/Chemistry/chemistry_enumerators.cpp \
 		   $(SRCDIR)/Chemistry/indigo.cpp \
 		   $(SRCDIR)/Chemistry/match_bonding_pattern.cpp \
 		   $(SRCDIR)/Chemistry/znumber.cpp \
@@ -27,9 +29,11 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/ForceField/forcefield_element.cpp \
 		   $(SRCDIR)/ForceField/forcefield_enumerators.cpp \
 		   $(SRCDIR)/Math/matrix_ops.cpp \
+		   $(SRCDIR)/Math/clustering.cpp \
 		   $(SRCDIR)/Math/reduction.cpp \
 		   $(SRCDIR)/Math/reduction_abstracts.cpp \
 		   $(SRCDIR)/Math/reduction_bridge.cpp \
+		   $(SRCDIR)/Math/reduction_enumerators.cpp \
 		   $(SRCDIR)/Math/reduction_workunit.cpp \
 		   $(SRCDIR)/Math/rounding.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
@@ -47,6 +51,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_property.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_refinement.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_request.cpp \
+		   $(SRCDIR)/MoleculeFormat/mm_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_file_io.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_parsing.cpp \
@@ -99,6 +104,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/mesh_parameters.cpp \
 		   $(SRCDIR)/Structure/rmsd.cpp \
 		   $(SRCDIR)/Structure/rmsd_plan.cpp \
+		   $(SRCDIR)/Structure/structure_enumerators.cpp \
 		   $(SRCDIR)/Structure/structure_ops.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.cpp \
@@ -152,6 +158,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Accelerator/gpu_details.h \
 		     $(SRCDIR)/Accelerator/kernel_manager.h \
+		     $(SRCDIR)/Analysis/comparison_guide.h \
 		     $(SRCDIR)/Chemistry/atommask.h \
 		     $(SRCDIR)/Chemistry/atom_equivalence.h \
 		     $(SRCDIR)/Chemistry/chemical_features.h \
@@ -177,6 +184,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/FileManagement/file_util.h \
 		     $(SRCDIR)/ForceField/forcefield_element.h \
 		     $(SRCDIR)/ForceField/forcefield_enumerators.h \
+		     $(SRCDIR)/Math/cluster_manager.h \
 		     $(SRCDIR)/Math/matrix.h \
 		     $(SRCDIR)/Math/matrix_ops.h \
 		     $(SRCDIR)/Math/multiplication.h \
@@ -308,10 +316,12 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 
 # STORMM C++ template source files
 STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
+		   $(SRCDIR)/Analysis/comparison_guide.tpp \
 		   $(SRCDIR)/Constants/generalized_born.tpp \
 		   $(SRCDIR)/Chemistry/chemical_features.tpp \
 		   $(SRCDIR)/DataTypes/common_types.tpp \
 		   $(SRCDIR)/DataTypes/stormm_vector_types.tpp \
+		   $(SRCDIR)/Math/cluster_manager.tpp \
 		   $(SRCDIR)/Math/matrix.tpp \
 		   $(SRCDIR)/Math/matrix_ops.tpp \
 		   $(SRCDIR)/Math/multiplication.tpp \
@@ -368,9 +378,11 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Accelerator/kernel_manager.o \
+		  $(SRCDIR)/Analysis/comparison_guide.o \
 		  $(SRCDIR)/Chemistry/atommask.o \
 		  $(SRCDIR)/Chemistry/atom_equivalence.o \
 		  $(SRCDIR)/Chemistry/chemical_features.o \
+		  $(SRCDIR)/Chemistry/chemistry_enumerators.o \
 		  $(SRCDIR)/Chemistry/indigo.o \
 		  $(SRCDIR)/Chemistry/match_bonding_pattern.o \
 		  $(SRCDIR)/Chemistry/znumber.o \
@@ -382,10 +394,12 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/FileManagement/file_util.o \
 		  $(SRCDIR)/ForceField/forcefield_element.o \
 		  $(SRCDIR)/ForceField/forcefield_enumerators.o \
+		  $(SRCDIR)/Math/clustering.o \
 		  $(SRCDIR)/Math/matrix_ops.o \
 		  $(SRCDIR)/Math/reduction.o \
 		  $(SRCDIR)/Math/reduction_abstracts.o \
 		  $(SRCDIR)/Math/reduction_bridge.o \
+		  $(SRCDIR)/Math/reduction_enumerators.o \
 		  $(SRCDIR)/Math/reduction_workunit.o \
 		  $(SRCDIR)/Math/rounding.o \
 		  $(SRCDIR)/Math/series_ops.o \
@@ -403,6 +417,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_property.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_refinement.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_request.o \
+		  $(SRCDIR)/MoleculeFormat/mm_enumerators.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_file_io.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_parsing.o \
@@ -455,6 +470,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/mesh_parameters.o \
 		  $(SRCDIR)/Structure/rmsd.o \
 		  $(SRCDIR)/Structure/rmsd_plan.o \
+		  $(SRCDIR)/Structure/structure_enumerators.o \
 		  $(SRCDIR)/Structure/structure_ops.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
 		  $(SRCDIR)/Structure/virtual_site_handling.o \
@@ -704,6 +720,12 @@ $(TESTDIR)/bin/test_math : $(LIBDIR)/libstormm.so $(TESTDIR)/Math/test_math.cpp
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_math $(TESTDIR)/Math/test_math.cpp \
 	  -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
+# Target: math operations program
+$(TESTDIR)/bin/test_clustering : $(LIBDIR)/libstormm.so $(TESTDIR)/Math/test_clustering.cpp
+	@echo "[STORMM]  Building test_clustering..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_clustering
+	  $(TESTDIR)/Math/test_clustering.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
 # Target: prmtop reading program
 $(TESTDIR)/bin/test_amber_prmtop : $(LIBDIR)/libstormm.so \
 				   $(TESTDIR)/Topology/test_amber_prmtop.cpp \
@@ -766,6 +788,13 @@ $(TESTDIR)/bin/test_synthesis : $(LIBDIR)/libstormm.so \
 	@echo "[STORMM]  Building test_synthesis..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_synthesis \
 	  $(TESTDIR)/Synthesis/test_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
+# Target: testing the conformer sampling capabilities
+$(TESTDIR)/bin/test_small_molecules : $(LIBDIR)/libstormm.so \
+				      $(TESTDIR)/Synthesis/test_small_molecules.cpp
+	@echo "[STORMM]  Building test_small_molecules..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_small_molecules \
+	  $(TESTDIR)/Synthesis/test_small_molecules.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 # Target: testing the condensed coordinate object usde for analyses
 $(TESTDIR)/bin/test_condensate : $(LIBDIR)/libstormm.so \

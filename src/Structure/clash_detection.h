@@ -4,6 +4,7 @@
 
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -31,10 +32,11 @@ using energy::StaticExclusionMaskReader;
 using energy::supertile_length;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
-using math::roundUp;
-using math::indexingArray;
+using stmath::roundUp;
+using stmath::indexingArray;
 using namelist::default_minimize_clash_ratio;
 using namelist::default_minimize_clash_r0;
+using numerics::globalpos_scale_nonoverflow_bits;
 using synthesis::Condensate;
 using synthesis::CondensateReader;
 using synthesis::PhaseSpaceSynthesis;
@@ -321,7 +323,7 @@ int3 clashGridDecomposition(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                  const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                 const StaticExclusionMask &mask, Tcalc elec_limit = default_minimize_clash_r0,
+                 const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
                  Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
                  ClashReport *summary = nullptr);
 
@@ -339,10 +341,10 @@ bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExc
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 bool detectClash(const CoordinateFrame &cf, const AtomGraph &ag, const StaticExclusionMask &mask,
-                 ClashReport *summary);
+                 ClashReport *summary = nullptr);
 
 bool detectClash(const CoordinateFrame *cf, const AtomGraph *ag, const StaticExclusionMask *mask,
-                 ClashReport *summary);
+                 ClashReport *summary = nullptr);
 
 bool detectClash(const PhaseSpaceReader &psr, const ValenceKit<double> &vk,
                  const NonbondedKit<double> &nbk, const StaticExclusionMask *mask,
@@ -358,37 +360,58 @@ bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusio
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 bool detectClash(const PhaseSpace &ps, const AtomGraph &ag, const StaticExclusionMask &mask,
-                 ClashReport *summary);
+                 ClashReport *summary = nullptr);
 
 bool detectClash(const PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask *mask,
-                 ClashReport *summary);
+                 ClashReport *summary = nullptr);
 
 template <typename Tcoord, typename Tcalc>
-bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, int frame, const ValenceKit<Tcalc> &vk,
-                 const NonbondedKit<double> &nbk, const StaticExclusionMask *mask,
-                 Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
-                 ClashReport *summary = nullptr);
+bool detectClash(const CoordinateSeriesReader<Tcoord> &csr, size_t frame,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> *cs, int frame, const AtomGraph *ag,
                  const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
-                 ClashReport *summary = nullptr);
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
   
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> &cs, int frame, const AtomGraph &ag,
                  const StaticExclusionMask &mask, Tcalc elec_limit = default_minimize_clash_r0,
-                 Tcalc vdw_ratio = default_minimize_clash_ratio, Tcalc inv_scale = 1.0,
-                 ClashReport *summary = nullptr);
+                 Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> *cs, const int frame, const AtomGraph *ag,
-                 const StaticExclusionMask *mask, ClashReport *summary);
+                 const StaticExclusionMask *mask, ClashReport *summary = nullptr);
 
 template <typename Tcoord, typename Tcalc>
 bool detectClash(const CoordinateSeries<Tcoord> &cs, const int frame, const AtomGraph &ag,
-                 const StaticExclusionMask &mask, ClashReport *summary);
+                 const StaticExclusionMask &mask, ClashReport *summary = nullptr);
+
+template <typename Tcalc>
+bool detectClash(const PsSynthesisReader &poly_psr, const int system_index,
+                 const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary = nullptr);
+
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis *poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary = nullptr);
+
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis &poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, const Tcalc elec_limit, const Tcalc vdw_ratio,
+                 ClashReport *summary = nullptr);
+
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis *poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, ClashReport *summary = nullptr);
+
+template <typename Tcalc>
+bool detectClash(const PhaseSpaceSynthesis &poly_ps, const int system_index,
+                 const StaticExclusionMask *mask, ClashReport *summary = nullptr);
 
 template <typename Tcalc>
 bool detectClash(const CondensateReader &cdnsr, const int system_index,
@@ -396,19 +419,23 @@ bool detectClash(const CondensateReader &cdnsr, const int system_index,
                  const StaticExclusionMask *mask, Tcalc elec_limit = default_minimize_clash_r0,
                  Tcalc vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
+template <typename Tcalc>
 bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
                  const StaticExclusionMask *mask, double elec_limit = default_minimize_clash_r0,
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
+template <typename Tcalc>
 bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
                  const StaticExclusionMask &mask, double elec_limit = default_minimize_clash_r0,
                  double vdw_ratio = default_minimize_clash_ratio, ClashReport *summary = nullptr);
 
+template <typename Tcalc>
 bool detectClash(const Condensate *cdns, const int system_index, const AtomGraph *ag,
-                 const StaticExclusionMask *mask, ClashReport *summary);
+                 const StaticExclusionMask *mask, ClashReport *summary = nullptr);
 
+template <typename Tcalc>
 bool detectClash(const Condensate &cdns, const int system_index, const AtomGraph &ag,
-                 const StaticExclusionMask &mask, ClashReport *summary);
+                 const StaticExclusionMask &mask, ClashReport *summary = nullptr);
 /// \}
 
 } // namespace structure

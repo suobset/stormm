@@ -1,8 +1,8 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
-#include "FileManagement/file_util.h"
 #include "FileManagement/file_listing.h"
+#include "FileManagement/file_util.h"
 #include "Math/rounding.h"
 #include "Parsing/textfile.h"
 #include "amber_ascii.h"
@@ -14,11 +14,13 @@ namespace trajectory {
 
 using card::HybridKind;
 using constants::CartesianDimension;
+using diskutil::detectCoordinateFileKind;
 using diskutil::DataFormat;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
-using math::roundUp;
+using diskutil::getTrajectoryFormat;
 using parse::TextFile;
+using stmath::roundUp;
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceWriter::PhaseSpaceWriter(const int natom_in, const UnitCellType unit_cell_in,
@@ -344,9 +346,9 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
     }
     break;
   case CoordinateFileKind::SDF:
-    {
-      
-    }
+    rtErr("An SD file (BIOVIA .sdf) cannot be used to create a PhaseSpace object directly.  "
+          "Create an MdlMol object and export a PhaseSpace object from it instead.",
+          "PhaseSpace", "buildFromFile");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;

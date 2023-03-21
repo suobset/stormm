@@ -11,9 +11,9 @@
 namespace stormm {
 namespace trajectory {
 
-using math::computeBoxTransform;
-using math::extractBoxDimensions;
-using math::maxValue;
+using stmath::computeBoxTransform;
+using stmath::extractBoxDimensions;
+using stmath::maxValue;
 using parse::NumberFormat;
 using parse::readNumberSeries;
 using parse::separateText;

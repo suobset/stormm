@@ -21,17 +21,17 @@ namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
-using math::buildReductionWorkUnits;
-using math::incrementingSeries;
-using math::maxAbsoluteDifference;
-using math::maxValue;
-using math::minValue;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::RdwuAbstractMap;
-using math::rdwu_abstract_length;
-using math::roundUp;
-using math::sum;
+using stmath::buildReductionWorkUnits;
+using stmath::incrementingSeries;
+using stmath::maxAbsoluteDifference;
+using stmath::maxValue;
+using stmath::minValue;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::RdwuAbstractMap;
+using stmath::rdwu_abstract_length;
+using stmath::roundUp;
+using stmath::sum;
 using parse::realToString;
 using restraints::RestraintStage;
 using topology::accepted_coulomb_constant;
@@ -763,12 +763,12 @@ void AtomGraphSynthesis::checkCommonSettings() {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("All topologies must have a consistent implicit solvent model setting.  The first, "
-            "set to " + getImplicitSolventModelName(gb_style) +
+            "set to " + getEnumerationName(gb_style) +
             ", does not agree with subsequent topologies.", "AtomGraphSynthesis",
             "checkCommonSettings");
     case ExceptionResponse::WARN:
       rtWarn("All topologies must have a consistent implicit solvent model setting.  The first, "
-             "set to " + getImplicitSolventModelName(gb_style) +
+             "set to " + getEnumerationName(gb_style) +
              ", will be applied to all systems.", "AtomGraphSynthesis", "checkCommonSettings");
       break;
     case ExceptionResponse::SILENT:
@@ -824,7 +824,7 @@ void AtomGraphSynthesis::checkCommonSettings() {
   }
   if (box_problem) {
     rtErr("All topologies must have consistent periodic or isolated boundary conditions.  "
-          "The first topology is \"" + getUnitCellTypeName(periodic_box_class) + "\" but "
+          "The first topology is \"" + getEnumerationName(periodic_box_class) + "\" but "
           "subsequent topologies are different.  No remedy is available.", "AtomGraphSynthesis",
           "checkCommonSettings");
   }

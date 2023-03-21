@@ -39,7 +39,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   case ParameterKind::ATTN_14_SCALE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
     rtErr("Construction with only one atom type is not acceptable for a parameter of type \"" +
-          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
 }
@@ -64,7 +64,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
     rtErr("Construction with two atom types is not acceptable for a parameter of type \"" +
-          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -90,7 +90,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
     rtErr("Construction with three atom types is not acceptable for a parameter of type \"" +
-          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -118,7 +118,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
     rtErr("Construction with four atom types is not acceptable for a parameter of type \"" +
-          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -148,7 +148,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
     case VirtualSiteKind::FIXED_4:
     case VirtualSiteKind::NONE:
       rtErr("Construction with three atom and residue names does not properly specify a virtual "
-            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "site of frame type " + getEnumerationName(frame_type_in)+ ".",
             "ForceFieldElement");
     }
     break;
@@ -164,7 +164,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
     rtErr("Construction with three atom and residue names is not acceptable for a parameter of "
-          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          "type \"" + getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -197,7 +197,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
     case VirtualSiteKind::FIXED_4:
     case VirtualSiteKind::NONE:
       rtErr("Construction with three atom and residue names does not properly specify a virtual "
-            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "site of frame type " + getEnumerationName(frame_type_in)+ ".",
             "ForceFieldElement");
     }
     break;
@@ -213,7 +213,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
     rtErr("Construction with four atom and residue names is not acceptable for a parameter of "
-          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          "type \"" + getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -249,7 +249,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
     case VirtualSiteKind::FIXED_4:
     case VirtualSiteKind::NONE:
       rtErr("Construction with five atom and residue names does not properly specify a virtual "
-            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "site of frame type " + getEnumerationName(frame_type_in)+ ".",
             "ForceFieldElement");
     }
     break;
@@ -265,7 +265,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
     rtErr("Construction with five atom and residue names plus a virtual site frame type is not "
-          "acceptable for a parameter of type \"" + getParameterKindName(kind_in) + "\".",
+          "acceptable for a parameter of type \"" + getEnumerationName(kind_in) + "\".",
           "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
@@ -307,7 +307,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
     rtErr("Construction with five atom and residue names is not acceptable for a parameter of "
-          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+          "type \"" + getEnumerationName(kind_in) + "\".", "ForceFieldElement");
   }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -418,7 +418,7 @@ char4 ForceFieldElement::getNameOfAtom(const char atom_rank) const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
-          "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getNameOfAtom");
+          "type \"" + getEnumerationName(kind) + "\".", "ForceFieldElement", "getNameOfAtom");
   }
   __builtin_unreachable();
 }
@@ -509,7 +509,7 @@ char4 ForceFieldElement::getTypeOfAtom(const char atom_rank) const {
   }
   if (problem) {
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
-          "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getTypeOfAtom");
+          "type \"" + getEnumerationName(kind) + "\".", "ForceFieldElement", "getTypeOfAtom");
   }
   __builtin_unreachable();
 }
@@ -595,7 +595,7 @@ char4 ForceFieldElement::getNameOfResidue(const char atom_rank) const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
-          "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getNameOfResidue");
+          "type \"" + getEnumerationName(kind) + "\".", "ForceFieldElement", "getNameOfResidue");
   }
   __builtin_unreachable();
 }
@@ -616,7 +616,7 @@ double ForceFieldElement::getCharge() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no charge property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no charge property.",
           "ForceFieldElement", "getCharge");
   }
   __builtin_unreachable();
@@ -638,7 +638,7 @@ double ForceFieldElement::getSigma() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no sigma property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no sigma property.",
           "ForceFieldElement", "getSigma");
   }
   __builtin_unreachable();
@@ -660,7 +660,7 @@ double ForceFieldElement::getEpsilon() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no epsilon property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no epsilon property.",
           "ForceFieldElement", "getEpsilon");
   }
   __builtin_unreachable();
@@ -682,7 +682,7 @@ double ForceFieldElement::getRho() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no rho property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no rho property.",
           "ForceFieldElement", "getRho");
   }
   __builtin_unreachable();
@@ -697,7 +697,7 @@ double ForceFieldElement::getStiffnessConstant() const {
   case ParameterKind::CHARMM_IMPROPER:
     return property_a;
   case ParameterKind::DIHEDRAL:
-    rtWarn("A " + getParameterKindName(kind) + "\" has an amplitude, which is more correctly "
+    rtWarn("A " + getEnumerationName(kind) + "\" has an amplitude, which is more correctly "
            "accessed with getAmplitude(), but the amplitude is equivalent to a stiffness.",
            "ForceFieldElement", "getStiffnessConstant");
     return property_a;
@@ -708,7 +708,7 @@ double ForceFieldElement::getStiffnessConstant() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness constant.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no stiffness constant.",
           "ForceFieldElement", "getStiffnessConstant");
   }
   __builtin_unreachable();
@@ -730,7 +730,7 @@ double ForceFieldElement::getEquilibriumConstant() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no equilibrium "
           "constant.", "ForceFieldElement", "getEquilibriumConstant");
   }
   __builtin_unreachable();
@@ -752,7 +752,7 @@ double ForceFieldElement::getAmplitude() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no amplitude.",
           "ForceFieldElement", "getAmplitude");
   }
   __builtin_unreachable();
@@ -774,7 +774,7 @@ double ForceFieldElement::getPhaseAngle() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no phase angle.",
           "ForceFieldElement", "getPhaseAngle");
   }
   __builtin_unreachable();
@@ -796,7 +796,7 @@ double ForceFieldElement::getPeriodicity() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no periodicity.",
           "ForceFieldElement", "getPeriodicity");
   }
   __builtin_unreachable();
@@ -818,7 +818,7 @@ double ForceFieldElement::getElectrostaticScaling() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no 1:4 scaling factor.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no 1:4 scaling factor.",
           "ForceFieldElement", "getElectrostaticScaling");
   }
   __builtin_unreachable();
@@ -840,7 +840,7 @@ double ForceFieldElement::getVanDerWaalsScaling() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no 1:4 scaling factor.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no 1:4 scaling factor.",
           "ForceFieldElement", "getVanDerWaalsScaling");
   }
   __builtin_unreachable();
@@ -862,7 +862,7 @@ TorsionKind ForceFieldElement::getTorsionKind() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" does not have a "
           "torsion kind associated with it.", "ForceFieldElement", "getTorsionKind");
   }
   __builtin_unreachable();
@@ -884,7 +884,7 @@ std::vector<double> ForceFieldElement::getSurfaceValues() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have any "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" does not have any "
           "two-dimensional potential surface elements.", "ForceFieldElement", "getSurfaceValues");
   }
   __builtin_unreachable();
@@ -906,7 +906,7 @@ std::vector<int2> ForceFieldElement::getSurfaceIndices() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have any "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" does not have any "
           "two-dimensional potential surface elements.", "ForceFieldElement", "getSurface");
   }
   __builtin_unreachable();
@@ -928,7 +928,7 @@ VirtualSiteKind ForceFieldElement::getVirtualSiteFrameType() const {
   case ParameterKind::LENNARD_JONES:
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" does not have a "
           "virtual site frame type.", "ForceFieldElement", "getVirtualSiteFrameType");
   }
   __builtin_unreachable();
@@ -950,7 +950,7 @@ bool ForceFieldElement::testSigmaModification() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no sigma property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no sigma property.",
           "ForceFieldElement", "testSigmaModification");
   }
   __builtin_unreachable();
@@ -972,7 +972,7 @@ bool ForceFieldElement::testEpsilonModification() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no epsilon property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no epsilon property.",
           "ForceFieldElement", "testEpsilonModification");
   }
   __builtin_unreachable();
@@ -994,7 +994,7 @@ bool ForceFieldElement::testRhoModification() const {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no rho property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no rho property.",
           "ForceFieldElement", "testRhoModification");
   }
   __builtin_unreachable();
@@ -1009,7 +1009,7 @@ bool ForceFieldElement::testStiffnessModification() const {
   case ParameterKind::CHARMM_IMPROPER:
     return activate_a;
   case ParameterKind::DIHEDRAL:
-    rtWarn("A " + getParameterKindName(kind) + "\" has an amplitude, which is more correctly "
+    rtWarn("A " + getEnumerationName(kind) + "\" has an amplitude, which is more correctly "
            "accessed with getAmplitude(), but the amplitude is equivalent to a stiffness.",
            "ForceFieldElement", "testStiffnessModification");
     return activate_a;
@@ -1020,7 +1020,7 @@ bool ForceFieldElement::testStiffnessModification() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness constant.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no stiffness constant.",
           "ForceFieldElement", "testStiffnessModification");
   }
   __builtin_unreachable();
@@ -1042,7 +1042,7 @@ bool ForceFieldElement::testEquilibriumModification() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no equilibrium "
           "constant.", "ForceFieldElement", "testEquilibriumModification");
   }
   __builtin_unreachable();
@@ -1064,7 +1064,7 @@ bool ForceFieldElement::testAmplitudeModification() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no amplitude.",
           "ForceFieldElement", "testAmplitudeModification");
   }
   __builtin_unreachable();
@@ -1086,7 +1086,7 @@ bool ForceFieldElement::testPhaseAngleModification() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no phase angle.",
           "ForceFieldElement", "testPhaseAngleModification");
   }
   __builtin_unreachable();
@@ -1108,7 +1108,7 @@ bool ForceFieldElement::testPeriodicityModification() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no periodicity.",
           "ForceFieldElement", "testPeriodicityModification");
   }
   __builtin_unreachable();
@@ -1132,7 +1132,7 @@ void ForceFieldElement::setStiffness(const double stiffness_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no stiffness property.",
           "ForceFieldElement", "setStiffness");
   }
 }
@@ -1158,7 +1158,7 @@ void ForceFieldElement::setEquilibrium(const double equilibrium_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no equilibrium "
           "property.", "ForceFieldElement", "setEquilibrium");
   }
 }
@@ -1181,7 +1181,7 @@ void ForceFieldElement::setPhaseAngle(const double phase_angle_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle "
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no phase angle "
           "property.", "ForceFieldElement", "setPhaseAngle");
   }
 }
@@ -1204,7 +1204,7 @@ void ForceFieldElement::setAmplitude(const double amplitude_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no amplitude property.",
           "ForceFieldElement", "setAmplitude");
   }
 }
@@ -1227,7 +1227,7 @@ void ForceFieldElement::setPeriodicity(const double periodicity_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no periodicity.",
           "ForceFieldElement", "setPeriodicity");
   }
 }
@@ -1250,7 +1250,7 @@ void ForceFieldElement::setChargeScaling(const double scaling_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no scaling factors.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no scaling factors.",
           "ForceFieldElement", "setChargeScaling");
   }
 }
@@ -1273,7 +1273,7 @@ void ForceFieldElement::setVanDerWaalsScaling(const double scaling_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no scaling factors.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no scaling factors.",
           "ForceFieldElement", "setVanDerWaalsScaling");
   }
 }
@@ -1296,7 +1296,7 @@ void ForceFieldElement::setCharge(const double charge_in) {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no charge property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no charge property.",
           "ForceFieldElement", "setCharge");
   }
 }
@@ -1319,7 +1319,7 @@ void ForceFieldElement::setSigma(const double sigma_in) {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Sigma property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no Sigma property.",
           "ForceFieldElement", "setSigma");
   }
 }
@@ -1342,7 +1342,7 @@ void ForceFieldElement::setEpsilon(const double epsilon_in) {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Epsilon property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no Epsilon property.",
           "ForceFieldElement", "setEpsilon");
   }
 }
@@ -1365,7 +1365,7 @@ void ForceFieldElement::setRho(const double rho_in) {
   case ParameterKind::CHARGE:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Rho property.",
+    rtErr("A parameter of type \"" + getEnumerationName(kind) + "\" has no Rho property.",
           "ForceFieldElement", "setRho");
   }
 }

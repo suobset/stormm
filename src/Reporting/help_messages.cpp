@@ -113,7 +113,7 @@ bool displayNamelistHelp(const std::string &module_name) {
   int start_line = 0;
   if (strcmpCased(module_name, "&files", CaseSensitivity::YES)) {
     const std::vector<SubkeyRequirement> sys_keyword_reqs(1, SubkeyRequirement::REQUIRED);
-    const NamelistEmulator t_nml = filesInput(tf, &start_line, sys_keyword_reqs);
+    const NamelistEmulator t_nml = filesInput(tf, &start_line, nullptr, sys_keyword_reqs);
     t_nml.printHelp();
     return true;
   }

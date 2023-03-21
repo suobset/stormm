@@ -2,6 +2,7 @@
 #ifndef STORMM_SYNTHESIS_ENUMERATORS_H
 #define STORMM_SYNTHESIS_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
@@ -124,10 +125,11 @@ enum class InitializationTask {
   NONE                   ///< Work units perform no initializations or random number computations.
 };
 
-/// \brief List the possible origins for a condensate object.
-enum class CondensateSource {
+/// \brief List the possible origins for an object referencing a collection of structures.
+enum class StructureSource {
   SYNTHESIS,  ///< The coordinates came from a PhaseSpaceSynthesis
-  SERIES      ///< The coordinates came from a CoordinateSeries
+  SERIES,     ///< The coordinates came from a CoordinateSeries
+  NONE        ///< No source of coordinates has yet been assigned
 };
 
 /// \brief List the possible ways that systems from a synthesis can be grouped.
@@ -142,6 +144,26 @@ enum class SystemGrouping {
               ///<   and the label groups happen to span multiple topologies).
 };
 
+/// \brief List the possible ways in which a synthesis can be used to inform the available settings
+///        for conformational permutations of the systems it contains.
+enum class VariableTorsionAdjustment {
+  ADJUST_NEARBY_VALUES,       ///< The synthesis permutor will adjust settings for rotatable bonds
+                              ///<   and cis-trans isomeric bonds which are near those angle values
+                              ///<   found in a coordinate synthesis.  Other settings will be left
+                              ///<   unchanged.
+  RESTRICT_TO_NEARBY_VALUES,  ///< The synthesis permutor will adjust settings for rotatable bonds
+                              ///<   and cis-trans isomeric bonds which are near those angle values
+                              ///<   found in a coordinate synthesis.  Settings in the permutor not
+                              ///<   near a value in some actual conformation will be deleted.
+  CLUSTER_AND_APPLY_VALUES,   ///< The synthesis permutor will cluster the values found in the
+                              ///<   coordinate synthesis into as many bins as it has settings for
+                              ///<   each variable torsion angle (rotatable bond or cis-trans
+                              ///<   isomeric bond), then apply the central values for each cluster
+                              ///<   as the selected settings.
+  DO_NOT_CHANGE               ///< The geometries of coordinates in the synthesis will not affect
+                              ///<   the choice of torsion angles around each rotatable bond.
+};
+  
 /// \brief Get a human-readable string for one of the enumerator settings.  Various overloads of
 ///        this function here and in other libraries seve different enumerators.
 ///
@@ -151,8 +173,9 @@ std::string getEnumerationName(NbwuKind input);
 std::string getEnumerationName(VwuTask input);
 std::string getEnumerationName(VwuGoal input);
 std::string getEnumerationName(InitializationTask input);
-std::string getEnumerationName(CondensateSource input);
+std::string getEnumerationName(StructureSource input);
 std::string getEnumerationName(SystemGrouping input);
+std::string getEnumerationName(VariableTorsionAdjustment input);
 /// \}
 
 /// \brief Translate a control string into one of the accepted system grouping protocols.  The
@@ -160,6 +183,12 @@ std::string getEnumerationName(SystemGrouping input);
 ///
 /// \param input_string  Control string of interest
 SystemGrouping translateSystemGrouping(const std::string &input_string);
+
+/// \brief Translate a control string into one of the accepted torsion adjustment protocols.  The
+///        process is case-insensitive.
+///
+/// \param input_string  Control string of interest
+VariableTorsionAdjustment translateVariableTorsionAdjustment(const std::string &input_string);
   
 } // namespace synthesis
 } // namespace stormm

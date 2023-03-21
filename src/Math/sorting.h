@@ -6,7 +6,7 @@
 #include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 /// \brief Enumerate the directions that a sort can go.
 enum class SortDirection {
@@ -24,7 +24,7 @@ enum class UniqueValueHandling {
                        ///<   single entry of 2.7.
 };
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #endif

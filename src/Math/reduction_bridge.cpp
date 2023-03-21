@@ -3,7 +3,7 @@
 #include "reduction_bridge.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::HybridKind;
 
@@ -79,5 +79,5 @@ double* ReductionBridge::getPointer(const CartesianDimension cdim, const HybridT
   __builtin_unreachable();
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

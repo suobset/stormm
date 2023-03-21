@@ -4,9 +4,6 @@
 namespace stormm {
 namespace trajectory {
 
-using numerics::default_trajpos_scale_bits;
-using math::roundUp;
-
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 CoordinateSeriesWriter<T>::CoordinateSeriesWriter(const int natom_in, const int nframe_in,

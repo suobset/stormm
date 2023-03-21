@@ -666,7 +666,7 @@ void MdlMol::addProperty(const MdlMolProperty &mmprop) {
   case MdlMolPropertyKind::SGROUP_HIERARCHY:
   case MdlMolPropertyKind::SGROUP_COMP_NUMBER:
   case MdlMolPropertyKind::SGROUP_BRACKET_STYLE:
-  case MdlMolPropertyKind::SGROUP_CORRESPONENCE:
+  case MdlMolPropertyKind::SGROUP_CORRESPONDENCE:
   case MdlMolPropertyKind::SGROUP_ATTACH_POINT:
   case MdlMolPropertyKind::LINK_ATOM:
   case MdlMolPropertyKind::SGROUP_DISPLAY_INFO:

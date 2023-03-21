@@ -2,6 +2,7 @@
 #ifndef STORMM_MM_ENUMERATORS_H
 #define STORMM_MM_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 
 namespace stormm {
@@ -92,6 +93,14 @@ enum class ValenceWorkUnitSpecs {
                           ///<   kernel).
   DESCRIPTOR_COUNT        ///< Total number of descriptors in this enumerator
 };
+
+/// \brief Produce a human-readable string to describe each enumeration.  Overloads of this
+///        function are found in other libraries as well.
+///
+/// \param input  The enumerated value to translate
+/// \{
+std::string getEnumerationName(ValenceWorkUnitSpecs input);
+/// \}
 
 } // namespace mm
 } // namespace stormm

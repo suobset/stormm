@@ -9,9 +9,9 @@
 namespace stormm {
 namespace topology {
 
-using math::findBin;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
+using stmath::findBin;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
 using parse::char4ToString;
   
 //-------------------------------------------------------------------------------------------------
@@ -52,6 +52,52 @@ bool isBonded(const AtomGraph &ag, const int atom_i, const int atom_j) {
 bool isBonded(const AtomGraph *ag, const int atom_i, const int atom_j) {
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
   return isBonded(nbk, atom_i, atom_j);
+}
+
+//-------------------------------------------------------------------------------------------------
+int matchTopology(const AtomGraph *query_ag, const std::vector<AtomGraph*> &repo) {
+  const int ntop = repo.size();
+  for (int i = 0; i < ntop; i++) {
+    if (query_ag == repo[i]) {
+      return i;
+    }
+  }
+  const int natom = query_ag->getAtomCount();
+  const std::string fname = query_ag->getFileName();
+  for (int i = 0; i < ntop; i++) {
+    if (natom == repo[i]->getAtomCount() && fname == repo[i]->getFileName()) {
+      return i;
+    }
+  }
+  return ntop;
+}
+
+//-------------------------------------------------------------------------------------------------
+int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph*> &repo) {
+  return matchTopology(query_ag.getSelfPointer(), repo);
+}
+
+//-------------------------------------------------------------------------------------------------
+int matchTopology(const AtomGraph *query_ag, const std::vector<AtomGraph> &repo) {
+  const int ntop = repo.size();
+  for (int i = 0; i < ntop; i++) {
+    if (query_ag == &repo[i]) {
+      return i;
+    }
+  }
+  const int natom = query_ag->getAtomCount();
+  const std::string fname = query_ag->getFileName();
+  for (int i = 0; i < ntop; i++) {
+    if (natom == repo[i].getAtomCount() && fname == repo[i].getFileName()) {
+      return i;
+    }
+  }
+  return ntop;
+}
+
+//-------------------------------------------------------------------------------------------------
+int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph> &repo) {
+  return matchTopology(query_ag.getSelfPointer(), repo);
 }
 
 } // namespace topology

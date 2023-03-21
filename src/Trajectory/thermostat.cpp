@@ -18,7 +18,7 @@ namespace trajectory {
 using card::HybridKind;
 using card::HybridTargetLevel;
 using constants::time_step_factor;
-using math::roundUp;
+using stmath::roundUp;
 using namelist::default_dynamics_time_step;
 using parse::realToString;
 using parse::NumberFormat;

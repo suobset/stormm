@@ -2,7 +2,7 @@
 #include "copyright.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -251,5 +251,5 @@ void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
   }
 }
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm

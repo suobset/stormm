@@ -17,9 +17,9 @@ using diskutil::splitPath;
 using energy::evaluateBondTerms;
 using energy::evaluateAngleTerms;
 using energy::ScoreCard;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
-using math::sum;
+using stmath::prefixSumInPlace;
+using stmath::PrefixSumType;
+using stmath::sum;
 using namelist::MoleculeSystem;
 using parse::findStringInVector;
 using structure::readStructureDataFile;
@@ -34,18 +34,19 @@ SystemCache::SystemCache(const ExceptionResponse policy_in,
                          const PrintSituation expectation_in) :
     policy{policy_in}, expectation{expectation_in}, system_count{0}, topology_count{0},
     label_count{0}, restraint_count{0}, file_merger_protocol{TrajectoryFusion::AUTO},
-    topology_cache{}, coordinates_cache{}, label_cache{}, features_cache{}, restraints_cache{},
-    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, label_indices{},
-    label_degeneracy{}, trajectory_subindices{}, trajectory_degeneracy{}, checkpoint_subindices{},
-    checkpoint_degeneracy{}, restraint_indices{}, example_indices{}, topology_cases{},
-    topology_case_bounds{}, system_input_coordinate_names{}, system_trajectory_names{},
-    system_checkpoint_names{}, system_labels{}, label_cases{}, label_case_bounds{},
-    system_input_coordinate_kinds{}, system_trajectory_kinds{}, system_checkpoint_kinds{}
+    topology_cache{}, coordinates_cache{}, sdf_cache{}, label_cache{}, features_cache{},
+    restraints_cache{}, static_masks_cache{}, forward_masks_cache{}, topology_indices{},
+    label_indices{}, label_degeneracy{}, trajectory_subindices{}, trajectory_degeneracy{},
+    checkpoint_subindices{}, checkpoint_degeneracy{}, restraint_indices{}, example_indices{},
+    topology_cases{}, topology_case_bounds{}, system_input_coordinate_names{},
+    system_trajectory_names{}, system_checkpoint_names{}, system_labels{}, label_cases{},
+    label_case_bounds{}, system_input_coordinate_kinds{}, system_trajectory_kinds{},
+    system_checkpoint_kinds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         std::vector<MdlMol> *sdf_recovery, const ExceptionResponse policy_in,
+                         const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
@@ -490,6 +491,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       topology_cache.erase(topology_cache.begin() + cache_track);
     }
   }
+  sdf_cache.reserve(nsys);
   for (int i = 0; i < nsys; i++) {
     int top_idx = findStringInVector(current_topology_holdings, sysvec[i].getTopologyFileName());
     bool topology_ok = false;
@@ -559,9 +561,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
               system_input_coordinate_kinds.push_back(icrd_kind);
               system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
               system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
-              if (sdf_recovery != nullptr) {
-                sdf_recovery->emplace_back();
-              }
+              sdf_cache.emplace_back();
               system_count += 1;
             }
           }
@@ -634,9 +634,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
                 system_input_coordinate_kinds.push_back(icrd_kind);
                 system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
                 system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
-                if (sdf_recovery != nullptr) {
-                  sdf_recovery->push_back(frame_selection[j]);
-                }
+                sdf_cache.push_back(frame_selection[j]);
                 system_count += 1;
               }
             }
@@ -899,28 +897,10 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 }
 
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, std::vector<MdlMol> *sdf_recovery,
-                         const ExceptionResponse policy_in,
-                         const MapRotatableGroups map_chemfe_rotators,
-                         const PrintSituation expectation_in,
-                         StopWatch *timer_in) :
-    SystemCache(fcon, {}, sdf_recovery, policy_in, map_chemfe_rotators, expectation_in, timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         const ExceptionResponse policy_in,
-                         const MapRotatableGroups map_chemfe_rotators,
-                         const PrintSituation expectation_in,
-                         StopWatch *timer_in) :
-    SystemCache(fcon, rstcon, nullptr, policy_in, map_chemfe_rotators, expectation_in, timer_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in, StopWatch *timer_in) :
-    SystemCache(fcon, {}, nullptr, policy_in, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, {}, policy_in, map_chemfe_rotators, expectation_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -945,33 +925,24 @@ int SystemCache::getRestraintCount() const {
 
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getSystemTopologyIndex(const int coord_index) const {
-  if (coord_index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(coord_index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getSystemTopologyIndex");
-  }
+  checkSystemBounds(coord_index, "getSystemTopologyIndex");
   return topology_indices[coord_index];
 }
 
 //-------------------------------------------------------------------------------------------------
-int SystemCache::getCoordinateExample(const int topology_index) const {
+int SystemCache::getSystemExampleIndex(const int topology_index) const {
   return example_indices[topology_index];
 }
 
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* SystemCache::getTopologyPointer(const int topology_index) const {
-  if (topology_index >= static_cast<int>(topology_cache.size())) {
-    rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
-  }
+  checkTopologyBounds(topology_index, "getTopologyPointer");
   return &topology_cache[topology_index];
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph* SystemCache::getTopologyPointer(const int topology_index) {
-  if (topology_index >= static_cast<int>(topology_cache.size())) {
-    rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
-  }
+  checkTopologyBounds(topology_index, "getTopologyPointer");
   return &topology_cache[topology_index];
 }
 
@@ -996,11 +967,8 @@ std::vector<AtomGraph*> SystemCache::getTopologyPointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph& SystemCache::getTopologyReference(const int topology_index) const {
-  if (topology_index >= static_cast<int>(topology_cache.size())) {
-    rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
-  }
+const AtomGraph& SystemCache::getTopology(const int topology_index) const {
+  checkTopologyBounds(topology_index, "getTopologyPointer");
   return topology_cache[topology_index];
 }
 
@@ -1219,22 +1187,14 @@ int SystemCache::getFirstMatchingSystemIndex(const std::string &query_label) con
 
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* SystemCache::getSystemTopologyPointer(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getSystemTopologyPointer");
-  }
+  checkSystemBounds(index, "getSystemTopologyPointer");
   const AtomGraph* tp_cache_ptr = topology_cache.data();
   return &tp_cache_ptr[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph* SystemCache::getSystemTopologyPointer(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getSystemTopologyPointer");
-  }
+  checkSystemBounds(index, "getSystemTopologyPointer");
   AtomGraph* tp_cache_ptr = topology_cache.data();
   return &tp_cache_ptr[topology_indices[index]];
 }
@@ -1261,41 +1221,21 @@ std::vector<AtomGraph*> SystemCache::getSystemTopologyPointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph& SystemCache::getSystemTopologyReference(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getSystemTopologyReference");
-  }
-  return topology_cache[topology_indices[index]];
-}
-
-//-------------------------------------------------------------------------------------------------
-AtomGraph& SystemCache::getSystemTopologyReference(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getSystemTopologyReference");
-  }
+const AtomGraph& SystemCache::getSystemTopology(const int index) const {
+  checkSystemBounds(index, "getSystemTopology");
   return topology_cache[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 const PhaseSpace* SystemCache::getCoordinatePointer(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinatePointer");
-  }
+  checkSystemBounds(index, "getCoordinatePointer");
   const PhaseSpace* crd_cache_ptr = coordinates_cache.data();
   return &crd_cache_ptr[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpace* SystemCache::getCoordinatePointer(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinatePointer");
-  }
+  checkSystemBounds(index, "getCoordinatePointer");
   PhaseSpace* crd_cache_ptr = coordinates_cache.data();
   return &crd_cache_ptr[index];
 }
@@ -1323,191 +1263,150 @@ std::vector<PhaseSpace*> SystemCache::getCoordinatePointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
-const PhaseSpace& SystemCache::getCoordinateReference(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinateReference");
-  }
+const PhaseSpace& SystemCache::getCoordinates(const int index) const {
+  checkSystemBounds(index, "getCoordinates");
   return coordinates_cache[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace& SystemCache::getCoordinateReference(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinateReference");
+const std::vector<PhaseSpace>& SystemCache::getCoordinates() const {
+  return coordinates_cache;
+}
+
+//-------------------------------------------------------------------------------------------------
+const MdlMol* SystemCache::getStructureDataEntryPointer(int index) const {
+  checkSystemBounds(index, "getStructureDataPointer");
+  return &sdf_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+MdlMol* SystemCache::getStructureDataEntryPointer(int index) {
+  checkSystemBounds(index, "getStructureDataPointer");
+  return &sdf_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<MdlMol*> SystemCache::getStructureDataEntryPointer() const {
+  std::vector<MdlMol*> result;
+  result.reserve(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result.emplace_back(const_cast<MdlMol*>(&sdf_cache[i]));
   }
-  return coordinates_cache[index];
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<PhaseSpace>& SystemCache::getCoordinateReference() const {
-  return coordinates_cache;
+std::vector<MdlMol*> SystemCache::getStructureDataEntryPointer() {
+  std::vector<MdlMol*> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = &sdf_cache[i];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<PhaseSpace>& SystemCache::getCoordinateReference() {
-  return coordinates_cache;
+const MdlMol& SystemCache::getStructureDataEntry(int index) const {
+  checkSystemBounds(index, "getStructureDataEntry");
+  return sdf_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<MdlMol>& SystemCache::getStructureDataEntry() const {
+  return sdf_cache;
 }
 
 //-------------------------------------------------------------------------------------------------
 const ChemicalFeatures* SystemCache::getFeaturesPointer(const int index) const {
-  if (index >= static_cast<int>(features_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesPointer");
-  }
+  checkSystemBounds(index, "getFeaturesPointer");
   return &features_cache[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures* SystemCache::getFeaturesPointer(const int index) {
-  if (index >= static_cast<int>(features_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesPointer");
-  }
+  checkSystemBounds(index, "getFeaturesPointer");
   return &features_cache[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const ChemicalFeatures& SystemCache::getFeaturesReference(const int index) const {
-  if (index >= static_cast<int>(features_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesReference");
+const std::vector<ChemicalFeatures*> SystemCache::getFeaturesPointer() const {
+  std::vector<ChemicalFeatures*> result(system_count);
+  for (size_t i = 0; i < system_count; i++) {
+    result[i] = const_cast<ChemicalFeatures*>(&features_cache[i]);
   }
-  return features_cache[index];
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-ChemicalFeatures& SystemCache::getFeaturesReference(const int index) {
-  if (index >= static_cast<int>(features_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesReference");
+std::vector<ChemicalFeatures*> SystemCache::getFeaturesPointer() {
+  std::vector<ChemicalFeatures*> result(system_count);
+  for (size_t i = 0; i < system_count; i++) {
+    result[i] = &features_cache[i];
   }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const ChemicalFeatures& SystemCache::getFeatures(const int index) const {
+  checkSystemBounds(index, "getFeaturesReference");
   return features_cache[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus* SystemCache::getRestraintPointer(const int index) const {
-  if (index >= static_cast<int>(restraint_indices.size())) {
-    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
-          "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
-  }
+  checkSystemBounds(index, "getRestraintPointer");
   return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus* SystemCache::getRestraintPointer(const int index) {
-  if (index >= static_cast<int>(restraint_indices.size())) {
-    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
-          "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
-  }
+  checkSystemBounds(index, "getRestraintPointer");
   return &restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
-const RestraintApparatus& SystemCache::getRestraintReference(const int index) const {
-  if (index >= static_cast<int>(restraint_indices.size())) {
-    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
-          "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
-  }
-  return restraints_cache[restraint_indices[index]];
-}
-
-//-------------------------------------------------------------------------------------------------
-RestraintApparatus& SystemCache::getRestraintReference(const int index) {
-  if (index >= static_cast<int>(restraint_indices.size())) {
-    rtErr("Restraint cache index " + std::to_string(restraint_indices[index]) + ", serving "
-          "system " + std::to_string(index) + ", is invalid for an array of length " +
-          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
-  }
+const RestraintApparatus& SystemCache::getRestraints(const int index) const {
+  checkSystemBounds(index, "getRestraints");
   return restraints_cache[restraint_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 const StaticExclusionMask* SystemCache::getSystemStaticMaskPointer(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getStaticMaskPointer");
-  }
+  checkSystemBounds(index, "getSystemStaticMaskPointer");
   const int top_idx = topology_indices[index];
   return &static_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------
 StaticExclusionMask* SystemCache::getSystemStaticMaskPointer(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getStaticMaskPointer");
-  }
+  checkSystemBounds(index, "getSystemStaticMaskPointer");
   const int top_idx = topology_indices[index];
   return &static_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------
-const StaticExclusionMask& SystemCache::getSystemStaticMaskReference(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getStaticMaskReference");
-  }
-  const int top_idx = topology_indices[index];
-  return static_masks_cache[top_idx];
-}
-
-//-------------------------------------------------------------------------------------------------
-StaticExclusionMask& SystemCache::getSystemStaticMaskReference(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getStaticMaskReference");
-  }
+const StaticExclusionMask& SystemCache::getSystemStaticMask(const int index) const {
+  checkSystemBounds(index, "getSystemStaticMask");
   const int top_idx = topology_indices[index];
   return static_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------
 const ForwardExclusionMask* SystemCache::getSystemForwardMaskPointer(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getForwardMaskPointer");
-  }
+  checkSystemBounds(index, "getSystemForwardMaskPointer");
   const int top_idx = topology_indices[index];
   return &forward_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------
 ForwardExclusionMask* SystemCache::getSystemForwardMaskPointer(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getForwardMaskPointer");
-  }
+  checkSystemBounds(index, "getSystemForwardMaskPointer");
   const int top_idx = topology_indices[index];
   return &forward_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------
-const ForwardExclusionMask& SystemCache::getSystemForwardMaskReference(const int index) const {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getForwardMaskReference");
-  }
-  const int top_idx = topology_indices[index];
-  return forward_masks_cache[top_idx];
-}
-
-//-------------------------------------------------------------------------------------------------
-ForwardExclusionMask& SystemCache::getSystemForwardMaskReference(const int index) {
-  if (index >= static_cast<int>(coordinates_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
-          "getForwardMaskReference");
-  }
+const ForwardExclusionMask& SystemCache::getSystemForwardMask(const int index) const {
+  checkSystemBounds(index, "getSystemForwardMask");
   const int top_idx = topology_indices[index];
   return forward_masks_cache[top_idx];
 }
@@ -1765,6 +1664,22 @@ void SystemCache::checkSystemBounds(const int index, const char* caller) const {
   if (index < 0 || index >= system_count) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
           std::to_string(system_count) + ".", "SystemCache", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void SystemCache::checkTopologyBounds(const int index, const char* caller) const {
+  if (index < 0 || index >= topology_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(topology_count) + ".", "SystemCache", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void SystemCache::checkLabelBounds(const int index, const char* caller) const {
+  if (index < 0 || index >= label_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(label_count) + ".", "SystemCache", caller);
   }
 }
 

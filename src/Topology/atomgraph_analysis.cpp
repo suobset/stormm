@@ -11,10 +11,10 @@
 namespace stormm {
 namespace topology {
 
-using math::findBin;
-using math::accumulateBitmask;
-using math::unsetBitInMask;
-using math::readBitFromMask;
+using stmath::findBin;
+using stmath::accumulateBitmask;
+using stmath::unsetBitInMask;
+using stmath::readBitFromMask;
 using parse::char4ToString;
 using testing::Approx;
 
@@ -573,7 +573,7 @@ std::string listVirtualSiteFrameTypes(const int* vs_types, const int nsite) {
   }
   std::string frame_type_list;
   for (int i = 0; i < n_unique; i++) {
-    frame_type_list += getVirtualSiteFrameName(static_cast<VirtualSiteKind>(unique_frm[i]));
+    frame_type_list += getEnumerationName(static_cast<VirtualSiteKind>(unique_frm[i]));
     if (i < n_unique - 1) {
       frame_type_list += ", ";
     }

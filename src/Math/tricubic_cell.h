@@ -11,7 +11,7 @@
 #include "matrix_ops.h"
 
 namespace stormm {
-namespace math {
+namespace stmath {
 
 using card::Hybrid;
 using constants::CartesianDimension;
@@ -181,7 +181,7 @@ private:
 ///        and used in lower-precision formats.
 Hybrid<double> getTricubicMatrix();
 
-} // namespace math
+} // namespace stmath
 } // namespace stormm
 
 #include "tricubic_cell.tpp"
