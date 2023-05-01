@@ -253,27 +253,37 @@ public:
 
   /// \brief Get the box dimensions in their pure form for a particular frame.
   ///
+  /// Overloaded:
+  ///   - Get the dimensions for a specific system on the CPU host or GPU device
+  ///   - Get the dimensions for all systems at both levels
+  ///
   /// \param frame_index  The frame for which to extract the transformation matrix
   /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
+  /// \{
   std::vector<double> getBoxDimensions(int frame_index,
                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  const Hybrid<double>& getBoxDimensions() const;
+  /// \}
 
   /// \brief Extract coordinates to a pre-existing object.
   ///
   /// Overloaded:
-  ///   - Load coordinates into a CoordinateFrame object or its abstract
-  ///   - Load coordinates into a PhaseSpace object or its abstract, using the stated point in
-  ///     the time cycle or taking the object's current orientation
+  ///   - Load coordinates into a CoordinateFrame object
+  ///   - Load coordinates into a PhaseSpace object using the stated point in the time cycle or
+  ///     taking the object's current orientation
   ///
-  /// \param cf
-  /// \param ps
+  /// \param cf           Coordinate frame into which coordinates shall be placed
+  /// \param ps           Phase space object into which coordinates shall be placed
   /// \param frame_index  Frame to use in coordinate extraction
   /// \{
   void extractFrame(CoordinateFrame *cf, int frame_index,
                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   void extractFrame(PhaseSpace *ps, int frame_index,
-                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
-                    CoordinateCycle time_point = CoordinateCycle::PRIMARY,
+                    TrajectoryKind kind, CoordinateCycle time_point,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  void extractFrame(PhaseSpace *ps, int frame_index,
+                    TrajectoryKind kind, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  void extractFrame(PhaseSpace *ps, int frame_index,
                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
@@ -310,18 +320,6 @@ public:
                     PrintSituation expectation = PrintSituation::UNKNOWN, int low_index = 0,
                     int high_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-#ifdef STORMM_USE_HPC
-  /// \brief Upload all information
-  void upload();
-
-  /// \brief Download all information
-  void download();
-#endif
-
-  /// \brief Get a const pointer to the object iself, so that it may be passed to functions by
-  ///        const reference and still emit a const poiner.
-  const CoordinateSeries<T>* getSelfPointer() const;
-
   /// \brief Get a const reference to the one of the Cartesian coordinate arrays.
   ///
   /// \param dim  The dimension of interest
@@ -332,17 +330,24 @@ public:
   /// \param dim  The dimension of interest
   const Hybrid<T>* getCoordinatePointer(CartesianDimension dim) const;
 
-  /// \brief Get a const pointer to the box space transformation matrices
+  /// \brief Get a const reference to the box space transformation matrices
   const Hybrid<double>& getBoxTransforms() const;
 
   /// \brief Get a const pointer to the box space transformation matrices
   const Hybrid<double>* getBoxTransformPointer() const;
 
-  /// \brief Get a const pointer to the box space transformation matrices
+  /// \brief Get a const reference to the box space transformation matrices
   const Hybrid<double>& getInverseTransforms() const;
 
   /// \brief Get a const pointer to the box space transformation matrices
   const Hybrid<double>* getInverseTransformPointer() const;
+
+  /// \brief Get a const pointer to the list of box dimensions for all frames
+  const Hybrid<double>* getBoxDimensionPointer() const;
+
+  /// \brief Get a const pointer to the object iself, so that it may be passed to functions by
+  ///        const reference and still emit a const poiner.
+  const CoordinateSeries<T>* getSelfPointer() const;
 
   /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
   ///        access to any of its member variables.
@@ -354,6 +359,25 @@ public:
   const CoordinateSeriesReader<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CoordinateSeriesWriter<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
+
+#ifdef STORMM_USE_HPC
+  /// \brief Get an abstract for the object's host data that is guaranteed to be accessible by the
+  ///        GPU device.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract for a const coordinate series
+  ///   - Get a writeable abstract for a non-const coordinate series
+  /// \{
+  const CoordinateSeriesReader<T> deviceViewToHostData() const;
+  CoordinateSeriesWriter<T> deviceViewToHostData();
+  /// \}
+  
+  /// \brief Upload all information
+  void upload();
+
+  /// \brief Download all information
+  void download();
+#endif
   
   /// \brief Import coordinates from a CoordinateFrame or PhaseSpace object.  The original object
   ///        must have the same number of atoms as the CoordinateSeries itself, or else a range of

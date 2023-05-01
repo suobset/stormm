@@ -732,16 +732,16 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 j_name = (forward) ? cdk.atom_names[j_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.bond_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness");
+                snprintf(buffer_data, 256, " Atom Names   Indices     Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------");
+                snprintf(buffer_data, 256, "  ---- ----  ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : j_atom + 1;
               const int j_index = (forward) ? j_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
-                      i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z, j_name.w,
-                      i_index, j_index, vk.bond_leq[param_idx], vk.bond_keq[param_idx]);
+              snprintf(buffer_data, 256, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
+                       i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z, j_name.w,
+                       i_index, j_index, vk.bond_leq[param_idx], vk.bond_keq[param_idx]);
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -768,18 +768,21 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.angl_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, "    Atom Names        Indices       Eq. L0    Stiffness");
+                snprintf(buffer_data, 256,
+                         "    Atom Names        Indices       Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ---- ----  ---- ---- ----  ---------- ----------");
+                snprintf(buffer_data, 256,
+                         "  ---- ---- ----  ---- ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
               const int j_index = j_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d  %10.4lf %10.4lf",
-                      i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z,
-                      j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, i_index, j_index, k_index,
-                      vk.angl_theta[param_idx] * 180.0 / symbols::pi, vk.angl_keq[param_idx]);
+              snprintf(buffer_data, 256,
+                       "  %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d  %10.4lf %10.4lf",
+                       i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y, j_name.z,
+                       j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, i_index, j_index, k_index,
+                       vk.angl_theta[param_idx] * 180.0 / symbols::pi, vk.angl_keq[param_idx]);
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -825,23 +828,23 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 l_name = (forward) ? cdk.atom_names[l_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.dihe_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, "       Atom Names            Indices         Amplitude "
-                        "   Phase    N");
+                snprintf(buffer_data, 256, "       Atom Names            Indices         "
+                         "Amplitude    Phase    N");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
-                        "---------- --");
+                snprintf(buffer_data, 256, "  ---- ---- ---- ----  ---- ---- ---- ----  "
+                         "---------- ---------- --");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
               const int j_index = (forward) ? j_atom + 1 : k_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
               const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
-                      "%10.4lf %10.4lf %2d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
-                      j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
-                      l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
-                      vk.dihe_amp[param_idx], vk.dihe_phi[param_idx] * 180.0 / symbols::pi,
-                      static_cast<int>(std::round(vk.dihe_freq[param_idx])));
+              snprintf(buffer_data, 256, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
+                       "%10.4lf %10.4lf %2d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                       j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                       l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
+                       vk.dihe_amp[param_idx], vk.dihe_phi[param_idx] * 180.0 / symbols::pi,
+                       static_cast<int>(std::round(vk.dihe_freq[param_idx])));
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -863,16 +866,16 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 k_name = (forward) ? cdk.atom_names[k_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.ubrd_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, " Atom Names   Indices     Eq. L0    Stiffness");
+                snprintf(buffer_data, 256, " Atom Names   Indices     Eq. L0    Stiffness");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ----  ---- ----  ---------- ----------");
+                snprintf(buffer_data, 256, "  ---- ----  ---- ----  ---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : k_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
-                      i_name.y, i_name.z, i_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
-                      i_index, k_index, vk.ubrd_leq[param_idx], vk.ubrd_keq[param_idx]);
+              snprintf(buffer_data, 256, "  %c%c%c%c %c%c%c%c  %4d %4d  %10.4lf %10.4lf", i_name.x,
+                       i_name.y, i_name.z, i_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                       i_index, k_index, vk.ubrd_leq[param_idx], vk.ubrd_keq[param_idx]);
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -903,22 +906,22 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 l_name = (forward) ? cdk.atom_names[l_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.cimp_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, "       Atom Names            Indices         Stiffness "
-                        "   Phase  ");
+                snprintf(buffer_data, 256, "       Atom Names            Indices         "
+                         "Stiffness    Phase  ");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ---- ---- ----  ---- ---- ---- ----  ---------- "
-                        "----------");
+                snprintf(buffer_data, 256, "  ---- ---- ---- ----  ---- ---- ---- ----  "
+                         "---------- ----------");
                 di_body.push_back(buffer_data);
               }
               const int i_index = (forward) ? i_atom + 1 : l_atom + 1;
               const int j_index = (forward) ? j_atom + 1 : k_atom + 1;
               const int k_index = (forward) ? k_atom + 1 : j_atom + 1;
               const int l_index = (forward) ? l_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
-                      "%10.4lf %10.4lf", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
-                      j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
-                      l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
-                      vk.cimp_keq[param_idx], vk.cimp_phi[param_idx] * 180.0 / symbols::pi);
+              snprintf(buffer_data, 256, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d %4d  "
+                       "%10.4lf %10.4lf", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                       j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                       l_name.x, l_name.y, l_name.z, l_name.w, i_index, j_index, k_index, l_index,
+                       vk.cimp_keq[param_idx], vk.cimp_phi[param_idx] * 180.0 / symbols::pi);
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -955,10 +958,10 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const char4 m_name = (forward) ? cdk.atom_names[m_atom] : cdk.atom_names[i_atom];
               const int param_idx = vk.cimp_param_idx[pos];
               if (nfound == 0) {
-                sprintf(buffer_data, "          Atom Names                 Indices          "
-                        " Map");
+                snprintf(buffer_data, 256, "          Atom Names                 Indices          "
+                         " Map");
                 di_body.push_back(buffer_data);
-                sprintf(buffer_data, "  ---- ---- ---- ---- ----  ---- ---- ---- ---- ----  "
+                snprintf(buffer_data, 256, "  ---- ---- ---- ---- ----  ---- ---- ---- ---- ----  "
                         "----");
                 di_body.push_back(buffer_data);
               }
@@ -967,11 +970,12 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
               const int k_index = (forward) ? k_atom + 1 : k_atom + 1;
               const int l_index = (forward) ? l_atom + 1 : j_atom + 1;
               const int m_index = (forward) ? m_atom + 1 : i_atom + 1;
-              sprintf(buffer_data, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d %4d "
-                      "%4d %4d  %4d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x, j_name.y,
-                      j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w, l_name.x,
-                      l_name.y, l_name.z, l_name.w, m_name.x, m_name.y, m_name.z, m_name.w,
-                      i_index, j_index, k_index, l_index, m_index, vk.cmap_surf_idx[param_idx]);
+              snprintf(buffer_data, 256, "  %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c  %4d %4d "
+                       "%4d %4d %4d  %4d", i_name.x, i_name.y, i_name.z, i_name.w, j_name.x,
+                       j_name.y, j_name.z, j_name.w, k_name.x, k_name.y, k_name.z, k_name.w,
+                       l_name.x, l_name.y, l_name.z, l_name.w, m_name.x, m_name.y, m_name.z,
+                       m_name.w, i_index, j_index, k_index, l_index, m_index,
+                       vk.cmap_surf_idx[param_idx]);
               di_body.push_back(buffer_data);
               nfound++;
             }
@@ -1128,20 +1132,21 @@ std::string MdlMol::writeMdl(const MdlMolVersion vformat) const {
   case MdlMolVersion::V2000:
 
     // Write out the counts line.
-    sprintf(buffer.data(), "%3d%3d%3d   %3d%3d            999 V2000\n", atom_count, bond_count,
-            list_count, static_cast<int>(chirality), stext_entry_count);
+    snprintf(buffer.data(), 512, "%3d%3d%3d   %3d%3d            999 V2000\n", atom_count,
+             bond_count, list_count, static_cast<int>(chirality), stext_entry_count);
     result.append(buffer_data, 40);
     
     // Write out the atom block.
     for (int i = 0; i < atom_count; i++) {
-      sprintf(buffer_data, "%10.4lf%10.4lf%10.4lf %c%c%c%2d%3d%3d%3d%3d%3d%3d  0  0%3d%3d%3d\n",
-              coordinates[i].x, coordinates[i].y, coordinates[i].z, atomic_symbols[i].x,
-              atomic_symbols[i].y, atomic_symbols[i].z, getIsotopicShiftCode(i),
-              getFormalChargeCode(i), static_cast<int>(parities[i]), getImplicitHydrogenCode(i),
-              static_cast<int>(stereo_considerations[i]), static_cast<int>(valence_connections[i]),
-              static_cast<int>(hydrogenation_protocol[i]), atom_atom_mapping_count[i],
-              static_cast<int>(orientation_stability[i]),
-              static_cast<int>(exact_change_enforced[i]));
+      snprintf(buffer_data, 512, "%10.4lf%10.4lf%10.4lf %c%c%c%2d%3d%3d%3d%3d%3d%3d  0  "
+               "0%3d%3d%3d\n", coordinates[i].x, coordinates[i].y, coordinates[i].z,
+               atomic_symbols[i].x, atomic_symbols[i].y, atomic_symbols[i].z,
+               getIsotopicShiftCode(i), getFormalChargeCode(i), static_cast<int>(parities[i]),
+               getImplicitHydrogenCode(i), static_cast<int>(stereo_considerations[i]),
+               static_cast<int>(valence_connections[i]),
+               static_cast<int>(hydrogenation_protocol[i]), atom_atom_mapping_count[i],
+               static_cast<int>(orientation_stability[i]),
+               static_cast<int>(exact_change_enforced[i]));
       result.append(buffer_data, 70);
     }
 
@@ -1150,11 +1155,11 @@ std::string MdlMol::writeMdl(const MdlMolVersion vformat) const {
 
       // Add 1 to the bond atom indices to get back into the file format.  This adjustment is
       // automated for the properties.
-      sprintf(buffer.data(), "%3d%3d%3d%3d  0%3d%3d\n", bonds[i].getFirstAtom() + 1,
-              bonds[i].getSecondAtom() + 1, static_cast<int>(bonds[i].getOrder()),
-              static_cast<int>(bonds[i].getStereochemistry()),
-              static_cast<int>(bonds[i].getRingStatus()),
-              static_cast<int>(bonds[i].getReactivity()));
+      snprintf(buffer.data(), 256, "%3d%3d%3d%3d  0%3d%3d\n", bonds[i].getFirstAtom() + 1,
+               bonds[i].getSecondAtom() + 1, static_cast<int>(bonds[i].getOrder()),
+               static_cast<int>(bonds[i].getStereochemistry()),
+               static_cast<int>(bonds[i].getRingStatus()),
+               static_cast<int>(bonds[i].getReactivity()));
       result.append(buffer_data, 22);
     }
 
@@ -1162,11 +1167,11 @@ std::string MdlMol::writeMdl(const MdlMolVersion vformat) const {
     if (property_element_lists == false) {
       for (int i = 0; i < list_count; i++) {
         const int n_entry = element_lists[i].getEntryCount();
-        sprintf(buffer_data, "%3d %c    %d", element_lists[i].getAttachmentPoint(),
-                element_lists[i].getExclusionCode(), n_entry);
+        snprintf(buffer_data, 256, "%3d %c    %d", element_lists[i].getAttachmentPoint(),
+                 element_lists[i].getExclusionCode(), n_entry);
         int nchar = 10;
         for (int j = 0; j < n_entry; j++) {
-          sprintf(&buffer_data[nchar], " %3d", element_lists[i].getEntry(j));
+          snprintf(&buffer_data[nchar], 512 - nchar, " %3d", element_lists[i].getEntry(j));
           nchar += 4;
         }
         buffer_data[nchar] = '\n';

@@ -2,6 +2,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Namelists/input.h"
 #include "../../src/Parsing/parse.h"
+#include "../../src/Parsing/parsing_enumerators.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -12,7 +13,9 @@ using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::errors::rtWarn;
 using stormm::parse::separateText;
+using stormm::parse::TextOrigin;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::namelist;
 using namespace stormm::testing;
 
@@ -59,6 +62,20 @@ NamelistEmulator lisaInput(const TextFile &tf, int *start_line) {
   return t_nml;
 }
 
+//-------------------------------------------------------------------------------------------------
+// Create a generic namelist with simple keywords corresponding to each type.
+//-------------------------------------------------------------------------------------------------
+NamelistEmulator genericNamelist() {
+  NamelistEmulator t_nml("dtopic", CaseSensitivity::YES, ExceptionResponse::DIE, "A minimal "
+                         "testing namelist");
+  t_nml.addKeyword("kw_real", NamelistType::REAL);
+  t_nml.addKeyword("kw_string", NamelistType::STRING);
+  t_nml.addKeyword("kw_integer", NamelistType::INTEGER);
+  return t_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
@@ -239,8 +256,51 @@ int main(const int argc, const char* argv[]) {
   check(gth3, RelationalOperator::EQUAL, 4.20, "A REAL value for a sub-key of a repeated STRUCT "
         "keyword did not carry through correctly.", file_check);
 
+  // Check that missing input variables do no change existing values external to the namelist.
+  const std::string nml_d_input_a("&dtopic\n&end\n");
+  const TextFile nml_d_tf_a(nml_d_input_a, TextOrigin::RAM);
+  NamelistEmulator nml_d = genericNamelist();
+  start_line = 0;
+  start_line = readNamelist(nml_d_tf_a, &nml_d, start_line, WrapTextSearch::NO,
+                            nml_d_tf_a.getLineCount());
+  double my_real = -0.6;
+  std::string my_string("not_your_average_string");
+  int my_int = 9;
+  nml_d.assignVariable(&my_real, "kw_real");
+  nml_d.assignVariable(&my_string, "kw_string");
+  nml_d.assignVariable(&my_int, "kw_integer");
+  check(my_real, RelationalOperator::EQUAL, -0.6, "A real-valued variable was altered by reading "
+        "from an unspecified namelist keyword.");
+  check(my_string, RelationalOperator::EQUAL, "not_your_average_string", "A string variable was "
+        "altered by reading from an unspecified namelist keyword.");
+  check(my_int, RelationalOperator::EQUAL, 9, "An integer variable was altered by reading from an "
+        "unspecified namelist keyword.");
+
+  // Check that the NamelistEmulator object is able to assign values as required.
+  const std::string nml_d_input_b("&dtopic\n  kw_real 5.7, kw_string \"some_string\" "
+                                  "kw_integer 8,\n&end\n");
+  const TextFile nml_d_tf_b(nml_d_input_b, TextOrigin::RAM);
+  nml_d = genericNamelist();
+  start_line = 0;
+  start_line = readNamelist(nml_d_tf_b, &nml_d, start_line, WrapTextSearch::NO,
+                            nml_d_tf_b.getLineCount());
+  nml_d.assignVariable(&my_real, "kw_real");
+  nml_d.assignVariable(&my_string, "kw_string");
+  nml_d.assignVariable(&my_int, "kw_integer");
+  std::vector<int> trip_int = { -1, -1, -1 };
+  nml_d.assignVariable(&trip_int[0], &trip_int[1], &trip_int[2], "kw_integer");
+  check(my_real, RelationalOperator::EQUAL, 5.7, "A real-valued variable was not assigned "
+        "correctly.");
+  check(my_string, RelationalOperator::EQUAL, "some_string", "A string variable was not assigned "
+        "correctly.");
+  check(my_int, RelationalOperator::EQUAL, 8, "An integer variable was not assigned correctly.");
+  check(trip_int, RelationalOperator::EQUAL, std::vector<int>(3, 8), "Integers were not assigned "
+        "as expected in triplicate by a generic &namelist object.");
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

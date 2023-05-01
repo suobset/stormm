@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/ascii_numbers.h"
 #include "../../src/Parsing/parse.h"
@@ -8,12 +9,15 @@
 #include "../../src/Topology/amber_prmtop_util.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using stormm::data_types::ullint;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::stmath::sum;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
+using stormm::review::protectText;
 using stormm::topology::amberPrmtopData;
 
 using namespace stormm::parse;
@@ -49,6 +53,9 @@ int main(const int argc, const char* argv[]) {
   // Section 6
   section("Test string comparisons with wildcards");
 
+  // Section 7
+  section("Test string manipulation");
+  
   // Test the TextFile object and its features
   section(1);
   const std::string something_path = oe.getStormmSourcePath() + osSeparator() + "test" +
@@ -202,6 +209,14 @@ int main(const int argc, const char* argv[]) {
   check(realToString(-2.0 * dbl_real, 14, 5, NumberFormat::SCIENTIFIC,
                      NumberPrintStyle::LEADING_ZEROS), RelationalOperator::EQUAL, "-001.37280e+03",
         "realToString() reports an incorrect representation.");
+  check(minimalRealFormat(2.0e-9, 1.0e-6), RelationalOperator::EQUAL, "2.0e-9", "A real number "
+        "was not represented its most compact form.");
+  check(minimalRealFormat(2.1245e-01, 1.0e-6), RelationalOperator::EQUAL, "0.21245", "A real "
+        "number was not represented its most compact form.");
+  check(minimalRealFormat(-7.06e+08, 1.0e-6), RelationalOperator::EQUAL, "-7.06e8", "A real "
+        "number was not represented its most compact form.");
+  check(minimalRealFormat(-1.071593e+08, 1.0e-6), RelationalOperator::EQUAL, "-107159300",
+        "A real number was not represented its most compact form.");
 
   // Test character conversion
   section(4);
@@ -222,19 +237,19 @@ int main(const int argc, const char* argv[]) {
   check(uppercase("ttyl78_0bama"), RelationalOperator::EQUAL, "TTYL78_0BAMA",
         "Lowercase conversion of a mixed, const C-style string failed.");
   char test_str[32];
-  sprintf(test_str, "upaiwof89xxv");
+  snprintf(test_str, 32, "upaiwof89xxv");
   uppercase(test_str);
   check(std::string(test_str), RelationalOperator::EQUAL, "UPAIWOF89XXV",
         "Uppercase conversion of a mixed C-style string failed.");
-  sprintf(test_str, "upaiwof89xxv");
+  snprintf(test_str, 32, "upaiwof89xxv");
   uppercase(test_str, 4);
   check(std::string(test_str), RelationalOperator::EQUAL, "UPAIwof89xxv",
         "Uppercase partial conversion of a mixed C-style string failed.");
-  sprintf(test_str, "VDNnL@)*cCB");
+  snprintf(test_str, 32, "VDNnL@)*cCB");
   lowercase(test_str);
   check(std::string(test_str), RelationalOperator::EQUAL, "vdnnl@)*ccb",
         "Lowercase conversion of a mixed C-style string failed.");
-  sprintf(test_str, "VDNnL@)*cCB");
+  snprintf(test_str, 32, "VDNnL@)*cCB");
   lowercase(test_str, 4);
   check(std::string(test_str), RelationalOperator::EQUAL, "vdnnL@)*cCB",
         "Lowercase partial conversion of a mixed C-style string failed.");
@@ -384,9 +399,80 @@ int main(const int argc, const char* argv[]) {
   const std::string tw_regexp_d("T*k");
   check(strcmpWildCard(tw_e, tw_regexp_d, wildcards_b) == false, "Case-sensitive string matching "
         "with wildcards incorrectly equates \"" + tw_e + "\" with \"" + tw_regexp_d + "\".");
+
+  // Test how numbers and strings can be formatted with special considerations to tabulated,
+  // terminal output.
+  section(7);
+  std::vector<std::string> many_params(10);
+  many_params[0] = "Times Radio";
+  many_params[1] = "October 15, 2024";
+  many_params[2] = "Londoners in Shock at Outcome of Keating Summit";
+  many_params[3] = "newsy";
+  many_params[4] = "people";
+  many_params[5] = "hearing";
+  many_params[6] = "story";
+  many_params[7] = "common";
+  many_params[8] = "money";
+  many_params[9] = "Downing";
+  const int general_length = justifyStrings(&many_params, JustifyText::RIGHT, 10, 2, 4);
+  check(general_length, RelationalOperator::EQUAL, 11, "The consensus length of a series of "
+        "strings does not meet expectations after right-hand justification.");
+  check(many_params[3].size(), RelationalOperator::EQUAL, 11, "A set of strings was not set to "
+        "the consensus lengths as expected.");
+  check(many_params[2].size(), RelationalOperator::EQUAL, 47, "A very long string should not "
+        "have been altered by the formatStrings() function.");
+  check(many_params[9], RelationalOperator::EQUAL, "    Downing", "Strings were not pre-pended "
+        "with white space as expected after right-hand justification.");
+  const std::string all_blank = "          ";
+  check(removeLeadingWhiteSpace(all_blank).size(), RelationalOperator::EQUAL, 0, "A completely "
+        "blank string was not reduced to zero length by removal of leading white space as "
+        "expected.");
+  check(removeTailingWhiteSpace(all_blank).size(), RelationalOperator::EQUAL, 0, "A completely "
+        "blank string was not reduced to zero length by removal of tailing white space as "
+        "expected.");
+  check(addTailingWhiteSpace(tw_a, 12), RelationalOperator::EQUAL, "ThisWord    ", "Tailing "
+        "whitespace was not added in the expected manner to a simple string.");
+  const int lgen_length = justifyStrings(&many_params, JustifyText::LEFT, 10, 2, 4);
+  check(lgen_length, RelationalOperator::EQUAL, 11, "The consensus length of a series of "
+        "strings does not meet expectations after left-hand justification.");
+  check(many_params[4], RelationalOperator::EQUAL, "people     ", "Strings were not appended with "
+        "the expected white space after left-hand justification.");
+
+  // Check text protection for output purposes.
+  const std::string my_paragraph = "This is a paragraph containing many words, including some "
+                                   "which are particularly long such as "
+                                   "\"antidisestablishmentarianism.\" Printing this much text may "
+                                   "require multiple line breaks.  In fact, the text itself can "
+                                   "contain line breaks:\n\nAll of the text is to be protected by "
+                                   "a hash symbol.";
+  const std::string protected_paragraph = protectText(my_paragraph, '#', 28);
+  const std::string protected_ans = "# This is a paragraph\n# containing many words,\n"
+                                    "# including some which are\n# particularly long such as\n"
+                                    "# \"antidisestablishmentarianism.\"\n"
+                                    "# Printing this much text\n# may require multiple line\n"
+                                    "# breaks.  In fact, the text\n# itself can contain line\n"
+                                    "# breaks:\n#\n# All of the text is to be\n"
+                                    "# protected by a hash\n# symbol.\n";
+  check(protected_paragraph, RelationalOperator::EQUAL, protected_ans, "A paragraph was not "
+        "protected for output in the manner expected.");
+
+  // Test conversion of base-10 integers to alphabetical base-26 strings.
+  const std::vector<ullint> number_range = { 18, 29, 383, 19836732 };
+  std::string string_range;
+  for (int i = 0; i < 4; i++) {
+    string_range += alphabetNumber(number_range[i]);
+    if (i < 3) {
+      string_range += "_";
+    }
+  }
+  const std::string string_range_ans("s_ad_nt_aqjpgg");
+  check(string_range, RelationalOperator::EQUAL, string_range_ans, "Positive integers were not "
+        "converted to alphanumeric strings as expected.");
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

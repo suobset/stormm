@@ -306,6 +306,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier, gpu);
           sc->incrementSampleCount();
+          sc->setLastTimeStep(i);
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -477,6 +478,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier, gpu);
           sc->incrementSampleCount();
+          sc->setLastTimeStep(i);
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -596,6 +598,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   // Advance the energy tracking history counter to log the final energy results
   sc->commit(devc_tier, gpu);
   sc->incrementSampleCount();
+  sc->setLastTimeStep(total_steps);
   if (timer != nullptr) {
     cudaDeviceSynchronize();
     timer->assignTime(min_timings);

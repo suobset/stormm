@@ -25,6 +25,7 @@ using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::parse::operator==;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::trajectory::CoordinateFileKind;
@@ -525,6 +526,8 @@ int main(const int argc, const char* argv[]) {
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

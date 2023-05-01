@@ -109,6 +109,20 @@ enum class BoundaryCondition {
   PERIODIC   ///< There is a defined length to the space in which variables reside, and to exceed
              ///<   one limit of the range is to re-enter starting at the opposite limit.
 };
+
+/// \brief Enumerate the ways in which a mesh can be positioned relative to a biomolecule.
+enum class MeshPosition {
+  MOLECULE,  ///< The mesh is positioned such that it encloses a rigid molecule, which it
+             ///<   supposedly represents, with equal lengths of space in all directions.
+             ///<   Non-orthorhombic meshes will be placed according to the minimum distance of
+             ///<   any atom to a mesh face (as computed by Hessian normal form), and if the mesh
+             ///<   is not large enough to enclose the molecule completely then the overhang will
+             ///<   be equalized over all sides.  No rotation of the molecule or mesh coordinate
+             ///<   system will be considered in this placement.
+  ORIGIN,    ///< The mesh's origin will be placed at the origin of the coordinate system for the
+             ///<   molecule it is tailored to represent.
+  ARBITRARY  ///< The mesh's origin is an arbitrary point in space.
+};
   
 /// \brief Return a human-readable string describing each enumerated value.  The enumerator in the
 ///        argument determines the overload to be used.
@@ -124,12 +138,37 @@ std::string getEnumerationName(GridDetail input);
 std::string getEnumerationName(ClashKind input);
 std::string getEnumerationName(SamplingIntensity input);
 std::string getEnumerationName(BoundaryCondition input);
+std::string getEnumerationName(MeshPosition input);
 /// \}
 
+/// \brief Interpret string input to recognize an RMSD calculation method (which could include
+///        alignment or no alignment).  This enumerator class can also be used to specify a
+///        particular method for aligning structures in preparation for other procedures.
+///
+/// \param input  The human-readable sampling keyword input
+RMSDMethod translateRMSDMethod(const std::string &input);
+  
+/// \brief Interpret string input to recognize a specific type of non-bonded potential for a mesh
+///        representation of a receptor or other macromolecule.
+///
+/// \param input  The human-readable sampling keyword input
+GridDetail translateGridDetail(const std::string &input);
+  
 /// \brief Interpret string input to recognize a specific level of sampling effort.
 ///
 /// \param input  The human-readable sampling keyword input
 SamplingIntensity translateSamplingIntensity(const std::string &input);
+
+/// \brief Interpret string input to recognize a specific type of boundary conditions.
+///
+/// \param input  The human-readable sampling keyword input
+BoundaryCondition translateBoundaryCondition(const std::string &input);
+
+/// \brief Interpret string input to recognize a specific type of mesh positioning relative to the
+///        molecular structure that the mesh shall represent.
+///
+/// \param input  The human-readable sampling keyword input
+MeshPosition translateMeshPosition(const std::string &input);
 
 } // namespace structure
 } // namespace stormm

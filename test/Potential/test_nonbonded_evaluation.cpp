@@ -56,6 +56,7 @@ using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::structure::rotateAboutBond;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
@@ -1252,6 +1253,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

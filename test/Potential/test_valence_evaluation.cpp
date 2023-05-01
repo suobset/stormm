@@ -28,6 +28,7 @@ using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::topology::AtomGraph;
 using stormm::trajectory::CoordinateFileKind;
 using stormm::trajectory::CoordinateSeries;
@@ -569,6 +570,8 @@ int main(const int argc, const char* argv[]) {
 
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

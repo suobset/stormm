@@ -47,7 +47,7 @@ kPsyInitializeForces(PsSynthesisWriter psyw, const int index);
 __global__ void __launch_bounds__(large_block_size, 1)
 kPsyPrimeConjugateGradient(PsSynthesisWriter psyw);
 
-/// \brief Import the Cartesian X, Y, and Z components of poositions, velocities, or forces of one
+/// \brief Import the Cartesian X, Y, and Z components of positions, velocities, or forces of one
 ///        system within the synthesis.
 ///
 /// \param x_recv             Long-long integer component of the fixed-precision arrays that the

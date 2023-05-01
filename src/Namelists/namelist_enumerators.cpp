@@ -1,8 +1,13 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Parsing/parse.h"
 #include "namelist_enumerators.h"
 
 namespace stormm {
 namespace namelist {
+
+using constants::CaseSensitivity;
+using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const NamelistType input) {
@@ -74,14 +79,47 @@ std::string getEnumerationName(const RestraintAnchoring input) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const SubkeyRequirement input) {
+std::string getEnumerationName(const KeyRequirement input) {
   switch (input) {
-  case SubkeyRequirement::OPTIONAL:
+  case KeyRequirement::OPTIONAL:
     return std::string("OPTIONAL");
-  case SubkeyRequirement::REQUIRED:
+  case KeyRequirement::REQUIRED:
     return std::string("REQUIRED");
-  case SubkeyRequirement::BOGUS:
+  case KeyRequirement::BOGUS:
     return std::string("BOGUS");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NamelistIntroduction input) {
+  switch (input) {
+  case NamelistIntroduction::HEADER:
+    return std::string("HEADER");
+  case NamelistIntroduction::COMPACT_HEADER:
+    return std::string("COMPACT_HEADER");
+  case NamelistIntroduction::BLANK_LINE:
+    return std::string("BLANK_LINE");
+  case NamelistIntroduction::NONE:
+    return std::string("NONE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+KeyRequirement translateKeyRequirement(const std::string &input) {
+  if (strcmpCased(input, "optional", CaseSensitivity::NO)) {
+    return KeyRequirement::OPTIONAL;
+  }
+  else if (strcmpCased(input, "required", CaseSensitivity::NO)) {
+    return KeyRequirement::REQUIRED;
+  }
+  else if (strcmpCased(input, "bogus", CaseSensitivity::NO)) {
+    return KeyRequirement::BOGUS;
+  }
+  else {
+    rtErr("No translation of KeyRequirement \"" + input + "\" is available.",
+          "translateKeyRequirement");
   }
   __builtin_unreachable();
 }

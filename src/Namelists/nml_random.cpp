@@ -16,7 +16,8 @@ RandomControls::RandomControls(const ExceptionResponse policy_in, const WrapText
     igseed{default_random_seed},
     stream_count{default_random_streams},
     production_stride{default_random_stride},
-    warmup_cycles{default_random_warmup}
+    warmup_cycles{default_random_warmup},
+    nml_transcript{"random"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -25,6 +26,7 @@ RandomControls::RandomControls(const TextFile &tf, int *start_line, bool *found_
     RandomControls(policy_in)
 {
   NamelistEmulator t_nml = randomInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   igseed = t_nml.getIntValue("igseed");
   stream_count = t_nml.getIntValue("igstreams");
   production_stride = t_nml.getIntValue("igstride");
@@ -54,6 +56,11 @@ int RandomControls::getProductionStride() const {
 //-------------------------------------------------------------------------------------------------
 int RandomControls::getWarmupCycleCount() const {
   return warmup_cycles;
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& RandomControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------

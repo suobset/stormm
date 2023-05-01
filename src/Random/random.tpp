@@ -450,5 +450,287 @@ void fillRandomCache(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, Hybri
                   product, index_start, index_end);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Tvar* x, const size_t length, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  if (isFloatingPointScalarType<Tvar>()) {
+    if (fabs(scale - 1.0) > 1.0e-6) {
+      rtErr("Floating point data types assume that there is no scaling factor on the numerical "
+            "representation.  Fold the scaling factor into the multiplier if required.",
+            "addRandomNoise");
+    }
+    switch (kind) {
+    case RandomNumberKind::UNIFORM:
+      for (size_t i = 0; i < length; i++) {
+        x[i] += (0.5 - prng->uniformRandomNumber()) * mult;
+      }
+      break;
+    case RandomNumberKind::GAUSSIAN:
+      for (size_t i = 0; i < length; i++) {
+        x[i] += prng->gaussianRandomNumber() * mult;
+      }
+      break;
+    }
+  }
+  else {
+    const double relevant_mult = mult * scale;
+    switch (kind) {
+    case RandomNumberKind::UNIFORM:
+      if (std::type_index(typeid(Tvar)).hash_code() == llint_type_index) {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += llround((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+        }
+      }
+      else {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += round((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+        }
+      }
+      break;
+    case RandomNumberKind::GAUSSIAN:
+      if (std::type_index(typeid(Tvar)).hash_code() == llint_type_index) {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += llround((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+        }
+      }
+      else {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += round((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+        }
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, std::vector<Tvar> *x, const double mult, const double scale,
+                    const RandomNumberKind kind) {
+  addRandomNoise(prng, x->data(), x->size(), mult, scale, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Hybrid<Tvar> *x, const double mult, const double scale,
+                    const RandomNumberKind kind) {
+  addRandomNoise(prng, x->data(), x->size(), mult, scale, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Tvar* x, Tvar* y, Tvar *z, const size_t length, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  if (isFloatingPointScalarType<Tvar>()) {
+    if (fabs(scale - 1.0) > 1.0e-6) {
+      rtErr("Floating point data types assume that there is no scaling factor on the numerical "
+            "representation.  Fold the scaling factor into the multiplier if required.",
+            "addRandomNoise");
+    }
+    switch (kind) {
+    case RandomNumberKind::UNIFORM:
+      for (size_t i = 0; i < length; i++) {
+        x[i] += (0.5 - prng->uniformRandomNumber()) * mult;
+        y[i] += (0.5 - prng->uniformRandomNumber()) * mult;
+        z[i] += (0.5 - prng->uniformRandomNumber()) * mult;
+      }
+      break;
+    case RandomNumberKind::GAUSSIAN:
+      for (size_t i = 0; i < length; i++) {
+        x[i] += prng->gaussianRandomNumber() * mult;
+        y[i] += prng->gaussianRandomNumber() * mult;
+        z[i] += prng->gaussianRandomNumber() * mult;
+      }
+      break;
+    }
+  }
+  else {
+    const double relevant_mult = mult * scale;
+    switch (kind) {
+    case RandomNumberKind::UNIFORM:
+      if (std::type_index(typeid(Tvar)).hash_code() == llint_type_index) {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += llround((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+          y[i] += llround((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+          z[i] += llround((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+        }
+      }
+      else {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += round((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+          y[i] += round((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+          z[i] += round((0.5 - prng->uniformRandomNumber()) * relevant_mult);
+        }
+      }
+      break;
+    case RandomNumberKind::GAUSSIAN:
+      if (std::type_index(typeid(Tvar)).hash_code() == llint_type_index) {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += llround((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+          y[i] += llround((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+          z[i] += llround((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+        }
+      }
+      else {
+        for (size_t i = 0; i < length; i++) {
+          x[i] += round((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+          y[i] += round((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+          z[i] += round((0.5 - prng->gaussianRandomNumber()) * relevant_mult);
+        }
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, std::vector<Tvar> *x, std::vector<Tvar> *y, std::vector<Tvar> *z,
+                    const double mult, const double scale, const RandomNumberKind kind) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("The arrays must all be the same lengths (currently " + std::to_string(length) + ", " +
+          std::to_string(y->size()) + ", " + std::to_string(z->size()) + ").", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), y->data(), z->data(), x->size(), mult, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Hybrid<Tvar> *x, Hybrid<Tvar> *y, Hybrid<Tvar> *z,
+                    const double mult, const double scale, const RandomNumberKind kind) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("The arrays must all be the same lengths (currently " + std::to_string(length) + ", " +
+          std::to_string(y->size()) + ", " + std::to_string(z->size()) + ").", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), y->data(), z->data(), x->size(), mult, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, const size_t length, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  const double relevant_mult = mult * scale;
+  switch (kind) {
+  case RandomNumberKind::UNIFORM:
+    for (size_t i = 0; i < length; i++) {
+      const double noise = (0.5 - prng->uniformRandomNumber()) * relevant_mult;
+      const int95_t nxi = hostInt95Sum(x[i], x_ovrf[i], noise);
+      x[i] = nxi.x;
+      x_ovrf[i] = nxi.y;
+    }
+    break;
+  case RandomNumberKind::GAUSSIAN:
+    for (size_t i = 0; i < length; i++) {
+      const double noise = (0.5 - prng->gaussianRandomNumber()) * relevant_mult;
+      const int95_t nxi = hostInt95Sum(x[i], x_ovrf[i], noise);
+      x[i] = nxi.x;
+      x_ovrf[i] = nxi.y;
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  if (x->size() != x_ovrf->size()) {
+    rtErr("The array of overflow bits must be the same length as the primary array of "
+          "fixed-precision numbers.", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), x_ovrf->data(), x->size(), mult, scale, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  if (x->size() != x_ovrf->size()) {
+    rtErr("The array of overflow bits must be the same length as the primary array of "
+          "fixed-precision numbers.", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), x_ovrf->data(), x->size(), mult, scale, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, llint* y, int* y_ovrf, llint* z,
+                    int* z_ovrf, const size_t length, const double mult, const double scale,
+                    const RandomNumberKind kind) {
+  const double relevant_mult = mult * scale;
+  switch (kind) {
+  case RandomNumberKind::UNIFORM:
+    for (size_t i = 0; i < length; i++) {
+      const double noise_x = (0.5 - prng->uniformRandomNumber()) * relevant_mult;
+      const double noise_y = (0.5 - prng->uniformRandomNumber()) * relevant_mult;
+      const double noise_z = (0.5 - prng->uniformRandomNumber()) * relevant_mult;
+      const int95_t nxi = hostInt95Sum(x[i], x_ovrf[i], noise_x);
+      const int95_t nyi = hostInt95Sum(y[i], y_ovrf[i], noise_y);
+      const int95_t nzi = hostInt95Sum(z[i], z_ovrf[i], noise_z);
+      x[i] = nxi.x;
+      y[i] = nyi.x;
+      z[i] = nzi.x;
+      x_ovrf[i] = nxi.y;
+      y_ovrf[i] = nyi.y;
+      z_ovrf[i] = nzi.y;
+    }
+    break;
+  case RandomNumberKind::GAUSSIAN:
+    for (size_t i = 0; i < length; i++) {
+      const double noise_x = (0.5 - prng->gaussianRandomNumber()) * relevant_mult;
+      const double noise_y = (0.5 - prng->gaussianRandomNumber()) * relevant_mult;
+      const double noise_z = (0.5 - prng->gaussianRandomNumber()) * relevant_mult;
+      const int95_t nxi = hostInt95Sum(x[i], x_ovrf[i], noise_x);
+      const int95_t nyi = hostInt95Sum(y[i], y_ovrf[i], noise_y);
+      const int95_t nzi = hostInt95Sum(z[i], z_ovrf[i], noise_z);
+      x[i] = nxi.x;
+      y[i] = nyi.x;
+      z[i] = nzi.x;
+      x_ovrf[i] = nxi.y;
+      y_ovrf[i] = nyi.y;
+      z_ovrf[i] = nzi.y;
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf,
+                    std::vector<llint> *y, std::vector<int> *y_ovrf, std::vector<llint> *z,
+                    std::vector<int> *z_ovrf, const double mult, const double scale,
+                    const RandomNumberKind kind) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("The arrays must all be the same lengths (currently " + std::to_string(length) + ", " +
+          std::to_string(y->size()) + ", " + std::to_string(z->size()) + ").", "addRandomNoise");
+  }
+  if (length != x_ovrf->size() || length != y_ovrf->size() || length != z_ovrf->size()) {
+    rtErr("The arrays of overflow bits must be the same length as the primary array of "
+          "fixed-precision numbers.", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), x_ovrf->data(), x->size(), mult, scale, kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Trng>
+void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, Hybrid<llint> *y,
+                    Hybrid<int> *y_ovrf, Hybrid<llint> *z, Hybrid<int> *z_ovrf, const double mult,
+                    const double scale, const RandomNumberKind kind) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("The arrays must all be the same lengths (currently " + std::to_string(length) + ", " +
+          std::to_string(y->size()) + ", " + std::to_string(z->size()) + ").", "addRandomNoise");
+  }
+  if (length != x_ovrf->size() || length != y_ovrf->size() || length != z_ovrf->size()) {
+    rtErr("The arrays of overflow bits must be the same length as the primary array of "
+          "fixed-precision numbers.", "addRandomNoise");
+  }
+  addRandomNoise(prng, x->data(), x_ovrf->data(), x->size(), mult, scale, kind);
+}
+
 } // namespace random
 } // namespace stormm

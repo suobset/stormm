@@ -273,23 +273,36 @@ public:
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN) const;
 
+  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
+  ///        access to any of its member variables.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract from a const object
+  ///   - Get a writeable abstract from a mutable object
+  /// \{
+  const CoordinateFrameReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  CoordinateFrameWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
 #ifdef STORMM_USE_HPC
   /// \brief Upload all information
   void upload();
 
   /// \brief Download all information
   void download();
-#endif
-  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
-  ///        access to any of its member variables.
+
+  /// \brief Get a read-only abstract that is guaranteed to be valid on the device.  While many
+  ///        GPU devices will accept the output of data() and the level of the HOST, the pointers
+  ///        set herein will work for all devices.
   ///
   /// Overloaded:
-  ///   - Get a read-only object
-  ///   - Get a writeable object
+  ///   - Get a read-only abstract from a const object
+  ///   - Get a writeable abstract from a mutable object
   /// \{
-  const CoordinateFrameReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  CoordinateFrameWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  const CoordinateFrameReader deviceViewToHostData() const;
+  CoordinateFrameWriter deviceViewToHostData();
   /// \}
+#endif
 
   /// \brief Set the frame number, for bookkeeping purposes.  This function exists that the frame
   ///        number does not become a necessary argument in one of the overloaded constructors.

@@ -122,7 +122,7 @@ template <typename Tcalc>
 void rotateCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index, const Tcalc alpha,
                        const Tcalc beta, const Tcalc gamma, const int lower_limit,
                        const int upper_limit) {
-  const AtomGraph *ag = poly_ps->getSystemTopologyPointer();
+  const AtomGraph *ag = poly_ps->getSystemTopologyPointer(system_index);
   if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
     const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
     CoordinateFrame cf = poly_ps->exportCoordinates(system_index);

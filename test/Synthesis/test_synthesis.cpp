@@ -71,6 +71,7 @@ using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
 using stormm::restraints::RestraintKit;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::structure::distance;
 using stormm::structure::angle;
 using stormm::structure::dihedralAngle;
@@ -1515,6 +1516,8 @@ int main(const int argc, const char* argv[]) {
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

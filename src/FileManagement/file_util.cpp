@@ -26,17 +26,19 @@ std::ofstream openOutputFile(const std::string &filename, const PrintSituation e
 
   // Check the file conditions: look before you leap
   std::ofstream foutp;
+  bool directory_in_the_way = false;
   switch (expectation) {
   case PrintSituation::UNKNOWN:
   case PrintSituation::OPEN_NEW:
     switch (getDrivePathType(filename)) {
     case DrivePathType::FILE:
-      rtErr("Unable to open a new file " + filename + " because it already exists.  Activity: " +
+      rtErr("Unable to open a new file " + filename + " because it already exists.  If this "
+            "file is to be overwritten, the command line option \"-O\" appended or placed amongst "
+            "the program options can often override this safety mechanism.  Activity: " +
             description + ".", "openOutputFile");
       break;
     case DrivePathType::DIRECTORY:
-      rtErr("Unable to open a new file " + filename + " because a directory of the same name "
-            "exists.  Activity: " + description + ".", "openOutputFile");
+      directory_in_the_way = true;
       break;
     case DrivePathType::REGEXP:
       switch (style) {
@@ -64,15 +66,28 @@ std::ofstream openOutputFile(const std::string &filename, const PrintSituation e
     }
     break;
   case PrintSituation::OVERWRITE:
-    switch (style) {
-    case DataFormat::ASCII:
-      foutp.open(filename, std::ofstream::trunc);
+    switch (getDrivePathType(filename)) {
+    case DrivePathType::FILE:
+    case DrivePathType::REGEXP:
+      switch (style) {
+      case DataFormat::ASCII:
+        foutp.open(filename, std::ofstream::trunc);
+        break;
+      case DataFormat::BINARY:
+        foutp.open(filename, std::ofstream::trunc | std::ofstream::binary);
+        break;
+      }
       break;
-    case DataFormat::BINARY:
-      foutp.open(filename, std::ofstream::trunc | std::ofstream::binary);
+    case DrivePathType::DIRECTORY:
+      directory_in_the_way = true;
       break;
     }
     break;
+  }
+  if (directory_in_the_way) {
+    rtErr("Unable to open a new file " + filename + " because a directory of the same name "
+          "exists.  No remedy is provided in the command line -O option for this case.  "
+          "Activity: " + description + ".", "openOutputFile");
   }
 
   // Check that the file has been opened
@@ -279,6 +294,9 @@ std::string getDefaultFileExtension(const CoordinateFileKind kind) {
     return std::string(default_amber_netcdf_rst_extension);
   case CoordinateFileKind::SDF:
     return std::string(default_sd_file_extension);
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("No default extension is available for files of " + getEnumerationName(kind) + " type.",
+          "getDefaultFileExtension");
   }
   __builtin_unreachable();
 }

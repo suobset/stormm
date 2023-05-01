@@ -28,6 +28,7 @@ using stormm::parse::polyNumericVector;
 using stormm::random::Ran2Generator;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::diskutil;
 using namespace stormm::trajectory;
 using namespace stormm::testing;
@@ -168,8 +169,17 @@ int main(const int argc, const char* argv[]) {
                              NumberFormat::STANDARD_REAL, PrintSituation::OPEN_NEW),
                     "Snapshotting was able to open a new file " + snp_file +
                     " despite it already existing.", snp_tests);
+  const std::string snp_txt_file = oe.getTemporaryDirectoryPath() + osSeparator() + "verbiage.txt";
+  const std::string some_text("# Text written to a snapshot file can take any form.\n"
+                              "The only restriction is that it not contain special markers\n"
+                              "beginning with '|>>>' and followed by a label name or 'End'.\n");
+  snapshot(snp_txt_file, some_text, "ktxt", "A text block was not properly conveyed to or from a "
+           "snapshot file.", SnapshotOperation::SNAPSHOT, PrintSituation::OPEN_NEW, snp_tests);
+  snapshot(snp_txt_file, some_text, "ktxt", "A text block was not properly conveyed to or from a "
+           "snapshot file.", SnapshotOperation::COMPARE, PrintSituation::OPEN_NEW, snp_tests);
   if (snp_tests == TestPriority::CRITICAL) {
     oe.logFileCreated(snp_file);
+    oe.logFileCreated(snp_txt_file);
   }
   section_timer.assignTime(2);
 
@@ -355,6 +365,8 @@ int main(const int argc, const char* argv[]) {
 
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

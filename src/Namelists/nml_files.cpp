@@ -2,6 +2,7 @@
 #include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
+#include "Reporting/summary_file.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "nml_files.h"
 
@@ -199,10 +200,12 @@ FilesControls::FilesControls(const ExceptionResponse policy_in,
     coordinate_checkpoint_format{default_filecon_chkcrd_type},
     topology_file_names{}, coordinate_file_names{}, systems{},
     report_file{std::string(default_filecon_report_name)},
+    input_transcript_file{std::string("")},
     coordinate_output_name{std::string(default_filecon_trajectory_name)},
     checkpoint_name{std::string(default_filecon_checkpoint_name)},
     sdf_mod_policy{ModificationPolicy::DO_NOT_MODIFY},
-    sdf_mod_alert{ExceptionResponse::WARN}
+    sdf_mod_alert{ExceptionResponse::WARN},
+    nml_transcript{"files"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -281,19 +284,23 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line, bool *found_nm
     trj_is_bogus = (trj_is_bogus || sys_requirements[i] == "-xg");
     rst_is_bogus = (rst_is_bogus || sys_requirements[i] == "-rg");
   }
-  const SubkeyRequirement short_req = SubkeyRequirement::REQUIRED;
-  const SubkeyRequirement short_opt = SubkeyRequirement::OPTIONAL;
-  const SubkeyRequirement short_bog = SubkeyRequirement::BOGUS;
-  const std::vector<SubkeyRequirement> sys_keyword_reqs = {
+  const KeyRequirement short_req = KeyRequirement::REQUIRED;
+  const KeyRequirement short_opt = KeyRequirement::OPTIONAL;
+  const KeyRequirement short_bog = KeyRequirement::BOGUS;
+  const std::vector<KeyRequirement> sys_keyword_reqs = {
     (top_name_required) ? short_req : (top_is_bogus) ? short_bog : short_opt,
     (crd_name_required) ? short_req : (crd_is_bogus) ? short_bog : short_opt,
     (trj_name_required) ? short_req : (trj_is_bogus) ? short_bog : short_opt,
     (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt,
-    short_opt
+    short_opt, short_opt, short_opt, short_opt,
+    (crd_name_required) ? short_req : (crd_is_bogus) ? short_bog : short_opt,
+    (trj_name_required) ? short_req : (trj_is_bogus) ? short_bog : short_opt,
+    (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt
   };
   NamelistEmulator t_nml = filesInput(tf, start_line, found_nml, sys_keyword_reqs, policy, wrap,
                                       coordinate_input_format, coordinate_output_format,
                                       coordinate_checkpoint_format);
+  nml_transcript = t_nml;
   const InputStatus stt_missing = InputStatus::MISSING;
   const int nsys = t_nml.getKeywordEntries("-sys");
   for (int i = 0; i < nsys; i++) {
@@ -503,7 +510,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line, bool *found_nm
   }
 
   // Shall corrections to SD files be raised to the user's attention?
-  const std::string& sdf_alert_cmd = t_nml.getStringValue("sdf_correction_alert");
+  const std::string& sdf_alert_cmd = t_nml.getStringValue("sdf_alert");
   if (strcmpCased(sdf_alert_cmd, std::string("NO")) ||
       strcmpCased(sdf_alert_cmd, std::string("SILENT"))) {
     sdf_mod_alert = ExceptionResponse::SILENT;
@@ -517,10 +524,10 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line, bool *found_nm
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("An invalid setting \"" + sdf_alert_cmd + "\" was supplied to the "
-            "\"sdf_correction_alert\" keyword.", "FilesControls");
+            "\"sdf_alert\" keyword.", "FilesControls");
     case ExceptionResponse::WARN:
       rtWarn("An invalid setting \"" + sdf_alert_cmd + "\" was supplied to the "
-             "\"sdf_correction_alert\" keyword.  The default setting of \"" +
+             "\"sdf_alert\" keyword.  The default setting of \"" +
              std::string(default_filecon_sdf_notification) + "\" will remain in place.",
              "FilesControls");
       break;
@@ -534,7 +541,10 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line, bool *found_nm
   coordinate_output_name = t_nml.getStringValue("-x");  
   checkpoint_name        = t_nml.getStringValue("-r");
   warning_file_name      = t_nml.getStringValue("-wrn");
-
+  if (t_nml.getKeywordStatus("-t") != InputStatus::MISSING) {
+    input_transcript_file = t_nml.getStringValue("-t");
+  }
+  
   // General file formats
   if (t_nml.getKeywordStatus("c_kind") != InputStatus::MISSING) {
     coordinate_input_format = translateCoordinateFileKind(t_nml.getStringValue("c_kind"));
@@ -612,10 +622,14 @@ MoleculeSystem FilesControls::getSystem(int index) const {
   return systems[index];
 }
 
-
 //-------------------------------------------------------------------------------------------------
 std::string FilesControls::getReportFile() const {
   return report_file;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string FilesControls::getInputTranscriptFile() const {
+  return input_transcript_file;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -641,6 +655,11 @@ ModificationPolicy FilesControls::getSdfModificationPolicy() const {
 //-------------------------------------------------------------------------------------------------
 ExceptionResponse FilesControls::getSdfNotifications() const {
   return sdf_mod_alert;
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& FilesControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -763,6 +782,11 @@ void FilesControls::setReportFileName(const std::string &file_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void FilesControls::setInputTranscriptFileName(const std::string &file_name) {
+  input_transcript_file = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
 void FilesControls::setGeneralTrajectoryFileName(const std::string &proto_name) {
   coordinate_output_name = proto_name;
 }
@@ -789,7 +813,7 @@ void FilesControls::setSdfNotifications(const ExceptionResponse policy_in) {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
-                            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
+                            const std::vector<KeyRequirement> &sys_keyword_reqs,
                             const ExceptionResponse policy, const WrapTextSearch wrap,
                             const CoordinateFileKind crd_input_format,
                             const CoordinateFileKind crd_output_format,
@@ -838,6 +862,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                                    sys_keys_help, sys_keyword_reqs));
   t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING,
                                    std::string(default_filecon_report_name)));
+  t_nml.addKeyword(NamelistElement("-t", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("-x", NamelistType::STRING,
                                    std::string(default_filecon_trajectory_name)));
   t_nml.addKeyword(NamelistElement("-r", NamelistType::STRING,
@@ -854,7 +879,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                                    std::string(default_filecon_result_fusion)));
   t_nml.addKeyword(NamelistElement("correct_sdf", NamelistType::STRING,
                                    std::string(default_filecon_sdf_mod_policy)));
-  t_nml.addKeyword(NamelistElement("sdf_correction_alert", NamelistType::STRING,
+  t_nml.addKeyword(NamelistElement("sdf_alert", NamelistType::STRING,
                                    std::string(default_filecon_sdf_notification)));  
   t_nml.addHelp("-p", "System topology file.  Repeatable for multiple systems.  Also accepts "
                 "regular expressions.");
@@ -881,13 +906,13 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                 "restart file name.");
   t_nml.addHelp("c_kind", "The type of input coordinate file to expect, barring specific "
                 "directives for a particular system.  Acceptable settings include 'AMBER_INPCRD' "
-                "and 'SDF', among others.  Default 'AMBER_INPCRD'.");
+                "and 'SDF', among others.");
   t_nml.addHelp("x_kind", "The type of trajectory file to write, barring specific directives for "
                 "a particular system.  Acceptable settings include 'AMBER_CRD' and 'SDF', among "
-                "others.  Default 'AMBER_CRD'.");
+                "others.");
   t_nml.addHelp("r_kind", "The type of checkpoint file to write, unless specific directives are "
                 "provided for a particular system.  Acceptable settings include 'AMBER_ASCII_RST' "
-                "and 'AMMBER_INPCRD', among others.  Default 'AMBER_ASCII_RST'.");  
+                "and 'AMMBER_INPCRD', among others.");  
   t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
   t_nml.addHelp("fusion", "Indicate whether multiple trajectories or checkpoint files produced "
                 "from systems classified under the same label should be fused into a single file "
@@ -899,15 +924,15 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                 "(again, if the checkpoint file format is suitable).  The order of frames in a "
                 "fused trajectory will proceed { A1, B1, C1, D1, A2, B2, C2, D2, A3, ... }, where "
                 "A, B, C, and D are the individual systems grouped under a single label and 1, 2, "
-                "... represent the frame numbers.  Set this to OFF to de-activate fusion of "
+                "... represent the frame numbers.  Set this to 'OFF' to de-activate fusion of "
                 "checkpoint files even if the specified format would support it.");
   t_nml.addHelp("correct_sdf", "Correct minor issues in the naming conventions of .sdf file "
                 "data items.  Set to one of \"modify\", \"correct\", or \"yes\" to activate this "
                 "behavior (input is case-insensitive).  By default, .sdf file details will not be "
-                "modified (a setting of \"no\").");
-  t_nml.addHelp("sdf_correction_alert", "By default, when modifying .sdf files to correct errors "
-                "in data item names on output, a warning will be emitted.  This behavior can also "
-                "be triggered by supplying one of \"warn\", \"alert\", or \"yes\".  To suppress "
+                "modified.");
+  t_nml.addHelp("sdf_alert", "By default, when modifying .sdf files to correct errors in data "
+                "item names on output, a warning will be emitted.  This behavior can also be "
+                "triggered by supplying one of \"warn\", \"alert\", or \"yes\".  To suppress "
                 "warnings, enter \"no\" or \"silent\".");
   
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by

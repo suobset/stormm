@@ -400,6 +400,12 @@ std::vector<double> CoordinateSeries<T>::getBoxDimensions(const int frame_index,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+const Hybrid<double>& CoordinateSeries<T>::getBoxDimensions() const {
+  return box_dimensions;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void CoordinateSeries<T>::extractFrame(CoordinateFrame *cf, const int frame_index,
                                        const HybridTargetLevel tier) const {
   if (cf->getAtomCount() != atom_count) {
@@ -466,6 +472,21 @@ void CoordinateSeries<T>::extractFrame(PhaseSpace *ps, const int frame_index,
     break;
 #endif
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::extractFrame(PhaseSpace *ps, const int frame_index,
+                                       const TrajectoryKind kind,
+                                       const HybridTargetLevel tier) const {
+  extractFrame(ps, frame_index, kind, ps->getCyclePosition(), tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::extractFrame(PhaseSpace *ps, const int frame_index,
+                                       const HybridTargetLevel tier) const {
+  extractFrame(ps, frame_index, TrajectoryKind::POSITIONS, ps->getCyclePosition(), tier);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -604,34 +625,6 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   foutp.close();
 }
 
-#ifdef STORMM_USE_HPC
-//-------------------------------------------------------------------------------------------------
-template <typename T> void CoordinateSeries<T>::upload() {
-  x_coordinates.upload();
-  y_coordinates.upload();
-  z_coordinates.upload();
-  box_space_transforms.upload();
-  inverse_transforms.upload();
-  box_dimensions.upload();
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T> void CoordinateSeries<T>::download() {
-  x_coordinates.download();
-  y_coordinates.download();
-  z_coordinates.download();
-  box_space_transforms.download();
-  inverse_transforms.download();
-  box_dimensions.download();
-}
-#endif
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-const CoordinateSeries<T>* CoordinateSeries<T>::getSelfPointer() const {
-  return this;
-}
-
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 const Hybrid<T>& CoordinateSeries<T>::getCoordinateReference(CartesianDimension dim) const {
@@ -686,6 +679,18 @@ const Hybrid<double>* CoordinateSeries<T>::getInverseTransformPointer() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+const Hybrid<double>* CoordinateSeries<T>::getBoxDimensionPointer() const {
+  return &box_dimensions;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const CoordinateSeries<T>* CoordinateSeries<T>::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 CoordinateSeriesWriter<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) {
   return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
                                    globalpos_scale, inverse_globalpos_scale,
@@ -703,6 +708,55 @@ const CoordinateSeriesReader<T> CoordinateSeries<T>::data(const HybridTargetLeve
                                    z_coordinates.data(tier), box_space_transforms.data(tier),
                                    inverse_transforms.data(tier), box_dimensions.data(tier));
 }
+
+#ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const CoordinateSeriesReader<T> CoordinateSeries<T>::deviceViewToHostData() const {
+  const T* xcrd = x_coordinates.getDeviceValidHostPointer();
+  const T* ycrd = y_coordinates.getDeviceValidHostPointer();
+  const T* zcrd = z_coordinates.getDeviceValidHostPointer();
+  const double* umat = box_space_transforms.getDeviceValidHostPointer();
+  const double* invu = inverse_transforms.getDeviceValidHostPointer();
+  const double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateSeriesReader<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                   globalpos_scale, inverse_globalpos_scale, xcrd, ycrd, zcrd,
+                                   umat, invu, boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> CoordinateSeriesWriter<T> CoordinateSeries<T>::deviceViewToHostData() {
+  T* xcrd = x_coordinates.getDeviceValidHostPointer();
+  T* ycrd = y_coordinates.getDeviceValidHostPointer();
+  T* zcrd = z_coordinates.getDeviceValidHostPointer();
+  double* umat = box_space_transforms.getDeviceValidHostPointer();
+  double* invu = inverse_transforms.getDeviceValidHostPointer();
+  double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                   globalpos_scale, inverse_globalpos_scale, xcrd, ycrd, zcrd,
+                                   umat, invu, boxdim);  
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void CoordinateSeries<T>::upload() {
+  x_coordinates.upload();
+  y_coordinates.upload();
+  z_coordinates.upload();
+  box_space_transforms.upload();
+  inverse_transforms.upload();
+  box_dimensions.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void CoordinateSeries<T>::download() {
+  x_coordinates.download();
+  y_coordinates.download();
+  z_coordinates.download();
+  box_space_transforms.download();
+  inverse_transforms.download();
+  box_dimensions.download();
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>

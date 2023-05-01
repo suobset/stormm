@@ -71,6 +71,9 @@ public:
   /// \brief Get the number of warmup cycles for the prime stream generator.
   int getWarmupCycleCount() const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Set the random seed.
   ///
   /// \param igseed_in  The new choice of random seed (will be checked for validity)
@@ -109,6 +112,9 @@ private:
                              ///<   producing numbers in the prime stream, or spawning any other
                              ///<   streams.
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Check the random number seed to ensure that it contains enough bits set to 1.
   ///        Adjust the number of warmup cycles as necessary.
   void validateRandomSeed();

@@ -85,7 +85,7 @@ public:
   std::vector<T> getPossibleStates(int var_index) const;
   /// \}
 
-  /// \brief Get the exact number of permutations count for this object.
+  /// \brief Get the exact number of permutations for this object.
   llint getExactPermutationCount() const;
 
   /// \brief Get the number of permutations count for this object as a floating-point number.

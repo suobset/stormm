@@ -10,6 +10,7 @@
 #include "DataTypes/common_types.h"
 #include "FileManagement/directory_util.h"
 #include "FileManagement/file_listing.h"
+#include "Parsing/parsing_enumerators.h"
 #include "Parsing/tabulation.h"
 #include "unit_test.h"
 
@@ -42,6 +43,8 @@ using parse::polyNumericVector;
 using parse::printTable;
 using parse::realDecimalPlaces;
 using parse::realToString;
+using parse::TextFileReader;
+using parse::TextOrigin;
 
 //-------------------------------------------------------------------------------------------------
 void section(const std::string &section_name) {
@@ -539,6 +542,150 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
                      const PrintSituation expectation, const TestPriority urgency) {
   return snapshot(filename, content, label, comparison_tolerance, error_message, activity,
                   output_precision, data_format, expectation, urgency);
+}
+
+//-------------------------------------------------------------------------------------------------
+CheckResult snapshot(const std::string &filename, const TextFile &content,
+                     const std::string &label, const std::string &error_message,
+                     const SnapshotOperation activity, const PrintSituation expectation,
+                     const TestPriority urgency) {
+  
+  // Abort if some prior condition has made this test impossible to run
+  if (urgency == TestPriority::ABORT) {
+
+    // Check first that the point is not to write the snapshot
+    switch (activity) {
+    case SnapshotOperation::COMPARE:
+      gbl_test_results.logResult(CheckResult::SKIPPED);
+      return CheckResult::SKIPPED;
+    case SnapshotOperation::SNAPSHOT:
+      writeTextSnapshot(filename, content, label, expectation);
+      gbl_test_results.logResult(CheckResult::SUCCESS);
+      return CheckResult::SUCCESS;
+    }
+  }
+
+  // For a non-abortive test, perform the requested snapshotting activity.
+  switch (activity) {
+  case SnapshotOperation::COMPARE:
+    {
+      const TextFile ref_content = readTextSnapshot(filename, label);
+      const TextFileReader rtrial = content.data();
+      const TextFileReader rref = ref_content.data();
+      bool mismatch = (rtrial.line_count != rref.line_count);
+      const bool line_count_difference = mismatch;
+      int i = 0;
+      std::vector<int> line_length_differences;
+      while (i < rtrial.line_count) {
+        if (rtrial.line_limits[i + 1] - rtrial.line_limits[i] !=
+            rref.line_limits[i + 1] - rref.line_limits[i]) {
+          line_length_differences.push_back(i + 1);
+        }
+        i++;
+      }
+      mismatch = (mismatch || line_length_differences.size() > 0);
+      size_t altered_chars = 0;
+      std::vector<int> line_content_differences;
+      i = 0;
+      while (i < rtrial.line_count) {
+        bool line_noted = false;
+        for (size_t ic = rtrial.line_limits[i]; ic < rtrial.line_limits[i + 1]; ic++) {
+          if (rtrial.text[ic] != rref.text[ic]) {
+            altered_chars++;
+            if (line_noted == false) {
+              line_content_differences.push_back(i + 1);
+              line_noted = true;
+            }
+          }
+        }
+        i++;
+      }
+      mismatch = (mismatch || line_content_differences.size());
+      if (mismatch) {
+        printf("Snapshot MISMATCH: ");
+        std::string error_edit("  ");
+        if (line_count_difference) {
+          error_edit += "The text samples contain different line counts (reference " +
+                        std::to_string(rref.line_count) + ", comparison " +
+                        std::to_string(rtrial.line_count) + ").";
+        }
+        else if (line_length_differences.size() > 0) {
+          const int ndiff = line_length_differences.size();
+          error_edit += "In all, " + std::to_string(ndiff) + " out of " +
+                        std::to_string(rtrial.line_count) + " lines differ in length between "
+                        "the two samples (entry \"" + label + "\"): [ ";
+          int nrep = 0;
+          bool elipsis_printed = false;
+          for (int j = 0; j < ndiff; j++) {
+            if (nrep < 7 || j == ndiff - 1) {
+              error_edit += std::to_string(line_length_differences[j]);
+              if (j != ndiff - 1) {
+                error_edit += " ";
+              }
+            }
+            else if (elipsis_printed == false) {
+              elipsis_printed = true;
+              error_edit += "... ";
+            }
+          }
+          error_edit += " ].";
+        }
+        else if (line_content_differences.size() > 0) {
+          const int ndiff = line_content_differences.size();
+          error_edit += "In all, " + std::to_string(line_length_differences.size()) + " out of " +
+                        std::to_string(rtrial.line_count) + " lines differ between the two "
+                        "samples (entry \"" + label + "\"), with " +
+                        std::to_string(altered_chars) + " total differences between the "
+                        "characters: [ ";
+          int nrep = 0;
+          bool elipsis_printed = false;
+          for (int j = 0; j < ndiff; j++) {
+            if (nrep < 7 || j == ndiff - 1) {
+              error_edit += std::to_string(line_content_differences[j]);
+              if (j != ndiff - 1) {
+                error_edit += " ";
+              }
+            }
+            else if (elipsis_printed == false) {
+              elipsis_printed = true;
+              error_edit += "... ";
+            }
+          }
+          error_edit += " ].";
+        }
+        const std::string parsed_msg = terminalFormat(error_message + error_edit,
+                                                      "", "", 19, 0, 19);
+        printf("%s\n", parsed_msg.c_str());
+        if (urgency == TestPriority::NON_CRITICAL) {
+          gbl_test_results.logResult(CheckResult::IGNORED);
+          return CheckResult::IGNORED;
+        }
+        else if (urgency == TestPriority::CRITICAL) {
+          gbl_test_results.logResult(CheckResult::FAILURE);
+          return CheckResult::FAILURE;
+        }
+      }
+      else {
+        gbl_test_results.logResult(CheckResult::SUCCESS);
+        return CheckResult::SUCCESS;
+      }
+    }
+    break;
+  case SnapshotOperation::SNAPSHOT:
+    writeTextSnapshot(filename, content, label, expectation);
+    gbl_test_results.logResult(CheckResult::SUCCESS);
+    return CheckResult::SUCCESS;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+CheckResult snapshot(const std::string &filename, const std::string &content,
+                     const std::string &label, const std::string &error_message,
+                     const SnapshotOperation activity, const PrintSituation expectation,
+                     const TestPriority urgency) {
+  return snapshot(filename, TextFile(content, TextOrigin::RAM), label, error_message, activity,
+                  expectation, urgency);
 }
 
 //-------------------------------------------------------------------------------------------------

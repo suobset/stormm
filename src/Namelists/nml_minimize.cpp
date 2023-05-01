@@ -26,7 +26,8 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in, const Wrap
     initial_step{default_minimize_dx0},
     convergence_target{default_minimize_drms},
     clash_minimum_distance{default_minimize_clash_r0},
-    clash_vdw_ratio{default_minimize_clash_ratio}
+    clash_vdw_ratio{default_minimize_clash_ratio},
+    nml_transcript{"minimize"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -35,6 +36,7 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
     MinimizeControls(policy_in)
 {
   NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   clash_damping_cycles = t_nml.getIntValue("cdcyc");
@@ -119,6 +121,11 @@ double MinimizeControls::getAbsoluteClashDistance() const {
 //-------------------------------------------------------------------------------------------------
 double MinimizeControls::getVdwClashRatio() const {
   return clash_vdw_ratio;
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& MinimizeControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------

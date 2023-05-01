@@ -15,7 +15,8 @@ FFMorphControls::FFMorphControls(const ExceptionResponse policy_in, const WrapTe
     policy{policy_in},
     harmonic_bonds{}, harmonic_angles{}, cosine_dihedrals{}, urey_bradley_angles{},
     charmm_impropers{}, cmap_surfaces{}, attn14_scalings{}, charge_properties{},
-    van_der_waals_properties{}, virtual_sites{}
+    van_der_waals_properties{}, virtual_sites{},
+    nml_transcript{"ffmorph"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -24,7 +25,8 @@ FFMorphControls::FFMorphControls(const TextFile &tf, int *start_line, bool *foun
     FFMorphControls(policy_in)
 {
   NamelistEmulator t_nml = ffmorphInput(tf, start_line, found_nml, policy, wrap);
-
+  nml_transcript = t_nml;
+  
   // Load each kind of parameter edit
   const int nbond    = t_nml.getKeywordEntries("bond");
   const int nangl    = t_nml.getKeywordEntries("angle");
@@ -425,6 +427,11 @@ ForceFieldElement FFMorphControls::getModelEdit(const ParameterKind kind, const 
 }
 
 //-------------------------------------------------------------------------------------------------
+const NamelistEmulator& FFMorphControls::getTranscript() const {
+  return nml_transcript;
+}
+  
+//-------------------------------------------------------------------------------------------------
 NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                               const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("ffmorph", CaseSensitivity::AUTOMATIC, policy, "Permits user control of "
@@ -448,8 +455,8 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                    { std::string(""), std::string(""), std::string(""),
                                      std::string("") }, DefaultIsObligatory::NO, InputRepeats::YES,
                                    bond_help, bond_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
   const std::string angle_help("Modify the parameters of an angle between three atom types.");
   const std::vector<std::string> angle_keys_help = {
     "Atom type for the I atom in the angle (required)",
@@ -464,9 +471,9 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                    { std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string("") }, DefaultIsObligatory::NO,
                                    InputRepeats::YES, angle_help, angle_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL }));
   const std::string dihedral_help("Modify the parameters of a dihedral interaction between four "
                                   "atom types.");
   const std::vector<std::string> dihedral_keys_help = {
@@ -488,10 +495,10 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string(""), std::string("PROPER") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, dihedral_help,
                                    dihedral_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::REQUIRED }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::REQUIRED }));
   const std::string ubrd_help("Modify the parameters of a Urey-Bradley interaction between three "
                               "atom types (the spring constant applies only between the first and "
                               "third atom types, but the central atom type is essential for "
@@ -509,9 +516,9 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                    { std::string(""), std::string(""), std::string(""),
                                      std::string(""), std::string("") }, DefaultIsObligatory::NO,
                                    InputRepeats::YES, ubrd_help, ubrd_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL }));
   const std::string cimp_help("Modify the parameters of a CHARMM improper dihedral between four "
                               "atom types.");
   const std::vector<std::string> cimp_keys_help = {
@@ -529,9 +536,9 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string(""), std::string(""), std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, cimp_help,
                                    cimp_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
   const std::string cmap_help("Modify selected elements of a CMAP surface.");
   const std::vector<std::string> cmap_keys_help = {
     "Name of the I atom in the CMAP interaction (required)",
@@ -574,17 +581,17 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string(""), std::string(""), std::string(""),
                                      std::string("") }, DefaultIsObligatory::NO, InputRepeats::YES,
                                    cmap_help, cmap_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
   const std::string attn14_help("Modify the non-bonded scaling parameters of an attenuated 1:4 "
                                 "interaction.");
   const std::vector<std::string> attn14_keys_help = {
@@ -603,9 +610,9 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string(""), std::string(""), std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, attn14_help,
                                    attn14_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
   const std::string charge_help("Modify the properties of a charged atom.");
   const std::vector<std::string> charge_keys_help = {
     "Name of the atom to alter (this is not an atom type, and is required)", "Residue name of the "
@@ -616,8 +623,8 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                    { std::string(""), std::string(""), std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, charge_help,
                                    charge_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL }));
   const std::string vdw_help("Modify the van-der Waals properties of an atom.");
   const std::vector<std::string> vdw_keys_help = {
     "Atom type to alter (the van-der Waals atom types are one and the same with those used in "
@@ -632,8 +639,8 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, vdw_help,
                                    vdw_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
   const std::string vsite_help("Modify the dimensions of a virtual site frame (the non-bonded "
                                "properties of the virtual site can be altered with the 'charge' "
                                "and 'vdw' keywords--this keyword pertains to the geometry of the "
@@ -659,11 +666,11 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string(""), std::string(""), std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, vsite_help,
                                    vsite_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::REQUIRED, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::REQUIRED, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL }));
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

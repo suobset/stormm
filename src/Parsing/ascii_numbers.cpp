@@ -13,7 +13,8 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
                        const std::string &task) {
   
   // Allocate an individual line
-  std::vector<char> line(values_per_line * width + 65, '\0');
+  const int nl_char = (values_per_line * width) + 65;
+  std::vector<char> line(nl_char, '\0');
 
   // Check integer format for expedited ASCII printing
   const bool fixed_resources_exceeded = (sizeof(int) != 4 || decimal > 9);
@@ -77,7 +78,8 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
 
         // Print the numbers
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*.*e", width, decimal, values[llim + j].d);
+          snprintf(&line[j * width], nl_char - (j * width), "%*.*e", width, decimal,
+                   values[llim + j].d);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';
@@ -136,7 +138,8 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
         // but not so much that they break the actual format, print them with the standard tools
         if (extreme_values) {
           for (int j = llim; j < hlim; j++) {
-            sprintf(&line[(j - llim) * width], "%*.*lf", width, decimal, values[j].d);
+            snprintf(&line[(j - llim) * width], nl_char - ((j - llim) * width), "%*.*lf", width,
+                     decimal, values[j].d);
           }
           line[n_this_line * width] = '\n';
           line[n_this_line * width + 1] = '\0';
@@ -248,7 +251,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           }
         }
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*d", width, values[llim + j].i);
+          snprintf(&line[j * width], nl_char - (j * width), "%*d", width, values[llim + j].i);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';
@@ -293,7 +296,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           }
         }
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*lld", width, values[llim + j].lli);
+          snprintf(&line[j * width], nl_char - (j * width), "%*lld", width, values[llim + j].lli);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';
@@ -313,8 +316,8 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
         const int hlim = std::min(llim + values_per_line, nval);
         const int n_this_line = hlim - llim;
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * 5], "%c%c%c%c ", values[llim + j].c4.x, values[llim + j].c4.y,
-                  values[llim + j].c4.z, values[llim + j].c4.w);
+          snprintf(&line[j * 5], nl_char - (j * 5), "%c%c%c%c ", values[llim + j].c4.x,
+                   values[llim + j].c4.y, values[llim + j].c4.z, values[llim + j].c4.w);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';
@@ -357,7 +360,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           }
         }
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*u", width, values[llim + j].ui);
+          snprintf(&line[j * width], nl_char - (j * width), "%*u", width, values[llim + j].ui);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';
@@ -400,7 +403,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           }
         }
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*llu", width, values[llim + j].ulli);
+          snprintf(&line[j * width], nl_char - (j * width), "%*llu", width, values[llim + j].ulli);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';

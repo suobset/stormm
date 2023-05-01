@@ -47,6 +47,7 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::RandomNumberMill;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::structure::BoundaryCondition;
 using stormm::symbols::pi;
 using stormm::symbols::twopi;
@@ -1442,6 +1443,8 @@ int main(const int argc, const char* argv[]) {
   
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

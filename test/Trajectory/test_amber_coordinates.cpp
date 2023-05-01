@@ -34,6 +34,7 @@ using stormm::parse::polyNumericVector;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Ran2Generator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::symbols::pi;
 using stormm::topology::UnitCellType;
 using namespace stormm::testing;
@@ -646,6 +647,8 @@ int main(const int argc, const char* argv[]) {
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

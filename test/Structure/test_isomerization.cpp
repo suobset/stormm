@@ -52,6 +52,7 @@ using stormm::errors::rtWarn;
 using stormm::parse::char4ToString;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::stmath::computeBoxTransform;
 using stormm::stmath::meanUnsignedError;
 using stormm::symbols::twopi;
@@ -877,6 +878,8 @@ int main(const int argc, const char* argv[]) {
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

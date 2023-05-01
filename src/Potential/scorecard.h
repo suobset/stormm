@@ -26,7 +26,8 @@ struct ScoreCardReader {
   /// \brief The constructor is, as usual, a collection of the relevant constants and pointers.
   ScoreCardReader(int system_count_in, int data_stride_in, int sampled_step_count_in,
                   float nrg_scale_f_in, double nrg_scale_lf_in, float inverse_nrg_scale_f_in,
-                  double inverse_nrg_scale_lf_in, const llint* instantaneous_accumulators_in,
+                  double inverse_nrg_scale_lf_in, const int* time_steps_in,
+                  const llint* instantaneous_accumulators_in,
                   const double* running_accumulators_in, const double* squared_accumulators_in,
                   const llint* time_series_in);
 
@@ -48,6 +49,8 @@ struct ScoreCardReader {
   const double nrg_scale_lf;               ///< Conversion factor for fixed-precision accumulation
   const float inverse_nrg_scale_f;         ///< Conversion for fixed-precision interpretation
   const double inverse_nrg_scale_lf;       ///< Conversion for fixed-precision interpretation
+  const int* time_steps;                   ///< Time steps in the simulation at which each energy
+                                           ///<   sample was taken
   const llint* instantaneous_accumulators; ///< State variables for each system
   const double* running_accumulators;      ///< Running sums of state variables for each system
   const double* squared_accumulators;      ///< Running squared sums of state variables for each
@@ -63,9 +66,9 @@ struct ScoreCardWriter {
   /// \brief The constructor is, as usual, a collection of the relevant constants and pointers.
   ScoreCardWriter(int system_count_in, int data_stride_in, int sampled_step_count_in,
                   float nrg_scale_f_in, double nrg_scale_lf_in, float inverse_nrg_scale_f_in,
-                  double inverse_nrg_scale_lf_in, llint* instantaneous_accumulators_in,
-                  double* running_accumulators_in, double* squared_accumulators_in,
-                  llint* time_series_in);
+                  double inverse_nrg_scale_lf_in, int* time_steps_in,
+                  llint* instantaneous_accumulators_in, double* running_accumulators_in,
+                  double* squared_accumulators_in, llint* time_series_in);
 
   /// \brief Take only the default copy constructor and copy assignemnt operator for this
   ///        struct with const elements.
@@ -82,6 +85,8 @@ struct ScoreCardWriter {
   const double nrg_scale_lf;          ///< Conversion factor for fixed-precision accumulation
   const float inverse_nrg_scale_f;    ///< Conversion for fixed-precision interpretation
   const double inverse_nrg_scale_lf;  ///< Conversion for fixed-precision interpretation
+  int* time_steps;                    ///< Time steps in the simulation at which each energy
+                                      ///<   sample was taken
   llint* instantaneous_accumulators;  ///< State variables for each system
   double* running_accumulators;       ///< Running sums of state variables for each system
   double* squared_accumulators;       ///< Running squared sums of state variables for each system
@@ -141,12 +146,17 @@ public:
   
   /// \brief Get the number of bits of fixed precision to which results are stored
   int getEnergyScaleBits() const;
-
+  
   /// \brief Get the energy scaling factors in single- or double-precision floating point format
   /// \{
   template <typename T> T getEnergyScalingFactor() const;
   template <typename T> T getInverseEnergyScalingFactor() const;
   /// \}
+
+  /// \brief Get the time step at which a particular energy value was taken.
+  ///
+  /// \param time_index  The index of the energies and time step number in question
+  int getTimeStep(int time_index) const;
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload data to the device (this could be useful in situations where the CPU is
@@ -392,23 +402,28 @@ public:
   /// \param tier          Level from which to extract the data
   /// \{
   std::vector<double> reportEnergyHistory(int system_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double> reportEnergyHistory(StateVariable aspect, int system_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
-  std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double2> reportEnergyHistory(StateVariable aspect,
-                                           HybridTargetLevel tier = HybridTargetLevel::HOST);
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Get a const pointer to this object.
   const ScoreCard* getSelfPointer() const;
+
+  /// \brief Set the time index for the most recent stored set of energies.
+  ///
+  /// \param time_index  Set the time index
+  void setLastTimeStep(int time_index);
   
-  /// \brief Import the results of another ScoreCard into this one, including all components and the
-  ///        associated energy history.  If the current object does not have sufficient space either
-  ///        in terms of systems or sample capacity (depth of history), it will be re-allocated.  This
-  ///        functionality is available on the GPU as a free function energyCopy(), which allows the
-  ///        reader from the source and the writer from the destination to be used rather than a long
-  ///        series of pointers and array size constants.
+  /// \brief Import the results of another ScoreCard into this one, including all components and
+  ///        the associated energy history.  If the current object does not have sufficient space
+  ///        either in terms of systems or sample capacity (depth of history), it will be
+  ///        re-allocated.  This functionality is available on the GPU as a free function
+  ///        energyCopy(), which allows the reader from the source and the writer from the
+  ///        destination to be used rather than a long series of pointers and array size constants.
   ///
   /// Overloaded:
   ///   - Supply a const pointer or const reference to the other energy tracking object
@@ -459,6 +474,14 @@ private:
   double inverse_nrg_scale_lf;
   /// \}
 
+  Hybrid<int> time_steps;                    ///< The numbers of the time steps in the simulation
+                                             ///<   at which each energy sample was taken.
+                                             ///<   Multiply each step number by the time step
+                                             ///<   increment (available from a DynamicsControls
+                                             ///<   object, in units of femtoseconds) to determine
+                                             ///<   the time at which each energy sample was taken.
+                                             ///<   In other contexts, these values may be step
+                                             ///<   numbers in a line minimization calculation.
   Hybrid<llint> instantaneous_accumulators;  ///< Instantaneous accumulators for reporting the
                                              ///<   energy at one time step, accumulated in fixed
                                              ///<   precision after scaling by

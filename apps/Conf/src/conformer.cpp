@@ -13,6 +13,7 @@
 #  include "../../../src/MolecularMechanics/minimization.h"
 #endif
 #include "../../../src/MoleculeFormat/mdlmol.h"
+#include "../../../src/Namelists/input_transcript.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/nml_precision.h"
 #include "../../../src/Namelists/nml_random.h"
@@ -213,50 +214,6 @@ int main(int argc, const char* argv[]) {
   Condensate sandbox_snapshot(sandbox);
 #endif
 
-  // CHECK
-#if 0
-  const SynthesisMapReader scmapr = sandbox_map.data();
-  const SyPermutorKit syperk = sandbox_prm.dpData();
-  for (int i = 0; i < sc.getSystemCount(); i++) {
-    const ChemicalDetailsKit cdk = sc.getSystemTopologyPointer(i)->getChemicalDetailsKit();
-    printf("System %2d spawns -> [\n", i);
-    int jtrack = 0;
-    for (int j = scmapr.csystem_bounds[i]; j < scmapr.csystem_bounds[i + 1]; j++) {
-      printf(" %4d", scmapr.csystem_proj[j]);
-      jtrack++;
-      if (jtrack == 18) {
-        jtrack = 0;
-        printf("\n");
-      }
-    }
-    if (jtrack > 0) {
-      printf("\n");
-    }
-    printf("];\n");
-    printf("Definitions %2d = [\n", i);
-    for (int j = syperk.prm_rot_grp_bounds[i]; j < syperk.prm_rot_grp_bounds[i + 1]; j++) {
-      printf("  %4.4s %4.4s %4.4s %4.4s\n",
-             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].x]).c_str(),
-             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].y]).c_str(),
-             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].z]).c_str(),
-             char4ToString(cdk.atom_names[syperk.rot_bond_markers[j].w]).c_str());
-    }
-    printf("Angles %2d = [\n", i);
-    for (int j = scmapr.csystem_bounds[i]; j < scmapr.csystem_bounds[i + 1]; j++) {
-      for (int k = syperk.prm_rot_grp_bounds[i]; k < syperk.prm_rot_grp_bounds[i + 1]; k++) {
-        printf("  %7.4lf", dihedralAngle<double>(syperk.rot_bond_markers[k].x,
-                                                 syperk.rot_bond_markers[k].y,
-                                                 syperk.rot_bond_markers[k].z,
-                                                 syperk.rot_bond_markers[k].w, sandbox,
-                                                 scmapr.csystem_proj[j]));
-      }
-      printf("\n");
-    }
-    printf("];\n");
-  }
-#endif
-  // END CHECK
-  
   // For each rotatable bond, compute the value obtained in each conformer.  This will produce a
   // map of the viable minima for various conformations.
   
@@ -269,7 +226,9 @@ int main(int argc, const char* argv[]) {
   // Print the best conformations for each topological system.
   printResults(sandbox, best_confs, emin, sc, sandbox_map, ui.getConformerNamelistInfo(),
                ui.getReportNamelistInfo());
-
+  writeInputTranscript(ui);
+  printReport(sc, ui, sandbox_prm, sandbox_map, emin);
+  
   // Print timings results
   master_timer.printResults();
 

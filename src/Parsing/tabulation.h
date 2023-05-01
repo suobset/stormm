@@ -5,28 +5,14 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
-#include "polynumeric.h"
 #include "Math/sorting.h"
+#include "parsing_enumerators.h"
+#include "polynumeric.h"
 
 namespace stormm {
 namespace parse {
 
 using stmath::SortDirection;
-
-/// \brief List the possible types of header lines for a formatted table.  This class and the
-///        functions below output strings that can laterbe fed into any file or output stream.
-enum class TableHeadingLine {
-  HEADER,          ///< A line containing the column headers (multiline headers are presently
-                   ///<   formatted on separate lines by separate calls to buildTableHeader)
-  HORIZONTAL_RULE  ///< A horiizontale rule to underline all table categories
-};
-
-enum class BorderFormat {
-  NONE,   ///< No borders or horizontal rules will accompany the table
-  LIGHT,  ///< A horizontal rule will be printed to underline each of the category headings and a
-          ///<   vertical rule will separate the leftmost column from those to the right
-  FULL    ///< 
-};
 
 /// \brief Print a horizontal rule for this table.
 ///

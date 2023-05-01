@@ -2,6 +2,8 @@
 #ifndef STORMM_USER_SETTINGS_H
 #define STORMM_USER_SETTINGS_H
 
+#include <string>
+#include <vector>
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "FileManagement/file_enumerators.h"
@@ -11,6 +13,7 @@
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_precision.h"
 #include "Namelists/nml_random.h"
+#include "Namelists/nml_receptor.h"
 #include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
 #include "Namelists/nml_solvent.h"
@@ -64,12 +67,28 @@ struct UserSettings {
   /// \param argv  List of command line argument strings
   UserSettings(int argc, const char* argv[], AppName prog_set);
 
+  /// \brief With no const members and Standard Template Library objects comprising the only
+  ///        complexity beyond scalar data types, the default copy and move constructors as well
+  ///        as copy and move assignment operators can take effect.
+  ///
+  /// \param original  A pre-existing object to copy or move
+  /// \param other     Object in the left hand side of an assignment statement
+  /// \{
+  UserSettings(const UserSettings &original) = default;
+  UserSettings(UserSettings &&original) = default;
+  UserSettings& operator=(const UserSettings &original) = default;
+  UserSettings& operator=(UserSettings &&original) = default;
+  /// \}
+  
   /// \brief Get the policy (for passing to other operations that may trigger an exception).
   ExceptionResponse getExceptionBehavior() const;
 
   /// \brief Get the name of the input file.
-  std::string getInputFileName() const;
+  const std::string& getInputFileName() const;
 
+  /// \brief Get the list of command-line arguments
+  const std::vector<std::string>& getCommandLineArguments() const;
+  
   /// \brief Detect whether a &files namelist was present
   bool getFilesPresence() const;
 
@@ -115,6 +134,12 @@ struct UserSettings {
   /// \brief Get the block of information associated with the &conformer namelist.
   const ConformerControls& getConformerNamelistInfo() const;
 
+  /// \brief Get the block of information associated with the &receptor namelist.
+  const ReceptorControls& getReceptorNamelistInfo() const;
+
+  /// \brief Get the block of information associated with the &conformer namelist.
+  const DynamicsControls& getDynamicsNamelistInfo() const;
+
   /// \brief Get force field hyperparameter optimization controls through the &ffmorph namelist.
   const FFMorphControls& getFFMorphNamelistInfo() const;
 
@@ -140,6 +165,7 @@ private:
   bool has_random_nml;          ///< Indicate the presence of a &random namelist in the input
   bool has_precision_nml;       ///< Indicate the presence of a &precision namelist in the input
   bool has_conformer_nml;       ///< Indicate the presence of a &conformer namelist in the input
+  bool has_receptor_nml;        ///< Indicate the presence of a &receptor namelist in the input
   bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
   bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
   bool has_report_nml;          ///< Indicate the presence of a &report namelist in the input
@@ -147,6 +173,9 @@ private:
   
   /// Name of the original input file
   std::string input_file;
+
+  /// A record of the command-line arguments
+  std::vector<std::string> command_line_args;
   
   // Control parameters: these structs each encapsulate their own namelist from the input file.
   FilesControls file_io_input;      ///< All input and output file names, save for the command file
@@ -156,10 +185,11 @@ private:
   PrecisionControls prec_input;     ///< Precision model specifications, including accumulation bit
                                     ///<   settings as well as calculation floating point types
   ConformerControls conf_input;     ///< Conformer generation instructions
+  ReceptorControls receptor_input;  ///< Grid-based rigid receptor representation instructions
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions
   ReportControls diagnostic_input;  ///< Diagnostics report file details and layout
-
+  
   /// There can be many restraint controls sections in the input.  This vector holds them all.
   std::vector<RestraintControls> rstr_inputs;
 };

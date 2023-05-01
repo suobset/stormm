@@ -19,8 +19,6 @@ using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
 using errors::rtErr;
 using errors::rtWarn;
-using namelist::NamelistElement;
-using namelist::NamelistType;
 using parse::NumberFormat;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
@@ -32,24 +30,31 @@ using trajectory::translateCoordinateFileKind;
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
     has_files_nml{false}, has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
-    has_precision_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
-    has_ffmorph_nml{false}, has_report_nml{false}, restraint_nml_count{0},
+    has_precision_nml{false}, has_conformer_nml{false}, has_receptor_nml{false},
+    has_dynamics_nml{false}, has_ffmorph_nml{false}, has_report_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
-    file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{}, dyna_input{},
-    ffmod_input{}, diagnostic_input{}, rstr_inputs{}
+    command_line_args{}, file_io_input{}, line_min_input{}, solvent_input{}, prng_input{},
+    conf_input{}, receptor_input{}, dyna_input{}, ffmod_input{}, diagnostic_input{}, rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
-  std::string cval_report_file, cval_traj_file_name;
+  std::string cval_report_file, cval_traj_file_name, cval_input_transcript_file;
   std::vector<std::string> cval_topology_file_names;
   std::vector<std::string> cval_coordinate_file_names;
+
+  // Make a record of the command-line arguments for future reference
+  command_line_args.reserve(argc);
+  for (int i = 0; i < argc; i++) {
+    command_line_args.emplace_back(argv[i]);
+  }
   
   // Detect command line arguments, and note that their presence overrides similar directives
   // in the input deck.
-  bool cli_inpfile  = false;
-  bool cli_igseed   = false;
-  bool cli_report   = false;
-  bool cli_confname = false;
+  bool cli_inpfile          = false;
+  bool cli_igseed           = false;
+  bool cli_report           = false;
+  bool cli_input_transcript = false;
+  bool cli_confname         = false;
   CoordinateFileKind c_kind = default_filecon_inpcrd_type;
   CoordinateFileKind x_kind = default_filecon_outcrd_type;
   CoordinateFileKind r_kind = default_filecon_chkcrd_type;
@@ -80,6 +85,11 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     else if (i < argc - 1 && strcmp(argv[i], "-o") == 0) {
       cval_report_file = std::string(argv[i + 1]);
       cli_report = true;
+      i++;
+    }
+    else if (i < argc - 1 && strcmp(argv[i], "-t") == 0) {
+      cval_input_transcript_file = std::string(argv[i + 1]);
+      cli_input_transcript = true;
       i++;
     }
     else if (i < argc - 1 && strcmp(argv[i], "-x") == 0) {
@@ -132,6 +142,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   std::vector<std::string> sys_reqs = { "-pe", "-ce" };
   switch (prog_set) {
   case AppName::CONFORMER:
+    sys_reqs.push_back("-rg");
     break;
   case AppName::DYNAMICS:
     break;
@@ -152,6 +163,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   start_line = 0;
   conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
   start_line = 0;
+  receptor_input = ReceptorControls(inp_tf, &start_line, &has_receptor_nml, policy);
+  start_line = 0;  
   dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
   start_line = 0;
   ffmod_input = FFMorphControls(inp_tf, &start_line, &has_ffmorph_nml, policy);
@@ -197,6 +210,9 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   if (cli_confname) {
     file_io_input.setGeneralTrajectoryFileName(cval_traj_file_name);
   }
+  if (cli_input_transcript) {
+    file_io_input.setInputTranscriptFileName(cval_input_transcript_file);
+  }
   if (cval_topology_file_names.size() > 0LLU) {
     for (size_t i = 0; i < cval_topology_file_names.size(); i++) {
       file_io_input.addFreeTopologyName(cval_topology_file_names[i]);
@@ -215,8 +231,13 @@ ExceptionResponse UserSettings::getExceptionBehavior() const {
 }
   
 //-------------------------------------------------------------------------------------------------
-std::string UserSettings::getInputFileName() const {
+const std::string& UserSettings::getInputFileName() const {
   return input_file;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<std::string>& UserSettings::getCommandLineArguments() const {
+  return command_line_args;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -292,6 +313,16 @@ const PrecisionControls& UserSettings::getPrecisionNamelistInfo() const {
 //-------------------------------------------------------------------------------------------------
 const ConformerControls& UserSettings::getConformerNamelistInfo() const {
   return conf_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const ReceptorControls& UserSettings::getReceptorNamelistInfo() const {
+  return receptor_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const DynamicsControls& UserSettings::getDynamicsNamelistInfo() const {
+  return dyna_input;
 }
 
 //-------------------------------------------------------------------------------------------------

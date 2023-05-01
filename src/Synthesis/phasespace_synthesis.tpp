@@ -16,9 +16,11 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
   int *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
   double *box_xform_ptr, *inverse_xform_ptr, *box_dim_ptr;
   double conv_factor;
+  bool needs_overflow;
   switch (kind) {
   case TrajectoryKind::POSITIONS:
     conv_factor = inverse_scaling_factor * globalpos_scale;
+    needs_overflow = (globalpos_scale_bits > globalpos_scale_nonoverflow_bits);
     switch (orientation) {
     case CoordinateCycle::PRIMARY:
       x_recv            = x_coordinates.data(tier);
@@ -46,6 +48,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     break;
   case TrajectoryKind::VELOCITIES:
     conv_factor = inverse_scaling_factor * velocity_scale;
+    needs_overflow = (velocity_scale_bits > velocity_scale_nonoverflow_bits);
     switch (orientation) {
     case CoordinateCycle::PRIMARY:
       x_recv      = x_velocities.data(tier);
@@ -67,6 +70,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     break;
   case TrajectoryKind::FORCES:
     conv_factor = inverse_scaling_factor * force_scale;
+    needs_overflow = (force_scale_bits > force_scale_nonoverflow_bits);
     switch (orientation) {
     case CoordinateCycle::PRIMARY:
       x_recv      = x_forces.data(tier);
@@ -111,21 +115,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
       case TrajectoryKind::FORCES:
         break;
       }
-      if (globalpos_scale_bits <= globalpos_scale_nonoverflow_bits) {
-        for (int i = pos_start; i < pos_end; i++) {
-          const size_t ip = i - pos_start;
-          const llint fpx = llround(static_cast<double>(x_import[ip]) * conv_factor);
-          const llint fpy = llround(static_cast<double>(y_import[ip]) * conv_factor);
-          const llint fpz = llround(static_cast<double>(z_import[ip]) * conv_factor);
-          x_recv[i]      = fpx;
-          y_recv[i]      = fpy;
-          z_recv[i]      = fpz;
-          x_recv_ovrf[i] = 0;
-          y_recv_ovrf[i] = 0;
-          z_recv_ovrf[i] = 0;
-        }
-      }
-      else {
+      if (needs_overflow) {
         for (int i = pos_start; i < pos_end; i++) {
           const size_t ip = i - pos_start;
           const int95_t fpx = hostDoubleToInt95(static_cast<double>(x_import[ip]) * conv_factor);
@@ -137,6 +127,20 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
           y_recv_ovrf[i] = fpy.y;
           z_recv[i]      = fpz.x;
           z_recv_ovrf[i] = fpz.y;
+        }
+      }
+      else {
+        for (int i = pos_start; i < pos_end; i++) {
+          const size_t ip = i - pos_start;
+          const llint fpx = llround(static_cast<double>(x_import[ip]) * conv_factor);
+          const llint fpy = llround(static_cast<double>(y_import[ip]) * conv_factor);
+          const llint fpz = llround(static_cast<double>(z_import[ip]) * conv_factor);
+          x_recv[i]      = fpx;
+          y_recv[i]      = fpy;
+          z_recv[i]      = fpz;
+          x_recv_ovrf[i] = 0;
+          y_recv_ovrf[i] = 0;
+          z_recv_ovrf[i] = 0;
         }
       }
     }

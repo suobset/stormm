@@ -519,6 +519,33 @@ int SynthesisPermutor::getPermutorSetCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int SynthesisPermutor::getPermutorMapIndex(const AtomGraph *query_ag) const {
+  const int map_idx = matchTopology(query_ag, topologies);
+  if (map_idx == permutor_map_count) {
+    rtErr("No topology originating in file " + query_ag->getFileName() + " was found.",
+          "SynthesisPermutor", "getPermutorMapIndex");
+  }
+  return map_idx;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisPermutor::getPermutorMapIndex(const AtomGraph &query_ag) const {
+  return getPermutorMapIndex(query_ag.getSelfPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisPermutor::getPermutorMapIndex(const PhaseSpaceSynthesis *poly_ps,
+                                           const int system_index) const {
+  return getPermutorMapIndex(poly_ps->getSystemTopologyPointer(system_index));
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisPermutor::getPermutorMapIndex(const PhaseSpaceSynthesis &poly_ps,
+                                           const int system_index) const {
+  return getPermutorMapIndex(poly_ps.getSelfPointer(), system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 int SynthesisPermutor::getRotatableBondSampleCount() const {
   return rotatable_bond_samples;
 }
@@ -695,10 +722,25 @@ const IsomerPlan& SynthesisPermutor::getInvertibleGroup(const int system_index,
 }
 
 //-------------------------------------------------------------------------------------------------
-const TickCounter<double>& SynthesisPermutor::getStateTracker(int system_index) const {
+const TickCounter<double>& SynthesisPermutor::getStateTracker(const int system_index) const {
   validateSystemIndex(system_index);
   const int map_index = permutor_map_indices.readHost(system_index);
   return state_trackers[map_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const TickCounter<double>& SynthesisPermutor::getStateTracker(const AtomGraph *ag) const {
+  const int map_idx = matchTopology(ag, topologies);
+  if (map_idx == permutor_map_count) {
+    rtErr("No topology originating in file " + ag->getFileName() + " was found.",
+          "SynthesisPermutor", "getStateTracker");
+  }
+  return state_trackers[map_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+const TickCounter<double>& SynthesisPermutor::getStateTracker(const AtomGraph &ag) const {
+  return getStateTracker(ag.getSelfPointer());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -722,25 +764,20 @@ llint SynthesisPermutor::getReplicaCount(const int query_index,
 //-------------------------------------------------------------------------------------------------
 llint SynthesisPermutor::getReplicaCount(const AtomGraph *query_ag,
                                          const SamplingIntensity effort) const {
-  int map_index = -1;
-  for (int i = 0; i < permutor_map_count; i++) {
-    if (query_ag == topologies[i]) {
-      map_index = i;
-    }
-  }
-  if (map_index < 0) {
+  int map_idx = getPermutorMapIndex(query_ag);
+  if (map_idx == permutor_map_count) {
     rtErr("A topology originating in file " + getBaseName(query_ag->getFileName()) + " was not "
           "matched to any in the synthesis.", "SynthesisPermutor", "getReplicaCount");
   }
   switch (effort) {
   case SamplingIntensity::MINIMAL:
-    return minimal_sampling_replicas[map_index];
+    return minimal_sampling_replicas[map_idx];
   case SamplingIntensity::LIGHT:
-    return light_sampling_replicas[map_index];
+    return light_sampling_replicas[map_idx];
   case SamplingIntensity::HEAVY:
-    return heavy_sampling_replicas[map_index];
+    return heavy_sampling_replicas[map_idx];
   case SamplingIntensity::EXHAUSTIVE:
-    return exhaustive_sampling_replicas[map_index];
+    return exhaustive_sampling_replicas[map_idx];
   }
   __builtin_unreachable();  
 }
@@ -1476,11 +1513,11 @@ SynthesisPermutor::buildSynthesis(const SamplingIntensity effort, Xoshiro256ppGe
   // The resulting synthesis is now filled with copies of the synthesis referenced by this
   // SynthesisPermutor object.  Perform the permutations on the new synthesis.
   const bool use_single_prec = (globalpos_scale_bits <= globalpos_scale_nonoverflow_bits);
-#ifdef STORMM_USE_HPC
+//#ifdef STORMM_USE_HPC
 
   // Count the number of successful placements made on the GPU
-  int n_success = 0;
-#else
+  //int n_success = 0;
+//#else
   int n_success = 0;
   for (int i = 0; i < system_count; i++) {
     const int imap_index = permutor_map_indices.readHost(i);
@@ -1852,7 +1889,7 @@ SynthesisPermutor::buildSynthesis(const SamplingIntensity effort, Xoshiro256ppGe
       break;
     }
   }
-#endif
+//#endif
   
   // Report the correspondence, if requested.
   if (correspondence != nullptr) {

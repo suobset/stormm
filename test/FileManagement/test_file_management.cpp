@@ -2,6 +2,7 @@
 #include <vector>
 #include "copyright.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/FileManagement/directory_util.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -10,7 +11,9 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::errors::rtWarn;
+using stormm::parse::findStringInVector;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::diskutil;
 using namespace stormm::testing;
 
@@ -213,9 +216,56 @@ int main(const int argc, const char* argv[]) {
   const std::string island = substituteNameExtension("bikini", "atoll");
   check(island, RelationalOperator::EQUAL, std::string("bikini.atoll"), "Substitution of a "
         "file name extension does not work as expected when no extension is initially present.");
-  
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_bgs_name = osc + std::string("misdirected") + osc + "simply" + osc +
+                                    "bogus" + osc + "Nothing";
+  const std::vector<std::string> many_names_base = {
+    base_top_name + osc + "symmetry_L1.top", base_crd_name + osc + "symmetry_L1.inpcrd",
+    base_top_name + osc + "symmetry_C1.top", base_crd_name + osc + "symmetry_C1.inpcrd",
+    base_top_name + osc + "symmetry_C2.top", base_crd_name + osc + "symmetry_C2.inpcrd",
+    base_top_name + osc + "symmetry_C3.top", base_crd_name + osc + "symmetry_C3.inpcrd",
+    base_top_name + osc + "symmetry_C4.top", base_crd_name + osc + "symmetry_C4.inpcrd",
+    base_bgs_name + osc + "content.txt"
+  };
+  std::vector<std::string> many_names = many_names_base;
+  std::vector<std::string> cp_a = extractCommonPaths(&many_names, 2, 2);
+  const TestPriority inspect_a = (cp_a.size() >= 2) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  check(cp_a.size(), RelationalOperator::EQUAL, 2, "An unexpected number of common prefixes were "
+        "located in a collection of " + std::to_string(many_names.size()) + " paths.");
+  check(findStringInVector(cp_a, base_crd_name) < static_cast<int>(cp_a.size()), "The coordinate "
+        "directory path was not among the list of common prefixes in a collection of " +
+        std::to_string(many_names.size()) + " paths.", inspect_a);
+  check(findStringInVector(cp_a, base_top_name) < static_cast<int>(cp_a.size()), "The topology "
+        "directory path was not among the list of common prefixes in a collection of " +
+        std::to_string(many_names.size()) + " paths.", inspect_a);
+  many_names = many_names_base;
+  for (int i = 0; i < 9; i++) {
+    many_names.push_back(many_names_base[10]);
+  }
+  std::vector<std::string> cp_b = extractCommonPaths(&many_names, 4, 2);
+  const TestPriority inspect_b = (cp_b.size() >= 3) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  check(cp_b.size(), RelationalOperator::EQUAL, 3, "An unexpected number of common prefixes were "
+        "located in a collection of " + std::to_string(many_names.size()) + " paths.");
+  check(findStringInVector(cp_b, base_bgs_name) < static_cast<int>(cp_b.size()), "The imaginary "
+        "directory path was not among the list of common prefixes in a collection of " +
+        std::to_string(many_names.size()) + " paths.", inspect_a);
+  many_names = { osc + std::string("a") + osc + "b" + osc + "cde.txt",
+                 osc + std::string("c") + osc + "d" + osc + "fgh.txt",
+                 osc + std::string("e") + osc + "f" + osc + "ijk.txt",
+                 osc + std::string("g") + osc + "h" + osc + "lmn.txt",
+                 osc + std::string("i") + osc + "j" + osc + "opq.txt",
+                 osc + std::string("k") + osc + "l" + osc + "rst.txt",
+                 osc + std::string("m") + osc + "n" + osc + "uvw.txt",
+                 osc + std::string("o") + osc + "p" + osc + "xyz.txt" };
+  const std::vector<std::string> cp_c = extractCommonPaths(&many_names, 4, 2);
+  check(cp_c.size(), RelationalOperator::EQUAL, 0, "Common prefixes were located in a collection "
+        "of unique paths that should not be shortened.");
+
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

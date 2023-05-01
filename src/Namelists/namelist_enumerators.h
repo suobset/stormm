@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef STORMM_NAMELIST_ENUMERATIONS_H
-#define STORMM_NAMELIST_ENUMERATIONS_H
+#ifndef STORMM_NAMELIST_ENUMERATORS_H
+#define STORMM_NAMELIST_ENUMERATORS_H
 
 #include <string>
 #include "copyright.h"
@@ -41,7 +41,7 @@ enum class RestraintAnchoring {
 };
 
 /// \brief Enumeration to indicate the requirement of STRUCT subkeys
-enum class SubkeyRequirement {
+enum class KeyRequirement {
   OPTIONAL,  ///< The keyword is not required, but can be specified
   REQUIRED,  ///< The keyword is essential and must be supplied in order to create a valid STRUCT
   BOGUS      ///< The option should actually NOT be present--useful for situations in which a
@@ -49,6 +49,16 @@ enum class SubkeyRequirement {
              ///<   certain STRUCT options
 };
 
+/// \brief List the ways that a namelist can be presented in a transcript file.
+enum class NamelistIntroduction {
+  HEADER,          ///< Print the namelist title and category headings
+  COMPACT_HEADER,  ///< Print a more compact header that will not stand out as much against section
+                   ///<   headings
+  BLANK_LINE,      ///< Print a single blank line to space one namelist from another (no headings
+                   ///<   or title)
+  NONE             ///< Prin no headings, title, or spacing
+};
+  
 /// \brief Return a string corresponding to the namelist data type enumerations.  Various overloads
 ///        of this function are also found in other libraries.
 ///
@@ -59,9 +69,15 @@ std::string getEnumerationName(InputRepeats input);
 std::string getEnumerationName(DefaultIsObligatory input);
 std::string getEnumerationName(InputStatus input);
 std::string getEnumerationName(RestraintAnchoring input);
-std::string getEnumerationName(SubkeyRequirement input);
+std::string getEnumerationName(KeyRequirement input);
+std::string getEnumerationName(NamelistIntroduction input);
 /// \}
 
+/// \brief Interpret various inputs into a KeyRequirement enumeration.
+///
+/// \param input  The word or phrase to translate
+KeyRequirement translateKeyRequirement(const std::string &input);
+  
 /// \brief Return a string corresponding to an input status setting.
 ///
 /// \param stt  The status of interest

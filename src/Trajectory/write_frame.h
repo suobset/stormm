@@ -2,6 +2,7 @@
 #ifndef STORMM_WRITE_FRAME_H
 #define STORMM_WRITE_FRAME_H
 
+#include <fstream>
 #include <string>
 #include <vector>
 #include "copyright.h"

@@ -177,6 +177,12 @@ public:
   std::vector<AtomGraph*> getTopologiesMatchingLabel(const std::string &query_label);
   /// \}
 
+  /// \brief Get a label from the cache by the numerical index in which it appears in the list of
+  ///        all labels.
+  ///
+  /// \param label_index  Index of the label of interest
+  const std::string& getLabel(int label_index) const;
+  
   /// \brief Get a list of labels associated with a particular topology.  This will return copies
   ///        of each label string which can then be manipulated at the developer's discretion.  A
   ///        blank vector is returned if no associated labels are found.
@@ -571,7 +577,7 @@ private:
   /// program built on STORMM executes and then shuts down, this will mean file printing.  In
   /// a situation where a function based on STORMM takes inputs from a python environment and then
   /// returns results, it may still need to decide whether to overwrite or add to a growing array.
-  /// This parameter indicates the SystemCache's way to handle existing data when writing it own.
+  /// This parameter indicates the SystemCache's way to handle existing data when writing its own.
   PrintSituation expectation;
   
   // Counts are kept as separate integers, to have a single authoritative number on some central

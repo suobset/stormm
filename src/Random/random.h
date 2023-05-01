@@ -10,6 +10,8 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
+#include "Numerics/split_fixed_precision.h"
+#include "random_enumerators.h"
 
 namespace stormm {
 namespace random {
@@ -39,25 +41,6 @@ constexpr double double_increment = 2.2205e-16;
 constexpr double ran2_max = 1.0 - double_increment;
 /// \}
 
-/// \brief Enumerate the types of random numbers that can be generated.
-enum class RandomNumberKind {
-  UNIFORM,   ///< Uniform random number distribution
-  GAUSSIAN   ///< Normal distribution of random numbers
-};
-
-/// \brief List the random number generator types that can power a RandomNumberMill object.
-enum class RandomAlgorithm {
-  XOROSHIRO_128P,  ///< Xoroshiro128+ generator (see below, fails BigCrush and not advised for
-                   ///<   powering mills with > 1024 generator streams)
-  XOSHIRO_256PP    ///< Xoshiro256++ generator (see below--high quality generator)
-};
-
-/// \brief Define the order in which various random number generators will fill a matrix.
-enum class RngFillMode {
-  COLUMNS,  ///< Fill the column-major matrix one column at a time
-  ROWS      ///< Fill the column-major matrix in row-major order, one row at a time
-};
-  
 /// \brief The default random seed for STORMM
 constexpr int default_random_seed = 827493;
 
@@ -574,6 +557,82 @@ void fillRandomCache(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, std::
                      size_t index_start, size_t index_end);
 /// \}
 
+/// \brief Add random noise to a series of numbers.  If the number series is represented in a
+///        floating point type, its scaling factor is assumed to be 1.0
+///
+/// Overloaded:
+///   - Operate on C-style arrays with a trusted length, Standard Template Library vectors, or
+///     Hybrid objects
+///   - Operate on the 95-bit fixed-precision fused data type
+///   - Operate on one array or three arrays of numbers, anticipating applications to
+///     three-dimensional coordinate sets
+/// 
+/// \param prng    The random number generator to use
+/// \param x       The (first) array of numbers to add noise onto
+/// \param y       The second array of numbers to add noise onto
+/// \param z       The third array of numbers to add noise onto
+/// \param x_ovrf  Overflow bits for the (first) array of fixed precision numbers
+/// \param y_ovrf  Overflow bits for the third array of fixed precision numbers
+/// \param z_ovrf  Overflow bits for the second array of fixed precision numbers
+/// \param length  The length of the number series (if provided as C-style arrays)
+/// \param mult    Strength of the random noise
+/// \param scale   Scaling factor applied to fixed-precision number representations in x, y, and z
+/// \param kind    The type of random noise to apply (default Gaussian, normal distribution)
+/// \{
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Tvar* x, size_t length, double mult, double scale = 1.0,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, std::vector<Tvar> *x, double mult, double scale = 1.0,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Hybrid<Tvar> *x, double mult, double scale = 1.0,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Tvar* x, Tvar* y, Tvar *z, size_t length, double mult,
+                    double scale = 1.0, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, std::vector<Tvar> *x, std::vector<Tvar> *y, std::vector<Tvar> *z,
+                    double mult, double scale = 1.0,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng, typename Tvar>
+void addRandomNoise(Trng *prng, Hybrid<Tvar> *x, Hybrid<Tvar> *y, Hybrid<Tvar> *z, double mult,
+                    double scale = 1.0, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, size_t length, double mult, double scale,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf, size_t length,
+                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, size_t length,
+                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, llint* y, int* y_ovrf, llint* z,
+                    int* z_ovrf, size_t length, double mult, double scale,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf,
+                    std::vector<llint> *y, std::vector<int> *y_ovrf, std::vector<llint> *z,
+                    std::vector<int> *z_ovrf, size_t length, double mult, double scale,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+
+template <typename Trng>
+void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, Hybrid<llint> *y,
+                    Hybrid<int> *y_ovrf, Hybrid<llint> *z, Hybrid<int> *z_ovrf, size_t length,
+                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+/// \}
+  
 } // namespace random
 } // namespace stormm
 

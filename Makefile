@@ -9,8 +9,9 @@ APPDIR=apps
 LIBDIR=lib
 
 # STORMM C++ source files
-STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
-		   $(SRCDIR)/Accelerator/gpu_details.cpp \
+STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
+		   $(SRCDIR)/Accelerator/hybrid.cpp \
+		   $(SRCDIR)/Accelerator/hybrid_enumerators.cpp \
 		   $(SRCDIR)/Accelerator/kernel_manager.cpp \
 		   $(SRCDIR)/Analysis/comparison_guide.cpp \
 		   $(SRCDIR)/Chemistry/atommask.cpp \
@@ -37,12 +38,14 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Math/reduction_workunit.cpp \
 		   $(SRCDIR)/Math/rounding.cpp \
 		   $(SRCDIR)/Math/series_ops.cpp \
+		   $(SRCDIR)/Math/statistical_enumerators.cpp \
 		   $(SRCDIR)/Math/statistics.cpp \
 		   $(SRCDIR)/Math/tricubic_cell.cpp \
 		   $(SRCDIR)/Math/vector_ops.cpp \
 		   $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/minimization.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
+		   $(SRCDIR)/MolecularMechanics/mm_enumerators.cpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol.cpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.cpp \
@@ -56,6 +59,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.cpp \
 		   $(SRCDIR)/MoleculeFormat/molecule_parsing.cpp \
 		   $(SRCDIR)/Namelists/input.cpp \
+		   $(SRCDIR)/Namelists/input_transcript.cpp \
 		   $(SRCDIR)/Namelists/namelist_element.cpp \
 		   $(SRCDIR)/Namelists/namelist_emulator.cpp \
 		   $(SRCDIR)/Namelists/namelist_enumerators.cpp \
@@ -66,6 +70,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Namelists/nml_minimize.cpp \
 		   $(SRCDIR)/Namelists/nml_precision.cpp \
 		   $(SRCDIR)/Namelists/nml_random.cpp \
+		   $(SRCDIR)/Namelists/nml_receptor.cpp \
 		   $(SRCDIR)/Namelists/nml_report.cpp \
 		   $(SRCDIR)/Namelists/nml_restraint.cpp \
 		   $(SRCDIR)/Namelists/nml_solvent.cpp \
@@ -74,6 +79,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Parsing/ascii_numbers.cpp \
 		   $(SRCDIR)/Parsing/citation.cpp \
 		   $(SRCDIR)/Parsing/parse.cpp \
+		   $(SRCDIR)/Parsing/parsing_enumerators.cpp \
 		   $(SRCDIR)/Parsing/polynumeric.cpp \
 		   $(SRCDIR)/Parsing/tabulation.cpp \
 		   $(SRCDIR)/Parsing/textfile.cpp \
@@ -87,11 +93,16 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Potential/static_exclusionmask.cpp \
 		   $(SRCDIR)/Potential/valence_potential.cpp \
 		   $(SRCDIR)/Random/random.cpp \
+		   $(SRCDIR)/Random/random_enumerators.cpp \
 		   $(SRCDIR)/Reporting/code_dox.cpp \
 		   $(SRCDIR)/Reporting/display.cpp \
 		   $(SRCDIR)/Reporting/help_messages.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
+		   $(SRCDIR)/Reporting/ordered_list.cpp \
+		   $(SRCDIR)/Reporting/present_energy.cpp \
 		   $(SRCDIR)/Reporting/reporting_enumerators.cpp \
+		   $(SRCDIR)/Reporting/report_table.cpp \
+		   $(SRCDIR)/Reporting/section_contents.cpp \
 		   $(SRCDIR)/Reporting/summary_file.cpp \
 		   $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
@@ -155,8 +166,9 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 
 # STORMM C++ header files
 STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
-		     $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Accelerator/gpu_details.h \
+		     $(SRCDIR)/Accelerator/hybrid.h \
+		     $(SRCDIR)/Accelerator/hybrid_enumerators.h \
 		     $(SRCDIR)/Accelerator/kernel_manager.h \
 		     $(SRCDIR)/Analysis/comparison_guide.h \
 		     $(SRCDIR)/Chemistry/atommask.h \
@@ -196,6 +208,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Math/rounding.h \
 		     $(SRCDIR)/Math/series_ops.h \
 		     $(SRCDIR)/Math/sorting.h \
+		     $(SRCDIR)/Math/statistical_enumerators.h \
 		     $(SRCDIR)/Math/statistics.h \
 		     $(SRCDIR)/Math/summation.h \
 		     $(SRCDIR)/Math/tickcounter.h \
@@ -204,6 +217,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		     $(SRCDIR)/MolecularMechanics/minimization.h \
 		     $(SRCDIR)/MolecularMechanics/mm_controls.h \
+		     $(SRCDIR)/MolecularMechanics/mm_enumerators.h \
 		     $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol.h \
 		     $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.h \
@@ -216,6 +230,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.h \
 		     $(SRCDIR)/MoleculeFormat/molecule_parsing.h \
 		     $(SRCDIR)/Namelists/input.h \
+		     $(SRCDIR)/Namelists/input_transcript.h \
 		     $(SRCDIR)/Namelists/namelist_element.h \
 		     $(SRCDIR)/Namelists/namelist_emulator.h \
 		     $(SRCDIR)/Namelists/namelist_enumerators.h \
@@ -226,6 +241,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Namelists/nml_minimize.h \
 		     $(SRCDIR)/Namelists/nml_precision.h \
 		     $(SRCDIR)/Namelists/nml_random.h \
+		     $(SRCDIR)/Namelists/nml_receptor.h \
 		     $(SRCDIR)/Namelists/nml_report.h \
 		     $(SRCDIR)/Namelists/nml_restraint.h \
 		     $(SRCDIR)/Namelists/nml_solvent.h \
@@ -234,6 +250,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Parsing/ascii_numbers.h \
 		     $(SRCDIR)/Parsing/citation.h \
 		     $(SRCDIR)/Parsing/parse.h \
+		     $(SRCDIR)/Parsing/parsing_enumerators.h \
 		     $(SRCDIR)/Parsing/polynumeric.h \
 		     $(SRCDIR)/Parsing/tabulation.h \
 		     $(SRCDIR)/Parsing/textfile.h \
@@ -250,11 +267,16 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Potential/static_exclusionmask.h \
 		     $(SRCDIR)/Potential/valence_potential.h \
 		     $(SRCDIR)/Random/random.h \
+		     $(SRCDIR)/Random/random_enumerators.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
 		     $(SRCDIR)/Reporting/help_messages.h \
 		     $(SRCDIR)/Reporting/error_format.h \
+		     $(SRCDIR)/Reporting/ordered_list.h \
+		     $(SRCDIR)/Reporting/present_energy.h \
 		     $(SRCDIR)/Reporting/reporting_enumerators.h \
+		     $(SRCDIR)/Reporting/report_table.h \
+		     $(SRCDIR)/Reporting/section_contents.h \
 		     $(SRCDIR)/Reporting/summary_file.h \
 		     $(SRCDIR)/Restraints/bounded_restraint.h \
 		     $(SRCDIR)/Restraints/restraint_apparatus.h \
@@ -337,6 +359,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol.tpp \
+		   $(SRCDIR)/Namelists/namelist_emulator.tpp \
 		   $(SRCDIR)/Parsing/polynumeric.tpp \
 		   $(SRCDIR)/Potential/cacheresource.tpp \
 		   $(SRCDIR)/Potential/energy_abstracts.tpp \
@@ -375,8 +398,9 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp
 
 # STORMM C++ object files
-STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
-		  $(SRCDIR)/Accelerator/gpu_details.o \
+STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
+		  $(SRCDIR)/Accelerator/hybrid.o \
+		  $(SRCDIR)/Accelerator/hybrid_enumerators.o \
 		  $(SRCDIR)/Accelerator/kernel_manager.o \
 		  $(SRCDIR)/Analysis/comparison_guide.o \
 		  $(SRCDIR)/Chemistry/atommask.o \
@@ -403,12 +427,14 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Math/reduction_workunit.o \
 		  $(SRCDIR)/Math/rounding.o \
 		  $(SRCDIR)/Math/series_ops.o \
+		  $(SRCDIR)/Math/statistical_enumerators.o \
 		  $(SRCDIR)/Math/statistics.o \
 		  $(SRCDIR)/Math/tricubic_cell.o \
 		  $(SRCDIR)/Math/vector_ops.o \
 		  $(SRCDIR)/MolecularMechanics/line_minimization.o \
 		  $(SRCDIR)/MolecularMechanics/minimization.o \
 		  $(SRCDIR)/MolecularMechanics/mm_controls.o \
+		  $(SRCDIR)/MolecularMechanics/mm_enumerators.o \
 		  $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol.o \
 		  $(SRCDIR)/MoleculeFormat/mdlmol_atomlist.o \
@@ -422,6 +448,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_format_enumerators.o \
 		  $(SRCDIR)/MoleculeFormat/molecule_parsing.o \
 		  $(SRCDIR)/Namelists/input.o \
+		  $(SRCDIR)/Namelists/input_transcript.o \
 		  $(SRCDIR)/Namelists/namelist_element.o \
 		  $(SRCDIR)/Namelists/namelist_emulator.o \
 		  $(SRCDIR)/Namelists/namelist_enumerators.o \
@@ -432,6 +459,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Namelists/nml_minimize.o \
 		  $(SRCDIR)/Namelists/nml_precision.o \
 		  $(SRCDIR)/Namelists/nml_random.o \
+		  $(SRCDIR)/Namelists/nml_receptor.o \
 		  $(SRCDIR)/Namelists/nml_report.o \
 		  $(SRCDIR)/Namelists/nml_restraint.o \
 		  $(SRCDIR)/Namelists/nml_solvent.o \
@@ -440,6 +468,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Parsing/ascii_numbers.o \
 		  $(SRCDIR)/Parsing/citation.o \
 		  $(SRCDIR)/Parsing/parse.o \
+		  $(SRCDIR)/Parsing/parsing_enumerators.o \
 		  $(SRCDIR)/Parsing/polynumeric.o \
 		  $(SRCDIR)/Parsing/tabulation.o \
 		  $(SRCDIR)/Parsing/textfile.o \
@@ -453,11 +482,16 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Potential/static_exclusionmask.o \
 		  $(SRCDIR)/Potential/valence_potential.o \
 		  $(SRCDIR)/Random/random.o \
+		  $(SRCDIR)/Random/random_enumerators.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
 		  $(SRCDIR)/Reporting/help_messages.o \
 		  $(SRCDIR)/Reporting/error_format.o \
+		  $(SRCDIR)/Reporting/ordered_list.o \
+		  $(SRCDIR)/Reporting/present_energy.o \
 		  $(SRCDIR)/Reporting/reporting_enumerators.o \
+		  $(SRCDIR)/Reporting/report_table.o \
+		  $(SRCDIR)/Reporting/section_contents.o \
 		  $(SRCDIR)/Reporting/summary_file.o \
 		  $(SRCDIR)/Restraints/bounded_restraint.o \
 		  $(SRCDIR)/Restraints/restraint_apparatus.o \

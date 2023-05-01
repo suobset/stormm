@@ -34,6 +34,7 @@ using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::topology::amber_coulomb_constant;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
@@ -624,6 +625,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

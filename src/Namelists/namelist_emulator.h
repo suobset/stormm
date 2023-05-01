@@ -2,18 +2,30 @@
 #ifndef STORMM_NAMELIST_EMULATOR_H
 #define STORMM_NAMELIST_EMULATOR_H
 
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 #include "copyright.h"
 #include "Constants/behavior.h"
+#include "DataTypes/common_types.h"
+#include "FileManagement/file_enumerators.h"
+#include "Reporting/error_format.h"
+#include "Reporting/summary_file.h"
 #include "namelist_element.h"
+#include "namelist_enumerators.h"
 
 namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
 using constants::ExceptionResponse;
-
+using data_types::isFloatingPointScalarType;
+using data_types::isSignedIntegralScalarType;
+using data_types::isUnsignedIntegralScalarType;
+using diskutil::PrintSituation;
+using review::default_output_file_width;
+  
 /// \brief Collection of variables to transcribe information contained within a namelist
 class NamelistEmulator {
 public:
@@ -165,18 +177,105 @@ public:
   const std::string& getHelp(const std::string &keyword_query, const std::string &sub_key) const;
   /// \}
 
+  /// \brief Assign a value, external to the object, based on the content inside of it.  This will
+  ///        first check whether the appropriate keyword is not missing (that is has a default
+  ///        value, or has been specified by the user).  If the associated keyword is indeed
+  ///        missing, there will be no effect on the external variable.
+  ///
+  /// Overloaded:
+  ///   - Assign other integers
+  ///   - Assign other real values
+  ///   - Assign other strings
+  ///   - Assign triplets of other numerical variables (useful for cases where a generic keyword
+  ///     can assign settings for all three dimensions of an object)
+  ///   - Provide a multiplier to scale the units of user input into internal units (a common case
+  ///     is degrees to radians)
+  ///
+  /// \param var            The integer, real, or string ariable to assign
+  /// \param mult           Multiplication factor to apply to any value extracted from the
+  ///                       &namelist.  This factor is only available for scalar results (or
+  ///                       triplicate input extractions) and will be cast to the data type of var
+  ///                       for integral types.
+  /// \param keyword_query  The keyword associated with the input data of interest
+  /// \param sub_key        The sub-key within a STRUCT associated with the input data of interest
+  /// \param index          Index of the keyword repeat to retrieve
+  /// \{
+  template <typename T>
+  void assignVariable(T *var, double mult, const std::string &keyword_query, int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var, const std::string &keyword_query, int index = 0) const;
+
+  void assignVariable(std::string *var, double mult, const std::string &keyword_query,
+                      int index = 0) const;
+
+  void assignVariable(std::string *var, const std::string &keyword_query, int index = 0) const;
+  
+  template <typename T>
+  void assignVariable(T *var_x, T *var_y, T *var_z, double mult, const std::string &keyword_query,
+                      int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var_x, T *var_y, T *var_z, const std::string &keyword_query,
+                      int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var, const std::string &keyword_query, const std::string &sub_key,
+                      int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var, double mult, const std::string &keyword_query,
+                      const std::string &sub_key, int index = 0) const;
+
+  void assignVariable(std::string *var, double mult, const std::string &keyword_query,
+                      const std::string &sub_key, int index = 0) const;
+
+  void assignVariable(std::string *var, const std::string &keyword_query,
+                      const std::string &sub_key, int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var_x, T *var_y, T *var_z, double mult, const std::string &keyword_query,
+                      const std::string &sub_key, int index = 0) const;
+
+  template <typename T>
+  void assignVariable(T *var_x, T *var_y, T *var_z, const std::string &keyword_query,
+                      const std::string &sub_key, int index = 0) const;
+  /// \}
+
   /// \brief Add a keyword to the namelist.
   ///
   /// Overloaded:
   ///   - Add a single keyword (be it a INTEGER, REAL, STRING, or STRUCT namelist element)
   ///   - Add multiple keywords
+  ///   - Provide a NamelistElement object
+  ///   - Provide input parameters with one-to-one correspondence to NameListElement objects (this
+  ///     can save space and make the API cleaner)
   ///
   /// \param new_key   The keyword to add
   /// \param new_keys  The keywords to add
+  
   /// \{
   void addKeyword(const std::vector<NamelistElement> &new_keys);
+
   void addKeywords(const std::vector<NamelistElement> &new_keys);
+
   void addKeyword(const NamelistElement &new_key);
+
+  void addKeyword(const std::string &keyword_in, NamelistType kind_in,
+                  const std::string &default_in = std::string(""),
+                  DefaultIsObligatory obligate = DefaultIsObligatory::NO,
+                  InputRepeats rep_in = InputRepeats::NO,
+                  const std::string &help_in = std::string("No description provided"));
+
+  void addKeyword(const std::string keyword_in, const std::vector<std::string> &sub_keys_in,
+                  const std::vector<NamelistType> &sub_kinds_in,
+                  const std::vector<std::string> &default_list,
+                  DefaultIsObligatory obligate_list = DefaultIsObligatory::NO,
+                  InputRepeats rep_in = InputRepeats::NO,
+                  const std::string &help_in = std::string("No description provided"),
+                  const std::vector<std::string> &sub_help_in =
+                  std::vector<std::string>(1, "No description provided"),
+                  const std::vector<KeyRequirement> &template_requirements_in = {});
   /// \}
 
   /// \brief Add a value to one keyword's default settings.  This enables a single keyword to have
@@ -244,14 +343,44 @@ public:
   /// \brief Place a namelist keyword into one of a list of arbitrary categories defined by the
   ///        developer.  This is for organizing the user documentation.
   ///
-  /// \param key             The namelist keyword to find and catagorize
+  /// \param key             The namelist keyword to find and categorize
   /// \param category_label  The category to put it in
   void categorizeKeyword(const std::string &key, const std::string &category_label);
+
+  /// \brief Change the requirement associated with a keyword.  By default, all keywords are set to
+  ///        "REQUIRED" just as all STRUCT-type keyword subkeys are required unless stated
+  ///        otherwise.  Even if required, many keywords, like STRUCT subkeys, will have default
+  ///        values that satisfy the requirements.
+  ///
+  /// Overloaded:
+  ///   - Set the criticality of a keyword
+  ///   - Set the criticality of a subkey within a STRUCT keyword
+  ///
+  /// \param key            The namelist keyword to find and alter
+  /// \param sub_key_query  Name of the sub-key to search if the namelist element is a STRUCT
+  /// \param req            The requirement level to impose
+  /// \{
+  void setImperative(const std::string &key, KeyRequirement req);
+  void setImperative(const std::vector<std::string> &directives);
+  void setImperative(const std::string &key, const std::vector<std::string> &directives);
+  /// \}
 
   /// \brief Print the documentation for a specific keyword.  The format is fixed in the sense
   ///        that it will have a set indentation, a dash for a bullet point, and the keyword
   ///        printed in a space large enough for a series of related keywords in a column.
-  void printKeywordDocumentation(int p_idx, int name_width) const;
+  ///
+  /// \param p_idx          Index of the keyword within the namelist emulator
+  /// \param name_width     Width at which to print keyword names
+  /// \param kw_kind_width  Width at which to print keyword kinds
+  /// \param kw_dflt        Default value of the parameter, pre-converted to a string and
+  ///                       pre-pended with white space for alignment
+  void printKeywordDocumentation(int p_idx, int name_width, int kw_kind_width,
+                                 const std::string &kw_dflt) const;
+
+  /// \brief Convert the default value of a keyword to a string for output in a formatted table.
+  ///
+  /// \param tkw  The keyword of interest
+  std::string convertDefaultToString(const NamelistElement &tkw) const;
 
   /// \brief Print a detailed message concerning the user documentation for keywords in this
   ///        namelist.  This function can be called from the main program, for any namelists that
@@ -261,8 +390,37 @@ public:
 
   /// \brief Print a complete table of the values for all parameters in this namelist, starting
   ///        including their sources (input statuses, i.e. DEFAULT, MISSING, or USER-SPECIFIED).
-  void printContents() const;
+  ///
+  /// Overloaded:
+  ///   - Write to a string for further processing
+  ///   - Write directly to an output file stream
+  ///   - Write to a named output file, given a state that it must be found in
+  ///
+  /// \param foutp              File to which information should be printed, defaulting to the
+  ///                           terminal
+  /// \param file_width         The width at which to print results (this parameter will be ignored
+  ///                           and replaced with the terminal width if the output goes to the
+  ///                           terminal)
+  /// \param max_entry_reports  The maximum number of entries to report from any given keyword
+  /// \param print_decor        Indicate whether to introduce the namelist or rely on some previous
+  ///                           iteration writing to the same file
+  /// \{
+  std::string printContents(int file_width = default_output_file_width, int max_entry_counts = 4,
+                            NamelistIntroduction print_decor = NamelistIntroduction::HEADER) const;
   
+  void printContents(std::ostream *foutp, int file_width = default_output_file_width,
+                     int max_entry_counts = 4,
+                     NamelistIntroduction print_decor = NamelistIntroduction::HEADER) const;
+
+  void printContents(std::ofstream *foutp, int file_width = default_output_file_width,
+                     int max_entry_counts = 4,
+                     NamelistIntroduction print_decor = NamelistIntroduction::HEADER) const;
+
+  void printContents(const std::string &file_name, PrintSituation expectation,
+                     int file_width = default_output_file_width, int max_entry_counts = 4,
+                     NamelistIntroduction print_decor = NamelistIntroduction::HEADER) const;
+  /// \}
+
 private:
   std::string title;                       ///< Title of this namelist, i.e. &cntrl
   std::vector<NamelistElement> keywords;   ///< List of all keywords stored in this namelist
@@ -300,5 +458,7 @@ private:
 
 } // namespace namelist
 } // namespace stormm
+
+#include "namelist_emulator.tpp"
 
 #endif

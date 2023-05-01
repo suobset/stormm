@@ -856,6 +856,16 @@ const std::vector<AtomGraph*>& PhaseSpaceSynthesis::getUniqueTopologies() const 
 }
 
 //-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getAtomOffset(const int system_index) const {
+  return atom_starts.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getAtomCount(const int system_index) const {
+  return atom_counts.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 int PhaseSpaceSynthesis::getUniqueTopologyIndex(const int system_index) const {
   return unique_topology_reference.readHost(system_index);
 }
@@ -1068,202 +1078,202 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
 
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
-PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
+const PsSynthesisReader
+PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycle orientation) const {
+
+  // Obtain pointers to system indexing and unit cell dimensions stored on the host.  The pointers
+  // are valid on the device.  Some of this could be expedited by retracing the manner in which
+  // some of the ARRAY-kind Hybrids were allocated to infer the values of subsequent pointers, but
+  // cudaHostGetDevicePointer is not a high-latency or laborious call.  Reduce complexity in the
+  // central Hybrid object by generating the pointers every time this special case occurs.
+  const int* devc_atom_starts = atom_starts.getDeviceValidHostPointer();
+  const int* devc_atom_counts = atom_counts.getDeviceValidHostPointer();
+  const int* devc_shared_topology_instances =
+    shared_topology_instances.getDeviceValidHostPointer();
+  const int* devc_shared_topology_instance_bounds =
+    shared_topology_instance_bounds.getDeviceValidHostPointer();
+  const int* devc_unique_topology_reference =
+    unique_topology_reference.getDeviceValidHostPointer();
+  const int* devc_shared_topology_instance_index =
+    shared_topology_instance_index.getDeviceValidHostPointer();
+  const llint* devc_boxvecs = box_vectors.getDeviceValidHostPointer();
+  const int* devc_boxvec_ovrf = box_vector_overflow.getDeviceValidHostPointer();
+  const double* devc_umat = box_space_transforms.getDeviceValidHostPointer();
+  const double* devc_invu = inverse_transforms.getDeviceValidHostPointer();
+  const double* devc_boxdims = box_dimensions.getDeviceValidHostPointer();
+  const llint* devc_alt_boxvecs = alt_box_vectors.getDeviceValidHostPointer();
+  const int* devc_alt_boxvec_ovrf = alt_box_vector_overflow.getDeviceValidHostPointer();
+  const double* devc_umat_alt = alt_box_transforms.getDeviceValidHostPointer();
+  const double* devc_invu_alt = alt_inverse_transforms.getDeviceValidHostPointer();
+  const double* devc_alt_boxdims = alt_box_dimensions.getDeviceValidHostPointer();
+  
+  // Obtain pointers to the host-data for atomic positions.
+  const llint* devc_xcrd = x_coordinates.getDeviceValidHostPointer();
+  const llint* devc_ycrd = y_coordinates.getDeviceValidHostPointer();
+  const llint* devc_zcrd = z_coordinates.getDeviceValidHostPointer();
+  const int* devc_xcrd_ovrf = x_coordinate_overflow.getDeviceValidHostPointer();
+  const int* devc_ycrd_ovrf = y_coordinate_overflow.getDeviceValidHostPointer();
+  const int* devc_zcrd_ovrf = z_coordinate_overflow.getDeviceValidHostPointer();
+
+  // Obtain pointers to the host-data for particle velocities.
+  const llint* devc_xvel = x_velocities.getDeviceValidHostPointer();
+  const llint* devc_yvel = y_velocities.getDeviceValidHostPointer();
+  const llint* devc_zvel = z_velocities.getDeviceValidHostPointer();
+  const int* devc_xvel_ovrf = x_velocity_overflow.getDeviceValidHostPointer();
+  const int* devc_yvel_ovrf = y_velocity_overflow.getDeviceValidHostPointer();
+  const int* devc_zvel_ovrf = z_velocity_overflow.getDeviceValidHostPointer();
+
+  // Obtain pointers to the host-data for forces acting on all particles.
+  const llint* devc_xfrc = x_forces.getDeviceValidHostPointer();
+  const llint* devc_yfrc = y_forces.getDeviceValidHostPointer();
+  const llint* devc_zfrc = z_forces.getDeviceValidHostPointer();
+  const int* devc_xfrc_ovrf = x_force_overflow.getDeviceValidHostPointer();
+  const int* devc_yfrc_ovrf = y_force_overflow.getDeviceValidHostPointer();
+  const int* devc_zfrc_ovrf = z_force_overflow.getDeviceValidHostPointer();
+
+  // Obtain pointers to the host data for prior positions.
+  const llint* devc_xalt = x_alt_coordinates.getDeviceValidHostPointer();
+  const llint* devc_yalt = y_alt_coordinates.getDeviceValidHostPointer();
+  const llint* devc_zalt = z_alt_coordinates.getDeviceValidHostPointer();
+  const int* devc_xalt_ovrf = x_alt_coord_overflow.getDeviceValidHostPointer();
+  const int* devc_yalt_ovrf = y_alt_coord_overflow.getDeviceValidHostPointer();
+  const int* devc_zalt_ovrf = z_alt_coord_overflow.getDeviceValidHostPointer();
+
+  // Obtain pointers to the host data for prior velocities.
+  const llint* devc_vxalt = x_alt_velocities.getDeviceValidHostPointer();
+  const llint* devc_vyalt = y_alt_velocities.getDeviceValidHostPointer();
+  const llint* devc_vzalt = z_alt_velocities.getDeviceValidHostPointer();
+  const int* devc_vxalt_ovrf = x_alt_velocity_overflow.getDeviceValidHostPointer();
+  const int* devc_vyalt_ovrf = y_alt_velocity_overflow.getDeviceValidHostPointer();
+  const int* devc_vzalt_ovrf = z_alt_velocity_overflow.getDeviceValidHostPointer();
+
+  // Obtain pointers to the host data for prior forces.
+  const llint* devc_fxalt = x_alt_forces.getDeviceValidHostPointer();
+  const llint* devc_fyalt = y_alt_forces.getDeviceValidHostPointer();
+  const llint* devc_fzalt = z_alt_forces.getDeviceValidHostPointer();
+  const int* devc_fxalt_ovrf = x_alt_force_overflow.getDeviceValidHostPointer();
+  const int* devc_fyalt_ovrf = y_alt_force_overflow.getDeviceValidHostPointer();
+  const int* devc_fzalt_ovrf = z_alt_force_overflow.getDeviceValidHostPointer();
+
+  // Return an abstract based on the requested point in the coordinate cycle
+  switch (orientation) {
+  case CoordinateCycle::PRIMARY:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
+                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
+                             devc_unique_topology_reference, devc_shared_topology_instance_index,
+                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
+                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
+                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
+                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_xcrd, devc_ycrd,
+                             devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel,
+                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
+                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
+                             devc_zfrc_ovrf, devc_xalt, devc_yalt, devc_zalt, devc_xalt_ovrf,
+                             devc_yalt_ovrf, devc_zalt_ovrf, devc_vxalt, devc_vyalt, devc_vzalt,
+                             devc_vxalt_ovrf, devc_vyalt_ovrf, devc_vzalt_ovrf, devc_fxalt,
+                             devc_fyalt, devc_fzalt, devc_fxalt_ovrf, devc_fyalt_ovrf,
+                             devc_fzalt_ovrf);
+  case CoordinateCycle::ALTERNATE:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
+                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
+                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
+                             devc_unique_topology_reference, devc_shared_topology_instance_index,
+                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
+                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
+                             force_scale_bits, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
+                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_boxvecs,
+                             devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims, devc_xalt,
+                             devc_yalt, devc_zalt, devc_xalt_ovrf, devc_yalt_ovrf, devc_zalt_ovrf,
+                             devc_vxalt, devc_vyalt, devc_vzalt, devc_vxalt_ovrf, devc_vyalt_ovrf,
+                             devc_vzalt_ovrf, devc_fxalt, devc_fyalt, devc_fzalt, devc_fxalt_ovrf,
+                             devc_fyalt_ovrf, devc_fzalt_ovrf, devc_xcrd, devc_ycrd, devc_zcrd,
+                             devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel,
+                             devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc,
+                             devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const PsSynthesisReader PhaseSpaceSynthesis::deviceViewToHostData() const {
   return deviceViewToHostData(cycle_position);
 }
 
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycle orientation) {
 
-  // Some of this could be expedited by retracing the manner in which some of the ARRAY-kind
-  // Hybrids were allocated to infer the values of subsequent pointers, but
-  // cudaHostGetDevicePointer is not a high-latency or laborious call.  Reduce complexity in the
-  // central Hybrid object by generating the pointers every time this special case occurs.
-  int *devc_atom_starts, *devc_atom_counts;
-  int *devc_shared_topology_instances, *devc_shared_topology_instance_bounds;
-  int *devc_unique_topology_reference, *devc_shared_topology_instance_index;
-  llint *devc_boxvecs, *devc_alt_boxvecs;
-  int *devc_boxvec_ovrf, *devc_alt_boxvec_ovrf;
-  double *devc_umat, *devc_invu, *devc_boxdims, *devc_umat_alt, *devc_invu_alt, *devc_alt_boxdims;
-  llint *devc_xcrd,  *devc_ycrd,  *devc_zcrd,  *devc_xvel,  *devc_yvel,  *devc_zvel;
-  llint *devc_xfrc,  *devc_yfrc,  *devc_zfrc,  *devc_xalt,  *devc_yalt,  *devc_zalt;
-  llint *devc_vxalt, *devc_vyalt, *devc_vzalt, *devc_fxalt, *devc_fyalt, *devc_fzalt;
-  int *devc_xcrd_ovrf,  *devc_ycrd_ovrf,  *devc_zcrd_ovrf;
-  int *devc_xvel_ovrf,  *devc_yvel_ovrf,  *devc_zvel_ovrf;
-  int *devc_xfrc_ovrf,  *devc_yfrc_ovrf,  *devc_zfrc_ovrf;
-  int *devc_xalt_ovrf,  *devc_yalt_ovrf,  *devc_zalt_ovrf;
-  int *devc_vxalt_ovrf, *devc_vyalt_ovrf, *devc_vzalt_ovrf;
-  int *devc_fxalt_ovrf, *devc_fyalt_ovrf, *devc_fzalt_ovrf;
-
-  bool problem = false;
-#  ifdef STORMM_USE_CUDA
   // Obtain pointers to system indexing and unit cell dimensions stored on the host.  The pointers
   // are valid on the device.
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_starts,
-                                                 (void *)atom_starts.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_counts,
-                                                 (void *)atom_counts.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_shared_topology_instances,
-                                      (void *)shared_topology_instances.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_shared_topology_instance_bounds,
-                                      (void *)shared_topology_instance_bounds.data(), 0) !=
-             cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_boxvecs,
-                                                 (void *)box_vectors.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_boxvec_ovrf,
-                                      (void *)box_vector_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_umat,
-                                      (void *)box_space_transforms.data(), 0) != cudaSuccess);
-  problem = (problem ||  
-             cudaHostGetDevicePointer((void **)&devc_invu,
-                                      (void *)inverse_transforms.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_boxdims,
-                                                 (void *)box_dimensions.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_alt_boxvecs,
-                                      (void *)alt_box_vectors.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_alt_boxvec_ovrf,
-                                      (void *)alt_box_vector_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_umat_alt,
-                                      (void *)alt_box_transforms.data(), 0) != cudaSuccess);
-  problem = (problem ||  
-             cudaHostGetDevicePointer((void **)&devc_invu_alt,
-                                      (void *)alt_inverse_transforms.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_alt_boxdims,
-                                      (void *)alt_box_dimensions.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_unique_topology_reference,
-                                      (void *)unique_topology_reference.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_shared_topology_instance_index,
-                                      (void *)shared_topology_instance_index.data(), 0) !=
-             cudaSuccess);
+  int* devc_atom_starts = atom_starts.getDeviceValidHostPointer();
+  int* devc_atom_counts = atom_counts.getDeviceValidHostPointer();
+  int* devc_shared_topology_instances = shared_topology_instances.getDeviceValidHostPointer();
+  int* devc_shared_topology_instance_bounds =
+    shared_topology_instance_bounds.getDeviceValidHostPointer();
+  int* devc_unique_topology_reference = unique_topology_reference.getDeviceValidHostPointer();
+  int* devc_shared_topology_instance_index =
+    shared_topology_instance_index.getDeviceValidHostPointer();
+  llint* devc_boxvecs = box_vectors.getDeviceValidHostPointer();
+  int* devc_boxvec_ovrf = box_vector_overflow.getDeviceValidHostPointer();
+  double* devc_umat = box_space_transforms.getDeviceValidHostPointer();
+  double* devc_invu = inverse_transforms.getDeviceValidHostPointer();
+  double* devc_boxdims = box_dimensions.getDeviceValidHostPointer();
+  llint* devc_alt_boxvecs = alt_box_vectors.getDeviceValidHostPointer();
+  int* devc_alt_boxvec_ovrf = alt_box_vector_overflow.getDeviceValidHostPointer();
+  double* devc_umat_alt = alt_box_transforms.getDeviceValidHostPointer();
+  double* devc_invu_alt = alt_inverse_transforms.getDeviceValidHostPointer();
+  double* devc_alt_boxdims = alt_box_dimensions.getDeviceValidHostPointer();
   
   // Obtain pointers to the host-data for atomic positions.
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xcrd,
-                                                 (void *)x_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_ycrd,
-                                                 (void *)y_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_zcrd,
-                                                 (void *)z_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_xcrd_ovrf,
-                                      (void *)x_coordinate_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_ycrd_ovrf,
-                                      (void *)y_coordinate_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_zcrd_ovrf,
-                                      (void *)z_coordinate_overflow.data(), 0) != cudaSuccess);
+  llint* devc_xcrd = x_coordinates.getDeviceValidHostPointer();
+  llint* devc_ycrd = y_coordinates.getDeviceValidHostPointer();
+  llint* devc_zcrd = z_coordinates.getDeviceValidHostPointer();
+  int* devc_xcrd_ovrf = x_coordinate_overflow.getDeviceValidHostPointer();
+  int* devc_ycrd_ovrf = y_coordinate_overflow.getDeviceValidHostPointer();
+  int* devc_zcrd_ovrf = z_coordinate_overflow.getDeviceValidHostPointer();
 
   // Obtain pointers to the host-data for particle velocities.
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xvel,
-                                                 (void *)x_velocities.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_yvel,
-                                                 (void *)y_velocities.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_zvel,
-                                                 (void *)z_velocities.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_xvel_ovrf,
-                                      (void *)x_velocity_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_yvel_ovrf,
-                                      (void *)y_velocity_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_zvel_ovrf,
-                                      (void *)z_velocity_overflow.data(), 0) != cudaSuccess);
+  llint* devc_xvel = x_velocities.getDeviceValidHostPointer();
+  llint* devc_yvel = y_velocities.getDeviceValidHostPointer();
+  llint* devc_zvel = z_velocities.getDeviceValidHostPointer();
+  int* devc_xvel_ovrf = x_velocity_overflow.getDeviceValidHostPointer();
+  int* devc_yvel_ovrf = y_velocity_overflow.getDeviceValidHostPointer();
+  int* devc_zvel_ovrf = z_velocity_overflow.getDeviceValidHostPointer();
 
   // Obtain pointers to the host-data for forces acting on all particles.
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xfrc,
-                                                 (void *)x_forces.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_yfrc,
-                                                 (void *)y_forces.data(), 0) != cudaSuccess);
-  problem = (problem || cudaHostGetDevicePointer((void **)&devc_zfrc,
-                                                 (void *)z_forces.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_xfrc_ovrf,
-                                      (void *)x_force_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_yfrc_ovrf,
-                                      (void *)y_force_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_zfrc_ovrf,
-                                      (void *)z_force_overflow.data(), 0) != cudaSuccess);
+  llint* devc_xfrc = x_forces.getDeviceValidHostPointer();
+  llint* devc_yfrc = y_forces.getDeviceValidHostPointer();
+  llint* devc_zfrc = z_forces.getDeviceValidHostPointer();
+  int* devc_xfrc_ovrf = x_force_overflow.getDeviceValidHostPointer();
+  int* devc_yfrc_ovrf = y_force_overflow.getDeviceValidHostPointer();
+  int* devc_zfrc_ovrf = z_force_overflow.getDeviceValidHostPointer();
 
   // Obtain pointers to the host data for prior positions.
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_xalt,
-                                      (void *)x_alt_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_yalt,
-                                      (void *)y_alt_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_zalt,
-                                      (void *)z_alt_coordinates.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_xalt_ovrf,
-                                      (void *)x_alt_coord_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_yalt_ovrf,
-                                      (void *)y_alt_coord_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_zalt_ovrf,
-                                      (void *)z_alt_coord_overflow.data(), 0) != cudaSuccess);
+  llint* devc_xalt = x_alt_coordinates.getDeviceValidHostPointer();
+  llint* devc_yalt = y_alt_coordinates.getDeviceValidHostPointer();
+  llint* devc_zalt = z_alt_coordinates.getDeviceValidHostPointer();
+  int* devc_xalt_ovrf = x_alt_coord_overflow.getDeviceValidHostPointer();
+  int* devc_yalt_ovrf = y_alt_coord_overflow.getDeviceValidHostPointer();
+  int* devc_zalt_ovrf = z_alt_coord_overflow.getDeviceValidHostPointer();
 
   // Obtain pointers to the host data for prior velocities.
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vxalt,
-                                      (void *)x_alt_velocities.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vyalt,
-                                      (void *)y_alt_velocities.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vzalt,
-                                      (void *)z_alt_velocities.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vxalt_ovrf,
-                                      (void *)x_alt_velocity_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vyalt_ovrf,
-                                      (void *)y_alt_velocity_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_vzalt_ovrf,
-                                      (void *)z_alt_velocity_overflow.data(), 0) != cudaSuccess);
+  llint* devc_vxalt = x_alt_velocities.getDeviceValidHostPointer();
+  llint* devc_vyalt = y_alt_velocities.getDeviceValidHostPointer();
+  llint* devc_vzalt = z_alt_velocities.getDeviceValidHostPointer();
+  int* devc_vxalt_ovrf = x_alt_velocity_overflow.getDeviceValidHostPointer();
+  int* devc_vyalt_ovrf = y_alt_velocity_overflow.getDeviceValidHostPointer();
+  int* devc_vzalt_ovrf = z_alt_velocity_overflow.getDeviceValidHostPointer();
 
   // Obtain pointers to the host data for prior forces.
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fxalt,
-                                      (void *)x_alt_forces.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fyalt,
-                                      (void *)y_alt_forces.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fzalt,
-                                      (void *)z_alt_forces.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fxalt_ovrf,
-                                      (void *)x_alt_force_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fyalt_ovrf,
-                                      (void *)y_alt_force_overflow.data(), 0) != cudaSuccess);
-  problem = (problem ||
-             cudaHostGetDevicePointer((void **)&devc_fzalt_ovrf,
-                                      (void *)z_alt_force_overflow.data(), 0) != cudaSuccess);
-#  endif // STORMM_USE_CUDA
-  if (problem) {
-    rtErr("Unable to get device-mapped pointers to host memory.  Types of memory used in each "
-          "array: " + std::string(int_data.getLabel().name) + " " + int_data.getLabel().format +
-          ", " + std::string(llint_data.getLabel().name) + " " + llint_data.getLabel().format +
-          ", " + std::string(double_data.getLabel().name) + " " + double_data.getLabel().format +
-          ".", "PhaseSpaceSynthesis", "deviceViewToHostData");
-  }
+  llint* devc_fxalt = x_alt_forces.getDeviceValidHostPointer();
+  llint* devc_fyalt = y_alt_forces.getDeviceValidHostPointer();
+  llint* devc_fzalt = z_alt_forces.getDeviceValidHostPointer();
+  int* devc_fxalt_ovrf = x_alt_force_overflow.getDeviceValidHostPointer();
+  int* devc_fyalt_ovrf = y_alt_force_overflow.getDeviceValidHostPointer();
+  int* devc_fzalt_ovrf = z_alt_force_overflow.getDeviceValidHostPointer();
+
+  // Return an abstract based on the requested point in the coordinate cycle
   switch (orientation) {
   case CoordinateCycle::PRIMARY:
     return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
@@ -1302,6 +1312,11 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
                              devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf);
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
+  return deviceViewToHostData(cycle_position);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2240,7 +2255,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       // Initialize the trajectory if this is the first time printing it
       if (fi_exists == false || actual_expectation == PrintSituation::OVERWRITE ||
           actual_expectation == PrintSituation::OPEN_NEW) {
-        sprintf(buffer, "Generated by STORMM\n");
+        snprintf(buffer, 128, "Generated by STORMM\n");
         foutp.write(buffer, strlen(buffer));
       }
     }
@@ -2366,9 +2381,11 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
         foutp = openOutputFile(aug_file_name, actual_expectation, "Open an output trajectory for "
                                "writing frame " + std::to_string(i + 1) + " of a "
                                "PhaseSpaceSynthesis object's contents.", style);
-        sprintf(buffer, "Generated by STORMM\n");
-        sprintf(&buffer[strlen(buffer)], "%8d %15.7e\n", frame_atom_count, current_time);
-        foutp.write(buffer, strlen(buffer));
+        snprintf(buffer, 128, "Generated by STORMM\n");
+        const int slen_buff = strlen(buffer);
+        snprintf(&buffer[slen_buff], 128 - slen_buff, "%8d %15.7e\n", frame_atom_count,
+                 current_time);
+        foutp.write(buffer, slen_buff);
         writeFrame(&foutp, file_name, output_kind, tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel,
                    tmp_yvel, tmp_zvel, unit_cell, tmp_boxdims);
         foutp.close();

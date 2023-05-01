@@ -8,6 +8,7 @@
 #include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "parsing_enumerators.h"
 #include "polynumeric.h"
 #include "textfile.h"
 #include "textguard.h"
@@ -17,21 +18,6 @@ namespace parse {
 
 using constants::ExceptionResponse;
 using constants::CaseSensitivity;
-
-/// \brief Specify the way in which to print a standard real number or integer (with or without
-///        leading zeros)
-enum class NumberPrintStyle {
-  STANDARD,      ///< Print without leading zeros
-  LEADING_ZEROS  ///< Print with leading zeros
-};
-
-/// \brief Enumerate the types of wildcard characters.  The exact nature of the characters,
-///        i.e. "*" or ".", may be defined elsewhere.
-enum class WildCardKind {
-  NONE,            ///< Not a wildcard: direct match is the only way to success
-  FREE_CHARACTER,  ///< Matches any one character, but must match a character
-  FREE_STRETCH     ///< Matches any number of consecutive characters, including no characters
-};
 
 /// \brief Constant to define the default formatting for integer and real number representations.
 ///        If these values are seen then the program knows to do free formatting.
@@ -57,7 +43,7 @@ std::string char4ToString(const char4 value);
 ///
 /// \param value  The string to convert
 char4 stringToChar4(const std::string &value);
-
+  
 /// \brief Overload == to handle two char4 tuples
 ///
 /// \param lhs  The first value to compare
@@ -70,6 +56,11 @@ bool operator==(const char4 lhs, const char4 rhs);
 /// \param rhs  The second value to compare
 bool operator!=(const char4 lhs, const char4 rhs);
 
+/// \brief Convert a positive integer to an alphabetic string, essentially a base-26 number.
+///
+/// \param input  The integer to convert
+std::string alphabetNumber(ullint input);
+  
 /// \brief Determine whether a character string can qualify as an integer, real, or char4
 ///
 /// \param a           The character string
@@ -215,6 +206,93 @@ bool strcmpWildCard(const std::string &target, const std::string &query,
 /// \param limit  The maximum number of decimal places to report (optional)
 int realDecimalPlaces(double value, int limit = 10);
 
+/// \brief Add leading white space to a string and return the new string as the result.
+///
+/// Overloaded:
+///   - Return the resulting string as a new string
+///   - Modify an existing string
+///
+/// \param input          The string to pre-pend
+/// \param target_length  The length that the string should have with added white space.  If the
+///                       string is already this length or longer, no white space will be added.
+/// \{
+std::string addLeadingWhiteSpace(const std::string &input, const size_t target_length);
+void addLeadingWhiteSpace(std::string *input, const size_t target_length);
+/// \}
+
+/// \brief Add tailing white space to a string and return the new string as the result.
+///
+/// Overloaded:
+///   - Return the resulting string as a new string
+///   - Modify an existing string
+///
+/// \param input          The string to pre-pend
+/// \param target_length  The length that the string should have with added white space.  If the
+///                       string is already this length or longer, no white space will be added.
+/// \{
+std::string addTailingWhiteSpace(const std::string &input, const size_t target_length);
+void addTailingWhiteSpace(std::string *input, const size_t target_length);
+/// \}
+
+/// \brief Remove leading white space from a string and return a new string as the result.
+///
+/// Overloaded:
+///   - Return the resulting string as a new string
+///   - Modify an existing string
+///
+/// \param input  The string to prune
+/// \{
+std::string removeLeadingWhiteSpace(const std::string &input);
+void removeLeadingWhiteSpace(std::string *input);
+/// \}
+
+/// \brief Remove tailing white space from a string and return a new string as the result.
+///
+/// Overloaded:
+///   - Return the resulting string as a new string
+///   - Modify an existing string
+///
+/// \param input  The string to prune
+/// \{
+std::string removeTailingWhiteSpace(const std::string &input);
+void removeTailingWhiteSpace(std::string *input);
+/// \}
+
+/// \brief Add leading white space to a series of strings.  White space will be pre-pended to the
+///        front or back, insofar as it does not add excessive blank text to the output.  The
+///        consensus width of all default parameter strings is returned.
+///
+/// Overloaded:
+///   - Operate on a range of strings within the array
+///   - Operate on the entrie array
+///
+/// \param ds           List of strings, such as keyword parameters
+/// \param lower_limit  The lower limit of strings to operate upon
+/// \param upper_limit  The upper limit of strings to operate upon
+/// \param max_length   The maximum length to raise all strings to without further consideration.
+///                     If some strings are above this length, at least long_count members of the
+///                     list must aproach the upper end of the length spectrum before all strings
+///                     will be lengthened.
+/// \param long_count   The number of strings that must come within near_limit of the longest
+///                     string in order for all strings to be lengthed to the maximum length found.
+/// \param near_limit   The number of characters that at least long_count - 1 strings, other than
+///                     the longest string found, must come within the length of the longest string
+///                     in order for all strings to be lengthend to max_length.  
+/// \{
+size_t justifyStrings(std::vector<std::string> *ds, int lower_limit, int upper_limit,
+                      JustifyText fside = JustifyText::LEFT, size_t max_length = 10,
+                      int long_count = 2, int near_limit = 4);
+
+size_t justifyStrings(std::vector<std::string> *ds, JustifyText fside = JustifyText::LEFT,
+                      size_t max_length = 10, int long_count = 2, int near_limit = 4);
+/// \}
+
+/// \brief Compute the maximum length of an individual line, if a string were to be printed to the
+///        screen or a file with its carriage returns intact.
+///
+/// \param input  The string to examine
+size_t maximumLineLength(const std::string &input);
+  
 /// \brief Convert a real number to a formatted string.
 ///
 /// Overloaded:
@@ -238,7 +316,15 @@ std::string realToString(double value, int format_a = free_number_format,
 std::string realToString(const double value, const int format_a, const NumberFormat method,
                          const NumberPrintStyle style = NumberPrintStyle::STANDARD);
 /// \}
-  
+
+/// \brief Return the shortest string able to represent a real number to a relative precision,
+///        preferring standard notation over scientific in the case that both representations
+///        would be the same length.
+///
+/// \param value  The value to convert
+/// \param rel    Precision to which the value should be represented
+std::string minimalRealFormat(const double value, const double rel);
+
 /// Convert an integer to a formatted string.
 ///
 /// \param value  The number to convert
@@ -267,6 +353,7 @@ const std::vector<TextGuard> operator+(const std::vector<TextGuard> &lhs,
 /// \{
 bool detectGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                  const std::string &guard_seq);
+
 bool detectGuard(const char* line, const int pos_idx, const std::string &guard_seq);
 /// \}
 

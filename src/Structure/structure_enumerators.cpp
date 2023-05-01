@@ -123,6 +123,77 @@ std::string getEnumerationName(const BoundaryCondition input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MeshPosition input) {
+  switch (input) {
+  case MeshPosition::MOLECULE:
+    return std::string("MOLECULE");
+  case MeshPosition::ORIGIN:
+    return std::string("ORIGIN");
+  case MeshPosition::ARBITRARY:
+    return std::string("ARBITRARY");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
+RMSDMethod translateRMSDMethod(const std::string &input) {
+  if (strcmpCased(input, std::string("align_mass"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("align_mass_weighted"), CaseSensitivity::NO)) {
+    return RMSDMethod::ALIGN_MASS;
+  }
+  else if (strcmpCased(input, std::string("align_geom"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("align_geometry"), CaseSensitivity::NO)) {
+    return RMSDMethod::ALIGN_GEOM;
+  }
+  else if (strcmpCased(input, std::string("noalign_mass"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("noalign_mass_weighted"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("no_align_mass"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("no_align_mass_weighted"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("nonalign_mass"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("nonalign_mass_weighted"), CaseSensitivity::NO)) {
+    return RMSDMethod::NO_ALIGN_MASS;
+  }
+  else if (strcmpCased(input, std::string("noalign_geom"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("noalign_geometry"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("no_align_geom"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("no_align_geometry"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("nonalign_geom"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("nonalign_geometry"), CaseSensitivity::NO)) {
+    return RMSDMethod::NO_ALIGN_GEOM;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid RMSD calculation method.", "translateRMSDMethod");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+GridDetail translateGridDetail(const std::string &input) {
+  if (strcmpCased(input, std::string("occlusion"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("spacefill"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("space_fill"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("spacefilling"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("space_filling"), CaseSensitivity::NO)) {
+    return GridDetail::OCCLUSION;
+  }
+  else if (strcmpCased(input, std::string("nonbonded"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("non_bonded"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("nonbonded_field"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("non_bonded_field"), CaseSensitivity::NO)) {
+    return GridDetail::NONBONDED_FIELD;
+  }
+  else if (strcmpCased(input, std::string("nonbonded_atomic"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("non_bonded_atomic"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("atomic"), CaseSensitivity::NO)) {
+    return GridDetail::NONBONDED_ATOMIC;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid level of grid detail.", "translateGridDetail");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 SamplingIntensity translateSamplingIntensity(const std::string &input) {
   if (strcmpCased(input, std::string("minimal"), CaseSensitivity::NO)) {
     return SamplingIntensity::MINIMAL;
@@ -142,5 +213,39 @@ SamplingIntensity translateSamplingIntensity(const std::string &input) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+BoundaryCondition translateBoundaryCondition(const std::string &input) {
+  if (strcmpCased(input, std::string("isolated"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("nonperiodic"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("non_periodic"), CaseSensitivity::NO)) {
+    return BoundaryCondition::ISOLATED;
+  }
+  else if (strcmpCased(input, std::string("periodic"), CaseSensitivity::NO)) {
+    return BoundaryCondition::PERIODIC;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid boundary condition.", "translateBoundaryCondition");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MeshPosition translateMeshPosition(const std::string &input) {
+  if (strcmpCased(input, std::string("molecule"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("structure"), CaseSensitivity::NO)) {
+    return MeshPosition::MOLECULE;
+  }
+  else if (strcmpCased(input, std::string("origin"), CaseSensitivity::NO)) {
+    return MeshPosition::ORIGIN;
+  }
+  else if (strcmpCased(input, std::string("arbitrary"), CaseSensitivity::NO)) {
+    return MeshPosition::ARBITRARY;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid mesh alignment.", "translateMeshPosition");
+  }
+  __builtin_unreachable();
+}
+  
 } // namespace structure
 } // namespace stormm

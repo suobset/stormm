@@ -39,6 +39,7 @@ using stormm::parse::NumberFormat;
 using stormm::parse::operator!=;
 using stormm::parse::operator==;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::topology::AtomGraph;
 using stormm::topology::ChemicalDetailsKit;
 using stormm::topology::MobilitySetting;
@@ -624,6 +625,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

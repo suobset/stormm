@@ -119,6 +119,34 @@ std::vector<std::string> listFilesInPath(const std::string &regexp_path, SearchS
 ///                   path is the correct root
 std::string findStormmPath(const std::string &path, const std::string &extension);
 
+/// \brief Form the variable name for common path prefixes.  This encapsulates a convention and
+///        applies to output files meant for human comprehension, not actual code or functional
+///        scripts produced by STORMM.
+///
+/// \param index  Index of the path variable to encode
+std::string commonPathVariableName(int index);
+  
+/// \brief Find common paths among a list of file names.  Return the common paths in a separate
+///        vector of strings and modify the input to reflect variables set to each common path,
+///        which can shorten the overall reporting.  Common paths will be restricted to similar
+///        directory tree structures and must begin at the base of each path they modify.  The
+///        input will be modified as "${PATH_1}", "${PATH_2}", etc. to substitute the first,
+///        second, and additional common, shortcut paths.
+///
+/// \param input_paths  Input paths to parse for common directory trees.  Modified and returned.
+/// \param n_shortcut   The maximum number of shortcut paths to find.  Each shortcut must be
+///                     common to at least n_instance paths.
+/// \param n_instance   The number of paths that must be feasible to shorten with each shortcut
+///                     declaration in order to warrant making a new shortcut
+std::vector<std::string> extractCommonPaths(std::vector<std::string> *input_paths,
+                                            int n_shortcut = 2, int n_instance = 2);
+
+/// \brief State the list of common path names as a concatenated string.
+///
+/// \param shortcuts    List of path shortcuts
+/// \param indentation  The number of spaces to indent the list of path tokens
+std::string listCommonPaths(const std::vector<std::string> &shortcuts, int indentation = 2);
+  
 } // namespace parse
 } // namespace stormm
 

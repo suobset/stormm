@@ -5,11 +5,11 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/symbol_values.h"
-#include "Namelists/namelist_emulator.h"
-#include "Namelists/namelist_element.h"
 #include "Structure/structure_enumerators.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Parsing/textfile.h"
+#include "namelist_element.h"
+#include "namelist_emulator.h"
 
 namespace stormm {
 namespace namelist {
@@ -67,8 +67,8 @@ public:
   ///                    the beginning of an input file if no such namelist is found starting
   ///                    from the original starting point
   /// \{
-  ConformerControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
-                    WrapTextSearch wrap = WrapTextSearch::NO);
+  ConformerControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  
   ConformerControls(const TextFile &tf, int *start_line, bool *found_nml,
                     ExceptionResponse policy_in = ExceptionResponse::DIE,
                     WrapTextSearch wrap = WrapTextSearch::NO);
@@ -176,6 +176,9 @@ public:
   ///        isomeric bonds) used in reconciling general settings to the known values emerging from
   ///        a collection of structures for each molecule.
   VariableTorsionAdjustment getTorsionAdjustmentProtocol() const;
+
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
   
 private:
   ExceptionResponse policy;         ///< Set the behavior when bad inputs are encountered.  DIE =
@@ -244,6 +247,9 @@ private:
   /// The specific values at which to set each cis-trans isomeric bond for initial poses.
   std::vector<double> cis_trans_sample_values;
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Validate the restraining potential that will define the common core.
   void validateCoreRestraint() const;
   
@@ -317,14 +323,7 @@ private:
                              const NamelistEmulator &t_nml);
 };
 
-/// \brief Free function to read the &conformer namelist.  This works in analogous fashion to
-///        various namelist-assoicated objects implemented in src/Namelists/, except that the
-///        &conformer namelist is private to this application.  The UserSettings object is the
-///        object associated in this manner to the &conformer namelist.  Unlike the objects linked
-///        to general-purpose namelists in src/Namelists, the UserSettings object does not need
-///        additional setter functions for keyword-associated content in a &confomer namelist, as
-///        the namelist in an input file is the one way that this information will enter the
-///        program.
+/// \brief Free function to read the &conformer namelist.  
 ///
 /// \param tf          Text of file containing the input deck, read into RAM
 /// \param start_line  Line of the input file at which to begin the scan

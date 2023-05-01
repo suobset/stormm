@@ -104,6 +104,8 @@ std::string getEnumerationName(const StructureSource input) {
     return std::string("SYNTHESIS");
   case StructureSource::SERIES:
     return std::string("SERIES");
+  case StructureSource::NONE:
+    return std::string("NONE");
   }
   __builtin_unreachable();
 }

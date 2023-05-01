@@ -963,7 +963,184 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   foutp.close();
 }
 
+//-------------------------------------------------------------------------------------------------
+const PhaseSpace* PhaseSpace::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceReader PhaseSpace::data(const HybridTargetLevel tier) const {
+  return data(cycle_position, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceReader PhaseSpace::data(const CoordinateCycle orientation,
+                                        const HybridTargetLevel tier) const {
+  switch (orientation) {
+  case CoordinateCycle::ALTERNATE:
+    return PhaseSpaceReader(atom_count, unit_cell, x_alt_coordinates.data(tier),
+                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
+                            alt_box_space_transform.data(tier),
+                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_alt_velocities.data(tier),
+                            y_alt_velocities.data(tier), z_alt_velocities.data(tier),
+                            x_alt_forces.data(tier), y_alt_forces.data(tier),
+                            z_alt_forces.data(tier), x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            x_velocities.data(tier), y_velocities.data(tier),
+                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                            z_forces.data(tier));
+  case CoordinateCycle::PRIMARY:
+    return PhaseSpaceReader(atom_count, unit_cell, x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), alt_box_space_transform.data(tier),
+                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
+                            x_velocities.data(tier), y_velocities.data(tier),
+                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                            z_forces.data(tier), x_alt_coordinates.data(tier),
+                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
+                            x_alt_velocities.data(tier), y_alt_velocities.data(tier),
+                            z_alt_velocities.data(tier), x_alt_forces.data(tier),
+                            y_alt_forces.data(tier), z_alt_forces.data(tier));
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter PhaseSpace::data(const HybridTargetLevel tier) {
+  return data(cycle_position, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter PhaseSpace::data(const CoordinateCycle orientation,
+                                  const HybridTargetLevel tier) {
+  switch (orientation) {
+  case CoordinateCycle::ALTERNATE:
+    return PhaseSpaceWriter(atom_count, unit_cell, x_alt_coordinates.data(tier),
+                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
+                            alt_box_space_transform.data(tier),
+                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_alt_velocities.data(tier),
+                            y_alt_velocities.data(tier), z_alt_velocities.data(tier),
+                            x_alt_forces.data(tier), y_alt_forces.data(tier),
+                            z_alt_forces.data(tier), x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            x_velocities.data(tier), y_velocities.data(tier),
+                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                            z_forces.data(tier));
+  case CoordinateCycle::PRIMARY:
+    return PhaseSpaceWriter(atom_count, unit_cell, x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), alt_box_space_transform.data(tier),
+                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
+                            x_velocities.data(tier), y_velocities.data(tier),
+                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                            z_forces.data(tier), x_alt_coordinates.data(tier),
+                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
+                            x_alt_velocities.data(tier), y_alt_velocities.data(tier),
+                            z_alt_velocities.data(tier), x_alt_forces.data(tier),
+                            y_alt_forces.data(tier), z_alt_forces.data(tier));
+  }
+  __builtin_unreachable();
+}
+
 #ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceReader PhaseSpace::deviceViewToHostData(CoordinateCycle orientation) const {
+  const double* xcrd = x_coordinates.getDeviceValidHostPointer();
+  const double* ycrd = y_coordinates.getDeviceValidHostPointer();
+  const double* zcrd = z_coordinates.getDeviceValidHostPointer();
+  const double* xcrd_alt = x_alt_coordinates.getDeviceValidHostPointer();
+  const double* ycrd_alt = y_alt_coordinates.getDeviceValidHostPointer();
+  const double* zcrd_alt = z_alt_coordinates.getDeviceValidHostPointer();
+  const double* umat = box_space_transform.getDeviceValidHostPointer();
+  const double* invu = inverse_transform.getDeviceValidHostPointer();
+  const double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  const double* umat_alt = alt_box_space_transform.getDeviceValidHostPointer();
+  const double* invu_alt = alt_inverse_transform.getDeviceValidHostPointer();
+  const double* boxdim_alt = alt_box_dimensions.getDeviceValidHostPointer();
+  const double* xvel = x_velocities.getDeviceValidHostPointer();
+  const double* yvel = y_velocities.getDeviceValidHostPointer();
+  const double* zvel = z_velocities.getDeviceValidHostPointer();
+  const double* xvel_alt = x_alt_velocities.getDeviceValidHostPointer();
+  const double* yvel_alt = y_alt_velocities.getDeviceValidHostPointer();
+  const double* zvel_alt = z_alt_velocities.getDeviceValidHostPointer();
+  const double* xfrc = x_forces.getDeviceValidHostPointer();
+  const double* yfrc = y_forces.getDeviceValidHostPointer();
+  const double* zfrc = z_forces.getDeviceValidHostPointer();
+  const double* xfrc_alt = x_alt_forces.getDeviceValidHostPointer();
+  const double* yfrc_alt = y_alt_forces.getDeviceValidHostPointer();
+  const double* zfrc_alt = z_alt_forces.getDeviceValidHostPointer();
+  switch (orientation) {
+  case CoordinateCycle::ALTERNATE:
+    return PhaseSpaceReader(atom_count, unit_cell, xcrd_alt, ycrd_alt, zcrd_alt, umat_alt,
+                            invu_alt, boxdim_alt, umat, invu, boxdim, xvel_alt, yvel_alt, zvel_alt,
+                            xfrc_alt, yfrc_alt, zfrc_alt, xcrd, ycrd, zcrd, xvel, yvel, zvel, xfrc,
+                            yfrc, zfrc);
+  case CoordinateCycle::PRIMARY:
+    return PhaseSpaceReader(atom_count, unit_cell, xcrd, ycrd, zcrd, umat, invu, boxdim, umat_alt,
+                            invu_alt, boxdim_alt, xvel, yvel, zvel, xfrc, yfrc, zfrc, xcrd_alt,
+                            ycrd_alt, zcrd_alt, xvel_alt, yvel_alt, zvel_alt, xfrc_alt, yfrc_alt,
+                            zfrc_alt);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceReader PhaseSpace::deviceViewToHostData() const {
+  return deviceViewToHostData(cycle_position);
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter PhaseSpace::deviceViewToHostData(CoordinateCycle orientation) {
+  double* xcrd = x_coordinates.getDeviceValidHostPointer();
+  double* ycrd = y_coordinates.getDeviceValidHostPointer();
+  double* zcrd = z_coordinates.getDeviceValidHostPointer();
+  double* xcrd_alt = x_alt_coordinates.getDeviceValidHostPointer();
+  double* ycrd_alt = y_alt_coordinates.getDeviceValidHostPointer();
+  double* zcrd_alt = z_alt_coordinates.getDeviceValidHostPointer();
+  double* umat = box_space_transform.getDeviceValidHostPointer();
+  double* invu = inverse_transform.getDeviceValidHostPointer();
+  double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  double* umat_alt = alt_box_space_transform.getDeviceValidHostPointer();
+  double* invu_alt = alt_inverse_transform.getDeviceValidHostPointer();
+  double* boxdim_alt = alt_box_dimensions.getDeviceValidHostPointer();
+  double* xvel = x_velocities.getDeviceValidHostPointer();
+  double* yvel = y_velocities.getDeviceValidHostPointer();
+  double* zvel = z_velocities.getDeviceValidHostPointer();
+  double* xvel_alt = x_alt_velocities.getDeviceValidHostPointer();
+  double* yvel_alt = y_alt_velocities.getDeviceValidHostPointer();
+  double* zvel_alt = z_alt_velocities.getDeviceValidHostPointer();
+  double* xfrc = x_forces.getDeviceValidHostPointer();
+  double* yfrc = y_forces.getDeviceValidHostPointer();
+  double* zfrc = z_forces.getDeviceValidHostPointer();
+  double* xfrc_alt = x_alt_forces.getDeviceValidHostPointer();
+  double* yfrc_alt = y_alt_forces.getDeviceValidHostPointer();
+  double* zfrc_alt = z_alt_forces.getDeviceValidHostPointer();
+  switch (orientation) {
+  case CoordinateCycle::ALTERNATE:
+    return PhaseSpaceWriter(atom_count, unit_cell, xcrd_alt, ycrd_alt, zcrd_alt, umat_alt,
+                            invu_alt, boxdim_alt, umat, invu, boxdim, xvel_alt, yvel_alt, zvel_alt,
+                            xfrc_alt, yfrc_alt, zfrc_alt, xcrd, ycrd, zcrd, xvel, yvel, zvel, xfrc,
+                            yfrc, zfrc);
+  case CoordinateCycle::PRIMARY:
+    return PhaseSpaceWriter(atom_count, unit_cell, xcrd, ycrd, zcrd, umat, invu, boxdim, umat_alt,
+                            invu_alt, boxdim_alt, xvel, yvel, zvel, xfrc, yfrc, zfrc, xcrd_alt,
+                            ycrd_alt, zcrd_alt, xvel_alt, yvel_alt, zvel_alt, xfrc_alt, yfrc_alt,
+                            zfrc_alt);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter PhaseSpace::deviceViewToHostData() {
+  return deviceViewToHostData(cycle_position);
+}
+
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::upload() {
   storage.upload();
@@ -1100,93 +1277,7 @@ void PhaseSpace::downloadForces(const CoordinateCycle orientation) {
 void PhaseSpace::downloadForces() {
   downloadForces(cycle_position);
 }
-
 #endif
-
-//-------------------------------------------------------------------------------------------------
-const PhaseSpaceReader PhaseSpace::data(const HybridTargetLevel tier) const {
-  return data(cycle_position, tier);
-}
-
-//-------------------------------------------------------------------------------------------------
-const PhaseSpaceReader PhaseSpace::data(const CoordinateCycle orientation,
-                                        const HybridTargetLevel tier) const {
-  switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
-    return PhaseSpaceReader(atom_count, unit_cell, x_alt_coordinates.data(tier),
-                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
-                            alt_box_space_transform.data(tier),
-                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
-                            box_space_transform.data(tier), inverse_transform.data(tier),
-                            box_dimensions.data(tier), x_alt_velocities.data(tier),
-                            y_alt_velocities.data(tier), z_alt_velocities.data(tier),
-                            x_alt_forces.data(tier), y_alt_forces.data(tier),
-                            z_alt_forces.data(tier), x_coordinates.data(tier),
-                            y_coordinates.data(tier), z_coordinates.data(tier),
-                            x_velocities.data(tier), y_velocities.data(tier),
-                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                            z_forces.data(tier));
-  case CoordinateCycle::PRIMARY:
-    return PhaseSpaceReader(atom_count, unit_cell, x_coordinates.data(tier),
-                            y_coordinates.data(tier), z_coordinates.data(tier),
-                            box_space_transform.data(tier), inverse_transform.data(tier),
-                            box_dimensions.data(tier), alt_box_space_transform.data(tier),
-                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
-                            x_velocities.data(tier), y_velocities.data(tier),
-                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                            z_forces.data(tier), x_alt_coordinates.data(tier),
-                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
-                            x_alt_velocities.data(tier), y_alt_velocities.data(tier),
-                            z_alt_velocities.data(tier), x_alt_forces.data(tier),
-                            y_alt_forces.data(tier), z_alt_forces.data(tier));
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceWriter PhaseSpace::data(const HybridTargetLevel tier) {
-  return data(cycle_position, tier);
-}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceWriter PhaseSpace::data(const CoordinateCycle orientation,
-                                  const HybridTargetLevel tier) {
-  switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
-    return PhaseSpaceWriter(atom_count, unit_cell, x_alt_coordinates.data(tier),
-                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
-                            alt_box_space_transform.data(tier),
-                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
-                            box_space_transform.data(tier), inverse_transform.data(tier),
-                            box_dimensions.data(tier), x_alt_velocities.data(tier),
-                            y_alt_velocities.data(tier), z_alt_velocities.data(tier),
-                            x_alt_forces.data(tier), y_alt_forces.data(tier),
-                            z_alt_forces.data(tier), x_coordinates.data(tier),
-                            y_coordinates.data(tier), z_coordinates.data(tier),
-                            x_velocities.data(tier), y_velocities.data(tier),
-                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                            z_forces.data(tier));
-  case CoordinateCycle::PRIMARY:
-    return PhaseSpaceWriter(atom_count, unit_cell, x_coordinates.data(tier),
-                            y_coordinates.data(tier), z_coordinates.data(tier),
-                            box_space_transform.data(tier), inverse_transform.data(tier),
-                            box_dimensions.data(tier), alt_box_space_transform.data(tier),
-                            alt_inverse_transform.data(tier), alt_box_dimensions.data(tier),
-                            x_velocities.data(tier), y_velocities.data(tier),
-                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                            z_forces.data(tier), x_alt_coordinates.data(tier),
-                            y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
-                            x_alt_velocities.data(tier), y_alt_velocities.data(tier),
-                            z_alt_velocities.data(tier), x_alt_forces.data(tier),
-                            y_alt_forces.data(tier), z_alt_forces.data(tier));
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-const PhaseSpace* PhaseSpace::getSelfPointer() const {
-  return this;
-}
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::allocate() {

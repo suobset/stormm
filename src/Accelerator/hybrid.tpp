@@ -1074,6 +1074,64 @@ Hybrid<T> Hybrid<T>::getPointer(const size_t position, const size_t new_length,
   return result;
 }
 
+#ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+template <typename T> const T* Hybrid<T>::getDeviceValidHostPointer() const {
+  T* proto;
+  switch (format) {
+  case HybridFormat::EXPEDITED:
+  case HybridFormat::HOST_ONLY:
+  case HybridFormat::UNIFIED:
+#  ifdef STORMM_USE_CUDA
+    if (cudaHostGetDevicePointer((void **)&proto, (void *)host_data, 0) != cudaSuccess) {
+      rtErr("Error in retrieving device-accessible pointer to host data in Hybrid object " +
+            std::string(label.name) + " of type " +
+            std::string(std::type_index(typeid(T)).name()) + ".", "Hybrid",
+            "getDeviceValidHostPointer");
+    }
+#  endif
+    break;
+  case HybridFormat::DECOUPLED:
+    rtErr("In order to retrieve a pointer to host memory valid on the GPU device, the host "
+          "memory must be allocated in page-locked format with cudaHostAlloc().  " +
+          getEnumerationName(format) + " is not compatible.", "Hybrid",
+          "getDeviceValidHostPointer");
+  case HybridFormat::DEVICE_ONLY:
+    rtErr("No host memory is available in " + getEnumerationName(format) + " allocation format.",
+          "Hybrid", "getDeviceValidHostPointer");
+  }
+  return proto;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> T* Hybrid<T>::getDeviceValidHostPointer() {
+  T* proto;
+  switch (format) {
+  case HybridFormat::EXPEDITED:
+  case HybridFormat::HOST_ONLY:
+  case HybridFormat::UNIFIED:
+#  ifdef STORMM_USE_CUDA
+    if (cudaHostGetDevicePointer((void **)&proto, (void *)host_data, 0) != cudaSuccess) {
+      rtErr("Error in retrieving device-accessible pointer to host data in Hybrid object " +
+            std::string(label.name) + " of type " +
+            std::string(std::type_index(typeid(T)).name()) + ".", "Hybrid",
+            "getDeviceValidHostPointer");
+    }
+#  endif
+    break;
+  case HybridFormat::DECOUPLED:
+    rtErr("In order to retrieve a pointer to host memory valid on the GPU device, the host "
+          "memory must be allocated in page-locked format with cudaHostAlloc().  " +
+          getEnumerationName(format) + " is not compatible.", "Hybrid",
+          "getDeviceValidHostPointer");
+  case HybridFormat::DEVICE_ONLY:
+    rtErr("No host memory is available in " + getEnumerationName(format) + " allocation format.",
+          "Hybrid", "getDeviceValidHostPointer");
+  }
+  return proto;
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::enforceDataTypeLimits() {
 
@@ -1336,7 +1394,7 @@ template <typename T> HybridLabel Hybrid<T>::assignLabel(const char* tag) {
   HybridLabel hlbl;
   if (tag == nullptr) {
     const ulint obj_count = gbl_mem_balance_sheet.getActiveEntryCount();
-    sprintf(hlbl.name, "array%lu", obj_count);
+    snprintf(hlbl.name, 23, "array%lu", obj_count);
   }
   else {
     if (strlen(tag) > 22) {

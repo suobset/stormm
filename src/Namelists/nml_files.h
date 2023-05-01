@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
-#include "input.h"
-#include "namelist_emulator.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "Trajectory/trajectory_enumerators.h"
+#include "input.h"
+#include "namelist_emulator.h"
 
 namespace stormm {
 namespace namelist {
@@ -336,6 +336,10 @@ public:
   /// \brief Get the name of the report file (equivalent to mdout in sander or pmemd)
   std::string getReportFile() const;
 
+  /// \brief Get the name of the input transcript file (there is no sander or pmemd equivalent
+  ///        other than the verbose reproduction of the input settings at the beginning of mdout)
+  std::string getInputTranscriptFile() const;
+  
   /// \brief Get the base name of trajectory files to write
   std::string getTrajectoryFileName() const;
 
@@ -351,6 +355,9 @@ public:
   /// \brief Get an indication of whether to alert the user when correcting minor mistakes in .sdf
   ///        files.
   ExceptionResponse getSdfNotifications() const;
+
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
   
   /// \brief Set whether to read all frames from each free trajectory (true), or just the first
   ///        (false).
@@ -434,6 +441,11 @@ public:
   /// \param file_name  New name for the calculation report file
   void setReportFileName(const std::string &file_name);
 
+  /// \brief Set the input transcript file name.
+  ///
+  /// \param file_name  New name for the input transcript file
+  void setInputTranscriptFileName(const std::string &file_name);
+  
   /// \brief Set the general (fallback) coordinate output file name.
   ///
   /// \param proto_name  New generic name for unspecified trajectory files
@@ -511,6 +523,10 @@ private:
   /// spans all systems.
   std::string report_file;
 
+  /// Name of the file to be used in reporting a transcript of all user input in the context of all
+  /// possible input directives, including default values and any omitted options.
+  std::string input_transcript_file;
+  
   /// Conformation output base name.  Each set of initial coordinates will lead to a trajectory,
   /// whether an evolving series of dynamics snapshots through MD, a set of conformers created by
   /// a series of guided minimizations, or some other protocol.  The coordinate files are
@@ -535,6 +551,9 @@ private:
   /// Indication of whether to warn the user when minor corrections are made to bring .sdf file
   /// outputs back into alignment with the Biovia standard.
   ExceptionResponse sdf_mod_alert;
+
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
 };
   
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place
@@ -556,7 +575,7 @@ private:
 /// \param crd_chkpt_format   The default type for restart files written based on each system
 NamelistEmulator
 filesInput(const TextFile &tf, int *start_line, bool *found,
-           const std::vector<SubkeyRequirement> &sys_keyword_reqs,
+           const std::vector<KeyRequirement> &sys_keyword_reqs,
            ExceptionResponse policy = ExceptionResponse::DIE,
            WrapTextSearch wrap = WrapTextSearch::NO,
            CoordinateFileKind crd_input_format = default_filecon_inpcrd_type,

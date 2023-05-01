@@ -1,20 +1,16 @@
 #include "copyright.h"
-#include "Namelists/input.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 #include "Structure/local_arrangement.h"
 #include "Structure/structure_enumerators.h"
+#include "input.h"
 #include "nml_conformer.h"
 
 namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
-using namelist::InputStatus;
-using namelist::NamelistElement;
-using namelist::NamelistType;
-using namelist::readNamelist;
 using errors::rtErr;
 using errors::rtWarn;
 using parse::CaseSensitivity;
@@ -29,8 +25,7 @@ using synthesis::translateSystemGrouping;
 using synthesis::translateVariableTorsionAdjustment;
   
 //-------------------------------------------------------------------------------------------------
-ConformerControls::ConformerControls(const ExceptionResponse policy_in,
-                                     const WrapTextSearch wrap) :
+ConformerControls::ConformerControls(const ExceptionResponse policy_in) :
     policy{policy_in}, core_atom_mask{std::string("")}, core_data_item{std::string("")},
     core_rk2{0.0}, core_rk3{0.0}, core_r2{0.0}, core_r3{0.0}, anchor_conformation{std::string("")},
     sample_chirality{false}, sample_cis_trans{false}, prevent_hbonds{false},
@@ -49,7 +44,8 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in,
     rotation_snap_threshold{stod(std::string(default_conf_rotation_snap)) * pi / 180.0},
     cis_trans_snap_threshold{stod(std::string(default_conf_cis_trans_snap)) * pi / 180.0},
     adjustment_method{default_conf_adjustment_method},
-    rotation_sample_values{}, cis_trans_sample_values{}
+    rotation_sample_values{}, cis_trans_sample_values{},
+    nml_transcript{"conformer"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -59,6 +55,7 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *
     ConformerControls(policy_in)
 {
   const NamelistEmulator t_nml = conformerInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   if (t_nml.getKeywordStatus("core_mask") != InputStatus::MISSING) {
     core_atom_mask = t_nml.getStringValue("core_mask", "atoms");
     core_data_item = t_nml.getStringValue("core_mask", "data_item");
@@ -270,6 +267,11 @@ double ConformerControls::getCisTransBondSnapThreshold() const {
 //-------------------------------------------------------------------------------------------------
 VariableTorsionAdjustment ConformerControls::getTorsionAdjustmentProtocol() const {
   return translateVariableTorsionAdjustment(adjustment_method);
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& ConformerControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -656,17 +658,17 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
     "The harmonic restraint stiffness, in units of kcal/mol-Angstrom^2, preventing atoms from "
     "wandering away from their initial positions.",
     "Alias for 'rk3'.  If both are defined, the value of 'rk3' will take precedence.",
-    "Alias for 'rk2' and 'rk3', in units of kcal/mol-Angstrom^2 with a default of 16.0.  This "
-    "value will apply to both stiffness constants, but specifying either 'rk2', 'repulsion', "
+    "Alias for 'rk2' and 'rk3', in units of kcal/mol-Angstrom^2.  This value will apply to both "
+    "stiffness constants, but specifying either 'rk2', 'repulsion', "
     "'rk3', or 'attraction' will override the effect.",
     "The distance, in Angstroms, at which to stop applying a repulsive potential pushing atoms "
     "away from their initial positions.",
-    "Alias for 'r2', with a default value of 0.0 Angstroms.  If 'r2' is supplied, that value will "
-    "take precedence.",
+    "Alias for 'r2', in units of Angstroms as all core restraints are distance-based.  If 'r2' is "
+    "supplied, that value will take precedence.",
     "The distance, in Angstroms, at which to begin applying an attractive potential that keeps "
     "atoms from wandering away from their initial positions.",
-    "Alias for 'r3', with a default value of 0.0 Angstroms.  If 'r3' is supplied, that value will "
-    "take precedence." };
+    "Alias for 'r3', in units of Angstroms.  If 'r3' is supplied, that value will take "
+    "precedence." };
   t_nml.addKeyword(NamelistElement("core_mask",
                                    { "data_item", "atoms", "rk2", "repulsion", "rk3", "attraction",
                                      "stiffness", "r2", "demand", "r3", "grace" },
@@ -679,12 +681,12 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                      "0.0", std::string(""), "0.0", "0.0" },
                                    DefaultIsObligatory::NO,
                                    InputRepeats::NO, core_help, core_keys_help,
-                                   { SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL }));
   t_nml.addKeyword(NamelistElement("anchor_conf", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("sample_chirality", NamelistType::STRING,
                                    std::string(default_conf_chirality)));
@@ -750,11 +752,12 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "bond.  Locations for the samples will be chosen based on the detected minima "
                 "along each bond's rotation profile.");
   t_nml.addHelp("rotation_sample", "A specific value of rotatable bonds to sample, given in units "
-                "of degrees.  Repeated entries are accepted.  The default values include 60, 180, "
-                "and -60 degrees.");
+                "of degrees.  Repeated entries are accepted.  The default values sample basic "
+                "rotamers expected for a bond between sp3 carbon atoms.");
   t_nml.addHelp("cis_trans_sample", "A specific value of cis-trans isomeric bonds to sample, "
                 "given in units of degrees.  Repeated entries are accepted.  The default values "
-                "include 0 and 180 degrees.");
+                "sample basic cis- and trans- configurations for a bond between two sp2 carbon "
+                "atoms.");
   t_nml.addHelp("max_seeding_attempts", "If a conformer's initial configuration contains a clash "
                 "between atoms (their van-der Waals radii are violated), randomization of the "
                 "configuration will occur for this number of attempts.  If, after exhausting this "
@@ -785,7 +788,9 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "defined in the &files namelist).");
   t_nml.addHelp("effort", "Specifies the approximate level of effort, measured in terms of the "
                 "number of independent minimization attempts starting from unique configurations, "
-                "that will be applied to find optimal structures in each molecule.");
+                "that will be applied to find optimal structures in each molecule.  Options "
+                "include MINIMAL, LIGHT, HEAVY, and EXHAUSTIVE, with higher and higher orders "
+                "of the combinatorial space being sampled with each setting.");
 
   // Add more default values to the rotation_sample and cis_trans_sample keywords.
   t_nml.addDefaultValue("rotation_sample", std::string(default_conf_rotation_set_one));

@@ -660,18 +660,6 @@ void CoordinateFrame::allocate() {
   box_dimensions.setPointer(&storage,     (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
 }
 
-#ifdef STORMM_USE_HPC
-//-------------------------------------------------------------------------------------------------
-void CoordinateFrame::upload() {
-  storage.upload();
-}
-
-//-------------------------------------------------------------------------------------------------
-void CoordinateFrame::download() {
-  storage.download();
-}
-#endif
-
 //-------------------------------------------------------------------------------------------------
 const CoordinateFrameReader CoordinateFrame::data(HybridTargetLevel tier) const {
   return CoordinateFrameReader(atom_count, unit_cell, x_coordinates.data(tier),
@@ -687,6 +675,42 @@ CoordinateFrameWriter CoordinateFrame::data(HybridTargetLevel tier) {
                                box_space_transform.data(tier), inverse_transform.data(tier),
                                box_dimensions.data(tier));
 }
+
+#ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void CoordinateFrame::upload() {
+  storage.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateFrame::download() {
+  storage.download();
+}
+
+//-------------------------------------------------------------------------------------------------
+const CoordinateFrameReader CoordinateFrame::deviceViewToHostData() const {
+  const double* devc_xcrd = x_coordinates.getDeviceValidHostPointer();
+  const double* devc_ycrd = y_coordinates.getDeviceValidHostPointer();
+  const double* devc_zcrd = z_coordinates.getDeviceValidHostPointer();
+  const double* devc_umat = box_space_transform.getDeviceValidHostPointer();
+  const double* devc_invu = inverse_transform.getDeviceValidHostPointer();
+  const double* devc_bdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateFrameReader(atom_count, unit_cell, devc_xcrd, devc_ycrd, devc_zcrd, devc_umat,
+                               devc_invu, devc_bdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameWriter CoordinateFrame::deviceViewToHostData() {
+  double* devc_xcrd = x_coordinates.getDeviceValidHostPointer();
+  double* devc_ycrd = y_coordinates.getDeviceValidHostPointer();
+  double* devc_zcrd = z_coordinates.getDeviceValidHostPointer();
+  double* devc_umat = box_space_transform.getDeviceValidHostPointer();
+  double* devc_invu = inverse_transform.getDeviceValidHostPointer();
+  double* devc_bdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateFrameWriter(atom_count, unit_cell, devc_xcrd, devc_ycrd, devc_zcrd, devc_umat,
+                               devc_invu, devc_bdim);
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 void CoordinateFrame::setFrameNumber(int frame_number_in) {

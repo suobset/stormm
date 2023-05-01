@@ -15,11 +15,11 @@ CondensateWriter::CondensateWriter(const PrecisionModel mode_in, const Structure
                                    const size_t* atom_starts_in, const int* atom_counts_in,
                                    float* xcrd_sp_in, float* ycrd_sp_in, float* zcrd_sp_in,
                                    double* xcrd_in, double* ycrd_in, double* zcrd_in,
-                                   double* umat_in, double* invu_in) :
+                                   double* umat_in, double* invu_in, double* boxdims_in) :
     mode{mode_in}, basis{basis_in}, system_count{system_count_in}, unit_cell{unit_cell_in},
     atom_starts{atom_starts_in}, atom_counts{atom_counts_in}, xcrd_sp{xcrd_sp_in},
     ycrd_sp{ycrd_sp_in}, zcrd_sp{zcrd_sp_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    umat{umat_in}, invu{invu_in}
+    umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -29,19 +29,20 @@ CondensateReader::CondensateReader(const PrecisionModel mode_in, const Structure
                                    const float* xcrd_sp_in, const float* ycrd_sp_in,
                                    const float* zcrd_sp_in, const double* xcrd_in,
                                    const double* ycrd_in, const double* zcrd_in,
-                                   const double* umat_in, const double* invu_in) :
+                                   const double* umat_in, const double* invu_in,
+                                   const double* boxdims_in) :
     mode{mode_in}, basis{basis_in}, system_count{system_count_in}, unit_cell{unit_cell_in},
     atom_starts{atom_starts_in}, atom_counts{atom_counts_in}, xcrd_sp{xcrd_sp_in},
     ycrd_sp{ycrd_sp_in}, zcrd_sp{zcrd_sp_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    umat{umat_in}, invu{invu_in}
+    umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 CondensateReader::CondensateReader(const CondensateWriter &cdw) :
-  mode{cdw.mode}, basis{cdw.basis}, system_count{cdw.system_count}, unit_cell{cdw.unit_cell},
+    mode{cdw.mode}, basis{cdw.basis}, system_count{cdw.system_count}, unit_cell{cdw.unit_cell},
     atom_starts{cdw.atom_starts}, atom_counts{cdw.atom_counts}, xcrd_sp{cdw.xcrd_sp},
     ycrd_sp{cdw.ycrd_sp}, zcrd_sp{cdw.zcrd_sp}, xcrd{cdw.xcrd}, ycrd{cdw.ycrd}, zcrd{cdw.zcrd},
-    umat{cdw.umat}, invu{cdw.invu}
+    umat{cdw.umat}, invu{cdw.invu}, boxdims{cdw.boxdims}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -58,8 +59,9 @@ Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionMod
     x_coordinates{HybridKind::POINTER, "cdns_xcrd"},
     y_coordinates{HybridKind::POINTER, "cdns_ycrd"},
     z_coordinates{HybridKind::POINTER, "cdns_zcrd"},
-    umat{HybridKind::POINTER, "cdns_umat"},
-    invu{HybridKind::POINTER, "cdns_invu"},
+    box_transforms{HybridKind::POINTER, "cdns_umat"},
+    inv_transforms{HybridKind::POINTER, "cdns_invu"},
+    box_dimensions{HybridKind::POINTER, "cdns_bdim"},
     pps_ptr{const_cast<PhaseSpaceSynthesis*>(poly_ps_in)},
     cs_ptr{nullptr},
     float_data{HybridKind::ARRAY, "cdns_floats"},
@@ -84,8 +86,9 @@ Condensate::Condensate(const Condensate &original) :
     x_coordinates{original.x_coordinates},
     y_coordinates{original.y_coordinates},
     z_coordinates{original.z_coordinates},
-    umat{original.umat},
-    invu{original.invu},
+    box_transforms{original.box_transforms},
+    inv_transforms{original.inv_transforms},
+    box_dimensions{original.box_dimensions},
     pps_ptr{original.pps_ptr},
     cs_ptr{original.cs_ptr},
     float_data{original.float_data},
@@ -110,8 +113,9 @@ Condensate::Condensate(Condensate &&original) :
     x_coordinates{std::move(original.x_coordinates)},
     y_coordinates{std::move(original.y_coordinates)},
     z_coordinates{std::move(original.z_coordinates)},
-    umat{std::move(original.umat)},
-    invu{std::move(original.invu)},
+    box_transforms{std::move(original.box_transforms)},
+    inv_transforms{std::move(original.inv_transforms)},
+    box_dimensions{std::move(original.box_dimensions)},
     pps_ptr{original.pps_ptr},
     cs_ptr{original.cs_ptr},
     float_data{std::move(original.float_data)},
@@ -141,8 +145,9 @@ Condensate& Condensate::operator=(const Condensate &other) {
   x_coordinates = other.x_coordinates;
   y_coordinates = other.y_coordinates;
   z_coordinates = other.z_coordinates;
-  umat = other.umat;
-  invu = other.invu;
+  box_transforms = other.box_transforms;
+  inv_transforms = other.inv_transforms;
+  box_dimensions = other.box_dimensions;
   pps_ptr = other.pps_ptr;
   cs_ptr = other.cs_ptr;
   float_data = other.float_data;
@@ -176,8 +181,9 @@ Condensate& Condensate::operator=(Condensate &&other) {
   x_coordinates = std::move(other.x_coordinates);
   y_coordinates = std::move(other.y_coordinates);
   z_coordinates = std::move(other.z_coordinates);
-  umat = std::move(other.umat);
-  invu = std::move(other.invu);
+  box_transforms = std::move(other.box_transforms);
+  inv_transforms = std::move(other.inv_transforms);
+  box_dimensions = std::move(other.box_dimensions);
   pps_ptr = other.pps_ptr;
   cs_ptr = other.cs_ptr;
   float_data = std::move(other.float_data);
@@ -212,6 +218,16 @@ bool Condensate::ownsCoordinates() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+size_t Condensate::getAtomOffset(const int system_index) const {
+  return atom_starts.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+int Condensate::getAtomCount(const int system_index) const {
+  return atom_counts.readHost(system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 size_t Condensate::getCoordinateSeriesTypeID() const {
   return csptr_data_type;
 }
@@ -228,6 +244,7 @@ CoordinateFrame Condensate::exportCoordinateFrame(const int system_index,
   const size_t natom = atom_counts.readHost(system_index);
   const size_t atom_offset = atom_starts.readHost(system_index);
   const size_t xfrm_offset = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
+  const size_t bdim_offset = static_cast<size_t>(system_index) * roundUp<size_t>(6, warp_size_zu);
   CoordinateFrame result(natom);
   CoordinateFrameWriter resw = result.data();
   switch (tier) {
@@ -261,11 +278,15 @@ CoordinateFrame Condensate::exportCoordinateFrame(const int system_index,
       }
 
       // Copy the transformation matrices.
-      const double* fr_umat = umat.data();
-      const double* fr_invu = invu.data();
+      const double* fr_umat = box_transforms.data();
+      const double* fr_invu = inv_transforms.data();
+      const double* fr_bdim = box_dimensions.data();
       for (size_t i = 0; i < 9; i++) {
         resw.umat[i] = fr_umat[xfrm_offset + i];
         resw.invu[i] = fr_invu[xfrm_offset + i];
+      }
+      for (size_t i = 0; i < 6; i++) {
+        resw.boxdim[i] = fr_bdim[bdim_offset + i];
       }
     }
     break;
@@ -300,11 +321,15 @@ CoordinateFrame Condensate::exportCoordinateFrame(const int system_index,
       }
 
       // Copy the transformation matrices.
-      const std::vector<double> fr_umat = umat.readDevice(xfrm_offset, 9);
-      const std::vector<double> fr_invu = invu.readDevice(xfrm_offset, 9);
+      const std::vector<double> fr_umat = box_transforms.readDevice(xfrm_offset, 9);
+      const std::vector<double> fr_invu = inv_transforms.readDevice(xfrm_offset, 9);
+      const std::vector<double> fr_bdim = box_dimensions.readDevice(bdim_offset, 6);
       for (int i = 0; i < 9; i++) {
         resw.umat[i] = fr_umat[i];
         resw.invu[i] = fr_invu[i];
+      }
+      for (size_t i = 0; i < 6; i++) {
+        resw.boxdim[i] = fr_bdim[i];
       }
     }
     break;
@@ -397,7 +422,8 @@ const CondensateReader Condensate::data(const HybridTargetLevel tier) const {
                           atom_counts.data(tier), x_coordinates_sp.data(tier),
                           y_coordinates_sp.data(tier), z_coordinates_sp.data(tier),
                           x_coordinates.data(tier), y_coordinates.data(tier),
-                          z_coordinates.data(tier), umat.data(tier), invu.data(tier));
+                          z_coordinates.data(tier), box_transforms.data(tier),
+                          inv_transforms.data(tier), box_dimensions.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -406,10 +432,45 @@ CondensateWriter Condensate::data(const HybridTargetLevel tier) {
                           atom_counts.data(tier), x_coordinates_sp.data(tier),
                           y_coordinates_sp.data(tier), z_coordinates_sp.data(tier),
                           x_coordinates.data(tier), y_coordinates.data(tier),
-                          z_coordinates.data(tier), umat.data(tier), invu.data(tier));
+                          z_coordinates.data(tier), box_transforms.data(tier),
+                          inv_transforms.data(tier), box_dimensions.data(tier));
 }
 
 #ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+const CondensateReader Condensate::deviceViewToHostData() const {
+  const size_t* astarts = atom_starts.getDeviceValidHostPointer();
+  const int* acounts = atom_counts.getDeviceValidHostPointer();
+  const float* xcrd_sp = x_coordinates_sp.getDeviceValidHostPointer();
+  const float* ycrd_sp = y_coordinates_sp.getDeviceValidHostPointer();
+  const float* zcrd_sp = z_coordinates_sp.getDeviceValidHostPointer();
+  const double* xcrd = x_coordinates.getDeviceValidHostPointer();
+  const double* ycrd = y_coordinates.getDeviceValidHostPointer();
+  const double* zcrd = z_coordinates.getDeviceValidHostPointer();
+  const double* umat_ptr = box_transforms.getDeviceValidHostPointer();
+  const double* invu_ptr = inv_transforms.getDeviceValidHostPointer();
+  const double* bdim_ptr = box_dimensions.getDeviceValidHostPointer();
+  return CondensateReader(mode, basis, system_count, unit_cell, astarts, acounts, xcrd_sp, ycrd_sp,
+                          zcrd_sp, xcrd, ycrd, zcrd, umat_ptr, invu_ptr, bdim_ptr);
+}
+
+//-------------------------------------------------------------------------------------------------
+CondensateWriter Condensate::deviceViewToHostData() {
+  size_t* astarts = atom_starts.getDeviceValidHostPointer();
+  int* acounts = atom_counts.getDeviceValidHostPointer();
+  float* xcrd_sp = x_coordinates_sp.getDeviceValidHostPointer();
+  float* ycrd_sp = y_coordinates_sp.getDeviceValidHostPointer();
+  float* zcrd_sp = z_coordinates_sp.getDeviceValidHostPointer();
+  double* xcrd = x_coordinates.getDeviceValidHostPointer();
+  double* ycrd = y_coordinates.getDeviceValidHostPointer();
+  double* zcrd = z_coordinates.getDeviceValidHostPointer();
+  double* umat_ptr = box_transforms.getDeviceValidHostPointer();
+  double* invu_ptr = inv_transforms.getDeviceValidHostPointer();
+  double* bdim_ptr = box_dimensions.getDeviceValidHostPointer();
+  return CondensateWriter(mode, basis, system_count, unit_cell, astarts, acounts, xcrd_sp, ycrd_sp,
+                          zcrd_sp, xcrd, ycrd, zcrd, umat_ptr, invu_ptr, bdim_ptr);
+}
+
 //-------------------------------------------------------------------------------------------------
 void Condensate::upload() {
   atom_starts.upload();
@@ -451,8 +512,9 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
     x_coordinates_sp.setPointer(&float_data, 0, 0);
     y_coordinates_sp.setPointer(&float_data, 0, 0);
     z_coordinates_sp.setPointer(&float_data, 0, 0);
-    umat.setPointer(&double_data, 0, 0);
-    invu.setPointer(&double_data, 0, 0);
+    box_transforms.setPointer(&double_data, 0, 0);
+    inv_transforms.setPointer(&double_data, 0, 0);
+    box_dimensions.setPointer(&double_data, 0, 0);
     return;
   }
 
@@ -483,13 +545,15 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
     x_coordinates_sp.setPointer(&float_data, 0, 0);
     y_coordinates_sp.setPointer(&float_data, 0, 0);
     z_coordinates_sp.setPointer(&float_data, 0, 0);
-    double_data.resize((3LLU * padded_atoms) + (2 * xfrm_spacing));
+    double_data.resize((3LLU * padded_atoms) + (3 * xfrm_spacing));
     double_data.shrinkToFit();
     x_coordinates.setPointer(&double_data,                   0, padded_atoms);
     y_coordinates.setPointer(&double_data,        padded_atoms, padded_atoms);
     z_coordinates.setPointer(&double_data, 2LLU * padded_atoms, padded_atoms);
-    umat.setPointer(&double_data,  3LLU * padded_atoms                , xfrm_spacing);
-    invu.setPointer(&double_data, (3LLU * padded_atoms) + xfrm_spacing, xfrm_spacing);
+    box_transforms.setPointer(&double_data,  3LLU * padded_atoms                , xfrm_spacing);
+    inv_transforms.setPointer(&double_data, (3LLU * padded_atoms) + xfrm_spacing, xfrm_spacing);
+    box_dimensions.setPointer(&double_data, (3LLU * padded_atoms) + (2LLU *xfrm_spacing),
+                              xfrm_spacing);
     break;
   case PrecisionModel::SINGLE:
     float_data.resize(3LLU * padded_atoms);
@@ -497,13 +561,14 @@ void Condensate::rebuild(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionM
     x_coordinates_sp.setPointer(&float_data,                   0, padded_atoms);
     y_coordinates_sp.setPointer(&float_data,        padded_atoms, padded_atoms);
     z_coordinates_sp.setPointer(&float_data, 2LLU * padded_atoms, padded_atoms);
-    double_data.resize(2 * xfrm_spacing);
+    double_data.resize(3LLU * xfrm_spacing);
     double_data.shrinkToFit();
     x_coordinates.setPointer(&double_data, 0, 0);
     y_coordinates.setPointer(&double_data, 0, 0);
     z_coordinates.setPointer(&double_data, 0, 0);
-    umat.setPointer(&double_data, 0, xfrm_spacing);
-    invu.setPointer(&double_data, xfrm_spacing, xfrm_spacing);
+    box_transforms.setPointer(&double_data, 0, xfrm_spacing);
+    inv_transforms.setPointer(&double_data,         xfrm_spacing,  xfrm_spacing);
+    box_dimensions.setPointer(&double_data, (2LLU * xfrm_spacing), xfrm_spacing);
     break;
   }
 
@@ -564,6 +629,11 @@ void Condensate::update(const HybridTargetLevel tier, const GpuDetails &gpu) {
               cdw.umat[j] = poly_psr.umat[j];
               cdw.invu[j] = poly_psr.invu[j];
             }
+            const size_t bllim = static_cast<size_t>(i) * roundUp<size_t>(6, warp_size_zu);
+            const size_t bhlim = xllim + 6LLU;
+            for (size_t j = xllim; j < xhlim; j++) {
+              cdw.boxdims[j] = poly_psr.boxdims[i];
+            }
           }
         }
         break;
@@ -623,8 +693,9 @@ void Condensate::repairPointers() {
     x_coordinates.swapTarget(&double_data);
     y_coordinates.swapTarget(&double_data);
     z_coordinates.swapTarget(&double_data);
-    umat.swapTarget(&double_data);
-    invu.swapTarget(&double_data);
+    box_transforms.swapTarget(&double_data);
+    inv_transforms.swapTarget(&double_data);
+    box_dimensions.swapTarget(&double_data);
   }
 }
 

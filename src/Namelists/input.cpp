@@ -48,10 +48,10 @@ std::string padNamelistTuples(const char* text, const std::vector<bool> &quoted,
 std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator &nml,
                                       const int start_line, const WrapTextSearch wrap,
                                       int *end_line) {
-
+  
   // Make the scan, seeking out the title (plus leading ampersand) as a keyword
   const std::string title_key = "&" + nml.getTitle();
-  const int n_title_char = title_key.size();
+  const size_t n_title_char = title_key.size();
   if (n_title_char == 1) {
     rtErr("Cannot search for a namelist with no title in " + tf.getFileName() + ".",
           "pullNamelist");
@@ -67,16 +67,20 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
   const std::vector<bool> quoted = markGuardedText(tfr, quote_marks, comment_marks);
   int max_line_length = 0;
   for (int i = 0; i < tfr.line_count; i++) {
-    max_line_length = std::max(max_line_length, tfr.line_limits[i + 1] - tfr.line_limits[i]);
+    max_line_length = std::max(max_line_length,
+                               static_cast<int>(tfr.line_limits[i + 1] - tfr.line_limits[i]));
   }
   std::vector<char> buffer(max_line_length + 1, '\0');
   const int actual_end = (*end_line == -1 || *end_line > tfr.line_count) ?
                          tfr.line_count : *end_line;
   const CaseSensitivity case_sensitivity = nml.getCaseSensitivity();
-  for (int i = start_line; i < *end_line; i++) {
-    for (int j = tfr.line_limits[i]; j <= tfr.line_limits[i + 1] - n_title_char; j++) {
+  for (int i = start_line; i < actual_end; i++) {
+    if (tfr.line_limits[i + 1] - tfr.line_limits[i] < n_title_char) {
+      continue;
+    }
+    for (size_t j = tfr.line_limits[i]; j <= tfr.line_limits[i + 1] - n_title_char; j++) {
 
-      // Check for the namelist title 
+      // Check for the namelist title
       if (commented[j] == false && quoted[j] == false && tfr.text[j] == '&') {
         bool found = true;
         switch (case_sensitivity) {
@@ -94,7 +98,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
           // special tuple delimiters with whitespace (so that they will be identified as
           // individual words)
           std::vector<std::string> result;
-          int start_char = j;
+          size_t start_char = j;
           int next_line = i + 1;
           bool end_found = false;
           std::string accumulated_nml;
@@ -104,7 +108,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
 
             // Separate out delimiters for tuples and eliminate visual aids '=', ',' and ';'.
             int n_enclosures = 0;
-            for (int k = start_char; k < tfr.line_limits[next_line]; k++) {
+            for (size_t k = start_char; k < tfr.line_limits[next_line]; k++) {
               n_enclosures += (quoted[k] == false && commented[k] == false &&
                                (tfr.text[k] == '[' || tfr.text[k] == '(' || tfr.text[k] == '{' ||
                                 tfr.text[k] == ']' || tfr.text[k] == ')' || tfr.text[k] == '}'));

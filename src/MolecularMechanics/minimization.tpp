@@ -276,8 +276,11 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
     }
     transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                             UnitCellType::NONE, vsk);
-    sc.commit(StateVariable::ALL_STATES);
-    sc.incrementSampleCount();
+    if (step % mincon.getDiagnosticPrintFrequency() == 0) {
+      sc.commit(StateVariable::ALL_STATES);
+      sc.incrementSampleCount();
+      sc.setLastTimeStep(step);
+    }
     evec[0] = sc.reportTotalEnergy();
     mvec[0] = 0.0;
 
@@ -455,9 +458,11 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
   }
   transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                           UnitCellType::NONE, vsk);
+
+  // Always commit the final state
   sc.commit(StateVariable::ALL_STATES);
   sc.incrementSampleCount();
-
+  sc.setLastTimeStep(mincon.getTotalCycles());
   return sc;
 }
 

@@ -189,6 +189,41 @@ SynthesisCacheMap& SynthesisCacheMap::operator=(SynthesisCacheMap &&other) {
 }
 
 //-------------------------------------------------------------------------------------------------
+int SynthesisCacheMap::getCacheSystemCount() const {
+  return cache_system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisCacheMap::getSynthesisSystemCount() const {
+  return synthesis_system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisCacheMap::getCacheLabelCount() const {
+  return cache_label_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisCacheMap::getCacheTopologyCount() const {
+  return cache_topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int SynthesisCacheMap::getSynthesisTopologyCount() const {
+  if (poly_ps_ptr != nullptr) {
+    return poly_ps_ptr->getUniqueTopologyCount();
+  }
+  else if (poly_ag_ptr != nullptr) {
+    return poly_ag_ptr->getUniqueTopologyCount();
+  }
+  else {
+    rtErr("Neither a topology synthesis nor a coordinate synthesis is attached.",
+          "SynthesisCacheMap", "getSynthesisTopologyCount");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<int> SynthesisCacheMap::getSourceGroup(const int query_index) const {
   std::vector<int> result;
   if (query_index >= 0 && query_index >= cache_system_count) {

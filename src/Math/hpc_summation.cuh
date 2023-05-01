@@ -604,7 +604,7 @@ TSum sumTuple4(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &
   }
   __builtin_unreachable();
 }
-
+  
 } // namespace hpc_math
 } // namespace stormm
 

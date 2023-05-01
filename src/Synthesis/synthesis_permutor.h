@@ -212,6 +212,24 @@ public:
   ///        object).
   int getPermutorSetCount() const;
 
+  /// \brief Match a topology to the permutor map index, or a system in a synthesis to its
+  ///        permutor map index.
+  ///
+  /// Overloaded:
+  ///   - Provide the topology by pointer or by const reference
+  ///   - Provide a coordinate synthesis by pointer or const reference with a system index
+  ///     indicating a topology to search for
+  ///
+  /// \param query_ag      The topology to search for
+  /// \param poly_ps       Coordinate synthesis containing many systems with topology pointers
+  /// \param system_index  Index of system within the coordinate synthesis
+  /// \{
+  int getPermutorMapIndex(const AtomGraph *query_ag) const;
+  int getPermutorMapIndex(const AtomGraph &query_ag) const;
+  int getPermutorMapIndex(const PhaseSpaceSynthesis *poly_ps, int system_index) const;
+  int getPermutorMapIndex(const PhaseSpaceSynthesis &poly_ps, int system_index) const;
+  /// \}
+  
   /// \brief Get the default number of rotatable bond angle samples.
   int getRotatableBondSampleCount() const;
   
@@ -330,8 +348,18 @@ public:
   /// \brief Get a const reference to the state tracker for the molecule.  Also useable to get a
   ///        copy of the state tracker which is then mutable.
   ///
+  /// Overloaded:
+  ///   - Get the state tracker based on an index in the permutor
+  ///   - Get the state tracker based on a system's topology (this will raise an exception if the
+  ///     search fails)
+  ///
   /// \param system_index  Index of the system of interest
+  /// \param ag            System topology
+  /// \{
   const TickCounter<double>& getStateTracker(int system_index) const;
+  const TickCounter<double>& getStateTracker(const AtomGraph *ag) const;
+  const TickCounter<double>& getStateTracker(const AtomGraph &ag) const;
+  /// \}
 
   /// \brief Get the number of replicas needed to fulfill a given level of sampling in one of the
   ///        permutor maps.
