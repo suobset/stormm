@@ -157,5 +157,18 @@ std::string getEnumerationName(const ClashResponse input) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const EnergySample input) {
+  switch (input) {
+  case EnergySample::TIME_SERIES:
+    return std::string("TIME_SERIES");
+  case EnergySample::FINAL:
+    return std::string("FINAL");
+  case EnergySample::TIME_AVERAGE:
+    return std::string("TIME_AVERAGE");
+  }
+  __builtin_unreachable();
+}
+  
 } // namespace energy
 } // namespace stormm

@@ -298,18 +298,5 @@ void Ledger::printMemoryProfile(const int n_display, const llint display_thresho
   }
 }
 
-//-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(HybridTargetLevel tier) {
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    return std::string("Host");
-#ifdef STORMM_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    return std::string("Device");
-#endif
-  }
-  __builtin_unreachable();
-}
-
 } // namespace card
 } // namespace stormm

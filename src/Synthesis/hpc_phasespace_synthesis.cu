@@ -400,31 +400,34 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpaceWriter *psw, const int index,
   cudaDeviceSynchronize();
 }
 
-#if 0
 //-------------------------------------------------------------------------------------------------
-_global__ void __launch_bounds__(large_block_size, 1)
+__global__ void __launch_bounds__(large_block_size, 1)
 kPsyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_recv_ovrf,
                      llint* z_recv, int* z_recv_ovrf, double* box_xform, double* inverse_xform,
                      double* box_dimensions, llint* box_vectors, int* box_vector_ovrf,
                      const int* atom_starts, const int* atom_counts, const double* x_import,
                      const double* y_import, const double* z_import, const double* box_xform_in,
                      const double* inverse_xform_in, const double* box_dimensions_in,
-                     const int system_index, const double conversion_factor) {
+                     const int system_index, const TrajectoryKind kind,
+                     const double conversion_factor) {
 
   // Transfer the box information, if it exists
   switch (kind) {
   case TrajectoryKind::POSITIONS:
     if (threadIdx.x < 9) {
+      const int box_offset = system_index * devcRoundUp(9, warp_size_int);
       box_xform[box_offset + threadIdx.x] = box_xform_in[threadIdx.x];
       inverse_xform[box_offset + threadIdx.x] = inverse_xform_in[threadIdx.x];
     }
     if (threadIdx.x >= warp_size_int && threadIdx.x < warp_size_int + 9) {
-      const int95_t fpbv = doubleToInt95(inverse_xform_in[threadIdx.x] * globalpos_scale);
+      const int box_offset = system_index * devcRoundUp(9, warp_size_int);
+      const int95_t fpbv = doubleToInt95(inverse_xform_in[threadIdx.x] * conversion_factor);
       box_vectors[box_offset + threadIdx.x] = fpbv.x;
       box_vector_ovrf[box_offset + threadIdx.x] = fpbv.y;
     }
     if (threadIdx.x >= twice_warp_size_int && threadIdx.x < twice_warp_size_int + 6) {
-      box_dim_ptr[dim_offset + threadIdx.x] = box_dimensions_in[threadIdx.x];
+      const int dim_offset = system_index * devcRoundUp(9, warp_size_int);
+      box_dimensions[dim_offset + threadIdx.x] = box_dimensions_in[threadIdx.x];
     }
     break;
   case TrajectoryKind::VELOCITIES:
@@ -433,8 +436,8 @@ kPsyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_recv
   }
 
   // Transfer atomic data
-  const int pos_start = psyw.atom_starts[system_index];
-  const int pos_end   = pos_start + psyw.atom_counts[system_index];
+  const int pos_start = atom_starts[system_index];
+  const int pos_end   = pos_start + atom_counts[system_index];
   const int stride = pos_end - pos_start;
   const int padded_stride = devcRoundUp(stride, warp_size_int);
   int pos = threadIdx.x;
@@ -477,16 +480,17 @@ void psyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_
                          const double* y_import, const double* z_import,
                          const double* box_xform_in, const double* inverse_xform_in,
                          const double* box_dimensions_in, const int system_index,
-                         const double conversion_factor, const GpuDetails &gpu) {
+                         const TrajectoryKind kind, const double conversion_factor,
+                         const GpuDetails &gpu) {
   kPsyImportSystemData<<<large_block_size,
                          gpu.getSMPCount()>>>(x_recv, x_recv_ovrf, y_recv, y_recv_ovrf, z_recv,
                                               z_recv_ovrf, box_xform, inverse_xform,
                                               box_dimensions, box_vectors, box_vector_ovrf,
                                               atom_starts, atom_counts, x_import, y_import,
                                               z_import, box_xform_in, inverse_xform_in,
-                                              box_dimensions_in, system_index, conversion_factor);
+                                              box_dimensions_in, system_index, kind,
+                                              conversion_factor);
 }
-#endif
 
 } // namespace synthesis
 } // namespace stormm

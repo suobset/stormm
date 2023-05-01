@@ -22,6 +22,7 @@
 #include "Math/rounding.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
+#include "gpu_enumerators.h"
 
 namespace stormm {
 namespace card {
@@ -46,47 +47,11 @@ constexpr char host_only_code = 'H';
 constexpr llint allocating = 1;
 constexpr llint deallocating = -1;
 constexpr ulint hybrid_byte_increment = 128;
-
-/// \brief Indication of whether a Hybrid object is an actual array or just contains pointers to
-///        another Hybrid object that actually is an array.
-enum class HybridKind {
-  ARRAY, POINTER
-};
-
-/// \brief Available formats for Hybrid data arrays.
-enum class HybridFormat {
-#ifdef STORMM_USE_HPC
-  EXPEDITED,   ///< The default, best general-purpose format for side-by-side data on the host and
-               ///<   device: pinned (page-locked) memory on the host and a separate array on the
-               ///<   GPU.  40% higher upload and download bandwidth than DECOUPLED memory with the
-               ///<   only constraint being that host memory is page-locked, unswappable to disk.
-  DECOUPLED,   ///< Pageable memory on the host and a separate array on the device.
-  UNIFIED,     ///< Managed memory, one array that the developer sees which is automatically
-               ///<   updated based on changes at either the host or device levels.
-  HOST_ONLY,   ///< Page-locked memory allocated by cudaHostAlloc(), accessible to the GPU by a
-               ///<   device pointer and transfer through the PCIE bus
-  DEVICE_ONLY  ///< A cudaMalloc() allocated array on the device with no equivalent on the host.
-               ///<   accessible to the host only through cudaMemcpy or one of the wrappers like
-               ///<   readHost() and putHost().
-#else
-  HOST_ONLY    ///< A new[] allocated array when CUDA or HIP is not used in the compilation
-#endif
-};
 #ifdef STORMM_USE_HPC
 constexpr HybridFormat default_hpc_format = HybridFormat::EXPEDITED;
 #else
 constexpr HybridFormat default_hpc_format = HybridFormat::HOST_ONLY;
 #endif
-
-/// \brief Two levels to which the pointers might go, depending on whether an HPC language is
-///        compiled
-enum class HybridTargetLevel {
-#ifdef STORMM_USE_HPC
-  HOST, DEVICE
-#else
-  HOST
-#endif
-};
 
 /// \brief Byte lengths of specific data types, or components thereof
 constexpr ulint tag_name_length = 23;
@@ -484,7 +449,22 @@ public:
                              const char* tag_in = nullptr) const;
   Hybrid<T> getPointer(size_t position = 0, size_t new_length = 0, const char* tag_in = nullptr);
   /// \}
-  
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  /// \brief Get a device-readable and -writeable pointer to the host mapped data of a Hybrid
+  ///        object.  For many GPUs, it is possible to use the host pointer for registered, pinned
+  ///        memory, but the safest approach is to always get this pointer.
+  ///
+  /// Overloaded:
+  ///   - Get a const Hybrid POINTER-kind object to a const Hybrid array
+  ///   - Get a non-const Hybrid POINTER-kind object to a non-const array
+  ///
+  /// \{
+  const T* getDeviceValidHostPointer() const;
+  T* getDeviceValidHostPointer();
+  /// \}
+#  endif
+#endif
 private:
 
   /// Indicate whether this struct is a pointer to aspects of another Hybrid struct.  If so, it
@@ -559,11 +539,6 @@ private:
   /// \param tag  The name for this Hybrid object
   HybridLabel assignLabel(const char* tag);
 };
-
-/// \brief Produce a string indicating the Hybrid target level.
-///
-/// \param tier  Hybrid target level of interest
-std::string getEnumerationName(HybridTargetLevel tier);
   
 } // namespace card
 } // namespace stormm

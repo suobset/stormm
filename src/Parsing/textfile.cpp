@@ -12,7 +12,7 @@ using diskutil::openOutputFile;
 
 //-------------------------------------------------------------------------------------------------
 TextFileReader::TextFileReader(const int line_count_in, const int* line_lengths_in,
-                               const int* line_limits_in, const char* text_in,
+                               const size_t* line_limits_in, const char* text_in,
                                const std::string file_name_in) :
   line_count{line_count_in}, line_lengths{line_lengths_in}, line_limits{line_limits_in},
   text{text_in}, file_name{file_name_in}
@@ -23,7 +23,7 @@ TextFile::TextFile() :
     orig_file{std::string("")},
     line_count{0},
     line_lengths{},
-    line_limits{std::vector<int>(1, 0)},
+    line_limits{std::vector<size_t>(1, 0)},
     text{std::vector<char>()}
 {}
 
@@ -92,6 +92,17 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
 }
 
 //-------------------------------------------------------------------------------------------------
+TextFile::TextFile(const char* content, const size_t length, const std::string &caller) :
+  orig_file{"None"},
+  line_count{0},
+  line_lengths{},
+  line_limits{},
+  text{}
+{
+  linesFromString(content, length);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string TextFile::getFileName() const {
   if (orig_file.size() > 0LLU) {
     return orig_file;
@@ -126,6 +137,20 @@ int TextFile::getLineLength(const int index) const {
   return line_limits[index + 1] - line_limits[index];
 }
 
+//-------------------------------------------------------------------------------------------------
+int TextFile::getLongestLineLength() const {
+  size_t result = 0;
+  for (int i = 0; i < line_count; i++) {
+    result = std::max(result, line_limits[i + 1] - line_limits[i]);
+  }
+  return static_cast<int>(result);
+}
+
+//-------------------------------------------------------------------------------------------------
+size_t TextFile::getTextSize() const {
+  return line_limits[line_count];
+}
+  
 //-------------------------------------------------------------------------------------------------
 char TextFile::getChar(const int index) const {
   return text[index];
@@ -204,19 +229,18 @@ std::string TextFile::setFileName(const std::string &file_name, const TextOrigin
 }
 
 //-------------------------------------------------------------------------------------------------
-void TextFile::linesFromString(const std::string &text_in) {
+void TextFile::linesFromString(const char* text_in, const size_t n_char) {
   int n_br = 0;
-  const int n_char = text_in.size();
-  for (int i = 0; i < n_char; i++) {
+  for (size_t i = 0; i < n_char; i++) {
     n_br += (text_in[i] == '\n');
   }
-  line_count = n_br + (text_in[text_in.size() - 1] != '\n');
+  line_count = n_br + (text_in[n_char - 1] != '\n');
   line_lengths.resize(line_count);
   line_limits.resize(line_count + 1);
   text.resize(n_char - n_br + 1);
-  int n_tx = 0;
+  size_t n_tx = 0;
   n_br = 0;
-  for (int i = 0; i < n_char; i++) {
+  for (size_t i = 0; i < n_char; i++) {
     text[n_tx] = text_in[i];
     if (text_in[i] == '\n') {
       n_br++;
@@ -226,12 +250,21 @@ void TextFile::linesFromString(const std::string &text_in) {
       n_tx++;
     }
   }
+
+  // Determine line lengths.  Set the upper line limit index to the total number of characters
+  // in case the string does not end in a carriage return.
+  line_limits[line_count] = n_tx;
   for (int i = 0; i < line_count; i++) {
     line_lengths[i] = line_limits[i + 1] - line_limits[i];
   }
 
   // Ensure that the final line limit is catalogged
   line_limits[line_count] = n_tx;
+}
+
+//-------------------------------------------------------------------------------------------------
+void TextFile::linesFromString(const std::string &text_in) {
+  linesFromString(text_in.data(), text_in.size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -249,12 +282,46 @@ int TextFile::checkAvailableLength(const int line_number, const int start_pos,
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string TextFile::toString(const TextEnds line_endings) const {
+  std::string buffer;
+  switch (line_endings) {
+  case TextEnds::AS_IS:
+    buffer.resize(line_limits[line_count] +
+                  static_cast<size_t>((line_count > 0) ? line_count - 1 : 0));
+    break;
+  case TextEnds::NEWLINE:
+    buffer.resize(line_limits[line_count] + static_cast<size_t>(line_count));
+    break;
+  }
+  size_t counter = 0;
+  for (int i = 0; i < line_count; i++) {
+    for (size_t j = line_limits[i]; j < line_limits[i + 1]; j++) {
+      buffer[counter] = text[j];
+      counter++;
+    }
+    switch (line_endings) {
+    case TextEnds::AS_IS:
+      if (i < line_count - 1) {
+        buffer[counter] = ' ';
+      }
+      break;
+    case TextEnds::NEWLINE:
+      buffer[counter] = '\n';
+      break;
+    }
+    counter++;
+  }
+  buffer.resize(counter);
+  return buffer;
+}
+
+//-------------------------------------------------------------------------------------------------
 void TextFile::write(std::ofstream *foutp) const {
   for (int i = 0; i < line_count; i++) {
     std::string buffer(line_lengths[i] + 1, '\n');
-    const int hlim = line_limits[i + 1];
-    int k = 0;
-    for (int j = line_limits[i]; j < hlim; j++) {
+    const size_t hlim = line_limits[i + 1];
+    size_t k = 0;
+    for (size_t j = line_limits[i]; j < hlim; j++) {
       buffer[k] = text[j];
       k++;
     }
@@ -278,7 +345,6 @@ void TextFile::write(const std::string &new_filename, const PrintSituation expec
 void TextFile::write(const PrintSituation expectation) const {
   write(orig_file, expectation);
 }
-
 
 } // namespace parse
 } // namespace stormm

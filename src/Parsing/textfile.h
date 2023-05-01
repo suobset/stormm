@@ -7,29 +7,20 @@
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "FileManagement/file_enumerators.h"
+#include "Reporting/reporting_enumerators.h"
+#include "parsing_enumerators.h"
 
 namespace stormm {
 namespace parse {
 
 using diskutil::PrintSituation;
-  
-/// \brief Many searches in TextFile objects will begin at a particular line.  If the query is not
-///        found, it may be necessary to wrap the search back to the beginning and continue until
-///        the original starting line.  This will indicate whether to do that.
-enum class WrapTextSearch {
-  NO, YES
-};
-
-/// \brief Differentiate between text data originating on a disk and in RAM
-enum class TextOrigin {
-  DISK, RAM
-};
+using review::TextEnds;
 
 /// \brief Abstract for the TextFile object, providing read-only access
 struct TextFileReader {
 
   /// \brief The constructor takes length constants and constant pointers.
-  TextFileReader(int line_count_in, const int* line_lengths_in, const int* line_limits_in,
+  TextFileReader(int line_count_in, const int* line_lengths_in, const size_t* line_limits_in,
                  const char* text_in, const std::string file_name_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
@@ -41,7 +32,7 @@ struct TextFileReader {
 
   const int line_count;
   const int* line_lengths;
-  const int* line_limits;
+  const size_t* line_limits;
   const char* text;
   const std::string file_name;
 };
@@ -66,10 +57,15 @@ public:
   /// \param source      Origin of the text--disk or RAM
   /// \param content     Content for the TextFile, and perhaps later an ASCII text file, to hold
   /// \param caller      (Optional) name of the calling function
+  /// \{
   TextFile();
+
   TextFile(const std::string &file_name, TextOrigin source = TextOrigin::DISK,
            const std::string &content = std::string(""),
            const std::string &caller = std::string(""));
+
+  TextFile(const char* content, const size_t length, const std::string &caller = std::string(""));
+  /// \}
 
   /// \brief The default copy and move constructors as well as assignment operators are acceptable.
   /// \{
@@ -100,6 +96,13 @@ public:
   ///                file has lines, to allow the end of the last line to be determined.
   int getLineLength(int index) const;
 
+  /// \brief Get the length of the longest line in the file.
+  int getLongestLineLength() const;
+
+  /// \brief Get the number of text characters in the object's buffer (this will not count implicit
+  ///        carriage returns between lines).
+  size_t getTextSize() const;
+  
   /// \brief Get one character of a text file after converting it to a character vector in memory.
   ///
   /// \param index   The character index, as ascertained by line limits and some offset
@@ -142,6 +145,13 @@ public:
   ///                       end of the tuple.
   char4 extractChar4(int line_number, int start_pos, int string_length) const;
 
+  /// \brief Convert all content to a string, with the option of making line endings carriage
+  ///        returns or simple spaces (fused line endings, which could create combined words out
+  ///        of the last word on one line and the first word on another, are not accepted).
+  ///
+  /// \param line_endings  Specify whether to insert newlines or white space between lines
+  std::string toString(TextEnds line_endings = TextEnds::NEWLINE) const;
+
   /// \brief Write the contents of the object to disk.
   ///
   /// Overloaded:
@@ -160,7 +170,7 @@ public:
              PrintSituation expectation = PrintSituation::OPEN_NEW) const;
   void write(PrintSituation expectation = PrintSituation::OPEN_NEW) const;
   /// \}
-
+  
 private:
 
   /// Name of the file that was read
@@ -173,7 +183,7 @@ private:
   std::vector<int> line_lengths;
   
   /// Limits for each line's text in the concatenated character array
-  std::vector<int> line_limits;
+  std::vector<size_t> line_limits;
   
   /// The text, sans carriage returns (see line limits to determine their locations)
   std::vector<char> text;
@@ -198,10 +208,19 @@ private:
 
   /// \brief Break a large, formatted string into separate lines based on carriage returns.
   ///
+  /// Overloaded:
+  ///   - Accept a C-style character array with trusted length
+  ///   - Accept a Standard Template Library string
+  ///
   /// \param text_in  The text to parse.  See setFileName and above in the TextFile documentation
   ///                 to understand how this could be either of two constructor inputs.
+  /// \param n_char   Trusted number of characters in the input text (if provided as a C-style
+  ///                 array)
+  /// \{
+  void linesFromString(const char* text_in, const size_t n_char);
   void linesFromString(const std::string &text_in);
-
+  /// \}
+  
   /// \brief Check that a certain number of characters can be extracted from one line at the
   ///        specified positions.
   ///

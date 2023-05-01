@@ -79,6 +79,9 @@ public:
   /// \brief Get the Poisson-Boltzmann radii set
   AtomicRadiusSet getPBRadiiSet() const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Set the implicit solvent model
   ///
   /// Overloaded:
@@ -146,6 +149,9 @@ private:
                                   ///<   radii).  Acceptable values in the input include "Bondi",
                                   ///<   "Amber6", "mBondi", "mBond2", "mBondi3", or "none".
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Validate the Born radii cutoff.
   void validateBornRadiiCutoff();
 

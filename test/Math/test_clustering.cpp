@@ -140,6 +140,8 @@ int main(const int argc, const char* argv[]) {
   
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

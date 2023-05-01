@@ -1,7 +1,9 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "FileManagement/file_util.h"
 #include "Parsing/parse.h"
+#include "Parsing/parsing_enumerators.h"
 #include "Parsing/tabulation.h"
 #include "Reporting/display.h"
 #include "Reporting/error_format.h"
@@ -11,10 +13,17 @@ namespace stormm {
 namespace namelist {
 
 using errors::RTMessageKind;
+using display::horizontalRule;
 using display::terminalHorizontalRule;
+using parse::addLeadingWhiteSpace;
 using parse::findStringInVector;
+using parse::JustifyText;
+using parse::justifyStrings;
 using parse::lowercase;
+using parse::minimalRealFormat;
 using parse::NumberFormat;
+using parse::removeLeadingWhiteSpace;
+using parse::strcmpCased;
   
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator::NamelistEmulator(const std::string &title_in, const CaseSensitivity casing_in,
@@ -263,6 +272,22 @@ const std::string& NamelistEmulator::getHelp(const std::string &keyword_query,
 }
 
 //-------------------------------------------------------------------------------------------------
+void NamelistEmulator::assignVariable(std::string *var, const std::string &keyword_query,
+                                      const int index) const {
+  if (getKeywordStatus(keyword_query) != InputStatus::MISSING) {
+    *var = getStringValue(keyword_query, index);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::assignVariable(std::string *var, const std::string &keyword_query,
+                                      const std::string &sub_key, const int index) const {
+  if (getKeywordStatus(keyword_query, sub_key) != InputStatus::MISSING) {
+    *var = getStringValue(keyword_query, sub_key, index);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void NamelistEmulator::addKeyword(const std::vector<NamelistElement> &new_keys) {
   const int n_new_key = new_keys.size();
   for (int i = 0; i < n_new_key; i++) {
@@ -292,6 +317,27 @@ void NamelistEmulator::addKeywords(const std::vector<NamelistElement> &new_keys)
 void NamelistEmulator::addKeyword(const NamelistElement &new_key) {
   std::vector<NamelistElement> new_keys(1, new_key);
   addKeyword(new_keys);
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::addKeyword(const std::string &keyword_in, const NamelistType kind_in,
+                                  const std::string &default_in,
+                                  const DefaultIsObligatory obligate, const InputRepeats rep_in,
+                                  const std::string &help_in) {
+  addKeyword(NamelistElement(keyword_in, kind_in, default_in, obligate, rep_in, help_in));
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::addKeyword(const std::string keyword_in,
+                                  const std::vector<std::string> &sub_keys_in,
+                                  const std::vector<NamelistType> &sub_kinds_in,
+                                  const std::vector<std::string> &default_list,
+                                  const DefaultIsObligatory obligate_list,
+                                  const InputRepeats rep_in, const std::string &help_in,
+                                  const std::vector<std::string> &sub_help_in,
+                                  const std::vector<KeyRequirement> &template_requirements_in) {
+  addKeyword(NamelistElement(keyword_in, sub_keys_in, sub_kinds_in, default_list, obligate_list,
+                             rep_in, help_in, sub_help_in, template_requirements_in));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -488,7 +534,7 @@ void NamelistEmulator::triggerResizeBuffer(const std::string &key) {
           // then trigger a runtime error.
           if (keywords[param_index].template_establishment[i] == InputStatus::MISSING) {
             keywords[param_index].instance_establishment[eopi] = InputStatus::MISSING;
-            if (keywords[param_index].template_requirements[i] == SubkeyRequirement::REQUIRED) {
+            if (keywords[param_index].template_requirements[i] == KeyRequirement::REQUIRED) {
               rtAlert("Incomplete STRUCT entry for keyword \"" + key + "\" of namelist \"" +
                       title + "\": sub-key \"" + keywords[param_index].sub_keys[i] +
                       "\" does not have a user specification or a default value.",
@@ -519,7 +565,7 @@ void NamelistEmulator::triggerResizeBuffer(const std::string &key) {
         else {
 
           // Check that the subkey is valid, then mark the user-specified input
-          if (keywords[param_index].template_requirements[i] == SubkeyRequirement::BOGUS) {
+          if (keywords[param_index].template_requirements[i] == KeyRequirement::BOGUS) {
             rtAlert("Situational violation in STRUCT keyword \"" + key + "\" of namelist \"" +
                     title + "\": sub-key \"" + keywords[param_index].sub_keys[i] +
                     "\" is bogus in this context.", "NamelistEmulator", "triggerResizeBuffer");
@@ -605,21 +651,176 @@ void NamelistEmulator::categorizeKeyword(const std::string &key,
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name_width) const {
-  printf(" - %-*.*s : %s\n", name_width, name_width, keywords[p_idx].label.c_str(),
-         terminalFormat("[" + getEnumerationName(keywords[p_idx].kind) + "] " +
-                        keywords[p_idx].help_message, "", "", 6 + name_width,
-                        0, 6 + name_width, 0, RTMessageKind::TABULAR).c_str());
+void NamelistEmulator::setImperative(const std::string &key, const KeyRequirement req) {
+  const size_t p_index = findIndexByKeyword(key);
+  if (p_index >= keywords.size()) {
+    rtErr("No keyword \"" + key + "\" is present in namelist \"" + title + "\".",
+          "NamelistEmulator", "setImperative");
+  }
+  keywords[p_index].setImperative(req);  
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::setImperative(const std::vector<std::string> &directives) {
+  const int ndir = directives.size();
+  for (int i = 0; i < ndir; i++) {
+    const size_t ndchar = directives[i].size() - 1;
+    if (directives[i][ndchar] == 'r' || directives[i][ndchar] == 'o' ||
+        directives[i][ndchar] == 'g') {
+
+      // Try interpreting the directive as a "keyword / requirement" fusion, where the name of a
+      // valid keyword is followed by 'r' (REQUIRED), 'o' (OPTIONAL), or 'g' (BOGUS).  If this
+      // interpretation succeeds, let the directive counter advance with the loop control.
+      try {
+        KeyRequirement req;
+        switch (directives[i][ndchar]) {
+        case 'r':
+          req = KeyRequirement::REQUIRED;
+          break;
+        case 'o':
+          req = KeyRequirement::OPTIONAL;
+          break;
+        case 'g':
+          req = KeyRequirement::BOGUS;
+          break;
+        default:
+
+          // This case cannot be reached.
+          break;
+        }
+        setImperative(directives[i].substr(0, ndchar), req);
+        continue;
+      }
+      catch (std::runtime_error) {}
+    }
+    if (i < ndir - 1) {
+
+      // Try interpreting the directive as a keyword and the one directly behind it as the
+      // requirement code.  If this succeeds, advance the loop counter one extra time.
+      try {
+        setImperative(directives[i], translateKeyRequirement(directives[i + 1]));
+        i++;
+        continue;
+      }
+      catch (std::runtime_error) {}
+    }
+
+    // This situation indicates an error in parsing the directives.
+    rtErr("The directive " + directives[i] + " is invalid for setting input requirements.",
+          "NamelistEmulator", "setImperative");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::setImperative(const std::string &key,
+                                     const std::vector<std::string> &directives) {
+  const size_t p_index = findIndexByKeyword(key);
+  if (p_index >= keywords.size()) {
+    rtErr("No keyword \"" + key + "\" is present in namelist \"" + title + "\".",
+          "NamelistEmulator", "setImperative");
+  }
+  const int ndir = directives.size();
+  for (int i = 0; i < ndir; i++) {
+    const size_t ndchar = directives[i].size() - 1;
+    if (directives[i][ndchar] == 'r' || directives[i][ndchar] == 'o' ||
+        directives[i][ndchar] == 'g') {
+
+      // Try interpreting the directive as a "keyword / requirement" fusion, where the name of a
+      // valid keyword is followed by 'r' (REQUIRED), 'o' (OPTIONAL), or 'g' (BOGUS).  If this
+      // interpretation succeeds, let the directive counter advance with the loop control.
+      try {
+        KeyRequirement req;
+        switch (directives[i][ndchar]) {
+        case 'r':
+          req = KeyRequirement::REQUIRED;
+          break;
+        case 'o':
+          req = KeyRequirement::OPTIONAL;
+          break;
+        case 'g':
+          req = KeyRequirement::BOGUS;
+          break;
+        default:
+
+          // This case cannot be reached.
+          break;
+        }
+        keywords[p_index].setImperative(directives[i].substr(0, ndchar), req);
+        continue;
+      }
+      catch (std::runtime_error) {}
+    }
+    if (i < ndir - 1) {
+
+      // Try interpreting the directive as a keyword and the one directly behind it as the
+      // requirement code.  If this succeeds, advance the loop counter one extra time.
+      try {
+        keywords[p_index].setImperative(directives[i], translateKeyRequirement(directives[i + 1]));
+        i++;
+        continue;
+      }
+      catch (std::runtime_error) {}
+    }
+
+    // This situation indicates an error in parsing the directives.
+    rtErr("The directive " + directives[i] + " is invalid for setting input requirements in "
+          "keyword \"" + key + "\".", "NamelistEmulator", "setImperative");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name_width,
+                                                 const int kw_kind_width,
+                                                 const std::string &kw_dflt) const {
+  std::string kw_kind = getEnumerationName(keywords[p_idx].kind);
+  kw_kind = addLeadingWhiteSpace(kw_kind, kw_kind_width);
+  printf(" + %-*.*s : %s\n", name_width, name_width, keywords[p_idx].label.c_str(),
+         terminalFormat("[" + kw_kind + ", " + kw_dflt + "] " + keywords[p_idx].help_message, "",
+                        "", 6 + name_width, 0, 6 + name_width, 0, RTMessageKind::TABULAR).c_str());
   if (keywords[p_idx].kind == NamelistType::STRUCT) {
+    int dflt_width = 0;
     int member_width = 0;
+    int kind_width = 0;
+    std::vector<std::string> kind_pres(keywords[p_idx].template_size);
     for (int i = 0; i < keywords[p_idx].template_size; i++) {
-      member_width = std::max(member_width,
-                              static_cast<int>(keywords[p_idx].sub_keys[i].size()));
+      member_width = std::max(member_width, static_cast<int>(keywords[p_idx].sub_keys[i].size()));
+      kind_pres[i] = getEnumerationName(keywords[p_idx].sub_kinds[i]);
+      kind_width = std::max(kind_width, static_cast<int>(kind_pres[i].size()));
+    }
+    std::vector<std::string> dflt_pres(keywords[p_idx].template_size);
+    for (int i = 0; i < keywords[p_idx].template_size; i++) {
+      switch (keywords[p_idx].template_establishment[i]) {
+      case InputStatus::MISSING:
+        dflt_pres[i] = "None";
+        break;
+      case InputStatus::DEFAULT:
+        switch (keywords[p_idx].sub_kinds[i]) {
+        case NamelistType::INTEGER:
+          dflt_pres[i] = std::to_string(keywords[p_idx].template_ints[i]);
+          break;
+        case NamelistType::REAL:
+          dflt_pres[i] = minimalRealFormat(keywords[p_idx].template_reals[i], 1.0e-4);
+          break;
+        case NamelistType::STRING:
+          dflt_pres[i] = "'" + keywords[p_idx].template_strings[i] + "'";
+          break;
+        case NamelistType::STRUCT:
+          break;
+        }
+        break;
+      case InputStatus::USER_SPECIFIED:
+
+        // Keywords either have default values or are missing default values.
+        break;
+      }
+      dflt_width = std::max(dflt_width, static_cast<int>(dflt_pres[i].size()));
     }
     for (int i = 0; i < keywords[p_idx].template_size; i++) {
-      printf("   * %-*.*s : %s\n", member_width, member_width,
+      dflt_pres[i] = addLeadingWhiteSpace(dflt_pres[i], dflt_width);
+      kind_pres[i] = addLeadingWhiteSpace(kind_pres[i], kind_width);
+      printf("   - %-*.*s : %s\n", member_width, member_width,
              keywords[p_idx].sub_keys[i].c_str(),
-             terminalFormat("[" + getEnumerationName(keywords[p_idx].sub_kinds[i]) + "] " +
+             terminalFormat("[" + kind_pres[i] + ", " + dflt_pres[i] + "] " +
                             keywords[p_idx].sub_help_messages[i], "", "", 8 + member_width, 0,
                             8 + member_width, 0, RTMessageKind::TABULAR).c_str());
     }
@@ -627,29 +828,102 @@ void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string NamelistEmulator::convertDefaultToString(const NamelistElement &tkw) const {
+  std::string result;
+  int ndval;
+  switch (tkw.establishment) {
+  case InputStatus::MISSING:
+    return std::string("None");
+  case InputStatus::DEFAULT:
+    switch (tkw.kind) {
+    case NamelistType::INTEGER:
+      ndval = tkw.default_int_values.size();
+      for (int j = 0; j < ndval; j++) {
+        result += std::to_string(tkw.default_int_values[j]);
+        if (j < ndval - 1) {
+          result += ", ";
+        }
+      }
+      break;
+    case NamelistType::REAL:
+      ndval = tkw.default_real_values.size();
+      for (int j = 0; j < ndval; j++) {
+        result += minimalRealFormat(tkw.default_real_values[j], 1.0e-4);
+        if (j < ndval - 1) {
+          result += ", ";
+        }
+      }
+      break;
+    case NamelistType::STRING:
+      ndval = tkw.default_string_values.size();
+      for (int j = 0; j < ndval; j++) {
+        result += "'" + tkw.default_string_values[j] + "'";
+        if (j < ndval - 1) {
+          result += ", ";
+        }
+      }
+      break;
+    case NamelistType::STRUCT:
+
+      // STRUCT-type keywords' default values are stored in the template_(ints / reals / strings)
+      // arrays.
+      break;
+    }
+    break;
+  case InputStatus::USER_SPECIFIED:
+
+    // This case should never be reached
+    break;
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 void NamelistEmulator::printHelp() const {
   terminalHorizontalRule();
   printf("%s\n", terminalFormat("&" + title + ": " + help_message, "", "", 0, 0, title.size() + 3,
                                 0, RTMessageKind::TABULAR).c_str());
   terminalHorizontalRule();
+
+  int param_width = 0;
+  int param_kind_width = 0;
+  std::vector<std::string> param_defaults;
   if (categories.size() == 0) {
-    printf("\n Keywords:\n");
+    printf("\n Keywords [ type, default value ]:\n");
     const int n_params = keywords.size();
 
+    // Make a list of the parameter defaults and determine formatting
+    param_defaults.resize(n_params);
+    for (int i = 0; i < n_params; i++) {
+      param_defaults[i] = convertDefaultToString(keywords[i]);
+    }
+    justifyStrings(&param_defaults, JustifyText::RIGHT, 7, 3, 2);
+
     // Determine the maximum width of any keyword
-    int param_width = 0;
     for (int i = 0; i < n_params; i++) {
       param_width = std::max(param_width, static_cast<int>(keywords[i].label.size()));
+      param_kind_width = std::max(param_kind_width,
+                                  static_cast<int>(getEnumerationName(keywords[i].kind).size()));
     }
     for (int i = 0; i < n_params; i++) {
-      printKeywordDocumentation(i, param_width);
+      printKeywordDocumentation(i, param_width, param_kind_width, param_defaults[i]);
+      if (i < n_params - 1) {
+        printf("\n");
+      }
     }
   }
   else {
     const int n_categories = categories.size();
     for (int i = 0; i < n_categories; i++) {
-      printf("\n %s Keywords:\n", category_names[i].c_str());
+      printf("\n %s Keywords [ type, default value ]:\n", category_names[i].c_str());
       const int n_cati = categories[i].size();
+
+      // Make a list of the parameter defaults and determine formatting
+      param_defaults.resize(n_cati);
+      for (int j = 0; j < n_cati; j++) {
+        param_defaults[j] = convertDefaultToString(keywords[findIndexByKeyword(categories[i][j])]);
+      }
+      justifyStrings(&param_defaults, JustifyText::RIGHT, 7);
 
       // Determine the maximum width of any keyword
       int param_width = 0;
@@ -659,162 +933,300 @@ void NamelistEmulator::printHelp() const {
       for (int j = 0; j < n_cati; j++) {
         // Safe to use the output of findIndexByKeyword() as an array index because the contents of
         // every category have already been checked as valid members of the namelist
-        printKeywordDocumentation(findIndexByKeyword(categories[i][j]), param_width);
+        printKeywordDocumentation(findIndexByKeyword(categories[i][j]), param_width,
+                                  param_kind_width, param_defaults[j]);
+        if (i < n_cati - 1) {
+          printf("\n");
+        }
       }
     }
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::printContents() const {
+std::string NamelistEmulator::printContents(const int file_width, const int max_entry_reports,
+                                            const NamelistIntroduction print_decor) const {
   int key_width = 0;
   int kind_width = 0;
   int source_width = 0;
   int value_width = 20;
-  for (size_t i = 0; i < keywords.size(); i++) {
-    NamelistType i_kind = keywords[i].kind;
-    key_width = std::max(key_width, static_cast<int>(keywords[i].label.size()) + 2);
-    kind_width = std::max(kind_width, static_cast<int>(getEnumerationName(i_kind).size()));
-    const int i_entry_count = keywords[i].getEntryCount();
-    if (i_kind == NamelistType::STRING) {
-      for (int j = 0; j < i_entry_count; j++) {
-        value_width = std::max(value_width,
-                               static_cast<int>(keywords[i].getStringValue(j).size()) + 2);
-      }
+  const std::string needs_ui("[ Needs user input ]");
+  const std::string blank_mark;
+  const std::string skip_mark("  (...)");
+  int nkw = keywords.size();
+  int nkw_elements = 1;
+  for (int i = 0; i < nkw; i++) {
+    int nrep;
+    if (keywords[i].getEstablishment() == InputStatus::MISSING) {
+      nrep = 1;      
     }
-    if (i_kind == NamelistType::STRUCT) {
-      for (size_t j = 0; j < keywords[i].getTemplateSize(); j++) {
-        NamelistType j_kind = keywords[i].sub_kinds[j];
-        kind_width = std::max(kind_width, static_cast<int>(getEnumerationName(j_kind).size()));
-        key_width = std::max(key_width, static_cast<int>(keywords[i].sub_keys[j].size()) + 3);
-        if (j_kind == NamelistType::STRING) {
-          for (int k = 0; k < i_entry_count; k++) {
-            const int slen = keywords[i].getStringValue(keywords[i].sub_keys[j], k).size();
-            value_width = std::max(value_width, slen + 2);
-          }
-        }
-      }
+    else {
+      nrep = std::min(max_entry_reports, keywords[i].getEntryCount());
+      nkw_elements += (max_entry_reports < keywords[i].getEntryCount());
     }
-    switch (keywords[i].getEstablishment()) {
-    case InputStatus::DEFAULT:
-    case InputStatus::MISSING:
-      source_width = std::max(source_width, 7);
-      break;
-    case InputStatus::USER_SPECIFIED:
-      source_width = std::max(source_width, 14);
-      break;
-    }
-  }
-
-  // Don't let excessively long values make the table ridiculously wide
-  value_width = (value_width > 32) ? 32 : value_width;
-
-  // Print the table headings
-  const int total_width = key_width + kind_width + value_width + source_width + 10;
-  terminalHorizontalRule("-", "-", total_width);
-  printf("Contents of &%s:\n", title.c_str());
-  terminalHorizontalRule("-", "-", total_width);
-  printf(" %-*.*s | %*.*s | %*.*s | %*.*s\n", key_width, key_width, "Keyword", kind_width,
-         kind_width, "Type", value_width, value_width, "Value", source_width, source_width,
-         "Source");
-  terminalHorizontalRule("-", "-", total_width);
-  for (size_t i = 0; i < keywords.size(); i++) {
-
-    // Print the first value with a full description
-    printf(" %-*.*s | %*.*s | ", key_width, key_width, keywords[i].getLabel().c_str(), kind_width,
-           kind_width, getEnumerationName(keywords[i].getKind()).c_str());
-    switch (keywords[i].getKind()) {
-    case NamelistType::INTEGER:
-      if (keywords[i].getEstablishment() == InputStatus::MISSING) {
-        printf("%*.*s | ", value_width, value_width, "[ Needs user input ]");
-      }
-      else {
-        printf("%*d | ", value_width, keywords[i].getIntValue(0));
-      }
-      break;
+    switch (keywords[i].kind) {
     case NamelistType::REAL:
-      if (keywords[i].getEstablishment() == InputStatus::MISSING) {
-        printf("%*.*s | ", value_width, value_width, "[ Needs user input ]");
-      }
-      else {
-        printf("%*.4lf | ", value_width, keywords[i].getRealValue(0));
-      }
-      break;
+    case NamelistType::INTEGER:
     case NamelistType::STRING:
-      {
-        std::string outstring = "\"" + keywords[i].getStringValue(0) + "\"";
-        if (outstring.size() > 32) {
-          outstring = outstring.substr(0, 28) + "...\"";
-        }
-        printf("%*.*s | ", value_width, value_width, outstring.c_str());
-      }
+      nkw_elements += nrep;
       break;
     case NamelistType::STRUCT:
-      printf("%*.*s | ", value_width, value_width, "");
+      nkw_elements += 1 + (nrep * keywords[i].getTemplateSize());
       break;
-    }
-    std::string source_tmp;
-    switch (keywords[i].getEstablishment()) {
-    case InputStatus::DEFAULT:
-      source_tmp = "Default";
-      break;
-    case InputStatus::MISSING:
-      source_tmp = "MISSING";
-      break;
-    case InputStatus::USER_SPECIFIED:
-      source_tmp = "User Specified";
-      break;
-    }
-    printf("%*.*s\n", source_width, source_width, source_tmp.c_str());
-
-    // If the keyword is a STRUCT, print its sub-keys
-    if (keywords[i].getKind() == NamelistType::STRUCT) {
-      for (int j = 0; j < keywords[i].getTemplateSize(); j++) {
-        const std::string ij_key = keywords[i].getSubLabel(j);
-        const std::string ij_kind = lowercase(getEnumerationName(keywords[i].sub_kinds[j]));
-        printf("  - %-*.*s | %*.*s | ", key_width - 3, key_width - 3, ij_key.c_str(), kind_width,
-               kind_width, ij_kind.c_str());
-        switch (keywords[i].sub_kinds[j]) {
-        case NamelistType::INTEGER:
-          if (keywords[i].getEstablishment() == InputStatus::MISSING) {
-            printf("%*.*s | ", value_width, value_width, "[ Needs user input ]");
-          }
-          else {
-            printf("%*d | ", value_width, keywords[i].getIntValue(ij_key, 0));
-          }
-          break;
-        case NamelistType::REAL:
-          if (keywords[i].getEstablishment() == InputStatus::MISSING) {
-            printf("%*.*s | ", value_width, value_width, "[ Needs user input ]");
-          }
-          else {
-            printf("%*.4lf | ", value_width, keywords[i].getRealValue(ij_key, 0));
-          }
-          break;
-        case NamelistType::STRING:
-          {
-            std::string outstring = "\"" + keywords[i].getStringValue(ij_key, 0) + "\"";
-            if (outstring.size() > 32) {
-              outstring = outstring.substr(0, 28) + "...\"";
-            }
-            printf("%*.*s | ", value_width, value_width, outstring.c_str());
-          }
-          break;
-        case NamelistType::STRUCT:
-          break;
-        }
-        printf("\n");
-      }
-    }
-
-    // Print information about additional values
-    const int nval = keywords[i].getEntryCount();
-    if (nval > 1) {
-      std::string more_values = "[ +" + std::to_string(nval) + " more values ]";
-      printf(" %-*.*s | %*.*s | %*.*s | %*.*s\n", key_width, key_width, "", kind_width, kind_width,
-             "", value_width, value_width, more_values.c_str(), source_width, source_width, "");
     }
   }
+  std::vector<std::string> kw_names, kw_kinds, kw_sources, kw_repeats, kw_values;
+  kw_names.reserve(nkw_elements);
+  kw_kinds.reserve(nkw_elements);
+  kw_sources.reserve(nkw_elements);
+  kw_values.reserve(nkw_elements);
+  switch (print_decor) {
+  case NamelistIntroduction::HEADER:
+  case NamelistIntroduction::COMPACT_HEADER:
+    kw_names.push_back(std::string("Keyword"));
+    kw_kinds.push_back(std::string("Kind"));
+    kw_sources.push_back(std::string("Source"));
+    kw_repeats.push_back(std::string("Rep"));
+    kw_values.push_back(std::string("Value"));
+    break;
+  case NamelistIntroduction::BLANK_LINE:
+  case NamelistIntroduction::NONE:
+    break;
+  }
+  bool multiple_entries = false;
+  for (int i = 0; i < nkw; i++) {
+
+    // Skip bogus keywords
+    if (keywords[i].getImperative() == KeyRequirement::BOGUS) {
+      continue;
+    }
+    
+    // The first line of each entry is devoted to the keyword and, unless it is a STRUCT, the
+    // first value of that keyword.
+    kw_names.push_back(keywords[i].getLabel());
+    kw_kinds.push_back(getEnumerationName(keywords[i].getKind()));
+    kw_sources.push_back(getEnumerationName(keywords[i].getEstablishment()));
+    if (keywords[i].getEstablishment() == InputStatus::MISSING) {
+      kw_values.push_back(needs_ui);
+      kw_repeats.push_back(blank_mark);
+    }
+    else {
+
+      // Detail the first instance of the keyword
+      switch (keywords[i].getKind()) {
+      case NamelistType::REAL:
+        kw_values.push_back(minimalRealFormat(keywords[i].getRealValue(0), 1.0e-4));
+        kw_repeats.push_back(std::to_string(1));
+        break;
+      case NamelistType::INTEGER:
+        kw_values.push_back(std::to_string(keywords[i].getIntValue(0)));
+        kw_repeats.push_back(std::to_string(1));
+        break;
+      case NamelistType::STRING:
+        kw_values.push_back(keywords[i].getStringValue(0));
+        kw_repeats.push_back(std::to_string(1));
+        break;
+      case NamelistType::STRUCT:
+        kw_values.push_back(blank_mark);
+        kw_repeats.push_back(blank_mark);
+        for (int j = 0; j < keywords[i].getTemplateSize(); j++) {
+
+          // Skip bogus subkeys
+          if (keywords[i].template_requirements[j] == KeyRequirement::BOGUS) {
+            continue;
+          }
+          const std::string &jsl = keywords[i].getSubLabel(j);
+          const NamelistType jkind = keywords[i].getKind(jsl);
+          kw_names.push_back("  + " + jsl);
+          kw_kinds.push_back(getEnumerationName(jkind));
+          kw_sources.push_back(getEnumerationName(keywords[i].getEstablishment(jsl, 0)));
+          kw_repeats.push_back(std::to_string(1));
+          switch (jkind) {
+          case NamelistType::REAL:
+            kw_values.push_back(minimalRealFormat(keywords[i].getRealValue(jsl, 0), 1.0e-4));
+            break;
+          case NamelistType::INTEGER:
+            kw_values.push_back(std::to_string(keywords[i].getIntValue(jsl, 0)));
+            break;
+          case NamelistType::STRING:
+            kw_values.push_back(keywords[i].getStringValue(jsl, 0));
+            break;
+          case NamelistType::STRUCT:
+            break;
+          }
+        }
+        break;
+      }
+
+      // Detail subsequent instances of the keyword
+      const bool skip_reports = (keywords[i].getEntryCount() > max_entry_reports);
+      bool skip_placed = false;
+      const int n_entry = keywords[i].getEntryCount();
+      for (int j = 1; j < n_entry; j++) {
+        multiple_entries = true;
+        if (skip_reports && j > max_entry_reports - 2 && j < n_entry - 1) {
+          if (skip_placed == false) {
+            kw_names.push_back(skip_mark);
+            kw_kinds.push_back(skip_mark);
+            kw_sources.push_back(skip_mark);
+            kw_repeats.push_back(blank_mark);
+            kw_values.push_back(skip_mark);
+            skip_placed = true;
+          }
+        }
+        else {
+          switch (keywords[i].getKind()) {
+          case NamelistType::INTEGER:
+          case NamelistType::REAL:
+          case NamelistType::STRING:
+            kw_names.push_back(blank_mark);
+            kw_kinds.push_back(blank_mark);
+            kw_sources.push_back(blank_mark);
+            kw_repeats.push_back(std::to_string(j + 1));
+            break;
+          case NamelistType::STRUCT:
+            break;
+          }
+          switch (keywords[i].getKind()) {
+          case NamelistType::INTEGER:
+            kw_values.push_back(std::to_string(keywords[i].getIntValue(j)));
+            break;
+          case NamelistType::REAL:
+            kw_values.push_back(minimalRealFormat(keywords[i].getRealValue(j), 1.0e-4));
+            break;
+          case NamelistType::STRING:
+            kw_values.push_back(keywords[i].getStringValue(j));
+            break;
+          case NamelistType::STRUCT:
+            for (int k = 0; k < keywords[i].getTemplateSize(); k++) {
+
+              // Skip bogus subkeys
+              if (keywords[i].template_requirements[k] == KeyRequirement::BOGUS) {
+                continue;
+              }
+              const std::string &ksl = keywords[i].getSubLabel(k);
+              const NamelistType kkind = keywords[i].getKind(ksl);
+              kw_names.push_back("  + " + ksl);
+              kw_kinds.push_back(getEnumerationName(kkind));
+              kw_sources.push_back(getEnumerationName(keywords[i].getEstablishment(ksl, j)));
+              kw_repeats.push_back(std::to_string(j + 1));
+              switch (kkind) {
+              case NamelistType::REAL:
+                kw_values.push_back(minimalRealFormat(keywords[i].getRealValue(ksl, j), 1.0e-4));
+                break;
+              case NamelistType::INTEGER:
+                kw_values.push_back(std::to_string(keywords[i].getIntValue(ksl, j)));
+                break;
+              case NamelistType::STRING:
+                kw_values.push_back(keywords[i].getStringValue(ksl, j));
+                break;
+              case NamelistType::STRUCT:
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Improve the presentation by de-emphasizing variable tyes and abridging other terms
+  const std::string user_source = getEnumerationName(InputStatus::USER_SPECIFIED);
+  for (size_t i = 1; i < kw_sources.size(); i++) {
+    if (strcmpCased(kw_sources[i], user_source)) {
+      kw_sources[i] = "USER";
+    }
+    kw_sources[i] = lowercase(kw_sources[i]);
+  }
+  for (size_t i = 0; i < kw_kinds.size(); i++) {
+    kw_kinds[i] = lowercase(kw_kinds[i]);
+  }
+  
+  // Justify the non-value components of each input
+  const size_t ntab_ent = kw_names.size();
+  justifyStrings(&kw_names, 0, ntab_ent, JustifyText::LEFT, 20, 0, 20);
+  justifyStrings(&kw_kinds, 0, ntab_ent, JustifyText::LEFT, 20, 0, 20);
+  justifyStrings(&kw_sources, 0, ntab_ent, JustifyText::LEFT, 20, 0, 20);
+  justifyStrings(&kw_repeats, JustifyText::RIGHT);
+
+  // Print the table headings
+  std::string result;
+  switch (print_decor) {
+  case NamelistIntroduction::HEADER:
+    result += horizontalRule("+", "+", file_width);
+    result += "Contents of &" + title + "\n\n";
+    break;
+  case NamelistIntroduction::COMPACT_HEADER:
+    result += "Contents of &" + title + "\n";
+    break;
+  case NamelistIntroduction::BLANK_LINE:
+    result += '\n';
+    break;
+  case NamelistIntroduction::NONE:
+    break;
+  }
+  for (size_t i = 0; i < ntab_ent; i++) {
+    result += " " + kw_names[i] + " | " + kw_kinds[i] + " | " + kw_sources[i] + " | ";
+    if (multiple_entries) {
+      result += kw_repeats[i] + " | ";
+    }
+    result += kw_values[i] + "\n";
+    if (i == 0) {
+      switch (print_decor) {
+      case NamelistIntroduction::HEADER:
+      case NamelistIntroduction::COMPACT_HEADER:
+        {
+          result += " " + std::string(kw_names[0].size(), '-') + "-+-" +
+                    std::string(kw_kinds[0].size(), '-') + "-+-" +
+                    std::string(kw_sources[0].size(), '-') + "-+-";
+          if (multiple_entries) {
+            result += std::string(kw_repeats[0].size(), '-') + "-+-";
+          }
+          size_t mv_len = 0;
+          for (size_t j = 0; j < ntab_ent; j++) {
+            mv_len = std::max(mv_len, kw_values[j].size());
+          }
+          result += std::string(mv_len, '-') + "\n";
+        }
+        break;
+      case NamelistIntroduction::BLANK_LINE:
+      case NamelistIntroduction::NONE:
+        break;
+      }
+    }
+  }
+  result += "\n";
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::printContents(std::ostream *foutp, const int file_width,
+                                     const int max_entry_reports,
+                                     const NamelistIntroduction print_decor) const {
+  const std::string result = printContents(file_width, max_entry_reports, print_decor);
+  foutp->write(result.data(), result.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::printContents(std::ofstream *foutp, const int file_width,
+                                     const int max_entry_reports,
+                                     const NamelistIntroduction print_decor) const {
+  const std::string result = printContents(file_width, max_entry_reports, print_decor);
+  foutp->write(result.data(), result.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::printContents(const std::string &file_name,
+                                     const PrintSituation expectation, const int file_width,
+                                     const int max_entry_reports,
+                                     const NamelistIntroduction print_decor) const {
+  std::ofstream foutp = openOutputFile(file_name, expectation, "print &namelist information to a "
+                                       "file detailing up to " +
+                                       std::to_string(max_entry_reports) + " entry repetitions");
+  const std::string result = printContents(file_width, max_entry_reports, print_decor);
+  foutp.write(result.data(), result.size());
+  foutp.close();
 }
 
 //-------------------------------------------------------------------------------------------------

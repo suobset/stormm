@@ -101,6 +101,13 @@ enum class ClashResponse {
            ///<   some multiple of the pairwise Lennard-Jones sigma value, or if that is also zero
            ///<   then some arbitrary minimum value.
 };
+
+/// \brief List the different modes in which to extract energies from a ScoreCard object.
+enum class EnergySample {
+  TIME_SERIES,  ///< Return the entire time series of all values stored for a state variable
+  FINAL,        ///< Return the current (most recent, or final) value of a state variable
+  TIME_AVERAGE  ///< Return the average of the time series of a state variable
+};
   
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///
@@ -114,6 +121,7 @@ std::string getEnumerationName(StateVariable input);
 std::string getEnumerationName(NonbondedPotential input);
 std::string getEnumerationName(VdwCombiningRule input);
 std::string getEnumerationName(ClashResponse input);
+std::string getEnumerationName(EnergySample input);
 /// \}
 
 } // namespace energy

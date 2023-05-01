@@ -6,6 +6,7 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Accelerator/test_hybrid.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Parsing/test_parse.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Parsing/test_input.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Parsing/test_output.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Namelists/test_namelists.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_clustering.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_math.cpp

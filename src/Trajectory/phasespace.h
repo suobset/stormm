@@ -417,8 +417,52 @@ public:
                     TrajectoryKind traj_kind = TrajectoryKind::POSITIONS,
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN) const;
+
+  /// \brief Get a pointer to the object itself (useful when the object has been passed as a const
+  ///        reference and a pointer is needed).
+  const PhaseSpace* getSelfPointer() const;
+
+  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
+  ///        access to any of its member variables.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract from a const PhaseSpace object
+  ///   - Get a writeable abstract from a mutable PhaseSpace object
+  ///   - Get either object oriented with the present, alternate positional arrays set as holding
+  ///     the current coordinates (three such abstracts can be rotated over successive cycles of
+  ///     dynamics to let the coordinates evolve, protected against race conditions, without
+  ///     swapping the actual locations in memory)
+  ///
+  /// \param tier         Specify pointers on the host or device
+  /// \param orientation  Arbitrarily selected point on the time cycle to have the reader or writer
+  ///                     take as the current coordinates
+  /// \{
+  const PhaseSpaceReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  const PhaseSpaceReader data(CoordinateCycle orientation,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  PhaseSpaceWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  PhaseSpaceWriter data(CoordinateCycle orientation,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
   
 #ifdef STORMM_USE_HPC
+  /// \brief Get an abstract for the object's host data such that all pointers are guaranteed to
+  ///        be valid on the GPU.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract for a const PhaseSpace object
+  ///   - Get a writeable abstract for a non-const PhaseSpace object
+  ///   - Get either object oriented with the present, alternate coordinate arrays
+  ///
+  /// \param orientation  Arbitrarily selected point on the time cycle to have the reader or writer
+  ///                     take as the current coordinates
+  /// \{
+  const PhaseSpaceReader deviceViewToHostData(CoordinateCycle orientation) const;
+  const PhaseSpaceReader deviceViewToHostData() const;
+  PhaseSpaceWriter deviceViewToHostData(CoordinateCycle orientation);
+  PhaseSpaceWriter deviceViewToHostData();
+  /// \}
+
   /// \brief Upload all information
   void upload();
 
@@ -503,33 +547,6 @@ public:
   void downloadForces();
   /// \}
 #endif
-  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
-  ///        access to any of its member variables.
-  ///
-  /// Overloaded:
-  ///   - Get a read-only abstract from a const PhaseSpace object
-  ///   - Get a writeable abstract from a mutable PhaseSpace object
-  ///   - Get either object oriented with the past, present, or future positional arrays set as
-  ///     holding the current coordinates (three such abstracts can be rotated over successive
-  ///     cycles of dynamics to let the coordinates evolve, protected against race conditions,
-  ///     without swapping the actual locations in memory)
-  ///
-  /// \param tier         Specify pointers on the host or device
-  /// \param orientation  Arbitrarily selected point on the time cycle to have the reader or writer
-  ///                     take as the current coordinates
-  /// \{
-  const PhaseSpaceReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  const PhaseSpaceReader data(CoordinateCycle orientation,
-                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  PhaseSpaceWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
-  PhaseSpaceWriter data(CoordinateCycle orientation,
-                        HybridTargetLevel tier = HybridTargetLevel::HOST);
-  /// \}
-
-  /// \brief Get a pointer to the object itself (useful when the object has been passed as a const
-  ///        reference and a pointer is needed).
-  const PhaseSpace* getSelfPointer() const;
-  
 private:
   std::string file_name;           ///< Name of the file from which these coordinates (and
                                    ///<   perhaps velocities) derived.  Empty string indicates

@@ -340,7 +340,7 @@ template <typename Tdata, typename Tcalc>
 ClusterManager<Tdata, Tcalc> kMeans(const Tdata* data_points, const size_t count,
                                     const int clusters, const Tcalc scale_factor,
                                     const BoundaryCondition boundaries, const Tcalc range) {
-  ClusterManager result(data_points.size(), clusters);
+  ClusterManager result(data_points->size(), clusters);
   kMeans(&result, data_points, count, clusters, scale_factor, boundaries, range);
   return result;
 }

@@ -26,7 +26,7 @@ using numerics::default_inverse_energy_scale_lf;
 ScoreCardReader::ScoreCardReader(const int system_count_in, const int data_stride_in,
                                  const int sampled_step_count_in, const float nrg_scale_f_in,
                                  const double nrg_scale_lf_in, const float inverse_nrg_scale_f_in,
-                                 const double inverse_nrg_scale_lf_in,
+                                 const double inverse_nrg_scale_lf_in, const int* time_steps_in,
                                  const llint* instantaneous_accumulators_in,
                                  const double* running_accumulators_in,
                                  const double* squared_accumulators_in,
@@ -34,7 +34,7 @@ ScoreCardReader::ScoreCardReader(const int system_count_in, const int data_strid
     system_count{system_count_in}, data_stride{data_stride_in},
     sampled_step_count{sampled_step_count_in}, nrg_scale_f{nrg_scale_f_in},
     nrg_scale_lf{nrg_scale_lf_in}, inverse_nrg_scale_f{inverse_nrg_scale_f_in},
-    inverse_nrg_scale_lf{inverse_nrg_scale_lf_in},
+    inverse_nrg_scale_lf{inverse_nrg_scale_lf_in}, time_steps{time_steps_in},
     instantaneous_accumulators{instantaneous_accumulators_in},
     running_accumulators{running_accumulators_in},
     squared_accumulators{squared_accumulators_in},
@@ -45,14 +45,14 @@ ScoreCardReader::ScoreCardReader(const int system_count_in, const int data_strid
 ScoreCardWriter::ScoreCardWriter(const int system_count_in, const int data_stride_in,
                                  const int sampled_step_count_in, const float nrg_scale_f_in,
                                  const double nrg_scale_lf_in, const float inverse_nrg_scale_f_in,
-                                 const double inverse_nrg_scale_lf_in,
+                                 const double inverse_nrg_scale_lf_in, int* time_steps_in,
                                  llint* instantaneous_accumulators_in,
                                  double* running_accumulators_in, double* squared_accumulators_in,
                                  llint* time_series_in) :
     system_count{system_count_in}, data_stride{data_stride_in},
     sampled_step_count{sampled_step_count_in}, nrg_scale_f{nrg_scale_f_in},
     nrg_scale_lf{nrg_scale_lf_in}, inverse_nrg_scale_f{inverse_nrg_scale_f_in},
-    inverse_nrg_scale_lf{inverse_nrg_scale_lf_in},
+    inverse_nrg_scale_lf{inverse_nrg_scale_lf_in}, time_steps{time_steps_in},
     instantaneous_accumulators{instantaneous_accumulators_in},
     running_accumulators{running_accumulators_in},
     squared_accumulators{squared_accumulators_in},
@@ -71,6 +71,7 @@ ScoreCard::ScoreCard(const int system_count_in, const int capacity_in,
     nrg_scale_lf{0.0},
     inverse_nrg_scale_f{0.0},
     inverse_nrg_scale_lf{0.0},
+    time_steps{static_cast<size_t>(capacity_in), "scorecard_time_steps"},
     instantaneous_accumulators{static_cast<size_t>(data_stride * system_count), "scorecard_acc"},
     running_accumulators{static_cast<size_t>(data_stride * system_count), "score_running_acc"},
     squared_accumulators{static_cast<size_t>(data_stride * system_count), "score_squared_acc"},
@@ -189,6 +190,11 @@ int ScoreCard::getEnergyScaleBits() const {
   return nrg_scale_bits;
 }
 
+//-------------------------------------------------------------------------------------------------
+int ScoreCard::getTimeStep(const int time_index) const {
+  return time_steps.readHost(time_index);
+}
+
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void ScoreCard::upload() {
@@ -210,7 +216,7 @@ void ScoreCard::download() {
 //-------------------------------------------------------------------------------------------------
 const ScoreCardReader ScoreCard::data(const HybridTargetLevel tier) const {
   return ScoreCardReader(system_count, data_stride, sampled_step_count, nrg_scale_f, nrg_scale_lf,
-                         inverse_nrg_scale_f, inverse_nrg_scale_lf,
+                         inverse_nrg_scale_f, inverse_nrg_scale_lf, time_steps.data(tier),
                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
                          squared_accumulators.data(tier), time_series_accumulators.data(tier));
 }
@@ -218,7 +224,7 @@ const ScoreCardReader ScoreCard::data(const HybridTargetLevel tier) const {
 //-------------------------------------------------------------------------------------------------
 ScoreCardWriter ScoreCard::data(const HybridTargetLevel tier) {
   return ScoreCardWriter(system_count, data_stride, sampled_step_count, nrg_scale_f, nrg_scale_lf,
-                         inverse_nrg_scale_f, inverse_nrg_scale_lf,
+                         inverse_nrg_scale_f, inverse_nrg_scale_lf, time_steps.data(tier),
                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
                          squared_accumulators.data(tier), time_series_accumulators.data(tier));
 }
@@ -233,6 +239,7 @@ void ScoreCard::reserve(const int new_capacity) {
     sample_capacity = new_capacity + 1;
     time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
                                     static_cast<size_t>(sample_capacity));
+    time_steps.resize(sample_capacity);
   }
 }
 
@@ -1064,24 +1071,15 @@ double ScoreCard::reportVarianceOfStates(const StateVariable aspect, const int s
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportEnergyHistory(const int system_index,
-                                                   const HybridTargetLevel tier) {
+                                                   const HybridTargetLevel tier) const {
   return reportEnergyHistory(StateVariable::TOTAL_ENERGY, system_index, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
                                                    const int system_index,
-                                                   const HybridTargetLevel tier) {
+                                                   const HybridTargetLevel tier) const {
   std::vector<double> result(sampled_step_count);
-#ifdef STORMM_USE_HPC
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    break;
-  case HybridTargetLevel::DEVICE:
-    download();
-    break;
-  }
-#endif
   const llint* ts_ptr = time_series_accumulators.data();
   const size_t data_stride_zu = static_cast<size_t>(data_stride);
   for (int i = 0; i < sampled_step_count; i++) {
@@ -1094,23 +1092,14 @@ std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double2> ScoreCard::reportEnergyHistory(const HybridTargetLevel tier) {
+std::vector<double2> ScoreCard::reportEnergyHistory(const HybridTargetLevel tier) const {
   return reportEnergyHistory(StateVariable::TOTAL_ENERGY, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double2> ScoreCard::reportEnergyHistory(const StateVariable aspect,
-                                                    const HybridTargetLevel tier) {
+                                                    const HybridTargetLevel tier) const {
   std::vector<double2> result(sampled_step_count);
-#ifdef STORMM_USE_HPC
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    break;
-  case HybridTargetLevel::DEVICE:
-    download();
-    break;
-  }
-#endif
   const llint* ts_ptr = time_series_accumulators.data();
   const size_t data_stride_zu = static_cast<size_t>(data_stride);
   std::vector<double> step_buffer(system_count);
@@ -1140,6 +1129,15 @@ const ScoreCard* ScoreCard::getSelfPointer() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ScoreCard::setLastTimeStep(const int time_index) {
+  if (sampled_step_count <= 0) {
+    rtErr("No energy values have yet been committed to the sampled history.", "ScoreCard",
+          "setLastTimeStep");
+  }
+  time_steps.putHost(time_index, sampled_step_count - 1);
+}
+
+//-------------------------------------------------------------------------------------------------
 void ScoreCard::import(const ScoreCard *other, const size_t fill_index,
                        const size_t source_index) {
   ScoreCardReader src_r = other->data();
@@ -1151,9 +1149,51 @@ void ScoreCard::import(const ScoreCard *other, const size_t fill_index,
     rtErr("System index " + std::to_string(fill_index) + " is invalid for a ScoreCard with " +
           std::to_string(system_count) + " systems.", "ScoreCard", "import");
   }
+
+  // Take the other object's time steps if there are no settings
+  bool all_zero_ts = true;
+  int tscon = 0;
+  int* time_step_ptr = time_steps.data();
+  while (tscon < sampled_step_count && all_zero_ts) {
+    all_zero_ts = (all_zero_ts && time_step_ptr[tscon] == 0);
+    tscon++;
+  }
+  bool other_zero_ts = true;
+  tscon = 0;
+  while (tscon < src_r.sampled_step_count && other_zero_ts) {
+    other_zero_ts = (other_zero_ts && src_r.time_steps[tscon] == 0);
+    tscon++;
+  }
+
+  // Reserve space as needed.  Apply the other object's time series if this object has no time
+  // series of its own.  Otherwise, check that this object's time series matches the other
+  // object's, or that at least the other object has no time series of its own.  Warn if there is
+  // an explicit mismatch.
   if (src_r.sampled_step_count > sample_capacity) {
     reserve(src_r.sampled_step_count);
   }
+  if (all_zero_ts == false && other_zero_ts == false) {
+    bool ts_consistent = true;
+    const int minpts = std::min(sampled_step_count, src_r.sampled_step_count);
+    for (int i = 0; i < minpts; i++) {
+      ts_consistent = (ts_consistent && (time_step_ptr[i] == src_r.time_steps[i]));
+    }
+    if (ts_consistent == false) {
+      rtWarn("Importing energy tracking with inconsistent time step numbering.  The first " +
+             std::to_string(src_r.sampled_step_count) + " time steps will be altered to match the "
+             "imported energies.", "ScoreCard", "import");
+    }
+    const int istart = (ts_consistent) ? minpts : 0;
+    for (int i = istart; i < src_r.sampled_step_count; i++) {
+      time_step_ptr[i] = src_r.time_steps[i];
+    }
+  }
+  else if (all_zero_ts && other_zero_ts == false) {
+    for (int i = 0; i < src_r.sampled_step_count; i++) {
+      time_step_ptr[i] = src_r.time_steps[i];
+    }
+  }
+  sampled_step_count = std::max(sampled_step_count, src_r.sampled_step_count);
   const size_t nvar = data_stride;
   const size_t padded_nvar = data_stride;
   size_t src_llim = padded_nvar * source_index;

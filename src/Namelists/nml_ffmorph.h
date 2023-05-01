@@ -61,6 +61,9 @@ public:
   /// \param index  Index of the edit from the appropriate list
   ForceFieldElement getModelEdit(ParameterKind kind, int index) const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
 private:
   ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
                                   ///<   abort program, WARN = warn the user, and likely reset to
@@ -100,6 +103,9 @@ private:
   /// Virtual site frames--the non-bonded properties of the virtual site are controlled by
   /// entries in van_der_waals_properties and charge_properties, respectively.
   std::vector<ForceFieldElement> virtual_sites;
+
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
 };
 
 /// \brief Produce a namelist for translating user input into lists of ForceFieldElement objects,

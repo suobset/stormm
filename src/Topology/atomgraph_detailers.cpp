@@ -543,7 +543,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
       version_stamp[9] = '\0';
     }
     else {
-      sprintf(version_stamp, "UNKNOWN");
+      snprintf(version_stamp, 16, "UNKNOWN");
     }
     if (tfr.line_limits[1] >= 61 && strncmp(&tfr.text[37], "DATE", 4) == 0) {
       char td[4];

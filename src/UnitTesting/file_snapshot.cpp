@@ -43,7 +43,7 @@ std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &lab
         tfr.text[tfr.line_limits[iline]] == '%' &&
         strncmp(&tfr.text[tfr.line_limits[iline] + 2], "Snapshot data, ", 15) == 0) {
 
-      // This looks promising.  Separate the words on the line and seek the name of the data type
+      // This looks promising.  Separate the words on the line and seek the name of the data type.
       std::vector<std::string> snapshot_info = separateText(&tfr.text[tfr.line_limits[iline]],
                                                             tfr.line_limits[iline + 1] -
                                                             tfr.line_limits[iline]);
@@ -262,39 +262,41 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
   const int values_per_line = (99 / width < 1) ? 1 : 99 / width;
   switch (data_format) {
   case NumberFormat::SCIENTIFIC:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { SCIENTIFIC %d %d %d } (%d x %%%d.%de per "
-            "line).\n", content.size(), name_of_the_type.c_str(), values_per_line, width,
-            digits_after_decimal, values_per_line, width, digits_after_decimal);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { SCIENTIFIC %d %d "
+             "%d } (%d x %%%d.%de per line).\n", content.size(), name_of_the_type.c_str(),
+             values_per_line, width, digits_after_decimal, values_per_line, width,
+             digits_after_decimal);
     break;
   case NumberFormat::STANDARD_REAL:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { GENERAL %d %d %d } (%d x %%%d.%df per "
-            "line).\n", content.size(), name_of_the_type.c_str(), values_per_line, width,
-            digits_after_decimal, values_per_line, width, digits_after_decimal);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { GENERAL %d %d %d "
+             "} (%d x %%%d.%df per line).\n", content.size(), name_of_the_type.c_str(),
+             values_per_line, width, digits_after_decimal, values_per_line, width,
+             digits_after_decimal);
     break;
   case NumberFormat::INTEGER:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { INTEGER %d %d } (%d x %%%dd per "
-            "line).\n", content.size(), name_of_the_type.c_str(), values_per_line, width,
-            values_per_line, width);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { INTEGER %d %d } "
+             "(%d x %%%dd per line).\n", content.size(), name_of_the_type.c_str(), values_per_line,
+             width, values_per_line, width);
     break;
   case NumberFormat::LONG_LONG_INTEGER:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { LONG_LONG_INTEGER %d %d } (%d x %%%dlld "
-            "per line).\n", content.size(), name_of_the_type.c_str(), values_per_line, width,
-            values_per_line, width);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { LONG_LONG_INTEGER "
+             "%d %d } (%d x %%%dlld per line).\n", content.size(), name_of_the_type.c_str(),
+             values_per_line, width, values_per_line, width);
     break;
   case NumberFormat::UNSIGNED_INTEGER:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { UNSIGNED_INTEGER %d %d } (%d x %%%dlu per "
-            "line).\n", content.size(), name_of_the_type.c_str(), values_per_line, width,
-            values_per_line, width);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { UNSIGNED_INTEGER "
+             "%d %d } (%d x %%%dlu per line).\n", content.size(), name_of_the_type.c_str(),
+             values_per_line, width, values_per_line, width);
     break;
   case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { UNSIGNED_LONG_LONG_INTEGER %d %d } (%d x "
-            "%%%dllu per line).\n", content.size(), name_of_the_type.c_str(), values_per_line,
-            width, values_per_line, width);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { "
+             "UNSIGNED_LONG_LONG_INTEGER %d %d } (%d x %%%dllu per line).\n", content.size(),
+             name_of_the_type.c_str(), values_per_line, width, values_per_line, width);
     break;
   case NumberFormat::CHAR4:
-    sprintf(buffer.data(), "%% Snapshot data, %zu %s { CHAR4 %d } (%d x %%4.4s per "
-            "line).\n", content.size(), name_of_the_type.c_str(), values_per_line,
-            values_per_line);
+    snprintf(buffer.data(), necessary_buffer_size, "%% Snapshot data, %zu %s { CHAR4 %d } (%d x "
+             "%%4.4s per line).\n", content.size(), name_of_the_type.c_str(), values_per_line,
+             values_per_line);
     break;
   }
 
@@ -304,7 +306,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
   // it was in the STORMM program's memory.
   foutp.write(buffer.data(), strlen(buffer.data()));
   const std::string var_label = (label.size() > 0) ? label : "data";
-  sprintf(buffer.data(), "%s = [\n", var_label.c_str());
+  snprintf(buffer.data(), necessary_buffer_size, "%s = [\n", var_label.c_str());
   foutp.write(buffer.data(), strlen(buffer.data()));
   const int nval = content.size();
   const int padded_nval = ((nval + values_per_line - 1) / values_per_line) * values_per_line;
@@ -318,16 +320,101 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
   }
   printNumberSeries(&foutp, content_plus, values_per_line, width, digits_after_decimal,
                     data_format, "writeSnapshot", "Snapshot program data");
-  sprintf(buffer.data(), "];\n%s = reshape(transpose(%s), 1, %d);\n", var_label.c_str(),
-          var_label.c_str(), padded_nval);
+  snprintf(buffer.data(), necessary_buffer_size, "];\n%s = reshape(transpose(%s), 1, %d);\n",
+           var_label.c_str(), var_label.c_str(), padded_nval);
   foutp.write(buffer.data(), strlen(buffer.data()));
   if (nval != padded_nval) {
-    sprintf(buffer.data(), "%s = %s(1:%d);\n", var_label.c_str(), var_label.c_str(), nval);
+    snprintf(buffer.data(), necessary_buffer_size, "%s = %s(1:%d);\n", var_label.c_str(),
+             var_label.c_str(), nval);
     foutp.write(buffer.data(), strlen(buffer.data()));
   }
   
   // Close the output file
   foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+TextFile readTextSnapshot(const TextFile &tf, const std::string &label) {
+
+  // Seek the formatting comment
+  TextFileReader tfr = tf.data();
+  bool label_found = false;
+  bool format_found = false;
+  int iline = 0;
+  while (format_found == false && iline < tfr.line_count - 1) {
+    if (tfr.line_limits[iline + 1] - tfr.line_limits[iline] >= 11 &&
+        tfr.text[tfr.line_limits[iline]] == '|' &&
+        strncmp(&tfr.text[tfr.line_limits[iline]], "|>>> Label", 10) == 0) {
+      
+      // This looks promising.  Separate the words on the line and seek the name of the data type.
+      std::vector<std::string> snapshot_info = separateText(&tfr.text[tfr.line_limits[iline] + 11],
+                                                            tfr.line_limits[iline + 1] -
+                                                            tfr.line_limits[iline] - 11);
+      const int n_info = snapshot_info.size();
+      if ((label.size() == 0 && snapshot_info[0] == "data") ||
+          (label.size() > 0  && snapshot_info[0] == label)) {
+
+        // The label has ben matched.  Read until the next "|>>> End" marker and assemble a new
+        // TextFile to hold the result.
+        iline++;
+        const int trx_start = iline;
+        TextFile result;
+        while (iline < tfr.line_count &&
+               (tfr.line_limits[iline + 1] - tfr.line_limits[iline] < 8 ||
+                strncmp(&tfr.text[tfr.line_limits[iline]], "|>>> End", 8) != 0)) {
+          iline++;
+        }
+        if (iline == tfr.line_count) {
+          rtErr("File " +  tf.getFileName() + " has no end mark for data in label [" + label +
+                "].  Transcription starts on line " + std::to_string(trx_start) + ".",
+                "readTextSnapshot");
+        }
+        const int trx_end = iline;
+        const size_t nchar = tfr.line_limits[trx_end] - tfr.line_limits[trx_start];
+        std::string proto_result;
+        proto_result.reserve(nchar + trx_end - trx_start);
+        for (int i = trx_start; i < trx_end; i++) {
+          const size_t jlim = tfr.line_limits[i + 1];
+          for (size_t j = tfr.line_limits[i]; j < jlim; j++) {
+            proto_result.push_back(tfr.text[j]);
+          }
+          proto_result.push_back('\n');
+        }
+        return TextFile(proto_result, TextOrigin::RAM);
+      }
+    }
+    iline++;
+  }
+  rtErr("A search for \"" + label + "\" in snapshot file " + tf.getFileName() + " yielded no "
+        "matches.", "readTextSnapshot");
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+TextFile readTextSnapshot(const std::string &filename, const std::string &label) {
+  const TextFile tf(filename, TextOrigin::DISK, std::string(""), "readTextSnapshot");
+  return readTextSnapshot(tf, label);
+}
+
+//-------------------------------------------------------------------------------------------------
+void writeTextSnapshot(const std::string &filename, const TextFile &content,
+                       const std::string &label, const PrintSituation expectation) {
+  std::ofstream foutp = openOutputFile(filename, expectation);
+  std::string opening_line("|>>> Label ");
+  opening_line += (label.size() == 0) ? "data" : label;
+  opening_line += "\n";
+  foutp.write(opening_line.data(), opening_line.size());
+  content.write(&foutp);
+  const std::string closing_line("|>>> End\n\n");
+  foutp.write(closing_line.data(), closing_line.size());
+  foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+void writeTextSnapshot(const std::string &filename, const std::string &content,
+                       const std::string &label, const PrintSituation expectation) {
+  const TextFile tf(content, TextOrigin::RAM);
+  writeTextSnapshot(filename, tf, label, expectation);
 }
 
 } // namespace testing

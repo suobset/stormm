@@ -111,21 +111,13 @@ TSum sumTuple2(const std::vector<TBase> &v) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename TSum, typename TBase>
-TSum sumTuple2(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
+TSum sumTuple2(const Hybrid<TBase> &hb) {
   const size_t hblen = hb.size();
   TSum total = { 0, 0 };
-  const TBase* hbptr = hb.data(tier);
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    for (size_t i = 0; i < hblen; i++) {
-      total.x += static_cast<TSum>(hbptr[i].x);
-      total.y += static_cast<TSum>(hbptr[i].y);
-    }
-    break;
-#ifdef STORMM_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    rtErr("Device summation is not yet implemented.", "sumTuple2");
-#endif
+  const TBase* hbptr = hb.data();
+  for (size_t i = 0; i < hblen; i++) {
+    total.x += static_cast<TSum>(hbptr[i].x);
+    total.y += static_cast<TSum>(hbptr[i].y);
   }
   return total;
 }
@@ -157,22 +149,14 @@ TSum sumTuple3(const std::vector<TBase> &v) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename TSum, typename TBase>
-TSum sumTuple3(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
+TSum sumTuple3(const Hybrid<TBase> &hb) {
   const size_t hblen = hb.size();
   TSum total = { 0, 0, 0 };
-  const TBase* hbptr = hb.data(tier);
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    for (size_t i = 0; i < hblen; i++) {
-      total.x += static_cast<TSum>(hbptr[i].x);
-      total.y += static_cast<TSum>(hbptr[i].y);
-      total.z += static_cast<TSum>(hbptr[i].z);
-    }
-    break;
-#ifdef STORMM_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    rtErr("Device summation is not yet implemented.", "sumTuple3");
-#endif
+  const TBase* hbptr = hb.data();
+  for (size_t i = 0; i < hblen; i++) {
+    total.x += static_cast<TSum>(hbptr[i].x);
+    total.y += static_cast<TSum>(hbptr[i].y);
+    total.z += static_cast<TSum>(hbptr[i].z);
   }
   return total;
 }
@@ -206,25 +190,242 @@ TSum sumTuple4(const std::vector<TBase> &v) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename TSum, typename TBase>
-TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
+TSum sumTuple4(const Hybrid<TBase> &hb) {
   const size_t hblen = hb.size();
   TSum total = { 0, 0, 0, 0 };
-  const TBase* hbptr = hb.data(tier);
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    for (size_t i = 0; i < hblen; i++) {
-      total.x += static_cast<TSum>(hbptr[i].x);
-      total.y += static_cast<TSum>(hbptr[i].y);
-      total.z += static_cast<TSum>(hbptr[i].z);
-      total.w += static_cast<TSum>(hbptr[i].w);
-    }
-    break;
-#ifdef STORMM_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    rtErr("Device summation is not yet implemented.", "sumTuple4");
-#endif
+  const TBase* hbptr = hb.data();
+  for (size_t i = 0; i < hblen; i++) {
+    total.x += static_cast<TSum>(hbptr[i].x);
+    total.y += static_cast<TSum>(hbptr[i].y);
+    total.z += static_cast<TSum>(hbptr[i].z);
+    total.w += static_cast<TSum>(hbptr[i].w);
   }
   return total;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb>
+std::vector<Ta> sum(const std::vector<Ta> &va, const std::vector<Tb> &vb, const double afac,
+                    const double bfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va.size();
+  if (vlen != vb.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  std::vector<Ta> result(vlen);
+  if (afac == 1.0 && bfac == 1.0) {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = va[i] + static_cast<Ta>(vb[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                                  (static_cast<double>(vb[i]) * bfac));
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc>
+std::vector<Ta> sum(const std::vector<Ta> &va, const std::vector<Tb> &vb,
+                    const std::vector<Tc> &vc, const double afac, const double bfac,
+                    const double cfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va.size();
+  if (vlen != vb.size() || vlen != vc.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ") cannot "
+          "be summed in element-wise fashion.", "sum");
+  }
+  std::vector<Ta> result(vlen);
+  if (afac == 1.0 && bfac == 1.0 && cfac == 1.0) {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = va[i] + static_cast<Ta>(vb[i]) + static_cast<Ta>(vc[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                                  (static_cast<double>(vb[i]) * bfac) +
+                                  (static_cast<double>(vc[i]) * cfac));
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc, typename Td>
+std::vector<Ta> sum(const std::vector<Ta> &va, const std::vector<Tb> &vb,
+                    const std::vector<Tc> &vc, const std::vector<Td> &vd, const double afac,
+                    const double bfac, const double cfac, const double dfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va.size();
+  if (vlen != vb.size() || vlen != vc.size() || vlen != vd.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ", " +
+          std::to_string(vd.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  std::vector<Ta> result(vlen);
+  if (afac == 1.0 && bfac == 1.0 && cfac == 1.0 && dfac == 1.0) {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = va[i] + static_cast<Ta>(vb[i]) + static_cast<Ta>(vc[i]) + static_cast<Ta>(vd[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < vlen; i++) {
+      result[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                                  (static_cast<double>(vb[i]) * bfac) +
+                                  (static_cast<double>(vc[i]) * cfac) +
+                                  (static_cast<double>(vd[i]) * dfac));
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb>
+void sum(Ta* va, const Tb* vb, const size_t length, const double afac, const double bfac) {
+  if (afac == 1.0 && bfac == 1.0) {
+    for (size_t i = 0; i < length; i++) {
+      va[i] += static_cast<Ta>(vb[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < length; i++) {
+      va[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                              (static_cast<double>(vb[i]) * bfac));
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc>
+void sum(Ta* va, const Tb* vb, const Tc* vc, const size_t length, const double afac,
+         const double bfac, const double cfac) {
+  if (afac == 1.0 && bfac == 1.0 && cfac == 1.0) {
+    for (size_t i = 0; i < length; i++) {
+      va[i] += static_cast<Ta>(vb[i]) + static_cast<Ta>(vc[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < length; i++) {
+      va[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                              (static_cast<double>(vb[i]) * bfac) +
+                              (static_cast<double>(vc[i]) * cfac));
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc, typename Td>
+void sum(Ta* va, const Tb* vb, const Tc* vc, const Td* vd, const size_t length, const double afac,
+         const double bfac, const double cfac, const double dfac) {
+  if (afac == 1.0 && bfac == 1.0 && cfac == 1.0 && dfac == 1.0) {
+    for (size_t i = 0; i < length; i++) {
+      va[i] += static_cast<Ta>(vb[i]) + static_cast<Ta>(vc[i]) + static_cast<Ta>(vd[i]);
+    }
+  }
+  else {
+    for (size_t i = 0; i < length; i++) {
+      va[i] = static_cast<Ta>((static_cast<double>(va[i]) * afac) +
+                              (static_cast<double>(vb[i]) * bfac) +
+                              (static_cast<double>(vc[i]) * cfac) +
+                              (static_cast<double>(vd[i]) * dfac));
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb>
+void sum(std::vector<Ta> *va, const std::vector<Tb> &vb, const double afac, const double bfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vlen, afac, bfac);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc>
+void sum(std::vector<Ta> *va, const std::vector<Tb> &vb, const std::vector<Tc> &vc,
+         const double afac, const double bfac, const double cfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size() || vlen != vc.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ") cannot be summed in "
+          "element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vc.data(), vlen, afac, bfac, cfac);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc, typename Td>
+void sum(std::vector<Ta> *va, const std::vector<Tb> &vb, const std::vector<Tc> &vc,
+         const std::vector<Td> &vd, const double afac, const double bfac, const double cfac,
+         const double dfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size() || vlen != vc.size() || vlen != vd.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ", " +
+          std::to_string(vd.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vc.data(), vd.data(), vlen, afac, bfac, cfac, dfac);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb>
+void sum(Hybrid<Ta> *va, const Hybrid<Tb> &vb, const double afac, const double bfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vlen, afac, bfac);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc>
+void sum(Hybrid<Ta> *va, const Hybrid<Tb> &vb, const Hybrid<Tc> &vc, const double afac,
+         const double bfac, const double cfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size() || vlen != vc.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ") cannot be summed in "
+          "element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vc.data(), vlen, afac, bfac, cfac);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Ta, typename Tb, typename Tc, typename Td>
+void sum(Hybrid<Ta> *va, const Hybrid<Tb> &vb, const Hybrid<Tc> &vc, const Hybrid<Td> &vd,
+         const double afac, const double bfac, const double cfac, const double dfac) {
+
+  // Check that all parameters have the same length
+  const size_t vlen = va->size();
+  if (vlen != vb.size() || vlen != vc.size() || vlen != vd.size()) {
+    rtErr("Vectors of differing sizes (" + std::to_string(vlen) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(vc.size()) + ", " +
+          std::to_string(vd.size()) + ") cannot be summed in element-wise fashion.", "sum");
+  }
+  sum(va->data(), vb.data(), vc.data(), vd.data(), vlen, afac, bfac, cfac, dfac);
 }
 
 } // namespace stmath

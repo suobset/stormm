@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -56,6 +57,28 @@ bool operator==(const char4 lhs, const char4 rhs) {
 //-------------------------------------------------------------------------------------------------
 bool operator!=(const char4 lhs, const char4 rhs) {
   return (lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z || lhs.w != rhs.w);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string alphabetNumber(ullint input) {
+  int nchar = 1;
+  ullint factor = 26;
+  ullint range = factor;
+  while (range < input) {
+    factor *= 26;
+    range += factor;
+    nchar++;
+  }
+  std::string result(nchar, ' ');
+  ullint remainder = input;
+  factor /= 26;
+  for (int i = nchar - 1; i >= 0; i--) {
+    const ullint digit = remainder / factor;
+    remainder -= digit * factor;
+    result[nchar - 1 - i] = 'a' + digit - (i > 0);
+    factor /= 26;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -440,6 +463,223 @@ bool strcmpWildCard(const std::string &target, const std::string &query,
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string addLeadingWhiteSpace(const std::string &input, const size_t target_length) {
+  if (input.size() >= target_length) {
+    return input;
+  }
+  std::string result;
+  result.reserve(target_length);
+  const size_t nadd = target_length - input.size();
+  for (size_t i = 0; i < nadd; i++) {
+    result.append(" ");
+  }
+  result.append(input);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void addLeadingWhiteSpace(std::string *input, const size_t target_length) {
+  if (input->size() >= target_length) {
+    return;
+  }
+  const size_t init_length = input->size();
+  const size_t nadd = target_length - init_length;
+  input->resize(target_length);
+  char* iptr = input->data();
+  for (size_t i = init_length - 1; i < init_length; i--) {
+    iptr[i + nadd] = iptr[i];
+  }
+  for (size_t i = 0; i < nadd; i++) {
+    iptr[i] = ' ';
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string addTailingWhiteSpace(const std::string &input, const size_t target_length) {
+  if (input.size() >= target_length) {
+    return input;
+  }
+  std::string result;
+  result.reserve(target_length);
+  result.append(input);
+  const size_t nadd = target_length - input.size();
+  for (size_t i = 0; i < nadd; i++) {
+    result.append(" ");
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void addTailingWhiteSpace(std::string *input, const size_t target_length) {
+  if (input->size() >= target_length) {
+    return;
+  }
+  const size_t init_length = input->size();
+  input->resize(target_length);
+  char* iptr = input->data();
+  for (size_t i = init_length; i < target_length; i++) {
+    iptr[i] = ' ';    
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string removeLeadingWhiteSpace(const std::string &input) {
+  size_t leading_space = 0;
+  const size_t slen = input.size();
+  while (leading_space < slen && input[leading_space] == ' ') {
+    leading_space++;
+  }
+  if (leading_space > 0) {
+    return input.substr(leading_space);
+  }
+  else {
+    return input;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void removeLeadingWhiteSpace(std::string *input) {
+  size_t leading_space = 0;
+  const size_t slen = input->size();
+  char* iptr = input->data();
+  while (leading_space < slen && iptr[leading_space] == ' ') {
+    leading_space++;
+  }
+  if (leading_space > 0) {
+    for (size_t i = leading_space; i < slen; i++) {
+      iptr[i - leading_space] = iptr[i];
+    }
+    input->resize(slen - leading_space);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string removeTailingWhiteSpace(const std::string &input) {
+  const size_t slen = input.size();
+  size_t tailing_space = slen - 1;
+  while (tailing_space < slen && input[tailing_space] == ' ') {
+    tailing_space--;
+  }
+  if (tailing_space < slen) {
+    return input.substr(0, tailing_space + 1);
+  }
+  else {
+    return std::string("");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void removeTailingWhiteSpace(std::string *input) {
+  const size_t slen = input->size();
+  size_t tailing_space = slen - 1;
+  const char* iptr = input->data();
+  while (tailing_space < slen && iptr[tailing_space] == ' ') {
+    tailing_space--;
+  }
+  if (tailing_space < slen) {
+    input->resize(tailing_space + 1);
+  }
+  else {
+    input->resize(0);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+size_t justifyStrings(std::vector<std::string> *ds, const int lower_limit,
+                      const int upper_limit, const JustifyText fside, const size_t max_length,
+                      const int long_count, const int near_limit) {
+
+  // Some parameters may have very long defaults, or multiple values that result in a very long
+  // string.  Catch those cases and go with a consensus length that suits most parameters to
+  // avoid polluting the output with excessive white space.
+  size_t dflt_length = 0;
+  std::string* ds_ptr = ds->data();
+  if (lower_limit >= upper_limit || lower_limit > ds->size() || upper_limit > ds->size()) {
+    rtErr("The range " + std::to_string(lower_limit) + " - " + std::to_string(upper_limit) +
+          " is invalid for a list of " + std::to_string(ds->size()) + " strings.",
+          "justifyStrings");
+  }
+  for (int i = lower_limit; i < upper_limit; i++) {
+    dflt_length = std::max(dflt_length, ds_ptr[i].size());
+  }
+  if (dflt_length >= max_length) {
+
+    // Check to see whether there are a sufficient number of strings with lengths near that of
+    // the longest string.  If not, clip the longest strings, up to long_count, until there are
+    // a sufficient number of strings with nearly the same length.
+    const int n_params = upper_limit - lower_limit;
+    std::vector<size_t> all_lengths(n_params);
+    for (size_t i = lower_limit; i < upper_limit; i++) {
+      all_lengths[i - lower_limit] = ds_ptr[i].size();
+    }
+    std::sort(all_lengths.begin(), all_lengths.end(), [](int x, int y) { return x < y; });
+    int pivot = n_params - 1;
+    bool critical_mass;
+    do {
+      const int llim = std::min(std::max(pivot - long_count + 1, 0), pivot);
+      if (pivot < n_params - long_count || all_lengths[llim] + near_limit >= all_lengths[pivot]) {
+        critical_mass = true;
+      }
+      else {
+        pivot--;
+        critical_mass = false;
+      }
+    } while (critical_mass == false);
+    dflt_length = all_lengths[pivot];
+  }
+  for (int i = lower_limit; i < upper_limit; i++) {
+    ds_ptr[i] = removeLeadingWhiteSpace(ds_ptr[i]);
+    ds_ptr[i] = removeTailingWhiteSpace(ds_ptr[i]);
+  }
+  switch (fside) {
+  case JustifyText::LEFT:
+    for (int i = lower_limit; i < upper_limit; i++) {
+      ds_ptr[i] = addTailingWhiteSpace(ds_ptr[i], dflt_length);
+    }
+    break;
+  case JustifyText::RIGHT:
+    for (int i = lower_limit; i < upper_limit; i++) {
+      ds_ptr[i] = addLeadingWhiteSpace(ds_ptr[i], dflt_length);
+    }
+    break;
+  case JustifyText::CENTER:
+    for (int i = lower_limit; i < upper_limit; i++) {
+      const int nspc = dflt_length - static_cast<int>(ds_ptr[i].size());
+      if (nspc > 0) {
+        const int lspc = nspc / 2;
+        const int rspc = nspc - lspc;
+        ds_ptr[i] = addTailingWhiteSpace(addLeadingWhiteSpace(ds_ptr[i], dflt_length - rspc),
+                                         dflt_length);
+      }
+    }
+    break;
+  }
+  return dflt_length;
+}
+
+//-------------------------------------------------------------------------------------------------
+size_t justifyStrings(std::vector<std::string> *ds, const JustifyText fside,
+                      const size_t max_length, const int long_count, const int near_limit) {
+  return justifyStrings(ds, 0, ds->size(), fside, max_length, long_count, near_limit);
+}
+
+//-------------------------------------------------------------------------------------------------
+size_t maximumLineLength(const std::string &input) {
+  size_t llim = 0;
+  size_t lmax = 0;
+  const size_t slen = input.size();
+  for (size_t i = 0; i < slen; i++) {
+    if (input[i] == '\n') {
+      lmax = std::max(lmax, i - llim);
+      llim = i;
+    }
+  }
+  lmax = std::max(lmax, slen - llim);
+  return lmax;
+}
+//-------------------------------------------------------------------------------------------------
 int realDecimalPlaces(const double value, const int limit) {
   
   // Determine the fractional component
@@ -504,18 +744,18 @@ std::string realToString(const double value, const int format_a, const int forma
     switch (style) {
     case NumberPrintStyle::STANDARD:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%*.*e", format_a, format_b, value);
+        snprintf(buffer, 64, "%*.*e", format_a, format_b, value);
       }
       else {
-        sprintf(buffer, "%*.*f", format_a, format_b, value);
+        snprintf(buffer, 64, "%*.*f", format_a, format_b, value);
       }
       break;
     case NumberPrintStyle::LEADING_ZEROS:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%0*.*e", format_a, format_b, value);
+        snprintf(buffer, 64, "%0*.*e", format_a, format_b, value);
       }
       else {
-        sprintf(buffer, "%0*.*f", format_a, format_b, value);
+        snprintf(buffer, 64, "%0*.*f", format_a, format_b, value);
       }
       break;
     }
@@ -524,18 +764,18 @@ std::string realToString(const double value, const int format_a, const int forma
     switch (style) {
     case NumberPrintStyle::STANDARD:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%.*e", format_b, value);
+        snprintf(buffer, 64, "%.*e", format_b, value);
       }
       else {
-        sprintf(buffer, "%.*f", format_b, value);
+        snprintf(buffer, 64, "%.*f", format_b, value);
       }
       break;
     case NumberPrintStyle::LEADING_ZEROS:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%0.*e", format_b, value);
+        snprintf(buffer, 64, "%0.*e", format_b, value);
       }
       else {
-        sprintf(buffer, "%0.*f", format_b, value);
+        snprintf(buffer, 64, "%0.*f", format_b, value);
       }
       break;
     }
@@ -544,25 +784,25 @@ std::string realToString(const double value, const int format_a, const int forma
     switch (style) {
     case NumberPrintStyle::STANDARD:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%.*e", format_a, value);
+        snprintf(buffer, 64, "%.*e", format_a, value);
       }
       else {
-        sprintf(buffer, "%.*f", format_a, value);
+        snprintf(buffer, 64, "%.*f", format_a, value);
 
       }
       break;
     case NumberPrintStyle::LEADING_ZEROS:
       if (method == NumberFormat::SCIENTIFIC) {
-        sprintf(buffer, "%0.*e", format_a, value);
+        snprintf(buffer, 64, "%0.*e", format_a, value);
       }
       else {
-        sprintf(buffer, "%0.*f", format_a, value);
+        snprintf(buffer, 64, "%0.*f", format_a, value);
       }
       break;
     }
   }
   else {
-    sprintf(buffer, "%.*f", realDecimalPlaces(value, 8), value);
+    snprintf(buffer, 64, "%.*f", realDecimalPlaces(value, 8), value);
   }
   return std::string(buffer);
 }
@@ -573,6 +813,96 @@ std::string realToString(const double value, const int format_a, const NumberFor
   return realToString(value, format_a, free_number_format, method, style);
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string minimalRealFormat(const double value, const double rel) {
+
+  // Return immediately if the value is zero
+  if (value == 0.0) {
+    return std::string("0.0");
+  }
+
+  // Compute the critical increment
+  const double increment = fabs(value * rel);
+  
+  // Find the best result possible in scientific notation
+  int nsci_dec = ceil(fabs(log10(fabs(value)) - log10(fabs(value * rel)))) + 1;
+  std::string best_sci_result;
+  bool trim_success = false;
+  do {
+    const std::string sci_result = realToString(value, nsci_dec + 7, nsci_dec,
+                                                NumberFormat::SCIENTIFIC);
+    const double test = std::stod(sci_result);
+    const double test_margin = fabs(value - test);
+    if (test_margin <= increment) {
+      if (nsci_dec > 1) {
+        nsci_dec--;
+        trim_success = true;
+      }
+      else {
+        trim_success = false;
+      }
+      best_sci_result = sci_result;
+    }
+    else {
+      trim_success = false;
+    }
+  } while (nsci_dec >= 1 && trim_success);
+  best_sci_result = removeLeadingWhiteSpace(best_sci_result);
+  const int nsci_char = best_sci_result.size();
+  int nelim;
+  for (int i = 0; i < nsci_char; i++) {
+    if (best_sci_result[i] == 'e' && i < nsci_char - 2) {
+      if (best_sci_result[i + 1] == '+' && best_sci_result[i + 2] == '0') {
+        for (int j = i + 1; j < nsci_char - 2; j++) {
+          best_sci_result[j] = best_sci_result[j + 2];
+        }
+        nelim = 2;
+      }
+      else if (best_sci_result[i + 2] == '0') {
+        for (int j = i + 2; j < nsci_char - 1; j++) {
+          best_sci_result[j] = best_sci_result[j + 1];
+        }
+        nelim = 1;
+      }
+    }
+  }
+  best_sci_result.resize(best_sci_result.size() - nelim);
+
+  // Find the best result possible in standard notation
+  int nstd_dec = 1;
+  int nstd_maj = ceil(fabs(log10(fabs(value))));
+  std::string best_std_result;
+  bool search_on = true;
+  while (search_on) {
+    best_std_result = realToString(value, 2 + nstd_maj + nstd_dec, nstd_dec,
+                                   NumberFormat::STANDARD_REAL);
+    const double test = std::stod(best_std_result);
+    const double test_margin = fabs(value - test);
+    if (test_margin > increment) {
+      nstd_dec++;
+      search_on = true;
+    }
+    else {
+      search_on = false;
+    }
+  }
+  const size_t std_test_size = best_std_result.size();
+  if (std_test_size > 2 && best_std_result[std_test_size - 1] == '0' &&
+      best_std_result[std_test_size - 2] == '.') {
+    best_std_result.resize(std_test_size - 2);
+  }
+  best_std_result = removeLeadingWhiteSpace(best_std_result);
+
+  // Return the shorter representation, preferring standard notation in the case of a tie.
+  if (best_std_result.size() <= best_sci_result.size()) {
+    return best_std_result;
+  }
+  else {
+    return best_sci_result;
+  }
+  __builtin_unreachable();
+}
+  
 //-------------------------------------------------------------------------------------------------
 std:: string intToString(const llint value, const int width, const NumberPrintStyle style) {
 
@@ -586,15 +916,15 @@ std:: string intToString(const llint value, const int width, const NumberPrintSt
   if (width != free_number_format) {
     switch (style) {
     case NumberPrintStyle::STANDARD:
-      sprintf(buffer, "%*lld", width, value);
+      snprintf(buffer, 64, "%*lld", width, value);
       break;
     case NumberPrintStyle::LEADING_ZEROS:
-      sprintf(buffer, "%0*lld", width, value);
+      snprintf(buffer, 64, "%0*lld", width, value);
       break;
     }
   }
   else {
-    sprintf(buffer, "%lld", value);
+    snprintf(buffer, 64, "%lld", value);
   }
   return std::string(buffer);
 }
@@ -1197,7 +1527,7 @@ std::vector<std::string> separateText(const TextFile &tf,
   return separateText(tfr.text, tfr.line_limits[tfr.line_count], comment_mask, quotation_mask,
                       quote_marks, delimiters, escapes);
 }
-
+  
 //-------------------------------------------------------------------------------------------------
 int findStringInVector(const std::vector<std::string> &vec, const std::string &query) {
 

@@ -205,6 +205,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

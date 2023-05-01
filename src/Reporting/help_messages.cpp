@@ -29,7 +29,7 @@ using namelist::randomInput;
 using namelist::reportInput;
 using namelist::restraintInput;
 using namelist::solventInput;
-using namelist::SubkeyRequirement;
+using namelist::KeyRequirement;
 using parse::strcmpCased;
 using parse::TextFile;
 using parse::TextOrigin;
@@ -112,7 +112,7 @@ bool displayNamelistHelp(const std::string &module_name) {
   const TextFile tf(std::string(""), TextOrigin::RAM);
   int start_line = 0;
   if (strcmpCased(module_name, "&files", CaseSensitivity::YES)) {
-    const std::vector<SubkeyRequirement> sys_keyword_reqs(1, SubkeyRequirement::REQUIRED);
+    const std::vector<KeyRequirement> sys_keyword_reqs(1, KeyRequirement::REQUIRED);
     const NamelistEmulator t_nml = filesInput(tf, &start_line, nullptr, sys_keyword_reqs);
     t_nml.printHelp();
     return true;

@@ -28,6 +28,15 @@ using review::OutputScope;
 using review::OutputSyntax;
 using structure::MdlMolDataRequest;
 
+/// \brief Default values for the &report namelist
+/// \{
+constexpr int default_common_path_limit = 8;
+constexpr int default_common_path_threshold = 4;
+constexpr int default_energy_decimal_places = 4;
+constexpr double default_energy_outlier_sigmas = 3.0;
+constexpr int default_outlier_limit = 4;
+/// \}
+
 /// \brief Collect output directives relating to the diagnostics file.  While the output frequency
 ///        is controlled by another namelist such as &minimize or &dynamics, STORMM is designed to
 ///        handle many trajectories and thus the user is faced with a choice of what information
@@ -75,10 +84,16 @@ public:
   /// \brief Get the date on which the program began to run, taken as the time that this
   ///        ReportControls object was constructed.
   timeval getStartDate() const;
-
+  
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Indicate whether to print timings data from the calculations.
   bool printWallTimeData() const;
 
+  /// \brief Get the requested width for the output file.
+  int getReportFileWidth() const;
+  
   /// \brief Get the number of reported quantities.
   int getReportedQuantityCount() const;
   
@@ -102,6 +117,26 @@ public:
   /// \param index  Index of the request to produce
   MdlMolDataRequest getSDFileDataRequest(int index) const;
 
+  /// \brief Get the maximum number of common paths to be permitted in system output.
+  int getCommonPathLimit() const;
+
+  /// \brief Get the required number of times a root path must be repeated in order to become one
+  ///        of the common paths used to condense output tables.
+  int getCommonPathThreshold() const;
+
+  /// \brief Get the number of decimal places with which to express energetic quantities in output
+  ///        tables.  This precision will be consistent across all energy quantities.
+  int getEnergyDecimalPlaces() const;
+
+  /// \brief Get the multiplier for the number of standard deviations from the mean that defines
+  ///        an outlier among the energetics of a group of systems.
+  double getOutlierSigmaFactor() const;
+
+  /// \brief Get the maximum number of outliers to report (per group, or per the whole synthesis
+  ///        if there is no grouping) in terms of systems deviating from the expected (mean)
+  ///        energy.
+  int getOutlierCount() const;
+  
   /// \brief Set the output format.
   ///
   /// Overloaded:
@@ -146,6 +181,11 @@ public:
   void setWallTimeData(const std::string &preference);
   /// \}
 
+  /// \brief Set the report file width.
+  ///
+  /// \param report_file_width_in  The general width (in ASCII characters) of report output
+  void setReportFileWidth(int report_file_width_in);
+  
   /// \brief Set the reported quantities that will be reported.  Some quantities are obligatory:
   ///        Total, total potential, and total kinetic energy; thermodynamic integration energy
   ///        derivatives (if applicable); pressure and volume (if applicable); and overall system
@@ -166,30 +206,63 @@ public:
   void setReportedQuantities(StateVariable quantities_in);
   void setReportedQuantities(const std::vector<StateVariable> &quantities_in);
   /// \}
-
+  
   /// \brief Add a request for a data item in an output SD file.
   ///
   /// \param ask  The requested data item
   void addDataItem(const MdlMolDataRequest &ask);
+
+  /// \brief Set the upper limit on the number of common paths used to condense output files.
+  ///
+  /// \param common_path_limit_in  The maximum number of path shortcuts to create
+  void setCommonPathLimit(int common_path_limit_in);
+  
+  /// \brief Set the number of instances that a common root path must appear in order for it to be
+  ///        declared a common path with a token variable to condense output tables.
+  ///
+  /// \param common_path_threshold  The number of path tree instances needed to create a shortcut
+  void setCommonPathThreshold(int common_path_threshold);
+
+  /// \brief Set the number of digits after the decimal with which to express energetic quantities.
+  ///
+  /// \param energy_decimal_places_in  The number of digits after each energy quantity decimal
+  void setEnergyDecimalPlaces(int energy_decimal_places_in);
   
 private:
-  ExceptionResponse policy;    ///< Course of action if bad input is encountered
-  OutputSyntax report_layout;  ///< Layout of the diagnostics report file, making it amenable to
-                               ///<   one or more plotting or matrix analysis programs
-  OutputScope report_scope;    ///< Detail in which to report each system's results
-  std::string username;        ///< Name of the user (detected automatically)
-  timeval start_date;          ///< Date and time on which this object was constructed, which will
-                               ///<   be taken as a good approximation of the date and time on
-                               ///<   which the calling program was executed.
-  bool print_walltime_data;    ///< Flag to activate printing of wall time data (collected from
-                               ///<   functions that issue results) to help profile the calculation
-
+  ExceptionResponse policy;     ///< Course of action if bad input is encountered
+  OutputSyntax report_layout;   ///< Layout of the diagnostics report file, making it amenable to
+                                ///<   one or more plotting or matrix analysis programs
+  OutputScope report_scope;     ///< Detail in which to report each system's results
+  std::string username;         ///< Name of the user (detected automatically)
+  timeval start_date;           ///< Date and time on which this object was constructed, which will
+                                ///<   be taken as a good approximation of the date and time on
+                                ///<   which the calling program was executed.
+  bool print_walltime_data;     ///< Flag to activate printing of wall time data (collected from
+                                ///<   functions that issue results) to profile the calculation
+  int report_file_width;        ///< Indicate the width that a report file should keep to, within
+                                ///<   the limits of required formatting an variable or file names
+                                ///<   that cannot be broken up.
+  int common_path_limit;        ///< The maximum number of distinct common paths to find when
+                                ///<   seeking ways to condense tables of file names for output
+  int common_path_threshold;    ///< Threshold for the number of repeated instances of a common
+                                ///<   path needed to declare a new path shortcut when seeking ways
+                                ///<   to condense tables of file names for output
+  int energy_decimal_places;    ///< The number of places with which to express energy quantities
+                                ///<   in output tables
+  double outlier_sigma_factor;  ///< The multiple of sigmas from the mean energy at which a system
+                                ///<   might qualify as an outlier
+  int outlier_count;            ///< The maxmum number of outliers to report, whether across the
+                                ///<   entire set or within each partition of the set
+  
   /// List the energetic quantities to report
   std::vector<StateVariable> reported_quantities;
 
   /// List of data item requests for information to be included in an SD file output
   std::vector<MdlMolDataRequest> sdf_addons;
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Translate a user-supplied string into one or more energy quantities classifiable with
   ///        the state variable.
   ///
@@ -204,6 +277,14 @@ private:
   /// \param index  Index of the STRUCT keyword value to translate into a data item request
   std::vector<MdlMolDataRequest> translateSdfKeywordInput(const NamelistEmulator &t_nml,
                                                           int index);
+
+  /// \brief Validate the number of decimal places chosen for energetic quantities.  The number
+  ///        must be at least 1 (to ensure results are useful) and at most twelve (the practical
+  ///        limit of double-precision calculations under even the most favorable circumstances).
+  void validateEnergyDecimalPlaces();
+
+  /// \brief Validate the outlier specifications, both in number and in degree.
+  void validateOutlierMetrics();
 };
 
 /// \brief Produce a namelist for specifying content and format of the output diagnostics report,

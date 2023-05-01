@@ -1,16 +1,20 @@
+#include <algorithm>
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <regex>
 #include <string.h>
 #include "copyright.h"
-#include "file_listing.h"
+#include "DataTypes/stormm_vector_types.h"
+#include "Math/series_ops.h"
 #include "Reporting/error_format.h"
+#include "file_listing.h"
 
 namespace stormm {
 namespace diskutil {
 
 using errors::rtErr;
+using stmath::incrementingSeries;
 
 //-------------------------------------------------------------------------------------------------
 char osSeparator() {
@@ -327,6 +331,211 @@ std::string findStormmPath(const std::string &path, const std::string &extension
 
   // If this point is reached, a good guess as to ${STORMM_HOME} could not be made 
   return std::string("");
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string commonPathVariableName(const int index) {
+  return std::string("${PATH_") + std::to_string(index + 1) + std::string("}");
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<std::string> extractCommonPaths(std::vector<std::string> *input_paths,
+                                            const int n_shortcut, const int n_instance) {
+  const int npath = input_paths->size();
+  std::vector<std::string> result;
+  std::vector<int> matches(npath);
+  std::vector<int> last_ossep(npath, 0);
+  const char osc = osSeparator();
+  std::string* input_path_ptr = input_paths->data();
+  for (int i = 0; i < npath; i++) {
+    const int ilen = input_path_ptr[i].size();
+    for (int j = 0; j < ilen; j++) {
+      if (input_path_ptr[i][j] == osc) {
+        last_ossep[i] = j;
+      }
+    }
+  }
+  std::vector<llint3> best_results(npath);
+  for (int i = 0; i < npath; i++) {
+    for (int j = 0; j < npath; j++) {
+      if (i == j) {
+        matches[j] = last_ossep[i] + 1;
+        continue;
+      }
+      int nchar = 0;
+      while (nchar <= last_ossep[i] && nchar <= last_ossep[j] &&
+             input_path_ptr[i][nchar] == input_path_ptr[j][nchar]) {
+        nchar++;
+      }
+      while (nchar >= 0 && input_path_ptr[i][nchar] != osc) {
+        nchar--;
+      }
+      matches[j] = nchar + 1;
+    }
+
+    // With the number of matching characters to all other paths now known, sort the list of
+    // matches to determine the most effective shortcut that could be generated based on a
+    // substring of the ith path.  Weight shortcuts that reduce the length by greater amounts
+    // more heavily and have paths that 
+    std::sort(matches.begin(), matches.end(), [](int a, int b) { return a < b; });
+    llint best_score = 0;
+    int best_length;
+    for (int j = 0; j < npath; j++) {
+      int k = j + 1;
+      while (k < npath && matches[k] == matches[j]) {
+        k++;
+      }
+      llint test_score = static_cast<llint>(k - j) * static_cast<llint>(matches[j] - 11);
+
+      // Assign negative scores to any shortcut path that mathces fewer than the number of
+      // instances needed to qualify.
+      if (test_score > 0 && (k - j < n_instance)) {
+        test_score *= -1;
+      }
+      if (test_score >= best_score) {
+        best_score = test_score;
+        best_length = matches[j];
+      }
+
+      // Advance the outer loop counter to reflect similar scores found in the inner "while" loop.
+      j = k - 1;
+    }
+    best_results[i] = { best_score, static_cast<llint>(i), static_cast<llint>(best_length) };
+  }
+  
+  // Sort the vector of best results by their scores.  Each tuple contains the score, the index
+  // of one of the paths containing the correct base, and the length of the base.
+  std::sort(best_results.begin(), best_results.end(),
+            [](llint3 a, llint3 b) { return a.x > b.x; });
+  int good_options_limit = 0;
+  while (good_options_limit < npath && best_results[good_options_limit].x > 0) {
+    good_options_limit++;
+  }
+  
+  // The goal is to find not one but up to n_shortcut paths that can reduce the lengths of the
+  // various file paths.  Ignore cases with scores of zero or less--these would not reduce the
+  // path lengths sufficently to be worth it.
+  llint best_overall_score = 0;
+  bool score_improving = true;
+  std::vector<bool> shortened(npath, false);
+  std::vector<int2> best_shortcuts;
+  int nsh_skip = 0;
+  while (score_improving) {
+
+    // Clear all markings for shortened paths
+    for (int i = 0; i < npath; i++) {
+      shortened[i] = false;
+    }
+
+    // The best solution may be to forego one of the top-scoring shortcuts because it, in fact,
+    // precludes other shortucts from applying to the same paths.  While not an exhuastive search
+    // method, eliminating such solutions from the top down will help to find the best set of
+    // specific and mututally exclusive path shortcuts.
+    int skips_to_process = nsh_skip;
+    int sh_counter = 0;
+    while (skips_to_process > 0) {
+      const int path_basis = best_results[sh_counter].y;
+      const int shortcut_length = best_results[sh_counter].z;
+      for (int i = 0; i < npath; i++) {
+        if (shortened[i] == false &&
+            strncmp(input_path_ptr[i].data(), input_path_ptr[path_basis].data(),
+                    shortcut_length) == 0) {
+          shortened[i] = true;
+        }
+      }
+
+      // Increment the shortcut counter until an unaffected path is found.
+      while (sh_counter < npath && shortened[best_results[sh_counter].y]) {
+        sh_counter++;
+      }
+
+      // Mark one possible, high-scoring shortcut as skipped.
+      skips_to_process--;
+    }
+
+    // Reset the tracking for whether each path has been affected by some candidate shortcut.
+    for (int i = 0; i < npath; i++) {
+      shortened[i] = false;
+    }
+    
+    // Initialize the test score, the number of available path shortcuts to use, and the counter
+    // for traversing the ordered list of { score, shortcut ID, length } tuples.  Many of those
+    // tuples which have the same score will in fact describe the same shortcut and apply to the
+    // same systems.  Therefore, with each new shortcut added to the list, keep stepping through
+    // the ordered tuples until the path to which the shortcut ID corresponds has not already been
+    // affected by one of the previous shortcuts.
+    llint test_score = 0;
+    int nsh_avail = n_shortcut;
+    std::vector<int2> test_shortcuts;
+    test_shortcuts.reserve(n_shortcut);
+    while (nsh_avail > 0 && sh_counter < good_options_limit) {
+      const int path_basis = best_results[sh_counter].y;
+      const int shortcut_length = best_results[sh_counter].z;
+      const llint score_incr = shortcut_length - 11;
+      bool sh_used = false;
+      for (int i = 0; i < npath; i++) {
+        if (shortened[i] == false &&
+            strncmp(input_path_ptr[i].data(), input_path_ptr[path_basis].data(),
+                    shortcut_length) == 0) {
+          shortened[i] = true;
+          test_score += score_incr;
+          sh_used = true;
+        }
+      }
+      if (sh_used) {
+        test_shortcuts.push_back({ path_basis, shortcut_length });
+        nsh_avail--;
+      }
+
+      // Continue to increment the shortcut counter until an unaffected path is found.
+      sh_counter++;
+      while (sh_counter < npath && shortened[best_results[sh_counter].y]) {
+	sh_counter++;
+      }
+    }
+    if (test_score > best_overall_score) {
+      best_overall_score = test_score;
+      best_shortcuts = test_shortcuts;
+      score_improving = true;
+    }
+    else {
+      score_improving = false;
+    }
+  }
+  
+  // Take the best shortcuts and apply them to all possible paths.
+  const int nfound = best_shortcuts.size();
+  for (int i = 0; i < npath; i++) {
+    shortened[i] = false;
+  }
+  for (int i = 0; i < nfound; i++) {
+    const std::string substitute = commonPathVariableName(i);
+
+    // Omit the trailing directory delimiter in each shortcut path.  Add it back when
+    // reconstructing the path with the appropriate shortcut.
+    const int sh_eff_len = best_shortcuts[i].y - 1;
+    const std::string sh_path = input_path_ptr[best_shortcuts[i].x].substr(0, sh_eff_len);
+    result.push_back(sh_path);
+    for (int j = 0; j < npath; j++) {
+      if (shortened[j] == false &&
+          strncmp(sh_path.data(), input_path_ptr[j].data(), sh_eff_len) == 0) {
+        input_path_ptr[j] = substitute + osc + input_path_ptr[j].substr(best_shortcuts[i].y);
+        shortened[j] = true;
+      }
+    }
+  }
+  
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string listCommonPaths(const std::vector<std::string> &shortcuts, const int indentation) {
+  std::string result;
+  const std::string spacer(indentation, ' ');
+  for (size_t i = 0; i < shortcuts.size(); i++) {
+    result += spacer + commonPathVariableName(i) + " = " + shortcuts[i] + "\n";
+  }
+  return result;
 }
 
 } // namespace diskutil

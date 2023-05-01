@@ -13,6 +13,7 @@ using stormm::constants::tiny;
 using stormm::constants::ExceptionResponse;
 using stormm::random::Ran2Generator;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::card;
 using namespace stormm::testing;
 
@@ -140,6 +141,8 @@ int main(const int argc, const char* argv[]) {
 
   // Print a summary of tests run
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

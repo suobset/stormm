@@ -1,4 +1,7 @@
 #include "../../src/Analysis/comparison_guide.h"
+#include "../../src/Accelerator/gpu_details.h"
+#include "../../src/Accelerator/hpc_config.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"
@@ -26,6 +29,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::analysis;
+using namespace stormm::card;
 using namespace stormm::constants;
 using namespace stormm::data_types;
 using namespace stormm::diskutil;
@@ -141,11 +145,6 @@ void diffCoordinates(const Tcrd* xcrd, const Tcrd* ycrd, const Tcrd* zcrd, const
   check((xoff || yoff || zoff) == false, "Coordinates exceeded the specified deviations after "
         "copying " + copy_msg + ".  Deviations occur in " + fail_msg + ".", do_test);
   if (overall > 1.5 * tiny) {
-    check(rmsd, RelationalOperator::EQUAL, Approx(overall, ComparisonType::RELATIVE, 0.01),
-          "The root mean squared coordinate deviation obtained after copying " + copy_msg +
-          " does not meet expectations.", do_test);
-  }
-  else {
     check(rmsd, RelationalOperator::EQUAL, Approx(0.0).margin(overall), "The root mean squared "
           "coordinate deviation obtained after copying " + copy_msg + " does not meet "
           "expectations.", do_test);
@@ -290,7 +289,7 @@ PhaseSpaceSynthesis spawnMutableCoordinateObjects(const TestSystemManager &tsm,
   
   // Return a synthesis of everything, times two
   const std::vector<int> replicator = replicateSeries(tsm.getSystemCount(), 2);
-  return PhaseSpaceSynthesis(*tsm_ps, tsm.getTopologyPointer(), replicator);
+  return PhaseSpaceSynthesis(*tsm_ps, tsm.getTopologyPointer(), replicator, 26, 24, 28, 21);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -354,6 +353,430 @@ void checkATAFootprint(const ComparisonGuide &cg, const Condensate &cdns,
         "cover all systems percisely once (instances of -1) when systems are gouped by " +
         getEnumerationName(organization) + ".");
 }
+
+#ifdef STORMM_USE_HPC
+//-------------------------------------------------------------------------------------------------
+// Prepare coordinate objects for comparison by downloading their device-side data to the host if
+// the copy originated from or went to the device side.
+//
+// Arguments:
+//   crd_a:   The first of two coordinate objects to check
+//   crd_b:   The second of two coordinate objects to check
+//   tier_a:  The tier containing relevant data on crd_a
+//   tier_b:  The tier containing relevant data on crd_b
+//-------------------------------------------------------------------------------------------------
+template <typename Tcrda, typename Tcrdb>
+void criticalCoordTransfer(Tcrda *crd_a, Tcrdb *crd_b, const HybridTargetLevel tier_a,
+                           const HybridTargetLevel tier_b) {
+  switch (tier_a) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    crd_a->download();
+  }
+  switch (tier_b) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    crd_b->download();
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Copy a coordinate set from one object to another, from a particular tier in the origin to a
+// particular tier in the destination.  This routine begins by using the copy assignment operator
+// to duplicate the original data so as not to corrupt it, performs the copy operation on the
+// duplicates, then compares the destination of the copy procedure to the source of the original.
+//
+// Overloaded:
+//   - Read various types of coordinate objects
+//   - Copy different types of coordinates (positions, velocities, forces, alternate or primary
+//     versions of each) depending on the objects
+//
+// Arguments:
+//   crd_a:       Basis for the origin in the copy operation
+//   crd_b:       Basis for the destination in the copy operation
+//   dest_tier:   Specify whether to copy coordinates into the CPU host or GPU device layer
+//   orig_tier:   Specify whether to copy coordinates from the CPU host or GPU device layer
+//   dest_type:   The type of coordinates to which the copied information will go
+//   orig_type:   The type of coordinates from which the copied information will come
+//   dest_cycle:  The coordinate cycle position to which the coordinates will go
+//   orig_cycle:  The coordinate cycle position from which the coordinates emerge
+//   gpu:         Details of the available GPU
+//   do_test:     Give the go-ahead to performing the test
+//-------------------------------------------------------------------------------------------------
+void copySetup(const CoordinateFrame &dest, const CoordinateFrame &orig,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Copy between the two objects on the specified tiers
+  CoordinateFrame active_dest = dest;
+  CoordinateFrame active_orig = orig;
+  CoordinateFrameWriter chkr = active_dest.data();
+  CoordinateFrameWriter refr = active_orig.data();
+  coordCopy(&active_dest, active_orig, dest_tier, orig_tier, gpu);
+
+  // Prepare for comparisons in the HOST tier.
+  criticalCoordTransfer(&active_dest, &active_orig, dest_tier, orig_tier);
+  diffCoordinates(chkr.xcrd, chkr.ycrd, chkr.zcrd, refr.xcrd, refr.ycrd, refr.zcrd, refr.natom,
+                  chkr.umat, refr.umat, "one CoordinateFrame to another, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+}
+
+void copySetup(const CoordinateFrame &cf, const PhaseSpace &ps,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Copy from the PhaseSpace to the CoordinateFrame
+  CoordinateFrame active_cf = cf;
+  PhaseSpace active_ps = ps;
+  CoordinateFrameWriter cfw = active_cf.data();
+  PhaseSpaceWriter psw = active_ps.data();
+  coordCopy(&active_cf, active_ps, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, psw.xcrd, psw.ycrd, psw.zcrd, psw.natom,
+                  cfw.umat, psw.umat, "a PhaseSpace object to a CoordinateFrame, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Reload by host-to-host copy, then upload to make the device data consistent
+  Xoroshiro128pGenerator xrs(671843927);
+  coordCopy(&active_cf, cf);
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = 5 * i;
+    cfw.umat[i] = umat_hold[i];
+  }
+  active_cf.upload();
+  coordCopy(&active_ps, ps);
+  addRandomNoise(&xrs, psw.xfrc, psw.yfrc, psw.zfrc, psw.natom, 8.4);
+  active_ps.upload();
+
+  // Copy a different aspect of the PhaseSpace object to the CoordinateFrame.
+  coordCopy(&active_cf, active_ps, TrajectoryKind::FORCES, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.natom,
+                  cfw.umat, umat_hold.data(), "a PhaseSpace object (forces) to a "
+                  "CoordinateFrame, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);  
+  
+  // Copy from the CoordinateFrame to the PhaseSpace  
+  coordCopy(&active_cf, cf);
+  active_cf.upload();
+  coordCopy(&active_ps, ps);
+  active_ps.upload();
+  coordCopy(&active_ps, active_cf, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_ps, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom,
+                  psw.umat, cfw.umat, "a CoordinateFrame to a PhaseSpace, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Try copying the CoordinateFrame's coordinates to a separate aspect of the PhaseSpace object,
+  // at a separate point in the time cycle.  Mark up the box space transformation matrix to verify
+  // that it doesn't get copied in this instance.
+  coordCopy(&active_cf, cf);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = psw.umat[i];
+    cfw.umat[i] = 3 * i;
+  }
+  active_cf.upload();
+  coordCopy(&active_ps, ps);
+  active_ps.upload();
+  coordCopy(&active_ps, TrajectoryKind::VELOCITIES, CoordinateCycle::ALTERNATE, active_cf,
+            dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_ps, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(psw.vxalt, psw.vyalt, psw.vzalt, cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom,
+                  psw.umat, umat_hold.data(), "a CoordinateFrame to a PhaseSpace (alt. "
+                  "velocities), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Try copying another aspect of the PhaseSpace object into the CoordinateFrame.  Make sure that
+  // the (invalid, but distinct) transformation matrix placed in the CoordinateFrame stays intact.
+  coordCopy(&active_cf, cf);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = -2 * i;
+    cfw.umat[i] = umat_hold[i];
+  }
+  active_cf.upload();
+  coordCopy(&active_ps, ps);
+  addRandomNoise(&xrs, psw.fxalt, psw.fyalt, psw.fzalt, psw.natom, 7.2);
+  active_ps.upload();
+  coordCopy(&active_cf, active_ps, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE,
+            dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, psw.fxalt, psw.fyalt, psw.fzalt, psw.natom,
+                  cfw.umat, umat_hold.data(), "a PhaseSpace (alt. forces) to a CoordinateFrame " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+}
+
+template <typename T>
+void copySetup(const CoordinateFrame &cf, const CoordinateSeries<T> &cs,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Copy the CoordinateSeries to the CoordinateFrame
+  const int frm_idx = cs.getFrameCount() / 2;
+  CoordinateFrame active_cf = cf;
+  CoordinateSeries<T> active_cs = cs;
+  CoordinateFrameWriter cfw = active_cf.data();
+  CoordinateSeriesWriter<T> csw = active_cs.data();
+  coordCopy<T>(&active_cf, active_cs, frm_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_cs, dest_tier, orig_tier);
+  const int atom_offset = frm_idx * roundUp(csw.natom, warp_size_int);
+  const int xfrm_offset = frm_idx * roundUp(9, warp_size_int);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0, &csw.xcrd[atom_offset],
+                  &csw.ycrd[atom_offset], &csw.zcrd[atom_offset], csw.gpos_scale, csw.natom,
+                  cfw.umat, &csw.umat[xfrm_offset], "a CoordinateSeries snapshot to a "
+                  "CoordinateFrame, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Refresh the coordinates
+  coordCopy(&active_cf, cf);
+  active_cf.upload();
+  for (int i = 0; i < cs.getFrameCount(); i++) {
+    coordCopy<T, T>(&active_cs, i, cs, i);
+  }
+  active_cs.upload();
+  
+  // Copy the CoordinateFrame into the CoordinateSeries
+  coordCopy<T>(&active_cs, frm_idx, active_cf, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(&csw.xcrd[atom_offset], &csw.ycrd[atom_offset], &csw.zcrd[atom_offset],
+                  csw.gpos_scale, cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0, cfw.natom,
+                  &csw.umat[xfrm_offset], cfw.umat, "a CoordinateFrame to a snapshot in a "
+                  "CoordinateSeries, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+}
+
+void copySetup(const CoordinateFrame &cf, const Condensate &cdns, const int sys_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Copy one of the condensate's systems to the CoordinateFrame
+  CoordinateFrame active_cf = cf;
+  Condensate active_cdns = cdns;
+  CoordinateFrameWriter cfw = active_cf.data();
+  CondensateWriter cdnsw = active_cdns.data();
+  coordCopy(&active_cf, active_cdns, sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_cdns, dest_tier, orig_tier);
+  const int atom_offset = active_cdns.getAtomOffset(sys_idx);
+  const int xfrm_offset = sys_idx * roundUp(9, warp_size_int);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0, &cdnsw.xcrd_sp[atom_offset],
+                  &cdnsw.ycrd_sp[atom_offset], &cdnsw.zcrd_sp[atom_offset], 1.0, cfw.natom,
+                  cfw.umat, &cdnsw.umat[xfrm_offset], "a Condensate system to a "
+                  "CoordinateFrame, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Refresh the coordinates
+  coordCopy(&active_cf, cf);
+  active_cf.upload();
+  for (int i = 0; i < cdns.getSystemCount(); i++) {
+    coordCopy(&active_cdns, i, cdns, i);    
+  }
+  active_cdns.upload();
+
+  // Copy the CoordinateFrame into one of the Condensate's systems
+  coordCopy(&active_cdns, sys_idx, active_cf, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(&cdnsw.xcrd_sp[atom_offset], &cdnsw.ycrd_sp[atom_offset],
+                  &cdnsw.zcrd_sp[atom_offset], 1.0, cfw.xcrd, cfw.ycrd, cfw.zcrd, 1.0, cfw.natom,
+                  &cdnsw.umat[xfrm_offset], cfw.umat, "a CoordinateFrame to a Condensate "
+                  "system, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test, 7.5e-7, 1.5e-6);
+}
+
+void copySetup(const CoordinateFrame &cf, const PhaseSpaceSynthesis &poly_ps, const int sys_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Copy one of the synthesis's systems to the CoordinateFrame
+  CoordinateFrame active_cf = cf;
+  PhaseSpaceSynthesis active_pps = poly_ps;
+  CoordinateFrameWriter cfw = active_cf.data();
+  PsSynthesisWriter poly_psw = active_pps.data();
+  coordCopy(&active_cf, active_pps, sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_pps, dest_tier, orig_tier);
+  const int atom_offset = active_pps.getAtomOffset(sys_idx);
+  const int xfrm_offset = sys_idx * roundUp(9, warp_size_int);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xcrd[atom_offset], &poly_psw.ycrd[atom_offset],
+                  &poly_psw.zcrd[atom_offset], &poly_psw.xcrd_ovrf[atom_offset],
+                  &poly_psw.ycrd_ovrf[atom_offset], &poly_psw.zcrd_ovrf[atom_offset],
+                  poly_psw.gpos_scale, cfw.natom, cfw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis system to a CoordinateFrame, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Reload and try loading a separate aspect of the PhaseSpaceSynthesis into the CoordinateFrame
+  coordCopy(&active_cf, cf);
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = -2 * i;
+    cfw.umat[i] = umat_hold[i];
+  }
+  active_cf.upload();
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    coordCopy(&active_pps, i, poly_ps, i);    
+  }
+  active_pps.upload();
+  coordCopy(&active_cf, active_pps, sys_idx, TrajectoryKind::VELOCITIES,
+            CoordinateCycle::ALTERNATE, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cf, &active_pps, dest_tier, orig_tier);
+  diffCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.vxalt[atom_offset], &poly_psw.vyalt[atom_offset],
+                  &poly_psw.vzalt[atom_offset], &poly_psw.vxalt_ovrf[atom_offset],
+                  &poly_psw.vyalt_ovrf[atom_offset], &poly_psw.vzalt_ovrf[atom_offset],
+                  poly_psw.vel_scale, cfw.natom, cfw.umat, umat_hold.data(),
+                  "a PhaseSpaceSynthesis system (alt. velocities) to a CoordinateFrame, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Reload and try copying the CoordinateFrame into the PhaseSpaceSynthesis
+  coordCopy(&active_cf, cf);
+  active_cf.upload();
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    coordCopy(&active_pps, i, poly_ps, i);    
+  }
+  active_pps.upload();
+  coordCopy(&active_pps, sys_idx, active_cf, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(&poly_psw.xcrd[atom_offset], &poly_psw.ycrd[atom_offset],
+                  &poly_psw.zcrd[atom_offset], &poly_psw.xcrd_ovrf[atom_offset],
+                  &poly_psw.ycrd_ovrf[atom_offset], &poly_psw.zcrd_ovrf[atom_offset],
+                  poly_psw.gpos_scale, cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, nullptr,
+                  1.0, cfw.natom, cfw.umat, &poly_psw.umat[xfrm_offset],
+                  "a CoordinateFrame to a PhaseSpaceSynthesis system, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  1.2e-8, 2.5e-8);
+
+  // Try copying the CoordinateFrame into another aspect of the PhaseSpaceSynthesis
+  coordCopy(&active_cf, cf);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = -i;
+    cfw.umat[i] = umat_hold[i];
+  }
+  active_cf.upload();
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    coordCopy(&active_pps, i, poly_ps, i);    
+  }
+  active_pps.upload();
+  coordCopy(&active_pps, sys_idx, TrajectoryKind::VELOCITIES, CoordinateCycle::ALTERNATE,
+            active_cf, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cf, dest_tier, orig_tier);
+  diffCoordinates(&poly_psw.vxalt[atom_offset], &poly_psw.vyalt[atom_offset],
+                  &poly_psw.vzalt[atom_offset], &poly_psw.vxalt_ovrf[atom_offset],
+                  &poly_psw.vyalt_ovrf[atom_offset], &poly_psw.vzalt_ovrf[atom_offset],
+                  poly_psw.vel_scale, cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, nullptr,
+                  1.0, cfw.natom, cfw.umat, umat_hold.data(),
+                  "a CoordinateFrame to a PhaseSpaceSynthesis system (alt. velocities), " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  3.0e-9, 6.2e-9);
+}
+
+void copySetup(const PhaseSpace &dest, const PhaseSpace &orig,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+  
+  // Duplicate the inputs and add random forces and velocities to each.
+  Xoroshiro128pGenerator xrs(817252330);
+  PhaseSpace active_dest = dest;
+  PhaseSpace active_orig = orig;
+  PhaseSpaceWriter chkw = active_dest.data();
+  PhaseSpaceWriter refw = active_orig.data();
+  addRandomNoise(&xrs, chkw.xvel, chkw.yvel, chkw.zvel, chkw.natom, 5.0);
+  addRandomNoise(&xrs, chkw.xfrc, chkw.yfrc, chkw.zfrc, chkw.natom, 9.0);
+  addRandomNoise(&xrs, refw.xvel, refw.yvel, refw.zvel, refw.natom, 2.0);
+  addRandomNoise(&xrs, refw.xfrc, refw.yfrc, refw.zfrc, refw.natom, 4.0);
+  active_dest.upload();
+  active_orig.upload();
+  
+  // Copy between the two objects on the specified tiers
+  coordCopy(&active_dest, active_orig, dest_tier, orig_tier, gpu);
+
+  // Prepare for comparisons in the HOST tier.
+  criticalCoordTransfer(&active_dest, &active_orig, dest_tier, orig_tier);
+  diffCoordinates(chkw.xcrd, chkw.ycrd, chkw.zcrd, refw.xcrd, refw.ycrd, refw.zcrd, refw.natom,
+                  chkw.umat, refw.umat, "one PhaseSpace object to another, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(chkw.xvel, chkw.yvel, chkw.zvel, refw.xvel, refw.yvel, refw.zvel, refw.natom,
+                  chkw.umat, refw.umat, "one PhaseSpace object to another, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(chkw.xfrc, chkw.yfrc, chkw.zfrc, refw.xfrc, refw.yfrc, refw.zfrc, refw.natom,
+                  chkw.umat, refw.umat, "one PhaseSpace object to another, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+}
+
+template <typename T>
+void copySetup(const PhaseSpace &ps, const CoordinateSeries<T> &cs,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Duplicate the inputs. Add random forces and velocities to the PhaseSpace object.
+  Xoroshiro128pGenerator xrs(817252330);
+  PhaseSpace active_ps = ps;
+  CoordinateSeries<T> active_cs = cs;
+  PhaseSpaceWriter psw = active_ps.data();
+  CoordinateSeriesWriter<T> csw = active_cs.data();
+  active_ps.upload();
+  active_cs.upload();
+
+  // Copy one frame of the coordinate series into the PhaseSpace's coordinate holdings.
+  const int frm_idx = cs.getFrameCount() - 1;
+  coordCopy(&active_ps, active_cs, frm_idx, dest_tier, orig_tier, gpu);
+  const int atom_offset = roundUp(active_cs.getAtomCount(), warp_size_int) * frm_idx;
+  const int xfrm_offset = roundUp(9, warp_size_int) * frm_idx;
+  criticalCoordTransfer(&active_ps, &active_cs, dest_tier, orig_tier);
+  diffCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, &csw.xcrd[atom_offset], &csw.ycrd[atom_offset],
+                  &csw.zcrd[atom_offset], csw.natom, psw.umat, &csw.umat[xfrm_offset],
+                  "a CoordinateSeries snapshot to a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Transfer the coordinate series data to an alternate aspect of the PhaseSpace object.
+  addRandomNoise(&xrs, csw.xcrd, csw.ycrd, csw.zcrd, csw.natom, 4.1);
+  active_cs.upload();
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = 5 - (3 * i);
+    psw.umat[i] = umat_hold[i];
+  }
+  active_ps.upload();
+  coordCopy(&active_ps, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE, active_cs, 0,
+           dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_ps, &active_cs, dest_tier, orig_tier);
+  diffCoordinates(psw.fxalt, psw.fyalt, psw.fzalt, csw.xcrd, csw.ycrd, csw.zcrd, csw.natom,
+                  psw.umat, umat_hold.data(), "a CoordinateSeries snapshot to a PhaseSpace "
+                  "object, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Reload both objects and try copying the PhaseSpace data into the CoordinateSeries.
+  coordCopy(&active_ps, ps);
+  addRandomNoise(&xrs, psw.xvel, psw.yvel, psw.zvel, psw.natom, 6.7);
+  addRandomNoise(&xrs, psw.xfrc, psw.yfrc, psw.zfrc, psw.natom, 6.7);
+  active_ps.upload();
+  for (int i = 0; i < cs.getFrameCount(); i++) {
+    coordCopy<T, T>(&active_cs, i, cs, i);
+  }
+  active_cs.upload();
+  const int nfrm_idx = cs.getFrameCount() / 2;
+  coordCopy(&active_cs, nfrm_idx, active_ps, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_ps, dest_tier, orig_tier);
+  const int natom_offset = roundUp(active_cs.getAtomCount(), warp_size_int) * nfrm_idx;
+  const int nxfrm_offset = roundUp(9, warp_size_int) * nfrm_idx;
+  diffCoordinates(&csw.xcrd[natom_offset], &csw.ycrd[natom_offset], &csw.zcrd[natom_offset],
+                  psw.xcrd, psw.ycrd, psw.zcrd, csw.natom, &csw.umat[nxfrm_offset], psw.umat,
+                  "a PhaseSpace object's positions into a CoordinateSeries snapshot, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = 7 - (2 * i);
+    csw.umat[i] = umat_hold[i];
+  }
+  active_cs.upload();
+  coordCopy(&active_cs, 0, active_ps, TrajectoryKind::VELOCITIES, CoordinateCycle::ALTERNATE,
+            dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(csw.xcrd, csw.ycrd, csw.zcrd, psw.vxalt, psw.vyalt, psw.vzalt, csw.natom,
+                  csw.umat, umat_hold.data(), "a PhaseSpace object into a CoordinateSeries "
+                  "snapshot (alt. velocities), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 // main
@@ -709,14 +1132,15 @@ int main(const int argc, const char* argv[]) {
 
   // Bring synthesis objects to the fore, filling out more aspects of the recv PhaseSpace object.
   CoordinateFrame buffer_a_cf(tsm_cf[0].getAtomCount()), buffer_b_cf(tsm_cf[0].getAtomCount());
+  CoordinateFrameWriter buffer_b_cfw = buffer_b_cf.data();
   coordCopy(&buffer_a_cf, tsm_psyn, tsm.getSystemCount());
   coordCopy(&tsm_psyn, 0, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE, buffer_a_cf);
   coordCopy(&buffer_b_cf, tsm_psyn, 0, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE);
   coordCopy(&recv, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE, buffer_a_cf);
-  diffCoordinates<double, double>(recv_r.fxalt, recv_r.fyalt, recv_r.fzalt, tsm_cfr[0].xcrd,
-                                  tsm_cfr[0].ycrd, tsm_cfr[0].zcrd, recv_r.natom,
+  diffCoordinates<double, double>(recv_r.fxalt, recv_r.fyalt, recv_r.fzalt, buffer_b_cfw.xcrd,
+                                  buffer_b_cfw.ycrd, buffer_b_cfw.zcrd, recv_r.natom,
                                   "CoordinateFrame => PhaseSpace(FORCES, ALTERNATE)",
-                                  tsm.getTestingStatus(), 3.477e-9, 5.0e-9);
+                                  tsm.getTestingStatus(), 3.0e-7, 3.0e-7);
   CHECK_THROWS(coordCopy(&recv, TrajectoryKind::VELOCITIES, CoordinateCycle::ALTERNATE, tsm_cdns,
                          1), "Systems with mismatching numbers of atoms were submitted to a copy "
                "operation between PhaseSpace and Condensate objects.");
@@ -724,7 +1148,7 @@ int main(const int argc, const char* argv[]) {
   diffCoordinates<double, double>(recv_r.vxalt, recv_r.vyalt, recv_r.vzalt, tsm_cfr[0].xcrd,
                                   tsm_cfr[0].ycrd, tsm_cfr[0].zcrd, recv_r.natom,
                                   "CoordinateFrame => PhaseSpace(FORCES, ALTERNATE)",
-                                  tsm.getTestingStatus(), 1.437e-7, 2.7e-7);
+                                  tsm.getTestingStatus(), 1.9e-7, 2.7e-7);
   
   // Push coordinates into a new PhaseSpaceSynthesis with higher precision
   const std::vector<int> replicator = replicateSeries(tsm.getSystemCount(), 2);
@@ -767,7 +1191,8 @@ int main(const int argc, const char* argv[]) {
                   &test_psynw.fzalt_ovrf[second_set_offset], test_psynw.frc_scale,
                   buffer_a_cfw.xcrd, buffer_a_cfw.ycrd, buffer_a_cfw.zcrd, nullptr, nullptr,
                   nullptr, 1.0, buffer_a_cfw.natom,
-                  "Condensate => PhaseSpaceSynthesis(FORCES, ALTERNATE)",tsm.getTestingStatus());
+                  "CoordinateFrame => PhaseSpaceSynthesis(FORCES, ALTERNATE)",
+                  tsm.getTestingStatus(), 1.5e-7, 2.9e-7);
 
   // Create more test systems with periodic boundary conditions.  Test that the transformation
   // matrices are transferred properly, while also checking other combinations of origin and
@@ -776,6 +1201,7 @@ int main(const int argc, const char* argv[]) {
                                                   "symmetry_C3_in_water", "symmetry_C4_in_water" };
   TestSystemManager tsm_pbc(base_top_dir, "top", pbc_fi_names, base_crd_dir, "inpcrd",
                             pbc_fi_names);
+  const TestPriority do_pbc_tests = tsm_pbc.getTestingStatus();
   std::vector<CoordinateFrame> tsm_pbc_cf;
   std::vector<PhaseSpace> tsm_pbc_ps;
   std::vector<CoordinateSeries<double>> tsm_pbc_cs;
@@ -790,27 +1216,106 @@ int main(const int argc, const char* argv[]) {
   PhaseSpace recv_pbc(tsm_pbc_cfr[2].natom);
   PhaseSpaceReader recv_pbc_r = recv_pbc.data();
   check(tsm_pbc_cdns.getBasis() == StructureSource::SERIES, "A condensate based on a coordinate "
-        "series does not properly report its basis.", tsm_pbc.getTestingStatus());
+        "series does not properly report its basis.", do_pbc_tests);
   check(tsm_pbc_cdns.ownsCoordinates() == false, "A condensate based on a coordinate series of "
         "double-precision reals should rely on the source to store its data, but does not.",
-        tsm_pbc.getTestingStatus());
+        do_pbc_tests);
   coordCopy(&recv_pbc, TrajectoryKind::POSITIONS, CoordinateCycle::ALTERNATE, tsm_pbc_cdns, 3);
   coordCopy(&recv_pbc, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE, tsm_pbc_cdns, 2);
   const CoordinateFrame sm2_f3 = tsm_pbc_cs[2].exportFrame(3);
   const CoordinateFrameReader sm2_f3r = sm2_f3.data();
   diffCoordinates(recv_pbc_r.xalt, recv_pbc_r.yalt, recv_pbc_r.zalt, sm2_f3r.xcrd, sm2_f3r.ycrd,
                   sm2_f3r.zcrd, sm2_f3r.natom, recv_pbc_r.umat_alt, sm2_f3r.umat,
-                  "CoordinateSeries => PhaseSpace(POSITIONS, ALTERNATE)",
-                  tsm_pbc.getTestingStatus());
+                  "CoordinateSeries => PhaseSpace(POSITIONS, ALTERNATE)", do_pbc_tests);
   const CoordinateFrame sm2_f2 = tsm_pbc_cs[2].exportFrame(2);
   const CoordinateFrameReader sm2_f2r = sm2_f2.data();
   diffCoordinates(recv_pbc_r.fxalt, recv_pbc_r.fyalt, recv_pbc_r.fzalt, sm2_f2r.xcrd, sm2_f2r.ycrd,
                   sm2_f2r.zcrd, sm2_f2r.natom,
-                  "CoordinateSeries => PhaseSpace(FORCES, ALTERNATE)",
-                  tsm_pbc.getTestingStatus());
+                  "CoordinateSeries => PhaseSpace(FORCES, ALTERNATE)", do_pbc_tests);
+  
+#ifdef STORMM_USE_HPC
+  // The following unit tests use HPC resources, copying between the host and device layers.
+  // Start by getting details of the available GPU.
+  const HpcConfig gpu_config(ExceptionResponse::WARN);
+  const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
+  const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);  
 
+  // Make additional copies of the periodic coordinate objects, distinguished by perturbations.
+  std::vector<CoordinateFrame> clone_pbc_cf;
+  std::vector<PhaseSpace> clone_pbc_ps;
+  std::vector<CoordinateSeries<double>> clone_pbc_cs;
+  std::vector<CoordinateFrameReader> clone_pbc_cfr;
+  std::vector<PhaseSpaceReader> clone_pbc_psr;
+  std::vector<CoordinateSeriesReader<double>> clone_pbc_csr;
+  PhaseSpaceSynthesis clone_pbc_psyn = spawnMutableCoordinateObjects(tsm_pbc, &clone_pbc_cf,
+                                                                     &clone_pbc_cfr, &clone_pbc_ps,
+                                                                     &clone_pbc_psr, &clone_pbc_cs,
+                                                                     &clone_pbc_csr, 187693308);
+  Condensate clone_pbc_cdns(clone_pbc_psyn, PrecisionModel::SINGLE);
+  std::vector<CoordinateFrameWriter> host_clone_cfw;
+  std::vector<PhaseSpaceWriter> host_clone_psw;
+  std::vector<CoordinateSeriesWriter<double>> host_clone_csw;
+  PsSynthesisWriter host_clone_psynw = clone_pbc_psyn.data();
+  CondensateWriter host_clone_cdnsw = clone_pbc_cdns.data();
+  for (int i = 0; i < tsm_pbc.getSystemCount(); i++) {
+    host_clone_cfw.push_back(clone_pbc_cf[i].data());
+    host_clone_psw.push_back(clone_pbc_ps[i].data());
+    host_clone_csw.push_back(clone_pbc_cs[i].data());
+    const int natom = host_clone_cfw[i].natom;
+    const int padded_natom = roundUp(natom, warp_size_int);
+    addRandomNoise(&xrs, host_clone_cfw[i].xcrd, host_clone_cfw[i].ycrd, host_clone_cfw[i].zcrd,
+                   natom, 0.1);
+    addRandomNoise(&xrs, host_clone_psw[i].xcrd, host_clone_psw[i].ycrd, host_clone_psw[i].zcrd,
+                   natom, 0.1);
+    addRandomNoise(&xrs, host_clone_psw[i].xvel, host_clone_psw[i].yvel, host_clone_psw[i].zvel,
+                   natom, 0.1);
+    addRandomNoise(&xrs, host_clone_psw[i].xfrc, host_clone_psw[i].yfrc, host_clone_psw[i].zfrc,
+                   natom, 0.1);
+    for (int j = 0; j < host_clone_csw[i].nframe; j++) {
+      const int jpos = j * padded_natom;
+      addRandomNoise(&xrs, &host_clone_csw[i].xcrd[jpos], &host_clone_csw[i].ycrd[jpos],
+                     &host_clone_csw[i].zcrd[jpos], natom, 0.1);
+    }
+    const int istart = host_clone_psynw.atom_starts[i];
+    addRandomNoise(&xrs, &host_clone_psynw.xcrd[istart], &host_clone_psynw.xcrd_ovrf[istart],
+                   &host_clone_psynw.ycrd[istart], &host_clone_psynw.ycrd_ovrf[istart],
+                   &host_clone_psynw.zcrd[istart], &host_clone_psynw.zcrd_ovrf[istart],
+                   natom, 0.1, host_clone_psynw.gpos_scale);
+    addRandomNoise(&xrs, &host_clone_cdnsw.xcrd[istart], &host_clone_cdnsw.ycrd[istart],
+                   &host_clone_cdnsw.zcrd[istart], natom, 0.1);
+
+
+    // After these uploads, all structures will hold the same coordinates on both the host and
+    // the device, but each structure will have unique perturbations.
+    clone_pbc_cf[i].upload();
+    clone_pbc_ps[i].upload();
+    clone_pbc_cs[i].upload();
+  }
+  clone_pbc_psyn.upload();
+  clone_pbc_cdns.upload();
+
+  // The various coordinate objects now contain unique structures, but the host and device memory
+  // for each particular object contains identical copies of one structure.  Run tests of various
+  // copy operations to verify their fidelity.
+  const HybridTargetLevel hl_host = HybridTargetLevel::HOST;
+  const HybridTargetLevel hl_devc = HybridTargetLevel::DEVICE;
+  const std::vector<HybridTargetLevel> dest_tiers   = { hl_devc, hl_host, hl_devc };
+  const std::vector<HybridTargetLevel> orig_tiers = { hl_host, hl_devc, hl_devc };
+  for (int i = 0; i < 3; i++) {
+    copySetup(clone_pbc_cf[2], tsm_pbc_cf[2], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cf[1], tsm_pbc_ps[1], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cf[0], tsm_pbc_cs[0], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cf[3], clone_pbc_cdns, 3, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cf[1], clone_pbc_psyn, 1, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_ps[3], tsm_pbc_ps[3], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_ps[2], tsm_pbc_cs[2], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+  }
+#endif
+  
   // Print results
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

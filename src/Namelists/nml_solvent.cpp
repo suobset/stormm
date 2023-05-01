@@ -21,7 +21,8 @@ SolventControls::SolventControls(const ExceptionResponse policy_in, const WrapTe
     internal_dielectric{default_solvent_intdiel},
     external_dielectric{default_solvent_extdiel},
     salt_concentration{default_solvent_saltcon},
-    pb_radii{translateAtomicRadiusSet(std::string(default_solvent_pbradii))}
+    pb_radii{translateAtomicRadiusSet(std::string(default_solvent_pbradii))},
+    nml_transcript{"solvent"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -30,6 +31,7 @@ SolventControls::SolventControls(const TextFile &tf, int *start_line, bool *foun
   SolventControls(policy_in)
 {
   NamelistEmulator t_nml = solventInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   gb_style            = translateImplicitSolventModel(t_nml.getIntValue("igb"));
   born_radii_cutoff   = t_nml.getRealValue("rgbmax");
   internal_dielectric = t_nml.getRealValue("intdiel");
@@ -72,6 +74,11 @@ double SolventControls::getSaltConcentration() const {
 //-------------------------------------------------------------------------------------------------
 AtomicRadiusSet SolventControls::getPBRadiiSet() const {
   return pb_radii;
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& SolventControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------

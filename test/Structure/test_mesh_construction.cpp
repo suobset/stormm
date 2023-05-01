@@ -17,6 +17,7 @@
 using stormm::data_types::ullint;
 using stormm::numerics::hostInt95ToDouble;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::diskutil;
 using namespace stormm::structure;
 using namespace stormm::testing;
@@ -136,6 +137,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

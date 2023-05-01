@@ -11,6 +11,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/polynumeric.h"
+#include "Parsing/textfile.h"
 #include "Reporting/error_format.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
@@ -78,6 +79,7 @@ using stmath::meanUnsignedError;
 using stmath::relativeRmsError;
 using parse::NumberFormat;
 using parse::polyNumericVector;
+using parse::TextFile;
 
 /// \brief Free function for changing the section of the global test results object.
 ///
@@ -222,6 +224,21 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
                      double comparison_tolerance = 1.0e-4, double output_precision = 1.0e-8,
                      PrintSituation expectation = PrintSituation::OVERWRITE,
                      TestPriority urgency = TestPriority::CRITICAL);
+
+CheckResult snapshot(const std::string &filename, const TextFile &content,
+                     const std::string &label = std::string(""),
+                     const std::string &error_message = std::string(""),
+                     const SnapshotOperation activity = SnapshotOperation::COMPARE,
+                     const PrintSituation expectation = PrintSituation::OVERWRITE,
+                     const TestPriority urgency = TestPriority::CRITICAL);
+
+
+CheckResult snapshot(const std::string &filename, const std::string &content,
+                     const std::string &label = std::string(""),
+                     const std::string &error_message = std::string(""),
+                     const SnapshotOperation activity = SnapshotOperation::COMPARE,
+                     const PrintSituation expectation = PrintSituation::OVERWRITE,
+                     const TestPriority urgency = TestPriority::CRITICAL);
 /// \}
 
 /// \brief Print the summary for the global test result struct.

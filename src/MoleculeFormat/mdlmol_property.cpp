@@ -549,17 +549,18 @@ std::string MdlMolProperty::getMdlText() const {
   }
   
   // Write the substrate index and the number of entries, each time erasing the string terminating
-  // character '\0' placed by sprintf().
+  // character '\0' placed by snprintf().
   if (substrate_line_pos + 3 > 128 || entry_count_line_pos + 3 > 128) {
     result.resize(std::max(substrate_line_pos, entry_count_line_pos) + 3, ' ');
     result_data = result.data();
   }
   if (substrate_line_pos > 0) {
-    sprintf(&result_data[substrate_line_pos], "%3d", getPrintedSubstrate());
+    snprintf(&result_data[substrate_line_pos], 128 - substrate_line_pos, "%3d",
+             getPrintedSubstrate());
     result_data[substrate_line_pos + 3] = ' ';
   }
   if (entry_count_line_pos > 0) {
-    sprintf(&result_data[entry_count_line_pos], "%3d", entry_count);
+    snprintf(&result_data[entry_count_line_pos], 128 - entry_count_line_pos, "%3d", entry_count);
     result_data[entry_count_line_pos + 3] = ' ';
   }
   if (kind == MdlMolPropertyKind::ATOM_LIST) {
@@ -575,10 +576,10 @@ std::string MdlMolProperty::getMdlText() const {
       }
       switch (entry_detail[j]) {
       case MolObjPropField::INTEGER:
-        sprintf(&result_data[pos], "%*d", span, getPrintedIntegerValue(i, j));
+        snprintf(&result_data[pos], 128 - pos, "%*d", span, getPrintedIntegerValue(i, j));
         break;
       case MolObjPropField::REAL:
-        sprintf(&result_data[pos], "%*.4lf", span, getRealValue(i, j));
+        snprintf(&result_data[pos], 128 - pos, "%*.4lf", span, getRealValue(i, j));
         break;
       case MolObjPropField::CHAR4:
         {
@@ -590,7 +591,7 @@ std::string MdlMolProperty::getMdlText() const {
         }
         break;
       case MolObjPropField::STRING:
-        sprintf(&result_data[pos], "%*.*s", span, span, getStringValue(i, j).c_str());
+        snprintf(&result_data[pos], 128 - pos, "%*.*s", span, span, getStringValue(i, j).c_str());
       }
       pos += span;
     }

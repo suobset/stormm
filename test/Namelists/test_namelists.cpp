@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "copyright.h"
 #include "../../src/Chemistry/chemical_features.h"
+#include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -17,6 +18,7 @@
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_minimize.h"
 #include "../../src/Namelists/nml_random.h"
+#include "../../src/Namelists/nml_receptor.h"
 #include "../../src/Namelists/nml_report.h"
 #include "../../src/Namelists/nml_restraint.h"
 #include "../../src/Namelists/nml_solvent.h"
@@ -55,6 +57,7 @@ using stormm::parse::TextOrigin;
 using stormm::review::OutputScope;
 using stormm::review::OutputSyntax;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::restraints::RestraintApparatus;
 using stormm::structure::DataRequestKind;
 using stormm::topology::AtomGraph;
@@ -107,6 +110,9 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   else if (strcmpCased(nml_name, "conformer")) {
     CHECK_THROWS(ConformerControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
   }
+  else if (strcmpCased(nml_name, "receptor")) {
+    CHECK_THROWS(ReceptorControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
+  }
   else {
     rtErr("The namelist &" + nml_name + " does not pair with any known case.", "test_namelists");
   }
@@ -154,6 +160,9 @@ int main(const int argc, const char* argv[]) {
   
   // Section 8
   section("Test the &report namelist");
+
+  // Section 9
+  section("Test the &receptor namelist");
   
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any STORMM app
@@ -480,7 +489,7 @@ int main(const int argc, const char* argv[]) {
                   "-typeJ CN -typeK CB }", "A data item printing bond force field parameters was "
                   "accepted without the correct number of atom types");
   testBadNamelist("report", "sdf_item { -title PrintAngle -parameter anglep -typeI CT "
-                  "-typeJ CN -typeK CB }", "A data item with a nonsensicale parameter name was "
+                  "-typeJ CN -typeK CB }", "A data item with a nonsensical parameter name was "
                   "accepted for SD file output");
   testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter dihedral -typeI CT "
                   "-typeJ CN -typeK CB -typeL OT }", "A data item printing dihedral force field "
@@ -489,6 +498,7 @@ int main(const int argc, const char* argv[]) {
   testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter HarmonicAngle -typeI CT "
                   "-typeJ CN -typeK CB -message blah }", "A data item printing angle force field "
                   "parameters was accepted, but there is an extra messaged tacked on");
+  testBadNamelist("report", "outlier_sigmas -9.1", "An invalid outlier criterion was accepted");
   
   // Test the automatic correction of an SD file item when conflicting directives are supplied
   const std::string rep_nml_b("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
@@ -502,8 +512,43 @@ int main(const int argc, const char* argv[]) {
         "The subject of an SD file data item request is not correctly conveyed by a &report "
         "namelist.");
 
+  // The receptor namelist must come with a label group for the receptor structures.  Whether that
+  // label group actually exists in a separate &files namelist will be tested at runtime.
+  const std::string dock_nml_a("&receptor\n  label_group = \"proteins\",\n  mesh_dim = 64, "
+                               "mesh_dim_b = 48,\n  mesh_spacing = 0.8, mesh_spacing_a = 0.75, "
+                               "mesh_alpha = 94.0\n  mesh_origin_x = 17.5, mesh_origin_y = 19.4, "
+                               "mesh_origin_z = 14.2\n  boundary = \"periodic\", "
+                               "mesh_position = \"arbitrary\"\n  scaling_bits = 36\n&end\n");
+  const TextFile dock_tf_a(dock_nml_a, TextOrigin::RAM);
+  start_line = 0;
+  ReceptorControls dock_a(dock_tf_a, &start_line, nullptr, ExceptionResponse::SILENT);
+  const std::vector<double> mesh_spacings = { dock_a.getMeshSpacing(UnitCellAxis::A),
+                                              dock_a.getMeshSpacing(UnitCellAxis::B),
+                                              dock_a.getMeshSpacing(UnitCellAxis::C) };
+  const std::vector<double> mesh_spacings_ans = { 0.75, 0.8, 0.8 };
+  check(mesh_spacings, RelationalOperator::EQUAL, mesh_spacings_ans, "Mesh spacings were not "
+        "conveyed as expected by a &receptor namelist.\n");
+  const std::vector<double> mesh_angles = { dock_a.getMeshAlpha(), dock_a.getMeshBeta(),
+                                            dock_a.getMeshGamma() };
+  const std::vector<double> mesh_angles_ans = { 94.0 * stormm::symbols::pi / 180.0,
+                                                0.5 * stormm::symbols::pi,
+                                                0.5 * stormm::symbols::pi };
+  check(mesh_angles, RelationalOperator::EQUAL, mesh_angles_ans, "Mesh angles were not conveyed "
+        "as expected by a &receptor namelist.");
+  check(dock_a.getLabelGroup(), RelationalOperator::EQUAL, std::string("proteins"), "The label "
+        "group for receptor structures was not conveyed correctly by the &receptor namelist.");
+  testBadNamelist("receptor", "mesh_dim = 72", "Input was accepted without a label group");
+  testBadNamelist("receptor", "label_group = unprotected, mesh_dim = 72, boundary = plox",
+                  "Input was accepted with an unrecognized boundary condition");
+  testBadNamelist("receptor", "label_group = unprotected, mesh_dim = 72, mesh_position = phlox",
+                  "Input was accepted with an unrecognized mesh alignment");
+  testBadNamelist("receptor", "label_group = unprotected, potential = blox",
+                  "Input was accepted with an unrecognized potential form");
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

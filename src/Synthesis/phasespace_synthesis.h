@@ -34,7 +34,9 @@ using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
+using numerics::force_scale_nonoverflow_bits;
 using numerics::globalpos_scale_nonoverflow_bits;
+using numerics::velocity_scale_nonoverflow_bits;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::Barostat;
@@ -458,6 +460,16 @@ public:
   ///        for accessibility to other functions.
   const std::vector<AtomGraph*>& getUniqueTopologies() const;
 
+  /// \brief Get the starting index of atoms for one of the systems, using its index.
+  ///
+  /// \param system_index  Index of the system of interest
+  int getAtomOffset(int system_index) const;
+
+  /// \brief Get the number of atoms in one of the systems, using its index.
+  ///
+  /// \param system_index  Index of the system of interest
+  int getAtomCount(int system_index) const;
+
   /// \brief Get the index of the unique topology used by a particular system in the synthesis.
   ///
   /// \param system_index  Index of the system of interest
@@ -514,14 +526,18 @@ public:
   /// Overloaded:
   ///   - Let the object automatically assign pointers to past, present, and future coordinates
   ///   - Specify which stage of the time cycle is to be taken as current
+  ///   - Produce a read-only abstract for a const synthesis or a writeable abstract for a mutable
+  ///     synthesis
   ///
   /// \param orientation  Optional argument stipulating from which stage of the cycle to take the
   ///                     current coordinates, past coordinates, and pointers to any future
   ///                     coordinates.  If not specified the object's own cycle position will be
   ///                     used.
   /// \{
-  PsSynthesisWriter deviceViewToHostData();
+  const PsSynthesisReader deviceViewToHostData(CoordinateCycle orientation) const;
+  const PsSynthesisReader deviceViewToHostData() const;
   PsSynthesisWriter deviceViewToHostData(CoordinateCycle orientation);
+  PsSynthesisWriter deviceViewToHostData();
   /// \}
   
   /// \brief Upload data to the device.

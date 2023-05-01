@@ -42,6 +42,7 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::energy;
 using namespace stormm::generalized_born_defaults;
 using namespace stormm::synthesis;
@@ -585,6 +586,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

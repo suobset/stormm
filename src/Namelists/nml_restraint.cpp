@@ -33,7 +33,8 @@ RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
     penalty{default_restraint_ensemble_penalty},
     flat_bottom_half_width{default_restraint_ensemble_half_width},
     cutoff{default_restraint_ensemble_distance_cutoff},
-    proximity{default_restraint_ensemble_hbond_proximity}
+    proximity{default_restraint_ensemble_hbond_proximity},
+    nml_transcript{"restraint"}
 {}
   
 //-------------------------------------------------------------------------------------------------
@@ -43,6 +44,7 @@ RestraintControls::RestraintControls(const TextFile &tf, int *start_line, bool *
   RestraintControls(policy_in)
 {
   NamelistEmulator t_nml = restraintInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   const int starting_line = *start_line + 1;
   if (found_nml != nullptr && *found_nml == false) {
     return;
@@ -553,6 +555,11 @@ RestraintControls::getRestraint(const AtomGraph *ag, const ChemicalFeatures &che
 }
 
 //-------------------------------------------------------------------------------------------------
+const NamelistEmulator& RestraintControls::getTranscript() const {
+  return nml_transcript;
+}
+
+//-------------------------------------------------------------------------------------------------
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy, WrapTextSearch wrap) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, policy,
@@ -611,18 +618,24 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
                 "and rk3a (if r[1-4]a and rk[2,3]a are unspecified, they are taken to be the same "
                 "as their initial counterparts and the restraint does not scale between nstep1 "
                 "and nstep2).");
-  t_nml.addHelp("r1", "Leftmost distance at which the left-hand harmonic restraint linearizes");
-  t_nml.addHelp("r2", "Middle distance parameter, to the left of which the left-hand harmonic "
+  t_nml.addHelp("r1", "Leftmost coordinate at which the left-hand harmonic restraint linearizes, "
+                "in units of Angstroms for distance-based restraints or radians for angle-based "
+                "restraints.");
+  t_nml.addHelp("r2", "Middle coordinate parameter, to the left of which the left-hand harmonic "
                 "restraint applies.  The left-hand harmonic restraint evaluates as "
-                "k2 * (R - r2)^2 for r1 <= R <= r2.");
-  t_nml.addHelp("r3", "Middle distance parameter, to the left of which the potential is flat and "
-                "to the right of which the right-hand harmonic restraint is applied.  The "
+                "k2 * (R - r2)^2 for r1 <= R <= r2.  The units of this and other r{#} parameters "
+                "are Angstroms for distance-based restraints or radians for angle-based "
+                "restraints.");
+  t_nml.addHelp("r3", "Middle coordinate parameter, to the left of which the potential is flat "
+                "and to the right of which the right-hand harmonic restraint is applied.  The "
                 "potential is flat, force 0, for a distance R such that r2 <= R <= r3.");
-  t_nml.addHelp("r4", "Rightmost distance parameter, defining the right-hand harmonic restraint "
+  t_nml.addHelp("r4", "Rightmost coordinate parameter, defining the right-hand harmonic restraint "
                 "on the interval r3 <= R <= r4.  To the right of r4 the right-hand harmonic "
                 "restraint linearizes.");
-  t_nml.addHelp("rk2", "Stiffness constant for the left-hand harmonic restraint.");
-  t_nml.addHelp("rk2", "Stiffness constant for the right-hand harmonic restraint.");
+  t_nml.addHelp("rk2", "Stiffness constant for the left-hand harmonic restraint in units of "
+                "kcal/mol divided by the squared unit of the coordinates.");
+  t_nml.addHelp("rk3", "Stiffness constant for the right-hand harmonic restraint in units of "
+                "kcal/mol divided by the squared unit of the coordinates.");
   t_nml.addHelp("r1a", "If specified along with distinct nstep1 and nstep2, this specifies "
                 "the final value of the left-most restraint distance parameter.");
   t_nml.addHelp("r2a", "Final value of the right-most limit of the left-hand harmonic restraint, "
@@ -632,9 +645,9 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addHelp("r4a", "Final value of the right-most limit of the right-hand harmonic restraint "
                 "(beyond which it linearizes), given appropriate nstep values.");
   t_nml.addHelp("rk2a", "Final value of the left-hand harmonic restraint stiffness, given "
-                "appropriate nstep values.");
+                "appropriate nstep values.  Shares units with rk2.");
   t_nml.addHelp("rk3a", "Final value of the right-hand harmonic restraint stiffness, given "
-                "appropriate nstep values.");
+                "appropriate nstep values.  Shares units with rk3.");
   t_nml.addHelp("mask1", "Ambmask string evaluating to the first atom in the restraint (may be "
                 "given in place of iatm1, but one of these is required)");
   t_nml.addHelp("mask2", "Ambmask string evaluating to the second atom in the restraint (may be "
@@ -659,7 +672,7 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addHelp("penalty", "General value of the harmonic restraint penalty to impose when "
                 "creating an ensemble of restraints.  The units are kcal/mol-A^2 for positional "
                 "or distance restraint ensembles, and kcal/mol-rad^2 for angle and dihedral "
-                "restraint ensembles.");
+                "restraint ensembles, following rk2 and rk3 from specific restraints.");
   t_nml.addHelp("fbhw", "General value of the permissive, flat-bottom well to incorporate into a "
                 "restraint ensemble.");
   t_nml.addHelp("proximity", "The proximity at which hydrogen-bond preventor restraints will "

@@ -35,7 +35,8 @@ PrecisionControls::PrecisionControls(const ExceptionResponse policy_in,
                                            policy)},
     nonbonded_method{translatePrecisionModel(std::string(default_precision_nonbonded_method),
                                              policy)},
-    pme_method{translatePrecisionModel(std::string(default_precision_pme_method), policy)}
+    pme_method{translatePrecisionModel(std::string(default_precision_pme_method), policy)},
+    nml_transcript{"precision"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -45,6 +46,7 @@ PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line, bool *
     PrecisionControls(policy_in)
 {
   NamelistEmulator t_nml = precisionInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   globalpos_scale_bits = t_nml.getIntValue("globalpos_bits");
   localpos_scale_bits = t_nml.getIntValue("localpos_bits");
   velocity_scale_bits = t_nml.getIntValue("velocity_bits");
@@ -117,6 +119,11 @@ PrecisionModel PrecisionControls::getNonbondedMethod() const {
 //-------------------------------------------------------------------------------------------------
 PrecisionModel PrecisionControls::getParticleMeshEwaldMethod() const {
   return pme_method;
+}
+
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& PrecisionControls::getTranscript() const {
+  return nml_transcript;
 }
 
 //-------------------------------------------------------------------------------------------------

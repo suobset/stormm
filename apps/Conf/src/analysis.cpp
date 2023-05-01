@@ -1,3 +1,5 @@
+#include <string>
+#include <fstream>
 #include "copyright.h"
 #include "../../../src/Accelerator/hybrid.h"
 #include "../../../src/Analysis/comparison_guide.h"
@@ -5,14 +7,29 @@
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
 #include "../../../src/Math/summation.h"
+#include "../../../src/Math/tickcounter.h"
 #include "../../../src/MoleculeFormat/mdlmol_refinement.h"
+#include "../../../src/Namelists/input_transcript.h"
+#include "../../../src/Namelists/namelist_emulator.h"
+#include "../../../src/Namelists/namelist_enumerators.h"
+#include "../../../src/Namelists/nml_files.h"
+#include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Numerics/split_fixed_precision.h"
 #include "../../../src/Parsing/parse.h"
+#include "../../../src/Parsing/textfile.h"
+#include "../../../src/Potential/energy_enumerators.h"
+#include "../../../src/Reporting/present_energy.h"
+#include "../../../src/Reporting/reporting_enumerators.h"
+#include "../../../src/Reporting/report_table.h"
+#include "../../../src/Reporting/section_contents.h"
+#include "../../../src/Reporting/summary_file.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/rmsd.h"
 #include "../../../src/Structure/rmsd_plan.h"
 #include "../../../src/Structure/structure_enumerators.h"
 #include "../../../src/Synthesis/condensate.h"
+#include "../../../src/Topology/atomgraph.h"
+#include "../../../src/Topology/atomgraph_enumerators.h"
 #include "../../../src/Trajectory/trajectory_enumerators.h"
 #include "analysis.h"
 
@@ -21,13 +38,19 @@ namespace analysis {
 
 using stormm::analysis::ComparisonGuide;
 using stormm::card::Hybrid;
-using stormm::diskutil::getBaseName;
-using stormm::diskutil::PrintSituation;
-using stormm::diskutil::substituteNameExtension;
-using stormm::diskutil::splitPath;
+using stormm::energy::EnergySample;
+using stormm::energy::StateVariable;
+using stormm::namelist::commandLineAsString;
+using stormm::namelist::FilesControls;
+using stormm::namelist::NamelistEmulator;
+using stormm::namelist::ReportControls;
 using stormm::numerics::hostInt95ToDouble;
 using stormm::parse::findStringInVector;
+using stormm::parse::maximumLineLength;
+using stormm::parse::minimalRealFormat;
+using stormm::parse::TextFile;
 using stormm::stmath::sum;
+using stormm::stmath::TickCounter;
 using stormm::structure::customizeDataItems;
 using stormm::structure::detectClash;
 using stormm::structure::RMSDPlan;
@@ -39,8 +62,12 @@ using stormm::synthesis::PsSynthesisWriter;
 using stormm::synthesis::SynthesisMapReader;
 using stormm::synthesis::translateSystemGrouping;
 using stormm::topology::AtomGraph;
+using stormm::topology::ImplicitSolventModel;
 using stormm::trajectory::CoordinateFileKind;
 using stormm::trajectory::TrajectoryFusion;
+
+using namespace stormm::diskutil;
+using namespace stormm::review;
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
@@ -319,6 +346,202 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
       }
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void printReport(const SystemCache &sc, const UserSettings &ui,
+                 const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
+                 const ScoreCard &prelim_emin) {
+
+  // Start with a header to explain the purpose of the program.
+  const FilesControls& ficon = ui.getFilesNamelistInfo(); 
+  const std::string output_name = ficon.getReportFile();
+  std::ofstream foutp = openOutputFile(output_name, ui.getPrintingPolicy(), "print a summary "
+                                       "of the conformer generation");
+
+  // Check for a preferred format, which will inform the choice of comment character leading
+  // most non-numeric lines.
+  const ReportControls repcon = ui.getReportNamelistInfo();
+  const char hide = commentSymbol(repcon.getOutputSyntax());
+
+  // Print the splash screen behind a comment block
+  const int output_width = (repcon.getReportFileWidth() < 0) ? findFormatWidth(&std::cout) :
+                                                               repcon.getReportFileWidth();
+
+  // First section: a summary of the user input
+  std::vector<SectionContents> parts;
+  parts.emplace_back("User Input", std::string(""), repcon.getReportFileWidth());
+  parts.back().addNarration("Here is the command line input:\n" + commandLineAsString(ui));
+  parts.back().addNarration("General statistics:\n"
+                            "  - " + std::to_string(sc.getSystemCount()) + " systems\n"
+                            "  - " + std::to_string(sc.getLabelCount()) + " label groups\n"
+                            "  - " + std::to_string(sc.getTopologyCount()) + " unique topologies\n"
+                            "  - " + std::to_string(ui.getRestraintNamelistInfo().size()) +
+                            " restraint specifications");
+  const TextFile inp_tf(ui.getInputFileName());
+  const int inp_width = std::max(repcon.getReportFileWidth(), inp_tf.getLongestLineLength() + 2);
+  parts.emplace_back("The Input File", output_name, inp_width, repcon.getOutputSyntax());
+  parts.back().designateSubsection();
+  parts.back().addNarration(inp_tf, TextEnds::NEWLINE);
+  std::string complete_inp = ficon.getInputTranscriptFile();
+  if (complete_inp.size() == 0) {
+    complete_inp = std::string("specify the '-t' (transcript) parameter with a file path either "
+                               "on the command line or in the &files namelist.");
+  }
+  else {
+    complete_inp = std::string("see the transcript file " + complete_inp + ".");
+  }
+  const std::string kw_text = prepareInputTranscript(ui, output_width, 3);
+  const int parsed_width = maximumLineLength(kw_text) + 2;
+  parts.emplace_back("Parsed Input Settings", output_name, parsed_width, repcon.getOutputSyntax());
+  parts.back().designateSubsection();
+  parts.back().addNarration("User input was interpreted as follows.  Samples of each input's "
+                            "contents are displayed below.  For a complete breakdown of the "
+                            "interpreted user input, " + complete_inp);
+  parts.back().addNarration(kw_text);
+
+  // Second section: summarize the chemical features detection
+  parts.emplace_back("Chemical Perception in Relevant Topologies", std::string(""),
+                     repcon.getReportFileWidth());
+  parts.back().addNarration("STORMM provides a capability for detecting bond orders and formal "
+                            "charges based primarily on the octet rule followed by averaging of "
+                            "equipotential resonance states.  Rings up to 64 atoms in size are "
+                            "detected, as well as chiral centers.  The results of these fast "
+                            "calculations are a good basis for detecting rotatable bonds, "
+                            "aromatic groups, and potential hydrogen bond participants.  From "
+                            "this information, it is possible to identify rotatable bonds as well "
+                            "as isomerization sites, and construct a map of the molecule's most "
+                            "important degrees of freedom.  A preliminary round of energy "
+                            "minimizations is used to find the most common angles for rotatable "
+                            "bonds so that these settings can guide future placements of the "
+                            "molecules in the context of a receptor.");
+  const int ncache = sc.getSystemCount();
+  std::vector<int> variable_stats(ncache * 3);
+  std::vector<int> explored_spaces(ncache * 3);
+  std::vector<double> combi_spaces(ncache);
+  std::vector<std::string> cache_names(ncache);
+  const ConformerControls confcon = ui.getConformerNamelistInfo();
+  for (int i = 0; i < ncache; i++) {
+    cache_names[i] = sc.getSystemTopologyPointer(i)->getFileName();
+    variable_stats[(3 * i)    ] = sc.getFeaturesPointer(i)->getRotatableBondCount();
+    variable_stats[(3 * i) + 1] = sc.getFeaturesPointer(i)->getCisTransBondCount();
+    variable_stats[(3 * i) + 2] = sc.getFeaturesPointer(i)->getChiralCenterCount();
+    const TickCounter<double>& itc = sandbox_prm.getStateTracker(sc.getSystemTopologyPointer(i));
+    combi_spaces[i] = itc.getApproximatePermutationCount();
+    explored_spaces[i] = sandbox_prm.getReplicaCount(sc.getSystemTopologyPointer(i),
+                                                     confcon.getSamplingIntensity());
+  }
+  const std::vector<std::string> path_shortcuts = extractCommonPaths(&cache_names, 8, 4);
+  std::vector<std::string> chemfe_stats;
+  chemfe_stats.reserve(ncache * 6);
+  for (int i = 0; i < ncache; i++) {
+    chemfe_stats.emplace_back(cache_names[i]);
+  }
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < ncache; j++) {
+      chemfe_stats.emplace_back(std::to_string(variable_stats[(3 * j) + i]));
+    }
+  }
+  for (int i = 0; i < ncache; i++) {
+    chemfe_stats.push_back(minimalRealFormat(combi_spaces[i], 1.0e-4));
+  }
+  for (int i = 0; i < ncache; i++) {
+    chemfe_stats.push_back(std::to_string(explored_spaces[i]));
+  }
+  if (path_shortcuts.size() > 0) {
+    const std::string pluralize = (path_shortcuts.size() > 1) ? "path shortcuts" :
+                                                                "a path shortcut";
+    const std::string explain_paths =
+      std::string("The table below uses " + pluralize + " to condense its contents:\n") +
+      listCommonPaths(path_shortcuts);
+    parts.back().addNarration(explain_paths);
+  }
+  const std::vector<std::string> chemfe_stat_headings = {
+    "System Topology", "Rotatable Bonds", "Cis-Trans Bonds", "Chiral Centers",
+    "Combinatorial  Space", "Sampled Space"
+  };
+  ReportTable chemfe_tab(chemfe_stats, chemfe_stat_headings, std::string(""),
+                         repcon.getReportFileWidth(),
+                         std::vector<JustifyText>(1, JustifyText::LEFT));
+  parts.back().addTable(chemfe_tab);
+
+  // Summarize the energy minimizations for the preliminary round
+  std::string env_name;
+  switch(sc.getTopologyPointer(0)->getImplicitSolventModel()) {
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    env_name = "Water";
+    break;
+  case ImplicitSolventModel::NONE:
+    env_name = "Free Space";
+    break;
+  };
+  parts.emplace_back("Preliminary Round Energetics, Molecules in " + env_name, std::string(""),
+                     repcon.getReportFileWidth());
+  parts.back().addNarration("In the preliminary round, multiple copies of each system are set to "
+                            "initial configurations throughout the combinatorial space in a "
+                            "controlled distribution and relaxed, subject to any user-specified "
+                            "restraints.  The results of this energy minimization help to inform "
+                            "the settings for critical bond rotations in subsequent ligand "
+                            "placements when the space occupied by the receptor provides an "
+                            "additional constraint on the conformation.");
+  std::vector<std::string> prelim_nrg_headings;
+  std::vector<double> prelim_nrg_data;
+  const SynthesisMapReader sandbox_mapr = sandbox_map.data();
+  switch (repcon.getOutputScope()) {
+  case OutputScope::AVERAGES:
+    break;
+  case OutputScope::OUTLIERS:
+    break;
+  case OutputScope::CLUSTER_AVERAGES:
+    {
+      std::string shortcut_key;
+      const std::vector<ReportTable> etables = tabulateGroupedEnergy(prelim_emin,
+                                                                     confcon.getGroupingMethod(),
+                                                                     EnergySample::TIME_SERIES,
+                                                                     "free", &shortcut_key,
+                                                                     sandbox_map, {}, repcon);
+      parts.back().addNarration(shortcut_key);
+      for (size_t i = 0; i < etables.size(); i++) {
+        parts.back().addTable(etables[i]);
+      }
+    }
+    break;
+  case OutputScope::CLUSTER_OUTLIERS:
+    break;
+  case OutputScope::FULL:
+    {
+      std::string shortcut_key;
+      std::string post_script;
+      const std::vector<ReportTable> etables = tabulateFullEnergy(prelim_emin,
+                                                                  EnergySample::TIME_SERIES,
+                                                                  "free", &shortcut_key,
+                                                                  &post_script, sandbox_map, {},
+                                                                  repcon);
+      parts.back().addNarration(shortcut_key);
+      for (size_t i = 0; i < etables.size(); i++) {
+        parts.back().addTable(etables[i]);
+      }
+      if (post_script.size() > 0) {
+        parts.back().addScript(post_script);
+      }
+    }
+    break;
+  }
+  parts.back().addNarration("Failures in the energy minimizations of molecules with grid "
+                            "constraints may indicate sensitive aspects of each compound.  "
+                            "Avoiding certain combinations of critical variable settings may be "
+                            "advisable to expedite future sampling.  Details of the most common "
+                            "failures in preliminary energy minimizations are listed below.");
+
+  // Print the sections to the output
+  printAllSections(&foutp, parts, repcon.getOutputSyntax(), ListEnumeration::NUMBERED,
+                   ListEnumeration::ALPHABETIC);
+  
+  foutp.close();
 }
   
 } // namespace analysis

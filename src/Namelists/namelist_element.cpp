@@ -41,7 +41,11 @@ NamelistElement::NamelistElement(const std::string &keyword_in, const NamelistTy
   template_ints{},
   template_reals{},
   template_strings{},
+  default_int_values{int_values[0]},
+  default_real_values{real_values[0]},
+  default_string_values{string_values[0]},
   establishment{setEstablishment(std::vector<std::string>(1, default_in))[0]},
+  imperative{KeyRequirement::REQUIRED},
   template_establishment{},
   template_requirements{},
   instance_establishment{},
@@ -128,7 +132,7 @@ NamelistElement::NamelistElement(const std::string keyword_in,
                                  const DefaultIsObligatory obligate, const InputRepeats rep_in,
                                  const std::string &help_in,
                                  const std::vector<std::string> &sub_help_in,
-                                 const std::vector<SubkeyRequirement> &template_requirements_in) :
+                                 const std::vector<KeyRequirement> &template_requirements_in) :
   label{keyword_in},
   kind{NamelistType::STRUCT},
   policy{ExceptionResponse::WARN},
@@ -149,7 +153,11 @@ NamelistElement::NamelistElement(const std::string keyword_in,
   template_ints{vectorStrtol(default_list, ExceptionResponse::SILENT)},
   template_reals{vectorStrtod(default_list, ExceptionResponse::SILENT)},
   template_strings{default_list},
+  default_int_values{},
+  default_real_values{},
+  default_string_values{},
   establishment{InputStatus::MISSING},
+  imperative{KeyRequirement::REQUIRED},
   template_establishment{setEstablishment(default_list)},
   template_requirements{template_requirements_in},
   instance_establishment{static_cast<size_t>(next_entry_index + 1) * sub_keys_in.size(),
@@ -176,7 +184,7 @@ NamelistElement::NamelistElement(const std::string keyword_in,
 
   // Fill out any remaining STRUCT template requirements--assume that all fields are required.
   for (size_t i = template_requirements.size(); i < sub_kinds.size(); i++) {
-    template_requirements.push_back(SubkeyRequirement::REQUIRED);
+    template_requirements.push_back(KeyRequirement::REQUIRED);
   }
   
   // If the right number of help messages for sub-key was not provided, fill in that array with
@@ -414,7 +422,7 @@ const std::string& NamelistElement::getStringValue(const std::string &sub_key_qu
   if (sub_key_query.size() > 0) {
     if (kind != NamelistType::STRUCT) {
       rtErr("Request for data associated with STRING sub-key \"" + sub_key_query + "\" in "
-            "non-STRUCT keyword \"" + label + "\".", "getRealValue");
+            "non-STRUCT keyword \"" + label + "\".", "getStringValue");
     }
     const size_t member_index = validateSubKey(sub_key_query, NamelistType::STRING,
                                                "getStringValue");
@@ -476,6 +484,21 @@ InputStatus NamelistElement::getEstablishment(const std::string &sub_key_query,
 }
 
 //-------------------------------------------------------------------------------------------------
+KeyRequirement NamelistElement::getImperative() const {
+  return imperative;
+}
+
+//-------------------------------------------------------------------------------------------------
+KeyRequirement NamelistElement::getImperative(const std::string &sub_key_query) const {
+  if (kind != NamelistType::STRUCT) {
+    rtErr("Request for data associated with STRING sub-key \"" + sub_key_query + "\" in "
+          "non-STRUCT keyword \"" + label + "\".", "getImperative");
+  }
+  const size_t member_index = validateSubKey(sub_key_query, NamelistType::STRING, "getImperative");
+  return template_requirements[member_index];
+}
+
+//-------------------------------------------------------------------------------------------------
 bool NamelistElement::getRepeatableValueState() const {
   return accept_multiple_values;
 }
@@ -516,6 +539,7 @@ void NamelistElement::addDefaultValue(const std::string &next_default) {
     int_values.resize(entry_count + 1);
     if (verifyContents(next_default, NumberFormat::INTEGER)) {      
       int_values[entry_count] = stoi(next_default);
+      default_int_values.push_back(int_values[entry_count]);
       entry_count++;
     }
     else {
@@ -528,6 +552,7 @@ void NamelistElement::addDefaultValue(const std::string &next_default) {
     if (verifyContents(next_default, NumberFormat::STANDARD_REAL) ||
         verifyContents(next_default, NumberFormat::SCIENTIFIC)) {
       real_values[entry_count] = stod(next_default);
+      default_real_values.push_back(real_values[entry_count]);
       entry_count++;
     }
     else {
@@ -538,7 +563,13 @@ void NamelistElement::addDefaultValue(const std::string &next_default) {
   case NamelistType::STRING:
     string_values.resize(entry_count + 1);
     string_values[entry_count] = next_default;
+    default_string_values.push_back(string_values[entry_count]);
     entry_count++;
+  case NamelistType::STRUCT:
+
+    // STRUCT-type keywords' default values are stored in the template_(ints / reals / strings)
+    // arrays.
+    break;
   }
 }
 
@@ -658,6 +689,18 @@ void NamelistElement::setStringValue(const std::string &sub_key_query, const std
     sub_string_values[(next_entry_index * template_size) +  member_index] = value;
     sub_key_found[member_index] = true;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistElement::setImperative(const KeyRequirement imperative_in) {
+  imperative = imperative_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistElement::setImperative(const std::string &sub_key_query,
+                                    const KeyRequirement imperative_in) {
+  const int member_index = validateSubKey(sub_key_query, NamelistType::REAL, "setRealValue");
+  template_requirements[member_index] = imperative_in;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -98,6 +98,9 @@ public:
   ///        parameter, below which two particles will be deemed colliding.
   double getVdwClashRatio() const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Set the total number of minimization cycles.
   ///
   /// \param cycles_in  The requested number of minimization cycles
@@ -180,6 +183,9 @@ private:
   double clash_vdw_ratio;         ///< The minimum ratio of inter-particle distance to the pairwise
                                   ///<   Lennard-Jones (van-der Waals) sigma parameter, below which
                                   ///<   a clash will be declared
+
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
   
   /// \brief Validate the total number of minimization cycles.
   void validateTotalCycles();

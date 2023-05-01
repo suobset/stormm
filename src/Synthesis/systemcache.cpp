@@ -1037,6 +1037,12 @@ std::vector<AtomGraph*> SystemCache::getTopologiesMatchingLabel(const std::strin
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::string& SystemCache::getLabel(const int label_index) const {
+  checkLabelBounds(label_index, "getLabel");
+  return label_cache[label_index];
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<std::string> SystemCache::getLabelsMatchingTopology(const AtomGraph *query_ag) const {
   const std::vector<int> matches = getMatchingSystemIndices(query_ag);
   const size_t nmatch = matches.size();

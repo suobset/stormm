@@ -54,6 +54,7 @@ using stormm::stmath::perpendicularComponent;
 using stormm::stmath::pointPlaneDistance;
 using stormm::stmath::sum;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using stormm::symbols::pi;
 using stormm::synthesis::Condensate;
 using stormm::synthesis::CondensateWriter;
@@ -931,6 +932,8 @@ int main(const int argc, const char* argv[]) {
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

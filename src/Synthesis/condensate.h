@@ -42,7 +42,8 @@ struct CondensateWriter {
   CondensateWriter(PrecisionModel mode_in, StructureSource basis_in, int system_count_in,
                    UnitCellType unit_cell_in, const size_t* atom_starts_in,
                    const int* atom_counts_in, float* xcrd_sp, float* ycrd_sp, float* zcrd_sp,
-                   double* xcrd, double* ycrd, double* zcrd, double* umat_in, double* invu_in);
+                   double* xcrd, double* ycrd, double* zcrd, double* umat_in, double* invu_in,
+                   double* boxdim_in);
 
   /// \brief The usual copy and move constructors aply for an abstract, with copy and move
   ///        assignment operators being implicitly deleted.
@@ -67,6 +68,7 @@ struct CondensateWriter {
   double* zcrd;                  ///< Double-precision Cartesian Z coordinates
   double* umat;                  ///< Box transform information for all systems
   double* invu;                  ///< Inverse box transform information for all systems
+  double* boxdims;               ///< Box dimensions for all systems
 };
 
 /// \brief Read-only abstract for the Condensate class.  In most cases, the read-only abstract will
@@ -81,7 +83,8 @@ struct CondensateReader {
                    UnitCellType unit_cell_in, const size_t* atom_starts_in,
                    const int* atom_counts_in, const float* xcrd_sp, const float* ycrd_sp,
                    const float* zcrd_sp, const double* xcrd, const double* ycrd,
-                   const double* zcrd, const double* umat_in, const double* invu_in);
+                   const double* zcrd, const double* umat_in, const double* invu_in,
+                   const double* boxdim_in);
 
   CondensateReader(const CondensateWriter &cdw);
   /// \}
@@ -109,6 +112,7 @@ struct CondensateReader {
   const double* zcrd;            ///< Double-precision Cartesian Z coordinates
   const double* umat;            ///< Box transform information for all systems
   const double* invu;            ///< Inverse box transform information for all systems
+  const double* boxdims;         ///< Box dimensions for all systems
 };
 
 /// \brief Condense the data format, and possibly offer a reduced representation of coordinates,
@@ -163,6 +167,16 @@ public:
   /// \brief Get an indication of whether the Condensate keeps its own copy of the coordinates.
   bool ownsCoordinates() const;
 
+  /// \brief Get the starting index of atoms for one of the systems, using its index.
+  ///
+  /// \param system_index  Index of the system of interest
+  size_t getAtomOffset(int system_index) const;
+
+  /// \brief Get the number of atoms in one of the systems, using its index.
+  ///
+  /// \param system_index  Index of the system of interest
+  int getAtomCount(int system_index) const;
+  
   /// \brief Get the data type of the CoordinateSeries upon which this object is based.
   size_t getCoordinateSeriesTypeID() const;
   
@@ -208,6 +222,17 @@ public:
   /// \}  
   
 #ifdef STORMM_USE_HPC
+  /// \brief Get an abstract to the condensate's host data that is guaranteed to be accessible by
+  ///        the GPU device.  
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract for a const condensate object
+  ///   - Get a writeable abstract for a non-const condensate object
+  /// \{
+  const CondensateReader deviceViewToHostData() const;
+  CondensateWriter deviceViewToHostData();
+  /// \}
+  
   /// \brief Upload all data from the host to the GPU device.
   void upload();
 
@@ -305,9 +330,11 @@ private:
   Hybrid<double> x_coordinates;    ///< Cartesian X coordinates of all particles
   Hybrid<double> y_coordinates;    ///< Cartesian Y coordinates of all particles
   Hybrid<double> z_coordinates;    ///< Cartesian Z coordinates of all particles
-  Hybrid<double> umat;             ///< Box space transformation matrices
-  Hybrid<double> invu;             ///< Inverse box space (back to real space) transformation
+  Hybrid<double> box_transforms;   ///< Box space transformation matrices
+  Hybrid<double> inv_transforms;   ///< Inverse box space (back to real space) transformation
                                    ///<   matrices
+  Hybrid<double> box_dimensions;   ///< Box dimensions (a, b, c, alpha, beta, gamma) for each
+                                   ///<   system
 
   // Pointers to the original coordinate objects
   PhaseSpaceSynthesis *pps_ptr;   ///< Pointer to the PhaseSpaceSynthesis object upon which this

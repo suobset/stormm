@@ -97,6 +97,9 @@ public:
   /// \brief Get the precision level for Particle-Mesh Ewald computations.
   PrecisionModel getParticleMeshEwaldMethod() const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Set the global position fixed-precision bits.
   ///
   /// \param bitval  The number of bits after the decimal (will be checked for validity in light
@@ -172,6 +175,9 @@ private:
   PrecisionModel nonbonded_method; ///< Non-bonded short-ranged computation precision model
   PrecisionModel pme_method;       ///< Particle-Mesh Ewald computation precision model
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Validate the bond constraint tolerance.  It cannot be too small, lest calculations
   ///        become unstable.
   void validateBondConstraintTol();

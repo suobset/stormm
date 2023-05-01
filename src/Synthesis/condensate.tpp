@@ -85,8 +85,8 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
       x_coordinates.setPointer(&double_data,                   0, padded_atoms);
       y_coordinates.setPointer(&double_data,        padded_atoms, padded_atoms);
       z_coordinates.setPointer(&double_data, 2LLU * padded_atoms, padded_atoms);
-      umat.setPointer(&double_data,  3LLU * padded_atoms                , xfrm_spacing);
-      invu.setPointer(&double_data, (3LLU * padded_atoms) + xfrm_spacing, xfrm_spacing);
+      box_transforms.setPointer(&double_data,  3LLU * padded_atoms                , xfrm_spacing);
+      inv_transforms.setPointer(&double_data, (3LLU * padded_atoms) + xfrm_spacing, xfrm_spacing);
     }
     else {
       double_data.resize(0);
@@ -97,8 +97,10 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
                                0, padded_atoms);
       z_coordinates.setPointer(const_cast<Hybrid<double>*>(cs_in_d->getCoordinatePointer(zdim)),
                                0, padded_atoms);
-      umat.setPointer(const_cast<Hybrid<double>*>(cs_in_d->getBoxTransformPointer()));
-      invu.setPointer(const_cast<Hybrid<double>*>(cs_in_d->getInverseTransformPointer()));
+      box_transforms.setPointer(const_cast<Hybrid<double>*>(cs_in_d->getBoxTransformPointer()));
+      const Hybrid<double>* cs_in_dptr = cs_in_d->getInverseTransformPointer();
+      inv_transforms.setPointer(const_cast<Hybrid<double>*>(cs_in_dptr));
+      box_dimensions.setPointer(const_cast<Hybrid<double>*>(cs_in_d->getBoxDimensionPointer()));
     }
     break;
   case PrecisionModel::SINGLE:
@@ -113,8 +115,8 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
       x_coordinates_sp.setPointer(&float_data,                   0, padded_atoms);
       y_coordinates_sp.setPointer(&float_data,        padded_atoms, padded_atoms);
       z_coordinates_sp.setPointer(&float_data, 2LLU * padded_atoms, padded_atoms);
-      umat.setPointer(&double_data,            0, xfrm_spacing);
-      invu.setPointer(&double_data, xfrm_spacing, xfrm_spacing);
+      box_transforms.setPointer(&double_data,            0, xfrm_spacing);
+      inv_transforms.setPointer(&double_data, xfrm_spacing, xfrm_spacing);
     }
     else {
       float_data.resize(0);
@@ -127,8 +129,10 @@ void Condensate::rebuild(const CoordinateSeries<T> *cs_in, const PrecisionModel 
                                   0, padded_atoms);
 
       // Even the float-type CoordinateSeries will emit double-precision transform pointers.
-      umat.setPointer(const_cast<Hybrid<double>*>(cs_in_f->getBoxTransformPointer()));
-      invu.setPointer(const_cast<Hybrid<double>*>(cs_in_f->getInverseTransformPointer()));
+      box_transforms.setPointer(const_cast<Hybrid<double>*>(cs_in_f->getBoxTransformPointer()));
+      const Hybrid<double>* cs_in_fptr = cs_in_f->getInverseTransformPointer();
+      inv_transforms.setPointer(const_cast<Hybrid<double>*>(cs_in_fptr));
+      box_dimensions.setPointer(const_cast<Hybrid<double>*>(cs_in_f->getBoxDimensionPointer()));
     }
     break;
   }

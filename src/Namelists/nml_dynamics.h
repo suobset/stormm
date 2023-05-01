@@ -71,6 +71,9 @@ public:
   /// \brief Get the RATTLE tolerance
   double getRattleTolerance() const;
 
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
+  
   /// \brief Set the total number of dynamics steps
   ///
   /// \param nstlim_in  The number of steps to take
@@ -97,6 +100,9 @@ private:
   double time_step;             ///< Time step to take after each force evaluation
   double rattle_tolerance;      ///< The tolerance to apply to bond constraint calculations
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Validate the total number of steps
   void validateStepCount() const;
 

@@ -15,7 +15,8 @@ DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const Wrap
     policy{policy_in},
     nstlim{default_dynamics_nstlim},
     time_step{default_dynamics_time_step},
-    rattle_tolerance{default_rattle_tolerance}
+    rattle_tolerance{default_rattle_tolerance},
+    nml_transcript{"dynamics"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -24,6 +25,7 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
     DynamicsControls(policy_in)
 {
   NamelistEmulator t_nml = dynamicsInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   nstlim = t_nml.getIntValue("nstlim");
 
   // Validate input
@@ -47,6 +49,11 @@ double DynamicsControls::getRattleTolerance() const {
   return rattle_tolerance;
 }
 
+//-------------------------------------------------------------------------------------------------
+const NamelistEmulator& DynamicsControls::getTranscript() const {
+  return nml_transcript;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setStepCount(const int nstlim_in) {
   nstlim = nstlim_in;

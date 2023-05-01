@@ -45,7 +45,6 @@ void psyInitializeForces(PsSynthesisWriter *psyw, int index, const GpuDetails &g
 /// \param gpu   Details of the GPU available  
 void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails &gpu);
 
-#if 0
 /// \brief Import the Cartesian X, Y, and Z components of poositions, velocities, or forces of one
 ///        system within the synthesis.
 ///
@@ -85,8 +84,8 @@ void psyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_
                          const double* y_import, const double* z_import,
                          const double* box_xform_in, const double* inverse_xform_in,
                          const double* box_dimensions_in, const int system_index,
-                         const double conversion_factor, const GpuDetails &gpu);
-#endif
+                         const TrajectoryKind kind, const double conversion_factor,
+                         const GpuDetails &gpu);
 
 } // namespace synthesis
 } // namespace stormm

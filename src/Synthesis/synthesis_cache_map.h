@@ -102,6 +102,23 @@ public:
   SynthesisCacheMap& operator=(SynthesisCacheMap &&original);
   /// \}
 
+  /// \brief Get the number of systems in the associated cache.
+  int getCacheSystemCount() const;
+
+  /// \brief Get the number of systems in the associated synthesis.
+  int getSynthesisSystemCount() const;
+
+  /// \brief Get the number of labels in the associated cache.
+  int getCacheLabelCount() const;
+
+  /// \brief Get the number of unique topologies in the associated cache.
+  int getCacheTopologyCount() const;
+
+  /// \brief Get the number of (unique) topologies in the associated synthesis.  This will check
+  ///        the coordinate synthesis pointer, then the topology synthesis pointer, and return the
+  ///        number of unique topologies based on the first valid pointer it encounters.
+  int getSynthesisTopologyCount() const;
+
   /// \brief Get a list of all system indices in the synthesis derived from a particular -sys
   ///        keyword entry (a single system within the cache).
   ///

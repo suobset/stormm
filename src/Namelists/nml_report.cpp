@@ -8,6 +8,7 @@
 #include "Constants/behavior.h"
 #include "MoleculeFormat/molecule_format_enumerators.h"
 #include "Parsing/parse.h"
+#include "Reporting/summary_file.h"
 #include "namelist_enumerators.h"
 #include "nml_report.h"
 
@@ -15,15 +16,24 @@ namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
+using parse::minimalRealFormat;
 using parse::strcmpCased;
 using parse::stringToChar4;
+using review::default_output_file_width;
 using structure::DataRequestKind;
   
 //-------------------------------------------------------------------------------------------------
 ReportControls::ReportControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
   policy{policy_in}, report_layout{OutputSyntax::STANDALONE}, report_scope{OutputScope::AVERAGES},
-  username{std::string("")}, start_date{}, print_walltime_data{true}, reported_quantities{},
-  sdf_addons{}
+  username{std::string("")}, start_date{}, print_walltime_data{true},
+  report_file_width{default_output_file_width},
+  common_path_limit{default_common_path_limit},
+  common_path_threshold{default_common_path_threshold},
+  energy_decimal_places{default_energy_decimal_places},
+  outlier_sigma_factor{default_energy_outlier_sigmas},
+  outlier_count{default_outlier_limit},
+  reported_quantities{}, sdf_addons{},
+  nml_transcript{"report"}
 {
   // Detect the time of day
   gettimeofday(&start_date, nullptr);
@@ -47,6 +57,7 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   ReportControls(policy_in, wrap)
 {
   NamelistEmulator t_nml = reportInput(tf, start_line, found_nml, policy, wrap);
+  nml_transcript = t_nml;
   if (t_nml.getKeywordStatus("syntax") != InputStatus::MISSING) {
     setOutputSyntax(t_nml.getStringValue("syntax"));
   }
@@ -59,6 +70,7 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   if (t_nml.getKeywordStatus("timings") != InputStatus::MISSING) {
     setWallTimeData(t_nml.getStringValue("timings"));
   }
+  report_file_width = t_nml.getIntValue("report_width");
   if (t_nml.getKeywordStatus("energy") != InputStatus::MISSING) {
     const int ndetail = t_nml.getKeywordEntries("energy");
     for (int i = 0; i < ndetail; i++) {
@@ -74,7 +86,16 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
       }
     }
   }
+  common_path_limit = t_nml.getIntValue("common_path_limit");
+  common_path_threshold = t_nml.getIntValue("common_path_threshold");
+  energy_decimal_places = t_nml.getIntValue("e_precision");
+  outlier_sigma_factor = t_nml.getRealValue("outlier_sigmas");
+  outlier_count = t_nml.getIntValue("outlier_count");
 
+  // Validate inputs found thus far
+  validateEnergyDecimalPlaces();
+  validateOutlierMetrics();
+  
   // Construct the list of state variables that will be presented in the output file (the actual
   // reporting will be contingent on whether these quantities are indeed relevant to the
   // calculation).
@@ -175,8 +196,18 @@ timeval ReportControls::getStartDate() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const NamelistEmulator& ReportControls::getTranscript() const {
+  return nml_transcript;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool ReportControls::printWallTimeData() const {
   return print_walltime_data;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ReportControls::getReportFileWidth() const {
+  return report_file_width;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -210,6 +241,31 @@ MdlMolDataRequest ReportControls::getSDFileDataRequest(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int ReportControls::getCommonPathLimit() const {
+  return common_path_limit;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ReportControls::getCommonPathThreshold() const {
+  return common_path_threshold;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ReportControls::getEnergyDecimalPlaces() const {
+  return energy_decimal_places;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ReportControls::getOutlierSigmaFactor() const {
+  return outlier_sigma_factor;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ReportControls::getOutlierCount() const {
+  return outlier_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ReportControls::setOutputSyntax(const OutputSyntax report_layout_in) {
   report_layout = report_layout_in;
 }
@@ -220,9 +276,9 @@ void ReportControls::setOutputSyntax(const std::string &report_layout_in) {
       strcmpCased(report_layout_in, "mat_plot_lib", CaseSensitivity::NO)) {
     report_layout = OutputSyntax::MATPLOTLIB;
   }
-  else if (strcmpCased(report_layout_in, "matrix_prg", CaseSensitivity::NO) ||
-           strcmpCased(report_layout_in, "matrix_program", CaseSensitivity::NO) ||
-           strcmpCased(report_layout_in, "matrix_algebra", CaseSensitivity::NO)) {
+  else if (strcmpCased(report_layout_in, "matlab", CaseSensitivity::NO) ||
+           strcmpCased(report_layout_in, "octave", CaseSensitivity::NO) ||
+           strcmpCased(report_layout_in, "matrix_pkg", CaseSensitivity::NO)) {
     report_layout = OutputSyntax::MATRIX_PKG;
   }
   else if (strcmpCased(report_layout_in, "standalone", CaseSensitivity::NO) ||
@@ -333,6 +389,11 @@ void ReportControls::setWallTimeData(const std::string &preference) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ReportControls::setReportFileWidth(const int report_file_width_in) {
+  report_file_width = report_file_width_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ReportControls::setReportedQuantities(const std::string &quantity_in) {
   setReportedQuantities(translateEnergyComponent(quantity_in));
 }
@@ -385,6 +446,21 @@ void ReportControls::addDataItem(const MdlMolDataRequest &ask) {
   if (problem == false) {
     sdf_addons.push_back(ask);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::setCommonPathLimit(const int common_path_limit_in) {
+  common_path_limit = common_path_limit_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::setCommonPathThreshold(const int common_path_threshold_in) {
+  common_path_threshold = common_path_threshold_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::setEnergyDecimalPlaces(const int energy_decimal_places_in) {
+  energy_decimal_places = energy_decimal_places_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -732,6 +808,51 @@ ReportControls::translateSdfKeywordInput(const NamelistEmulator &t_nml, const in
 }
 
 //-------------------------------------------------------------------------------------------------
+void ReportControls::validateEnergyDecimalPlaces() {
+  if (energy_decimal_places < 1 || energy_decimal_places > 12) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid number of digits after the decimal for reporting energies: " +
+            std::to_string(energy_decimal_places) + ".", "ReportControls",
+            "validateEnergyDecimalPlaces");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid number of digits after the decimal was specified for reporting "
+             "energies (" + std::to_string(energy_decimal_places) + ").  The default value of " +
+             std::to_string(default_energy_decimal_places) + " will be restored.",
+             "ReportControls", "validateEnergyDecimalPlaces");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    energy_decimal_places = default_energy_decimal_places;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::validateOutlierMetrics() {
+  if (outlier_sigma_factor <= 0.0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid multiplier for detecting outliers: " +
+            minimalRealFormat(outlier_sigma_factor, 1.0e-4) + " standard deviations from the "
+            "mean.", "ReportControls", "validateOutlierMetrics");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid multiplier (" + minimalRealFormat(outlier_sigma_factor, 1.0e-4) +
+             " standard deviations from the mean, was provided.  The default value of " +
+             minimalRealFormat(default_energy_outlier_sigmas, 1.0e-4) + " will be restored.",
+             "ReportControls", "validateOutlierMetrics");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    outlier_sigma_factor = default_energy_outlier_sigmas;
+  }
+  if (outlier_count < 0) {
+    outlier_count = 0;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                              const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("report", CaseSensitivity::AUTOMATIC, policy, "Collects directives "
@@ -765,15 +886,19 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
     "The external registry number for the compound (will be displayed on the headline in "
     "parentheses)",
     "Set to ON to have this data item state the internal registry number within the SDF on its "
-    "headline (default OFF)",
+    "headline",
     "The field number of this type of data in a MACCS-II database"
   };
   t_nml.addKeyword(NamelistElement("syntax", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("scope", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("username", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("timings", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("report_width", NamelistType::INTEGER,
+                                   std::to_string(default_output_file_width)));
   t_nml.addKeyword(NamelistElement("energy", NamelistType::STRING, "MISSING",
                                    DefaultIsObligatory::NO, InputRepeats::YES));
+  t_nml.addKeyword(NamelistElement("e_precision", NamelistType::INTEGER,
+                                   std::to_string(default_energy_decimal_places)));
   t_nml.addKeyword(NamelistElement("sdf_item", { "-title", "-label", "-energy", "-message",
                                                  "-mask", "-parameter", "-typeI", "-typeJ",
                                                  "-typeK", "-typeL", "-typeM", "-exregno",
@@ -792,15 +917,26 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                                      std::string("OFF"), std::string("") },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sdf_help,
                                    sdf_keys_help,
-                                   { SubkeyRequirement::REQUIRED, SubkeyRequirement::REQUIRED,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL,
-                                     SubkeyRequirement::OPTIONAL, SubkeyRequirement::OPTIONAL }));
+                                   { KeyRequirement::REQUIRED, KeyRequirement::REQUIRED,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL,
+                                     KeyRequirement::OPTIONAL, KeyRequirement::OPTIONAL }));
+  t_nml.addKeyword(NamelistElement("common_path_limit", NamelistType::INTEGER,
+                                   std::to_string(default_common_path_limit)));
+  t_nml.addKeyword(NamelistElement("common_path_threshold", NamelistType::INTEGER,
+                                   std::to_string(default_common_path_threshold)));
+  t_nml.addKeyword(NamelistElement("outlier_sigmas", NamelistType::REAL,
+                                   std::to_string(default_energy_outlier_sigmas)));
+  t_nml.addKeyword(NamelistElement("outlier_count", NamelistType::INTEGER,
+                                   std::to_string(default_outlier_limit)));
   t_nml.addHelp("syntax", "Layout of the diagnostics report file, intended to make it amenable "
-                "to one of a variety of plotting programs for further analysis.");
+                "to one of a variety of plotting programs for further analysis.  Options include "
+                "MATLAB, OCTAVE, MATRIX_PKG (various matrix algebra programs), MATPLOTLIB or "
+                "MAT_PLOT_LIB (python-based plotting library), or STANDALONE or STORMM (generic "
+                "format).");
   t_nml.addHelp("scope", "The extent of reporting that shall take place for the energies and "
                 "other properties of individual systems.");
   t_nml.addHelp("username", "Name of the user driving the run (if different from that which would "
@@ -808,6 +944,10 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addHelp("timings", "By default, the wall time devoted to various aspects of a calculation "
                 "will be displayed at the end of the run.  Set to ON or ACTIVE to ensure this "
                 "behavior, or OFF to decline printed timings.");
+  t_nml.addHelp("report_width", "Indicate the desired width of the report file.  For example, "
+                "sander's mdout has a width of 80 characters.  This width will be respected "
+                "except as required by aspects of line formatting and unbreakable variable or "
+                "file names.");
   t_nml.addHelp("energy", "In addition to certain obligatory outputs, a user can select that only "
                 "specific molecular mechanics energy components be printed, to help focus the "
                 "output and reduce file sizes.  In all cases, the total, total potential, and "
@@ -822,9 +962,23 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                 "sensitive.  A user may also opt to print temperatures of specific regions of the "
                 "simulation by supplying the LOCAL_TEMPERATURE argument, and components of the "
                 "virial using the VIRIAL_COMPONENTS argument.");
+  t_nml.addHelp("e_precision", "The number of decimal places with which to report all energy "
+                "quantities in the output tables.  Energies are reported in units of kcal/mol.  "
+                "The default setting matches Amber output and is appropriate for most molecular "
+                "simulations and geometry optimizations.");
   t_nml.addHelp("sdf_item", "Detail a data item to be included in an SD file archive.  These "
                 "items can be attached to specific systems and display particular aspects of the "
                 "energy or the model that calculated it.");
+  t_nml.addHelp("common_path_limit", "The maximum number of common paths that will be used to "
+                "condense output tables detailing the origins of each system in various files.");
+  t_nml.addHelp("common_path_threshold", "The number of files that must use a common root path in "
+                "order for it to be declared a common path and abstracted into a ${token} to "
+                "condense output.");
+  t_nml.addHelp("outlier_sigmas", "Multiplier for the number of standard deviations from the mean "
+                "energy at which point a given eneregy (and the system displaying it) will be "
+                "deemed an outlier.");
+  t_nml.addHelp("outlier_count", "The maximum number of outliers that will be reported, per group "
+                "if there is a grouping method in place or over the whole system otherwise.");
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

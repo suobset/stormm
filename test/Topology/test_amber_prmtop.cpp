@@ -27,6 +27,7 @@ using stormm::parse::stringToChar4;
 using stormm::parse::TextFile;
 using stormm::parse::operator==;
 using stormm::review::stormmSplash;
+using stormm::review::stormmWatermark;
 using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
@@ -1109,6 +1110,8 @@ int main(const int argc, const char* argv[]) {
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());  
-
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
   return countGlobalTestFailures();
 }

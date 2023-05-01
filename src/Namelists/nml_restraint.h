@@ -102,6 +102,9 @@ public:
   std::vector<BoundedRestraint> getRestraint(const AtomGraph *ag, const ChemicalFeatures &chemfe,
                                              const PhaseSpace &ps) const;
   /// \}
+
+  /// \brief Get the original namelist emulator object as a transcript of the user input.
+  const NamelistEmulator& getTranscript() const;
   
 private:
 
@@ -154,6 +157,9 @@ private:
                                   ///<   engage to prevent hydrogen bonds from forming between
                                   ///<   identified donors and acceptors
 
+  /// Store a deep copy of the original namelist emulator as read from the input file.
+  NamelistEmulator nml_transcript;
+  
   /// \brief Get a verdict on whether this object specifies atoms by masks or by indices.
   RestraintAnchoring getAtomSpecification() const;
 

@@ -7,13 +7,16 @@
 #include "../../../src/Accelerator/gpu_details.h"
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/nml_conformer.h"
+#include "../../../src/Namelists/nml_files.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/nml_report.h"
+#include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Potential/scorecard.h"
 #include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
-#include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Synthesis/synthesis_cache_map.h"
+#include "../../../src/Synthesis/synthesis_permutor.h"
+#include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/Structure/clash_detection.h"
 #include "../../../src/Structure/local_arrangement.h"
 
@@ -24,15 +27,18 @@ using stormm::card::GpuDetails;
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::namelist::ConformerControls;
-using stormm::namelist::ReportControls;
 using stormm::namelist::default_minimize_clash_r0;
 using stormm::namelist::default_minimize_clash_ratio;
+using stormm::namelist::FilesControls;
+using stormm::namelist::ReportControls;
+using stormm::namelist::UserSettings;
 using stormm::structure::ClashReport;
 using stormm::structure::MdlMol;
 using stormm::synthesis::Condensate;
 using stormm::synthesis::PhaseSpaceSynthesis;
 using stormm::synthesis::PsSynthesisReader;
 using stormm::synthesis::SynthesisCacheMap;
+using stormm::synthesis::SynthesisPermutor;
 using stormm::synthesis::SystemCache;
 using stormm::synthesis::SystemGrouping;
     
@@ -72,6 +78,20 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
                   const ScoreCard &emin, const SystemCache &sc, const SynthesisCacheMap &scmap,
                   const ConformerControls &confcon, const ReportControls &repcon);
 
+/// \brief Print a report for the user to summarize the results and indicate ways to improve the
+///        outcomes.
+///
+/// \param sc           Cache of systems used to seed the calculations
+/// \param ui           Contains user-generated contol input
+/// \param sandbox_prm  Contains information on the permutations and combinatorial space available
+///                     to each system in the systems cache sc
+/// \param sandbox_map  Map linking the coordinate synthesis used in the initial round of energy
+///                     minimizations to the systems cache created based on the &files namelist
+/// \param prelim_emin  Outputs from preliminary energy minimization runs
+void printReport(const SystemCache &sc, const UserSettings &ui,
+                 const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
+                 const ScoreCard &prelim_emin);
+  
 } // namespace analysis
 } // namespace conf_app
 

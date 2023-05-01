@@ -49,9 +49,22 @@ public:
                   const std::string &help_in = std::string("No description provided"),
                   const std::vector<std::string> &sub_help_in =
                   std::vector<std::string>(1, "No description provided"),
-                  const std::vector<SubkeyRequirement> &template_requirements_in = {});
+                  const std::vector<KeyRequirement> &template_requirements_in = {});
   /// \}
 
+  /// \brief With no const members and only Standard Template Library components, the default copy
+  ///        and move constructors, as well as the copy and move assignment operators, are valid.
+  ///
+  /// \param original  The pre-existing object to copy or move
+  /// \param other     A pre-existing object to fulfill the right hand side of an assignment
+  ///                  statement
+  /// \{
+  NamelistElement(const NamelistElement &original) = default;
+  NamelistElement(NamelistElement &&original) = default;
+  NamelistElement& operator=(const NamelistElement &original) = default;
+  NamelistElement& operator=(NamelistElement &&original) = default;
+  /// \}
+  
   /// \brief Get the keyword for a namelist element, i.e. nstlim in Amber &ctrl
   const std::string& getLabel() const;
 
@@ -151,6 +164,20 @@ public:
   InputStatus getEstablishment(const std::string &member_key = std::string(""),
                                int repeat_no = 0) const;
 
+  /// \brief Report whether a keyword has been deemed essential, optional, or bogus in a particular
+  ///        context.  This enables the same namelist to take on different profiles in different
+  ///        applications, and to report only that data which is relevant in the program output.
+  ///
+  /// Overloaded:
+  ///   - Get the criticality of the keyword
+  ///   - Get the criticality of a subkey within a STRUCT keyword
+  ///
+  /// \param sub_key_query  Name of the sub-key to search if the namelist element is a STRUCT
+  /// \{
+  KeyRequirement getImperative() const;
+  KeyRequirement getImperative(const std::string &sub_key_query) const;
+  /// \}
+
   /// \brief Report whether an element accepts multiple values
   bool getRepeatableValueState() const;
 
@@ -217,6 +244,19 @@ public:
   void setStringValue(const std::string &member_key, const std::string &value);
   /// \}
 
+  /// \brief Set the requirement associated with a keyword.
+  ///
+  /// Overloaded:
+  ///   - Set the criticality of a keyword
+  ///   - Set the criticality of a subkey within a STRUCT-type keyword
+  ///
+  /// \param imperative_in  The criticality level of the keyword to set.  Is it required, optional,
+  ///                       or bogus in some context?
+  /// \{
+  void setImperative(const KeyRequirement imperative_in);
+  void setImperative(const std::string &sub_key_query, const KeyRequirement imperative_in);
+  /// \}
+
 private:
   std::string label;                          ///< The keyword sought in the input file
   NamelistType kind;                          ///< The kind of namelist variable
@@ -263,10 +303,24 @@ private:
   std::vector<std::string> template_strings;  ///< List of strings providing template default
                                               ///<   values for STRUCT kind namelist elements
 
+  // Just as STRUCT-type keywords have the template_(...) arrays to store the default values of
+  // their member subkeys, STRING-, INTEGER-, and REAL-type keywords have special storage for their
+  // default(s).
+  std::vector<int> default_int_values;             ///< A record of default integer number values
+                                                   ///<   passed to the keyword
+  std::vector<double> default_real_values;         ///< A record of default real number values
+                                                   ///<   passed to the keyword
+  std::vector<std::string> default_string_values;  ///< A record of default string values passed to
+                                                   ///<   the keyword
+  
   /// Indicates whether a value for the appropriate keyword has been found in the input, taken from
   /// a default value, or is missing
   InputStatus establishment;     
 
+  /// Indicate the criticality of the keyword, enabling contextual dependence for various
+  /// &namelists.
+  KeyRequirement imperative;
+  
   /// Default statuses for each member of a STRUCT kind namelist element.  For STRUCTs accepting
   /// multiple input values, each new instance of the struct will have multiple int, real, or
   /// string variables which need to be specified or assigned default values from the template.
@@ -276,7 +330,7 @@ private:
   /// optional keywords with no defaults, and for reuseable code STRUCT elements can accept
   /// different subkey requirements in different contexts.  Subkeys can be flagged as "bogus" if,
   /// in some context, they should not be present.
-  std::vector<SubkeyRequirement> template_requirements;
+  std::vector<KeyRequirement> template_requirements;
   
   /// Current status of each member of every application of a STRUCT kind namelist element.
   /// Check this array to see if a particular instance of a STRUCT keyword supplied by the user

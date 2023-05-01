@@ -938,6 +938,9 @@ void ComparisonGuide::allocateSystemIndexing() {
     case StructureSource::SERIES:
       topology_count = 1;
       break;
+    case StructureSource::NONE:
+      topology_count = 0;
+      break;
     }
     source_count = topology_count;
     label_count = topology_count;

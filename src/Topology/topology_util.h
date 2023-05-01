@@ -105,7 +105,8 @@ bool isBonded(const AtomGraph *ag, int atom_i, int atom_j);
 
 /// \brief Locate a match for a topology pointer among a list of topology pointers.  If the pointer
 ///        cannot be found, look for a topology originating from the same file.  Return the index
-///        the array containing the matching topology.
+///        the array containing the matching topology.  If no match is found, return the length of
+///        the array of topologies.
 ///
 /// Overloaded:
 ///   - Match a pointer to a topology against an array of topology pointers
