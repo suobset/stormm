@@ -17,7 +17,7 @@
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_workunit.h"
 #include "../../src/Math/rounding.h"
-#include "../../src/Math/sorting.h"
+#include "../../src/Math/sorting_enumerators.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Namelists/nml_files.h"

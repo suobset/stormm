@@ -154,6 +154,11 @@ public:
   ///
   /// \param index  The system of interest
   PhaseSpace exportPhaseSpace(int index) const;
+
+  /// \brief Export the topology for one system.
+  ///
+  /// \param index  The system of interest.
+  AtomGraph exportAtomGraph(int index) const;
   
   /// \brief Get a const reference to the coordinates for one or more systems.
   ///

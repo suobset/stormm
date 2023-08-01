@@ -353,13 +353,26 @@ public:
   ///        access to any of its member variables.
   ///
   /// Overloaded:
-  ///   - Get a read-only object
-  ///   - Get a writeable object
+  ///   - Get a read-only abstract from a const coordinate series
+  ///   - Get a writeable abstract from a non-const coordinate series
+  ///
+  /// \param tier  Get pointers to data at the level of the CPU host or GPU device
   /// \{
   const CoordinateSeriesReader<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CoordinateSeriesWriter<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Get the object's abstract, with all templated type pointers cast to void pointers.
+  ///        The true data type can be encoded in a separate 64-bit unsigned integer code (use
+  ///        std::type_index() as seen in DataTypes/common_types.h).  Parameter descriptions and
+  ///        overloading match those in data() above.
+  /// \{
+  const CoordinateSeriesReader<void>
+  templateFreeData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  CoordinateSeriesWriter<void> templateFreeData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
 #ifdef STORMM_USE_HPC
   /// \brief Get an abstract for the object's host data that is guaranteed to be accessible by the
   ///        GPU device.
@@ -370,6 +383,17 @@ public:
   /// \{
   const CoordinateSeriesReader<T> deviceViewToHostData() const;
   CoordinateSeriesWriter<T> deviceViewToHostData();
+  /// \}
+
+  /// \brief Get an abstract for the object's host data that is guaranteed to be accessible by the
+  ///        GPU device with all of its templated pointers cast to void.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only abstract for a const coordinate series
+  ///   - Get a writeable abstract for a non-const coordinate series
+  /// \{
+  const CoordinateSeriesReader<void> deviceViewToTemplateFreeHostData() const;
+  CoordinateSeriesWriter<void> deviceViewToTemplateFreeHostData();
   /// \}
   
   /// \brief Upload all information
@@ -559,7 +583,35 @@ private:
   ///                            to avoid integer overflow.
   void allocate(int new_frame_capacity);
 };
-  
+
+/// \brief Reconstruct an abstract of the Coordinate series with a specific templated type.  This
+///        free function complements the templateFreeData() member function in the CoordinateSeries
+///        object and can be used to complete the handoff of information from C++-compiled
+///        libraries.  The object as well as this associated free function will be compiled by
+///        both C++ and HPC compilers so that, on each side of the fence, there is a means to cast
+///        the templated coordinate object to <void> and then unpack the contents in the other
+///        side.
+///
+/// Overloaded:
+///   - Produce a writeable abstract based on a non-const CoordinateSeriesWriter
+///   - Produce a read-only abstract based on a CoordinateSeriesReader
+///   - Accept the original, void-cast abstract by pointer or by reference
+///
+/// \param rasa  Abstract of the original coordinate series, free of templated pointers (inspired
+///              by the phrase "tabula rasa", a blank slate)
+/// \{
+template <typename T> CoordinateSeriesWriter<T> restoreType(CoordinateSeriesWriter<void> *rasa);
+
+template <typename T>
+CoordinateSeriesWriter<T> restoreType(const CoordinateSeriesWriter<void> &rasa);
+
+template <typename T>
+const CoordinateSeriesReader<T> restoreType(const CoordinateSeriesReader<void> *rasa);
+
+template <typename T>
+const CoordinateSeriesReader<T> restoreType(const CoordinateSeriesReader<void> &rasa);
+/// \}
+
 /// \brief Convert a coordinate series from one data type to another.  There are three major data
 ///        types for a CoordinateSeries: double, float, and long long int.  This function has
 ///        numerous branches to make efficient conversions between real and signed integral data
@@ -569,7 +621,7 @@ private:
 template <typename Torig, typename Tnew>
 CoordinateSeries<Tnew> changeCoordinateSeriesType(const CoordinateSeries<Torig> &cs,
                                                   int globalpos_scale_bits_in);
-  
+
 } // namespace trajectory 
 } // namespace stormm
 

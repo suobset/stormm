@@ -575,7 +575,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> rectilinear_y_crd = {  3.8, -3.4, 13.5, -9.4 };
   const std::vector<double> rectilinear_z_crd = { -4.9,  1.6, -3.1, -38.2 };
   std::vector<double> rectilinear_umat(9), rectilinear_invu(9);
-  computeBoxTransform(rectilinear_box, rectilinear_umat.data(), rectilinear_invu.data());
+  computeBoxTransform(rectilinear_box, &rectilinear_umat, &rectilinear_invu);
   double x1 = rectilinear_x_crd[0];
   double y1 = rectilinear_y_crd[0];
   double z1 = rectilinear_z_crd[0];
@@ -679,7 +679,7 @@ int main(const int argc, const char* argv[]) {
   // Create and test a fake triclinic system
   const std::vector<double> triclinic_box = { 16.0, 17.0, 15.0, 0.6 * pi, 0.53 * pi, 0.55 * pi };
   std::vector<double> triclinic_umat(9), triclinic_invu(9);
-  computeBoxTransform(triclinic_box, triclinic_umat.data(), triclinic_invu.data());
+  computeBoxTransform(triclinic_box, &triclinic_umat, &triclinic_invu);
   for (int i = 0; i < npts; i++) {
     dense_x_copy[i] = dense_x_crd[i];
     dense_y_copy[i] = dense_y_crd[i];

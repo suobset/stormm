@@ -12,7 +12,7 @@
 #include "Structure/hpc_rmsd.h"
 #include "Structure/hpc_virtual_site_handling.h"
 #endif
-#include "kernel_manager.h"
+#include "core_kernel_manager.h"
 
 namespace stormm {
 namespace card {
@@ -35,79 +35,8 @@ using parse::CaseSensitivity;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
-KernelFormat::KernelFormat() :
-  block_size_limit{1}, shared_usage{0}, block_dimension{1}, grid_dimension{1}, register_usage{0},
-  kernel_name{std::string("")}
-{}
-  
-//-------------------------------------------------------------------------------------------------
-KernelFormat::KernelFormat(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
-                           const int register_usage_in, const int shared_usage_in,
-                           const int block_subdivision, const GpuDetails &gpu,
-                           const std::string &kernel_name_in) :
-    block_size_limit{lb_max_threads_per_block},
-    shared_usage{shared_usage_in},
-    block_dimension{(block_size_limit / block_subdivision / warp_size_int) * warp_size_int},
-    grid_dimension{block_subdivision * lb_min_blocks_per_smp * gpu.getSMPCount()},
-    register_usage{register_usage_in},
-    kernel_name{kernel_name_in}
-{
-  // Refine the register usage (this is unreliable with current cudart function calls, and should
-  // not be trusted even after this step).
-  const std::vector<int> register_break_points = {  0, 40, 48, 56, 64, 72, 80, 128, 256 };
-  const std::vector<int> register_warp_counts  = { 48, 40, 36, 32, 28, 24, 16,   8 };
-  const int register_bin = findBin(register_break_points, register_usage, ExceptionResponse::WARN);
-  register_usage = register_warp_counts[register_bin];
-}
-
-//-------------------------------------------------------------------------------------------------
-KernelFormat::KernelFormat(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
-                           const int register_usage_in, const int shared_usage_in,
-                           const GpuDetails &gpu, const std::string &kernel_name_in) :
-    KernelFormat(lb_max_threads_per_block, lb_min_blocks_per_smp, register_usage_in,
-                 shared_usage_in, 1, gpu, kernel_name_in)
-{}
-
-#ifdef STORMM_USE_HPC
-#  ifdef STORMM_USE_CUDA
-//-------------------------------------------------------------------------------------------------
-KernelFormat::KernelFormat(const cudaFuncAttributes &attr, const int lb_min_blocks_per_smp,
-                           const int block_subdivision, const GpuDetails &gpu,
-                           const std::string &kernel_name_in) :
-    KernelFormat(attr.maxThreadsPerBlock, lb_min_blocks_per_smp, attr.numRegs,
-                 attr.sharedSizeBytes, block_subdivision, gpu, kernel_name_in)
-{}
-#  endif
-#endif
-
-//-------------------------------------------------------------------------------------------------
-int2 KernelFormat::getLaunchParameters() const {
-  return { grid_dimension, block_dimension };
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelFormat::getRegisterUsage() const {
-  return register_usage;
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelFormat::getBlockSizeLimit() const {
-  return block_size_limit;
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelFormat::getSharedMemoryRequirement() const {
-  return shared_usage;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::string& KernelFormat::getKernelName() const {
-  return kernel_name;
-}
-
-//-------------------------------------------------------------------------------------------------
-KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
-    gpu{gpu_in},
+CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
+    KernelManager(gpu_in),
     valence_block_multiplier{valenceBlockMultiplier()},
     nonbond_block_multiplier_dp{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType(),
                                                          PrecisionModel::DOUBLE,
@@ -122,7 +51,8 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     reduction_block_multiplier{reductionBlockMultiplier()},
     virtual_site_block_multiplier_dp{virtualSiteBlockMultiplier(PrecisionModel::DOUBLE)},
     virtual_site_block_multiplier_sp{virtualSiteBlockMultiplier(PrecisionModel::SINGLE)},
-    k_dictionary{}
+    rmsd_block_multiplier_dp{rmsdBlockMultiplier(PrecisionModel::DOUBLE)},
+    rmsd_block_multiplier_sp{rmsdBlockMultiplier(PrecisionModel::SINGLE)}
 {
 #ifdef STORMM_USE_HPC
   // Valence kernel entries
@@ -294,7 +224,7 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
+void CoreKlManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const AccumulationMethod acc_meth,
                                          const VwuGoal purpose,
@@ -305,7 +235,7 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "catalogValenceKernel");
+          "CoreKlManager", "catalogValenceKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -321,7 +251,7 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const NbwuKind kind,
+void CoreKlManager::catalogNonbondedKernel(const PrecisionModel prec, const NbwuKind kind,
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
                                            const AccumulationMethod acc_meth,
@@ -333,7 +263,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "catalogNonbondedKernel");
+          "CoreKlManager", "catalogNonbondedKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -357,7 +287,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const NbwuKind kind,
+void CoreKlManager::catalogBornRadiiKernel(const PrecisionModel prec, const NbwuKind kind,
                                            const AccumulationMethod acc_meth,
                                            const ImplicitSolventModel igb,
                                            const std::string &kernel_name) {
@@ -365,7 +295,7 @@ void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const Nbwu
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Born radii kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "catalogBornRadiiKernel");
+          "CoreKlManager", "catalogBornRadiiKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -387,7 +317,7 @@ void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogBornDerivativeKernel(const PrecisionModel prec, const NbwuKind kind,
+void CoreKlManager::catalogBornDerivativeKernel(const PrecisionModel prec, const NbwuKind kind,
                                                 const AccumulationMethod acc_meth,
                                                 const ImplicitSolventModel igb,
                                                 const std::string &kernel_name) {
@@ -395,7 +325,7 @@ void KernelManager::catalogBornDerivativeKernel(const PrecisionModel prec, const
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Born radii derivative kernel identifier " + k_key + " already exists in the kernel "
-          "map.", "KernelManager", "catalogBornRadiiKernel");
+          "map.", "CoreKlManager", "catalogBornRadiiKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -417,14 +347,14 @@ void KernelManager::catalogBornDerivativeKernel(const PrecisionModel prec, const
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
+void CoreKlManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process, const int subdivision,
                                            const std::string &kernel_name) {
   const std::string k_key = reductionKernelKey(prec, purpose, process);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Reduction kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "catalogReductionKernel");
+          "CoreKlManager", "catalogReductionKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -438,7 +368,7 @@ void KernelManager::catalogReductionKernel(const PrecisionModel prec, const Redu
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogVirtualSiteKernel(const PrecisionModel prec,
+void CoreKlManager::catalogVirtualSiteKernel(const PrecisionModel prec,
                                              const VirtualSiteActivity purpose,
                                              const int subdivision,
                                              const std::string &kernel_name) {
@@ -446,7 +376,7 @@ void KernelManager::catalogVirtualSiteKernel(const PrecisionModel prec,
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Virtual site handling kernel identifier " + k_key + " already exists in the kernel "
-          "map.", "KernelManager", "catalogVirtualSiteKernel");
+          "map.", "CoreKlManager", "catalogVirtualSiteKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -469,13 +399,13 @@ void KernelManager::catalogVirtualSiteKernel(const PrecisionModel prec,
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogRMSDKernel(const PrecisionModel prec, const RMSDTask order,
+void CoreKlManager::catalogRMSDKernel(const PrecisionModel prec, const RMSDTask order,
                                       const std::string &kernel_name) {
   const std::string k_key = rmsdKernelKey(prec, order);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("RMSD calculation kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "catalogRMSDKernel");
+          "CoreKlManager", "catalogRMSDKernel");
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
@@ -495,9 +425,9 @@ void KernelManager::catalogRMSDKernel(const PrecisionModel prec, const RMSDTask 
   k_dictionary[k_key] = KernelFormat();
 #endif
 }
-                                             
+
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
+int2 CoreKlManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const AccumulationMethod acc_meth,
                                          const VwuGoal purpose,
@@ -506,13 +436,13 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
                                              collision_handling);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " was not found in the kernel map.",
-          "KernelManager", "getValenceKernelDims");
+          "CoreKlManager", "getValenceKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const NbwuKind kind,
+int2 CoreKlManager::getNonbondedKernelDims(const PrecisionModel prec, const NbwuKind kind,
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
                                            const AccumulationMethod acc_meth,
@@ -522,13 +452,13 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
                                                collision_handling);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + " was not found in the kernel map.",
-          "KernelManager", "getNonbondedKernelDims");
+          "CoreKlManager", "getNonbondedKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind,
+int2 CoreKlManager::getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind,
                                            const AccumulationMethod acc_meth,
                                            const ImplicitSolventModel igb) const {
   if (igb == ImplicitSolventModel::NONE) {
@@ -537,13 +467,13 @@ int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const Nbwu
   const std::string k_key = bornRadiiKernelKey(prec, kind, acc_meth, igb);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Born radii computation kernel identifier " + k_key + " was not found in the kernel "
-          "map.", "KernelManager", "getBornRadiiKernelDims");
+          "map.", "CoreKlManager", "getBornRadiiKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getBornDerivativeKernelDims(const PrecisionModel prec, const NbwuKind kind,
+int2 CoreKlManager::getBornDerivativeKernelDims(const PrecisionModel prec, const NbwuKind kind,
                                                 const AccumulationMethod acc_meth,
                                                 const ImplicitSolventModel igb) const {
   if (igb == ImplicitSolventModel::NONE) {
@@ -552,68 +482,41 @@ int2 KernelManager::getBornDerivativeKernelDims(const PrecisionModel prec, const
   const std::string k_key = bornDerivativeKernelKey(prec, kind, acc_meth, igb);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Born radii derivative computation kernel identifier " + k_key + " was not found in "
-          "the kernel map.", "KernelManager", "getBornRadiiKernelDims");
+          "the kernel map.", "CoreKlManager", "getBornRadiiKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getReductionKernelDims(const PrecisionModel prec, const ReductionGoal purpose,
+int2 CoreKlManager::getReductionKernelDims(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process) const {
   const std::string k_key = reductionKernelKey(prec, purpose, process);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Reduction kernel identifier " + k_key + " was not found in the kernel map.",
-          "KernelManager", "getReductionKernelDims");
+          "CoreKlManager", "getReductionKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getVirtualSiteKernelDims(const PrecisionModel prec,
+int2 CoreKlManager::getVirtualSiteKernelDims(const PrecisionModel prec,
                                              const VirtualSiteActivity purpose) const {
   const std::string k_key = virtualSiteKernelKey(prec, purpose);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Virtual site handling kernel identifier " + k_key + " was not found in the kernel map.",
-          "KernelManager", "getVirtualSiteKernelDims");
+          "CoreKlManager", "getVirtualSiteKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getRMSDKernelDims(const PrecisionModel prec, const RMSDTask order) const {
+int2 CoreKlManager::getRMSDKernelDims(const PrecisionModel prec, const RMSDTask order) const {
   const std::string k_key = rmsdKernelKey(prec, order);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("RMSD calculation kernel identifier " + k_key + " was not found in the kernel map.",
-          "KernelManager", "getRMSDKerenlDims");
+          "CoreKlManager", "getRMSDKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
-}
-
-//-------------------------------------------------------------------------------------------------
-const GpuDetails& KernelManager::getGpu() const {
-  return gpu;
-}
-
-//-------------------------------------------------------------------------------------------------
-void KernelManager::printLaunchParameters(const std::string &k_key) const {
-  if (k_key.size() == 0) {
-    return;
-  }
-  if (strcmpCased(k_key, "all", CaseSensitivity::NO)) {
-    for (auto it = k_dictionary.begin(); it != k_dictionary.end(); it++) {
-      printLaunchParameters(it->first);
-    }
-    return;
-  }
-  if (k_dictionary.find(k_key) == k_dictionary.end()) {
-    rtErr("No kernel with identifier " + k_key + " is known.", "KernelManager",
-          "printLaunchParameters");
-  }
-  const int2 lp = k_dictionary.at(k_key).getLaunchParameters();
-  const int mtpb = k_dictionary.at(k_key).getBlockSizeLimit();
-  const int nreg = k_dictionary.at(k_key).getRegisterUsage();
-  printf("  %12.12s :: %4d blocks, %4d threads, %3d registers (%4d SMP, %4d max threads)\n",
-         k_key.c_str(), lp.x, lp.y, nreg, gpu.getSMPCount(), mtpb);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -759,12 +662,7 @@ int virtualSiteBlockMultiplier(const PrecisionModel prec) {
 //-------------------------------------------------------------------------------------------------
 int rmsdBlockMultiplier(const PrecisionModel prec) {
 #ifdef STORMM_USE_HPC
-  switch (prec) {
-  case PrecisionModel::DOUBLE:
-    return 4;
-  case PrecisionModel::SINGLE:
-    return 5;
-  }
+  return 4;
   __builtin_unreachable();
 #else
   return 1;

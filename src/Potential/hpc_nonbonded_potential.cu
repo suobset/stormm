@@ -2131,7 +2131,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                             ImplicitSolventWorkspace *ism_space, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy, const AccumulationMethod force_sum,
-                            const KernelManager &launcher, const double clash_minimum_distance,
+                            const CoreKlManager &launcher, const double clash_minimum_distance,
                             const double clash_ratio) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
@@ -2180,7 +2180,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                             Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                             ImplicitSolventWorkspace *ism_space, const EvaluateForce eval_force,
-                            const EvaluateEnergy eval_energy, const KernelManager &launcher,
+                            const EvaluateEnergy eval_energy, const CoreKlManager &launcher,
                             const double clash_minimum_distance, const double clash_ratio) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, heat_bath, sc, tb_space, ism_space,

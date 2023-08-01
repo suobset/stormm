@@ -16,6 +16,7 @@
 #include "../../src/Namelists/nml_conformer.h"
 #include "../../src/Namelists/nml_ffmorph.h"
 #include "../../src/Namelists/nml_files.h"
+#include "../../src/Namelists/nml_mesh.h"
 #include "../../src/Namelists/nml_minimize.h"
 #include "../../src/Namelists/nml_random.h"
 #include "../../src/Namelists/nml_receptor.h"
@@ -113,6 +114,9 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   else if (strcmpCased(nml_name, "receptor")) {
     CHECK_THROWS(ReceptorControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
   }
+  else if (strcmpCased(nml_name, "mesh")) {
+    CHECK_THROWS(ReceptorControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
+  }
   else {
     rtErr("The namelist &" + nml_name + " does not pair with any known case.", "test_namelists");
   }
@@ -162,6 +166,9 @@ int main(const int argc, const char* argv[]) {
   section("Test the &report namelist");
 
   // Section 9
+  section("Test the &mesh namelist");
+
+  // Section 10
   section("Test the &receptor namelist");
   
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
@@ -514,36 +521,60 @@ int main(const int argc, const char* argv[]) {
 
   // The receptor namelist must come with a label group for the receptor structures.  Whether that
   // label group actually exists in a separate &files namelist will be tested at runtime.
-  const std::string dock_nml_a("&receptor\n  label_group = \"proteins\",\n  mesh_dim = 64, "
-                               "mesh_dim_b = 48,\n  mesh_spacing = 0.8, mesh_spacing_a = 0.75, "
-                               "mesh_alpha = 94.0\n  mesh_origin_x = 17.5, mesh_origin_y = 19.4, "
-                               "mesh_origin_z = 14.2\n  boundary = \"periodic\", "
-                               "mesh_position = \"arbitrary\"\n  scaling_bits = 36\n&end\n");
+  const std::string dock_nml_a("&receptor\n  label_group = \"proteins\",\n"
+                               "  mesh_position = \"arbitrary\"\n&end\n");
   const TextFile dock_tf_a(dock_nml_a, TextOrigin::RAM);
   start_line = 0;
   ReceptorControls dock_a(dock_tf_a, &start_line, nullptr, ExceptionResponse::SILENT);
-  const std::vector<double> mesh_spacings = { dock_a.getMeshSpacing(UnitCellAxis::A),
-                                              dock_a.getMeshSpacing(UnitCellAxis::B),
-                                              dock_a.getMeshSpacing(UnitCellAxis::C) };
+  check(dock_a.getLabelGroup(), RelationalOperator::EQUAL, std::string("proteins"), "The label "
+        "group for receptor structures was not conveyed correctly by the &receptor namelist.");
+  testBadNamelist("receptor", "label_group = unprotected, boundary = plox",
+                  "Input was accepted with an unrecognized boundary condition");
+  testBadNamelist("receptor", "label_group = unprotected, mesh_position = phlox",
+                  "Input was accepted with an unrecognized mesh alignment");
+  testBadNamelist("receptor", "label_group = unprotected, potential = blox",
+                  "Input was accepted with an unrecognized potential form");
+  
+  // The mesh namelist groups parameters for the actual mesh, abstracting this functionality for
+  // multiple situations in which a mesh might be wanted.
+  const std::string mesh_nml_a("&mesh\n  mesh_dim = 64, mesh_dim_b = 48,\n  mesh_spacing = 0.8, "
+                               "mesh_spacing_a = 0.75, mesh_alpha = 94.0\n  mesh_origin_x = 17.5, "
+                               "mesh_origin_y = 19.4, mesh_origin_z = 14.2\n&end\n");
+  const TextFile mesh_tf_a(mesh_nml_a, TextOrigin::RAM);
+  start_line = 0;
+  MeshControls mesh_a(mesh_tf_a, &start_line, nullptr, ExceptionResponse::SILENT);
+  const std::vector<double> mesh_spacings = { mesh_a.getSpacing(UnitCellAxis::A),
+                                              mesh_a.getSpacing(UnitCellAxis::B),
+                                              mesh_a.getSpacing(UnitCellAxis::C) };
   const std::vector<double> mesh_spacings_ans = { 0.75, 0.8, 0.8 };
   check(mesh_spacings, RelationalOperator::EQUAL, mesh_spacings_ans, "Mesh spacings were not "
-        "conveyed as expected by a &receptor namelist.\n");
-  const std::vector<double> mesh_angles = { dock_a.getMeshAlpha(), dock_a.getMeshBeta(),
-                                            dock_a.getMeshGamma() };
+        "conveyed as expected by a &mesh namelist.\n");
+  const std::vector<double> mesh_angles = { mesh_a.getAlpha(), mesh_a.getBeta(),
+                                            mesh_a.getGamma() };
   const std::vector<double> mesh_angles_ans = { 94.0 * stormm::symbols::pi / 180.0,
                                                 0.5 * stormm::symbols::pi,
                                                 0.5 * stormm::symbols::pi };
   check(mesh_angles, RelationalOperator::EQUAL, mesh_angles_ans, "Mesh angles were not conveyed "
-        "as expected by a &receptor namelist.");
-  check(dock_a.getLabelGroup(), RelationalOperator::EQUAL, std::string("proteins"), "The label "
-        "group for receptor structures was not conveyed correctly by the &receptor namelist.");
-  testBadNamelist("receptor", "mesh_dim = 72", "Input was accepted without a label group");
-  testBadNamelist("receptor", "label_group = unprotected, mesh_dim = 72, boundary = plox",
-                  "Input was accepted with an unrecognized boundary condition");
-  testBadNamelist("receptor", "label_group = unprotected, mesh_dim = 72, mesh_position = phlox",
-                  "Input was accepted with an unrecognized mesh alignment");
-  testBadNamelist("receptor", "label_group = unprotected, potential = blox",
-                  "Input was accepted with an unrecognized potential form");
+        "as expected by a &mesh namelist.");
+  const std::vector<int> mesh_dims = { mesh_a.getAxisElementCount(UnitCellAxis::A),
+                                       mesh_a.getAxisElementCount(UnitCellAxis::B),
+                                       mesh_a.getAxisElementCount(UnitCellAxis::C) };
+  const std::vector<int> mesh_dims_ans = { 64, 48, 64 };
+  check(mesh_dims, RelationalOperator::EQUAL, mesh_dims_ans, "Mesh dimensions were not conveyed "
+        "as expected by a &mesh namelist.");
+  const std::string mesh_nml_b("&mesh\n  mesh_dim = 64, mesh_spacing = 1.0,\n  "
+                               "mesh_alpha = 15.0, mesh_beta = 16.1, mesh_gamma = 107.8\n&end\n");
+  const TextFile mesh_tf_b(mesh_nml_b, TextOrigin::RAM);
+  start_line = 0;
+  CHECK_THROWS(MeshControls mesh_b(mesh_tf_b, &start_line, nullptr, ExceptionResponse::DIE),
+               "A nonsensical mesh element was cleared for mesh generation.");
+  start_line = 0;
+  MeshControls mesh_bx(mesh_tf_b, &start_line, nullptr, ExceptionResponse::SILENT);
+  const std::vector<double> mesh_adj_dims = { mesh_bx.getAlpha(), mesh_bx.getBeta(),
+                                              mesh_bx.getGamma() };
+  const std::vector<double> mesh_adj_dims_ans = { 0.877027949, 0.887203219, 1.735450688 };
+  check(mesh_adj_dims, RelationalOperator::EQUAL, mesh_adj_dims_ans, "The adjusted angles values "
+        "for an impossible mesh element design do not meet expectations.");
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

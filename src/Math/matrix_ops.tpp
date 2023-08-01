@@ -617,6 +617,48 @@ template <typename T> void invertSquareMatrix(const T* matrix, T* inverse, const
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void invertSquareMatrix(const std::vector<T> &matrix, std::vector<T> *inverse) {
+  std::vector<T> mat_copy = matrix;
+  invertSquareMatrix(&mat_copy, inverse);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void invertSquareMatrix(std::vector<T> *matrix, std::vector<T> *inverse) {
+  const size_t rank = round(sqrt(static_cast<double>(matrix->size())));
+  if (matrix->size() != rank * rank) {
+    rtErr("An array of " + std::to_string(matrix->size()) + " cannot represent a square matrix.",
+          "invertSquareMatrix");
+  }
+  if (inverse->size() != matrix->size()) {
+    rtErr("The inverse matrix must be of the same rank as the original.", "invertSquareMatrix");
+  }
+  invertSquareMatrix(matrix->data(), inverse->data(), rank);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void invertSquareMatrix(const Hybrid<T> &matrix, Hybrid<T> *inverse) {
+  Hybrid<T> mat_copy = matrix;
+  invertSquareMatrix(&mat_copy, inverse);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void invertSquareMatrix(Hybrid<T> *matrix, Hybrid<T> *inverse) {
+  const size_t rank = round(sqrt(static_cast<double>(matrix->size())));
+  if (matrix->size() != rank * rank) {
+    rtErr("An array of " + std::to_string(matrix->size()) + " cannot represent a square matrix.",
+          "invertSquareMatrix");
+  }
+  if (inverse->size() != matrix->size()) {
+    rtErr("The inverse matrix must be of the same rank as the original.", "invertSquareMatrix");
+  }
+  invertSquareMatrix(matrix->data(), inverse->data(), rank);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void jacobiEigensolver(T* a, T* v, T* d, const size_t rank, const ExceptionResponse policy) {
   double tresh, theta, tau, t, sm, s, h, g, c;
 
@@ -1431,8 +1473,10 @@ void computeBoxTransform(const T lx, const T ly, const T lz, const T alpha, cons
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void computeBoxTransform(const std::vector<T> &dims, T* umat, T* invu) {
-  computeBoxTransform(dims[0], dims[1], dims[2], dims[3], dims[4], dims[5], umat, invu);
+template <typename T> void computeBoxTransform(const std::vector<T> &dims, std::vector<T> *umat,
+                                               std::vector<T> *invu) {
+  computeBoxTransform(dims[0], dims[1], dims[2], dims[3], dims[4], dims[5], umat->data(),
+                      invu->data());
 }
 
 //-------------------------------------------------------------------------------------------------

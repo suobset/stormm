@@ -698,5 +698,18 @@ std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, cons
   return mapRotatingGroup(nbk, cdk, atom_i, atom_j);
 }
 
+//-------------------------------------------------------------------------------------------------
+int inferLennardJonesTypeCount(const int length_a, const int length_b, const char* caller) {
+  if (length_a != length_b) {
+    rtErr("Parameter matrices must have identical sizes (" + std::to_string(length_a) + " and " +
+          std::to_string(length_b) + " provided).", caller);
+  }
+  const int n_lj_types = round(sqrt(length_a));
+  if (n_lj_types * n_lj_types != static_cast<int>(length_a)) {
+    rtErr("A number of atom types can only be inferred for square parameter matrices.", caller);
+  }
+  return n_lj_types;
+}
+  
 } // namespace topology
 } // namespace stormm

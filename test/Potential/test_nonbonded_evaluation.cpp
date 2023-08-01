@@ -12,6 +12,7 @@
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/soft_core_potentials.h"
 #include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
@@ -31,6 +32,7 @@
 
 #ifndef STORMM_USE_HPC
 using stormm::double2;
+using stormm::double4;
 using stormm::int2;
 using stormm::int3;
 #endif
@@ -45,18 +47,16 @@ using stormm::data_types::getStormmScalarTypeName;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
-using stormm::energy::StateVariable;
-using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
-using stormm::stmath::mean;
-using stormm::stmath::variance;
-using stormm::stmath::VarianceMethod;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
+using stormm::stmath::mean;
+using stormm::stmath::variance;
+using stormm::stmath::VarianceMethod;
 using stormm::structure::rotateAboutBond;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
@@ -209,17 +209,19 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc>nbk, const StaticExclusionMas
 }
 
 //-------------------------------------------------------------------------------------------------
-// Test the soft-core Coulomb potential.
+// Test the softcore Coulomb potential.
 //
 // Arguments:
 //   qiqj:            Product of the two atoms' charges (with any implicit attenuation effects)
-//   clash_distance:  Minimum distance between the two particles before the soft-core potential
+//   clash_distance:  Minimum distance between the two particles before the softcore potential
 //                    kicks in
 //   rinc:            [Optional] The sampling size for the test.  The quadratic soft core Coulomb
 //                    function wll be tested over a range from rinc to twice the clash distance.
+//   order:           The order of softcore potential to use.  Valid inputs are 1 (linear),
+//                    2 (quadratic), or 3 (cubic).
 //-------------------------------------------------------------------------------------------------
 void testSoftCoreCoulomb(const double qiqj, const double clash_distance,
-                         const double rinc = 0.001) {
+                         const double rinc = 0.001, const int order = 2) {
   const int npts = ceil(2.0 * clash_distance / rinc);
   std::vector<double> analytic_coulomb_e(npts);
   std::vector<double> analytic_coulomb_f(npts);
@@ -247,8 +249,22 @@ void testSoftCoreCoulomb(const double qiqj, const double clash_distance,
     }
     double p_nrg = 0.0;
     double n_nrg = 0.0;
-    quadraticCoreElectrostatics<double>(r + 5.0e-8, clash_distance, qiqj, &p_nrg, nullptr);
-    quadraticCoreElectrostatics<double>(r - 5.0e-8, clash_distance, qiqj, &n_nrg, nullptr);
+    if (order == 1) {
+      linearCoreElectrostatics<double>(r + 5.0e-8, clash_distance, qiqj, &p_nrg, nullptr);
+      linearCoreElectrostatics<double>(r - 5.0e-8, clash_distance, qiqj, &n_nrg, nullptr);
+    }
+    else if (order == 2) {
+      quadraticCoreElectrostatics<double>(r + 5.0e-8, clash_distance, qiqj, &p_nrg, nullptr);
+      quadraticCoreElectrostatics<double>(r - 5.0e-8, clash_distance, qiqj, &n_nrg, nullptr);
+    }
+    else if (order == 3) {
+      cubicCoreElectrostatics<double>(r + 5.0e-8, clash_distance, qiqj, &p_nrg, nullptr);
+      cubicCoreElectrostatics<double>(r - 5.0e-8, clash_distance, qiqj, &n_nrg, nullptr);
+    }
+    else {
+      rtErr("Invalid softcore potential order " + std::to_string(order) + " for electrostatic "
+            "modification.", "testSoftCoreElectrostatics");
+    }
 
     // The extra division by r is necessary as the force magnitudes emerging from the
     // quadraticCoreElectrostatics() function are divided by the distance to prepare for computing
@@ -268,18 +284,20 @@ void testSoftCoreCoulomb(const double qiqj, const double clash_distance,
 }
 
 //-------------------------------------------------------------------------------------------------
-// Test the soft-core Lennard-Jones potential.
+// Test the softcore Lennard-Jones potential.
 //
 // Arguments:
 //   lja:          The Lennard-Jones A parameter for the atom pair
 //   ljb:          The Lennard-Jones B parameter for the atom pair
 //   clash_ratio:  Minimum ratio of the distance between the two particles and their pariwise
-//                 LennardJones sigma, below which the soft-core potential engages
+//                 LennardJones sigma, below which the softcore potential engages
 //   rinc:         [Optional] The sampling size for the test.  Quartic soft core Lennard-Jones
 //                 evaluations wll be tested over a range from rinc to twice the clash distance.
+//   order:        The order of softcore potential to use.  Valid inputs are 3 (cubic),
+//                 4 (quartic).
 //-------------------------------------------------------------------------------------------------
 void testSoftCoreLennardJones(const double lja, const double ljb, const double clash_ratio,
-                              const double rinc = 0.001) {
+                              const double rinc = 0.001, const int order = 4) {
   const double sigma = (ljb > 1.0e-6) ? sqrt(cbrt(lja / ljb)) : 0.0;
   const int npts = ceil(2.0 * sigma / rinc);
   std::vector<double> analytic_lj_e(npts);
@@ -298,7 +316,18 @@ void testSoftCoreLennardJones(const double lja, const double ljb, const double c
     const double invr4 = invr2 * invr2;
     analytic_lj_e[i] = ((lja * invr2 * invr4) - ljb) * invr2 * invr4;
     analytic_lj_f[i] = ((6.0 * ljb) - (12.0 * lja * invr2 * invr4)) * invr4 * invr4;
-    quarticCoreLennardJones<double>(r, clash_ratio, lja, ljb, &computed_e[i], &computed_f[i]);
+    if (order == 3) {
+      cubicCoreLennardJones<double>(r, clash_ratio, lja, ljb, sigma, &computed_e[i],
+                                    &computed_f[i]);
+    }
+    else if (order == 4) {
+      quarticCoreLennardJones<double>(r, clash_ratio, lja, ljb, sigma, &computed_e[i],
+                                      &computed_f[i]);
+    }
+    else {
+      rtErr("Invalid softcore potential order " + std::to_string(order) + " for Lennard-Jones "
+            "modification.", "testSoftCoreLennardJones");
+    }
     if (r >= clash_ratio * sigma) {
       e_on_track = (e_on_track && fabs(computed_e[i] - analytic_lj_e[i]) < tiny);
       f_on_track = (f_on_track && fabs(computed_f[i] - analytic_lj_f[i]) < tiny);
@@ -311,9 +340,15 @@ void testSoftCoreLennardJones(const double lja, const double ljb, const double c
     }
     double p_nrg = 0.0;
     double n_nrg = 0.0;
-    quarticCoreLennardJones<double>(r + 5.0e-7, clash_ratio, lja, ljb, &p_nrg, nullptr);
-    quarticCoreLennardJones<double>(r - 5.0e-7, clash_ratio, lja, ljb, &n_nrg, nullptr);
-
+    if (order == 3) {
+      cubicCoreLennardJones<double>(r + 5.0e-7, clash_ratio, lja, ljb, sigma, &p_nrg, nullptr);
+      cubicCoreLennardJones<double>(r - 5.0e-7, clash_ratio, lja, ljb, sigma, &n_nrg, nullptr);
+    }
+    else if (order == 4) {
+      quarticCoreLennardJones<double>(r + 5.0e-7, clash_ratio, lja, ljb, sigma, &p_nrg, nullptr);
+      quarticCoreLennardJones<double>(r - 5.0e-7, clash_ratio, lja, ljb, sigma, &n_nrg, nullptr);
+    }
+    
     // The extra division by r is necessary as the force magnitudes emerging from the
     // quadraticCoreElectrostatics() function are divided by the distance to prepare for computing
     // force components.
@@ -323,12 +358,243 @@ void testSoftCoreLennardJones(const double lja, const double ljb, const double c
         "do not meet expectations.");
   check(f_on_track, "Forces computed for the non-softcore range of the Lennard-Jones function do "
         "not meet expectations.");
-  check(e_has_kink == false, "The quartic soft-core Lennard-Jones function evaluates with a kink "
+  check(e_has_kink == false, "The quartic softcore Lennard-Jones function evaluates with a kink "
         "in its energy.");
-  check(f_has_kink == false, "The quartic soft-core Lennard-Jones function evaluates with a kink "
+  check(f_has_kink == false, "The quartic softcore Lennard-Jones function evaluates with a kink "
         "in its force.");
   check(computed_f, RelationalOperator::EQUAL, Approx(finite_difference_f).margin(3.0e-4),
         "Soft-core Lennard-Jones forces do not agree with a finite difference approximation.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test the cubic-, quartic-, and quintic softcore potentials with a typical Lennard-Jones
+// function and a standard protein force field.  This will provide a lot of tests as to whether,
+// for a reasonable range of applications, the functions could contain artificial minima.
+//
+// Arguments:
+//   ag:            Topology for a protein system with numerous Lennard-Jones pair interactions
+//   sigma_factor:  Factor of the sigma parameter at which the handoff between the standard
+//                  potential and the softcore functions occurs
+//   slope_zero:    Target first derivative for the potentials as the inter-particle distance goes
+//                  to zero
+//   zero_ratio3:   Expected average ratio of the Lennard Jones well depth to the maximum of the
+//                  cubic softcore function at r = 0
+//   zero_ratio4:   Expected average ratio of the Lennard Jones well depth to the maximum of the
+//                  quartic softcore function at r = 0
+//   zero_ratio5:   Expected average ratio of the Lennard Jones well depth to the maximum of the
+//                  quintic softcore function at r = 0
+//   do_tests:      Indicate whether the tests can be run
+//-------------------------------------------------------------------------------------------------
+void testSplineSoftCore(const AtomGraph &ag, const double sigma_factor, const double slope_zero,
+                        const double zero_ratio3, const double zero_ratio4,
+                        const double zero_ratio5, const TestPriority do_tests) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  bool cubic_slope_always_negative = true;
+  bool quartic_slope_always_negative = true;
+  bool quintic_slope_always_negative = true;
+  std::vector<double> all_ij3_zratio, all_ij4_zratio, all_ij5_zratio;
+  for (int i = 0; i < nbk.n_lj_types; i++) {
+    for (int j = 0; j <= i; j++) {
+      const size_t ij_ljidx = (j * nbk.n_lj_types) + i;
+      const double ij_sigma = nbk.lj_sigma[ij_ljidx];
+      const double ij_well_min = pow(2.0, 1.0 / 6.0) * ij_sigma;
+      const double rswitch = ij_sigma * sigma_factor;
+      const double lja = nbk.lja_coeff[ij_ljidx];
+      const double ljb = nbk.ljb_coeff[ij_ljidx];
+      const double ij_epsilon = (ij_sigma > 1.0e-6) ? 0.25 * ljb / pow(ij_sigma, 6.0) : 0.0;
+      const double inv_rs = 1.0 / rswitch;
+      const double inv_rs2 = inv_rs * inv_rs;
+      const double inv_rs3 = inv_rs2 * inv_rs;
+      const double inv_rs4 = inv_rs2 * inv_rs2;
+      const double inv_rs6 = inv_rs3 * inv_rs3;
+      const double inv_rs8 = inv_rs4 * inv_rs4;
+      const double f_rswitch = ((lja * inv_rs6) - ljb) * inv_rs6;
+      const double df_rswitch  = ((  -12.0 * lja * inv_rs6) + (  6.0 * ljb)) * inv_rs6 * inv_rs;
+      const double d2f_rswitch = ((  156.0 * lja * inv_rs6) - ( 42.0 * ljb)) * inv_rs6 * inv_rs2;
+      const double d3f_rswitch = ((-2184.0 * lja * inv_rs6) + (336.0 * ljb)) * inv_rs6 * inv_rs3;
+      
+      // Test the cubic softcore potential
+      double4 abcd_coefs;
+      cubicSoftCore(&abcd_coefs, rswitch, f_rswitch, df_rswitch, slope_zero);
+      const double cbfd_a = 3.0 * abcd_coefs.x;
+      const double cbfd_b = 2.0 * abcd_coefs.y;
+      const double cbfd_c = abcd_coefs.z;
+
+      // Test the minimum and maximum points for nonzero sigma.  Test whether the function's 
+      // first derivative crosses zero using the quadratic formula and test any qualifying points.
+      std::vector<double> cubic_dd_roots;
+      cubic_dd_roots.push_back(0.0);
+      cubic_dd_roots.push_back(ij_sigma);
+      double discriminant = (cbfd_b * cbfd_b) - (4.0 * cbfd_a * cbfd_c);
+      if (discriminant > 0.0) {
+        const double zero_p = (-cbfd_b + sqrt(discriminant)) / (2.0 * cbfd_a);
+        const double zero_n = (-cbfd_b - sqrt(discriminant)) / (2.0 * cbfd_a);
+        if (zero_p > 0.0 && zero_p < ij_sigma) {
+          cubic_dd_roots.push_back(zero_p);
+        }
+        if (zero_n > 0.0 && zero_n < ij_sigma) {
+          cubic_dd_roots.push_back(zero_n);
+        }        
+      }
+      for (size_t i = 0; i < cubic_dd_roots.size(); i++) {
+        const double r = cubic_dd_roots[i];
+        const double cbfd_val = (((cbfd_a * r) + cbfd_b) * r) + cbfd_c;
+        if (cbfd_val > 1.0e-6) {
+          cubic_slope_always_negative = false;
+        }
+      }
+      
+      // Add the ratio of the cubic function's maximum height (which, if the previous tests have
+      // passed, occurs at zero) to the original Lennard-Jones well depth.
+      if (ij_sigma > 1.0e-6) {
+        all_ij3_zratio.push_back(abcd_coefs.w / ij_epsilon);
+      }
+      
+      // Test the quartic softcore potential
+      double e_coef;
+      quarticSoftCore(&abcd_coefs, &e_coef, rswitch, f_rswitch, df_rswitch, d2f_rswitch,
+                      slope_zero);
+      const double qrfd_a = 4.0 * abcd_coefs.x;
+      const double qrfd_b = 3.0 * abcd_coefs.y;
+      const double qrfd_c = 2.0 * abcd_coefs.z;
+      const double qrfd_d = abcd_coefs.w;
+      const double qrf2d_a = 12.0 * abcd_coefs.x;
+      const double qrf2d_b =  6.0 * abcd_coefs.y;
+      const double qrf2d_c =  2.0 * abcd_coefs.z;
+
+      // Test the minimum and maximum points for nonzero sigma.  Find the roots of the second
+      // derivative using the quadratic formula and test any qualifying points.
+      std::vector<double> quartic_dd_roots;
+      quartic_dd_roots.push_back(0.0);
+      quartic_dd_roots.push_back(ij_sigma);
+      discriminant = (qrf2d_b * qrf2d_b) - (4.0 * qrf2d_a * qrf2d_c);
+      if (discriminant > 0.0) {
+        const double zero_p = (-qrf2d_b + sqrt(discriminant)) / (2.0 * qrf2d_a);
+        const double zero_n = (-qrf2d_b - sqrt(discriminant)) / (2.0 * qrf2d_a);
+        if (zero_p > 0.0 && zero_p < ij_sigma) {
+          quartic_dd_roots.push_back(zero_p);
+        }
+        if (zero_n > 0.0 && zero_n < ij_sigma) {
+          quartic_dd_roots.push_back(zero_n);
+        }
+      }
+      for (size_t i = 0; i < quartic_dd_roots.size(); i++) {
+        const double r = quartic_dd_roots[i];
+        const double qrfd_val = (((((qrfd_a * r) + qrfd_b) * r) + qrfd_c) * r) + qrfd_d;
+        if (qrfd_val > 1.0e-6) {
+          quartic_slope_always_negative = false;
+        }
+      }
+
+      // Add the ratio of the quartic function's maximum height (which, if the previous tests have
+      // passed, occurs at zero) to the original Lennard-Jones well depth.
+      if (ij_sigma > 1.0e-6) {
+        all_ij4_zratio.push_back(e_coef / ij_epsilon);
+      }
+      
+      // Test the quintic softcore potential
+      double2 ef_coefs;
+      quinticSoftCore(&abcd_coefs, &ef_coefs, rswitch, f_rswitch, df_rswitch, d2f_rswitch,
+                      d3f_rswitch, slope_zero);
+      const double qnfd_a = 5.0 * abcd_coefs.x;
+      const double qnfd_b = 4.0 * abcd_coefs.y;
+      const double qnfd_c = 3.0 * abcd_coefs.z;
+      const double qnfd_d = 2.0 * abcd_coefs.w;
+      const double qnfd_e = ef_coefs.x;
+      const double qnf2d_a = 20.0 * abcd_coefs.x;
+      const double qnf2d_b = 12.0 * abcd_coefs.y;
+      const double qnf2d_c =  6.0 * abcd_coefs.z;
+      const double qnf2d_d =  2.0 * abcd_coefs.w;
+
+      // Iterate over the limits of the softcore function to see if there are any places that
+      // the second derivative hits zero, indicating an extremum in the first derivative which
+      // would then need to be checked.
+      std::vector<double> quintic_dd_roots;
+      quintic_dd_roots.push_back(0.0);
+      quintic_dd_roots.push_back(ij_sigma);
+      const double rdisc = 0.0001;
+      const double rlim = std::min(ij_sigma, rswitch - rdisc);
+      for (double r = 0.0; r < rlim; r += rdisc) {
+        const double rp = r + rdisc;
+        const double ddf_low  = (((((qnf2d_a * r) + qnf2d_b) * r) + qnf2d_c) * r) + qnf2d_d;
+        const double ddf_high = (((((qnf2d_a * rp) + qnf2d_b) * rp) + qnf2d_c) * rp) + qnf2d_d;
+        if (ddf_low == 0.0) {
+          quintic_dd_roots.push_back(r);
+        }
+        else if (ddf_high == 0.0) {
+          quintic_dd_roots.push_back(rp);
+        }
+        else if ((ddf_low < 0.0 && ddf_high > 0.0) || (ddf_low > 0.0 && ddf_high < 0.0)) {
+
+          // Solve the linear approximation for the root
+          const double rise = ddf_high - ddf_low;
+          const double local_slope = rise / rdisc;
+          const double dr = -ddf_low / local_slope;
+          quintic_dd_roots.push_back(r + dr);
+        }
+      }
+      for (size_t i = 0; i < quintic_dd_roots.size(); i++) {
+        const double r = quintic_dd_roots[i];
+        const double qnfd_val = (((((((qnfd_a * r) + qnfd_b) * r) + qnfd_c) * r) + qnfd_d) * r) +
+                                qnfd_e;
+        if (qnfd_val > 1.0e-6) {
+          quintic_slope_always_negative = false;
+        }
+      }
+
+      // Add the ratio of the quintic function's maximum height (which, if the previous tests have
+      // passed, occurs at zero) to the original Lennard-Jones well depth.
+      if (ij_sigma > 1.0e-6) {
+        all_ij5_zratio.push_back(ef_coefs.y / ij_epsilon);
+      }
+    }
+  }
+  check(cubic_slope_always_negative, "The cubic softcore potentials do not always deliver a "
+        "negative slope when taking over from a Lennard-Jones function.", do_tests);
+  check(quartic_slope_always_negative, "The quartic softcore potentials do not always deliver a "
+        "negative slope when taking over from a Lennard-Jones function.", do_tests);
+  check(quintic_slope_always_negative, "The quintic softcore potentials do not always deliver a "
+        "negative slope when taking over from a Lennard-Jones function.", do_tests);
+  switch (do_tests) {
+  case TestPriority::CRITICAL:
+    break;
+  case TestPriority::NON_CRITICAL:
+  case TestPriority::ABORT:
+    if (all_ij3_zratio.size() == 0) {
+      all_ij3_zratio = std::vector(3, 0.0);
+    }
+    if (all_ij4_zratio.size() == 0) {
+      all_ij4_zratio = std::vector(3, 0.0);
+    }
+    if (all_ij5_zratio.size() == 0) {
+      all_ij5_zratio = std::vector(3, 0.0);
+    }
+    break;
+  }
+  check(mean(all_ij3_zratio), RelationalOperator::EQUAL, zero_ratio3, "The ratio of the maximum "
+        "function height to the Lennard-Jones well depth in a cubic soft core potential does "
+        "not meet expectations.", do_tests);
+  check(mean(all_ij4_zratio), RelationalOperator::EQUAL, zero_ratio4, "The ratio of the maximum "
+        "function height to the Lennard-Jones well depth in a quartic soft core potential does "
+        "not meet expectations.", do_tests);
+  check(mean(all_ij5_zratio), RelationalOperator::EQUAL, zero_ratio5, "The ratio of the maximum "
+        "function height to the Lennard-Jones well depth in a quintic soft core potential does "
+        "not meet expectations.", do_tests);
+  check(variance(all_ij3_zratio, VarianceMethod::STANDARD_DEVIATION), RelationalOperator::EQUAL,
+        Approx(0.0).margin(1.0e-5), "The ratio of the maximum function height to the "
+        "Lennard-Jones minimum is not entirely consistent for rswitch = " +
+        realToString(sigma_factor, 9, 4, NumberFormat::STANDARD_REAL) + " * sigma in a cubic "
+        "soft core potential.", do_tests);
+  check(variance(all_ij4_zratio, VarianceMethod::STANDARD_DEVIATION), RelationalOperator::EQUAL,
+        Approx(0.0).margin(1.0e-5), "The ratio of the maximum function height to the "
+        "Lennard-Jones minimum is not entirely consistent for rswitch = " +
+        realToString(sigma_factor, 9, 4, NumberFormat::STANDARD_REAL) + " * sigma in a quartic "
+        "soft core potential.", do_tests);
+  check(variance(all_ij5_zratio, VarianceMethod::STANDARD_DEVIATION), RelationalOperator::EQUAL,
+        Approx(0.0).margin(1.0e-5), "The ratio of the maximum function height to the "
+        "Lennard-Jones minimum is not entirely consistent for rswitch = " +
+        realToString(sigma_factor, 9, 4, NumberFormat::STANDARD_REAL) + " * sigma in a quintic "
+        "soft core potential.", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1203,24 +1469,20 @@ int main(const int argc, const char* argv[]) {
         "familiar potential energy terms, taken point by point throughout the history, failed to "
         "confirm the results reported by the tracking object.");
   
-  // Check the non-bonded soft-core potentials by iteratively feeding them different values of
+  // Check the non-bonded softcore potentials by iteratively feeding them different values of
   // the displacement and checking the results against analytic numbers.
   section(9);
-  testSoftCoreCoulomb( 0.54 *  0.31, 0.9);
-  testSoftCoreCoulomb( 0.47 * -0.24, 0.9);
-  testSoftCoreCoulomb(-0.17 *  0.84, 0.5);
-  testSoftCoreLennardJones( 79716.0, 109.35, 0.6);
-  testSoftCoreLennardJones(110272.8, 124.25, 0.5);
-
-  // Check the non-bonded soft-core potentials by iteratively feeding them different values of
-  // the displacement and checking the results against analytic numbers.
-  section(9);
-  testSoftCoreCoulomb( 0.54 *  0.31, 0.9);
-  testSoftCoreCoulomb( 0.47 * -0.24, 0.9);
-  testSoftCoreCoulomb(-0.17 *  0.84, 0.5);
-  testSoftCoreLennardJones( 79716.0, 109.35, 0.6);
-  testSoftCoreLennardJones(110272.8, 124.25, 0.5);
-
+  for (int order = 1; order <= 3; order++) {
+    testSoftCoreCoulomb( 0.54 *  0.31, 0.9, order);
+    testSoftCoreCoulomb( 0.47 * -0.24, 0.9, order);
+    testSoftCoreCoulomb(-0.17 *  0.84, 0.5, order);
+  }
+  for (int order = 3; order <= 4; order++) {
+    testSoftCoreLennardJones( 79716.0, 109.35, 0.6, order);
+    testSoftCoreLennardJones(110272.8, 124.25, 0.5, order);
+  }
+  testSplineSoftCore(trpi_ag, 1.0, 0.0, 8.0, 50.0, 206.0, do_tests);
+  
   // Compute the potential and forces on some configurations that have clashes.
   const std::string base_nml_topl = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
                                     osc + "topol";

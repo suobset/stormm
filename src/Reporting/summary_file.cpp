@@ -119,6 +119,21 @@ char commentSymbol(OutputSyntax format) {
 }
 
 //-------------------------------------------------------------------------------------------------
+char commentSymbol(GridFileSyntax format) {
+  switch (format) {
+  case GridFileSyntax::MATPLOTLIB:
+    return commentSymbol(OutputSyntax::MATPLOTLIB);
+  case GridFileSyntax::MATRIX_PKG:
+    return commentSymbol(OutputSyntax::MATRIX_PKG);
+  case GridFileSyntax::OPEN_DX:
+    return '#';
+  case GridFileSyntax::CUBEGEN:
+    return '!';
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string indentText(const std::string &text, const std::string &marker, const int indent,
                        const int width, const bool mark_on_all_lines,
                        const TextEnds block_ending) {

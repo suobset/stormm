@@ -5,24 +5,6 @@ namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-MeshParamKit<T>::MeshParamKit(const int na_in, const int nb_in, const int nc_in,
-                              const int95_t orig_x_in, const int95_t orig_y_in,
-                              const int95_t orig_z_in, const T scale_in, const T inv_scale_in,
-                              const int scale_bits_in, const T* umat_in, const T* invu_in,
-                              const T* widths_in, const int95_t* fp_invu_in) :
-    na{na_in}, nb{nb_in}, nc{nc_in}, orig_x{orig_x_in}, orig_y{orig_y_in}, orig_z{orig_z_in},
-    scale{scale_in}, inv_scale{inv_scale_in}, scale_bits{scale_bits_in},
-    umat{ umat_in[0], umat_in[1], umat_in[2], umat_in[3], umat_in[4], umat_in[5], umat_in[6],
-          umat_in[7], umat_in[8] },
-    invu{ invu_in[0], invu_in[1], invu_in[2], invu_in[3], invu_in[4], invu_in[5], invu_in[6],
-          invu_in[7], invu_in[8] },
-    widths{ widths_in[0], widths_in[1], widths_in[2] },
-    fp_invu{ fp_invu_in[0], fp_invu_in[1], fp_invu_in[2], fp_invu_in[3], fp_invu_in[4],
-             fp_invu_in[5], fp_invu_in[6], fp_invu_in[7], fp_invu_in[8] }
-{}
-
-//-------------------------------------------------------------------------------------------------
 template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshOrigin() const {
   if (isFloatingPointScalarType<Tcoord>()) {
     std::vector<Tcoord> result(3);
@@ -168,6 +150,64 @@ template <typename Tcoord> std::vector<Tcoord> MeshParameters::getMeshInverseTra
           "MeshParameters", "getMeshTransform");
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+MeshParameters getMeasurements(const AtomGraph &ag, const CoordinateSeries<T> &cs,
+                               const double padding, const std::vector<double> &spacing,
+                               const int scale_bits_in) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  const CoordinateSeriesReader<T> csr = cs.data();
+  T xmin, ymin, zmin, xmax, ymax, zmax;
+  const bool data_is_int = isSignedIntegralScalarType<T>();
+  const T t_padding = (data_is_int) ? llround(padding * csr.gpos_scale) : padding * csr.gpos_scale;
+  bool points_unset = true;
+  const int lj_idx_offset = nbk.n_lj_types + 1;
+  const size_t natom_zu = csr.natom;
+  const size_t padded_natom = roundUp(natom_zu, warp_size_zu);
+  for (int i = 0; i < csr.nframe; i++) {
+    for (size_t pos = 0; pos < natom_zu; pos++) {
+      const size_t i_pos = (i * padded_natom) + pos;
+      if (ag.getAtomMobility(pos)) {
+        continue;
+      }
+      const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
+      const double atom_radius = 0.5 * csr.gpos_scale *
+                                 pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx], 1.0 / 6.0);
+      const T t_radius = (data_is_int) ? llround(atom_radius) : atom_radius;
+      if (points_unset) {
+        xmin = csr.xcrd[i_pos] - t_radius;
+        xmax = csr.xcrd[i_pos] + t_radius;
+        ymin = csr.ycrd[i_pos] - t_radius;
+        ymax = csr.ycrd[i_pos] + t_radius;
+        zmin = csr.zcrd[i_pos] - t_radius;
+        zmax = csr.zcrd[i_pos] + t_radius;
+        points_unset = false;
+      }
+      else {
+        xmin = std::min(xmin, csr.xcrd[i_pos] - t_radius);
+        xmax = std::max(xmax, csr.xcrd[i_pos] + t_radius);
+        ymin = std::min(ymin, csr.ycrd[i_pos] - t_radius);
+        ymax = std::max(ymax, csr.ycrd[i_pos] + t_radius);
+        zmin = std::min(zmin, csr.zcrd[i_pos] - t_radius);
+        zmax = std::max(zmax, csr.zcrd[i_pos] + t_radius);
+      }
+    }
+  }
+  xmin -= t_padding;
+  xmax += t_padding;
+  ymin -= t_padding;
+  ymax += t_padding;
+  zmin -= t_padding;
+  zmax += t_padding;
+  const std::vector<double> limits = { static_cast<double>(xmin) * csr.inv_gpos_scale,
+                                       static_cast<double>(ymin) * csr.inv_gpos_scale,
+                                       static_cast<double>(zmin) * csr.inv_gpos_scale,
+                                       static_cast<double>(xmax) * csr.inv_gpos_scale,
+                                       static_cast<double>(ymax) * csr.inv_gpos_scale,
+                                       static_cast<double>(zmax) * csr.inv_gpos_scale };
+  return getMeasurements(limits, spacing, scale_bits_in);
 }
 
 } // namespace structure

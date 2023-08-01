@@ -766,8 +766,8 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                 "minimizations.");
   t_nml.addHelp("clash_pair_tol", "In order to declare a seeded conformer 'clashing', the "
                 "internal conflicts must be great enough that guided minimization with a "
-                "soft-core potential would not be able to resolve the conflicts.  This is the "
-                "number of clashing atom pairs that will be assumed resolvable by the soft-core "
+                "softcore potential would not be able to resolve the conflicts.  This is the "
+                "number of clashing atom pairs that will be assumed resolvable by the softcore "
                 "energy minimization.");
   t_nml.addHelp("trial_limit", "The maximum number of trials that will be made for each "
                 "system.  Explicit sampling of chirality, cis-trans isomers, and then rotatable "

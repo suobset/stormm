@@ -294,7 +294,7 @@ MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel t
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
+void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &launcher,
                                                        const EvaluateForce eval_frc,
                                                        const EvaluateEnergy eval_nrg,
                                                        const ClashResponse softcore,
@@ -347,7 +347,7 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
+void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &launcher,
                                                        const EvaluateForce eval_frc,
                                                        const EvaluateEnergy eval_nrg,
                                                        const PrecisionModel prec,

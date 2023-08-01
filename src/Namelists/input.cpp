@@ -3,6 +3,7 @@
 #include "copyright.h"
 #include "Parsing/parse.h"
 #include "Parsing/textfile.h"
+#include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "input.h"
 
@@ -12,7 +13,8 @@ namespace namelist {
 using parse::strncmpCased;
 using parse::LineSpan;
 using parse::TextFileReader;
-  
+using stmath::maxValue;
+
 //-------------------------------------------------------------------------------------------------
 std::string padNamelistTuples(const char* text, const std::vector<bool> &quoted,
                               std::vector<bool> &commented) {
@@ -65,11 +67,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
                                                TextGuard("'", "'") };
   const std::vector<bool> commented = markGuardedText(tfr, comment_marks, quote_marks);
   const std::vector<bool> quoted = markGuardedText(tfr, quote_marks, comment_marks);
-  int max_line_length = 0;
-  for (int i = 0; i < tfr.line_count; i++) {
-    max_line_length = std::max(max_line_length,
-                               static_cast<int>(tfr.line_limits[i + 1] - tfr.line_limits[i]));
-  }
+  const int max_line_length = maxValue(tfr.line_lengths, tfr.line_count);
   std::vector<char> buffer(max_line_length + 1, '\0');
   const int actual_end = (*end_line == -1 || *end_line > tfr.line_count) ?
                          tfr.line_count : *end_line;

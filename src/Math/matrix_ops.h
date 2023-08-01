@@ -178,14 +178,27 @@ void transpose(const Hybrid<T> &a, Hybrid<T> *a_transpose, size_t rows, size_t c
 ///        BLAS calls.  Templated for single- and double-precision functionality.
 ///
 /// Overloaded:
+///   - Provide C-style arrays of trusted length, Standard Template Library vectors, or Hybrid
+///     objects
 ///   - Preserve the original matrix
 ///   - Destroy the original matrix 
 ///
 /// \param matrix   The matrix to invert, in column-mjaor (contiguous columns) format
 /// \param inverse  The inverse matrix result, pre-allocated and returned in column-major format
+/// \param rank     Matrix rank, implying a trusted length if C-style arrays are supplied
 /// \{
 template <typename T> void invertSquareMatrix(const T* matrix, T* inverse, size_t rank);
+
 template <typename T> void invertSquareMatrix(T* matrix, T* inverse, size_t rank);
+
+template <typename T> void invertSquareMatrix(const std::vector<T> &matrix,
+                                              std::vector<T> *inverse);
+
+template <typename T> void invertSquareMatrix(std::vector<T> *matrix, std::vector<T> *inverse);
+
+template <typename T> void invertSquareMatrix(const Hybrid<T> &matrix, Hybrid<T> *inverse);
+
+template <typename T> void invertSquareMatrix(Hybrid<T> *matrix, Hybrid<T> *inverse);
 /// \}
 
 /// \brief Check the dimensions of matrices against the determined rank.  This function serves the
@@ -381,9 +394,10 @@ double leibnizDeterminant(const Hybrid<T> &amat);
 template <typename T>
 void computeBoxTransform(T lx, T ly, T lz, T alpha, T beta, T gamma, T* umat, T* invu);
 
-template <typename T> void computeBoxTransform(const std::vector<T> &dims, T* umat, T* invu);
-
 template <typename T> void computeBoxTransform(const T* dims, T* umat, T* invu);
+
+template <typename T> void computeBoxTransform(const std::vector<T> &dims, std::vector<T> *umat,
+                                               std::vector<T> *invu);
 /// \}
 
 /// \brief Pull the box dimensions back out of the inverse transformation matrix.

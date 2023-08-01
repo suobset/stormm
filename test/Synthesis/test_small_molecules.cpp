@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+#include "copyright.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/series_ops.h"
@@ -66,12 +69,6 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis exhaustive_synth = syper.buildSynthesis(SamplingIntensity::EXHAUSTIVE, &xrs,
                                                               100000, 28, 26, 40, 28,
                                                               PrecisionModel::DOUBLE, &clrep);
-
-  // CHECK
-  printf("Sizes of syntheses: %4d %4d %4d %4d\n", minimal_synth.getSystemCount(),
-         light_synth.getSystemCount(), heavy_synth.getSystemCount(),
-         exhaustive_synth.getSystemCount());
-  // END CHECK
 #endif
   
   //syper.applySynthesis(poly_ps, VariableTorsionAdjustment::ADJUST_NEARBY_VALUES);

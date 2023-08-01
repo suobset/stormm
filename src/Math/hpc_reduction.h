@@ -3,7 +3,7 @@
 #define STORMM_HPC_REDUCTION_H
 
 #include "copyright.h"
-#include "Accelerator/kernel_manager.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
@@ -14,7 +14,7 @@
 namespace stormm {
 namespace stmath {
 
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using mm::MolecularMechanicsControls;
 using mm::MMControlKit;
@@ -64,7 +64,7 @@ void launchConjugateGradient(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
 
 void launchConjugateGradient(PrecisionModel prec, const AtomGraphSynthesis poly_ag,
                              PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
-                             MolecularMechanicsControls *mmctrl, const KernelManager &launcher);
+                             MolecularMechanicsControls *mmctrl, const CoreKlManager &launcher);
 /// \}
 
 } // namespace synthesis

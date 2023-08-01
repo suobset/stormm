@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
-#include "Math/sorting.h"
+#include "Math/sorting_enumerators.h"
 #include "parsing_enumerators.h"
 #include "polynumeric.h"
 

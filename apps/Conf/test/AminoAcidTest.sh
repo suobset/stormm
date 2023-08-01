@@ -1,8 +1,9 @@
 #!/bin/bash
 
 echo "&files" > cgen.in
-for SYS in gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_phe gly_pro \
-           gly_trp gly_tyr ; do
+#for SYS in gly_lys gly_gly ala arg gly lys phe pro trp tyr gly_ala gly_arg gly_phe gly_pro \
+#           gly_trp gly_tyr ; do
+for SYS in ala arg gly phe pro trp tyr ; do
   echo "  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/${SYS}.top" >> cgen.in
   echo "         -c ${STORMM_SOURCE}/test/Namelists/coord/${SYS}.inpcrd " >> cgen.in
   echo "         -x conf_${SYS}.crd x_kind SDF -label ${SYS} }" >> cgen.in
@@ -29,7 +30,7 @@ cat >> cgen.in << EOF
 &end
 
 &minimize
-  ncyc 500, cdcyc 0, maxcyc 500, ntpr = 25,
+  ncyc 25, cdcyc 0, maxcyc 25, ntpr = 1,
   clash_vdw_ratio 0.65,
 &end
 
@@ -44,7 +45,7 @@ cat >> cgen.in << EOF
   sdf_item { -title elec_14_energy  -label ALL -energy ELECTROSTATIC_NEAR }
   report_width 99
   e_precision 2
-  scope all
+  scope cluster_outlier
   syntax matlab
 &end
 EOF

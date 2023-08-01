@@ -10,6 +10,9 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::data_types::ullint;
+#ifndef STORMM_USE_HPC
+using stormm::data_types::uchar4;
+#endif
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
@@ -253,7 +256,15 @@ int main(const int argc, const char* argv[]) {
   lowercase(test_str, 4);
   check(std::string(test_str), RelationalOperator::EQUAL, "vdnnL@)*cCB",
         "Lowercase partial conversion of a mixed C-style string failed.");
-
+  const uchar4 rgb_code_i = { 255, 255, 255, 0 };
+  const std::string str_rgb_i = rgbHexCode(rgb_code_i);
+  check(str_rgb_i, RelationalOperator::EQUAL, "ffffff", "Conversion of an eight-bit color triplet "
+        "does not meet expectations.");
+  const uchar4 rgb_code_ii = {   5, 68, 170, 0 };
+  const std::string str_rgb_ii = rgbHexCode(rgb_code_ii);
+  check(str_rgb_ii, RelationalOperator::EQUAL, "0544aa", "Conversion of an eight-bit color "
+        "triplet does not meet expectations.");
+  
   // Test formatted column data reading: starting with integers
   section(5);
   const std::string spsh_path = oe.getStormmSourcePath() + osSeparator() + "test" + osSeparator() +
@@ -438,6 +449,29 @@ int main(const int argc, const char* argv[]) {
   check(many_params[4], RelationalOperator::EQUAL, "people     ", "Strings were not appended with "
         "the expected white space after left-hand justification.");
 
+  // Test the format determination of various number series.
+  const std::vector<double> column_num_a = { 5.68, 67.45, 53.22, 0.005, 9.997 };
+  const std::vector<double> column_num_b = { 67.5, 32.47846, 77.5, -99.499 };
+  const std::vector<double> column_num_c = { 5.68, 3.45, 1.22, -0.5, 9.997 };
+  const std::vector<double> column_num_d = { 5, 16, 7, 9, -2, 44 };
+  const int align_fmt_a = findAlignmentWidth<double>(column_num_a, 3);
+  const int align_fmt_b = findAlignmentWidth<double>(column_num_b, 1);
+  const int align_fmt_c = findAlignmentWidth<double>(column_num_c, 3);
+  const int align_fmt_d = findAlignmentWidth<double>(column_num_d, 0);
+  const int align_fmt_e = findAlignmentWidth<double>(column_num_b, 0);
+  check(align_fmt_a, RelationalOperator::EQUAL, 6, "The column format width of a series of "
+        "numbers does not meet expectations.");
+  check(align_fmt_b, RelationalOperator::EQUAL, 5, "The column format width of a series of "
+        "numbers does not meet expectations when a negative number is included.");
+  check(align_fmt_c, RelationalOperator::EQUAL, 6, "The column format width of a series of "
+        "numbers does not meet expectations when one of the numbers is a negative fraction.");
+  check(align_fmt_d, RelationalOperator::EQUAL, 2, "The column format width of a series of "
+        "numbers does not meet expectations with integer data when the number of decimal places "
+        "is zero.");
+  check(align_fmt_e, RelationalOperator::EQUAL, 3, "The column format width of a series of "
+        "numbers does not meet expectations with real data when the number of decimal places is "
+        "zero.");
+  
   // Check text protection for output purposes.
   const std::string my_paragraph = "This is a paragraph containing many words, including some "
                                    "which are particularly long such as "

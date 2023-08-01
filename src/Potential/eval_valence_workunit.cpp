@@ -254,9 +254,9 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
           const Vec2<double> uc =
             evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
                                      sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
-                                     nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
-                                     nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
-                                     sh_zfrc, eval_force, eval_force);
+                                     nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
+                                     sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                     sh_xfrc, sh_yfrc, sh_zfrc, eval_force, eval_force);
           if (log_term) {
             qq14_acc += llround(uc.x * nrg_scale_factor);
             lj14_acc += llround(uc.y * nrg_scale_factor);
@@ -463,9 +463,9 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const Vec2<double> uc =
         evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
                                  sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
-                                 nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
-                                 nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                                 eval_force, eval_force);
+                                 nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
+                                 sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                                 sh_yfrc, sh_zfrc, eval_force, eval_force);
       if (log_term) {
         qq14_acc += llround(uc.x * nrg_scale_factor);
         lj14_acc += llround(uc.y * nrg_scale_factor);

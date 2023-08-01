@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+#include "copyright.h"
 #include "../../src/FileManagement/file_enumerators.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parsing_enumerators.h"
@@ -153,7 +156,7 @@ int main(const int argc, const char* argv[]) {
   // Create a table of results and test its output.
   section(2);
   Xoshiro256ppGenerator xrs;
-  const std::vector<double> dbl_uni_data = xrs.uniformRandomNumber(20);
+  const std::vector<double> dbl_uni_data = uniformRand(&xrs, 20, 1.0);
   const std::vector<std::string> dbl_cols = { "Column A", "Segment B", "Partition C", "Group D" };
   const std::vector<int> dbl_dp = { 2, 3, 4, 3 };
   const ReportTable rtab_a(dbl_uni_data, dbl_cols, dbl_dp, "uni_dbl");
@@ -161,7 +164,7 @@ int main(const int argc, const char* argv[]) {
   snapshot(snp_file, rtab_a_str, "rand_uni_table", "A table of double-precision random numbers "
            "uniformly selected on the interval [0, 1) was not printed to string as expected.",
            oe.takeSnapshot(), PrintSituation::APPEND, do_snp_tests);
-  const std::vector<double> dbl_gss_data = xrs.gaussianRandomNumber(20);
+  const std::vector<double> dbl_gss_data = gaussianRand(&xrs, 20, 1.0);
   const ReportTable rtab_b(dbl_gss_data, dbl_cols, dbl_dp, "gss_dbl");
   const std::string rtab_b_str = rtab_b.printTable(OutputSyntax::MATRIX_PKG, 100);
   snapshot(snp_file, rtab_b_str, "rand_gss_table", "A table of double-precision random numbers "
@@ -226,7 +229,7 @@ int main(const int argc, const char* argv[]) {
   scon.addNarration("Narration can also precede a table in the output.");
   const std::vector<std::string> exmp_cols = { "Column A", "Column B", "Partition C", "Segment D",
                                                "Column E", "Group F", "Part G", "H", "I", "J" };
-  const std::vector<double> exmp_data = xrs.gaussianRandomNumber(50);
+  const std::vector<double> exmp_data = gaussianRand(&xrs, 50, 1.0);
   const std::vector<int> exmp_dp = { 2, 3, 4, 2, 7, 8, 7, 6, 6, 6 };
   const ReportTable exmp_rtab(exmp_data, exmp_cols, exmp_dp, "pseudo_rngs");
   scon.addTable(exmp_rtab);

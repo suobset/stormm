@@ -1,5 +1,6 @@
 #include "copyright.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
@@ -35,7 +36,7 @@ using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
-using stormm::topology::amber_coulomb_constant;
+using stormm::symbols::amber_ancient_bioq;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
 using stormm::topology::ImplicitSolventModel;
@@ -230,15 +231,15 @@ int main(const int argc, const char* argv[]) {
   const double sander_dielectric = 78.5;
   timer.assignTime(0);
   if (systems_exist) {
-    trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+    trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT, amber_ancient_bioq,
                             amber_default_qq14, amber_default_lj14, charge_rounding_tol,
                             charge_discretization_inc);
     trpi_ps.buildFromFile(trpi_crd_name, CoordinateFileKind::AMBER_INPCRD);
-    dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+    dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT, amber_ancient_bioq,
                             charmm_default_qq14, charmm_default_lj14, charge_rounding_tol,
                             charge_discretization_inc);
     dhfr_ps.buildFromFile(dhfr_crd_name, CoordinateFileKind::AMBER_INPCRD);
-    alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+    alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT, amber_ancient_bioq,
                             amber_default_qq14, amber_default_lj14, charge_rounding_tol,
                             charge_discretization_inc);
     alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);

@@ -667,17 +667,23 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
 
   
 //-------------------------------------------------------------------------------------------------
-std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, ReportTable *system_details,
+std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const EnergySample measure,
+                                               std::string *shortcut_key, std::string *post_script,
                                                const SynthesisCacheMap &scmap,
                                                const SystemGrouping organization,
                                                const std::vector<StateVariable> &quantities,
                                                const ReportControls &repcon) {
 
+  // CHECK
+  printf("Point A\n");
+  // END CHECK
+  
   // Determine the outliers based on the final energies, whether across the entire synthesis or
   // in terms of specific groups of systems.
   const SynthesisMapReader scmapr = scmap.data();
   const std::vector<double> final_e = nrg.reportInstantaneousStates();
-  std::vector<double> outlier_scores, outlier_indices;
+  std::vector<double> outlier_scores;
+  std::vector<int> outlier_indices;
   switch (repcon.getOutputScope()) {
   case OutputScope::AVERAGES:
   case OutputScope::CLUSTER_AVERAGES:
@@ -821,10 +827,6 @@ std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, ReportTable
     }
     break;
   }
-
-  // CHECK
-  printf("There are a total of %zu outliers.\n", outlier_scores.size());
-  // END CHECK
 }
  
 } // namespace review

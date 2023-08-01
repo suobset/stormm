@@ -146,7 +146,7 @@ void getAmberInputCoordinates(const TextFile &tf, double* x_coordinates, double*
       for (int i = 0; i < 6; i++) {
         box_dimensions[i] = box_dims[i];
       }
-      computeBoxTransform(box_dims, box_space_transform, inverse_transform);
+      computeBoxTransform(box_dims.data(), box_space_transform, inverse_transform);
     }
   }
   else {

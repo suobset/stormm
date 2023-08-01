@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef STORMM_KERNEL_MANAGER_H
-#define STORMM_KERNEL_MANAGER_H
+#ifndef STORMM_CORE_KERNEL_MANAGER_H
+#define STORMM_CORE_KERNEL_MANAGER_H
 
 #include <map>
 #include <string>
@@ -20,18 +20,17 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "gpu_details.h"
+#include "kernel_format.h"
 
 namespace stormm {
 namespace card {
 
 using constants::PrecisionModel;
-#ifndef STORMM_USE_HPC
-using data_types::int2;
-#endif
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
 using energy::ClashResponse;
 using numerics::AccumulationMethod;
+using structure::GridDetail;
 using structure::RMSDTask;
 using structure::VirtualSiteActivity;
 using synthesis::AtomGraphSynthesis;
@@ -43,87 +42,11 @@ using synthesis::VwuGoal;
 using topology::ImplicitSolventModel;
 using topology::UnitCellType;
 
-/// \brief Encapsulate the operations to store and retrieve information about a kernel's format.
-class KernelFormat {
-public:
-
-  /// \brief The constructor takes launch bounds and other information that can be plucked from a
-  ///        cudaFuncAttributes object.
-  ///
-  /// Overloaded:
-  ///   - Construct a blank object
-  ///   - Provide explicit instructions on whether to consider breaking up the blocks into smaller
-  ///     units
-  ///   - Assume that the largest possible block size is always to be used
-  ///
-  /// \param lb_max_threads_per_block  Maximum threads per block, as stated in the launch bounds
-  /// \param lb_min_blocks_per_smp     Minimum blocks per multiprocessor, from the launch bounds
-  /// \param register_usage_in         Input register usage
-  /// \param shared_usage_in           Input __shared__ memory usage
-  /// \param block_subdivision         Preferred block multiplicity (this will compound the input
-  ///                                  minimum number of blocks per multiprocessor)
-  /// \param attr                      Result of a CUDA runtime query to get kernel specifications
-  /// \param gpu                       Details of the available GPU (likely passed in from a
-  ///                                  KernelManager struct containing many KernelFormat objects)
-  /// \param kernel_name_in            Name of the kernel, for reporting purposes later (optional)
-  /// \{
-  KernelFormat();
-  
-  KernelFormat(int lb_max_threads_per_block, int lb_min_blocks_per_smp, int register_usage_in,
-               int shared_usage_in, int block_subdivision, const GpuDetails &gpu,
-               const std::string &kernel_name_in = std::string(""));
-
-  KernelFormat(int lb_max_threads_per_block, int lb_min_blocks_per_smp, int register_usage_in,
-               int shared_usage_in, const GpuDetails &gpu,
-               const std::string &kernel_name_in = std::string(""));
-
-#ifdef STORMM_USE_HPC
-#  ifdef STORMM_USE_CUDA
-  KernelFormat(const cudaFuncAttributes &attr, int lb_min_blocks_per_smp, int block_subdivision,
-               const GpuDetails &gpu, const std::string &kernel_name_in = std::string(""));
-#  endif
-#endif
-  /// \}
-
-  /// \brief Take the default copy and move constructors as well as assignment operators.
-  /// \{
-  KernelFormat(const KernelFormat &original) = default;
-  KernelFormat(KernelFormat &&original) = default;
-  KernelFormat& operator=(const KernelFormat &other) = default;
-  KernelFormat& operator=(KernelFormat &&other) = default;
-  /// \}
-  
-  /// \brief Get the optimal block and grid sizes for kernel launches with the present GPU.
-  int2 getLaunchParameters() const;
-
-  /// \brief Get the register usage of the kernel.
-  int getRegisterUsage() const;
-
-  /// \brief Get the maximum thread count for a single block in the kernel launch.
-  int getBlockSizeLimit() const;
-
-  /// \brief Get the amount of __shared__ memory needed by any one block.
-  int getSharedMemoryRequirement() const;
-
-  /// \brief Get the name of this kernel
-  const std::string& getKernelName() const;
-  
-private:
-  int block_size_limit;        ///< The largest block size usable by the kernel launch (exceeding
-                               ///<   this will cause the kernel launch to fail)
-  int shared_usage;            ///< The maximum amount of __shared__ memory needed by each block
-  int block_dimension;         ///< Computed optimal block dimension to use in kernel launches
-  int grid_dimension;          ///< Computed optimal grid size to use in kernel launches
-  int register_usage;          ///< The number of registers needed by each thread of the kernel
-                               ///<   as it is compiled for the current executable
-  std::string kernel_name;     ///< Name of the kernel, for reporting purposes
-};
-
 /// \brief A class to guide the implementation of GPU kernels, with selected thread counts per
 ///        block and block counts per launch grid for a specific GPU based on the workload.  This
 ///        object is constructed in a stepwise manner, with each kind of work unit contributing
 ///        new launch specifications.
-class KernelManager {
+class CoreKlManager : public KernelManager {
 public:
 
   /// \brief The constructor will fill in values as if this were a single-threaded CPU "launch."
@@ -131,7 +54,7 @@ public:
   /// \param gpu_in   Details of the GPU in use (this is relevant, as it will be used to interpret
   ///                 the layout of any kernels)
   /// \param poly_ag  Topologies for all systems, offering details of the workload
-  KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag);
+  CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag);
 
   /// \brief Get the architecture-specific block multiplier.  This will run a minimum number of
   ///        blocks per streaming multiprocessor on some cards, specifically NVIDIA's GTX 1080-Ti,
@@ -197,20 +120,7 @@ public:
   /// \param order  The order of the calculation (all to reference, or all to all)
   int2 getRMSDKernelDims(PrecisionModel prec, RMSDTask order) const;
   
-  /// \brief Get the GPU information for the active GPU.
-  const GpuDetails& getGpu() const;
-  
-  /// \brief Print out the kernel launch parameters found for this workload.
-  ///
-  /// \param kernel_name  Name of the kernel for which to print the parameters (if blank, no
-  ///                     kernels' parameters will be printed, and if "ALL" (case-insensitive),
-  ///                     all kernels' parameters will be printed)
-  void printLaunchParameters(const std::string &kernel_name = std::string("")) const;
-  
 private:
-
-  /// The details of the GPU in use are simply copied into this object.
-  GpuDetails gpu;
 
   /// The workload-specific block multiplier for valence kernels.  No provision is needed for
   /// NVIDIA GTX 1080-Ti, as the blocks will have at least multiplicity 2 on each streaming
@@ -256,16 +166,12 @@ private:
   /// \}
 
   /// The architecture-specific block multipliers for RMSD computation kernels.  The thread count
-  /// for each kernel is set to 128 (tiny) as each kernel operates strictly as a collection of
+  /// for each kernel is set to 128 (tiny).  Each kernel operates strictly as a collection of
   /// warps.
   /// \{
   int rmsd_block_multiplier_dp;
   int rmsd_block_multiplier_sp;
   /// \}
-  
-  /// Store the resource requirements and selected launch parameters for a variety of kernels.
-  /// Keys are determined according to the free functions further on in this library.
-  std::map<std::string, KernelFormat> k_dictionary;
 
   /// \brief Set the register, maximum block size, and thread counts for one of the valence
   ///        kernels.  This function complements getValenceKernelDims(), although the other
@@ -333,8 +239,9 @@ private:
 
   /// \brief Set the maximum block size and thread counts for one of the RMSD calculation kernels.
   ///
-  /// \param prec   The type of floating point numbers in which the kernel shall work
-  /// \param order  The order of the calculation (all to reference, or all to all)
+  /// \param prec         The type of floating point numbers in which the kernel shall work
+  /// \param order        The order of the calculation (all to reference, or all to all)
+  /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogRMSDKernel(PrecisionModel prec, RMSDTask order,
                          const std::string &kernel_name = std::string(""));
 };
@@ -378,7 +285,7 @@ int virtualSiteBlockMultiplier(PrecisionModel prec);
 ///
 /// \param prec  The type of floating point numbers in which the kernel shall work
 int rmsdBlockMultiplier(PrecisionModel prec);
-  
+
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
@@ -482,7 +389,7 @@ std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity proces
 /// \param prec   The type of floating point numbers in which the kernel shall work
 /// \param order  The order of the calculation (all to reference, or all to all)
 std::string rmsdKernelKey(PrecisionModel prec, RMSDTask order);
-  
+
 } // namespace card
 } // namespace stormm
 

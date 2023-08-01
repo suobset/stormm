@@ -36,7 +36,7 @@ template<typename Tdata, typename Tcalc>
 void clusterOneDimData(const int npoints, const int nclusters, Xoshiro256ppGenerator *xrs,
                        const BoundaryCondition boundary, const double range,
                        const bool beats = false, const Tcalc scale_factor = 1.0) {
-  std::vector<double> r_distro = xrs->uniformRandomNumber(npoints);
+  std::vector<double> r_distro = uniformRand(xrs, npoints, 1.0);
   elementwiseMultiply(&r_distro, range);
   ClusterManager<double, double> cls_obj(npoints, nclusters);
   kMeans(&cls_obj, r_distro, nclusters, 1.0, boundary, range);

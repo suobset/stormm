@@ -92,7 +92,7 @@ cudaFuncAttributes queryRMSDKernelRequirements(const PrecisionModel prec, const 
 //-------------------------------------------------------------------------------------------------
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<double> *result,
-          const KernelManager &launcher) {
+          const CoreKlManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::DOUBLE, RMSDTask::REFERENCE);
   kdComputeRMSDToReference<<<lp.x, lp.y>>>(cg.data(tier), rplan.dpData(tier), poly_ps.data(tier),
@@ -102,7 +102,7 @@ void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynt
 //-------------------------------------------------------------------------------------------------
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<float> *result,
-          const KernelManager &launcher) {
+          const CoreKlManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::SINGLE, RMSDTask::REFERENCE);
   kfComputeRMSDToReference<<<lp.x, lp.y>>>(cg.data(tier), rplan.spData(tier), poly_ps.data(tier),
@@ -111,7 +111,7 @@ void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynt
 
 //-------------------------------------------------------------------------------------------------
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-          Hybrid<double> *result, const KernelManager &launcher) {
+          Hybrid<double> *result, const CoreKlManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::DOUBLE, RMSDTask::MATRIX);
   kdComputeRMSDMatrix<<<lp.x, lp.y>>>(cg.data(tier), rplan.dpData(tier), poly_ps.data(tier),
@@ -120,7 +120,7 @@ void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynt
 
 //-------------------------------------------------------------------------------------------------
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-          Hybrid<float> *result, const KernelManager &launcher) {
+          Hybrid<float> *result, const CoreKlManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const int2 lp = launcher.getRMSDKernelDims(PrecisionModel::SINGLE, RMSDTask::MATRIX);
   kfComputeRMSDMatrix<<<lp.x, lp.y>>>(cg.data(tier), rplan.spData(tier), poly_ps.data(tier),

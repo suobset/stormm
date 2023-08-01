@@ -52,7 +52,7 @@ PrecisionModel translatePrecisionModel(const std::string &choice, const Exceptio
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getPrecisionModelName(const PrecisionModel plevel) {
+std::string getEnumerationName(const PrecisionModel plevel) {
   switch (plevel) {
   case PrecisionModel::SINGLE:
     return std::string("SINGLE");

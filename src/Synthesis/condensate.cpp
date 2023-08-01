@@ -46,9 +46,8 @@ CondensateReader::CondensateReader(const CondensateWriter &cdw) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionModel mode_in,
-                       const GpuDetails &gpu) :
-    mode{mode_in}, basis{StructureSource::NONE},
+Condensate::Condensate() :
+    mode{PrecisionModel::SINGLE}, basis{StructureSource::NONE},
     system_count{0}, unit_cell{UnitCellType::NONE},
     holds_own_data{false}, csptr_data_type{0},
     atom_starts{HybridKind::ARRAY, "cdns_atom_starts"},
@@ -62,11 +61,19 @@ Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionMod
     box_transforms{HybridKind::POINTER, "cdns_umat"},
     inv_transforms{HybridKind::POINTER, "cdns_invu"},
     box_dimensions{HybridKind::POINTER, "cdns_bdim"},
-    pps_ptr{const_cast<PhaseSpaceSynthesis*>(poly_ps_in)},
+    pps_ptr{nullptr},
     cs_ptr{nullptr},
     float_data{HybridKind::ARRAY, "cdns_floats"},
     double_data{HybridKind::ARRAY, "cdns_doubles"}
+{}
+
+//-------------------------------------------------------------------------------------------------
+Condensate::Condensate(const PhaseSpaceSynthesis *poly_ps_in, const PrecisionModel mode_in,
+                       const GpuDetails &gpu) :
+    Condensate()
 {
+  mode = mode_in;
+  pps_ptr = const_cast<PhaseSpaceSynthesis*>(poly_ps_in);
   rebuild(pps_ptr, mode, gpu);
 }
 

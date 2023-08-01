@@ -65,7 +65,7 @@ PrecisionModel translatePrecisionModel(const std::string &choice, ExceptionRespo
 /// \brief Get a descriptive string corresponding to each enumerated compute precision model.
 ///
 /// \param pmodel  The precision model to name
-std::string getPrecisionModelName(PrecisionModel pmodel);
+std::string getEnumerationName(PrecisionModel pmodel);
 
 /// \brief Translate the name of a Cartesian axis.
 ///

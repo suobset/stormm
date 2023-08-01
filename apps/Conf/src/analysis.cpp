@@ -3,6 +3,7 @@
 #include "copyright.h"
 #include "../../../src/Accelerator/hybrid.h"
 #include "../../../src/Analysis/comparison_guide.h"
+#include "../../../src/Constants/behavior.h"
 #include "../../../src/FileManagement/file_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/FileManagement/file_util.h"
@@ -37,6 +38,7 @@ namespace conf_app {
 namespace analysis {
 
 using stormm::analysis::ComparisonGuide;
+using stormm::constants::PrecisionModel;
 using stormm::card::Hybrid;
 using stormm::energy::EnergySample;
 using stormm::energy::StateVariable;
@@ -75,7 +77,7 @@ std::vector<int> filterMinimizedStructures(const PhaseSpaceSynthesis &poly_ps,
                                            const SystemCache &sc, const SynthesisCacheMap &scmap,
                                            const ScoreCard &emin, const ConformerControls &confcon,
                                            const GpuDetails &gpu) {
-  Condensate cdns(poly_ps);
+  Condensate cdns(poly_ps, PrecisionModel::SINGLE);
   ComparisonGuide cg(cdns, scmap);
   const std::vector<double> efinal = emin.reportTotalEnergies();
   const PsSynthesisReader poly_psr = poly_ps.data();
@@ -494,8 +496,6 @@ void printReport(const SystemCache &sc, const UserSettings &ui,
   switch (repcon.getOutputScope()) {
   case OutputScope::AVERAGES:
     break;
-  case OutputScope::OUTLIERS:
-    break;
   case OutputScope::CLUSTER_AVERAGES:
     {
       std::string shortcut_key;
@@ -510,12 +510,17 @@ void printReport(const SystemCache &sc, const UserSettings &ui,
       }
     }
     break;
+  case OutputScope::OUTLIERS:
   case OutputScope::CLUSTER_OUTLIERS:
+    {
+      std::string shortcut_key, post_script;
+      tabulateOutlierEnergy(prelim_emin, EnergySample::FINAL, &shortcut_key, &post_script,
+                            sandbox_map, confcon.getGroupingMethod(), {}, repcon);
+    }
     break;
   case OutputScope::FULL:
     {
-      std::string shortcut_key;
-      std::string post_script;
+      std::string shortcut_key, post_script;
       const std::vector<ReportTable> etables = tabulateFullEnergy(prelim_emin,
                                                                   EnergySample::TIME_SERIES,
                                                                   "free", &shortcut_key,

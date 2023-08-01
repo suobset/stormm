@@ -56,6 +56,15 @@ enum class OutputSyntax {
                ///<   with no syntax or other commands associated with plotting programs
 };
 
+/// \brief Possible formats for grid file output.  Descriptions of some enumerations follow from
+///        the OutputSyntax enumerator above.
+enum class GridFileSyntax {
+  MATPLOTLIB,  ///< Python-based MatPlotLib output, with isosurfaces
+  MATRIX_PKG,  ///< Matlab and GNU Octave, with isosurfaces
+  OPEN_DX,     ///< OpenDX format as used by VMD
+  CUBEGEN      ///< Gaussian cubegen format
+};
+  
 /// \brief Possible components of each output report file section
 enum class SectionComponent {
   NARRATIVE,  ///< A block of narration suitable for processing by the
@@ -94,6 +103,19 @@ enum class TableContentKind {
   STRING    ///< The table data can only be interpreted as strings, possibly char4
 };
 
+/// \brief List the ways in which a surface can be depicted.
+enum class SurfaceRender {
+  WIRE,     ///< The surface is a wire mesh network with edges colored but no opacity on its faces
+  SOLID,    ///< The surface is a collection of opaque or semi-transparent faces
+  SCAFFOLD  ///< The surface has both opaque or (semi-transparent) faces and colored edges
+};
+
+/// \brief Styles of plotting lines, valid in a range of visualization software.
+enum class LinePlotStyle {
+  SOLID,  ///< The line is solid with whatever weight
+  DASHED  ///< The line is dashed with a dash length defined by the plotting program
+};
+  
 /// \brief An array of Roman numerals, queried when using the ListEnumeration ROMAN setting.
 const std::vector<std::string> roman_numerals = { "i", "ii", "iii", "iv", "v", "vi", "vii", "viii",
                                                   "ix", "x", "xi", "xii", "xiii", "xiv", "xv",
@@ -110,11 +132,26 @@ constexpr int maximum_roman_numeral = 25;
 /// \{
 std::string getEnumerationName(OutputScope input);
 std::string getEnumerationName(OutputSyntax input);
+std::string getEnumerationName(GridFileSyntax input);
 std::string getEnumerationName(SectionComponent input);
 std::string getEnumerationName(ListEnumeration input);
 std::string getEnumerationName(TextEnds input);
 std::string getEnumerationName(TableContentKind input);
+std::string getEnumerationName(SurfaceRender input);
+std::string getEnumerationName(LinePlotStyle input);
 /// \}
+
+/// \brief Translate various directives for a surface rendering method into their corresponding
+///        enumerations.
+///
+/// \param input  The human-readable string to translate
+SurfaceRender translateSurfaceRender(const std::string &input);
+
+/// \brief Traanslate various directives for the line plotting style into their corresponding
+///        enumerations.
+///
+/// \param input  The human-readable string to translate
+LinePlotStyle translateLinePlotStyle(const std::string &input);
 
 /// \brief Perform a bounds check on an integer to see if it can be represented with one of the
 ///        hard-wired Roman numerals in the roman_numerals array above, then convert it if

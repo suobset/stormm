@@ -3,7 +3,7 @@
 #define STORMM_HPC_VIRTUAL_SITE_HANDLING_H
 
 #include "copyright.h"
-#include "Accelerator/kernel_manager.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Potential/cacheresource.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -14,7 +14,7 @@
 namespace stormm {
 namespace structure {
 
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using energy::CacheResource;
 using energy::CacheResourceKit;
@@ -89,7 +89,7 @@ void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<flo
 /// \param launcher  Repository with launch parameters for all kernels
 void launchVirtualSiteHandling(PrecisionModel prec, VirtualSiteActivity purpose,
                                PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
-                               const AtomGraphSynthesis &poly_ag, const KernelManager &launcher);
+                               const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher);
 
 } // namespace structure
 } // namespace stormm

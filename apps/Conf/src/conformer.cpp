@@ -6,7 +6,7 @@
 #include "../../../src/Math/summation.h"
 #include "../../../src/Math/vector_ops.h"
 #ifdef STORMM_USE_HPC
-#  include "../../../src/Accelerator/kernel_manager.h"
+#  include "../../../src/Accelerator/core_kernel_manager.h"
 #  include "../../../src/Accelerator/gpu_details.h"
 #  include "../../../src/MolecularMechanics/hpc_minimization.h"
 #else
@@ -105,10 +105,10 @@ int main(int argc, const char* argv[]) {
   master_timer.addCategory(tm_coordinate_expansion);
   master_timer.addCategory(tm_energy_minimization);
   master_timer.addCategory(tm_conformer_selection);
-
+  
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::CONFORMER);
-
+  
   // Get details of the GPU to use
 #ifdef STORMM_USE_HPC
   const HpcConfig gpu_config(ExceptionResponse::WARN);
@@ -211,7 +211,7 @@ int main(int argc, const char* argv[]) {
   emin.download();
   Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE, gpu);
 #else
-  Condensate sandbox_snapshot(sandbox);
+  Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE);
 #endif
 
   // For each rotatable bond, compute the value obtained in each conformer.  This will produce a

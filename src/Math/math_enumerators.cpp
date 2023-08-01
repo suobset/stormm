@@ -1,0 +1,77 @@
+#include "copyright.h"
+#include "math_enumerators.h"
+
+namespace stormm {
+namespace stmath {
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const FunctionLevel input) {
+  switch (input) {
+  case FunctionLevel::VALUE:
+    return std::string("VALUE");
+  case FunctionLevel::DX:
+    return std::string("DX");
+  case FunctionLevel::DY:
+    return std::string("DY");
+  case FunctionLevel::DZ:
+    return std::string("DZ");
+  case FunctionLevel::DXX:
+    return std::string("DXX");
+  case FunctionLevel::DXY:
+    return std::string("DXY");
+  case FunctionLevel::DXZ:
+    return std::string("DXZ");
+  case FunctionLevel::DYY:
+    return std::string("DYY");
+  case FunctionLevel::DYZ:
+    return std::string("DYZ");
+  case FunctionLevel::DZZ:
+    return std::string("DZZ");
+  case FunctionLevel::DXXX:
+    return std::string("DXXX");
+  case FunctionLevel::DXXY:
+    return std::string("DXXY");
+  case FunctionLevel::DXXZ:
+    return std::string("DXXZ");
+  case FunctionLevel::DXYY:
+    return std::string("DXYY");
+  case FunctionLevel::DXYZ:
+    return std::string("DXYZ");
+  case FunctionLevel::DXZZ:
+    return std::string("DXZZ");
+  case FunctionLevel::DYYY:
+    return std::string("DYYY");
+  case FunctionLevel::DYYZ:
+    return std::string("DYYZ");
+  case FunctionLevel::DYZZ:
+    return std::string("DYZZ");
+  case FunctionLevel::DZZZ:
+    return std::string("DZZZ");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const Interpolant input) {
+  switch (input) {
+  case Interpolant::SMOOTHNESS:
+    return std::string("SMOOTHNESS");
+  case Interpolant::FUNCTION_VALUE:
+    return std::string("FUNCTION_VALUE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const LimitApproach input) {
+  switch (input) {
+  case LimitApproach::BELOW:
+    return std::string("BELOW");
+  case LimitApproach::ABOVE:
+    return std::string("ABOVE");    
+  }
+  __builtin_unreachable();
+}
+
+} // namespace stormm
+} // namespace stmath

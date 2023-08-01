@@ -8,6 +8,7 @@
 #define SHFL_XOR(a, b)   __shfl_xor_sync(0xffffffff, a, b, 32)
 #define SHFL_UP(a, b)    __shfl_up_sync(0xffffffff, a, b, 32)
 #define SHFL(a, b)       __shfl_sync(0xffffffff, a, b, 32)
+#define SYNCWARP         __syncwarp()
 
 #define WARP_REDUCE_DOWN(var) {                     \
   var += __shfl_down_sync(0xffffffff, var, 16, 32); \
@@ -24,6 +25,7 @@
 #define SHFL_XOR(a, b)   __shfl_xor(0xffffffffffffffff, a, b, 64)
 #define SHFL_UP(a, b)    __shfl_up(0xffffffffffffffff, a, b, 64)
 #define SHFL(a, b)       __shfl(0xffffffffffffffff, a, b, 64)
+#define SYNCWARP
 
 #define WARP_REDUCE_DOWN(var) {                     \
   var += __shfl_down_sync(0xffffffff, var, 32, 64); \

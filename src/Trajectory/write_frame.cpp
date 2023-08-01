@@ -244,7 +244,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
 
     // Rebuild the transformation matrices to ensure that the box angles are sane
     std::vector<double> umat(9), invu(9);
-    computeBoxTransform(box_dimensions, umat.data(), invu.data());
+    computeBoxTransform(box_dimensions, &umat, &invu);
     for (int i = 0; i < 9; i++) {
       if (std::isnan(invu[i]) || std::isinf(invu[i])) {
         rtErr("The triclinic system evaluates to a nonsensical transformation matrix: [ " +

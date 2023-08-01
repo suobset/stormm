@@ -134,11 +134,19 @@ void imageCoordinates(PhaseSpaceSynthesis *poly_ps, int system_index, ImagingMet
 ///        function work with double-precision coordinates on the host.
 ///
 /// Overloaded:
+///   - Accept two 
 ///   - Accept two atom indices and raw pointers to templated coordinate arrays (float, double, or
 ///     fixed precision signed integers) and templated box specifications (float or double, which
 ///     will determine the numerical precision of the internal calculations)
 ///   - Accept two atom indices and any of the coordinate storage objects
 ///
+/// \param pti_x              Split fixed-precision, high accuracy representation of the ith
+///                           particle's Cartesian X coordinate
+/// \param pti_y              The ith particle's Cartesian Y coordinate
+/// \param pti_z              The ith particle's Cartesian Z coordinate
+/// \param ptj_x              The jth particle's Cartesian X coordinate
+/// \param ptj_y              The jth particle's Cartesian Y coordinate
+/// \param ptj_z              The jth particle's Cartesian Z coordinate
 /// \param atom_i             Topological index of the first atom in the system
 /// \param atom_j             Topological index of the second atom in the system
 /// \param xcrd               Cartesian x coordinate of all particles in the system
@@ -152,6 +160,11 @@ void imageCoordinates(PhaseSpaceSynthesis *poly_ps, int system_index, ImagingMet
 /// \param y_ovrf             Overflow bits for Cartesian y coordinates
 /// \param z_ovrf             Overflow bits for Cartesian z coordinates
 /// \{
+template <typename Tcalc4, typename Tcalc>
+Tcalc4 distance(const int95_t pti_x, const int95_t pti_y, const int95_t pti_z, const int95_t ptj_x,
+               	const int95_t ptj_y, const int95_t ptj_z, const	double*	umat, const double* invu,
+                UnitCellType unit_cell, Tcalc gpos_scale_factor);
+
 template <typename Tcoord, typename Tcalc>
 Tcalc distance(int atom_i, int atom_j, const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                const double* umat, const double* invu, UnitCellType unit_cell,

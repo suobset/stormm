@@ -1,7 +1,8 @@
 // -*-c++-*-
-#ifndef STORMM_SORTING_H
-#define STORMM_SORTING_H
+#ifndef STORMM_SORTING_ENUMERATORS_H
+#define STORMM_SORTING_ENUMERATORS_H
 
+#include <string>
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 
@@ -24,6 +25,15 @@ enum class UniqueValueHandling {
                        ///<   single entry of 2.7.
 };
 
+/// \brief Produce a human-readable string corresponding to each enumeration.  Overloads of this
+///        function here and in other libraries provide handling for each enum class object.
+///
+/// \param input  The enumeration to translate
+/// \{
+std::string getEnumerationName(SortDirection input);
+std::string getEnumerationName(UniqueValueHandling input);
+/// \}
+  
 } // namespace stmath
 } // namespace stormm
 

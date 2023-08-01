@@ -1,4 +1,6 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Parsing/parse.h"
 #include "reporting_enumerators.h"
 #include "error_format.h"
 
@@ -23,6 +25,9 @@ std::string getEnumerationName(const HelpSignalKind input) {
 } // namespace display
   
 namespace review {
+
+using constants::CaseSensitivity;
+using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const OutputScope input) {
@@ -50,6 +55,21 @@ std::string getEnumerationName(const OutputSyntax input) {
     return std::string("MATRIX_PKG");
   case OutputSyntax::STANDALONE:
     return std::string("STANDALONE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const GridFileSyntax input) {
+  switch (input) {
+  case GridFileSyntax::MATPLOTLIB:
+    return std::string("MATPLOTLIB");
+  case GridFileSyntax::MATRIX_PKG:
+    return std::string("MATRIX_PKG");
+  case GridFileSyntax::OPEN_DX:
+    return std::string("OPEN_DX");
+  case GridFileSyntax::CUBEGEN:
+    return std::string("CUBEGEN");
   }
   __builtin_unreachable();
 }
@@ -106,6 +126,65 @@ std::string getEnumerationName(const TableContentKind input) {
     return std::string("REAL");
   case TableContentKind::STRING:
     return std::string("STRING");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SurfaceRender input) {
+  switch (input) {
+  case SurfaceRender::WIRE:
+    return std::string("WIRE");
+  case SurfaceRender::SOLID:
+    return std::string("SOLID");
+  case SurfaceRender::SCAFFOLD:
+    return std::string("SCAFFOLD");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const LinePlotStyle input) {
+  switch (input) {
+  case LinePlotStyle::SOLID:
+    return std::string("SOLID");
+  case LinePlotStyle::DASHED:
+    return std::string("DASHED");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+SurfaceRender translateSurfaceRender(const std::string &input) {
+  if (strcmpCased(input, "wire", CaseSensitivity::NO) ||
+      strcmpCased(input, "wire mesh", CaseSensitivity::NO) ||
+      strcmpCased(input, "wire_mesh", CaseSensitivity::NO)) {
+    return SurfaceRender::WIRE;
+  }
+  else if (strcmpCased(input, "solid", CaseSensitivity::NO)) {
+    return SurfaceRender::SOLID;
+  }
+  else if (strcmpCased(input, "scaffold", CaseSensitivity::NO)) {
+    return SurfaceRender::SCAFFOLD;    
+  }
+  else {
+    rtErr("No SurfaceRender enumeration matches \"" + input + "\".", "translateSurfaceRender");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+LinePlotStyle translateLinePlotStyle(const std::string &input) {
+  if (strcmpCased(input, "solid", CaseSensitivity::NO) ||
+      strcmpCased(input, "continuous", CaseSensitivity::NO)) {
+    return LinePlotStyle::SOLID;
+  }
+  else if (strcmpCased(input, "dashed", CaseSensitivity::NO) ||
+           strcmpCased(input, "broken", CaseSensitivity::NO)) {
+    return LinePlotStyle::DASHED;
+  }
+  else {
+    rtErr("No LinePlotStyle enumeration matches \"" + input + "\".", "translateLinePlotStyle");
   }
   __builtin_unreachable();
 }

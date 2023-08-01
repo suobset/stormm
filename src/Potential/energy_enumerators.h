@@ -108,7 +108,24 @@ enum class EnergySample {
   FINAL,        ///< Return the current (most recent, or final) value of a state variable
   TIME_AVERAGE  ///< Return the average of the time series of a state variable
 };
-  
+
+/// \brief Different shapes for the scaffold used to build a scaffold for a softcore potential
+///        function.  Each of these functions are monotonic.
+enum class SplineScaffold {
+  LINEAR,           ///< The scaffold is a line of points between the function value at the
+                    ///<   switching distance r = rs and r = 0.
+  SIGMOIDAL,        ///< The scaffold is a sigmoidal function of the form
+                    ///<   1 / (1 + e^(-(8r / rs) + 4)).  This normalizes the sigmoidal behavior
+                    ///<   such that, over the interval [0, rs], the S-shaped curve traces the
+                    ///<   progress that the classic logistic function 1 / (1 + e^-r) would trace
+                    ///<   over the interval [ -4, 4 ].
+  QUADRATIC_HILL,   ///< The scaffold is an inverted parabola with the value of the original
+                    ///<   function at the switching point rs as well as zero derivative at r = 0.
+  QUADRATIC_VALLEY  ///< The scaffold is a parabola with the value of the original function and
+                    ///<   zero derivative at the switching distance r = rs and the target value at
+                    ///<   r = 0.
+};
+
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///
 /// \param input  The enumeration of interest
@@ -122,7 +139,13 @@ std::string getEnumerationName(NonbondedPotential input);
 std::string getEnumerationName(VdwCombiningRule input);
 std::string getEnumerationName(ClashResponse input);
 std::string getEnumerationName(EnergySample input);
+std::string getEnumerationName(SplineScaffold input);
 /// \}
+
+/// \brief Produce a potential enumeration based on a selection of sanctioned input strings.
+///
+/// \param input  The string describing the potential
+NonbondedPotential translateNonbondedPotential(const std::string &input);
 
 } // namespace energy
 } // namespace stormm

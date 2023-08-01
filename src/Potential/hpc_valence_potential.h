@@ -6,8 +6,8 @@
 #include <cuda_runtime.h>
 #endif
 #include "copyright.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Accelerator/gpu_details.h"
-#include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -26,7 +26,7 @@ namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
@@ -125,14 +125,14 @@ void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                   AccumulationMethod force_sum, const KernelManager &launcher,
+                   AccumulationMethod force_sum, const CoreKlManager &launcher,
                    double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                   const KernelManager &launcher, double clash_minimum_distance = 0.0,
+                   const CoreKlManager &launcher, double clash_minimum_distance = 0.0,
                    double clash_ratio = 0.0);
 /// \}
   

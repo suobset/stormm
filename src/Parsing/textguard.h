@@ -30,10 +30,10 @@ public:
   ~TextGuard() = default;
 
   /// \brief Get the left-hand guard
-  const std::string getLeft() const;
+  const std::string& getLeft() const;
 
   /// \brief Get the right-hand guard
-  const std::string getRight() const;
+  const std::string& getRight() const;
 
   /// \brief Get the size of the left-hand guard, in terms of the number of characters
   int leftSize() const;

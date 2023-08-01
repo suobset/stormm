@@ -3,8 +3,8 @@
 #define STORMM_MM_CONTROLS_H
 
 #include "copyright.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Accelerator/gpu_details.h"
-#include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Potential/energy_enumerators.h"
@@ -19,7 +19,7 @@ namespace stormm {
 namespace mm {
 
 using card::GpuDetails;
-using card::KernelManager;
+using card::CoreKlManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
@@ -195,11 +195,11 @@ public:
   /// \param poly_ag   Compilation of topologies describing the workload (used here for general
   ///                  descriptors such as the non-bonded work unit type)
   /// \{
-  void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
+  void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, const ClashResponse softcore,
                              PrecisionModel prec, const AtomGraphSynthesis &poly_ag); 
 
-  void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
+  void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, PrecisionModel prec,
                              const AtomGraphSynthesis &poly_ag); 
   /// \}

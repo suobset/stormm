@@ -26,12 +26,12 @@ TextGuard::TextGuard(const std::string &left_in, const std::string &right_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string TextGuard::getLeft() const {
+const std::string& TextGuard::getLeft() const {
   return left;
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::string TextGuard::getRight() const {
+const std::string& TextGuard::getRight() const {
   return right;
 }
 

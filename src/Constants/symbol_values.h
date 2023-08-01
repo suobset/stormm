@@ -43,6 +43,12 @@ constexpr double boltzmann_constant = (1.38064852e-23) / 4184.0 * avogadro_numbe
 /// \brief Hartree to kcal/mol conversion
 constexpr double hartree_to_kcal = 627.509474;
 
+/// \brief Bohr to Angstrom conversion factor
+constexpr double bohr_to_angstrom = 0.529177210903;
+
+/// \brief Angstrom to Bohr conversion factor
+constexpr double angstrom_to_bohr = 1.889726124626;
+  
 /// \brief Values which approach one from below.  They are used in dihedral and similar
 ///        computations to detect when a value is nearing 1.0 and might generate a singularity
 ///        in some denominator, or otherwise become numerically ill-conditioned.  The first is
