@@ -1,5 +1,8 @@
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <vector>
+#include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"

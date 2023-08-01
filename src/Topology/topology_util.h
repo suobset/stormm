@@ -8,7 +8,7 @@
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
-#include "Math/sorting.h"
+#include "Math/sorting_enumerators.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"

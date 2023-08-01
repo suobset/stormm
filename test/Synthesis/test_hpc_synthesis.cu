@@ -4,7 +4,7 @@
 #include <cusolverDn.h>
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.h"
-#include "../../src/Accelerator/kernel_manager.h"
+#include "../../src/Accelerator/core_kernel_manager.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/rounding.h"
@@ -79,7 +79,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                             const AtomGraphSynthesis &poly_ag,
                             const StaticExclusionMaskSynthesis &poly_se,
                             const AccumulationMethod facc_method, const PrecisionModel prec,
-                            const GpuDetails &gpu, const KernelManager &launcher,
+                            const GpuDetails &gpu, const CoreKlManager &launcher,
                             const double mue_tol, const double max_error_tol,
                             const TestPriority do_tests,
                             const std::string &side_note = std::string(""),
@@ -125,13 +125,13 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
           "valence interaction kernel, operating on systems " + restraint_presence + " external " +
           "restraints, exceed the tolerance for mean unsigned errors in their vector components.  "
           "Force accumulation method: " + getAccumulationMethodName(facc_method) +
-          ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+          ".  Precision level in the calculation: " + getEnumerationName(prec) + "." + end_note,
           do_tests);
     check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
           "by the valence interaction kernel, operating on systems " + restraint_presence +
           " external restraints, exceed the maximum allowed errors for forces acting on any one "
           "particle.  Force accumulation method: " + getAccumulationMethodName(facc_method) +
-          ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+          ".  Precision level in the calculation: " + getEnumerationName(prec) + "." + end_note,
           do_tests);
   }
 
@@ -212,19 +212,19 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     check(gpu_psi_values, RelationalOperator::EQUAL, Approx(cpu_psi_values).margin(max_error_tol),
           "Values for Psi computed on the GPU do not agree with their CPU counterparts.  "
           "Accumulation method: " + getAccumulationMethodName(facc_method) + ".  Precision level "
-          "in the calculation: " + getPrecisionModelName(prec) + "." + end_note, do_tests);
+          "in the calculation: " + getEnumerationName(prec) + "." + end_note, do_tests);
   }
   check(frc_mues, RelationalOperator::EQUAL, frc_mue_tolerance, "Forces obtained by the "
         "non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the tolerance for mean unsigned errors in their vector "
         "components.  Force accumulation method: " + getAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        ".  Precision level in the calculation: " + getEnumerationName(prec) + "." + end_note,
         do_tests);
   check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        ".  Precision level in the calculation: " + getEnumerationName(prec) + "." + end_note,
         do_tests);
 }
 
@@ -261,7 +261,7 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               const AtomGraphSynthesis &poly_ag,
                               const StaticExclusionMaskSynthesis &poly_se,
                               const PrecisionModel prec, const GpuDetails &gpu,
-                              const KernelManager &launcher, const double bond_tol,
+                              const CoreKlManager &launcher, const double bond_tol,
                               const double angl_tol, const double dihe_tol, const double impr_tol,
                               const double ubrd_tol, const double cimp_tol, const double cmap_tol,
                               const double lj14_tol, const double qq14_tol, const double rstr_tol,
@@ -338,47 +338,47 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   if (do_valence_tests) {
     check(gpu_bond, RelationalOperator::EQUAL, Approx(cpu_bond).margin(bond_tol), "Bond energies "
           "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
-          getPrecisionModelName(prec) + ".", do_tests);
+          getEnumerationName(prec) + ".", do_tests);
     check(gpu_angl, RelationalOperator::EQUAL, Approx(cpu_angl).margin(angl_tol), "Angle energies "
           "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
-          getPrecisionModelName(prec) + ".", do_tests);
+          getEnumerationName(prec) + ".", do_tests);
     check(gpu_dihe, RelationalOperator::EQUAL, Approx(cpu_dihe).margin(dihe_tol), "Proper "
           "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_impr, RelationalOperator::EQUAL, Approx(cpu_impr).margin(impr_tol), "Improper "
           "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_ubrd, RelationalOperator::EQUAL, Approx(cpu_ubrd).margin(ubrd_tol), "Urey-Bradley "
           "energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_cimp, RelationalOperator::EQUAL, Approx(cpu_cimp).margin(cimp_tol), "CHARMM "
           "improper dihedral energies computed on the CPU and GPU do not agree.  Precision level "
-          "in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "in the calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_cmap, RelationalOperator::EQUAL, Approx(cpu_cmap).margin(cmap_tol), "CMAP "
           "energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_qq14, RelationalOperator::EQUAL, Approx(cpu_qq14).margin(qq14_tol), "Electrostatic "
           "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     check(gpu_lj14, RelationalOperator::EQUAL, Approx(cpu_lj14).margin(lj14_tol), "Lennard-Jones "
           "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
-          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "calculation: " + getEnumerationName(prec) + ".", do_tests);
     if (nrstr > 0) {
       check(gpu_rstr, RelationalOperator::EQUAL, Approx(cpu_rstr).margin(rstr_tol), "Restraint "
             "energies computed on the CPU and GPU do not agree.  Precision level in the "
-            "calculation: " + getPrecisionModelName(prec) + ".", do_tests);    
+            "calculation: " + getEnumerationName(prec) + ".", do_tests);    
     }
   }
   check(gpu_qqnb, RelationalOperator::EQUAL, Approx(cpu_qqnb).margin(qqnb_tol), "Electrostatic "
         "non-bonded energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+        "calculation: " + getEnumerationName(prec) + ".", do_tests);
   check(gpu_ljnb, RelationalOperator::EQUAL, Approx(cpu_ljnb).margin(ljnb_tol), "Lennard-Jones "
         "non-bonded energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);  
+        "calculation: " + getEnumerationName(prec) + ".", do_tests);  
   if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
     check(gpu_gbnb, RelationalOperator::EQUAL, Approx(cpu_gbnb).margin(gbnb_tol), "Generalized "
           "Born non-bonded energies computed on the CPU and GPU do not agree.  Precision level in "
-          "the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+          "the calculation: " + getEnumerationName(prec) + ".", do_tests);
   }
 }
 
@@ -459,7 +459,7 @@ int main(const int argc, const char* argv[]) {
                                   36, 24, 34, 40);
   PhaseSpaceSynthesis poly_ps_sdbl(sysc.getCoordinates(), sysc.getSystemTopologyPointer(),
                                    72, 24, 34, 72);
-  KernelManager launcher(gpu, poly_ag);
+  CoreKlManager launcher(gpu, poly_ag);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -612,7 +612,7 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getUniqueTopologies(),
                                            big_poly_ag.getTopologyIndices());
   big_poly_ag.loadNonbondedWorkUnits(big_poly_se);
-  KernelManager big_launcher(gpu, big_poly_ag);
+  CoreKlManager big_launcher(gpu, big_poly_ag);
   big_poly_ag.upload();
   big_poly_se.upload();
   big_poly_ps.upload();
@@ -769,7 +769,7 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getUniqueTopologies(),
                                               ligand_poly_ag.getTopologyIndices());
   ligand_poly_ag.loadNonbondedWorkUnits(ligand_poly_se);
-  KernelManager ligand_launcher(gpu, ligand_poly_ag);
+  CoreKlManager ligand_launcher(gpu, ligand_poly_ag);
   ligand_poly_ag.upload();
   ligand_poly_se.upload();
   ligand_poly_ps.upload();
@@ -932,16 +932,16 @@ int main(const int argc, const char* argv[]) {
   }
   check(cpu_positions, RelationalOperator::EQUAL, gpu_positions, "Positions of virtual sites "
         "placed by the GPU kernel do not agree with those placed by the CPU function.  "
-        "Precision level: " + getPrecisionModelName(PrecisionModel::SINGLE) + ".  Bits after "
+        "Precision level: " + getEnumerationName(PrecisionModel::SINGLE) + ".  Bits after "
         "the decimal: " + std::to_string(ligand_poly_ps.getGlobalPositionBits()) + ".", do_tests);
   check(cpu_dbl_positions, RelationalOperator::EQUAL, gpu_dbl_positions, "Positions of virtual "
         "sites placed by the GPU kernel do not agree with those placed by the CPU function.  "
-        "Precision level: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after "
+        "Precision level: " + getEnumerationName(PrecisionModel::DOUBLE) + ".  Bits after "
         "the decimal: " + std::to_string(ligand_poly_ps_dbl.getGlobalPositionBits()) + ".",
         do_tests);
   check(cpu_sdbl_positions, RelationalOperator::EQUAL, gpu_sdbl_positions, "Positions of virtual "
         "sites placed by the GPU kernel do not agree with those placed by the CPU function.  "
-        "Precision level: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the "
+        "Precision level: " + getEnumerationName(PrecisionModel::DOUBLE) + ".  Bits after the "
         "decimal: " + std::to_string(ligand_poly_ps_sdbl.getGlobalPositionBits()) + ".", do_tests);
   
   // Now, download the updated positions to the CPU.  Recompute forces with the new positions
@@ -1031,17 +1031,17 @@ int main(const int argc, const char* argv[]) {
   check(cpu_forces, RelationalOperator::EQUAL, Approx(gpu_forces).margin(1.0e-5),
         "Force transmission from virtual sites produces different results when accomplished by "
         "C++ functions and the standalone GPU kernel.  Precision model: " +
-        getPrecisionModelName(PrecisionModel::SINGLE) + ".");
+        getEnumerationName(PrecisionModel::SINGLE) + ".");
   check(cpu_dbl_forces, RelationalOperator::EQUAL, Approx(gpu_dbl_forces).margin(1.0e-5),
         "Force transmission from virtual sites produces different results when accomplished by "
         "C++ functions and the standalone GPU kernel.  Precision model: " +
-        getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
+        getEnumerationName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
         "forces): " + std::to_string(ligand_poly_ps_dbl.getGlobalPositionBits()) + " / " +
         std::to_string(ligand_poly_ps_dbl.getForceAccumulationBits()) + ".");
   check(cpu_sdbl_forces, RelationalOperator::EQUAL, Approx(gpu_sdbl_forces).margin(1.0e-5),
         "Force transmission from virtual sites produces different results when accomplished by "
         "C++ functions and the standalone GPU kernel.  Precision model: " +
-        getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
+        getEnumerationName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
         "forces): " + std::to_string(ligand_poly_ps_sdbl.getGlobalPositionBits()) + " / " +
         std::to_string(ligand_poly_ps_sdbl.getForceAccumulationBits()) + ".");
 

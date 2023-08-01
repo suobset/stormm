@@ -109,6 +109,16 @@ void checkEnergyBits(int choice);
 /// \param pmdoel  The fixed-precision model, which implies the accumulation range
 void checkChargeMeshBits(int choice, PrecisionModel pmodel);
 
+/// \brief Consolidate repetitive vector size comparisons and errors messages in the following
+///        conversion functions.
+///
+/// \param primary_length   Length of the primary vector
+/// \param overflow_length  Length of the overflow vector
+/// \param caller           Name of the calling function
+/// \param message          The error message to print
+void checkFPVectorLength(size_t primary_length, size_t overflow_length, const char* caller,
+                         const std::string &message = std::string(""));
+
 /// \brief Convert floating point numbers into fixed-precision representations with two integers.
 ///        This is similar to splitRealAccumulation below, but will set the values rather than
 ///        add new contributions.
@@ -363,13 +373,35 @@ int2 hostInt63Sum(int a_x, int a_y, float breal);
 /// Overloaded:
 ///   - Convert int63_t (int2) to another int63_t
 ///   - Convert int95_t to another int95_t
+///   - Convert a Standard Template Library vector of int95_t
+///   - Convert two C-style arrays with a trusted length, two Standard Template Library vectors, or
+///     two Hybrid objects of the appropriate data types
 ///
-/// \param fp           The fixed-precision number of interest
+/// \param fp           The fixed-precision number of interest, or the primary array of values
+/// \param fp_ovrf      Overflow bits to complement fp
+/// \param length       Trusted length of C-style array inputs
 /// \param native_bits  Original bit scaling of the fixed-precision format
 /// \param output_bits  Bit scaling of the output format
 /// \{
 int2 hostChangeFPBits(const int2 fp, int native_bits, int output_bits);
+
 int95_t hostChangeFPBits(const int95_t fp, int native_bits, int output_bits);
+
+void hostChangeFPBits(std::vector<int95_t> *fp, int native_bits, int output_bits);
+
+void hostChangeFPBits(int* fp, int* fp_ovrf, size_t length, int native_bits, int output_bits);
+
+void hostChangeFPBits(llint* fp, int* fp_ovrf, size_t length, int native_bits, int output_bits);
+
+void hostChangeFPBits(std::vector<int> *fp, std::vector<int> *fp_ovrf, int native_bits,
+                      int output_bits);
+
+void hostChangeFPBits(std::vector<llint> *fp, std::vector<int> *fp_ovrf, int native_bits,
+                      int output_bits);
+
+void hostChangeFPBits(Hybrid<int> *fp, Hybrid<int> *fp_ovrf, int native_bits, int output_bits);
+
+void hostChangeFPBits(Hybrid<llint> *fp, Hybrid<int> *fp_ovrf, int native_bits, int output_bits);
 /// \}
 
 /// \brief Compute a one-dimensional grid of points, beginning at some arbitrary origin and

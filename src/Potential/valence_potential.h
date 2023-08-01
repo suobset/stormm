@@ -603,6 +603,7 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 /// \param attn14_vdw_factors   Unique van-der Waals 1:4 scaling factors
 /// \param lja_14_coeff         Lennard-Jones A coefficients, in U = (A / r^12) - (B / r^6)
 /// \param ljb_14_coeff         Lennard-Jones B coefficients, in U = (A / r^12) - (B / r^6)
+/// \param lj_14_sigma          Lennard-Jones sigma coefficients, pre-calculated for convenience
 /// \param ljtab_offset         Offset for the system's Lennard-Jones coefficient tables
 /// \param n_lj_types           Number of unique Lennard-Jones types, the rank of the A and B
 ///                             coefficient matrices above
@@ -623,11 +624,11 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
                                      const Tcalc* charges, const int* lj_param_idx,
                                      const Tcalc* attn14_elec_factors,
                                      const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, int ljtab_offset, int n_lj_types,
-                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
-                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, EvaluateForce eval_elec_force,
+                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                     int ljtab_offset, int n_lj_types, const Tcoord* xcrd,
+                                     const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                     const double* invu, UnitCellType unit_cell, Tforce* xfrc,
+                                     Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
                                      EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
                                      Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
                                      Tcalc clash_ratio = 0.0);
@@ -637,10 +638,11 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
                                      const Tcalc* charges, const int* lj_param_idx,
                                      const Tcalc* attn14_elec_factors,
                                      const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, int n_lj_types, const Tcoord* xcrd,
-                                     const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                                     const double* invu, UnitCellType unit_cell, Tforce* xfrc,
-                                     Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
+                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                     int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
+                                     const Tcoord* zcrd, const double* umat, const double* invu,
+                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, EvaluateForce eval_elec_force,
                                      EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
                                      Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
                                      Tcalc clash_ratio = 0.0);

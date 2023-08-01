@@ -179,7 +179,7 @@ AtomGraph::AtomGraph() :
     charge_type_count{0}, atom_type_count{0}, total_exclusions{0}, attenuated_14_type_count{0},
     inferred_14_attenuations{0}, periodic_box_class{UnitCellType::NONE},
     gb_style{ImplicitSolventModel::NONE}, dielectric_constant{1.0}, salt_concentration{0.0},
-    coulomb_constant{accepted_coulomb_constant}, pb_radii_set{""},
+    coulomb_constant{amber_ancient_bioq}, pb_radii_set{""},
     charge_indices{HybridKind::POINTER, "tp_qidx"},
     lennard_jones_indices{HybridKind::POINTER, "tp_ljidx"},
     atom_exclusion_bounds{HybridKind::POINTER, "tp_nexcl"},

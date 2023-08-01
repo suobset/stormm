@@ -5,12 +5,14 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/matrix.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/multiplication.h"
+#include "../../src/Math/radial_derivatives.h"
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/series_ops.h"
-#include "../../src/Math/sorting.h"
+#include "../../src/Math/sorting_enumerators.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/tickcounter.h"
 #include "../../src/Math/tricubic_cell.h"
@@ -20,6 +22,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Structure/structure_enumerators.h"
+#include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -51,6 +54,8 @@ using stormm::review::stormmWatermark;
 using stormm::structure::BoundaryCondition;
 using stormm::symbols::pi;
 using stormm::symbols::twopi;
+using stormm::topology::getEnumerationName;
+using stormm::topology::UnitCellType;
 using namespace stormm::stmath;
 using namespace stormm::testing;
 
@@ -160,9 +165,9 @@ void takePseudoInverse(const int nrow, const int ncol, const std::string &matric
 //-------------------------------------------------------------------------------------------------
 void solveLinearSystem(const size_t n_equations, const size_t n_unknowns) {
   Xoroshiro128pGenerator xrsm(n_equations * n_unknowns);
-  const std::vector<double> base_coefficients = xrsm.gaussianRandomNumber(n_unknowns);
-  const std::vector<double> amat = xrsm.gaussianRandomNumber(n_equations * n_unknowns);
-  std::vector<double> bvec = xrsm.gaussianRandomNumber(n_equations);
+  const std::vector<double> base_coefficients = gaussianRand(&xrsm, n_unknowns, 1.0);
+  const std::vector<double> amat = gaussianRand(&xrsm, n_equations * n_unknowns, 1.0);
+  std::vector<double> bvec = gaussianRand(&xrsm, n_equations, 1.0);
   elementwiseMultiply(&bvec, 0.5);
   matrixVectorMultiply(amat, base_coefficients, &bvec, n_equations, n_unknowns, 1.0, 1.0, 1.0);
 
@@ -241,6 +246,10 @@ std::vector<double> generateExpectedSeries(Tgen *xrs, const Tstate init_state, c
 //-------------------------------------------------------------------------------------------------
 // Test a TickCounter object to ensure that its incrementation is valid for a variety of series
 // lengths.
+//
+// Arguments:
+//   dials:  The tick counter to test, "a collection of dials"
+//   ncyc:   The number of cycles to increment forward or backward
 //-------------------------------------------------------------------------------------------------
 void testDialCounter(TickCounter<int> *dials, const int ncyc) {
   const int ndials = dials->getVariableCount();
@@ -286,7 +295,7 @@ void testDialCounter(TickCounter<int> *dials, const int ncyc) {
 //      F(x, y, z) = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
 //
 // There is also the option to include a list of coefficients for all combinations of powers of
-// the variables x, y, and z.  If supplied, this form will be evalauted instead.
+// the variables x, y, and z.  If supplied, this form will be evaluated instead.
 //
 // Arguments:
 //   x:     The Cartesian X coordinate
@@ -294,124 +303,244 @@ void testDialCounter(TickCounter<int> *dials, const int ncyc) {
 //   z:     The Cartesian Z coordinate
 //   kind:  The type of function derivative (or the primary value) to return
 //-------------------------------------------------------------------------------------------------
-double triPolynomial(const double x, const double y, const double z, const TricubicBound kind,
+double triPolynomial(const double x, const double y, const double z, const FunctionLevel kind,
                      const std::vector<double> coeffs = {}) {
   const bool do_separable_case = (coeffs.size() != 64LLU);
   int imin = 0;
   int jmin = 0;
   int kmin = 0;
   switch (kind) {
-  case TricubicBound::VALUE:
+  case FunctionLevel::VALUE:
     if (do_separable_case) {
 
       // Horner's rule would make these computations more efficient, but write expressions in a
       // format that uses fewer parentheses for clarity.
-      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
-             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
-             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
     }
     break;
-  case TricubicBound::DX:
+  case FunctionLevel::DX:
     if (do_separable_case) {
-      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
-             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
-             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
     }
     else {
       imin = 1;
     }
     break;
-  case TricubicBound::DY:
+  case FunctionLevel::DY:
     if (do_separable_case) {
-      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
-             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
-             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
     }
     else {
       jmin = 1;
     }
     break;
-  case TricubicBound::DZ:
+  case FunctionLevel::DZ:
     if (do_separable_case) {
-      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
-             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
-             (                    (18.0 * z * z)             - 9.0);
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                    (18.0 * z * z)              -  9.0);
     }
     else {
       kmin = 1;
     }
     break;
-  case TricubicBound::DXY:
+  case FunctionLevel::DXX:
     if (do_separable_case) {
-      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
-             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
-             ((6.0 * z * z * z)                  - (9.0 * z) + 1.0);
+      return (                                     (30.0 * x) +  4.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      imin = 2;
+    }
+    break;
+  case FunctionLevel::DXY:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
     }
     else {
       imin = 1;
       jmin = 1;
     }
     break;
-  case TricubicBound::DXZ:
+  case FunctionLevel::DXZ:
     if (do_separable_case) {
-      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
-             ((1.0 * y * y * y) - ( 4.0 * y * y) + (7.0 * y) - 8.0) *
-             (                    (18.0 * z * z)             - 9.0);
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                    (18.0 * z * z)              -  9.0);
     }
     else {
       imin = 1;
       kmin = 1;
     }
     break;
-  case TricubicBound::DYZ:
+  case FunctionLevel::DYY:
     if (do_separable_case) {
-      return ((5.0 * x * x * x) + ( 2.0 * x * x) + (1.0 * x) + 3.0) *
-             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
-             (                    (18.0 * z * z)             - 9.0);
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                                     ( 6.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      jmin = 2;
+    }
+    break;
+  case FunctionLevel::DYZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             (                    (18.0 * z * z)              -  9.0);
     }
     else {
       jmin = 1;
       kmin = 1;
     }
     break;
-  case TricubicBound::DXYZ:
+  case FunctionLevel::DZZ:
     if (do_separable_case) {
-      return (                    (15.0 * x * x) + (4.0 * x) + 1.0) *
-             (                    ( 3.0 * y * y) - (8.0 * y) + 7.0) *
-             (                    (18.0 * z * z)             - 9.0);
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                                     (36.0 * z)       );
+    }
+    else {
+      kmin = 2;
+    }
+    break;
+  case FunctionLevel::DXXX:
+    if (do_separable_case) {
+      return (                                                  30.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      imin = 3;
+    }
+    break;
+  case FunctionLevel::DXXY:
+    if (do_separable_case) {
+      return (                                     (30.0 * x) +  4.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      imin = 2;
+      jmin = 1;
+    }
+    break;
+  case FunctionLevel::DXXZ:
+    if (do_separable_case) {
+      return (                                     (30.0 * x) +  4.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                    (18.0 * z * z)              -  9.0);
+    }
+    else {
+      imin = 2;
+      kmin = 1;
+    }
+    break;
+  case FunctionLevel::DXYY:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             (                                     ( 6.0 * y) -  8.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      imin = 1;
+      jmin = 2;
+    }
+    break;
+  case FunctionLevel::DXYZ:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             (                    (18.0 * z * z)              -  9.0);
     }
     else {
       imin = 1;
       jmin = 1;
       kmin = 1;
+    }
+    break;
+  case FunctionLevel::DXZZ:
+    if (do_separable_case) {
+      return (                    (15.0 * x * x) + ( 4.0 * x) +  1.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                                     (36.0 * z)       );
+    }
+    else {
+      imin = 1;
+      kmin = 2;
+    }
+    break;
+  case FunctionLevel::DYYY:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                                                   6.0) *
+             ((6.0 * z * z * z)                  - ( 9.0 * z) +  1.0);
+    }
+    else {
+      jmin = 3;
+    }
+    break;
+  case FunctionLevel::DYYZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                                     ( 6.0 * y) -  8.0) *
+             (                    (18.0 * z * z)              -  9.0);
+    }
+    else {
+      jmin = 2;
+      kmin = 1;
+    }
+    break;
+  case FunctionLevel::DYZZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             (                    ( 3.0 * y * y) - ( 8.0 * y) +  7.0) *
+             (                                     (36.0 * z)       );
+    }
+    else {
+      jmin = 1;
+      kmin = 2;
+    }
+    break;
+  case FunctionLevel::DZZZ:
+    if (do_separable_case) {
+      return ((5.0 * x * x * x) + ( 2.0 * x * x) + ( 1.0 * x) +  3.0) *
+             ((1.0 * y * y * y) - ( 4.0 * y * y) + ( 7.0 * y) -  8.0) *
+             (                                                  36.0);
+    }
+    else {
+      kmin = 3;
     }
     break;
   }
 
   // If this point is reached, the function is evaluating the general case with a vector of
   // input coefficients.
-  double dxinc = (imin == 0) ? 0.0 : 1.0;
-  double dyinc = (jmin == 0) ? 0.0 : 1.0;
-  double dzinc = (kmin == 0) ? 0.0 : 1.0;
+  double dfactors[4][4] = { { 1.0, 1.0, 1.0, 1.0 }, { 0.0, 1.0, 2.0, 3.0 },
+                            { 0.0, 0.0, 2.0, 6.0 }, { 0.0, 0.0, 0.0, 6.0 } };
   double result = 0.0;
-  double difac = 1.0;
   double xv = 1.0;
   for (int i = imin; i < 4; i++) {
-    double djfac = 1.0;
     double yv = 1.0;
     for (int j = jmin; j < 4; j++) {
-      double dkfac = 1.0;
       double zv = 1.0;
       for (int k = kmin; k < 4; k++) {
-        result += coeffs[(4 * ((4 * k) + j)) + i] * difac * xv * djfac * yv * dkfac * zv;
+        result += coeffs[(4 * ((4 * k) + j)) + i] *
+                  dfactors[imin][i] * xv * dfactors[jmin][j] * yv * dfactors[kmin][k] * zv;
         zv *= z;
-        dkfac += dzinc;
       }
       yv *= y;
-      djfac += dyinc;
     }
     xv *= x;
-    difac += dxinc;
   }
   return result;
 }
@@ -425,47 +554,47 @@ void finiteDifferenceDisparity(const double x, const double y, const double z,
                                const std::vector<double> coeffs = {}) {
   const double incr = 0.000005;
   const double step = 2.0 * incr;
-  const double v = triPolynomial(x, y, z, TricubicBound::VALUE, coeffs);
-  const double vpx = triPolynomial(x + incr, y, z, TricubicBound::VALUE, coeffs);
-  const double vpy = triPolynomial(x, y + incr, z, TricubicBound::VALUE, coeffs);
-  const double vpz = triPolynomial(x, y, z + incr, TricubicBound::VALUE, coeffs);
-  const double vpxy = triPolynomial(x, y + incr, z, TricubicBound::DX, coeffs);
-  const double vpxz = triPolynomial(x, y, z + incr, TricubicBound::DX, coeffs);
-  const double vpyz = triPolynomial(x, y, z + incr, TricubicBound::DY, coeffs);
-  const double vpxyz = triPolynomial(x, y, z + incr, TricubicBound::DXY, coeffs);
-  const double vnx = triPolynomial(x - incr, y, z, TricubicBound::VALUE, coeffs);
-  const double vny = triPolynomial(x, y - incr, z, TricubicBound::VALUE, coeffs);
-  const double vnz = triPolynomial(x, y, z - incr, TricubicBound::VALUE, coeffs);
-  const double vnxy = triPolynomial(x, y - incr, z, TricubicBound::DX, coeffs);
-  const double vnxz = triPolynomial(x, y, z - incr, TricubicBound::DX, coeffs);
-  const double vnyz = triPolynomial(x, y, z - incr, TricubicBound::DY, coeffs);
-  const double vnxyz = triPolynomial(x, y, z - incr, TricubicBound::DXY, coeffs);
+  const double v = triPolynomial(x, y, z, FunctionLevel::VALUE, coeffs);
+  const double vpx = triPolynomial(x + incr, y, z, FunctionLevel::VALUE, coeffs);
+  const double vpy = triPolynomial(x, y + incr, z, FunctionLevel::VALUE, coeffs);
+  const double vpz = triPolynomial(x, y, z + incr, FunctionLevel::VALUE, coeffs);
+  const double vpxy = triPolynomial(x, y + incr, z, FunctionLevel::DX, coeffs);
+  const double vpxz = triPolynomial(x, y, z + incr, FunctionLevel::DX, coeffs);
+  const double vpyz = triPolynomial(x, y, z + incr, FunctionLevel::DY, coeffs);
+  const double vpxyz = triPolynomial(x, y, z + incr, FunctionLevel::DXY, coeffs);
+  const double vnx = triPolynomial(x - incr, y, z, FunctionLevel::VALUE, coeffs);
+  const double vny = triPolynomial(x, y - incr, z, FunctionLevel::VALUE, coeffs);
+  const double vnz = triPolynomial(x, y, z - incr, FunctionLevel::VALUE, coeffs);
+  const double vnxy = triPolynomial(x, y - incr, z, FunctionLevel::DX, coeffs);
+  const double vnxz = triPolynomial(x, y, z - incr, FunctionLevel::DX, coeffs);
+  const double vnyz = triPolynomial(x, y, z - incr, FunctionLevel::DY, coeffs);
+  const double vnxyz = triPolynomial(x, y, z - incr, FunctionLevel::DXY, coeffs);
   const std::vector<double> fdv = { v, (vpx - vnx) / step, (vpy - vny) / step, (vpz - vnz) / step,
                                     (vpxy - vnxy) / step, (vpxz - vnxz) / step,
                                     (vpyz - vnyz) / step, (vpxyz - vnxyz) / step };
-  const std::vector<double> dv = { triPolynomial(x, y, z, TricubicBound::VALUE, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DX, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DY, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DZ, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DXY, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DXZ, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DYZ, coeffs),
-                                   triPolynomial(x, y, z, TricubicBound::DXYZ, coeffs) };
+  const std::vector<double> dv = { triPolynomial(x, y, z, FunctionLevel::VALUE, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DX, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DY, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DZ, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DXY, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DXZ, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DYZ, coeffs),
+                                   triPolynomial(x, y, z, FunctionLevel::DXYZ, coeffs) };
   check(dv, RelationalOperator::EQUAL, Approx(fdv).margin(1.0e-6), "Analytic derivatives of the "
         "tricubic polynomial do not agree with results computed by the finite difference "
         "approximation.  Subsequent tests of the TricubicCell object may be unreliable.");
   const std::vector<double> fdv2 = { v, (vpx - vnx) / step, (vpy - vny) / step, (vpz - vnz) / step,
-                                     (triPolynomial(x + incr, y, z, TricubicBound::DY, coeffs) -
-                                      triPolynomial(x - incr, y, z, TricubicBound::DY, coeffs)) /
+                                     (triPolynomial(x + incr, y, z, FunctionLevel::DY, coeffs) -
+                                      triPolynomial(x - incr, y, z, FunctionLevel::DY, coeffs)) /
                                      step,
-                                     (triPolynomial(x + incr, y, z, TricubicBound::DZ, coeffs) -
-                                      triPolynomial(x - incr, y, z, TricubicBound::DZ, coeffs)) /
+                                     (triPolynomial(x + incr, y, z, FunctionLevel::DZ, coeffs) -
+                                      triPolynomial(x - incr, y, z, FunctionLevel::DZ, coeffs)) /
                                      step,
-                                     (triPolynomial(x, y + incr, z, TricubicBound::DZ, coeffs) -
-                                      triPolynomial(x, y - incr, z, TricubicBound::DZ, coeffs)) /
+                                     (triPolynomial(x, y + incr, z, FunctionLevel::DZ, coeffs) -
+                                      triPolynomial(x, y - incr, z, FunctionLevel::DZ, coeffs)) /
                                      step,
-                                     (triPolynomial(x, y + incr, z, TricubicBound::DXZ, coeffs) -
-                                      triPolynomial(x, y - incr, z, TricubicBound::DXZ, coeffs)) /
+                                     (triPolynomial(x, y + incr, z, FunctionLevel::DXZ, coeffs) -
+                                      triPolynomial(x, y - incr, z, FunctionLevel::DXZ, coeffs)) /
                                      step };
   check(fdv, RelationalOperator::EQUAL, fdv2, "Mixed partial derivatives of the tricubic "
         "polynomial do not show equivalence.  Subsequent tests of the TricubicCell object may be "
@@ -476,60 +605,121 @@ void finiteDifferenceDisparity(const double x, const double y, const double z,
 // Run a series of tests on a grid of TricubicCell objects.
 //
 // Arguments:
-//   tcmat:   Standard Template Library copy of the tricubic spline weights matrix
-//   coeffs:  [Optional] Vector of coefficients for individual terms in the polynomial
+//   tcmat:               Standard Template Library copy of the tricubic spline weights matrix
+//   coeffs:              [Optional] Vector of coefficients for individual terms in the polynomial
+//   cell_dimensions_in:  [Optional] Dimensions of the interpolating volume element
 //-------------------------------------------------------------------------------------------------
-void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<double> coeffs = {},
+void tricubicTestBundle(const TricubicStencil &tcstencil,
+                        const std::vector<double> coeffs = {},
                         const std::vector<double> &cell_dimensions_in = {}) {
 
   // Prepare the cell dimensions
-  std::vector<double> cell_dimensions(9, 0.0);
+  std::vector<double> cell_dimensions(9, 0.0), inv_cell_dimensions(9);
   cell_dimensions[0] = 1.0;
   cell_dimensions[4] = 1.0;
   cell_dimensions[8] = 1.0;
+  bool orthorhombic = true;
   if (cell_dimensions_in.size() == 3LLU) {
     cell_dimensions[0] = cell_dimensions_in[0];
     cell_dimensions[4] = cell_dimensions_in[1];
     cell_dimensions[8] = cell_dimensions_in[2];
   }
+  else if (cell_dimensions_in.size() == 9LLU) {
+    cell_dimensions = cell_dimensions_in;
+    orthorhombic = false;
+  }
+  invertSquareMatrix(cell_dimensions, &inv_cell_dimensions);
   
   // Begin by testing the polynomial's analytic evaluation, to ensure subsequent tests are valid.
   finiteDifferenceDisparity( 0.5,  0.9,  0.4, coeffs);
   finiteDifferenceDisparity(-1.7,  2.6, -1.8, coeffs);
   finiteDifferenceDisparity( 2.3,  1.1, -2.0, coeffs);
   std::vector<TricubicCell<double>> grid;
-  grid.reserve(729);
-  for (int k = -4; k < 5; k++) {
-    for (int j = -4; j < 5; j++) {
-      for (int i = -4; i < 5; i++) {
+  grid.reserve(1331);
+  for (int k = -5; k < 6; k++) {
+    const double d_k = k;
+    for (int j = -5; j < 6; j++) {
+      const double d_j = j;
+      for (int i = -5; i < 6; i++) {
+        const double d_i = i;
 
         // Map the function U = (5x^3 + 2x^2 + x + 3) * (y^3 - 4y^2 + 7y - 8) * (6z^3 - 9z + 1)
         // to a grid.  The function is encoded in triPolynomial() above.
-        std::vector<double> f(8), dx(8), dy(8), dz(8), dxy(8), dxz(8), dyz(8), dxyz(8);
+        std::vector<double> f(8), dx(8), dy(8), dz(8);
+        std::vector<double> dxx(8), dxy(8), dxz(8), dyy(8), dyz(8);
+        std::vector<double> dxxx(8), dxxy(8), dxxz(8), dxyy(8), dxyz(8);
         for (int pi = 0; pi < 2; pi++) {
-          const double xloc = cell_dimensions[0] * static_cast<double>(i + pi);
+          const double d_ipi = d_i + static_cast<double>(pi);
           for (int pj = 0; pj < 2; pj++) {
-            const double yloc = cell_dimensions[4] * static_cast<double>(j + pj);
+            const double d_jpj = d_j + static_cast<double>(pj);
             for (int pk = 0; pk < 2; pk++) {
-              const double zloc = cell_dimensions[8] * static_cast<double>(k + pk);
+              const double d_kpk = d_k + static_cast<double>(pk);
+              const double xloc = (cell_dimensions[0] * d_ipi) + (cell_dimensions[3] * d_jpj) +
+                                  (cell_dimensions[6] * d_kpk);
+              const double yloc = (cell_dimensions[4] * d_jpj) + (cell_dimensions[7] * d_kpk);
+              const double zloc = (cell_dimensions[8] * d_kpk);
               const int m = (2 * ((2 * pk) + pj)) + pi;
-              f[m]    = triPolynomial(xloc, yloc, zloc, TricubicBound::VALUE, coeffs);
-              dx[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DX, coeffs);
-              dy[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DY, coeffs);
-              dz[m]   = triPolynomial(xloc, yloc, zloc, TricubicBound::DZ, coeffs);
-              dxy[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DXY, coeffs);
-              dxz[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DXZ, coeffs);
-              dyz[m]  = triPolynomial(xloc, yloc, zloc, TricubicBound::DYZ, coeffs);
-              dxyz[m] = triPolynomial(xloc, yloc, zloc, TricubicBound::DXYZ, coeffs);
+              f[m]    = triPolynomial(xloc, yloc, zloc, FunctionLevel::VALUE, coeffs);
+              dx[m]   = triPolynomial(xloc, yloc, zloc, FunctionLevel::DX, coeffs);
+              dy[m]   = triPolynomial(xloc, yloc, zloc, FunctionLevel::DY, coeffs);
+              dz[m]   = triPolynomial(xloc, yloc, zloc, FunctionLevel::DZ, coeffs);
+              switch (tcstencil.getKind()) {
+              case Interpolant::SMOOTHNESS:
+                dxx[m]  = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXX, coeffs);
+                dxy[m]  = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXY, coeffs);
+                dxz[m]  = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXZ, coeffs);
+                dyy[m]  = triPolynomial(xloc, yloc, zloc, FunctionLevel::DYY, coeffs);
+                dyz[m]  = triPolynomial(xloc, yloc, zloc, FunctionLevel::DYZ, coeffs);
+                dxxx[m] = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXXX, coeffs);
+                dxxy[m] = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXXY, coeffs);
+                dxxz[m] = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXXZ, coeffs);
+                dxyy[m] = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXYY, coeffs);
+                dxyz[m] = triPolynomial(xloc, yloc, zloc, FunctionLevel::DXYZ, coeffs);
+                break;
+              case Interpolant::FUNCTION_VALUE:
+                {
+                  const double eorig_x = (cell_dimensions[0] * d_i) + (cell_dimensions[3] * d_j) +
+                                         (cell_dimensions[6] * d_k);
+                  const double eorig_y = (cell_dimensions[4] * d_j) + (cell_dimensions[7] * d_k);
+                  const double eorig_z = (cell_dimensions[8] * d_k);
+                  double abloc_x, abloc_y, abloc_z, acloc_x, acloc_y, acloc_z;
+                  double bcloc_x, bcloc_y, bcloc_z, cnloc_x, cnloc_y, cnloc_z;
+                  fvStencilCoordinates(eorig_x, eorig_y, eorig_z, UnitCellAxis::C, pi, pj, pk,
+                                       cell_dimensions.data(), &abloc_x, &abloc_y, &abloc_z);
+                  fvStencilCoordinates(eorig_x, eorig_y, eorig_z, UnitCellAxis::B, pi, pj, pk,
+                                       cell_dimensions.data(), &acloc_x, &acloc_y, &acloc_z);
+                  fvStencilCoordinates(eorig_x, eorig_y, eorig_z, UnitCellAxis::A, pi, pj, pk,
+                                       cell_dimensions.data(), &bcloc_x, &bcloc_y, &bcloc_z);
+                  fvStencilCoordinates(eorig_x, eorig_y, eorig_z, pi, pj, pk,
+                                       cell_dimensions.data(), &cnloc_x, &cnloc_y, &cnloc_z);
+                  dxy[m] = triPolynomial(abloc_x, abloc_y, abloc_z, FunctionLevel::VALUE, coeffs);
+                  dxz[m] = triPolynomial(acloc_x, acloc_y, acloc_z, FunctionLevel::VALUE, coeffs);
+                  dyz[m] = triPolynomial(bcloc_x, bcloc_y, bcloc_z, FunctionLevel::VALUE, coeffs);
+                  dxyz[m] = triPolynomial(cnloc_x, cnloc_y, cnloc_z, FunctionLevel::VALUE, coeffs);
+                }
+                break;
+              }
             }
           }
         }
-        const std::vector<double> anchor = { static_cast<double>(i) * cell_dimensions[0],
-                                             static_cast<double>(j) * cell_dimensions[4],
-                                             static_cast<double>(k) * cell_dimensions[8],
-                                             cell_dimensions[0], cell_dimensions[4],
-                                             cell_dimensions[8] };
-        grid.emplace_back(tcmat, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
+        const double xe_orig = (cell_dimensions[0] * d_i) + (cell_dimensions[3] * d_j) +
+                               (cell_dimensions[6] * d_k);
+        const double ye_orig = (cell_dimensions[4] * d_j) + (cell_dimensions[7] * d_k);
+        const double ze_orig = (cell_dimensions[8] * d_k);
+        const std::vector<double> anchor = { xe_orig, ye_orig, ze_orig, cell_dimensions[0],
+                                             cell_dimensions[1], cell_dimensions[2],
+                                             cell_dimensions[3], cell_dimensions[4],
+                                             cell_dimensions[5], cell_dimensions[6],
+                                             cell_dimensions[7], cell_dimensions[8] };
+        switch (tcstencil.getKind()) {
+        case Interpolant::SMOOTHNESS:
+          grid.emplace_back(tcstencil, anchor, f, dx, dy, dz, dxx, dxy, dxz, dyy, dyz, dxxx, dxxy,
+                            dxxz, dxyy, dxyz);
+          break;
+        case Interpolant::FUNCTION_VALUE:
+          grid.emplace_back(tcstencil, anchor, f, dx, dy, dz, dxy, dxz, dyz, dxyz);
+          break;
+        }
       }
     }
   }
@@ -547,58 +737,554 @@ void tricubicTestBundle(const std::vector<double> &tcmat, const std::vector<doub
   std::vector<double> analytic_tc_dx(npts), spline_tc_dx(npts);
   std::vector<double> analytic_tc_dy(npts), spline_tc_dy(npts);
   std::vector<double> analytic_tc_dz(npts), spline_tc_dz(npts);
+  std::vector<double> analytic_tc_dxx(npts), spline_tc_dxx(npts);
   std::vector<double> analytic_tc_dxy(npts), spline_tc_dxy(npts);
   std::vector<double> analytic_tc_dxz(npts), spline_tc_dxz(npts);
+  std::vector<double> analytic_tc_dyy(npts), spline_tc_dyy(npts);
   std::vector<double> analytic_tc_dyz(npts), spline_tc_dyz(npts);
+  std::vector<double> analytic_tc_dzz(npts), spline_tc_dzz(npts);
+  std::vector<double> analytic_tc_dxxx(npts), spline_tc_dxxx(npts);
+  std::vector<double> analytic_tc_dxxy(npts), spline_tc_dxxy(npts);
+  std::vector<double> analytic_tc_dxxz(npts), spline_tc_dxxz(npts);
+  std::vector<double> analytic_tc_dxyy(npts), spline_tc_dxyy(npts);
   std::vector<double> analytic_tc_dxyz(npts), spline_tc_dxyz(npts);
+  std::vector<double> analytic_tc_dxzz(npts), spline_tc_dxzz(npts);
+  std::vector<double> analytic_tc_dyyy(npts), spline_tc_dyyy(npts);
+  std::vector<double> analytic_tc_dyyz(npts), spline_tc_dyyz(npts);
+  std::vector<double> analytic_tc_dyzz(npts), spline_tc_dyzz(npts);
+  std::vector<double> analytic_tc_dzzz(npts), spline_tc_dzzz(npts);
+  const double grid_orig_x = grid[0].getCellOrigin(CartesianDimension::X);
+  const double grid_orig_y = grid[0].getCellOrigin(CartesianDimension::Y);
+  const double grid_orig_z = grid[0].getCellOrigin(CartesianDimension::Z);
   for (int i = 0; i < npts; i++) {
     const double ptx = test_points[(3 * i)    ];
     const double pty = test_points[(3 * i) + 1];
     const double ptz = test_points[(3 * i) + 2];
-    analytic_tc[i] = triPolynomial(ptx, pty, ptz, TricubicBound::VALUE, coeffs);
-    const int gcell_x = (ptx - grid[0].getCellOrigin(CartesianDimension::X)) / cell_dimensions[0];
-    const int gcell_y = (pty - grid[0].getCellOrigin(CartesianDimension::Y)) / cell_dimensions[4];
-    const int gcell_z = (ptz - grid[0].getCellOrigin(CartesianDimension::Z)) / cell_dimensions[8];
-    const int gcell = (9 * ((9 * gcell_z) + gcell_y)) + gcell_x;
+    analytic_tc[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::VALUE, coeffs);
+    const double rel_ptx = (ptx - grid_orig_x);
+    const double rel_pty = (pty - grid_orig_y);
+    const double rel_ptz = (ptz - grid_orig_z);
+    const int gcell_x = (rel_ptx * inv_cell_dimensions[0]) + (rel_pty * inv_cell_dimensions[3]) +
+                        (rel_ptz * inv_cell_dimensions[6]);
+    const int gcell_y = (rel_pty * inv_cell_dimensions[4]) + (rel_ptz * inv_cell_dimensions[7]);
+    const int gcell_z = rel_ptz * inv_cell_dimensions[8];
+    const int gcell = (11 * ((11 * gcell_z) + gcell_y)) + gcell_x;
     spline_tc[i] = grid[gcell].evaluate(ptx, pty, ptz);
-    analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DX, coeffs);
-    analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DY, coeffs);
-    analytic_tc_dz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DZ, coeffs);
-    analytic_tc_dxy[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXY, coeffs);
-    analytic_tc_dxz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXZ, coeffs);
-    analytic_tc_dyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DYZ, coeffs);
-    analytic_tc_dxyz[i] = triPolynomial(ptx, pty, ptz, TricubicBound::DXYZ, coeffs);
-    spline_tc_dx[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DX);
-    spline_tc_dy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DY);
-    spline_tc_dz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DZ);
-    spline_tc_dxy[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXY);
-    spline_tc_dxz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXZ);
-    spline_tc_dyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DYZ);
-    spline_tc_dxyz[i] = grid[gcell].evaluate(ptx, pty, ptz, TricubicBound::DXYZ);
+    analytic_tc_dx[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DX, coeffs);
+    analytic_tc_dy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DY, coeffs);
+    analytic_tc_dz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DZ, coeffs);
+    analytic_tc_dxx[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXX, coeffs);
+    analytic_tc_dxy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXY, coeffs);
+    analytic_tc_dxz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXZ, coeffs);
+    analytic_tc_dyy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DYY, coeffs);
+    analytic_tc_dyz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DYZ, coeffs);
+    analytic_tc_dzz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DZZ, coeffs);
+    analytic_tc_dxxx[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXXX, coeffs);
+    analytic_tc_dxxy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXXY, coeffs);
+    analytic_tc_dxxz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXXZ, coeffs);
+    analytic_tc_dxyy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXYY, coeffs);
+    analytic_tc_dxyz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXYZ, coeffs);
+    analytic_tc_dxzz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DXZZ, coeffs);
+    analytic_tc_dyyy[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DYYY, coeffs);
+    analytic_tc_dyyz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DYYZ, coeffs);
+    analytic_tc_dyzz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DYZZ, coeffs);
+    analytic_tc_dzzz[i] = triPolynomial(ptx, pty, ptz, FunctionLevel::DZZZ, coeffs);
+    const double3 first_derivative = grid[gcell].derivative<double3>(ptx, pty, ptz);
+    spline_tc_dx[i] = first_derivative.x; 
+    spline_tc_dy[i] = first_derivative.y;
+    spline_tc_dz[i] = first_derivative.z;
+    const std::vector<double> second_derivative = grid[gcell].secondDerivative(ptx, pty, ptz);
+    spline_tc_dxx[i] = second_derivative[0];
+    spline_tc_dxy[i] = second_derivative[1];
+    spline_tc_dxz[i] = second_derivative[2];
+    spline_tc_dyy[i] = second_derivative[4];
+    spline_tc_dyz[i] = second_derivative[5];
+    spline_tc_dzz[i] = second_derivative[8];
+    const std::vector<double> third_derivative = grid[gcell].thirdDerivative(ptx, pty, ptz);
+    spline_tc_dxxx[i] = third_derivative[0];
+    spline_tc_dxxy[i] = third_derivative[1];
+    spline_tc_dxxz[i] = third_derivative[2];
+    spline_tc_dxyy[i] = third_derivative[4];
+    spline_tc_dxyz[i] = third_derivative[5];
+    spline_tc_dxzz[i] = third_derivative[8];
+    spline_tc_dyyy[i] = third_derivative[13];
+    spline_tc_dyyz[i] = third_derivative[14];
+    spline_tc_dyzz[i] = third_derivative[17];
+    spline_tc_dzzz[i] = third_derivative[26];
   }
-  check(spline_tc, RelationalOperator::EQUAL, Approx(analytic_tc).margin(1.0e-6), "Spline-based "
+  double etol, etol_d1, etol_d2, etol_d3;
+  switch (tcstencil.getKind()) {
+  case Interpolant::SMOOTHNESS:
+    etol    = 1.0e-8;
+    etol_d1 = 1.0e-8;
+    etol_d2 = 1.0e-8;
+    etol_d3 = 1.0e-8;
+    break;
+  case Interpolant::FUNCTION_VALUE:
+    etol    = 1.0e-8;
+    etol_d1 = 1.0e-8;
+    etol_d2 = 5.0e-8;
+    etol_d3 = 1.0e-7;
+    break;
+  }
+  check(spline_tc, RelationalOperator::EQUAL, Approx(analytic_tc).margin(etol), "Spline-based "
         "computations for a tricubic function do not match the analytic results.");
-  check(spline_tc_dx, RelationalOperator::EQUAL, Approx(analytic_tc_dx).margin(1.0e-6),
+  check(spline_tc_dx, RelationalOperator::EQUAL, Approx(analytic_tc_dx).margin(etol_d1),
         "Spline-based computations for d/dx partial derivatives of a tricubic function do not "
         "match the analytic results.");
-  check(spline_tc_dy, RelationalOperator::EQUAL, Approx(analytic_tc_dy).margin(1.0e-6),
+  check(spline_tc_dy, RelationalOperator::EQUAL, Approx(analytic_tc_dy).margin(etol_d1),
         "Spline-based computations for d/dy partial derivatives of a tricubic function do not "
         "match the analytic results.");
-  check(spline_tc_dz, RelationalOperator::EQUAL, Approx(analytic_tc_dz).margin(1.0e-6),
+  check(spline_tc_dz, RelationalOperator::EQUAL, Approx(analytic_tc_dz).margin(etol_d1),
         "Spline-based computations for d/dz partial derivatives of a tricubic function do not "
         "match the analytic results.");
-  check(spline_tc_dxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxy).margin(1.0e-6),
+  check(spline_tc_dxx, RelationalOperator::EQUAL, Approx(analytic_tc_dxx).margin(etol_d2),
+        "Spline-based computations for d2/dx2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxy).margin(etol_d2),
         "Spline-based computations for d2/dxdy mixed partial derivatives of a tricubic function "
         "do not match the analytic results.");
-  check(spline_tc_dxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxz).margin(1.0e-6),
+  check(spline_tc_dxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxz).margin(etol_d2),
         "Spline-based computations for d2/dxdz mixed partial derivatives of a tricubic function "
         "do not match the analytic results.");
-  check(spline_tc_dyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyz).margin(1.0e-6),
+  check(spline_tc_dyy, RelationalOperator::EQUAL, Approx(analytic_tc_dyy).margin(etol_d2),
+        "Spline-based computations for d2/dy2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyz).margin(etol_d2),
         "Spline-based computations for d2/dydz mixed partial derivatives of a tricubic function "
         "do not match the analytic results.");
-  check(spline_tc_dxyz, RelationalOperator::EQUAL, Approx(analytic_tc_dxyz).margin(1.0e-6),
+  check(spline_tc_dzz, RelationalOperator::EQUAL, Approx(analytic_tc_dzz).margin(etol_d2),
+        "Spline-based computations for d2/dz2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxxx, RelationalOperator::EQUAL, Approx(analytic_tc_dxxx).margin(etol_d3),
+        "Spline-based computations for d3/dx3 derivatives of a tricubic function do not match the "
+        "analytic results.");
+  check(spline_tc_dxxy, RelationalOperator::EQUAL, Approx(analytic_tc_dxxy).margin(etol_d3),
+        "Spline-based computations for d3/dx2dy mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxxz, RelationalOperator::EQUAL, Approx(analytic_tc_dxxz).margin(etol_d3),
+        "Spline-based computations for d3/dx2dz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxyy, RelationalOperator::EQUAL, Approx(analytic_tc_dxyy).margin(etol_d3),
+        "Spline-based computations for d3/dxdy2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dxyz, RelationalOperator::EQUAL, Approx(analytic_tc_dxyz).margin(etol_d3),
         "Spline-based computations for d3/dxdydz mixed partial derivatives of a tricubic function "
         "do not match the analytic results.");
+  check(spline_tc_dxzz, RelationalOperator::EQUAL, Approx(analytic_tc_dxzz).margin(etol_d3),
+        "Spline-based computations for d3/dxdz2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyyy, RelationalOperator::EQUAL, Approx(analytic_tc_dyyy).margin(etol_d3),
+        "Spline-based computations for d3/dy3 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyyz, RelationalOperator::EQUAL, Approx(analytic_tc_dyyz).margin(etol_d3),
+        "Spline-based computations for d3/dy2dz mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dyzz, RelationalOperator::EQUAL, Approx(analytic_tc_dyzz).margin(etol_d3),
+        "Spline-based computations for d3/dydz2 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+  check(spline_tc_dzzz, RelationalOperator::EQUAL, Approx(analytic_tc_dzzz).margin(etol_d3),
+        "Spline-based computations for d3/dz3 mixed partial derivatives of a tricubic function "
+        "do not match the analytic results.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute derivatives for the electrostatic potential due to a test charge in the space of a
+// tricubic mesh element using finite difference approximations.  These derivaatives can be used to
+// test the derivatives that the mesh element works from, to ensure that various chain rules are
+// being properly computed.
+//
+// Arguments:
+//   q_x:    Cartesian X location of the charge source
+//   q_y:    Cartesian Y location of the charge source
+//   q_z:    Cartesian Z location of the charge source
+//   a:      The position of the corner of inerest along the cell's a axis
+//   b:      The position of the corner of inerest along the cell's b axis
+//   c:      The position of the corner of inerest along the cell's c axis
+//   invu:   Transformation matrix taking fractional coordinates in the mesh axes into real space
+//   order:  Order of the derivatives.  Selected derivatives from each tensor will be computed.
+//-------------------------------------------------------------------------------------------------
+std::vector<double> cellSpaceFD(const double q_x, const double q_y, const double q_z,
+                                const double a, const double b, const double c,
+                                const std::vector<double> &invu, const int order) {
+  
+  // Fill out the potential, then each derivative.
+  const double inc = pow(2.0, -12.0);
+  const double inv_inc = 0.5 / inc;
+  std::vector<double> u(27), du_da(27, 0.0), du_db(27, 0.0), du_dc(27, 0.0);
+  for (int i = 0; i < 3; i++) {
+    const double da = a + (static_cast<double>(i - 1) * inc);
+    for (int j = 0; j < 3; j++) {
+      const double db = b + (static_cast<double>(j - 1) * inc);
+      for (int k = 0; k < 3; k++) {
+        const double dc = c + (static_cast<double>(k - 1) * inc);
+        const double x = (invu[0] * da) + (invu[3] * db) + (invu[6] * dc);
+        const double y =                  (invu[4] * db) + (invu[7] * dc);
+        const double z =                                   (invu[8] * dc);
+        const double dx = x - q_x;
+        const double dy = y - q_y;
+        const double dz = z - q_z;
+        u[(((k * 3) + j) * 3) + i] = 1.0 / sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      }
+    }
+  }
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        const int ijk_idx = (((k * 3) + j) * 3) + i;
+        if (i == 1) {
+          du_da[ijk_idx] = (u[ijk_idx + 1] - u[ijk_idx - 1]) * inv_inc;
+        }
+        if (j == 1) {
+          du_db[ijk_idx] = (u[ijk_idx + 3] - u[ijk_idx - 3]) * inv_inc;
+        }
+        if (k == 1) {
+          du_dc[ijk_idx] = (u[ijk_idx + 9] - u[ijk_idx - 9]) * inv_inc;
+        }
+      }
+    }
+  }
+  std::vector<double> result(3);
+  if (order == 1) {
+    result[0] = du_da[13];
+    result[1] = du_db[13];
+    result[2] = du_dc[13];
+    return result;
+  }
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        int ijk_idx = (((k * 3) + j) * 3) + i;
+        
+        // Turn du_da into du_dab
+        if (i == 1 && j == 1) {
+          du_da[ijk_idx] = (du_da[ijk_idx + 3] - du_da[ijk_idx - 3]) * inv_inc;
+        }
+
+        // Turn du_db into du_dbc
+        if (j == 1 && k == 1) {
+          du_db[ijk_idx] = (du_db[ijk_idx + 9] - du_db[ijk_idx - 9]) * inv_inc;          
+        }
+
+        // Turn du_dc into du_dac
+        if (k == 1 && i == 1) {
+          du_dc[ijk_idx] = (du_dc[ijk_idx + 1] - du_dc[ijk_idx - 1]) * inv_inc;          
+        }
+      }
+    }
+  }
+  if (order == 2) {
+    result[0] = du_da[13];
+    result[1] = du_dc[13];
+    result[2] = du_db[13];
+    return result;
+  }
+
+  // Turn du_dab into du_dabc
+  du_da[13] = (du_da[22] - du_da[4]) * inv_inc;
+  result.resize(1);
+  result[0] = du_da[13];
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test the construction of a tricubic cell by computing derivatives at each of its corners using
+// finite difference calculations in the {a, b, c} coordinate axes, then comparing the results to
+// transformations of Cartesian derivatives.  Use a test charge of 1.0 (unitless) placed outside
+// the cell to generate the potential function.
+//
+// Arguments:
+//   invu:  Transformation matrix for taking fractional coordinates in the {a, b, c} axes of the
+//          tricubic interpolation cell into real space
+//-------------------------------------------------------------------------------------------------
+void testTricubicCorners(const std::vector<double> &invu) {
+
+  // Create the transformation matrix take Cartesian coordinates into the cell space
+  std::vector<double> umat(9);
+  invertSquareMatrix(invu, &umat);
+
+  // Compute the function values and derivatives at the cell corners.  The test charge is placed
+  // in the (-, -, -) octant to always be outside the cell.
+  std::vector<double> u(8), du_dx(8), du_dy(8), du_dz(8), du_dxx(8), du_dxy(8), du_dxz(8);
+  std::vector<double> du_dyy(8), du_dyz(8), du_dxxx(8), du_dxxy(8), du_dxxz(8), du_dxyy(8);
+  std::vector<double> du_dxyz(8);
+  std::vector<double> du_da(8), du_db(8), du_dc(8), du_dab(8), du_dac(8), du_dbc(8), du_dabc(8);
+  std::vector<double> fd_da(8), fd_db(8), fd_dc(8), fd_dab(8), fd_dac(8), fd_dbc(8), fd_dabc(8);
+  const double q_x = -5.3;
+  const double q_y = -4.7;
+  const double q_z = -2.4;
+  for (int i = 0; i < 2; i++) {
+    const double di = i;
+    for (int j = 0; j < 2; j++) {
+      const double dj = j;
+      for (int k = 0; k < 2; k++) {
+        const double dk = k;
+        const int ijk_idx = (((k * 2) + j) * 2) + i;
+        const double x = (invu[0] * di) + (invu[3] * dj) + (invu[6] * dk);
+        const double y =                  (invu[4] * dj) + (invu[7] * dk);
+        const double z =                                   (invu[8] * dk);
+        const double dx = x - q_x;
+        const double dy = y - q_y;
+        const double dz = z - q_z;
+        const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        const double invr = 1.0 / r;
+        const double invr2 = invr * invr;
+
+        // Compute the potential and its derivatives in Cartesian space
+        u[ijk_idx] = invr;
+        const double du  = -invr2;
+        const double d2u =  2.0 * invr2 * invr;
+        const double d3u = -6.0 * invr2 * invr2;
+        du_dx[ijk_idx] = radialFirstDerivative<double>(du, dx, r);
+        du_dy[ijk_idx] = radialFirstDerivative<double>(du, dy, r);
+        du_dz[ijk_idx] = radialFirstDerivative<double>(du, dz, r);
+        du_dxx[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, r);
+        du_dxy[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dy, r);
+        du_dxz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dz, r);
+        du_dyy[ijk_idx] = radialSecondDerivative<double>(du, d2u, dy, r);
+        du_dyz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dy, dz, r);
+        du_dxxx[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, r);
+        du_dxxy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, r);
+        du_dxxz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dz, r);
+        du_dxyy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dy, dx, r);
+        du_dxyz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, dz, r);
+
+        // Compute the derivatives in the cell space by analytic methods
+        du_da[ijk_idx] = (du_dx[ijk_idx] * invu[0]);
+        du_db[ijk_idx] = (du_dx[ijk_idx] * invu[3]) + (du_dy[ijk_idx] * invu[4]);
+        du_dc[ijk_idx] = (du_dx[ijk_idx] * invu[6]) + (du_dy[ijk_idx] * invu[7]) +
+                         (du_dz[ijk_idx] * invu[8]);
+        du_dab[ijk_idx] = invu[0] * ((invu[3] * du_dxx[ijk_idx]) + (invu[4] * du_dxy[ijk_idx]));
+        const double tcol_dx_sum = (invu[6] * du_dxx[ijk_idx]) + (invu[7] * du_dxy[ijk_idx]) +
+                                   (invu[8] * du_dxz[ijk_idx]);
+        du_dac[ijk_idx] = invu[0] * tcol_dx_sum;
+        du_dbc[ijk_idx] = (invu[3] * tcol_dx_sum) + (invu[4] * ((invu[6] * du_dxy[ijk_idx]) +
+                                                                (invu[7] * du_dyy[ijk_idx]) +
+                                                                (invu[8] * du_dyz[ijk_idx])));
+        du_dabc[ijk_idx] = invu[0] * ((invu[3] * ((invu[6] * du_dxxx[ijk_idx]) +
+                                                  (invu[7] * du_dxxy[ijk_idx]) +
+                                                  (invu[8] * du_dxxz[ijk_idx]))) +
+                                      (invu[4] * ((invu[6] * du_dxxy[ijk_idx]) +
+                                                  (invu[7] * du_dxyy[ijk_idx]) +
+                                                  (invu[8] * du_dxyz[ijk_idx]))));
+        
+        // Compute the derivatives in the cell space by finite difference methods
+        const std::vector<double> deriv_one   = cellSpaceFD(q_x, q_y, q_z, di, dj, dk, invu, 1);
+        const std::vector<double> deriv_two   = cellSpaceFD(q_x, q_y, q_z, di, dj, dk, invu, 2);
+        const std::vector<double> deriv_three = cellSpaceFD(q_x, q_y, q_z, di, dj, dk, invu, 3);
+        fd_da[ijk_idx] = deriv_one[0];
+        fd_db[ijk_idx] = deriv_one[1];
+        fd_dc[ijk_idx] = deriv_one[2];
+        fd_dab[ijk_idx] = deriv_two[0];
+        fd_dac[ijk_idx] = deriv_two[1];
+        fd_dbc[ijk_idx] = deriv_two[2];
+        fd_dabc[ijk_idx] = deriv_three[0];
+      }
+    }
+  }
+  
+  // Run tests
+  check(fd_da, RelationalOperator::EQUAL, du_da, "Calculations of df / da made analytically do "
+        "not match those computed by finite difference approximations.");
+  check(fd_db, RelationalOperator::EQUAL, du_db, "Calculations of df / db made analytically do "
+        "not match those computed by finite difference approximations.");
+  check(fd_dc, RelationalOperator::EQUAL, du_dc, "Calculations of df / dc made analytically do "
+        "not match those computed by finite difference approximations.");
+  check(fd_dab, RelationalOperator::EQUAL, du_dab, "Calculations of d2f / dab made analytically "
+        "do not match those computed by finite difference approximations.");
+  check(fd_dac, RelationalOperator::EQUAL, du_dac, "Calculations of d2f / dac made analytically "
+        "do not match those computed by finite difference approximations.");
+  check(fd_dbc, RelationalOperator::EQUAL, du_dbc, "Calculations of d2f / dbc made analytically "
+        "do not match those computed by finite difference approximations.");
+  check(fd_dabc, RelationalOperator::EQUAL, Approx(du_dabc).margin(1.0e-5), "Calculations of "
+        "d3f / dabc made analytically do not match those computed by finite difference "
+        "approximations.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test the efficacy of the FUNCTION_VALUE stencil mode for tricubic interpolation of typical
+// non-bonded potentials on a triclinic mesh element.
+//-------------------------------------------------------------------------------------------------
+void testCoulombInterpolation(const std::vector<double> &invu, const TricubicStencil &tcs,
+                              Xoshiro256ppGenerator *xrs) {
+
+  // Design a set of charges to influence the mesh element
+  const int nq = 8;
+  std::vector<double> q_x(nq), q_y(nq), q_z(nq), q_v(nq);
+  for (int i = 0; i < nq; i++) {
+    q_x[i] = -6.0 + (5.0 * xrs->uniformRandomNumber());
+    q_y[i] = -6.0 + (5.0 * xrs->uniformRandomNumber());
+    q_z[i] = -6.0 + (5.0 * xrs->uniformRandomNumber());
+    q_v[i] = -1.0 + (2.0 * xrs->uniformRandomNumber());
+  }
+
+  // Compute the locations of midpoints for extra potential calculations in the FUNCTION_VALUE
+  // interpolant case.
+  std::vector<double> xyblock_x(8), xzblock_x(8), yzblock_x(8), cnblock_x(8);
+  std::vector<double> xyblock_y(8), xzblock_y(8), yzblock_y(8), cnblock_y(8);
+  std::vector<double> xyblock_z(8), xzblock_z(8), yzblock_z(8), cnblock_z(8);
+  for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 2; j++) {
+      for (int k = 0; k < 2; k++) {
+        const int idx = (((k * 2) + j) * 2) + i;
+        double mpt_x, mpt_y, mpt_z;
+        fvStencilCoordinates(0.0, 0.0, 0.0, UnitCellAxis::C, i, j, k, invu.data(),
+                                   &mpt_x, &mpt_y, &mpt_z);
+        xyblock_x[idx] = mpt_x;
+        xyblock_y[idx] = mpt_y;
+        xyblock_z[idx] = mpt_z;
+        fvStencilCoordinates(0.0, 0.0, 0.0, UnitCellAxis::B, i, j, k, invu.data(),
+                                   &mpt_x, &mpt_y, &mpt_z);
+        xzblock_x[idx] = mpt_x;
+        xzblock_y[idx] = mpt_y;
+        xzblock_z[idx] = mpt_z;
+        fvStencilCoordinates(0.0, 0.0, 0.0, UnitCellAxis::A, i, j, k, invu.data(),
+                                   &mpt_x, &mpt_y, &mpt_z);
+        yzblock_x[idx] = mpt_x;
+        yzblock_y[idx] = mpt_y;
+        yzblock_z[idx] = mpt_z;
+        fvStencilCoordinates(0.0, 0.0, 0.0, i, j, k, invu.data(), &mpt_x, &mpt_y, &mpt_z);
+        cnblock_x[idx] = mpt_x;
+        cnblock_y[idx] = mpt_y;
+        cnblock_z[idx] = mpt_z;
+      }
+    }
+  }
+  
+  // Compute the potential and derivatives for the stencil on an element with origin
+  // { 0.0, 0.0, 0.0 }.
+  std::vector<double> u(8, 0.0), dudx(8, 0.0), dudy(8, 0.0), dudz(8, 0.0), dudxy(8, 0.0);
+  std::vector<double> dudxz(8, 0.0), dudyz(8, 0.0), dudxyz(8, 0.0), dudxx(8, 0.0), dudyy(8, 0.0);
+  std::vector<double> dudxxx(8, 0.0), dudxxy(8, 0.0), dudxxz(8, 0.0), dudxyy(8, 0.0);
+  for (int i = 0; i < 2; i++) {
+    const double d_i = i;
+    for (int j = 0; j < 2; j++) {
+      const double d_j = j;
+      for (int k = 0; k < 2; k++) {
+        const double d_k = k;
+        const int idx = (((k * 2) + j) * 2) + i;
+        const double vert_x = (invu[0] * d_i) + (invu[3] * d_j) + (invu[6] * d_k);
+        const double vert_y =                   (invu[4] * d_j) + (invu[7] * d_k);
+        const double vert_z =                                     (invu[8] * d_k);
+        for (int m = 0; m < nq; m++) {
+          const double dx = vert_x - q_x[m];
+          const double dy = vert_y - q_y[m];
+          const double dz = vert_z - q_z[m];
+          const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+          const double invr = 1.0 / r;
+          const double invr2 = invr * invr;
+          const double dqqe  = -invr2;
+          const double d2qqe =  2.0 * invr2 * invr;
+          const double d3qqe = -6.0 * invr2 * invr2;
+          u[idx]    += q_v[m] * invr;
+          dudx[idx] += q_v[m] * radialFirstDerivative(dqqe, dx, r);
+          dudy[idx] += q_v[m] * radialFirstDerivative(dqqe, dy, r);
+          dudz[idx] += q_v[m] * radialFirstDerivative(dqqe, dz, r);
+          switch (tcs.getKind()) {
+          case Interpolant::SMOOTHNESS:
+            dudxx[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, r);
+            dudxy[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dy, r);
+            dudxz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dz, r);
+            dudyy[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dy, r);
+            dudyz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dy, dz, r);
+            dudxxx[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, r);
+            dudxxy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, r);
+            dudxxz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dz, r);
+            dudxyy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dy, dx, r);
+            dudxyz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, dz, r);
+            break;
+          case Interpolant::FUNCTION_VALUE:
+            {
+              double mdx = xyblock_x[idx] - q_x[m];
+              double mdy = xyblock_y[idx] - q_y[m];
+              double mdz = xyblock_z[idx] - q_z[m];
+              dudxy[idx] += q_v[m] / sqrt((mdx * mdx) + (mdy * mdy) + (mdz * mdz));
+              mdx = xzblock_x[idx] - q_x[m];
+              mdy = xzblock_y[idx] - q_y[m];
+              mdz = xzblock_z[idx] - q_z[m];
+              dudxz[idx] += q_v[m] / sqrt((mdx * mdx) + (mdy * mdy) + (mdz * mdz));
+              mdx = yzblock_x[idx] - q_x[m];
+              mdy = yzblock_y[idx] - q_y[m];
+              mdz = yzblock_z[idx] - q_z[m];
+              dudyz[idx] += q_v[m] / sqrt((mdx * mdx) + (mdy * mdy) + (mdz * mdz));
+              mdx = cnblock_x[idx] - q_x[m];
+              mdy = cnblock_y[idx] - q_y[m];
+              mdz = cnblock_z[idx] - q_z[m];
+              dudxyz[idx] += q_v[m] / sqrt((mdx * mdx) + (mdy * mdy) + (mdz * mdz));
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Some arrays may not have been initialized, but these will not be used.
+  std::vector<double> tc_bounds(12, 0.0);
+  for (int i = 0; i < 9; i++) {
+    tc_bounds[i + 3] = invu[i];
+  }
+  TricubicCell<double> tc(tcs, tc_bounds, u, dudx, dudy, dudz, dudxx, dudxy, dudxz, dudyy, dudyz,
+                          dudxxx, dudxxy, dudxxz, dudxyy, dudxyz);
+
+  // Determine a spread of points in the element
+  const int npts = 1000;
+  std::vector<double> u_ans(npts, 0.0);
+  std::vector<double> dudx_ans(npts, 0.0), dudy_ans(npts, 0.0), dudz_ans(npts, 0.0);
+  std::vector<double> u_itp(npts), dudx_itp(npts), dudy_itp(npts), dudz_itp(npts);
+  for (int i = 0; i < npts; i++) {
+    const double loc_a = xrs->uniformRandomNumber();
+    const double loc_b = xrs->uniformRandomNumber();
+    const double loc_c = xrs->uniformRandomNumber();
+    const double loc_x = (invu[0] * loc_a) + (invu[3] * loc_b) + (invu[6] * loc_c);
+    const double loc_y =                     (invu[4] * loc_b) + (invu[7] * loc_c);
+    const double loc_z =                                         (invu[8] * loc_c);
+    for (int j = 0; j < nq; j++) {
+      const double dx = loc_x - q_x[j];
+      const double dy = loc_y - q_y[j];
+      const double dz = loc_z - q_z[j];
+      const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      const double invr = 1.0 / r;
+      const double invr2 = invr * invr;
+      u_ans[i] += q_v[j] * invr;
+      dudx_ans[i] += q_v[j] * radialFirstDerivative(-invr2, dx, r);
+      dudy_ans[i] += q_v[j] * radialFirstDerivative(-invr2, dy, r);
+      dudz_ans[i] += q_v[j] * radialFirstDerivative(-invr2, dz, r);
+    }
+    u_itp[i] = tc.evaluate(loc_x, loc_y, loc_z);
+    const double3 itp_dxyz = tc.derivative<double3>(loc_x, loc_y, loc_z);
+    dudx_itp[i] = itp_dxyz.x;
+    dudy_itp[i] = itp_dxyz.y;
+    dudz_itp[i] = itp_dxyz.z;
+  }
+
+  // Check that the errors are reasonable
+  std::string space_group;
+  double err_margin;
+  if (fabs(invu[3]) > tiny || fabs(invu[6]) > tiny || fabs(invu[7]) > tiny) {
+    space_group = getEnumerationName(UnitCellType::TRICLINIC);
+    err_margin = 1.5e-4;
+  }
+  else {
+    space_group = getEnumerationName(UnitCellType::ORTHORHOMBIC);
+    err_margin = 1.0e-4;
+  }
+  check(u_ans, RelationalOperator::EQUAL, Approx(u_itp).margin(err_margin), "Energies of "
+        "Coulombic interactions interpolated from a " + getEnumerationName(tcs.getKind()) +
+        " interpolant do not match the analytic results.  The element geometry is " + space_group +
+        ".");
+  check(dudx_ans, RelationalOperator::EQUAL, Approx(dudx_itp).margin(err_margin), "X-axis forces "
+        "due to Coulombic interactions interpolated from a " + getEnumerationName(tcs.getKind()) +
+        " interpolant do not match the analytic results.  The element geometry is " + space_group +
+        ".");
+  check(dudy_ans, RelationalOperator::EQUAL, Approx(dudy_itp).margin(err_margin), "Y-axis forces "
+        "due to Coulombic interactions interpolated from a " + getEnumerationName(tcs.getKind()) +
+        " interpolant do not match the analytic results.  The element geometry is " + space_group +
+        ".");
+  check(dudz_ans, RelationalOperator::EQUAL, Approx(dudz_itp).margin(err_margin), "Z-axis forces "
+        "due to Coulombic interactions interpolated from a " + getEnumerationName(tcs.getKind()) +
+        " interpolant do not match the analytic results.  The element geometry is " + space_group +
+        ".");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -659,8 +1345,8 @@ int main(const int argc, const char* argv[]) {
         "between two short unsigned integer vectors.");
   check(mean(uv_i), RelationalOperator::EQUAL, 57.0, "Incorrect evaluation of the mean of a "
         "vector of unsigned integers.");
-  const std::vector<double> cp_a = {  1.4, 5.8, -8.5 };
-  const std::vector<double> cp_b = { -3.4, 2.7, 10.1 };
+  const std::vector<double> cp_a = {  1.4,  5.8, -8.5 };
+  const std::vector<double> cp_b = { -3.4,  2.7, 10.1 };
   std::vector<double> cp_c(3);
   crossProduct(cp_a, cp_b, &cp_c);
   const std::vector<double> cp_ab = { 81.53, 14.76, 23.50 };
@@ -919,14 +1605,30 @@ int main(const int argc, const char* argv[]) {
   check(szt_b_round, RelationalOperator::EQUAL, Approx(159360).margin(1.0e-6), "Rounding upwards "
         "to the nearest increment of 128 failed.");
   const ulint prime_composite = 2 * 2 * 5 * 3 * 7 * 19;
-  const std::vector<ulint> primes = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 };
-  const std::vector<ulint> factors_i = primeFactors(prime_composite, primes, 7);
-  const std::vector<ulint> factors_ii = primeFactors(prime_composite, primes, 9);
-  const std::vector<ulint> answer_i = { 2, 1, 1, 1, 0, 0, 0 };
-  const std::vector<ulint> answer_ii = { 2, 1, 1, 1, 0, 0, 0, 1, 0 };
+  const std::vector<uint> primes = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 };
+  const std::vector<uint> factors_i = primeFactorCounts(prime_composite, primes, 7);
+  const std::vector<uint> factors_ii = primeFactorCounts(prime_composite, primes, 9);
+  const std::vector<uint> answer_i = { 2, 1, 1, 1, 0, 0, 0 };
+  const std::vector<uint> answer_ii = { 2, 1, 1, 1, 0, 0, 0, 1, 0 };
   check(factors_i, RelationalOperator::EQUAL, Approx(answer_i).margin(1.0e-8), "Prime "
         "factorization with numbers up to 7 fails.");
-
+  const int near_factor_a = nearestFactor(128, 64, primes, LimitApproach::BELOW);
+  const int near_factor_b = nearestFactor(128, 63, primes, LimitApproach::BELOW);
+  const int near_factor_c = nearestFactor(128, 63, primes, LimitApproach::ABOVE);
+  const int near_factor_d = nearestFactor(128, 69, primes, LimitApproach::ABOVE);
+  const int near_factor_e = nearestFactor(12612600, 69, primes, LimitApproach::ABOVE);
+  check(near_factor_a, RelationalOperator::EQUAL, 64, "The nearest factor of 128 to 64 was not "
+        "found correctly when approaching from " + getEnumerationName(LimitApproach::BELOW) + ".");
+  check(near_factor_b, RelationalOperator::EQUAL, 32, "The nearest factor of 128 to 63 was not "
+        "found correctly when approaching from " + getEnumerationName(LimitApproach::BELOW) + ".");
+  check(near_factor_c, RelationalOperator::EQUAL, 64, "The nearest factor of 128 to 63 was not "
+        "found correctly when approaching from " + getEnumerationName(LimitApproach::ABOVE) + ".");
+  check(near_factor_d, RelationalOperator::EQUAL, 128, "The nearest factor of 128 to 69 was not "
+        "found correctly when approaching from " + getEnumerationName(LimitApproach::ABOVE) + ".");
+  check(near_factor_e, RelationalOperator::EQUAL, 70, "The nearest factor of 12612600 to 69 was "
+        "not found correctly when approaching from " + getEnumerationName(LimitApproach::ABOVE) +
+        ".");
+  
   // Check matrix math from the lightweight, onboard library
   section(4);
   const int rows_a = 7;
@@ -1409,13 +2111,14 @@ int main(const int argc, const char* argv[]) {
   check(dten_state, RelationalOperator::EQUAL, dten_state_ans, "A TIckCounter does not return "
         "the expected state after some advancement.");
 
-  // Check tricubic interpolation mechanics.
+  // Check tricubic interpolation mechanics.  Begin with the high-continuity stencil mode.
   section(6);
-  const Hybrid<double> tcmat = getTricubicMatrix();
+  const TricubicStencil tcstencil_cont(Interpolant::SMOOTHNESS);
+  const TricubicStencil tcstencil_accr(Interpolant::FUNCTION_VALUE);
   bool all_integer = true;
-  const double* tcmat_ptr = tcmat.data();
+  const double* tccont_ptr = tcstencil_cont.data();
   for (int i = 0; i < 4096; i++) {
-    all_integer = (all_integer && Approx(tcmat_ptr[i]).test(round(tcmat_ptr[i])));
+    all_integer = (all_integer && Approx(tccont_ptr[i]).test(round(tccont_ptr[i])));
   }
   check(all_integer, "The tricubic spline coefficients matrix contains non-integral elements.");
   std::vector<double> tccol_sums(64, 0.0);
@@ -1423,24 +2126,49 @@ int main(const int argc, const char* argv[]) {
   tccol_sums_ans[7] = 1.0;
   for (int i = 0; i < 64; i++) {
     for (int j = 0; j < 64; j++) {
-      tccol_sums[i] += tcmat_ptr[(64 * i) + j];
+      tccol_sums[i] += tccont_ptr[(64 * i) + j];
     }
   }
   check(tccol_sums, RelationalOperator::EQUAL, tccol_sums_ans, "The column sums of the tricubic "
         "spline coefficients matrix do not meet expectations.");
-  tricubicTestBundle(tcmat.readHost());
+  tricubicTestBundle(tcstencil_cont);
   std::vector<double> random_coefficients(64);
   for (int i = 0; i < 64; i++) {
     random_coefficients[i] = xrs256pp.gaussianRandomNumber();
   }
-  tricubicTestBundle(tcmat.readHost(), random_coefficients);
+  tricubicTestBundle(tcstencil_cont, random_coefficients);
   std::vector<double> x_only_coefficients(64, 0.0);
   for (int i = 0; i < 4; i++) {
     x_only_coefficients[i] = xrs256pp.gaussianRandomNumber();
   }
-  tricubicTestBundle(tcmat.readHost(), x_only_coefficients, { 0.5, 1.0, 1.0 });
-  tricubicTestBundle(tcmat.readHost(), random_coefficients, { 0.7, 0.9, 1.1 });
-  
+  tricubicTestBundle(tcstencil_cont, x_only_coefficients, { 0.5, 1.0, 1.0 });
+  const std::vector<double> equivariant = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
+  const std::vector<double> equivariant_ii = { 0.9, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.7 };
+  const std::vector<double> triclinic_i = {  0.50000000000,  0.00000000000,  0.00000000000,
+                                            -0.33333333277,  0.94280904178,  0.00000000000,
+                                            -0.29999999949, -0.42426406772,  0.73484692362 };
+  const std::vector<double> triclinic_ii = {  0.50000000000,  0.00000000000,  0.00000000000, 
+                                             -0.23754420664,  0.97137672913,  0.00000000000, 
+                                             -0.25721634619, -0.37174068675,  0.77823429189 };
+  tricubicTestBundle(tcstencil_cont, x_only_coefficients, triclinic_i);
+  tricubicTestBundle(tcstencil_cont, random_coefficients,
+                     { 0.7, 0.9, 1.1 });
+  testTricubicCorners(equivariant_ii);
+  testTricubicCorners(triclinic_i);
+
+  // Check mesh mechanics with the high-accuracy stencil mode.
+  tricubicTestBundle(tcstencil_accr);
+  tricubicTestBundle(tcstencil_accr, random_coefficients);
+  tricubicTestBundle(tcstencil_accr, x_only_coefficients, { 0.5, 1.0, 1.0 });
+  tricubicTestBundle(tcstencil_accr, x_only_coefficients, triclinic_i);
+  tricubicTestBundle(tcstencil_accr, random_coefficients, { 0.7, 0.9, 1.1 });
+
+  // Compate the two modes for the tricubic interpolant.
+  testCoulombInterpolation(equivariant, tcstencil_cont, &xrs256pp);
+  testCoulombInterpolation(equivariant, tcstencil_accr, &xrs256pp);
+  testCoulombInterpolation(triclinic_i, tcstencil_cont, &xrs256pp);
+  testCoulombInterpolation(triclinic_i, tcstencil_accr, &xrs256pp);
+
   // Print results
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

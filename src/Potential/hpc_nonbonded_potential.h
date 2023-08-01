@@ -3,8 +3,8 @@
 #define STORMM_NONBONDED_POTENTIAL_CUH
 
 #include "copyright.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Accelerator/gpu_details.h"
-#include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/energy_enumerators.h"
@@ -23,7 +23,7 @@ namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
@@ -118,7 +118,7 @@ cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, Nb
 /// \param eval_energy  Whether to evaluate energies
 /// \param acc_meth     Accumulation method for forces
 /// \param bt           Block and thread counts for the main kernel, given the precision and force
-///                     or energy computation requirements (a KernelManager object "abstract")
+///                     or energy computation requirements (a CoreKlManager object "abstract")
 /// \param gbr_bt       Block and thread counts for the Generalized Born radii computation kernel
 /// \param gbd_bt       Block and thread counts for the Generalized Born radii derivative
 ///                     computation kernel
@@ -148,7 +148,7 @@ void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                      ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
                      EvaluateEnergy eval_energy, AccumulationMethod force_sum,
-                     const KernelManager &launcher, double clash_minimum_distance = 0.0,
+                     const CoreKlManager &launcher, double clash_minimum_distance = 0.0,
                      double clash_ratio = 0.0);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
@@ -156,7 +156,7 @@ void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                      Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                      ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, const KernelManager &launcher,
+                     EvaluateEnergy eval_energy, const CoreKlManager &launcher,
                      double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
 /// \}
 

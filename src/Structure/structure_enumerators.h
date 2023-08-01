@@ -64,6 +64,13 @@ enum class VirtualSiteActivity {
 enum class GridDetail {
   OCCLUSION,        ///< The grid contains only an occlusion mask, with one bit per grid point
                     ///<   stored in a manner like std::vector<bool>.
+  OCCLUSION_FIELD,  ///< The grid stores a real-valued occlusion potential, ranging from zero (no
+                    ///<   occlusion) to one (maximum occlusion) and multiplied by some constant to
+                    ///<   impose an overall wieght of the occlusive restraining potential.  The
+                    ///<   occlusive value at each grid point is a function of the total occupancy
+                    ///<   at the grid point averaged over multiple aligned receptor structures,
+                    ///<   and the function itself can be tuned to reach unity with a steeper or
+                    ///<   steadier slope as the occupany goes to 100%.
   NONBONDED_FIELD,  ///< The grid stores electrostatic, Generalized Born radial derivatives,
                     ///<   Generalized Born pairwise energy, and van-der Waals potentials with
                     ///<   tricibic interpolation.
@@ -74,12 +81,30 @@ enum class GridDetail {
                     ///<   explicit particles with unique segments for each bin.
 };
 
+/// \brief List the various operations that can be associated with a mesh grid.
+enum class MappingActivity {
+  PARTICLE_TO_MESH,  ///< Construct the mesh based on particles
+  MESH_TO_PARTICLE   ///< Interpolate, or read mesh values, to map its information back to
+                     ///<   particles
+};
+  
 /// \brief The types of clashes that can occur.
 enum class ClashKind {
   VAN_DER_WAALS,  ///< The distance between two particles is less than the minimum van-der Waals
                   ///<   (Lennard-Jones) sigma ratio.
   PURE_DISTANCE   ///< The distance between two particles is less than the minimum absolute
                   ///<   distance allowed before a clash is declared
+};
+
+/// \brief The choice of behavior when a point selected for interpolation is off of the mesh that
+///        provides the potential.  This can only go into effect when the mesh exists in ISOLATED
+///        boundary conditions.
+enum class OffMeshProtocol {
+  DIE,          ///< This is an error.  Do not proceed further.
+  EXTRAPOLATE,  ///< Particles that fall off then mesh should have their potentials and forces
+                ///<   extrapolated, rather than interpolated, based on the nearest mesh element.
+  ZERO          ///< Particles that fall off the mesh experience zero force and contribute zero
+                ///<   energy.
 };
 
 /// \brief List the various general levels for system sampling.  The maximum number of trials per
@@ -135,7 +160,9 @@ std::string getEnumerationName(RMSDAlignmentProtocol input);
 std::string getEnumerationName(RMSDTask input);
 std::string getEnumerationName(VirtualSiteActivity input);
 std::string getEnumerationName(GridDetail input);
+std::string getEnumerationName(MappingActivity input);
 std::string getEnumerationName(ClashKind input);
+std::string getEnumerationName(OffMeshProtocol input);
 std::string getEnumerationName(SamplingIntensity input);
 std::string getEnumerationName(BoundaryCondition input);
 std::string getEnumerationName(MeshPosition input);

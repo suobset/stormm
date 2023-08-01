@@ -128,7 +128,7 @@ extern void launchLineAdvance(const PrecisionModel prec, PsSynthesisWriter *poly
 extern void launchLineAdvance(const PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
                               const AtomGraphSynthesis &poly_ag, ScoreCard *sc,
                               LineMinimization *line_record, const int move_number,
-                              const KernelManager &launcher) {
+                              const CoreKlManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   const ReductionKit redk(poly_ag, tier);
@@ -152,7 +152,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                CacheResource *nonb_cache, CacheResource *nonb_cd_cache,
                                ImplicitSolventWorkspace *ism_space, ReductionBridge *rbg,
                                LineMinimization *line_record, const AccumulationMethod acc_meth,
-                               const GpuDetails &gpu, const KernelManager &launcher,
+                               const GpuDetails &gpu, const CoreKlManager &launcher,
                                StopWatch *timer, const std::string &task_name) {
   
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
@@ -619,7 +619,7 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   ScoreCard result(poly_ps->getSystemCount(), nframe, energy_accumulation_bits);
 
   // Map out all kernels.  Only a few are needed but this is not a lot of work.
-  KernelManager launcher(gpu, poly_ag);
+  CoreKlManager launcher(gpu, poly_ag);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
                                                         AccumulationMethod::SPLIT,

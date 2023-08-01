@@ -8,7 +8,7 @@
 namespace stormm {
 namespace numerics {
 
-using constants::getPrecisionModelName;
+using constants::getEnumerationName;
 using parse::strcmpCased;
 using parse::PolyNumeric;
 
@@ -133,7 +133,7 @@ void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
   switch (pmodel) {
   case PrecisionModel::SINGLE:
     if (choice > 31) {
-      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
+      rtErr("Charge mesh accumulation in a " + getEnumerationName(pmodel) + " precision model "
             "will take place with a 32-bit signed integer accumulation grid.  A value of " +
             std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, 8, 31),
             "checkChargeMeshBits");
@@ -141,13 +141,30 @@ void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
     break;
   case PrecisionModel::DOUBLE:
     if (choice > max_charge_mesh_scale_bits) {
-      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
+      rtErr("Charge mesh accumulation in a " + getEnumerationName(pmodel) + " precision model "
             "will take place with a 64-bit signed integer accumulation grid.  A value of " +
             std::to_string(choice) +
             fixedPrecisionRangeErrorMessage(choice, 8, max_charge_mesh_scale_bits),
             "checkChargeMeshBits");
     }
     break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkFPVectorLength(const size_t primary_length, const size_t overflow_length,
+                         const char* caller, const std::string &message) {
+  if (primary_length != overflow_length) {
+    std::string out_message;
+    if (message.size() > 0) {
+      out_message = message;
+    }
+    else {
+      out_message = std::string("The primary and overflow vectors must be the same lengths (") +
+                    std::to_string(primary_length) + " != " + std::to_string(overflow_length) +
+                    ").";
+    }
+    rtErr(out_message, caller);
   }
 }
 
@@ -184,26 +201,18 @@ void hostFloatToInt63(const float* fval, int* primary, int* overflow, const size
 //-------------------------------------------------------------------------------------------------
 void hostFloatToInt63(const std::vector<float> &fval, std::vector<int> *primary,
                       std::vector<int> *overflow, const float scale) {
-  if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostFloatToInt63");
-  }
-  if (primary->size() != fval.size()) {
-    rtErr("The original data must have the same length as the integral result vectors.",
-          "hostFloatToInt63");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostFloatToInt63");
+  checkFPVectorLength(primary->size(), fval.size(), "hostFloatToInt63", "The original data must "
+                      "have the same length as the integral result vectors.");
   hostFloatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
 void hostFloatToInt63(const Hybrid<float> &fval, Hybrid<int> *primary, Hybrid<int> *overflow,
                       const float scale) {
-  if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostFloatToInt63");
-  }
-  if (primary->size() != fval.size()) {
-    rtErr("The original data must have the same length as the integral result vectors.",
-          "hostFloatToInt63");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostFloatToInt63");
+  checkFPVectorLength(primary->size(), fval.size(), "hostFloatToInt63", "The original data must "
+                      "have the same length as the integral result vectors.");
   hostFloatToInt63(fval.data(), primary->data(), overflow->data(), fval.size(), scale);
 }
 
@@ -294,26 +303,18 @@ void hostDoubleToInt95(const double* dval, llint* primary, int* overflow, const 
 //-------------------------------------------------------------------------------------------------
 void hostDoubleToInt95(const std::vector<double> &dval, std::vector<llint> *primary,
                        std::vector<int> *overflow, const double scale) {
-  if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostDoubleToInt95");
-  }
-  if (primary->size() != dval.size()) {
-    rtErr("The original data must have the same length as the integral result vectors.",
-          "hostDoubleToInt95");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostDoubleToInt95");
+  checkFPVectorLength(primary->size(), dval.size(), "hostDoubleToInt95", "The original data must "
+                      "have the same length as the integral result vectors.");
   hostDoubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
 }
 
 //-------------------------------------------------------------------------------------------------
 void hostDoubleToInt95(const Hybrid<double> &dval, Hybrid<llint> *primary, Hybrid<int> *overflow,
                    const double scale) {
-  if (primary->size() != overflow->size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostDoubleToInt95");
-  }
-  if (primary->size() != dval.size()) {
-    rtErr("The original data must have the same length as the integral result vectors.",
-          "hostDoubleToInt95");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostDoubleToInt95");
+  checkFPVectorLength(primary->size(), dval.size(), "hostDoubleToInt95", "The original data must "
+                      "have the same length as the integral result vectors.");
   hostDoubleToInt95(dval.data(), primary->data(), overflow->data(), dval.size(), scale);
 }
 
@@ -366,26 +367,18 @@ void hostInt63ToDouble(double* result, const int* primary, const int* overflow,
 //-------------------------------------------------------------------------------------------------
 void hostInt63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
                    const std::vector<int> &overflow, const double descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostInt63ToDouble");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.",
-          "hostInt63ToDouble");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToDouble");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToDouble", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
 void hostInt63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary,
                        const Hybrid<int> &overflow, const double descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostInt63ToDouble");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.",
-          "hostInt63ToDouble");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToDouble");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToDouble", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
@@ -405,33 +398,18 @@ void hostInt63ToFloat(float* result, const int* primary, const int* overflow,
 //-------------------------------------------------------------------------------------------------
 void hostInt63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
                   const std::vector<int> &overflow, const float descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.  " +
-          std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
-          "hostInt63ToFloat");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.  " +
-          std::to_string(result->size()) + " != " + std::to_string(primary.size()) + ".",
-          "hostInt63ToFloat");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToFloat");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToFloat", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
 void hostInt63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary,
                       const Hybrid<int> &overflow, const float descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors (" + std::string(primary.getLabel().name) + " and " +
-          std::string(overflow.getLabel().name) + ") must have the same length.  " +
-          std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
-          "hostInt63ToFloat");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result (" + std::string(result->getLabel().name) + ") must have the same length as "
-          "the original, integral data.  " + std::to_string(result->size()) + " != " +
-          std::to_string(primary.size()) + ".", "hostInt63ToFloat");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToFloat");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToFloat", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
@@ -536,26 +514,18 @@ void hostInt95ToDouble(double* result, const llint* primary, const int* overflow
 //-------------------------------------------------------------------------------------------------
 void hostInt95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
                    const std::vector<int> &overflow, const double descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostInt95ToDouble");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.",
-          "hostInt95ToDouble");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt95ToDouble");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt95ToDouble", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
 //-------------------------------------------------------------------------------------------------
 void hostInt95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
                    const Hybrid<int> &overflow, const double descale) {
-  if (primary.size() != overflow.size()) {
-    rtErr("The primary and overflow vectors must have the same length.", "hostInt95ToDouble");
-  }
-  if (primary.size() != result->size()) {
-    rtErr("The result must have the same length as the original, integral data.",
-          "hostInt95ToDouble");
-  }
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt95ToDouble");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt95ToDouble", "The result must "
+                      "have the same length as the original, integral data.");
   hostInt95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
 }
 
@@ -745,7 +715,66 @@ int95_t hostChangeFPBits(const int95_t fp, const int native_bits, const int outp
   const int95_t ynew      = hostDoubleToInt95(ycomp);
   return hostSplitFPSum(xnew, ynew);
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(std::vector<int95_t> *fp, const int native_bits, const int output_bits) {
+  int95_t* fp_ptr = fp->data();
+  const size_t length = fp->size();
+  for (size_t i = 0; i < length; i++) {
+    fp_ptr[i] = hostChangeFPBits(fp_ptr[i], native_bits, output_bits);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(int* fp, int* fp_ovrf, const size_t length, const int native_bits,
+                      const int output_bits) {
+  for (size_t i = 0; i < length; i++) {
+    const int2 orig = { fp[i], fp_ovrf[i] };
+    const int2 conv = hostChangeFPBits(orig, native_bits, output_bits);
+    fp[i] = conv.x;
+    fp_ovrf[i] = conv.y;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(llint* fp, int* fp_ovrf, const size_t length, const int native_bits,
+                      const int output_bits) {
+  for (size_t i = 0; i < length; i++) {
+    const int95_t orig = { fp[i], fp_ovrf[i] };
+    const int95_t conv = hostChangeFPBits(orig, native_bits, output_bits);
+    fp[i] = conv.x;
+    fp_ovrf[i] = conv.y;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(std::vector<int> *fp, std::vector<int> *fp_ovrf, const int native_bits,
+                      const int output_bits) {
+  checkFPVectorLength(fp->size(), fp_ovrf->size(), "hostChangeFPBits");
+  hostChangeFPBits(fp->data(), fp_ovrf->data(), fp->size(), native_bits, output_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(std::vector<llint> *fp, std::vector<int> *fp_ovrf, const int native_bits,
+                      const int output_bits) {
+  checkFPVectorLength(fp->size(), fp_ovrf->size(), "hostChangeFPBits");
+  hostChangeFPBits(fp->data(), fp_ovrf->data(), fp->size(), native_bits, output_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(Hybrid<int> *fp, Hybrid<int> *fp_ovrf, const int native_bits,
+                      const int output_bits) {
+  checkFPVectorLength(fp->size(), fp_ovrf->size(), "hostChangeFPBits");
+  hostChangeFPBits(fp->data(), fp_ovrf->data(), fp->size(), native_bits, output_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostChangeFPBits(Hybrid<llint> *fp, Hybrid<int> *fp_ovrf, const int native_bits,
+                      const int output_bits) {
+  checkFPVectorLength(fp->size(), fp_ovrf->size(), "hostChangeFPBits");
+  hostChangeFPBits(fp->data(), fp_ovrf->data(), fp->size(), native_bits, output_bits);
+}
+
 //-------------------------------------------------------------------------------------------------
 void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
                         const int95_t increment) {
@@ -761,23 +790,20 @@ void fixedPrecisionGrid(std::vector<int95_t> *coordinates, const int95_t origin,
 //-------------------------------------------------------------------------------------------------
 void fixedPrecisionGrid(std::vector<llint> *primary, std::vector<int> *overflow,
                         const int95_t origin, const int95_t increment) {
-  if (primary->size() != overflow->size()) {
-    rtErr("Both primary and overflow vectors must be pre-allocated to the same size.  Lengths "
-          "are " + std::to_string(primary->size()) + " and " + std::to_string(overflow->size()) +
-          ".", "fixedPrecisionGrid");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostChangeFPBits", "Both primary and "
+                      "overflow vectors must be pre-allocated to the same size.  Lengths "
+                      "are " + std::to_string(primary->size()) + " and " +
+                      std::to_string(overflow->size()) + ".");
   fixedPrecisionGrid(primary->data(), overflow->data(), origin, increment, primary->size());
 }
 
 //-------------------------------------------------------------------------------------------------
 void fixedPrecisionGrid(Hybrid<llint> *primary, Hybrid<int> *overflow,
                         const int95_t origin, const int95_t increment) {
-  if (primary->size() != overflow->size()) {
-    rtErr("Both primary and overflow vectors must be pre-allocated to the same size.  Lengths "
-          " are " + std::to_string(primary->size()) + "(" + std::string(primary->getLabel().name) +
-          ") and " + std::to_string(overflow->size()) + "(" +
-          std::string(overflow->getLabel().name) + ").", "fixedPrecisionGrid");
-  }
+  checkFPVectorLength(primary->size(), overflow->size(), "hostChangeFPBits", "Both primary and "
+                      "overflow vectors must be pre-allocated to the same size.  Lengths "
+                      "are " + std::to_string(primary->size()) + " and " +
+                      std::to_string(overflow->size()) + ".");
   fixedPrecisionGrid(primary->data(), overflow->data(), origin, increment, primary->size());
 }
 

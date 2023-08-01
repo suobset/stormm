@@ -5,32 +5,198 @@ namespace stormm {
 namespace random {
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-void Ran2Generator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
-  const size_t count = xv->size();
-  T* xv_ptr = xv->data();
+template <typename Tprng> double uniformRand(Tprng *rng, double scale) {
+  return rng->uniformRandomNumber() * scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<double> uniformRand(Tprng *rng, const size_t count, const double scale) {
+  std::vector<double> result(count);
   for (size_t i = 0; i < count; i++) {
-    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+    result[i] = rng->uniformRandomNumber() * scale;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<double> uniformRand(Tprng *rng, const size_t rows, const size_t columns,
+                                const double scale, const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = rng->uniformRandomNumber() * scale;
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = rng->uniformRandomNumber() * scale;
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng, typename Tprod>
+void uniformRand(Tprng *rng, std::vector<Tprod> *xv, const double fp_scale, const double scale) {
+  const double eff_scale = fp_scale * scale;
+  const size_t count = xv->size();
+  Tprod* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = rng->uniformRandomNumber() * eff_scale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-void Xoroshiro128pGenerator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
-  const size_t count = xv->size();
-  T* xv_ptr = xv->data();
+template <typename Tprng> float spUniformRand(Tprng *rng, float scale) {
+  return rng->spUniformRandomNumber() * scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<float> spUniformRand(Tprng *rng, const size_t count, const float scale) {
+  std::vector<float> result(count);
   for (size_t i = 0; i < count; i++) {
-    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+    result[i] = rng->spUniformRandomNumber() * scale;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<float> spUniformRand(Tprng *rng, const size_t rows, const size_t columns,
+                                 const float scale, const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = rng->spUniformRandomNumber() * scale;
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = rng->spUniformRandomNumber() * scale;
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng, typename Tprod>
+void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, const float fp_scale, const float scale) {
+  const float eff_scale = fp_scale * scale;
+  const size_t count = xv->size();
+  Tprod* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = rng->spUniformRandomNumber() * eff_scale;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-void Xoshiro256ppGenerator::uniformRandomNumber(std::vector<T> *xv, const double fp_scale) {
-  const size_t count = xv->size();
-  T* xv_ptr = xv->data();
+template <typename Tprng> double gaussianRand(Tprng *rng, double scale) {
+  return rng->gaussianRandomNumber() * scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<double> gaussianRand(Tprng *rng, const size_t count, const double scale) {
+  std::vector<double> result(count);
   for (size_t i = 0; i < count; i++) {
-    xv_ptr[i] = uniformRandomNumber() * fp_scale;
+    result[i] = rng->gaussianRandomNumber() * scale;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<double> gaussianRand(Tprng *rng, const size_t rows, const size_t columns,
+                                 const double scale, const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<double> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = rng->gaussianRandomNumber() * scale;
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = rng->gaussianRandomNumber() * scale;
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng, typename Tprod>
+void gaussianRand(Tprng *rng, std::vector<Tprod> *xv, const double fp_scale, const double scale) {
+  const double eff_scale = fp_scale * scale;
+  const size_t count = xv->size();
+  Tprod* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = rng->gaussianRandomNumber() * eff_scale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng> float spGaussianRand(Tprng *rng, float scale) {
+  return rng->spGaussianRandomNumber() * scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<float> spGaussianRand(Tprng *rng, const size_t count, const float scale) {
+  std::vector<float> result(count);
+  for (size_t i = 0; i < count; i++) {
+    result[i] = rng->spGaussianRandomNumber() * scale;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng>
+std::vector<float> spGaussianRand(Tprng *rng, const size_t rows, const size_t columns,
+                                  const float scale, const RngFillMode mode) {
+  const size_t count = rows * columns;
+  std::vector<float> result(rows * columns);
+  switch (mode) {
+  case RngFillMode::COLUMNS:
+    for (size_t i = 0; i < count; i++) {
+      result[i] = rng->spGaussianRandomNumber() * scale;
+    }
+    break;
+  case RngFillMode::ROWS:
+    for (size_t i = 0; i < rows; i++) {
+      for (size_t j = 0; j < columns; j++) {
+        result[(j * rows) + i] = rng->spGaussianRandomNumber() * scale;
+      }
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tprng, typename Tprod>
+void spGaussianRand(Tprng *rng, std::vector<Tprod> *xv, const float fp_scale, const float scale) {
+  const float eff_scale = fp_scale * scale;
+  const size_t count = xv->size();
+  Tprod* xv_ptr = xv->data();
+  for (size_t i = 0; i < count; i++) {
+    xv_ptr[i] = rng->spGaussianRandomNumber() * eff_scale;
   }
 }
 

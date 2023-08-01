@@ -12,7 +12,8 @@ LIBDIR=lib
 STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Accelerator/hybrid_enumerators.cpp \
-		   $(SRCDIR)/Accelerator/kernel_manager.cpp \
+		   $(SRCDIR)/Accelerator/core_kernel_manager.cpp \
+		   $(SRCDIR)/Accelerator/mesh_kernel_manager.cpp \
 		   $(SRCDIR)/Analysis/comparison_guide.cpp \
 		   $(SRCDIR)/Chemistry/atommask.cpp \
 		   $(SRCDIR)/Chemistry/atom_equivalence.cpp \
@@ -29,8 +30,9 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/FileManagement/file_util.cpp \
 		   $(SRCDIR)/ForceField/forcefield_element.cpp \
 		   $(SRCDIR)/ForceField/forcefield_enumerators.cpp \
-		   $(SRCDIR)/Math/matrix_ops.cpp \
 		   $(SRCDIR)/Math/clustering.cpp \
+		   $(SRCDIR)/Math/math_enumerators.cpp \
+		   $(SRCDIR)/Math/matrix_ops.cpp \
 		   $(SRCDIR)/Math/reduction.cpp \
 		   $(SRCDIR)/Math/reduction_abstracts.cpp \
 		   $(SRCDIR)/Math/reduction_bridge.cpp \
@@ -90,16 +92,18 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Potential/forward_exclusionmask.cpp \
 		   $(SRCDIR)/Potential/nonbonded_potential.cpp \
 		   $(SRCDIR)/Potential/scorecard.cpp \
+		   $(SRCDIR)/Potential/soft_core_potentials.cpp \
 		   $(SRCDIR)/Potential/static_exclusionmask.cpp \
 		   $(SRCDIR)/Potential/valence_potential.cpp \
 		   $(SRCDIR)/Random/random.cpp \
 		   $(SRCDIR)/Random/random_enumerators.cpp \
 		   $(SRCDIR)/Reporting/code_dox.cpp \
 		   $(SRCDIR)/Reporting/display.cpp \
-		   $(SRCDIR)/Reporting/help_messages.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
+		   $(SRCDIR)/Reporting/help_messages.cpp \
 		   $(SRCDIR)/Reporting/ordered_list.cpp \
 		   $(SRCDIR)/Reporting/present_energy.cpp \
+		   $(SRCDIR)/Reporting/render_molecule.cpp \
 		   $(SRCDIR)/Reporting/reporting_enumerators.cpp \
 		   $(SRCDIR)/Reporting/report_table.cpp \
 		   $(SRCDIR)/Reporting/section_contents.cpp \
@@ -108,11 +112,15 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		   $(SRCDIR)/Restraints/restraint_builder.cpp \
 		   $(SRCDIR)/Restraints/restraint_enumerators.cpp \
+		   $(SRCDIR)/Structure/background_mesh.cpp \
 		   $(SRCDIR)/Structure/clash_detection.cpp \
 		   $(SRCDIR)/Structure/global_manipulation.cpp \
 		   $(SRCDIR)/Structure/isomerization.cpp \
 		   $(SRCDIR)/Structure/local_arrangement.cpp \
+		   $(SRCDIR)/Structure/mesh_foundation.cpp \
+		   $(SRCDIR)/Structure/mesh_mechanics.cpp \
 		   $(SRCDIR)/Structure/mesh_parameters.cpp \
+		   $(SRCDIR)/Structure/mesh_rulers.cpp \
 		   $(SRCDIR)/Structure/rmsd.cpp \
 		   $(SRCDIR)/Structure/rmsd_plan.cpp \
 		   $(SRCDIR)/Structure/structure_enumerators.cpp \
@@ -130,6 +138,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Synthesis/systemcache.cpp \
 		   $(SRCDIR)/Synthesis/valence_workunit.cpp \
 		   $(SRCDIR)/Topology/amber_prmtop_util.cpp \
+		   $(SRCDIR)/Topology/atomgraph.cpp \
 		   $(SRCDIR)/Topology/atomgraph_constructors.cpp \
 		   $(SRCDIR)/Topology/atomgraph_detailers.cpp \
 		   $(SRCDIR)/Topology/atomgraph_getters.cpp \
@@ -140,6 +149,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 		   $(SRCDIR)/Topology/atomgraph_refinement.cpp \
+		   $(SRCDIR)/Topology/combograph_ljmodel.cpp \
 		   $(SRCDIR)/Topology/topology_limits.cpp \
 		   $(SRCDIR)/Topology/topology_util.cpp \
 		   $(SRCDIR)/Trajectory/amber_ascii.cpp \
@@ -155,6 +165,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/gpu_details.cpp \
 		   $(SRCDIR)/Trajectory/write_annotated_frame.cpp \
 		   $(SRCDIR)/Trajectory/write_frame.cpp \
 		   $(SRCDIR)/UnitTesting/approx.cpp \
+		   $(SRCDIR)/UnitTesting/dissect_textfile.cpp \
 		   $(SRCDIR)/UnitTesting/stopwatch.cpp \
 		   $(SRCDIR)/UnitTesting/checklist.cpp \
 		   $(SRCDIR)/UnitTesting/file_snapshot.cpp \
@@ -169,7 +180,8 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Accelerator/gpu_details.h \
 		     $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Accelerator/hybrid_enumerators.h \
-		     $(SRCDIR)/Accelerator/kernel_manager.h \
+		     $(SRCDIR)/Accelerator/core_kernel_manager.h \
+		     $(SRCDIR)/Accelerator/mesh_kernel_manager.h \
 		     $(SRCDIR)/Analysis/comparison_guide.h \
 		     $(SRCDIR)/Chemistry/atommask.h \
 		     $(SRCDIR)/Chemistry/atom_equivalence.h \
@@ -197,9 +209,12 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/ForceField/forcefield_element.h \
 		     $(SRCDIR)/ForceField/forcefield_enumerators.h \
 		     $(SRCDIR)/Math/cluster_manager.h \
+		     $(SRCDIR)/Math/radial_derivatives.h \
+		     $(SRCDIR)/Math/math_enumerators.h \
 		     $(SRCDIR)/Math/matrix.h \
 		     $(SRCDIR)/Math/matrix_ops.h \
 		     $(SRCDIR)/Math/multiplication.h \
+		     $(SRCDIR)/Math/one_dimensional_splines.h \
 		     $(SRCDIR)/Math/reduction.h \
 		     $(SRCDIR)/Math/reduction_abstracts.h \
 		     $(SRCDIR)/Math/reduction_bridge.h \
@@ -274,6 +289,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Reporting/error_format.h \
 		     $(SRCDIR)/Reporting/ordered_list.h \
 		     $(SRCDIR)/Reporting/present_energy.h \
+		     $(SRCDIR)/Reporting/render_molecule.h \
 		     $(SRCDIR)/Reporting/reporting_enumerators.h \
 		     $(SRCDIR)/Reporting/report_table.h \
 		     $(SRCDIR)/Reporting/section_contents.h \
@@ -288,7 +304,11 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Structure/global_manipulation.h \
 		     $(SRCDIR)/Structure/isomerization.h \
 		     $(SRCDIR)/Structure/local_arrangement.h \
+		     $(SRCDIR)/Structure/mesh_foundation.h \
+		     $(SRCDIR)/Structure/mesh_forcefield.h \
+		     $(SRCDIR)/Structure/mesh_mechanics.h \
 		     $(SRCDIR)/Structure/mesh_parameters.h \
+		     $(SRCDIR)/Structure/mesh_rulers.h \
 		     $(SRCDIR)/Structure/rmsd_plan.h \
 		     $(SRCDIR)/Structure/structure_enumerators.h \
 		     $(SRCDIR)/Structure/structure_ops.h \
@@ -312,6 +332,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		     $(SRCDIR)/Topology/atomgraph_intake.h \
 		     $(SRCDIR)/Topology/atomgraph_refinement.h \
+		     $(SRCDIR)/Topology/combograph_ljmodel.h \
 		     $(SRCDIR)/Topology/topology_limits.h \
 		     $(SRCDIR)/Topology/topology_util.h \
 		     $(SRCDIR)/Trajectory/amber_ascii.h \
@@ -327,6 +348,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/copyright.h \
 		     $(SRCDIR)/Trajectory/write_annotated_frame.h \
 		     $(SRCDIR)/Trajectory/write_frame.h \
 		     $(SRCDIR)/UnitTesting/approx.h \
+		     $(SRCDIR)/UnitTesting/dissect_textfile.h \
 		     $(SRCDIR)/UnitTesting/stopwatch.h \
 		     $(SRCDIR)/UnitTesting/checklist.h \
 		     $(SRCDIR)/UnitTesting/file_snapshot.h \
@@ -343,10 +365,12 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Chemistry/chemical_features.tpp \
 		   $(SRCDIR)/DataTypes/common_types.tpp \
 		   $(SRCDIR)/DataTypes/stormm_vector_types.tpp \
+		   $(SRCDIR)/Math/radial_derivatives.tpp \
 		   $(SRCDIR)/Math/cluster_manager.tpp \
 		   $(SRCDIR)/Math/matrix.tpp \
 		   $(SRCDIR)/Math/matrix_ops.tpp \
 		   $(SRCDIR)/Math/multiplication.tpp \
+		   $(SRCDIR)/Math/one_dimensional_splines.tpp \
 		   $(SRCDIR)/Math/reduction.tpp \
 		   $(SRCDIR)/Math/reduction_abstracts.tpp \
 		   $(SRCDIR)/Math/rounding.tpp \
@@ -361,6 +385,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/MoleculeFormat/mdlmol.tpp \
 		   $(SRCDIR)/Namelists/namelist_emulator.tpp \
 		   $(SRCDIR)/Parsing/polynumeric.tpp \
+		   $(SRCDIR)/Parsing/parse.tpp \
 		   $(SRCDIR)/Potential/cacheresource.tpp \
 		   $(SRCDIR)/Potential/energy_abstracts.tpp \
 		   $(SRCDIR)/Potential/eval_synthesis.tpp \
@@ -368,6 +393,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Potential/scorecard.tpp \
 		   $(SRCDIR)/Potential/soft_core_potentials.tpp \
 		   $(SRCDIR)/Potential/valence_potential.tpp \
+		   $(SRCDIR)/Reporting/render_molecule.tpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.tpp \
 		   $(SRCDIR)/Restraints/restraint_util.tpp \
 		   $(SRCDIR)/Structure/clash_detection.tpp \
@@ -375,6 +401,10 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Structure/isomerization.tpp \
 		   $(SRCDIR)/Structure/local_arrangement.tpp \
 		   $(SRCDIR)/Structure/background_mesh.tpp \
+		   $(SRCDIR)/Structure/background_mesh_freefunc.tpp \
+		   $(SRCDIR)/Structure/mesh_forcefield.tpp \
+		   $(SRCDIR)/Structure/mesh_foundation.tpp \
+		   $(SRCDIR)/Structure/mesh_mechanics.tpp \
 		   $(SRCDIR)/Structure/mesh_parameters.tpp \
 		   $(SRCDIR)/Structure/rmsd.tpp \
 		   $(SRCDIR)/Structure/rmsd_plan.tpp \
@@ -386,6 +416,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.tpp \
 		   $(SRCDIR)/Topology/atomgraph.tpp \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
+		   $(SRCDIR)/Topology/combograph_ljmodel.tpp \
 		   $(SRCDIR)/Topology/topology_util.tpp \
 		   $(SRCDIR)/Trajectory/coordinateframe.tpp \
 		   $(SRCDIR)/Trajectory/coordinate_copy.tpp \
@@ -394,6 +425,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Trajectory/thermostat.tpp \
 		   $(SRCDIR)/Trajectory/write_annotated_frame.tpp \
 		   $(SRCDIR)/UnitTesting/approx.tpp \
+		   $(SRCDIR)/UnitTesting/dissect_textfile.tpp \
 		   $(SRCDIR)/UnitTesting/test_system_manager.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp
 
@@ -401,7 +433,8 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Accelerator/hybrid_enumerators.o \
-		  $(SRCDIR)/Accelerator/kernel_manager.o \
+		  $(SRCDIR)/Accelerator/core_kernel_manager.o \
+		  $(SRCDIR)/Accelerator/mesh_kernel_manager.o \
 		  $(SRCDIR)/Analysis/comparison_guide.o \
 		  $(SRCDIR)/Chemistry/atommask.o \
 		  $(SRCDIR)/Chemistry/atom_equivalence.o \
@@ -479,6 +512,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Potential/forward_exclusionmask.o \
 		  $(SRCDIR)/Potential/nonbonded_potential.o \
 		  $(SRCDIR)/Potential/scorecard.o \
+		  $(SRCDIR)/Potential/soft_core_potentials.o \
 		  $(SRCDIR)/Potential/static_exclusionmask.o \
 		  $(SRCDIR)/Potential/valence_potential.o \
 		  $(SRCDIR)/Random/random.o \
@@ -489,6 +523,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Reporting/error_format.o \
 		  $(SRCDIR)/Reporting/ordered_list.o \
 		  $(SRCDIR)/Reporting/present_energy.o \
+		  $(SRCDIR)/Reporting/render_molecule.o \
 		  $(SRCDIR)/Reporting/reporting_enumerators.o \
 		  $(SRCDIR)/Reporting/report_table.o \
 		  $(SRCDIR)/Reporting/section_contents.o \
@@ -497,11 +532,15 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Restraints/restraint_apparatus.o \
 		  $(SRCDIR)/Restraints/restraint_builder.o \
 		  $(SRCDIR)/Restraints/restraint_enumerators.o \
+		  $(SRCDIR)/Structure/background_mesh.o \
 		  $(SRCDIR)/Structure/clash_detection.o \
 		  $(SRCDIR)/Structure/global_manipulation.o \
 		  $(SRCDIR)/Structure/isomerization.o \
 		  $(SRCDIR)/Structure/local_arrangement.o \
+		  $(SRCDIR)/Structure/mesh_foundation.o \
+		  $(SRCDIR)/Structure/mesh_mechanics.o \
 		  $(SRCDIR)/Structure/mesh_parameters.o \
+		  $(SRCDIR)/Structure/mesh_rulers.o \
 		  $(SRCDIR)/Structure/rmsd.o \
 		  $(SRCDIR)/Structure/rmsd_plan.o \
 		  $(SRCDIR)/Structure/structure_enumerators.o \
@@ -519,6 +558,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Synthesis/systemcache.o \
 		  $(SRCDIR)/Synthesis/valence_workunit.o \
 		  $(SRCDIR)/Topology/amber_prmtop_util.o \
+		  $(SRCDIR)/Topology/atomgraph.o \
 		  $(SRCDIR)/Topology/atomgraph_abstracts.o \
 		  $(SRCDIR)/Topology/atomgraph_analysis.o \
 		  $(SRCDIR)/Topology/atomgraph_constructors.o \
@@ -529,6 +569,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Topology/atomgraph_miscellaneous.o \
 		  $(SRCDIR)/Topology/atomgraph_refinement.o \
 		  $(SRCDIR)/Topology/atomgraph_setters.o \
+		  $(SRCDIR)/Topology/combograph_ljmodel.o \
 		  $(SRCDIR)/Topology/topology_limits.o \
 		  $(SRCDIR)/Topology/topology_util.o \
 		  $(SRCDIR)/Trajectory/amber_ascii.o \
@@ -544,6 +585,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/gpu_details.o \
 		  $(SRCDIR)/Trajectory/write_annotated_frame.o \
 		  $(SRCDIR)/Trajectory/write_frame.o \
 		  $(SRCDIR)/UnitTesting/approx.o \
+		  $(SRCDIR)/UnitTesting/dissect_textfile.o \
 		  $(SRCDIR)/UnitTesting/stopwatch.o \
 		  $(SRCDIR)/UnitTesting/checklist.o \
 		  $(SRCDIR)/UnitTesting/file_snapshot.o \
@@ -560,6 +602,7 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Potential/hpc_nonbonded_potential.cu \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		    $(SRCDIR)/Random/hpc_random.cu \
+		    $(SRCDIR)/Structure/hpc_background_mesh.cu \
 		    $(SRCDIR)/Structure/hpc_rmsd.cu \
 		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
 		    $(SRCDIR)/Synthesis/hpc_condensate.cu \
@@ -568,7 +611,8 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Trajectory/hpc_coordinate_copy.cu
 
 # STORMM CUDA header files
-STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/hpc_config.h \
+STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/cuda_wrappers.h \
+		      $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Accelerator/ptx_macros.h \
 		      $(SRCDIR)/Math/hpc_reduction.h \
 		      $(SRCDIR)/Math/hpc_summation.cuh \
@@ -578,6 +622,8 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Potential/hpc_valence_potential.h \
 		      $(SRCDIR)/Random/hpc_random.h \
 		      $(SRCDIR)/Random/hpc_random.cuh \
+		      $(SRCDIR)/Structure/hpc_background_mesh.cuh \
+		      $(SRCDIR)/Structure/hpc_background_mesh.h \
 		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
 		      $(SRCDIR)/Synthesis/hpc_condensate.cuh \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
@@ -595,6 +641,9 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Potential/gbradii_tilegroups.cui \
 			     $(SRCDIR)/Potential/valence_potential.cui \
 			     $(SRCDIR)/Random/xor_shift_rng.cui \
+			     $(SRCDIR)/Structure/color_nbfield_mesh.cui \
+			     $(SRCDIR)/Structure/color_occlusion_mesh.cui \
+			     $(SRCDIR)/Structure/local_arrangement.cui \
 			     $(SRCDIR)/Structure/rmsd_calculation.cui \
 			     $(SRCDIR)/Structure/virtual_site_placement.cui \
 			     $(SRCDIR)/Structure/virtual_site_transmission.cui \
@@ -608,6 +657,7 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Potential/hpc_scorecard.o \
 		   $(SRCDIR)/Potential/hpc_valence_potential.o \
 		   $(SRCDIR)/Random/hpc_random.o \
+		   $(SRCDIR)/Structure/hpc_background_mesh.o \
 		   $(SRCDIR)/Structure/hpc_rmsd.o \
 		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
 		   $(SRCDIR)/Synthesis/hpc_condensate.o \

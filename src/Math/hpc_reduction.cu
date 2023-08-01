@@ -510,7 +510,7 @@ extern void launchConjugateGradient(const ReductionKit &redk, ConjGradSubstrate 
 extern void launchConjugateGradient(const PrecisionModel prec, const AtomGraphSynthesis poly_ag,
                                     PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
                                     MolecularMechanicsControls *mmctrl,
-                                    const KernelManager &launcher) {
+                                    const CoreKlManager &launcher) {
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
   const int2 bt = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,

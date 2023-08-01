@@ -2,6 +2,7 @@
 #include "Constants/generalized_born.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
+#include "Constants/symbol_values.h"
 #include "Math/rounding.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
@@ -32,9 +33,9 @@ using stmath::RdwuAbstractMap;
 using stmath::rdwu_abstract_length;
 using stmath::roundUp;
 using stmath::sum;
+using topology::amber_ancient_bioq;
 using parse::realToString;
 using restraints::RestraintStage;
-using topology::accepted_coulomb_constant;
 using topology::CmapAccessories;
 using topology::ComputeCmapDerivatives;
 using topology::ConstraintKit;
@@ -71,7 +72,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
     dielectric_constant{1.0}, is_kappa{0.0}, salt_concentration{0.0},
     gb_offset{default_gb_radii_offset}, gb_neckscale{default_gb_neck_scale},
-    gb_neckcut{default_gb_neck_cut}, coulomb_constant{accepted_coulomb_constant},
+    gb_neckcut{default_gb_neck_cut}, coulomb_constant{amber_ancient_bioq},
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
     water_residue_name{' ', ' ', ' ', ' '},
     pb_radii_sets{std::vector<AtomicRadiusSet>(system_count, AtomicRadiusSet::NONE)},

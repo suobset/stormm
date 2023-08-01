@@ -1313,12 +1313,12 @@ void SynthesisPermutor::permuteSystem(PhaseSpaceSynthesis *psynth, const int sys
   }
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    coordCopy<double>(&dcs, 0, psynth, system_index);
+    coordCopy<double>(&dcs, 0, *psynth, system_index);
     permuteSystem<double>(&dcs, map_index, ce, setting_index);
     coordCopy<double>(psynth, system_index, dcs, 0);
     break;
   case PrecisionModel::SINGLE:
-    coordCopy<float>(&fcs, 0, psynth, system_index);
+    coordCopy<float>(&fcs, 0, *psynth, system_index);
     permuteSystem<float>(&fcs, map_index, ce, setting_index);
     coordCopy<float>(psynth, system_index, fcs, 0);
     break;
@@ -1358,12 +1358,12 @@ void SynthesisPermutor::randomizeSystem(PhaseSpaceSynthesis *psynth, const int s
   }
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    coordCopy<double>(&dcs, 0, psynth, system_index);
+    coordCopy<double>(&dcs, 0, *psynth, system_index);
     randomizeSystem<double>(&dcs, map_index, xrs, mask_a, mask_b, mask_c);
     coordCopy<double>(psynth, system_index, dcs, 0);
     break;
   case PrecisionModel::SINGLE:
-    coordCopy<float>(&fcs, 0, psynth, system_index);
+    coordCopy<float>(&fcs, 0, *psynth, system_index);
     randomizeSystem<float>(&fcs, map_index, xrs, mask_a, mask_b, mask_c);
     coordCopy<float>(psynth, system_index, fcs, 0);
     break;

@@ -2,23 +2,31 @@
 #include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/MoleculeFormat/mdlmol.h"
 #include "../../src/MoleculeFormat/molecule_format_enumerators.h"
 #include "../../src/MoleculeFormat/molecule_parsing.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/render_molecule.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::constants;
+using namespace stormm::data_types;
 using namespace stormm::diskutil;
 using namespace stormm::errors;
 using namespace stormm::parse;
 using namespace stormm::review;
 using namespace stormm::structure;
+using namespace stormm::topology;
 using namespace stormm::trajectory;
 using namespace stormm::testing;
 
@@ -143,6 +151,59 @@ int main(const int argc, const char* argv[]) {
   check(recon_bond_counts, RelationalOperator::EQUAL, recon_bond_counts_ans, "Bond counts "
         "recovered from MDL MOL objects built from topology and CoordinateFrame objects do not "
         "meet expectations.", tsm.getTestingStatus());
+
+  // Process a series of structures and test rendering methods
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    const NonbondedKit<double> nbk = tsm.getTopologyPointer(i)->getDoublePrecisionNonbondedKit();
+    const ChemicalDetailsKit cdk = tsm.getTopologyPointer(i)->getChemicalDetailsKit();
+    const int nw_atom = (nbk.natom + (sizeof(uint) * 8) - 1) / (sizeof(uint) * 8);
+    const int nw_bond = (nbk.nb12_bounds[nbk.natom] + (sizeof(uint) * 8) - 1) / (sizeof(uint) * 8);
+    std::vector<uint> atom_coverage(nw_atom, 0U), bond_coverage(nw_bond, 0U);
+    for (int j = 0; j < cdk.nmol; j++) {
+      const std::vector<int> atom_trace = traceBondLines(nbk, cdk, j, &atom_coverage,
+                                                         &bond_coverage);
+    }
+    std::string missing_atoms;
+    std::string missing_bonds;
+    int n_missing_atoms = 0;
+    int n_missing_bonds = 0;
+    for (int j = 0; j < nbk.natom; j++) {
+      if (readBitFromMask(atom_coverage, j) == 0) {
+        if (n_missing_atoms < 8) {
+          if (n_missing_atoms > 0) {
+            missing_atoms += ", ";
+          }
+          missing_atoms += char4ToString(cdk.atom_names[j]);
+        }
+        n_missing_atoms++;
+      }
+      for (int k = nbk.nb12_bounds[j]; k < nbk.nb12_bounds[j + 1]; k++) {
+        if (readBitFromMask(bond_coverage, k) == 0) {
+          const size_t katom = nbk.nb12x[k];
+          for (int m = nbk.nb12_bounds[katom]; m < nbk.nb12_bounds[katom + 1]; m++) {
+            if (nbk.nb12x[m] == k && readBitFromMask(bond_coverage, m) == 0) {
+              if (n_missing_bonds < 8) {
+                if (n_missing_bonds > 0) {
+                  missing_bonds += ", ";
+                }
+                missing_bonds += char4ToString(cdk.atom_names[j]) + " -- " +
+                                 char4ToString(cdk.atom_names[katom]);
+              }
+              n_missing_bonds++;
+            }
+          }
+        }
+      }
+    }
+    check(n_missing_atoms, RelationalOperator::EQUAL, 0, "Some atoms were not covered in the "
+          "bond tracing for the molecular system originating in topology " +
+          getBaseName(tsm.getTopologyPointer(i)->getFileName()) + ".  Examples of missing "
+          "atoms: " + missing_atoms + ".", tsm.getTestingStatus(i));
+    check(n_missing_bonds, RelationalOperator::EQUAL, 0, "Some bonds were not covered in the "
+          "bond tracing for the molecular system originating in topology " +
+          getBaseName(tsm.getTopologyPointer(i)->getFileName()) + ".  Examples of missing "
+          "bonds: " + missing_bonds + ".", tsm.getTestingStatus(i));
+  }
   
   // Print results
   printTestSummary(oe.getVerbosity());

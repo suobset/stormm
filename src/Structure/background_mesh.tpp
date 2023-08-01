@@ -1,101 +1,52 @@
 // -*-c++-*-
 #include "copyright.h"
+#include "DataTypes/common_types.h"
 
 namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
-template <typename Txfrm, typename Tdata>
-BackgroundMeshReader<Txfrm, Tdata>::
-BackgroundMeshReader(const MeshParamKit<Txfrm> &dims_in, GridDetail kind_in,
-                     NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
-                     const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
-                     const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
-                     const llint* cvec_z_in, const llint* avec_abs_x_in,
-                     const llint* avec_abs_y_in, const llint* avec_abs_z_in,
-                     const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
-                     const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
-                     const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
-                     const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
-                     const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
-                     const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
-                     const Tdata* coeffs_in, const int* ngbr_in, const size_t* ngbr_bounds_in) :
-    dims{dims_in}, kind{kind_in}, field{field_in}, avec_x{avec_x_in}, avec_y{avec_y_in},
-    avec_z{avec_z_in}, bvec_x{bvec_x_in}, bvec_y{bvec_y_in}, bvec_z{bvec_z_in}, cvec_x{cvec_x_in},
-    cvec_y{cvec_y_in}, cvec_z{cvec_z_in}, avec_abs_x{avec_abs_x_in}, avec_abs_y{avec_abs_y_in},
-    avec_abs_z{avec_abs_z_in}, avec_x_ovrf{avec_x_ovrf_in}, avec_y_ovrf{avec_y_ovrf_in},
-    avec_z_ovrf{avec_z_ovrf_in}, bvec_x_ovrf{bvec_x_ovrf_in}, bvec_y_ovrf{bvec_y_ovrf_in},
-    bvec_z_ovrf{bvec_z_ovrf_in}, cvec_x_ovrf{cvec_x_ovrf_in}, cvec_y_ovrf{cvec_y_ovrf_in},
-    cvec_z_ovrf{cvec_z_ovrf_in}, avec_abs_x_ovrf{avec_abs_x_ovrf_in},
-    avec_abs_y_ovrf{avec_abs_y_ovrf_in}, avec_abs_z_ovrf{avec_abs_z_ovrf_in}, coeffs{coeffs_in},
-    ngbr{ngbr_in}, ngbr_bounds{ngbr_bounds_in}
+template <typename Tdata>
+BackgroundMeshWriter<Tdata>::BackgroundMeshWriter(const MeshParamKit &dims_in, GridDetail kind_in,
+                                                  NonbondedPotential field_in,
+                                                  const MeshRulerKit &rulers, Tdata* coeffs_in,
+                                                  double coeff_scale_in, double probe_radius_in,
+                                                  double well_depth_in, double occ_cost_in,
+                                                  const MeshBasicsKit &mbss_in) :
+    dims{dims_in}, kind{kind_in}, field{field_in}, rlrs{rulers}, coeffs{coeffs_in},
+    coeff_scale{coeff_scale_in}, coeff_scale_f{static_cast<float>(coeff_scale_in)},
+    probe_radius{probe_radius_in}, well_depth{well_depth_in}, occ_cost{occ_cost_in}, mbss{mbss_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-template <typename Txfrm, typename Tdata>
-BackgroundMeshWriter<Txfrm, Tdata>::
-BackgroundMeshWriter(const MeshParamKit<Txfrm> &dims_in, GridDetail kind_in,
-                     NonbondedPotential field_in, const llint* avec_x_in, const llint* avec_y_in,
-                     const llint* avec_z_in, const llint* bvec_x_in, const llint* bvec_y_in,
-                     const llint* bvec_z_in, const llint* cvec_x_in, const llint* cvec_y_in,
-                     const llint* cvec_z_in, const llint* avec_abs_x_in,
-                     const llint* avec_abs_y_in, const llint* avec_abs_z_in,
-                     const int* avec_x_ovrf_in, const int* avec_y_ovrf_in,
-                     const int* avec_z_ovrf_in, const int* bvec_x_ovrf_in,
-                     const int* bvec_y_ovrf_in, const int* bvec_z_ovrf_in,
-                     const int* cvec_x_ovrf_in, const int* cvec_y_ovrf_in,
-                     const int* cvec_z_ovrf_in, const int* avec_abs_x_ovrf_in,
-                     const int* avec_abs_y_ovrf_in, const int* avec_abs_z_ovrf_in,
-                     Tdata* coeffs_in, int* ngbr_in, size_t* ngbr_bounds_in) :
-    dims{dims_in}, kind{kind_in}, field{field_in}, avec_x{avec_x_in}, avec_y{avec_y_in},
-    avec_z{avec_z_in}, bvec_x{bvec_x_in}, bvec_y{bvec_y_in}, bvec_z{bvec_z_in}, cvec_x{cvec_x_in},
-    cvec_y{cvec_y_in}, cvec_z{cvec_z_in}, avec_abs_x{avec_abs_x_in}, avec_abs_y{avec_abs_y_in},
-    avec_abs_z{avec_abs_z_in}, avec_x_ovrf{avec_x_ovrf_in}, avec_y_ovrf{avec_y_ovrf_in},
-    avec_z_ovrf{avec_z_ovrf_in}, bvec_x_ovrf{bvec_x_ovrf_in}, bvec_y_ovrf{bvec_y_ovrf_in},
-    bvec_z_ovrf{bvec_z_ovrf_in}, cvec_x_ovrf{cvec_x_ovrf_in}, cvec_y_ovrf{cvec_y_ovrf_in},
-    cvec_z_ovrf{cvec_z_ovrf_in}, avec_abs_x_ovrf{avec_abs_x_ovrf_in},
-    avec_abs_y_ovrf{avec_abs_y_ovrf_in}, avec_abs_z_ovrf{avec_abs_z_ovrf_in}, coeffs{coeffs_in},
-    ngbr{ngbr_in}, ngbr_bounds{ngbr_bounds_in}
+template <typename Tdata>
+BackgroundMeshReader<Tdata>::BackgroundMeshReader(const MeshParamKit &dims_in, GridDetail kind_in,
+                                                  NonbondedPotential field_in,
+                                                  const MeshRulerKit &rulers,
+                                                  const Tdata* coeffs_in, double coeff_scale_in,
+                                                  double probe_radius_in, double well_depth_in,
+                                                  double occ_cost_in,
+                                                  const MeshBasicsKit &mbss_in) :
+    dims{dims_in}, kind{kind_in}, field{field_in}, rlrs{rulers}, coeffs{coeffs_in},
+    coeff_scale{coeff_scale_in}, coeff_scale_f{static_cast<float>(coeff_scale_in)},
+    probe_radius{probe_radius_in}, well_depth{well_depth_in}, occ_cost{occ_cost_in}, mbss{mbss_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
-                                  const MeshParameters &measurements_in) :
+                                  const MeshParameters &measurements_in,
+                                  const PrecisionModel build_precision_in) :
     measurements{measurements_in}, kind{kind_in}, field{field_in}, probe_radius{0.0},
-    well_depth{0.0}, mixing_protocol{VdwCombiningRule::LORENTZ_BERTHELOT},
-    a_line_x{HybridKind::POINTER, "mesh_avector_x"},
-    a_line_y{HybridKind::POINTER, "mesh_avector_y"},
-    a_line_z{HybridKind::POINTER, "mesh_avector_z"},
-    b_line_x{HybridKind::POINTER, "mesh_bvector_x"},
-    b_line_y{HybridKind::POINTER, "mesh_bvector_y"},
-    b_line_z{HybridKind::POINTER, "mesh_bvector_z"},
-    c_line_x{HybridKind::POINTER, "mesh_cvector_x"},
-    c_line_y{HybridKind::POINTER, "mesh_cvector_y"},
-    c_line_z{HybridKind::POINTER, "mesh_cvector_z"},
-    a_abs_line_x{HybridKind::POINTER, "mesh_avector_abs_x"},
-    a_abs_line_y{HybridKind::POINTER, "mesh_avector_abs_y"},
-    a_abs_line_z{HybridKind::POINTER, "mesh_avector_abs_z"},
-    a_line_x_overflow{HybridKind::POINTER, "mesh_avec_x_ovrf"},
-    a_line_y_overflow{HybridKind::POINTER, "mesh_avec_y_ovrf"},
-    a_line_z_overflow{HybridKind::POINTER, "mesh_avec_z_ovrf"},
-    b_line_x_overflow{HybridKind::POINTER, "mesh_bvec_x_ovrf"},
-    b_line_y_overflow{HybridKind::POINTER, "mesh_bvec_y_ovrf"},
-    b_line_z_overflow{HybridKind::POINTER, "mesh_bvec_z_ovrf"},
-    c_line_x_overflow{HybridKind::POINTER, "mesh_cvec_x_ovrf"},
-    c_line_y_overflow{HybridKind::POINTER, "mesh_cvec_y_ovrf"},
-    c_line_z_overflow{HybridKind::POINTER, "mesh_cvec_z_ovrf"},
-    a_abs_line_x_overflow{HybridKind::POINTER, "mesh_avec_abs_x_ovrf"},
-    a_abs_line_y_overflow{HybridKind::POINTER, "mesh_avec_abs_y_ovrf"},
-    a_abs_line_z_overflow{HybridKind::POINTER, "mesh_avec_abs_z_ovrf"},
+    well_depth{0.0}, occlusion_penalty{1.0},
+    build_precision{build_precision_in},
+    tick_marks{measurements_in},
+    nonbonded_model{},
     coefficients{HybridKind::ARRAY, "mesh_tricubic_coef"},
-    ag_pointer{nullptr},
-    cf_pointer{nullptr},
-    frozen_atoms{HybridKind::ARRAY, "mesh_frozen_atoms"},
-    neighbor_list{HybridKind::ARRAY, "mesh_neighbor_list"},
-    neighbor_list_bounds{HybridKind::ARRAY, "mesh_nl_bounds"},
-    int_data{HybridKind::ARRAY, "mesh_int_data"},
-    llint_data{HybridKind::ARRAY, "mesh_llint_data"}
+    coefficient_scale_bits{40},
+    coefficient_scale{pow(2.0, coefficient_scale_bits)},
+    inverse_coefficient_scale{1.0 / coefficient_scale},
+    basis{}
 {
   validateMeshKind();
   allocate();
@@ -107,25 +58,55 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double probe_radius_in, const double well_depth_in,
                                   const VdwCombiningRule mixing_protocol_in,
-                                  const MeshParameters &measurements_in, const GpuDetails &gpu) :
-    BackgroundMesh(kind_in, field_in, measurements_in)
+                                  const MeshParameters &measurements_in,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, field_in, measurements_in, prec)
 {
   // Set the system
-  setTopologyPointer(ag_in);
-  setCoordinatePointer(cf_in);
+  basis = MeshFoundation(cf_in, ag_in);
   
   // Validate the mesh dimensions, then allocate memory
   validateScalingBits();
   allocate();
-  computeMeshAxisCoordinates();
 
   // Map the potential and atomic near-neighbor interactions
   setProbeRadius(probe_radius_in);
   setWellDepth(well_depth_in);
-  setCombiningRule(mixing_protocol_in);
-  computeField(gpu);
-  computeNeighborLists(gpu);
+  setNonbondedModel(mixing_protocol_in, clash_ratio_in, clash_distance_in, probe_sigma,
+                    probe_epsilon);
+  computeField(launcher, prec, availability, probe_sigma, probe_epsilon);
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+  case GridDetail::OCCLUSION_FIELD:
+  case GridDetail::NONBONDED_FIELD:
+    break;
+  case GridDetail::NONBONDED_ATOMIC:
+    basis.computeNeighborLists(measurements, tick_marks, launcher, prec, availability);
+    break;
+  }
 }
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const MeshParameters &measurements_in,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher, 
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in.getSelfPointer(), cf_in.getSelfPointer(),
+                   probe_radius_in, well_depth_in, mixing_protocol_in, measurements_in,
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
+{}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -134,11 +115,34 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
-                 mixing_protocol_in,
-                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in, getMeasurements(ag_in, cf_in, buffer,
+                                                       std::vector<double>(3, spacing),
+                                                       scale_bits_in), probe_sigma, probe_epsilon,
+                   clash_distance_in, clash_ratio_in, prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in,
+                   ag_in.getSelfPointer(), cf_in.getSelfPointer(), buffer, spacing, scale_bits_in,
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -148,10 +152,33 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
-                 mixing_protocol_in, getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in),
-                 gpu)
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in, getMeasurements(ag_in, cf_in, buffer, spacing,
+                                                       scale_bits_in), probe_sigma, probe_epsilon,
+                   clash_distance_in, clash_ratio_in, prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in,
+                   ag_in.getSelfPointer(), cf_in.getSelfPointer(), buffer, spacing, scale_bits_in,
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -161,11 +188,34 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
-                 mixing_protocol_in,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in, getMeasurements(mesh_bounds,
+                                                       std::vector<double>(3, spacing),
+                                                       scale_bits_in), probe_sigma, probe_epsilon,
+                   clash_distance_in, clash_ratio_in, prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds, const double spacing,
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in,
+                   ag_in.getSelfPointer(), cf_in.getSelfPointer(), mesh_bounds, spacing,
+                   scale_bits_in, probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in,
+                   launcher, availability, prec)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -176,10 +226,34 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
-                 mixing_protocol_in,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in, getMeasurements(mesh_bounds, spacing, scale_bits_in),
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, probe_radius_in, well_depth_in, mixing_protocol_in,
+                   ag_in.getSelfPointer(), cf_in.getSelfPointer(), mesh_bounds, spacing,
+                   scale_bits_in, probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in,
+                   prec, launcher, availability)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -187,23 +261,42 @@ template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in,  ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
                  getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                 scale_bits_in), {}, {}, clash_distance_in,
+                 default_mesh_vdw_damping_ratio, prec, launcher, availability)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
 }
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in,  ag_in.getSelfPointer(), cf_in.getSelfPointer(), buffer,
+                   spacing, scale_bits_in, clash_distance_in, prec, launcher, availability)
+{}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), {}, {},
+                   clash_distance_in, default_mesh_vdw_damping_ratio, prec, launcher,
+                   availability)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
@@ -212,16 +305,43 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in.getSelfPointer(), cf_in.getSelfPointer(), buffer,
+                   spacing, scale_bits_in, clash_distance_in, prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds, const double spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in),
+                   {}, {}, clash_distance_in, default_mesh_vdw_damping_ratio, prec, launcher,
+                   availability)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
 }
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds, const double spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in.getSelfPointer(), cf_in.getSelfPointer(), mesh_bounds,
+                   spacing, scale_bits_in, clash_distance_in, prec, launcher, availability)
+{}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -229,9 +349,12 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+                                  const double clash_distance_in, const PrecisionModel prec,
+                                  const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cf_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(mesh_bounds, spacing, scale_bits_in), {}, {}, clash_distance_in,
+                   default_mesh_vdw_damping_ratio, prec, launcher, availability)
 {
   // This overload provides a way to get electrostatic potential meshes without specifying an
   // irrelevant van-der Waals type or clash probe radius.
@@ -239,14 +362,32 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPoten
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const double clash_distance_in, const PrecisionModel prec,
+                                  const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in.getSelfPointer(), cf_in.getSelfPointer(), mesh_bounds,
+                   spacing, scale_bits_in, clash_distance_in, prec, launcher, availability)
+{}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const double spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                   mixing_protocol_in,
+                   getMeasurements(ag_in, cf_in, buffer, std::vector<double>(3, spacing),
+                                   scale_bits_in), probe_sigma, {},
+                   default_mesh_elec_damping_range, default_mesh_vdw_damping_ratio, prec, launcher,
+                   availability)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -255,12 +396,31 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, probe_radius_in, mixing_protocol_in, ag_in.getSelfPointer(),
+                   cf_in.getSelfPointer(), buffer, spacing, scale_bits_in, probe_sigma, {},
+                   prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const double buffer, const std::vector<double> &spacing,
-                                  const int scale_bits_in, const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), gpu)
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                   mixing_protocol_in,
+                   getMeasurements(ag_in, cf_in, buffer, spacing, scale_bits_in), probe_sigma, {},
+                   default_mesh_elec_damping_range, default_mesh_vdw_damping_ratio, prec, launcher,
+                   availability)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -269,14 +429,32 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, probe_radius_in, mixing_protocol_in, ag_in.getSelfPointer(),
+                   cf_in.getSelfPointer(), buffer, spacing, scale_bits_in, probe_sigma, {},
+                   prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const double spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, std::vector<double>(3, spacing),
-                                 scale_bits_in), gpu)
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                   mixing_protocol_in,
+                   getMeasurements(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in),
+                   probe_sigma, {}, default_mesh_elec_damping_range,
+                   default_mesh_vdw_damping_ratio, prec, launcher, availability)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -285,13 +463,32 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const double spacing, const int scale_bits_in,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, probe_radius_in, mixing_protocol_in, ag_in.getSelfPointer(),
+                   cf_in.getSelfPointer(), mesh_bounds, spacing, scale_bits_in, probe_sigma,
+                   prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
                                   const AtomGraph *ag_in, const CoordinateFrame *cf_in,
                                   const std::vector<double> &mesh_bounds,
                                   const std::vector<double> &spacing, const int scale_bits_in,
-                                  const GpuDetails &gpu) :
-  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
-                 VdwCombiningRule::LORENTZ_BERTHELOT,
-                 getMeasurements(ag_in, cf_in, mesh_bounds, spacing, scale_bits_in), gpu)
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cf_in, probe_radius_in, 0.0,
+                   mixing_protocol_in, getMeasurements(mesh_bounds, spacing, scale_bits_in),
+                   probe_sigma, {}, default_mesh_elec_damping_range,
+                   default_mesh_vdw_damping_ratio, prec, launcher, availability)
 {
   // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
   // Waals atom type or the type of non-bonded field.
@@ -299,288 +496,700 @@ BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_r
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMesh<T>::BackgroundMesh(const BackgroundMesh<T> &original) :
-    measurements{original.measurements},
-    kind{original.kind},
-    field{original.field},
-    a_line_x{original.a_line_x},
-    a_line_y{original.a_line_y},
-    a_line_z{original.a_line_z},
-    b_line_x{original.b_line_x},
-    b_line_y{original.b_line_y},
-    b_line_z{original.b_line_z},
-    c_line_x{original.c_line_x},
-    c_line_y{original.c_line_y},
-    c_line_z{original.c_line_z},
-    a_abs_line_x{original.a_abs_line_x},
-    a_abs_line_y{original.a_abs_line_y},
-    a_abs_line_z{original.a_abs_line_z},
-    a_line_x_overflow{original.a_line_x_overflow},
-    a_line_y_overflow{original.a_line_y_overflow},
-    a_line_z_overflow{original.a_line_z_overflow},
-    b_line_x_overflow{original.b_line_x_overflow},
-    b_line_y_overflow{original.b_line_y_overflow},
-    b_line_z_overflow{original.b_line_z_overflow},
-    c_line_x_overflow{original.c_line_x_overflow},
-    c_line_y_overflow{original.c_line_y_overflow},
-    c_line_z_overflow{original.c_line_z_overflow},
-    a_abs_line_x_overflow{original.a_abs_line_x_overflow},
-    a_abs_line_y_overflow{original.a_abs_line_y_overflow},
-    a_abs_line_z_overflow{original.a_abs_line_z_overflow},
-    coefficients{original.coefficients},
-    ag_pointer{original.ag_pointer},
-    frozen_atoms{original.frozen_atoms},
-    neighbor_list{original.neighbor_list},
-    neighbor_list_bounds{original.neighbor_list_bounds},
-    int_data{original.int_data},
-    llint_data{original.llint_data}
-{
-  rebase_pointers();
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-BackgroundMesh<T>::BackgroundMesh(BackgroundMesh<T> &&original) :
-  measurements{std::move(original.measurements)},
-    kind{original.kind},
-    field{original.field},
-    a_line_x{std::move(original.a_line_x)},
-    a_line_y{std::move(original.a_line_y)},
-    a_line_z{std::move(original.a_line_z)},
-    b_line_x{std::move(original.b_line_x)},
-    b_line_y{std::move(original.b_line_y)},
-    b_line_z{std::move(original.b_line_z)},
-    c_line_x{std::move(original.c_line_x)},
-    c_line_y{std::move(original.c_line_y)},
-    c_line_z{std::move(original.c_line_z)},
-    a_abs_line_x{std::move(original.a_abs_line_x)},
-    a_abs_line_y{std::move(original.a_abs_line_y)},
-    a_abs_line_z{std::move(original.a_abs_line_z)},
-    a_line_x_overflow{std::move(original.a_line_x_overflow)},
-    a_line_y_overflow{std::move(original.a_line_y_overflow)},
-    a_line_z_overflow{std::move(original.a_line_z_overflow)},
-    b_line_x_overflow{std::move(original.b_line_x_overflow)},
-    b_line_y_overflow{std::move(original.b_line_y_overflow)},
-    b_line_z_overflow{std::move(original.b_line_z_overflow)},
-    c_line_x_overflow{std::move(original.c_line_x_overflow)},
-    c_line_y_overflow{std::move(original.c_line_y_overflow)},
-    c_line_z_overflow{std::move(original.c_line_z_overflow)},
-    a_abs_line_x_overflow{std::move(original.a_abs_line_x_overflow)},
-    a_abs_line_y_overflow{std::move(original.a_abs_line_y_overflow)},
-    a_abs_line_z_overflow{std::move(original.a_abs_line_z_overflow)},
-    coefficients{std::move(original.coefficients)},
-    ag_pointer{original.ag_pointer},
-    frozen_atoms{std::move(original.frozen_atoms)},
-    neighbor_list{std::move(original.neighbor_list)},
-    neighbor_list_bounds{std::move(original.neighbor_list_bounds)},
-    int_data{std::move(original.int_data)},
-    llint_data{std::move(original.llint_data)}
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateFrame &cf_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, probe_radius_in, mixing_protocol_in, ag_in.getSelfPointer(),
+                   cf_in.getSelfPointer(), mesh_bounds, spacing, scale_bits_in, probe_sigma, prec,
+                   launcher, availability)
 {}
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-BackgroundMesh<T>& BackgroundMesh<T>::operator=(const BackgroundMesh<T> &other) {
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const MeshParameters &measurements_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, field_in, measurements_in, prec)
+{
+  // Set the system
+  basis = MeshFoundation(cs_in, ag_in);
 
-  // Guard against self assignment
-  if (this == &other) {
-    return *this;
+  // Devise new mesh parameters based on the frame averaging at hand.  Occlusion meshes will
+  // require different parameters, as their bitwise densities are averaged in a
+  MeshParameters snapshot_measurements = measurements_in;
+  const MeshParamKit measr = measurements_in.data();
+  double a_vector_rescale, b_vector_rescale, c_vector_rescale;
+  switch (kind_in) {
+  case GridDetail::NONBONDED_FIELD:
+    a_vector_rescale = 1.0;
+    b_vector_rescale = 1.0;
+    c_vector_rescale = 1.0;
+    break;
+  case GridDetail::OCCLUSION_FIELD:
+    {
+      // The "top-hat" function density computation will take place on a mesh of size and
+      // discretization related to the continuous field mesh, element for element.  If the
+      // continuous density mesh derives from the series of top-hat meshes with an averaging order
+      // of 4, then each sub-element (1/64th of a full element) of the top-hat mesh corresponds to
+      // an element of the continuous mesh, and the top-hat mesh element will be scaled up 16x.
+      // At the other end of the spectrum, if the continuous density mesh derives from the series
+      // of top-hat meshes with an averaging order of 16, the elements of the top-hat occlusion
+      // meshes will have the same dimensions as the continuous density field mesh.  In all cases,
+      // the top-hat mesh origin will be shifted by half of the element width of the continuous
+      // mesh along all three lattice vectors.  If the mesh spans a periodic system, the capacity
+      // to accept lower sampling orders than 16 will depend on the continuous mesh element counts
+      // having enough factors of two along each dimension.
+      switch (averaging_order) {
+      case 4:
+
+        // Check that the dimensions of the continuous mesh are divisible by four.  If not, check
+        // for a factor of 2, and if that is not found, do not interpolate along that dimension.
+        a_vector_rescale = ((measr.na % 4) == 0) ? 4.0 : ((measr.na % 2) == 0) ? 2.0 : 1.0;
+        b_vector_rescale = ((measr.nb % 4) == 0) ? 4.0 : ((measr.nb % 2) == 0) ? 2.0 : 1.0;
+        c_vector_rescale = ((measr.nc % 4) == 0) ? 4.0 : ((measr.nc % 2) == 0) ? 2.0 : 1.0;
+        break;
+      case 8:
+
+        // Check that the dimensions of the continuous mesh are divisible by two.  If not, do not
+        // interpolate along that dimension.
+        a_vector_rescale = ((measr.na % 2) == 0) ? 2.0 : 1.0;
+        b_vector_rescale = ((measr.nb % 2) == 0) ? 2.0 : 1.0;
+        c_vector_rescale = ((measr.nc % 2) == 0) ? 2.0 : 1.0;
+        break;
+      case 32:
+        a_vector_rescale = 0.5;
+        b_vector_rescale = 0.5;
+        c_vector_rescale = 0.5;
+        break;
+      case 16:
+      default:
+        a_vector_rescale = 1.0;
+        b_vector_rescale = 1.0;
+        c_vector_rescale = 1.0;
+        break;
+      }
+
+      // Redefine the mesh for this snapshot
+      const int na_sm = snapshot_measurements.getAxisElementCount(UnitCellAxis::A);
+      const int nb_sm = snapshot_measurements.getAxisElementCount(UnitCellAxis::B);
+      const int nc_sm = snapshot_measurements.getAxisElementCount(UnitCellAxis::C);
+      std::vector<double> invu = snapshot_measurements.getMeshInverseTransform<double>();
+      int period_factor;
+      switch (measurements_in.getBoundaryConditions()) {
+      case BoundaryCondition::PERIODIC:
+        period_factor = 0;
+        break;
+      case BoundaryCondition::ISOLATED:
+        period_factor = 1;
+        break;
+      }
+      const int na_update = round(static_cast<double>(na_sm) / a_vector_rescale) + period_factor;
+      const int nb_update = round(static_cast<double>(nb_sm) / b_vector_rescale) + period_factor;
+      const int nc_update = round(static_cast<double>(nc_sm) / c_vector_rescale) + period_factor;
+      for (int i = 0; i < 3; i++) {
+        invu[i    ] *= a_vector_rescale;
+        invu[i + 3] *= b_vector_rescale;
+        invu[i + 6] *= c_vector_rescale;
+      }
+      double orig_update_x = snapshot_measurements.getMeshOrigin(CartesianDimension::X);
+      double orig_update_y = snapshot_measurements.getMeshOrigin(CartesianDimension::Y);
+      double orig_update_z = snapshot_measurements.getMeshOrigin(CartesianDimension::Z);
+      orig_update_x -= (0.5 / a_vector_rescale) * (invu[0] + invu[3] + invu[6]);
+      orig_update_y -= (0.5 / b_vector_rescale) * (invu[1] + invu[4] + invu[7]);
+      orig_update_z -= (0.5 / c_vector_rescale) * (invu[2] + invu[5] + invu[8]);
+      snapshot_measurements = MeshParameters(na_update, nb_update, nc_update, orig_update_x,
+                                             orig_update_y, orig_update_z, invu,
+                                             snapshot_measurements.getScalingBits());
+    }
+    break;
+  case GridDetail::OCCLUSION:
+  case GridDetail::NONBONDED_ATOMIC:
+    break;
   }
-  measurements = other.measurements;
-  kind = other.kind;
-  field = other.field;
-  a_line_x = other.a_line_x;
-  a_line_y = other.a_line_y;
-  a_line_z = other.a_line_z;
-  b_line_x = other.b_line_x;
-  b_line_y = other.b_line_y;
-  b_line_z = other.b_line_z;
-  c_line_x = other.c_line_x;
-  c_line_y = other.c_line_y;
-  c_line_z = other.c_line_z;
-  a_abs_line_x = other.a_abs_line_x;
-  a_abs_line_y = other.a_abs_line_y;
-  a_abs_line_z = other.a_abs_line_z;
-  a_line_x_overflow = other.a_line_x_overflow;
-  a_line_y_overflow = other.a_line_y_overflow;
-  a_line_z_overflow = other.a_line_z_overflow;
-  b_line_x_overflow = other.b_line_x_overflow;
-  b_line_y_overflow = other.b_line_y_overflow;
-  b_line_z_overflow = other.b_line_z_overflow;
-  c_line_x_overflow = other.c_line_x_overflow;
-  c_line_y_overflow = other.c_line_y_overflow;
-  c_line_z_overflow = other.c_line_z_overflow;
-  a_abs_line_x_overflow = other.a_abs_line_x_overflow;
-  a_abs_line_y_overflow = other.a_abs_line_y_overflow;
-  a_abs_line_z_overflow = other.a_abs_line_z_overflow;
-  coefficients = other.coefficients;
-  ag_pointer = other.ag_pointer;
-  frozen_atoms = other.frozen_atoms;
-  neighbor_list = other.neighbor_list;
-  neighbor_list_bounds = other.neighbor_list_bounds;
-  int_data = other.int_data;
-  llint_data = other.llint_data;
 
-  // Repair pointers
-  rebase_pointers();
-  return *this;
+  // Formulate a mesh with fixed-precision values in which to perform the accumulation.  Even for a
+  // continuous field computed on a single thread, accumulation in fixed precision is important to
+  // make the final mesh-based potential independent of the order in which snapshots are presented.
+  // This is also an opportunity to check whether any continuous field mesh might exceed the
+  // available format.
+  switch (kind_in) {
+  case GridDetail::NONBONDED_FIELD:
+    switch (field_in) {
+    case NonbondedPotential::ELECTROSTATIC:
+    case NonbondedPotential::VAN_DER_WAALS:
+    case NonbondedPotential::CLASH:
+      break;
+    }
+    break;
+  case GridDetail::OCCLUSION_FIELD:
+  case GridDetail::OCCLUSION:
+  case GridDetail::NONBONDED_ATOMIC:
+    break;
+  }
+  BackgroundMesh<llint> proto(kind_in, field_in, measurements_in);
+  proto.setCoefficientScalingBits(40);
+  
+  // Loop over each frame of the series, create the appropriate mesh for the accumulated
+  // potential, and sum the coefficients of the actual mesh.
+  const int nframe = cs_in.getFrameCount();
+  CoordinateFrame cf_hold(cs_in.getAtomCount());
+  const GpuDetails& gpu = launcher.getGpu();
+#ifdef STORMM_USE_HPC
+  const HybridTargetLevel target_tier = (gpu == null_gpu) ? HybridTargetLevel::HOST :
+                                                            HybridTargetLevel::DEVICE;
+#else
+  const HybridTargetLevel target_tier = HybridTargetLevel::HOST;
+#endif
+  BackgroundMeshWriter<llint> protow = proto.data(target_tier);
+  for (int i = 0; i < nframe; i++) {
+    switch (kind_in) {
+    case GridDetail::OCCLUSION:
+    case GridDetail::NONBONDED_ATOMIC:
+      rtErr("A mesh of type " + getEnumerationName(kind_in) + " must be created using a single "
+            "structure provided through a CoordinateFrame object, not a series of " +
+            std::to_string(nframe) + " frames.", "BackgroundMesh");
+    case GridDetail::OCCLUSION_FIELD:
+    case GridDetail::NONBONDED_FIELD:
+      {
+        // Copy coordinates of the ith structure from the tier at which they are available tier
+        // in the series to the appropriate tier of the holding frame.
+
+        // The coordinate copy operation will try to raise the availability of the coordinates to
+        // the DEVICE tier if a GPU is available.
+        coordCopy<Tcoord>(&cf_hold, cs_in, i, target_tier, availability, gpu);
+        if (kind_in == GridDetail::OCCLUSION_FIELD) {
+          const BackgroundMesh<llint> t_mesh(GridDetail::OCCLUSION, NonbondedPotential::CLASH,
+                                             basis.getTopologyPointer(), &cf_hold, probe_radius_in,
+                                             well_depth_in, mixing_protocol_in,
+                                             snapshot_measurements, probe_sigma, probe_epsilon,
+                                             clash_distance_in, clash_ratio_in, prec, launcher,
+                                             target_tier);
+          accumulateOcclusionMesh(&proto, t_mesh, gpu, target_tier);
+        }
+        else {
+          const BackgroundMesh<T> t_mesh(kind_in, field_in, basis.getTopologyPointer(), cf_hold,
+                                         probe_radius_in, well_depth_in, mixing_protocol_in,
+                                         snapshot_measurements, probe_sigma, probe_epsilon, prec,
+                                         launcher, target_tier);
+          const size_t ct_self = std::type_index(typeid(T)).hash_code();
+          accumulateNonbondedFieldMesh(&proto, t_mesh, gpu, target_tier);
+        }
+      }
+      break;
+    }
+  }
+  
+  // Validate the mesh dimensions, then allocate memory
+  validateScalingBits();
+  allocate();
+
+  // Map the potential and atomic near-neighbor interactions for the ensemble-averaged mesh at
+  // hand, as will have been done for each of the contributing meshes.
+  setProbeRadius(probe_radius_in);
+  setWellDepth(well_depth_in);
+  setNonbondedModel(mixing_protocol_in, clash_ratio_in, clash_distance_in, probe_sigma,
+                    probe_epsilon);
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T>
-BackgroundMesh<T>& BackgroundMesh<T>::operator=(BackgroundMesh<T> &&other)  {
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in,
+                   getMeasurements(ag_in, cs_in, buffer, std::vector<double>(3, spacing),
+                                   scale_bits_in), averaging_order, probe_sigma, probe_epsilon,
+                   clash_distance_in, clash_ratio_in, prec, launcher, availability)
+{}
 
-  // Guard against self assignment
-  if (this == &other) {
-    return *this;
-  }
-  measurements = std::move(other.measurements);
-  kind = other.kind;
-  field = other.field;
-  a_line_x = std::move(other.a_line_x);
-  a_line_y = std::move(other.a_line_y);
-  a_line_z = std::move(other.a_line_z);
-  b_line_x = std::move(other.b_line_x);
-  b_line_y = std::move(other.b_line_y);
-  b_line_z = std::move(other.b_line_z);
-  c_line_x = std::move(other.c_line_x);
-  c_line_y = std::move(other.c_line_y);
-  c_line_z = std::move(other.c_line_z);
-  a_abs_line_x = std::move(other.a_abs_line_x);
-  a_abs_line_y = std::move(other.a_abs_line_y);
-  a_abs_line_z = std::move(other.a_abs_line_z);
-  a_line_x_overflow = std::move(other.a_line_x_overflow);
-  a_line_y_overflow = std::move(other.a_line_y_overflow);
-  a_line_z_overflow = std::move(other.a_line_z_overflow);
-  b_line_x_overflow = std::move(other.b_line_x_overflow);
-  b_line_y_overflow = std::move(other.b_line_y_overflow);
-  b_line_z_overflow = std::move(other.b_line_z_overflow);
-  c_line_x_overflow = std::move(other.c_line_x_overflow);
-  c_line_y_overflow = std::move(other.c_line_y_overflow);
-  c_line_z_overflow = std::move(other.c_line_z_overflow);
-  a_abs_line_x_overflow = std::move(other.a_abs_line_x_overflow);
-  a_abs_line_y_overflow = std::move(other.a_abs_line_y_overflow);
-  a_abs_line_z_overflow = std::move(other.a_abs_line_z_overflow);
-  coefficients = std::move(other.coefficients);
-  ag_pointer = other.ag_pointer;
-  frozen_atoms = std::move(other.frozen_atoms);
-  neighbor_list = std::move(other.neighbor_list);
-  neighbor_list_bounds = std::move(other.neighbor_list_bounds);
-  int_data = std::move(other.int_data);
-  llint_data = std::move(other.llint_data);
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in, getMeasurements(ag_in, cs_in, buffer, spacing,
+                                                       scale_bits_in), averaging_order,
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
+{}
 
-  // As usual, no pointer repair is needed for the move assignment operator (or move constructor).
-  return *this;
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds, const double spacing,
+                                  const int scale_bits_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in,
+                   getMeasurements(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in),
+                   averaging_order, probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in,
+                   prec, launcher, availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const double probe_radius_in, const double well_depth_in,
+                                  const VdwCombiningRule mixing_protocol_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const std::vector<double> &probe_epsilon,
+                                  const double clash_distance_in, const double clash_ratio_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, probe_radius_in, well_depth_in,
+                   mixing_protocol_in,
+                   getMeasurements(mesh_bounds, spacing, scale_bits_in), averaging_order,
+                   probe_sigma, probe_epsilon, clash_distance_in, clash_ratio_in, prec, launcher,
+                   availability)
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in,  ag_in, cs_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(ag_in, cs_in, buffer, std::vector<double>(3, spacing),
+                                   scale_bits_in), 1, {}, {}, clash_distance_in, 1.0, prec,
+                   launcher, availability)
+{
+  // This overload provides a way to get electrostatic potential meshes without specifying an
+  // irrelevant van-der Waals type or clash probe radius.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, field_in, ag_in, cs_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                 getMeasurements(ag_in, cs_in, buffer, spacing, scale_bits_in), 1, {}, {},
+                 clash_distance_in, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get electrostatic potential meshes without specifying an
+  // irrelevant van-der Waals type or clash probe radius.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds, const double spacing,
+                                  const int scale_bits_in, const double clash_distance_in,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in),
+                   1, {}, {}, clash_distance_in, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get electrostatic potential meshes without specifying an
+  // irrelevant van-der Waals type or clash probe radius.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const NonbondedPotential field_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const double clash_distance_in, const PrecisionModel prec,
+                                  const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+    BackgroundMesh(kind_in, field_in, ag_in, cs_in, 0.0, 0.0, VdwCombiningRule::LORENTZ_BERTHELOT,
+                   getMeasurements(mesh_bounds, spacing, scale_bits_in), 1, {}, {},
+                   clash_distance_in, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get electrostatic potential meshes without specifying an
+  // irrelevant van-der Waals type or clash probe radius.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const double spacing,
+                                  const int scale_bits_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cs_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
+                 getMeasurements(ag_in, cs_in, buffer, std::vector<double>(3, spacing),
+                                 scale_bits_in), averaging_order, probe_sigma, {}, 1.0, 1.0, prec,
+                 launcher, availability)
+{
+  // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
+  // Waals atom type or the type of non-bonded field.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const double buffer, const std::vector<double> &spacing,
+                                  const int scale_bits_in, const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cs_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
+                 getMeasurements(ag_in, cs_in, buffer, spacing, scale_bits_in), averaging_order,
+                 probe_sigma, {}, 1.0, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
+  // Waals atom type or the type of non-bonded field.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const double spacing, const int scale_bits_in,
+                                  const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cs_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
+                 getMeasurements(mesh_bounds, std::vector<double>(3, spacing), scale_bits_in),
+                 averaging_order, probe_sigma, {}, 1.0, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
+  // Waals atom type or the type of non-bonded field.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+BackgroundMesh<T>::BackgroundMesh(const GridDetail kind_in, const double probe_radius_in,
+                                  const AtomGraph &ag_in, const CoordinateSeries<Tcoord> &cs_in,
+                                  const std::vector<double> &mesh_bounds,
+                                  const std::vector<double> &spacing, const int scale_bits_in,
+                                  const int averaging_order,
+                                  const std::vector<double> &probe_sigma,
+                                  const PrecisionModel prec, const MeshKlManager &launcher,
+                                  const HybridTargetLevel availability) :
+  BackgroundMesh(kind_in, NonbondedPotential::CLASH, ag_in, cs_in, probe_radius_in, 0.0,
+                 VdwCombiningRule::LORENTZ_BERTHELOT,
+                 getMeasurements(mesh_bounds, spacing, scale_bits_in), averaging_order,
+                 probe_sigma, {}, 1.0, 1.0, prec, launcher, availability)
+{
+  // This overload provides a way to get an occlusion mask without specifying an irrelevant van-der
+  // Waals atom type or the type of non-bonded field.
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshParameters& BackgroundMesh<T>::getDimensions() const {
+  return measurements;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshFoundation& BackgroundMesh<T>::getMolecularBasis() const {
+  return basis;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> MeshFoundation* BackgroundMesh<T>::getMolecularBasis() {
+  return &basis;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> const AtomGraph* BackgroundMesh<T>::getTopologyPointer() const {
-  return ag_pointer;
+  return basis.getTopologyPointer();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> const CoordinateFrame* BackgroundMesh<T>::getCoordinatePointer() const {
-  return cf_pointer;
+  return basis.getCoordinatePointer();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcoord>
+const CoordinateSeries<Tcoord>* BackgroundMesh<T>::getEnsemblePointer() const {
+  return basis.getEnsemblePointer<Tcoord>();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshReader<double, T> BackgroundMesh<T>::dpData(const HybridTargetLevel tier) const {
-  return BackgroundMeshReader<double, T>(measurements.dpData(), kind, field, a_line_x.data(tier),
-                                         a_line_y.data(tier), a_line_z.data(tier),
-                                         b_line_x.data(tier), b_line_y.data(tier),
-                                         b_line_z.data(tier), c_line_x.data(tier),
-                                         c_line_y.data(tier), c_line_z.data(tier),
-                                         a_abs_line_x.data(tier), a_abs_line_y.data(tier),
-                                         a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
-                                         a_line_y_overflow.data(tier),
-                                         a_line_z_overflow.data(tier),
-                                         b_line_x_overflow.data(tier),
-                                         b_line_y_overflow.data(tier),
-                                         b_line_z_overflow.data(tier),
-                                         c_line_x_overflow.data(tier),
-                                         c_line_y_overflow.data(tier),
-                                         c_line_z_overflow.data(tier),
-                                         a_abs_line_x_overflow.data(tier),
-                                         a_abs_line_y_overflow.data(tier),
-                                         a_abs_line_z_overflow.data(tier), coefficients.data(tier),
-                                         neighbor_list.data(tier),
-                                         neighbor_list_bounds.data(tier));
+size_t BackgroundMesh<T>::getEnsembleTypeCode() const {
+  return basis.getEnsembleTypeCode();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> GridDetail BackgroundMesh<T>::getMeshKind() const {
+  return kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> NonbondedPotential BackgroundMesh<T>::getNonbondedPotential() const {
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+  case GridDetail::OCCLUSION_FIELD:
+    rtErr("This mesh is associated with occlusion (type " + getEnumerationName(kind) + "), not a "
+          "non-bonded potential.", "BackgroundMesh", "getNonbondedPotential");
+  case GridDetail::NONBONDED_FIELD:
+  case GridDetail::NONBONDED_ATOMIC:
+    break;
+  }
+  return field;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getProbeRadius() const {
+  return probe_radius;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getWellDepth() const {
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+  case GridDetail::OCCLUSION_FIELD:
+    rtErr("This mesh is associated with occusion (type " + getEnumerationName(kind) + "), not a "
+          "non-bonded potential.", "BackgroundMesh", "getWellDepth");
+  case GridDetail::NONBONDED_FIELD:
+  case GridDetail::NONBONDED_ATOMIC:
+    switch (field) {
+    case NonbondedPotential::ELECTROSTATIC:
+    case NonbondedPotential::CLASH:
+      rtErr("Meshes associated with a " + getEnumerationName(field) + " non-bonded potential "
+            "do not have a valid well depth to report.", "BackgroundMesh", "getWellDepth");
+    case NonbondedPotential::VAN_DER_WAALS:
+      break;
+    }
+    break;
+  }
+  return well_depth;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getClashDistance() const {
+  return nonbonded_model.getClashDistance();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getClashRatio() const {
+  return nonbonded_model.getClashRatio();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getOcclusionPenalty() const {
+  return occlusion_penalty;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> VdwCombiningRule BackgroundMesh<T>::getCombiningRule() const {
+  switch (kind) {
+  case GridDetail::OCCLUSION:
+  case GridDetail::OCCLUSION_FIELD:
+    rtErr("This mesh is associated with occusion (type " + getEnumerationName(kind) + "), not a "
+          "non-bonded potential.", "BackgroundMesh", "getCombiningRule");
+  case GridDetail::NONBONDED_FIELD:
+  case GridDetail::NONBONDED_ATOMIC:
+    switch (field) {
+    case NonbondedPotential::ELECTROSTATIC:
+    case NonbondedPotential::CLASH:
+      rtErr("Meshes associated with a " + getEnumerationName(field) + " non-bonded potential "
+            "do not have a valid mixing protocol to report.", "BackgroundMesh",
+            "getCombiningRule");
+    case NonbondedPotential::VAN_DER_WAALS:
+      break;
+    }
+    break;
+  }
+  return nonbonded_model.getCombiningRule();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> PrecisionModel BackgroundMesh<T>::getBuildPrecision() const {
+  return build_precision;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double BackgroundMesh<T>::getCoefficientScalingFactor() const {
+  return coefficient_scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> int BackgroundMesh<T>::getCoefficientScalingBits() const {
+  return coefficient_scale_bits;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshWriter<double, T> BackgroundMesh<T>::dpData(const HybridTargetLevel tier) {
-  return BackgroundMeshWriter<double, T>(measurements.dpData(), kind, field, a_line_x.data(tier),
-                                         a_line_y.data(tier), a_line_z.data(tier),
-                                         b_line_x.data(tier), b_line_y.data(tier),
-                                         b_line_z.data(tier), c_line_x.data(tier),
-                                         c_line_y.data(tier), c_line_z.data(tier),
-                                         a_abs_line_x.data(tier), a_abs_line_y.data(tier),
-                                         a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
-                                         a_line_y_overflow.data(tier),
-                                         a_line_z_overflow.data(tier),
-                                         b_line_x_overflow.data(tier),
-                                         b_line_y_overflow.data(tier),
-                                         b_line_z_overflow.data(tier),
-                                         c_line_x_overflow.data(tier),
-                                         c_line_y_overflow.data(tier),
-                                         c_line_z_overflow.data(tier),
-                                         a_abs_line_x_overflow.data(tier),
-                                         a_abs_line_y_overflow.data(tier),
-                                         a_abs_line_z_overflow.data(tier), coefficients.data(tier),
-                                         neighbor_list.data(tier),
-                                         neighbor_list_bounds.data(tier));
+const BackgroundMeshReader<T> BackgroundMesh<T>::data(const HybridTargetLevel tier) const {
+  return BackgroundMeshReader<T>(measurements.data(), kind, field, tick_marks.data(tier),
+                                 coefficients.data(tier), coefficient_scale, probe_radius,
+                                 well_depth, occlusion_penalty, basis.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshReader<float, T> BackgroundMesh<T>::spData(const HybridTargetLevel tier) const {
-  return BackgroundMeshReader<float, T>(measurements.spData(), kind, field, a_line_x.data(tier),
-                                        a_line_y.data(tier), a_line_z.data(tier),
-                                        b_line_x.data(tier), b_line_y.data(tier),
-                                        b_line_z.data(tier), c_line_x.data(tier),
-                                        c_line_y.data(tier), c_line_z.data(tier),
-                                        a_abs_line_x.data(tier), a_abs_line_y.data(tier),
-                                        a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
-                                        a_line_y_overflow.data(tier), a_line_z_overflow.data(tier),
-                                        b_line_x_overflow.data(tier), b_line_y_overflow.data(tier),
-                                        b_line_z_overflow.data(tier), c_line_x_overflow.data(tier),
-                                        c_line_y_overflow.data(tier), c_line_z_overflow.data(tier),
-                                        a_abs_line_x_overflow.data(tier),
-                                        a_abs_line_y_overflow.data(tier),
-                                        a_abs_line_z_overflow.data(tier), coefficients.data(tier),
-                                        neighbor_list.data(tier), neighbor_list_bounds.data(tier));
+BackgroundMeshWriter<T> BackgroundMesh<T>::data(const HybridTargetLevel tier) {
+  return BackgroundMeshWriter<T>(measurements.data(), kind, field, tick_marks.data(tier),
+                                 coefficients.data(tier), coefficient_scale, probe_radius,
+                                 well_depth, occlusion_penalty, basis.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const BackgroundMeshReader<void>
+BackgroundMesh<T>::templateFreeData(const HybridTargetLevel tier) const {
+  return BackgroundMeshReader<void>(measurements.data(), kind, field, tick_marks.data(tier),
+                                    reinterpret_cast<void*>(coefficients.data(tier)),
+                                    coefficient_scale, probe_radius, well_depth, occlusion_penalty,
+                                    basis.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshWriter<float, T> BackgroundMesh<T>::spData(const HybridTargetLevel tier) {
-  return BackgroundMeshReader<float, T>(measurements.spData(), kind, field, a_line_x.data(tier),
-                                        a_line_y.data(tier), a_line_z.data(tier),
-                                        b_line_x.data(tier), b_line_y.data(tier),
-                                        b_line_z.data(tier), c_line_x.data(tier),
-                                        c_line_y.data(tier), c_line_z.data(tier),
-                                        a_abs_line_x.data(tier), a_abs_line_y.data(tier),
-                                        a_abs_line_z.data(tier), a_line_x_overflow.data(tier),
-                                        a_line_y_overflow.data(tier), a_line_z_overflow.data(tier),
-                                        b_line_x_overflow.data(tier), b_line_y_overflow.data(tier),
-                                        b_line_z_overflow.data(tier), c_line_x_overflow.data(tier),
-                                        c_line_y_overflow.data(tier), c_line_z_overflow.data(tier),
-                                        a_abs_line_x_overflow.data(tier),
-                                        a_abs_line_y_overflow.data(tier),
-                                        a_abs_line_z_overflow.data(tier), coefficients.data(tier),
-                                        neighbor_list.data(tier), neighbor_list_bounds.data(tier));
+BackgroundMeshWriter<void> BackgroundMesh<T>::templateFreeData(const HybridTargetLevel tier) {
+  return BackgroundMeshWriter<void>(measurements.data(), kind, field, tick_marks.data(tier),
+                                    reinterpret_cast<void*>(coefficients.data(tier)),
+                                    coefficient_scale, probe_radius, well_depth, occlusion_penalty,
+                                    basis.data(tier));
+}
+
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+BackgroundMeshWriter<void> BackgroundMesh<T>::deviceViewToTemplateFreeHostData() {
+  void* coeff_ptr = reinterpret_cast<void*>(coefficients.getDeviceValidHostPointer());
+  return BackgroundMeshWriter<void>(measurements.data(), kind, field,
+                                    tick_marks.deviceViewToHostData(), coeff_ptr,
+                                    coefficient_scale, probe_radius, well_depth,
+                                    basis.deviceViewToHostData());
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void BackgroundMesh<T>::setTopologyPointer(const AtomGraph *ag_in) {
-  ag_pointer = const_cast<AtomGraph*>(ag_in);
+template <typename T> const BackgroundMeshReader<void>
+BackgroundMesh<T>::deviceViewToTemplateFreeHostData() const {
+  const void* coeff_ptr = reinterpret_cast<const void*>(coefficients.getDeviceValidHostPointer());
+  return BackgroundMeshReader<void>(measurements.data(), kind, field,
+                                    tick_marks.deviceViewToHostData(), coeff_ptr,
+                                    coefficient_scale, probe_radius, well_depth,
+                                    basis.deviceViewToHostData());
+}
+#  endif
+#endif
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshFFKit<T>
+BackgroundMesh<T>::getNonbondedKit(const HybridTargetLevel tier) const {
+  return nonbonded_model.data(tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void BackgroundMesh<T>::setCoordinatePointer(const CoordinateFrame *cf_in) {
-  cf_pointer = const_cast<CoordinateFrame*>(cf_in);
+template <typename T> const MeshFFKit<double>
+BackgroundMesh<T>::getReferenceNonbondedKit(const HybridTargetLevel tier) const {
+  return nonbonded_model.referenceData(tier);
 }
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshFFKit<void>
+BackgroundMesh<T>::templateFreeNonbondedKit(const HybridTargetLevel tier) const {
+  return nonbonded_model.templateFreeData(tier);
+}
+
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshFFKit<double>
+BackgroundMesh<T>::deviceViewToReferenceNonbondedKit() const {
+  return nonbonded_model.deviceViewToReferenceHostData();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> const MeshFFKit<void>
+BackgroundMesh<T>::deviceViewToTemplateFreeNonbondedKit() const {
+  return nonbonded_model.deviceViewToTemplateFreeHostData();
+}
+#  endif
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::upload() {
+  coefficients.upload();
+  tick_marks.upload();
+  nonbonded_model.upload();
+  basis.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::download() {
+  coefficients.download();
+  tick_marks.download();
+  nonbonded_model.download();
+  basis.download();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::uploadFrame() {
+  basis.upload();
+  tick_marks.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::downloadFrame() {
+  basis.download();
+  tick_marks.download();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::uploadForceField() {
+  nonbonded_model.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void BackgroundMesh<T>::downloadForceField() {
+  nonbonded_model.download();
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -596,29 +1205,35 @@ void BackgroundMesh<T>::setMeshParameters(const AtomGraph *ag_in, const Coordina
                                           const double padding,
                                           const std::vector<double> &spacing,
                                           const int scale_bits_in) {
-  ag_pointer = (ag_in == nullptr) ? ag_pointer : const_cast<AtomGraph*>(ag_in);
-  cf_pointer = (cf_in == nullptr) ? cf_pointer : const_cast<CoordinateFrame*>(cf_in);
+  if (ag_in != nullptr) {
+    basis.setTopology(ag_in);
+  }
+  if (cf_in != nullptr) {
+    basis.setCoordinates(cf_in);
+  }
   const int actual_scale_bits = (scale_bits_in == -100) ?
                                 measurements.getScalingBits() : scale_bits_in;
-  measurements = getMeasurements(ag_pointer, cf_pointer, padding, spacing, actual_scale_bits);
+  measurements = getMeasurements(basis.getTopologyPointer(), basis.getCoordinatePointer(), padding,
+                                 spacing, actual_scale_bits);
   validateScalingBits();
   allocate();
-  computeMeshAxisCoordinates();
+  tick_marks = MeshRulers(measurements);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const double padding, const double spacing,
                                           const int scale_bits_in) {
-  setMeshParameters(ag_pointer, cf_pointer, padding, std::vector<double>(3, spacing),
-                    scale_bits_in);
+  setMeshParameters(basis.getTopologyPointer(), basis.getCoordinatePointer(), padding,
+                    std::vector<double>(3, spacing), scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void BackgroundMesh<T>::setMeshParameters(const double padding, const std::vector<double> &spacing,
                                           const int scale_bits_in) {
-  setMeshParameters(ag_pointer, cf_pointer, padding, spacing, scale_bits_in);
+  setMeshParameters(basis.getTopologyPointer(), basis.getCoordinatePointer(), padding, spacing,
+                    scale_bits_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -638,7 +1253,7 @@ void BackgroundMesh<T>::setMeshParameters(const std::vector<double> &mesh_bounds
   measurements = getMeasurements(mesh_bounds, spacing, actual_scale_bits);
   validateScalingBits();
   allocate();
-  computeMeshAxisCoordinates();
+  tick_marks = MeshRulers(measurements);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -665,211 +1280,155 @@ void BackgroundMesh<T>::setWellDepth(const double well_depth_in) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::setCombiningRule(const VdwCombiningRule mixing_protocol_in) {
-  mixing_protocol = mixing_protocol_in;
+void BackgroundMesh<T>::setOcclusionPenalty(const double occlusion_penalty_in) {
+  occlusion_penalty = occlusion_penalty_in;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::computeField(const GpuDetails &gpu) {
+void BackgroundMesh<T>::validateCombiningRule(const VdwCombiningRule mixing_protocol_in,
+                                              const std::vector<double> &probe_sigma,
+                                              const std::vector<double> &probe_epsilon) {
 
+  // Check that the combining rule fits with any provided Lennard-Jones parameter arrays specific
+  // to the probe used to draw the mesh.
+  switch (mixing_protocol_in) {
+  case VdwCombiningRule::GEOMETRIC:
+  case VdwCombiningRule::LORENTZ_BERTHELOT:
+    if (probe_sigma.size() > 0 || probe_epsilon.size() > 0) {
+      rtErr("Pair-specific Lennard-Jones parameters between the probe and atoms of the topology "
+            "are only valid if the combining rule is set to " +
+            getEnumerationName(VdwCombiningRule::NBFIX) + ".", "BackgroundMesh",
+            "validateCombiningRule");
+    }
+    break;
+  case VdwCombiningRule::NBFIX:
+    if (probe_sigma.size() != basis.getTopologyPointer()->getAtomTypeCount() ||
+        probe_sigma.size() != probe_epsilon.size()) {
+      rtErr("For " + getEnumerationName(VdwCombiningRule::NBFIX) + " combining rules, all "
+            "pairwise parameters between atoms in the topology and the probe must be provided.",
+            "BackgroundMesh", "validateCombiningRule");
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::setCoefficientScalingBits(const int scaling_bits_in) {
+
+  // Perform checks on the validity of the requested fixed-precision representation.
+  if (isFloatingPointScalarType<T>() && scaling_bits_in != 0) {
+    rtErr("Mesh coefficients expressed in a floating-point representation cannot have a nonzero "
+          "fixed-precision bit count on its coefficients (" + std::to_string(scaling_bits_in) +
+          " requested).", "BackgroundMesh", "setCoefficientScalingBits");
+  }
+  if (scaling_bits_in < 0 || scaling_bits_in > 40) {
+    rtErr("A fixed-precision representation of a mesh-based potential cannot have more than 40 "
+          "bits after the decimal in its coefficients (" + std::to_string(scaling_bits_in) +
+          " requested).", "BackgroundMesh", "setCoefficientScalingBits");
+  }
+  coefficient_scale_bits = scaling_bits_in;
+  coefficient_scale = pow(2.0, scaling_bits_in);
+  inverse_coefficient_scale = 1.0 / coefficient_scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void BackgroundMesh<T>::computeField(const MeshKlManager &launcher, const PrecisionModel prec,
+                                     const HybridTargetLevel availability,
+                                     const std::vector<double> &probe_sigma,
+                                     const std::vector<double> &probe_epsilon) {
+  
   // Loop over all atoms and apply the potential
   switch (kind) {
   case GridDetail::OCCLUSION:
-    colorExclusionMesh(gpu);
+    colorOcclusionMesh(launcher, prec, availability, probe_sigma);
+    break;
+  case GridDetail::OCCLUSION_FIELD:
+    mapOccupancyField(launcher, prec, availability, probe_sigma);
     break;
   case GridDetail::NONBONDED_FIELD:
-    mapPureNonbondedPotential(gpu);
+    mapPureNonbondedPotential(launcher, prec, availability, probe_sigma, probe_epsilon);
     break;
   case GridDetail::NONBONDED_ATOMIC:
     break;
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-void BackgroundMesh<T>::computeNeighborLists(const GpuDetails &gpu) {
-  switch (kind) {
-  case GridDetail::OCCLUSION:
-  case GridDetail::NONBONDED_FIELD:
-    break;
-  case GridDetail::NONBONDED_ATOMIC:
-    break;
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
-                                                  const double padding, const double spacing,
-                                                  const int scale_bits_in) const {
-  return getMeasurements(ag, cf, padding, std::vector<double>(3, spacing), scale_bits_in);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
-                                                  const std::vector<double> &mesh_bounds,
-                                                  const double spacing,
-                                                  const int scale_bits_in) const {
-  return getMeasurements(ag, cf, mesh_bounds, std::vector<double>(3, spacing), scale_bits_in);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const AtomGraph *ag, const CoordinateFrame *cf,
-                                                  const double padding,
-                                                  const std::vector<double> &spacing,
-                                                  const int scale_bits_in) const {
-  if (cf == nullptr || ag == nullptr) {
-    rtErr("When creating a mesh based on a zone surrounding a system of interest, the topology "
-          "and coordinates must be defined.  Supply the mesh boundaries explicitly to avoid "
-          "relying on pre-defined coordinates, or submit the system to the mesh prior to calling "
-          "this function.", "BackgroundMesh", "getMeasurements");
-  }
-  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  const CoordinateFrameReader cfr = cf->data();
-  double xmin, ymin, zmin, xmax, ymax, zmax;
-  bool points_unset = true;
-  const int lj_idx_offset = nbk.n_lj_types + 1;
-  for (int pos = 0; pos < nbk.natom; pos++) {
-    if (ag->getAtomMobility(pos)) {
-      continue;
-    }
-    const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
-    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
-                                         1.0 / 6.0);
-    if (points_unset) {
-      xmin = cfr.xcrd[pos] - atom_radius;
-      xmax = cfr.xcrd[pos] + atom_radius;
-      ymin = cfr.ycrd[pos] - atom_radius;
-      ymax = cfr.ycrd[pos] + atom_radius;
-      zmin = cfr.zcrd[pos] - atom_radius;
-      zmax = cfr.zcrd[pos] + atom_radius;
-      points_unset = false;
-    }
-    else {
-      xmin = std::min(xmin, cfr.xcrd[pos] - atom_radius);
-      xmax = std::max(xmax, cfr.xcrd[pos] + atom_radius);
-      ymin = std::min(ymin, cfr.ycrd[pos] - atom_radius);
-      ymax = std::max(ymax, cfr.ycrd[pos] + atom_radius);
-      zmin = std::min(zmin, cfr.zcrd[pos] - atom_radius);
-      zmax = std::max(zmax, cfr.zcrd[pos] + atom_radius);
-    }
-  }
-  xmin -= padding;
-  xmax += padding;
-  ymin -= padding;
-  ymax += padding;
-  zmin -= padding;
-  zmax += padding;
-  const std::vector<double> limits = { xmin, ymin, zmin, xmax, ymax, zmax };
-  return getMeasurements(limits, spacing, scale_bits_in);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T>
-MeshParameters BackgroundMesh<T>::getMeasurements(const std::vector<double> &mesh_bounds,
-                                                  const std::vector<double> &spacing,
-                                                  const int scale_bits_in) const {
-  if (mesh_bounds.size() != 6LLU) {
-    rtErr("An array of six elements, the minimum X, Y, and Z Cartesian coordinates followed by "
-          "the maximum coordinates, is required.  " + std::to_string(mesh_bounds.size()) +
-          " elements were provided.", "BackgroundMesh", "getMeasurements");
-  }
-  if (spacing.size() != 3LLU && spacing.size() != 9LLU) {
-    rtErr("An array of three elements, the length, width, and height (Cartesian X, Y, and Z "
-          "dimensions) of a rectilinear mesh element, or nine elements defining the bounding "
-          "vectors of a triclininc element, is required.  " +
-          std::to_string(spacing.size()) + " elements were provided.", "BackgroundMesh",
-          "getMeasurements");
-  }
-  const std::vector<double> mesh_limits = {
-    std::min(mesh_bounds[0], mesh_bounds[3]), std::min(mesh_bounds[1], mesh_bounds[4]),
-    std::min(mesh_bounds[2], mesh_bounds[5]), std::max(mesh_bounds[0], mesh_bounds[3]),
-    std::max(mesh_bounds[1], mesh_bounds[4]), std::max(mesh_bounds[2], mesh_bounds[5]) };  
-  const int pna = ceil((mesh_limits[3] - mesh_limits[0]) / spacing[0]);
-  const int pnb = ceil((mesh_limits[4] - mesh_limits[1]) / spacing[1]);
-  const int pnc = ceil((mesh_limits[5] - mesh_limits[2]) / spacing[2]);
-  const double dnx = static_cast<double>(pna) * spacing[0];
-  const double dny = static_cast<double>(pnb) * spacing[1];
-  const double dnz = static_cast<double>(pnc) * spacing[2];
-  const double overshoot_x = 0.5 * (dnx - (mesh_limits[3] - mesh_limits[0]));
-  const double overshoot_y = 0.5 * (dny - (mesh_limits[4] - mesh_limits[1]));
-  const double overshoot_z = 0.5 * (dnz - (mesh_limits[5] - mesh_limits[2]));
-  MeshParameters result(pna, pnb, pnc, mesh_limits[0] - overshoot_x, mesh_limits[1] - overshoot_y,
-                        mesh_limits[2] - overshoot_z, spacing, scale_bits_in);  
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void BackgroundMesh<T>::allocate() {
-  MeshParamKit<double> mps = measurements.dpData();
-  const int padded_na = roundUp(mps.na + 1, warp_size_int);
-  const int padded_nb = roundUp(mps.nb + 1, warp_size_int);
-  const int padded_nc = roundUp(mps.nc + 1, warp_size_int);
-  llint_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
-  int_data.resize(3 * ((2 * padded_na) + padded_nb + padded_nc));
-  a_line_x.setPointer(&llint_data,             0, mps.na + 1);
-  a_line_y.setPointer(&llint_data,     padded_na, mps.na + 1);
-  a_line_z.setPointer(&llint_data, 2 * padded_na, mps.na + 1);
-  a_line_x_overflow.setPointer(&int_data,             0, mps.na + 1);
-  a_line_y_overflow.setPointer(&int_data,     padded_na, mps.na + 1);
-  a_line_z_overflow.setPointer(&int_data, 2 * padded_na, mps.na + 1);
-  int thus_far = 3 * padded_na;
-  b_line_x.setPointer(&llint_data,                   thus_far, mps.nb + 1);
-  b_line_y.setPointer(&llint_data,       padded_nb + thus_far, mps.nb + 1);
-  b_line_z.setPointer(&llint_data, (2 * padded_nb) + thus_far, mps.nb + 1);
-  b_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nb + 1);
-  b_line_y_overflow.setPointer(&int_data,       padded_nb + thus_far, mps.nb + 1);
-  b_line_z_overflow.setPointer(&int_data, (2 * padded_nb) + thus_far, mps.nb + 1);
-  thus_far += 3 * padded_nb;
-  c_line_x.setPointer(&llint_data,                   thus_far, mps.nc + 1);
-  c_line_y.setPointer(&llint_data,       padded_nc + thus_far, mps.nc + 1);
-  c_line_z.setPointer(&llint_data, (2 * padded_nc) + thus_far, mps.nc + 1);
-  c_line_x_overflow.setPointer(&int_data,                   thus_far, mps.nc + 1);
-  c_line_y_overflow.setPointer(&int_data,       padded_nc + thus_far, mps.nc + 1);
-  c_line_z_overflow.setPointer(&int_data, (2 * padded_nc) + thus_far, mps.nc + 1);
-  thus_far += 3 * padded_nc;
-  a_abs_line_x.setPointer(&llint_data,                   thus_far, mps.na + 1);
-  a_abs_line_y.setPointer(&llint_data,       padded_na + thus_far, mps.na + 1);
-  a_abs_line_z.setPointer(&llint_data, (2 * padded_na) + thus_far, mps.na + 1);
-  a_abs_line_x_overflow.setPointer(&int_data,                   thus_far, mps.na + 1);
-  a_abs_line_y_overflow.setPointer(&int_data,       padded_na + thus_far, mps.na + 1);
-  a_abs_line_z_overflow.setPointer(&int_data, (2 * padded_na) + thus_far, mps.na + 1);
-  const int nbits = static_cast<int>(sizeof(uint)) * 8;
+  MeshParamKit mps = measurements.data();
   coefficients.resize(64LLU * static_cast<size_t>(mps.na * mps.nb * mps.nc));
-  if (ag_pointer != nullptr) {
-    frozen_atoms.resize((ag_pointer->getAtomCount() + nbits - 1) / nbits);
-  }
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void BackgroundMesh<T>::rebase_pointers() {
-  a_line_x.swapTarget(&llint_data);
-  a_line_y.swapTarget(&llint_data);
-  a_line_z.swapTarget(&llint_data);
-  b_line_x.swapTarget(&llint_data);
-  b_line_y.swapTarget(&llint_data);
-  b_line_z.swapTarget(&llint_data);
-  c_line_x.swapTarget(&llint_data);
-  c_line_y.swapTarget(&llint_data);
-  c_line_z.swapTarget(&llint_data);
-  a_abs_line_x.swapTarget(&llint_data);
-  a_abs_line_y.swapTarget(&llint_data);
-  a_abs_line_z.swapTarget(&llint_data);
-  a_line_x_overflow.swapTarget(&int_data);
-  a_line_y_overflow.swapTarget(&int_data);
-  a_line_z_overflow.swapTarget(&int_data);
-  b_line_x_overflow.swapTarget(&int_data);
-  b_line_y_overflow.swapTarget(&int_data);
-  b_line_z_overflow.swapTarget(&int_data);
-  c_line_x_overflow.swapTarget(&int_data);
-  c_line_y_overflow.swapTarget(&int_data);
-  c_line_z_overflow.swapTarget(&int_data);
-  a_abs_line_x_overflow.swapTarget(&int_data);
-  a_abs_line_y_overflow.swapTarget(&int_data);
-  a_abs_line_z_overflow.swapTarget(&int_data);
+template <typename T>
+void BackgroundMesh<T>::setNonbondedModel(const VdwCombiningRule mixing_protocol_in,
+                                          const double clash_ratio_in,
+                                          const double clash_distance_in,
+                                          const std::vector<double> &probe_sigma,
+                                          const std::vector<double> &probe_epsilon) {
+
+  // Check that the combining rule fits with any provided Lennard-Jones parameter arrays specific
+  // to the probe used to draw the mesh.
+  const AtomGraph *ag_ptr = basis.getTopologyPointer();
+  switch (mixing_protocol_in) {
+  case VdwCombiningRule::GEOMETRIC:
+  case VdwCombiningRule::LORENTZ_BERTHELOT:
+    if (probe_sigma.size() > 0 || probe_epsilon.size() > 0) {
+      rtErr("Pair-specific Lennard-Jones parameters between the probe and atoms of the topology "
+            "are only valid if the combining rule is set to " +
+            getEnumerationName(VdwCombiningRule::NBFIX) + ".", "BackgroundMesh",
+            "validateCombiningRule");
+    }
+    break;
+  case VdwCombiningRule::NBFIX:
+    if (probe_sigma.size() != ag_ptr->getAtomTypeCount() ||
+        probe_sigma.size() != probe_epsilon.size()) {
+      rtErr("For " + getEnumerationName(VdwCombiningRule::NBFIX) + " combining rules, all "
+            "pairwise parameters between atoms in the topology and the probe must be provided.",
+            "BackgroundMesh", "validateCombiningRule");
+    }
+    break;
+  }
+
+  // Allocate the non-bonded model and set its overall descriptors
+  nonbonded_model = MeshForceField<T>(mixing_protocol_in, clash_ratio_in, clash_distance_in,
+                                      ag_ptr);
+
+  // Return immediately if there are no allocations to perform.  Run checks on the data arrays with
+  // respect to any van-der Waals potential.  The non-bonded parameters of the mesh come together
+  // one piece at a time, owing to the composition and the point at which it is convenient to
+  // handle each aspect of the construction.  As of the time this function is called, the
+  // non-bonded parameter arrays should have been allocated and set in terms of the Coulomb
+  // constant, but not yet populated with coefficients
+  // to serve any 
+  switch (field) {
+  case NonbondedPotential::CLASH:
+    if (probe_sigma.size() > 0) {
+      nonbonded_model.setLJCoefficients(ag_ptr, probe_sigma, probe_epsilon);
+    }
+    else {
+      nonbonded_model.setLJCoefficients(ag_ptr, probe_radius, well_depth);
+    }
+    break;
+  case NonbondedPotential::VAN_DER_WAALS:
+
+    // The check above will ensure that probe_sigma and probe_epsilon are substantial if and only
+    // if the combining rule is NBFIX.
+    if (probe_sigma.size() > 0) {
+      nonbonded_model.setLJCoefficients(ag_ptr, probe_sigma, probe_epsilon);
+    }
+    else {
+      nonbonded_model.setLJCoefficients(ag_ptr, probe_radius, well_depth);
+    }
+    nonbonded_model.setLJSoftcoreParameters(measurements.getStencilKind());
+    break;
+  case NonbondedPotential::ELECTROSTATIC:
+    nonbonded_model.setElecSoftcoreParameters(measurements.getStencilKind());
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -887,6 +1446,7 @@ template <typename T> void BackgroundMesh<T>::validateMeshKind() const {
       }
     }
     break;
+  case GridDetail::OCCLUSION_FIELD:
   case GridDetail::NONBONDED_FIELD:
   case GridDetail::NONBONDED_ATOMIC:
     if (isFloatingPointScalarType<T>() == false) {
@@ -951,40 +1511,63 @@ template <typename T> void BackgroundMesh<T>::validateScalingBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void BackgroundMesh<T>::computeMeshAxisCoordinates() {
-  const MeshParamKit<double> mps = measurements.dpData();
-  fixedPrecisionGrid(&a_line_x, &a_line_x_overflow, { 0LL, 0 }, mps.fp_invu[0]);
-  fixedPrecisionGrid(&a_line_y, &a_line_y_overflow, { 0LL, 0 }, mps.fp_invu[1]);
-  fixedPrecisionGrid(&a_line_z, &a_line_z_overflow, { 0LL, 0 }, mps.fp_invu[2]);
-  fixedPrecisionGrid(&b_line_x, &b_line_x_overflow, { 0LL, 0 }, mps.fp_invu[3]);
-  fixedPrecisionGrid(&b_line_y, &b_line_y_overflow, { 0LL, 0 }, mps.fp_invu[4]);
-  fixedPrecisionGrid(&b_line_z, &b_line_z_overflow, { 0LL, 0 }, mps.fp_invu[5]);
-  fixedPrecisionGrid(&c_line_x, &c_line_x_overflow, { 0LL, 0 }, mps.fp_invu[6]);
-  fixedPrecisionGrid(&c_line_y, &c_line_y_overflow, { 0LL, 0 }, mps.fp_invu[7]);
-  fixedPrecisionGrid(&c_line_z, &c_line_z_overflow, { 0LL, 0 }, mps.fp_invu[8]);
-  fixedPrecisionGrid(&a_abs_line_x, &a_abs_line_x_overflow, mps.orig_x, mps.fp_invu[0]);
-  fixedPrecisionGrid(&a_abs_line_y, &a_abs_line_y_overflow, mps.orig_y, mps.fp_invu[1]);
-  fixedPrecisionGrid(&a_abs_line_z, &a_abs_line_z_overflow, mps.orig_z, mps.fp_invu[2]);
-}
-
-//-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
+void BackgroundMesh<T>::colorOcclusionMesh(const MeshKlManager &launcher,
+                                           const PrecisionModel prec,
+                                           const HybridTargetLevel availability,
+                                           const std::vector<double> &probe_sigma) {
 
+  // Check that the coordinates and topology have consistent numbers of atoms.  The coordinates
+  // must be represented by a single-structure CoordinateFrame object.
+  switch (basis.getReadyFrameCount()) {
+  case 0:
+    rtErr("An occlusion mesh requires a topology and a structure to have been specified.",
+          "BackgroundMesh", "colorOcclusionMesh");
+  case 1:
+    break;
+  default:
+    rtErr("An occlusion mesh cannot be formed based on a series of frames.  The OCCLUSION_FIELD "
+          "setting is appropriate with such inputs.", "BackgroundMesh", "colorOcclusionMesh");
+  }
+  const AtomGraph *ag_ptr = basis.getTopologyPointer();
+  const CoordinateFrame *cf_ptr = basis.getCoordinatePointer();
+  
   // Use the HPC kernel to color the mesh if a GPU is available
 #ifdef STORMM_USE_HPC
-  if (gpu != null_gpu) {
-    
+  if (launcher.getGpu() != null_gpu) {
+
+    // Upload the rulers and frozen atom content
+    tick_marks.upload();
+    basis.upload();
+
+    // Launch the kernel
+    BackgroundMeshWriter<void> bgmw = templateFreeData(HybridTargetLevel::DEVICE);
+    switch (availability) {
+    case HybridTargetLevel::HOST:
+      {
+        const CoordinateFrameReader cfr = cf_ptr->deviceViewToHostData();
+        launchColorOcclusionMesh(&bgmw, ag_ptr, cfr, prec, launcher);
+      }
+      break;
+    case HybridTargetLevel::DEVICE:
+      {
+        const CoordinateFrameReader cfr = cf_ptr->data(HybridTargetLevel::DEVICE);
+        launchColorOcclusionMesh(&bgmw, ag_ptr, cfr, prec, launcher);
+      }
+      break;
+    }
+
+    // Download the coefficients
     coefficients.download();
     return;
   }
 #endif
-
+  
   // Color the mesh on the CPU
-  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
-  const MeshParamKit<double> mps = measurements.dpData();
-  const CoordinateFrameReader cfr = cf_pointer->data();
+  const NonbondedKit<double> nbk = ag_ptr->getDoublePrecisionNonbondedKit();
+  const std::vector<bool> mobile_atom = ag_ptr->getAtomMobility();
+  const MeshParamKit mps = measurements.data();
+  const CoordinateFrameReader cfr = cf_ptr->data();
   
   // Initialize the mesh in CPU memory.
   const int n_elem = mps.na * mps.nb * mps.nc;
@@ -995,32 +1578,20 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
   // Replicate the mesh's grid vectors.  Subtract the origin coordinates from the "b" and "c"
   // vectors so that a[i] + b[j] + c[k] = the Cartesian coordinates of any grid point (i,j,k).
+  const MeshRulerKit rlrs = tick_marks.data();
   std::vector<double> avx(mps.na + 1), avy(mps.na + 1), avz(mps.na + 1);
   std::vector<double> bvx(mps.nb + 1), bvy(mps.nb + 1), bvz(mps.nb + 1);
   std::vector<double> cvx(mps.nc + 1), cvy(mps.nc + 1), cvz(mps.nc + 1);
-  hostInt95ToDouble(&avx, &avy, &avz, a_abs_line_x.readHost(), a_abs_line_x_overflow.readHost(),
-                    a_abs_line_y.readHost(), a_abs_line_y_overflow.readHost(),
-                    a_abs_line_z.readHost(), a_abs_line_z_overflow.readHost(), mps.inv_scale);
-  hostInt95ToDouble(&bvx, &bvy, &bvz, b_line_x.readHost(), b_line_x_overflow.readHost(),
-                    b_line_y.readHost(), b_line_y_overflow.readHost(), b_line_z.readHost(),
-                    b_line_z_overflow.readHost(), mps.inv_scale);
-  hostInt95ToDouble(&cvx, &cvy, &cvz, c_line_x.readHost(), c_line_x_overflow.readHost(),
-                    c_line_y.readHost(), c_line_y_overflow.readHost(), c_line_z.readHost(),
-                    c_line_z_overflow.readHost(), mps.inv_scale);
-  const double dorig_x = hostInt95ToDouble(mps.orig_x);
-  const double dorig_y = hostInt95ToDouble(mps.orig_y);
-  const double dorig_z = hostInt95ToDouble(mps.orig_z);
-
-  // Compute the increment within one element as the 16 x 16 x 16 mesh gets traced
-  const double de_ax = 0.0625 * (avx[1] - avx[0]);
-  const double de_ay = 0.0625 * (avy[1] - avy[0]);
-  const double de_az = 0.0625 * (avz[1] - avz[0]);
-  const double de_bx = 0.0625 * (bvx[1] - bvx[0]);
-  const double de_by = 0.0625 * (bvy[1] - bvy[0]);
-  const double de_bz = 0.0625 * (bvz[1] - bvz[0]);
-  const double de_cx = 0.0625 * (cvx[1] - cvx[0]);
-  const double de_cy = 0.0625 * (cvy[1] - cvy[0]);
-  const double de_cz = 0.0625 * (cvz[1] - cvz[0]);
+  hostInt95ToDouble(avx.data(), avy.data(), avz.data(), rlrs.avec_abs_x, rlrs.avec_abs_x_ovrf,
+                    rlrs.avec_abs_y, rlrs.avec_abs_y_ovrf, rlrs.avec_abs_z, rlrs.avec_abs_z_ovrf,
+                    mps.na + 1, mps.inv_scale);
+  hostInt95ToDouble(bvx.data(), bvy.data(), bvz.data(), rlrs.bvec_x, rlrs.bvec_x_ovrf, rlrs.bvec_y,
+                    rlrs.bvec_y_ovrf, rlrs.bvec_z, rlrs.bvec_z_ovrf, mps.nb + 1, mps.inv_scale);
+  hostInt95ToDouble(cvx.data(), cvy.data(), cvz.data(), rlrs.cvec_x, rlrs.cvec_x_ovrf, rlrs.cvec_y,
+                    rlrs.cvec_y_ovrf, rlrs.cvec_z, rlrs.cvec_z_ovrf, mps.nc + 1, mps.inv_scale);
+  const double dorig_x = hostInt95ToDouble(mps.orig_x) * mps.inv_scale;
+  const double dorig_y = hostInt95ToDouble(mps.orig_y) * mps.inv_scale;
+  const double dorig_z = hostInt95ToDouble(mps.orig_z) * mps.inv_scale;
 
   // Prepare a buffer to hold subgrid results
   std::vector<ullint> cube_buffer(64, 0LLU);
@@ -1032,45 +1603,52 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
       continue;
     }
     const size_t plj_idx = lj_idx_offset * nbk.lj_idx[pos];
-    const double atom_radius = 0.5 * pow(nbk.lja_coeff[plj_idx] / nbk.ljb_coeff[plj_idx],
-                                         1.0 / 6.0);
-    const double color_radius = atom_radius + probe_radius;
+    const double color_radius = (0.5 * nbk.lj_sigma[plj_idx]) + probe_radius;
     const double color_radius_sq = color_radius * color_radius;
     const double atom_x = cfr.xcrd[pos];
     const double atom_y = cfr.ycrd[pos];
     const double atom_z = cfr.zcrd[pos];
-    const int ixmin = std::max(static_cast<int>(floor((atom_x - color_radius - dorig_x) /
-                                                      mps.widths[0])), 0);
-    const int iymin = std::max(static_cast<int>(floor((atom_y - color_radius - dorig_y) /
-                                                      mps.widths[1])), 0);
-    const int izmin = std::max(static_cast<int>(floor((atom_z - color_radius - dorig_z) /
-                                                      mps.widths[2])), 0);
-    const int ixmax = std::min(static_cast<int>(ceil((atom_x + color_radius - dorig_x) /
-                                                     mps.widths[0])), mps.na - 1);
-    const int iymax = std::min(static_cast<int>(ceil((atom_y + color_radius - dorig_y) /
-                                                     mps.widths[1])), mps.nb - 1);
-    const int izmax = std::min(static_cast<int>(ceil((atom_z + color_radius - dorig_z) /
-                                                     mps.widths[2])), mps.nc - 1);
+    const double atom_dx = atom_x - dorig_x;
+    const double atom_dy = atom_y - dorig_y;
+    const double atom_dz = atom_z - dorig_z;
+    const int icenx = floor((mps.umat[0] * atom_dx) + (mps.umat[3] * atom_dy) +
+                            (mps.umat[6] * atom_dz));
+    const int iceny = floor((mps.umat[1] * atom_dx) + (mps.umat[4] * atom_dy) +
+                            (mps.umat[7] * atom_dz));
+    const int icenz = floor((mps.umat[2] * atom_dx) + (mps.umat[5] * atom_dy) +
+                            (mps.umat[8] * atom_dz));
+    const int pad_a = ceil(color_radius / mps.widths[0]);
+    const int pad_b = ceil(color_radius / mps.widths[1]);
+    const int pad_c = ceil(color_radius / mps.widths[2]);
+    const int ixmin = std::max(icenx - pad_a, 0);
+    const int iymin = std::max(iceny - pad_b, 0);
+    const int izmin = std::max(icenz - pad_c, 0);
+    const int ixmax = std::min(icenx + pad_a + 1, mps.na);
+    const int iymax = std::min(iceny + pad_b + 1, mps.nb);
+    const int izmax = std::min(icenz + pad_c + 1, mps.nc);
     for (int i = ixmin; i < ixmax; i++) {
       for (int j = iymin; j < iymax; j++) {
         for (int k = izmin; k < izmax; k++) {
-
+          
           // Color the buffer for this atom and this element
-          const double base_x = avx[ixmin] + bvx[iymin] + cvx[izmin];
-          const double base_y = avy[ixmin] + bvy[iymin] + cvy[izmin];
-          const double base_z = avz[ixmin] + bvz[iymin] + cvz[izmin];
+          const double base_x = avx[i] + bvx[j] + cvx[k];
+          const double base_y = avy[i] + bvy[j] + cvy[k];
+          const double base_z = avz[i] + bvz[j] + cvz[k];
           for (size_t m = 0LLU; m < 64LLU; m++) {
             cube_buffer[m] = 0LLU;
           }
           int grid_i = 0;
-          for (double di = 0.5; di < 16.0; di += 1.0) {
+          for (double di = 0.03125; di < 1.0; di += 0.0625) {
             int grid_j = 0;
-            for (double dj = 0.5; dj < 16.0; dj += 1.0) {
+            for (double dj = 0.03125; dj < 1.0; dj += 0.0625) {
               int grid_k = 0;
-              for (double dk = 0.5; dk < 16.0; dk += 1.0) {
-                const double xpt = base_x + (di * de_ax) + (dj * de_bx) + (dk * de_cx);
-                const double ypt = base_y + (di * de_ay) + (dj * de_by) + (dk * de_cy);
-                const double zpt = base_z + (di * de_az) + (dj * de_bz) + (dk * de_cz);
+              for (double dk = 0.03125; dk < 1.0; dk += 0.0625) {
+                const double xpt = base_x +
+                                   (di * mps.invu[0]) + (dj * mps.invu[3]) + (dk * mps.invu[6]);
+                const double ypt = base_y +
+                                   (di * mps.invu[1]) + (dj * mps.invu[4]) + (dk * mps.invu[7]);
+                const double zpt = base_z +
+                                   (di * mps.invu[2]) + (dj * mps.invu[5]) + (dk * mps.invu[8]);
                 const double dx = xpt - atom_x;
                 const double dy = ypt - atom_y;
                 const double dz = zpt - atom_z;
@@ -1112,24 +1690,39 @@ void BackgroundMesh<T>::colorExclusionMesh(const GpuDetails &gpu) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void BackgroundMesh<T>::mapOccupancyField(const MeshKlManager &launcher, const PrecisionModel prec,
+                                          const HybridTargetLevel availability,
+                                          const std::vector<double> &probe_sigma) {
+
+  // Check that the coordinates and topology have consistent numbers of atoms.  The coordinates
+  // must be represented by a single-structure CoordinateFrame object.
+  if (basis.getReadyFrameCount() == 0) {
+    rtErr("An occlusion field requires a topology and a coordinate series to have been specified.",
+          "BackgroundMesh", "mapOccupancyField");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
                                             const std::vector<double> &dudx_grid,
                                             const std::vector<double> &dudy_grid,
                                             const std::vector<double> &dudz_grid,
+                                            const std::vector<double> &dudxx_grid,
                                             const std::vector<double> &dudxy_grid,
                                             const std::vector<double> &dudxz_grid,
-                                            const std::vector<double> &dudyz_grid,
-                                            const std::vector<double> &dudxyz_grid,
-                                            const std::vector<double> &dudxx_grid,
                                             const std::vector<double> &dudyy_grid,
-                                            const std::vector<double> &dudzz_grid) {
+                                            const std::vector<double> &dudyz_grid,
+                                            const std::vector<double> &dudxxx_grid,
+                                            const std::vector<double> &dudxxy_grid,
+                                            const std::vector<double> &dudxxz_grid,
+                                            const std::vector<double> &dudxyy_grid,
+                                            const std::vector<double> &dudxyz_grid,
+                                            const TricubicStencil &tc_weights) {
   
   // Get the measurements abstract locally--better than passing a reference of the same size
   // and then having to de-reference it many times.
-  const MeshParamKit<double> mps = measurements.dpData();
-
-  // Compute the weights matrix
-  std::vector<double> tc_weights = getTricubicMatrix().readHost();  
+  const MeshParamKit mps = measurements.data();
 
   // Lay out the mesh cell bounds
   std::vector<double> tc_bounds;
@@ -1139,88 +1732,182 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
     break;
   case UnitCellType::ORTHORHOMBIC:
     tc_bounds.resize(6);
-    tc_bounds[3] = hostInt95ToDouble(mps.fp_invu[0]);
-    tc_bounds[4] = hostInt95ToDouble(mps.fp_invu[4]);
-    tc_bounds[5] = hostInt95ToDouble(mps.fp_invu[8]);
+    tc_bounds[3] = hostInt95ToDouble(mps.fp_invu[0]) * mps.inv_scale;
+    tc_bounds[4] = hostInt95ToDouble(mps.fp_invu[4]) * mps.inv_scale;
+    tc_bounds[5] = hostInt95ToDouble(mps.fp_invu[8]) * mps.inv_scale;
     break;
   case UnitCellType::TRICLINIC:
     tc_bounds.resize(12);
     for (int i = 0; i < 9; i++) {
-      tc_bounds[i + 3] = hostInt95ToDouble(mps.fp_invu[i]);
+      tc_bounds[i + 3] = hostInt95ToDouble(mps.fp_invu[i]) * mps.inv_scale;
     }
     break;
   }
 
   // Set constants and pointers to mesh lines for more rapid access
-  const size_t ngrid_a = mps.na + 1;
-  const size_t ngrid_b = mps.nb + 1;
-  const size_t ngrid_c = mps.nc + 1;
-  const llint* bvec_x_ptr = b_line_x.data();
-  const llint* bvec_y_ptr = b_line_y.data();
-  const llint* bvec_z_ptr = b_line_z.data();
-  const llint* cvec_x_ptr = c_line_x.data();
-  const llint* cvec_y_ptr = c_line_y.data();
-  const llint* cvec_z_ptr = c_line_z.data();
-  const llint* bvec_x_overflow_ptr = b_line_x.data();
-  const llint* bvec_y_overflow_ptr = b_line_y.data();
-  const llint* bvec_z_overflow_ptr = b_line_z.data();
-  const llint* cvec_x_overflow_ptr = c_line_x.data();
-  const llint* cvec_y_overflow_ptr = c_line_y.data();
-  const llint* cvec_z_overflow_ptr = c_line_z.data();
+  size_t bounds_offset;
+  switch (measurements.getBoundaryConditions()) {
+  case BoundaryCondition::ISOLATED:
+    bounds_offset = 1;
+    break;
+  case BoundaryCondition::PERIODIC:
+    bounds_offset = 0;
+    break;
+  }
+  const size_t ngrid_a = mps.na + bounds_offset;
+  const size_t ngrid_b = mps.nb + bounds_offset;
+  const size_t ngrid_c = mps.nc + bounds_offset;
+  const MeshRulerKit rlrs = tick_marks.data();
   T* coeff_ptr = coefficients.data();
   
   // Compute coefficeints
   std::vector<double> u_elem(8), dudx_elem(8), dudy_elem(8), dudz_elem(8);
-  std::vector<double> dudxy_elem(8), dudxz_elem(8), dudyz_elem(8), dudxyz_elem(8);
-  std::vector<double> dudxx_elem(8), dudyy_elem(8), dudzz_elem(8);
+  std::vector<double> dudxx_elem(8), dudxy_elem(8), dudxz_elem(8), dudyy_elem(8), dudyz_elem(8);
+  std::vector<double> dudxxx_elem(8), dudxxy_elem(8), dudxxz_elem(8), dudxyy_elem(8);
+  std::vector<double> dudxyz_elem(8);
   for (int i = 0; i < mps.na; i++) {
-    const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
-    const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
-    const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
+    const int95_t mesh_ax = { rlrs.avec_abs_x[i], rlrs.avec_abs_x_ovrf[i] };
+    const int95_t mesh_ay = { rlrs.avec_abs_y[i], rlrs.avec_abs_y_ovrf[i] };
+    const int95_t mesh_az = { rlrs.avec_abs_z[i], rlrs.avec_abs_z_ovrf[i] };
     for (int j = 0; j < mps.nb; j++) {
-      const int95_t mesh_abx = hostSplitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
-      const int95_t mesh_aby = hostSplitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
-      const int95_t mesh_abz = hostSplitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+      const int95_t mesh_abx = hostSplitFPSum(mesh_ax, rlrs.bvec_x[j], rlrs.bvec_x_ovrf[j]);
+      const int95_t mesh_aby = hostSplitFPSum(mesh_ay, rlrs.bvec_y[j], rlrs.bvec_y_ovrf[j]);
+      const int95_t mesh_abz = hostSplitFPSum(mesh_az, rlrs.bvec_z[j], rlrs.bvec_z_ovrf[j]);
       for (int k = 0; k < mps.nc; k++) {
-        const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, cvec_x_ptr[k], cvec_x_overflow_ptr[k]);
-        const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, cvec_y_ptr[k], cvec_y_overflow_ptr[k]);
-        const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, cvec_z_ptr[k], cvec_z_overflow_ptr[k]);
+        const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, rlrs.cvec_x[k], rlrs.cvec_x_ovrf[k]);
+        const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, rlrs.cvec_y[k], rlrs.cvec_y_ovrf[k]);
+        const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, rlrs.cvec_z[k], rlrs.cvec_z_ovrf[k]);
+        const size_t nijk_base = 8LLU * static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i);
 
         // Compose the input vectors
-        for (int ci = 0; ci < 2; ci++) {
-          const size_t ici = i + ci;
-          for (int cj = 0; cj < 2; cj++) {
-            const size_t jcj = j + cj;
-            for (int ck = 0; ck < 2; ck++) {
-              const size_t nv = (((ck * 2) + cj) * 2) + ci;
-              const size_t kck = k + ck;
-              const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
-              u_elem[nv] = u_grid[nijk];
-              dudx_elem[nv] = dudx_grid[nijk];
-              dudy_elem[nv] = dudy_grid[nijk];
-              dudz_elem[nv] = dudz_grid[nijk];
-              dudxy_elem[nv] = dudxy_grid[nijk];
-              dudxz_elem[nv] = dudxz_grid[nijk];
-              dudyz_elem[nv] = dudyz_grid[nijk];
-              dudxyz_elem[nv] = dudxyz_grid[nijk];
-              if (unit_cell == UnitCellType::TRICLINIC) {
-                dudxx_elem[nv] = dudxx_grid[nijk];
-                dudyy_elem[nv] = dudyy_grid[nijk];
-                dudzz_elem[nv] = dudzz_grid[nijk];
+        switch (measurements.getBoundaryConditions()) {
+        case BoundaryCondition::ISOLATED:
+          for (int ci = 0; ci < 2; ci++) {
+            const size_t ici = i + ci;
+            for (int cj = 0; cj < 2; cj++) {
+              const size_t jcj = j + cj;
+              for (int ck = 0; ck < 2; ck++) {
+                const size_t nv = (((ck * 2) + cj) * 2) + ci;
+                const size_t kck = k + ck;
+                const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+                u_elem[nv]    = u_grid[nijk];
+                dudx_elem[nv] = dudx_grid[nijk];
+                dudy_elem[nv] = dudy_grid[nijk];
+                dudz_elem[nv] = dudz_grid[nijk];
+                switch (measurements.getStencilKind()) {
+                case Interpolant::SMOOTHNESS:
+                  dudxy_elem[nv]  = dudxy_grid[nijk];
+                  dudxz_elem[nv]  = dudxz_grid[nijk];
+                  dudyz_elem[nv]  = dudyz_grid[nijk];
+                  dudxyz_elem[nv] = dudxyz_grid[nijk];
+                  if (unit_cell == UnitCellType::TRICLINIC) {
+                    dudxx_elem[nv]  = dudxx_grid[nijk];
+                    dudyy_elem[nv]  = dudyy_grid[nijk];
+                    dudxxx_elem[nv] = dudxxx_grid[nijk];
+                    dudxxy_elem[nv] = dudxxy_grid[nijk];
+                    dudxxz_elem[nv] = dudxxz_grid[nijk];
+                    dudxyy_elem[nv] = dudxyy_grid[nijk];
+                  }
+                  break;
+                case Interpolant::FUNCTION_VALUE:
+                  dudxy_elem[nv]  = dudxy_grid[nijk_base + nv];
+                  dudxz_elem[nv]  = dudxz_grid[nijk_base + nv];
+                  dudyz_elem[nv]  = dudyz_grid[nijk_base + nv];
+                  dudxyz_elem[nv] = dudxyz_grid[nijk_base + nv];
+                  break;
+                }
               }
             }
           }
+          break;
+        case BoundaryCondition::PERIODIC:
+
+          // The input grids are expected to be the same dimensions as the mesh, but it order to
+          // get the outer boundaries of points at any of the upper mesh limits, the indices
+          // referenced in each of the computed grids must wrap.
+          for (int ci = 0; ci < 2; ci++) {
+            size_t ici = i + ci;
+            ici -= (ici == ngrid_a) * ngrid_a;
+            for (int cj = 0; cj < 2; cj++) {
+              size_t jcj = j + cj;
+              jcj -= (jcj == ngrid_b) * ngrid_b;
+              for (int ck = 0; ck < 2; ck++) {
+                const size_t nv = (((ck * 2) + cj) * 2) + ci;
+                size_t kck = k + ck;
+                kck -= (kck == ngrid_c) * ngrid_c;
+                const size_t nijk = (((kck * ngrid_b) + jcj) * ngrid_a) + ici;
+                u_elem[nv] = u_grid[nijk];
+                dudx_elem[nv] = dudx_grid[nijk];
+                dudy_elem[nv] = dudy_grid[nijk];
+                dudz_elem[nv] = dudz_grid[nijk];
+                switch (measurements.getStencilKind()) {
+                case Interpolant::SMOOTHNESS:
+                  dudxy_elem[nv] = dudxy_grid[nijk];
+                  dudxz_elem[nv] = dudxz_grid[nijk];
+                  dudyz_elem[nv] = dudyz_grid[nijk];
+                  dudxyz_elem[nv] = dudxyz_grid[nijk];
+                  if (unit_cell == UnitCellType::TRICLINIC) {
+                    dudxx_elem[nv] = dudxx_grid[nijk];
+                    dudyy_elem[nv] = dudyy_grid[nijk];
+                    dudxxx_elem[nv] = dudxxx_grid[nijk];
+                    dudxxy_elem[nv] = dudxxy_grid[nijk];
+                    dudxxz_elem[nv] = dudxxz_grid[nijk];
+                    dudxyy_elem[nv] = dudxyy_grid[nijk];
+                  }
+                  break;
+                case Interpolant::FUNCTION_VALUE:
+                  dudxy_elem[nv]  = dudxy_grid[nijk_base + nv];
+                  dudxz_elem[nv]  = dudxz_grid[nijk_base + nv];
+                  dudyz_elem[nv]  = dudyz_grid[nijk_base + nv];
+                  dudxyz_elem[nv] = dudxyz_grid[nijk_base + nv];                  
+                  break;
+                }
+              }
+            }
+          }
+          break;
         }
 
         // Compose the mesh element.  Complete the bounds array by adding the origin, then
         // compute the tricubic coefficients.
-        tc_bounds[0] = hostInt95ToDouble(mesh_abcx);
-        tc_bounds[1] = hostInt95ToDouble(mesh_abcy);
-        tc_bounds[2] = hostInt95ToDouble(mesh_abcz);
-        const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
-                                           dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
-                                           dudxyz_elem, dudxx_elem, dudyy_elem, dudzz_elem);
-        const std::vector<double> tc_coeffs = tc_elem.getCoefficients();
+        tc_bounds[0] = hostInt95ToDouble(mesh_abcx) * mps.inv_scale;
+        tc_bounds[1] = hostInt95ToDouble(mesh_abcy) * mps.inv_scale;
+        tc_bounds[2] = hostInt95ToDouble(mesh_abcz) * mps.inv_scale;
+        std::vector<double> tc_coeffs;
+        switch (measurements.getStencilKind()) {
+        case Interpolant::SMOOTHNESS:
+          switch (unit_cell) {
+          case UnitCellType::NONE:
+            break;
+          case UnitCellType::ORTHORHOMBIC:
+            {
+              const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem,
+                                                 dudy_elem, dudz_elem, dudxy_elem, dudxz_elem,
+                                                 dudyz_elem, dudxyz_elem);
+              tc_coeffs = tc_elem.getCoefficients();
+            }
+            break;
+          case UnitCellType::TRICLINIC:
+            {
+              const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem,
+                                                 dudy_elem, dudz_elem, dudxx_elem, dudxy_elem,
+                                                 dudxz_elem, dudyy_elem, dudyz_elem, dudxxx_elem,
+                                                 dudxxy_elem, dudxxz_elem, dudxyy_elem,
+                                                 dudxyz_elem);
+              tc_coeffs = tc_elem.getCoefficients();
+            }
+            break;
+          }
+          break;
+        case Interpolant::FUNCTION_VALUE:
+          {
+            const TricubicCell<double> tc_elem(tc_weights, tc_bounds, u_elem, dudx_elem, dudy_elem,
+                                               dudz_elem, dudxy_elem, dudxz_elem, dudyz_elem,
+                                               dudxyz_elem);
+            tc_coeffs = tc_elem.getCoefficients();
+          }            
+          break;
+        }
         const size_t tc_offset = static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i) * 64LLU;
         for (size_t cpos = 0; cpos < 64; cpos++) {
           coeff_ptr[tc_offset + cpos] = tc_coeffs[cpos];
@@ -1232,70 +1919,54 @@ void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
-                                                  const std::vector<double> &eps_table,
-                                                  const std::vector<double> &sigma_table) {
-
-  // Check for problematic input cases
-  switch (field) {
-  case NonbondedPotential::ELECTROSTATIC:
-    break;
-  case NonbondedPotential::VAN_DER_WAALS:
-    if (mixing_protocol == VdwCombiningRule::NBFIX &&
-        (static_cast<int>(eps_table.size())   != ag_pointer->getAtomTypeCount() ||
-         static_cast<int>(sigma_table.size()) != ag_pointer->getAtomTypeCount())) {
-      rtErr("In order to map a van-der Waals potential using the " +
-            getEnumerationName(mixing_protocol) + " method, tables of the particle-particle well "
-            "depth and interaction sigma values must be provided for the probe interacting with "
-            "all types present in the receptor's topology.  Number of atom types in the "
-            "topology: " + std::to_string(ag_pointer->getAtomTypeCount()) + ".  Number of atom "
-            "types present in each table provided: " + std::to_string(eps_table.size()) +
-            " (epsilon) and " + std::to_string(sigma_table.size()) + " (sigma).", "BackgroundMesh",
-            "mapPureNonbondedPotential");
-    }
-    break;
-  case NonbondedPotential::CLASH:
-
-    // This would have to be an occlusion mask and would not have an associated potential field.
-    break;
+void BackgroundMesh<T>::computeCoefficients(const std::vector<double> &u_grid,
+                                            const std::vector<double> &dudx_grid,
+                                            const std::vector<double> &dudy_grid,
+                                            const std::vector<double> &dudz_grid,
+                                            const std::vector<double> &dudxy_grid,
+                                            const std::vector<double> &dudxz_grid,
+                                            const std::vector<double> &dudyz_grid,
+                                            const std::vector<double> &dudxyz_grid,
+                                            const TricubicStencil &tc_weights) {
+  if (measurements.getMeshCellType() == UnitCellType::TRICLINIC) {
+    rtErr("Derivatives for d2/dx2, d2/dy2, d3/dx3, d3/dx2y, d3/dx2z, and d3/dxy2 must be provided "
+          "for a non-orthorhombic mesh.", "BackgroundMesh", "computeCoefficients");
   }
-  
-  // Use the HPC kernel to color the mesh if a GPU is available
-#ifdef STORMM_USE_HPC
-  if (gpu != null_gpu) {
-    
-    coefficients.download();
-    return;
-  }
-#endif
+  computeCoefficients(u_grid, dudx_grid, dudy_grid, dudz_grid, {}, dudxy_grid, dudxz_grid, {},
+                      dudyz_grid, {}, {}, {}, {}, dudxyz_grid, tc_weights);
+}
 
-  // Color the mesh on the CPU
-  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
-  const std::vector<bool> mobile_atom = ag_pointer->getAtomMobility();
-  const MeshParamKit<double> mps = measurements.dpData();
-  const CoordinateFrameReader cfr = cf_pointer->data();
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tcalc, typename Tcalc2, typename Tcalc3, typename Tcalc4>
+void BackgroundMesh<T>::colorNonbondedField(const NonbondedKit<Tcalc> &nbk,
+                                            const TricubicStencil &tc_weights,
+                                            const std::vector<double> &sigma_table,
+                                            const std::vector<double> &eps_table) {
+  const std::vector<bool> mobile_atom = basis.getTopologyPointer()->getAtomMobility();
+  const MeshParamKit mps = measurements.data();
+  const CoordinateFrameReader cfr = basis.getCoordinatePointer()->data();
+  const Tcalc value_one   = 1.0;
+  const Tcalc value_two   = 2.0;
+  const Tcalc value_six   = 6.0;
+  const Tcalc value_n12   = -12.0;
+  const Tcalc value_n42   = -42.0;
+  const Tcalc value_156   = 156.0;
+  const Tcalc value_336   = 336.0;
+  const Tcalc value_n2184 = -2184.0;
+  const bool tcalc_is_double = std::type_index(typeid(Tcalc)).hash_code();
+  const T coeff_scl = coefficient_scale;
   
   // Initialize the mesh in CPU memory.
   const int n_elem = mps.na * mps.nb * mps.nc;
   T* coeff_ptr = coefficients.data();
-  const T zero = 0.0;
+  const T value_zero = 0.0;
   for (int pos = 0; pos < n_elem; pos++) {
-    coeff_ptr[pos] = zero;
+    coeff_ptr[pos] = value_zero;
   }
 
   // Set pointers to mesh lines for more rapid access
-  const llint* bvec_x_ptr = b_line_x.data();
-  const llint* bvec_y_ptr = b_line_y.data();
-  const llint* bvec_z_ptr = b_line_z.data();
-  const llint* cvec_x_ptr = c_line_x.data();
-  const llint* cvec_y_ptr = c_line_y.data();
-  const llint* cvec_z_ptr = c_line_z.data();
-  const int* bvec_x_overflow_ptr = b_line_x_overflow.data();
-  const int* bvec_y_overflow_ptr = b_line_y_overflow.data();
-  const int* bvec_z_overflow_ptr = b_line_z_overflow.data();
-  const int* cvec_x_overflow_ptr = c_line_x_overflow.data();
-  const int* cvec_y_overflow_ptr = c_line_y_overflow.data();
-  const int* cvec_z_overflow_ptr = c_line_z_overflow.data();
+  const MeshRulerKit rlrs = tick_marks.data();
+  const MeshFFKit<double> mnbk = nonbonded_model.referenceData();
   
   // Create a series of eight three-dimensional grids that will yield the mesh coefficients for
   // each element.  This allocates a small amount of additional memory, relative to the mesh that
@@ -1306,19 +1977,126 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
   // points on which the electrostatic potential U, dU/dx, dU/dy, ..., d2U/dxdy, ..., d3U/dxdydz
   // are computed, while "mesh" will refer to the collection of coefficients for each corresponding
   // element.
-  const size_t ngrid_a = mps.na + 1;
-  const size_t ngrid_b = mps.nb + 1;
-  const size_t ngrid_c = mps.nc + 1;
-  const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
-  std::vector<double> u_grid(ngabc, 0.0), dudx_grid(ngabc, 0.0), dudy_grid(ngabc, 0.0);
-  std::vector<double> dudz_grid(ngabc, 0.0), dudxy_grid(ngabc, 0.0), dudxz_grid(ngabc, 0.0);
-  std::vector<double> dudyz_grid(ngabc, 0.0), dudxyz_grid(ngabc, 0.0);
-  std::vector<double> dudxx_grid, dudyy_grid, dudzz_grid;
   const UnitCellType unit_cell = measurements.getMeshCellType();
-  if (unit_cell == UnitCellType::TRICLINIC) {
-    dudxx_grid.resize(ngabc, 0.0);
-    dudyy_grid.resize(ngabc, 0.0);
-    dudzz_grid.resize(ngabc, 0.0);
+  UnitCellType imaging_cell;
+  size_t bounds_offset;
+  switch (measurements.getBoundaryConditions()) {
+  case BoundaryCondition::ISOLATED:
+    imaging_cell = UnitCellType::NONE;
+    bounds_offset = 1;
+    break;
+  case BoundaryCondition::PERIODIC:
+    imaging_cell = unit_cell;
+    bounds_offset = 0;
+    break;
+  }
+  const size_t ngrid_a = mps.na + bounds_offset;
+  const size_t ngrid_b = mps.nb + bounds_offset;
+  const size_t ngrid_c = mps.nc + bounds_offset;
+  const size_t ngabc = ngrid_a * ngrid_b * ngrid_c;
+  const size_t nmabc = static_cast<size_t>(mps.na) * static_cast<size_t>(mps.nb) *
+                       static_cast<size_t>(mps.nc) * 8LLU;
+  std::vector<llint> u_grid(ngabc, 0LL);
+  std::vector<llint> dudx_grid(ngabc, 0LL), dudy_grid(ngabc, 0LL), dudz_grid(ngabc, 0LL);
+  std::vector<llint> dudxy_grid, dudxz_grid, dudyz_grid, dudxyz_grid;
+  std::vector<llint> dudxx_grid, dudyy_grid, dudxxx_grid, dudxxy_grid, dudxxz_grid, dudxyy_grid;
+  switch (measurements.getStencilKind()) {
+  case Interpolant::SMOOTHNESS:
+    dudxy_grid.resize(ngabc, 0LL);
+    dudxz_grid.resize(ngabc, 0LL);
+    dudyz_grid.resize(ngabc, 0LL);
+    dudxyz_grid.resize(ngabc, 0LL);
+    if (unit_cell == UnitCellType::TRICLINIC) {
+      dudxx_grid.resize(ngabc, 0LL);
+      dudyy_grid.resize(ngabc, 0LL);
+      dudxxx_grid.resize(ngabc, 0LL);
+      dudxxy_grid.resize(ngabc, 0LL);
+      dudxxz_grid.resize(ngabc, 0LL);
+      dudxyy_grid.resize(ngabc, 0LL);
+    }
+    break;
+  case Interpolant::FUNCTION_VALUE:
+
+    // For interpolating with a determinant weighted towards function values or additional
+    // first derivatives, the additional second derivatives from the trace of the tensor as well
+    // as other third partial derivatives are not needed.  However, some information for fitting
+    // the interpolant coefficients will become specific to each mesh element, which raises some
+    // of the memory requirements in this scheme by a factor approaching eight.
+    dudxy_grid.resize(nmabc, 0LL);
+    dudxz_grid.resize(nmabc, 0LL);
+    dudyz_grid.resize(nmabc, 0LL);
+    dudxyz_grid.resize(nmabc, 0LL);
+    break;
+  }
+
+  // Prepare for the periodic case by making transformation matrices spanning the entire mesh.
+  const double real_na = mps.na;
+  const double real_nb = mps.nb;
+  const double real_nc = mps.nc;
+  const std::vector<double> region_invu = { real_na * mps.invu[0], real_na * mps.invu[1],
+                                            real_na * mps.invu[2],
+                                            real_nb * mps.invu[3], real_nb * mps.invu[4],
+                                            real_nb * mps.invu[5],
+                                            real_nc * mps.invu[6], real_nc * mps.invu[7],
+                                            real_nc * mps.invu[8] };
+  std::vector<double> region_umat(9);
+  invertSquareMatrix(region_invu, &region_umat);
+  
+  // If necessary, pre-compute the coordinates of additional points for the mesh element stencil.
+  std::vector<int95_t> xy_box_x(8), xy_box_y(8), xy_box_z(8);
+  std::vector<int95_t> xz_box_x(8), xz_box_y(8), xz_box_z(8);
+  std::vector<int95_t> yz_box_x(8), yz_box_y(8), yz_box_z(8);
+  std::vector<int95_t> cn_box_x(8), cn_box_y(8), cn_box_z(8);
+  switch (measurements.getStencilKind()) {
+  case Interpolant::SMOOTHNESS:
+    break;
+  case Interpolant::FUNCTION_VALUE:
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        for (int k = 0; k < 2; k++) {
+          const size_t pt_idx = (((k * 2) + j) * 2) + i;
+          double dx, dy, dz;
+          fvStencilCoordinates<double>(0.0, 0.0, 0.0, UnitCellAxis::C, i, j, k, mps.invu,
+                                       &dx, &dy, &dz);
+          xy_box_x[pt_idx] = hostDoubleToInt95(dx * mps.scale);
+          xy_box_y[pt_idx] = hostDoubleToInt95(dy * mps.scale);
+          xy_box_z[pt_idx] = hostDoubleToInt95(dz * mps.scale);
+          fvStencilCoordinates<double>(0.0, 0.0, 0.0, UnitCellAxis::B, i, j, k, mps.invu,
+                                       &dx, &dy, &dz);
+          xz_box_x[pt_idx] = hostDoubleToInt95(dx * mps.scale);
+          xz_box_y[pt_idx] = hostDoubleToInt95(dy * mps.scale);
+          xz_box_z[pt_idx] = hostDoubleToInt95(dz * mps.scale);
+          fvStencilCoordinates<double>(0.0, 0.0, 0.0, UnitCellAxis::A, i, j, k, mps.invu,
+                                       &dx, &dy, &dz);
+          yz_box_x[pt_idx] = hostDoubleToInt95(dx * mps.scale);
+          yz_box_y[pt_idx] = hostDoubleToInt95(dy * mps.scale);
+          yz_box_z[pt_idx] = hostDoubleToInt95(dz * mps.scale);
+          fvStencilCoordinates<double>(0.0, 0.0, 0.0, i, j, k, mps.invu, &dx, &dy, &dz);
+          cn_box_x[pt_idx] = hostDoubleToInt95(dx * mps.scale);
+          cn_box_y[pt_idx] = hostDoubleToInt95(dy * mps.scale);
+          cn_box_z[pt_idx] = hostDoubleToInt95(dz * mps.scale);
+        }
+      }
+    }
+    break;
+  }
+  
+  // Retrieve coefficients for the general softcore electrostatic function.  It uses a slope of
+  // zero as the inter-particle distance approaches zero.
+  Tcalc4 elec_softcore_abcd;
+  Tcalc2 elec_softcore_ef;
+  switch (field) {
+  case NonbondedPotential::CLASH:
+  case NonbondedPotential::VAN_DER_WAALS:
+    break;
+  case NonbondedPotential::ELECTROSTATIC:
+    elec_softcore_abcd = { static_cast<Tcalc>(mnbk.softcore_qq[0]),
+                           static_cast<Tcalc>(mnbk.softcore_qq[1]),
+                           static_cast<Tcalc>(mnbk.softcore_qq[2]),
+                           static_cast<Tcalc>(mnbk.softcore_qq[3]) };
+    elec_softcore_ef = { static_cast<Tcalc>(mnbk.softcore_qq[4]),
+                         static_cast<Tcalc>(mnbk.softcore_qq[5]) };
+    break;
   }
   for (int pos = 0; pos < nbk.natom; pos++) {
     if (mobile_atom[pos]) {
@@ -1332,273 +2110,479 @@ void BackgroundMesh<T>::mapPureNonbondedPotential(const GpuDetails &gpu,
 
     // Get the particle's charge.  The mesh coefficients will be computed in kcal/mol-A^n,
     // n = { 0, 1, 2, 3 } depending on the degree of the derivative.
-    const double atom_q = nbk.charge[pos] * nbk.coulomb_constant;
-    const int atom_lj_idx = nbk.lj_idx[pos];
-    const double atom_lja = nbk.lja_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
-    const double atom_ljb = nbk.ljb_coeff[atom_lj_idx * (nbk.n_lj_types + 1)];
-    const double atom_sigma = (atom_lja >= 1.0e-6 && atom_ljb >= 1.0e-6) ?
-                              pow(atom_lja / atom_ljb, 1.0 / 6.0) : 0.0;
-    const double atom_eps = (atom_sigma > 0.0) ? 0.25 * atom_ljb / pow(atom_sigma, 6.0) :
-                                                 0.0;
-    double pair_eps, pair_sigma;
-    switch (mixing_protocol) {
-    case VdwCombiningRule::LORENTZ_BERTHELOT:
-      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
-      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+    Tcalc atom_q, rlj_lim, pair_lja, pair_ljb;
+    Tcalc4 lj_softcore_abcd;
+    Tcalc2 lj_softcore_ef;
+    switch (field) {
+    case NonbondedPotential::CLASH:
+      {
+        const size_t atom_lj_idx = nbk.lj_idx[pos];
+        rlj_lim  = mnbk.probe_ljsig[atom_lj_idx] * mnbk.clash_ratio;
+      }
       break;
-    case VdwCombiningRule::GEOMETRIC:
-      pair_eps = (atom_eps * well_depth > 1.0e-6) ? sqrt(atom_eps * well_depth) : 0.0;
-      pair_sigma = 0.5 * (atom_sigma + probe_radius);
+    case NonbondedPotential::VAN_DER_WAALS:
+      {
+        const size_t atom_lj_idx = nbk.lj_idx[pos];
+        rlj_lim  = mnbk.probe_ljsig[atom_lj_idx] * mnbk.clash_ratio;
+        pair_lja = mnbk.probe_lja[atom_lj_idx];
+        pair_ljb = mnbk.probe_ljb[atom_lj_idx];
+        lj_softcore_abcd = { static_cast<Tcalc>(mnbk.softcore_lja[atom_lj_idx]),
+                             static_cast<Tcalc>(mnbk.softcore_ljb[atom_lj_idx]),
+                             static_cast<Tcalc>(mnbk.softcore_ljc[atom_lj_idx]),
+                             static_cast<Tcalc>(mnbk.softcore_ljd[atom_lj_idx]) };
+        lj_softcore_ef = { static_cast<Tcalc>(mnbk.softcore_lje[atom_lj_idx]),
+                           static_cast<Tcalc>(mnbk.softcore_ljf[atom_lj_idx]) };
+      }
       break;
-    case VdwCombiningRule::NBFIX:
-      pair_eps   = eps_table[atom_lj_idx];
-      pair_sigma = sigma_table[atom_lj_idx];
+    case NonbondedPotential::ELECTROSTATIC:
+      atom_q = nbk.charge[pos] * nbk.coulomb_constant;
       break;
     }
-    const double pair_lja = 4.0 * pair_eps * pow(pair_sigma, 12.0);
-    const double pair_ljb = 4.0 * pair_eps * pow(pair_sigma, 6.0);
     
     // Loop over all grid points
     for (size_t i = 0; i < ngrid_a; i++) {
-      const int95_t mesh_ax = { a_abs_line_x.readHost(i), a_abs_line_x_overflow.readHost(i) };
-      const int95_t mesh_ay = { a_abs_line_y.readHost(i), a_abs_line_y_overflow.readHost(i) };
-      const int95_t mesh_az = { a_abs_line_z.readHost(i), a_abs_line_z_overflow.readHost(i) };
+      const int95_t mesh_ax = { rlrs.avec_abs_x[i], rlrs.avec_abs_x_ovrf[i] };
+      const int95_t mesh_ay = { rlrs.avec_abs_y[i], rlrs.avec_abs_y_ovrf[i] };
+      const int95_t mesh_az = { rlrs.avec_abs_z[i], rlrs.avec_abs_z_ovrf[i] };
       for (size_t j = 0; j < ngrid_b; j++) {
-        const int95_t mesh_abx = hostSplitFPSum(mesh_ax, bvec_x_ptr[j], bvec_x_overflow_ptr[j]);
-        const int95_t mesh_aby = hostSplitFPSum(mesh_ay, bvec_y_ptr[j], bvec_y_overflow_ptr[j]);
-        const int95_t mesh_abz = hostSplitFPSum(mesh_az, bvec_z_ptr[j], bvec_z_overflow_ptr[j]);
+        const int95_t mesh_abx = hostSplitFPSum(mesh_ax, rlrs.bvec_x[j], rlrs.bvec_x_ovrf[j]);
+        const int95_t mesh_aby = hostSplitFPSum(mesh_ay, rlrs.bvec_y[j], rlrs.bvec_y_ovrf[j]);
+        const int95_t mesh_abz = hostSplitFPSum(mesh_az, rlrs.bvec_z[j], rlrs.bvec_z_ovrf[j]);
         for (size_t k = 0; k < ngrid_c; k++) {
-          const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, cvec_x_ptr[k],
-                                                   cvec_x_overflow_ptr[k]);
-          const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, cvec_y_ptr[k],
-                                                   cvec_y_overflow_ptr[k]);
-          const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, cvec_z_ptr[k],
-                                                   cvec_z_overflow_ptr[k]);
-
+          const int95_t mesh_abcx = hostSplitFPSum(mesh_abx, rlrs.cvec_x[k], rlrs.cvec_x_ovrf[k]);
+          const int95_t mesh_abcy = hostSplitFPSum(mesh_aby, rlrs.cvec_y[k], rlrs.cvec_y_ovrf[k]);
+          const int95_t mesh_abcz = hostSplitFPSum(mesh_abz, rlrs.cvec_z[k], rlrs.cvec_z_ovrf[k]);
+          
           // Compute the displacements using the mesh's fixed-precision representation, then
           // immediately convert to double for real-valued computations.
           const int95_t fp_disp_x = hostSplitFPSum(mesh_abcx, -atom_x.x, -atom_x.y);
           const int95_t fp_disp_y = hostSplitFPSum(mesh_abcy, -atom_y.x, -atom_y.y);
           const int95_t fp_disp_z = hostSplitFPSum(mesh_abcz, -atom_z.x, -atom_z.y);
-          const double disp_x = hostInt95ToDouble(fp_disp_x) * mps.inv_scale;
-          const double disp_y = hostInt95ToDouble(fp_disp_y) * mps.inv_scale;
-          const double disp_z = hostInt95ToDouble(fp_disp_z) * mps.inv_scale;
-          const double r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
-          const double r  = sqrt(r2);
-          const double invr2 = 1.0 / r2;
+          Tcalc disp_x = hostInt95ToDouble(fp_disp_x) * mps.inv_scale;
+          Tcalc disp_y = hostInt95ToDouble(fp_disp_y) * mps.inv_scale;
+          Tcalc disp_z = hostInt95ToDouble(fp_disp_z) * mps.inv_scale;
+          switch (mps.bounds) {
+          case BoundaryCondition::ISOLATED:
+            break;
+          case BoundaryCondition::PERIODIC:
+            imageCoordinates<Tcalc, Tcalc>(&disp_x, &disp_y, &disp_z, region_umat.data(),
+                                           region_invu.data(), unit_cell,
+                                           ImagingMethod::MINIMUM_IMAGE);
+            break;
+          }
+          const Tcalc r2 = (disp_x * disp_x) + (disp_y * disp_y) + (disp_z * disp_z);
+          const Tcalc r  = (tcalc_is_double) ? sqrt(r2) : sqrtf(r2);
+          const Tcalc invr = value_one / r;
+          const Tcalc invr2 = value_one / r2;
 
-          // Compute one of a variety of potentials
-          double u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxyz, du_dxx, du_dyy, du_dzz;
-          switch (field) {
-          case NonbondedPotential::ELECTROSTATIC:
-            u = atom_q / r;
-            du_dx = -u * disp_x * invr2;
-            du_dy = -u * disp_y * invr2;
-            du_dz = -u * disp_z * invr2;
-            du_dxy = -3.0 * du_dx * disp_y * invr2;
-            du_dxz = -3.0 * du_dx * disp_z * invr2;
-            du_dyz = -3.0 * du_dy * disp_z * invr2;
-            du_dxyz = -5.0 * du_dxy * disp_z * invr2;
-            if (unit_cell == UnitCellType::TRICLINIC) {
-              du_dxx = -3.0 * du_dx * disp_x * invr2;
-              du_dyy = -3.0 * du_dy * disp_y * invr2;
-              du_dzz = -3.0 * du_dz * disp_z * invr2;
+          // Compute one of a variety of potentials.  Fill out the chosen stencil in order to fit
+          // mesh coefficients for the element.
+          Tcalc u, du, d2u, d3u, du_dx, du_dy, du_dz, du_dxy, du_dxz, du_dyz, du_dxx, du_dyy;
+          Tcalc du_dxxx, du_dxxy, du_dxxz, du_dxyy, du_dxyz;
+          Tcalc blk_xy[8], blk_xz[8], blk_yz[8], blk_cn[8];
+          switch (measurements.getStencilKind()) {
+          case Interpolant::SMOOTHNESS:
+            {
+              Tcalc4 u_pkg;
+              switch (field) {
+              case NonbondedPotential::ELECTROSTATIC:
+                if (r < mnbk.clash_distance) {
+                  const Tcalc3 tmp_pkg =
+                    evaluateQuinticSpline<Tcalc4, Tcalc3, Tcalc2, Tcalc>(elec_softcore_abcd,
+                                                                         elec_softcore_ef, r);
+                  u_pkg.x = tmp_pkg.x;
+                  u_pkg.y = tmp_pkg.y;
+                  u_pkg.z = tmp_pkg.z;
+
+                  // While the quintic spline does not have a continuous thrid derivative, the
+                  // quintic softcore function is designed to have this feature.  The softcore
+                  // polynomial functions are making use of the spline mechanics due to broader
+                  // similarities, but are not tabulated splines themselves.
+                  if (tcalc_is_double) {
+                    u_pkg.w = (((60.0 * elec_softcore_abcd.x * r) +
+                                (24.0 * elec_softcore_abcd.y)) * r) + (6.0 * elec_softcore_abcd.z);
+                  }
+                  else {
+                    u_pkg.w = (((60.0f * elec_softcore_abcd.x * r) +
+                                (24.0f * elec_softcore_abcd.y)) * r) +
+                              (6.0f * elec_softcore_abcd.z);
+                  }
+                }
+                else {
+                  u_pkg.x = invr;
+                  u_pkg.y = -invr2;
+                  u_pkg.z = value_two * invr * invr2;
+                  u_pkg.w = -value_six * invr2 * invr2;
+                }
+                u_pkg.x *= atom_q;
+                u_pkg.y *= atom_q;
+                u_pkg.z *= atom_q;
+                u_pkg.w *= atom_q;
+                break;
+              case NonbondedPotential::VAN_DER_WAALS:
+                if (r < rlj_lim) {
+                  const Tcalc3 tmp_pkg =
+                    evaluateQuinticSpline<Tcalc4, Tcalc3, Tcalc2, Tcalc>(lj_softcore_abcd,
+                                                                         lj_softcore_ef, r);
+                  u_pkg.x = tmp_pkg.x;
+                  u_pkg.y = tmp_pkg.y;
+                  u_pkg.z = tmp_pkg.z;
+                  if (tcalc_is_double) {
+                    u_pkg.w = (((60.0 * lj_softcore_abcd.x * r) +
+                                (24.0 * lj_softcore_abcd.y)) * r) + (6.0 * lj_softcore_abcd.z);
+                  }
+                  else {
+                    u_pkg.w = (((60.0f * lj_softcore_abcd.x * r) +
+                                (24.0f * lj_softcore_abcd.y)) * r) + (6.0f * lj_softcore_abcd.z);
+                  }
+                }
+                else {
+                  const Tcalc invr3 = invr2 * invr;
+                  const Tcalc invr6 = invr3 * invr3;
+                  u_pkg.x = ((pair_lja * invr6) - pair_ljb) * invr6;
+                  u_pkg.y = ((value_n12   * pair_lja * invr6) + (value_six * pair_ljb)) * invr6 *
+                            invr;
+                  u_pkg.z = ((value_156   * pair_lja * invr6) + (value_n42 * pair_ljb)) * invr6 *
+                            invr2;
+                  u_pkg.w = ((value_n2184 * pair_lja * invr6) + (value_336 * pair_ljb)) * invr6 *
+                            invr3;
+                }
+                break;
+              case NonbondedPotential::CLASH:
+                break;
+              }
+
+              // Repackage the function value and first three derivatives, all of which are
+              // continuous in the quintic spline.
+              u = u_pkg.x;
+              du = u_pkg.y;
+              d2u = u_pkg.z;
+              d3u = u_pkg.w;
             }
             break;
-          case NonbondedPotential::VAN_DER_WAALS:
+          case Interpolant::FUNCTION_VALUE:
             {
-              const double invr6 = invr2 * invr2 * invr2;
-              const double invr8 = invr6 * invr2;
-              const double invr10 = invr8 * invr2;
-              const double d_factor = ((6.0 * pair_ljb) - (12.0 * pair_lja * invr6)) * invr8;
-              const double d2_factor = ((168.0 * pair_lja * invr6) - (48.0 * pair_ljb)) * invr10;
-              const double d3_factor = ((480.0 * pair_ljb) - (2688.0 * pair_lja * invr6)) *
-                                       invr6 * invr6;
-              u = ((pair_lja * invr6) - pair_ljb) * invr6;
-              du_dx = d_factor * disp_x;
-              du_dy = d_factor * disp_y;
-              du_dz = d_factor * disp_z;
-              du_dxy = d2_factor * disp_x * disp_y;
-              du_dxz = d2_factor * disp_x * disp_z;
-              du_dyz = d2_factor * disp_y * disp_z;
-              du_dxyz = d3_factor * disp_x * disp_y * disp_z;
-              if (unit_cell == UnitCellType::TRICLINIC) {
-                du_dxx = d2_factor * disp_x * disp_x;
-                du_dyy = d2_factor * disp_y * disp_y;
-                du_dzz = d2_factor * disp_z * disp_z;
+              Tcalc2 u_pkg;
+              switch (field) {
+              case NonbondedPotential::ELECTROSTATIC:
+                u_pkg = evalElecCSC<Tcalc4, Tcalc2, Tcalc>(elec_softcore_abcd, r,
+                                                           mnbk.clash_distance, atom_q);
+                break;
+              case NonbondedPotential::VAN_DER_WAALS:
+                u_pkg = evalLennardJonesCSC<Tcalc4, Tcalc2, Tcalc>(lj_softcore_abcd, r, rlj_lim,
+                                                                   pair_lja, pair_ljb);
+                break;
+              case NonbondedPotential::CLASH:
+                break;
+              }
+              
+              // Repackage the function value and its first derivative for processing partial
+              // derivatives at the mesh vertex (a corner of up to eight mesh elements).
+              u = u_pkg.x;
+              du = u_pkg.y;
+              
+              // In addition to the corners, the function value must be evaluated at various other
+              // points.  Store the relevant distances, which are all that matter when only
+              // potentials are needed, in the buffers that will eventually hold those energies.
+              // This work is only needed if the i, j, and k indices are less than the mesh's true
+              // na, nb, and nc dimensions, even on a mesh with ISOLATED boundary conditions.
+              if (i < mps.na && j < mps.nb && k < mps.nc) {
+                for (size_t m = 0; m < 8; m++) {
+                  Tcalc4 rp = distance<Tcalc4, Tcalc>(atom_x, atom_y, atom_z,
+                                                      hostSplitFPSum(mesh_abcx, xy_box_x[m]),
+                                                      hostSplitFPSum(mesh_abcy, xy_box_y[m]),
+                                                      hostSplitFPSum(mesh_abcz, xy_box_z[m]),
+                                                      region_umat.data(), region_invu.data(),
+                                                      imaging_cell, mps.scale);
+                  blk_xy[m] = rp.x;
+                  rp = distance<Tcalc4, Tcalc>(atom_x, atom_y, atom_z,
+                                               hostSplitFPSum(mesh_abcx, xz_box_x[m]),
+                                               hostSplitFPSum(mesh_abcy, xz_box_y[m]),
+                                               hostSplitFPSum(mesh_abcz, xz_box_z[m]),
+                                               region_umat.data(), region_invu.data(),
+                                               imaging_cell, mps.scale);
+                  blk_xz[m] = rp.x;
+                  rp = distance<Tcalc4, Tcalc>(atom_x, atom_y, atom_z,
+                                               hostSplitFPSum(mesh_abcx, yz_box_x[m]),
+                                               hostSplitFPSum(mesh_abcy, yz_box_y[m]),
+                                               hostSplitFPSum(mesh_abcz, yz_box_z[m]),
+                                               region_umat.data(), region_invu.data(),
+                                               imaging_cell, mps.scale);
+                  blk_yz[m] = rp.x;
+                  rp = distance<Tcalc4, Tcalc>(atom_x, atom_y, atom_z,
+                                               hostSplitFPSum(mesh_abcx, cn_box_x[m]),
+                                               hostSplitFPSum(mesh_abcy, cn_box_y[m]),
+                                               hostSplitFPSum(mesh_abcz, cn_box_z[m]),
+                                               region_umat.data(), region_invu.data(),
+                                               imaging_cell, mps.scale);
+                  blk_cn[m] = rp.x;
+                }
+                switch (field) {
+                case NonbondedPotential::ELECTROSTATIC:
+                  for (size_t m = 0; m < 8; m++) {
+                    blk_xy[m] = evalElecCSCND<Tcalc4, Tcalc2, Tcalc>(elec_softcore_abcd, blk_xy[m],
+                                                                     mnbk.clash_distance, atom_q);
+                    blk_xz[m] = evalElecCSCND<Tcalc4, Tcalc2, Tcalc>(elec_softcore_abcd, blk_xz[m],
+                                                                     mnbk.clash_distance, atom_q);
+                    blk_yz[m] = evalElecCSCND<Tcalc4, Tcalc2, Tcalc>(elec_softcore_abcd, blk_yz[m],
+                                                                     mnbk.clash_distance, atom_q);
+                    blk_cn[m] = evalElecCSCND<Tcalc4, Tcalc2, Tcalc>(elec_softcore_abcd, blk_cn[m],
+                                                                     mnbk.clash_distance, atom_q);
+                  }
+                  break;
+                case NonbondedPotential::VAN_DER_WAALS:
+                  for (size_t m = 0; m < 8; m++) {
+                    blk_xy[m] = evalLennardJonesCSCND<Tcalc4, Tcalc2, Tcalc>(lj_softcore_abcd,
+                                                                             blk_xy[m], rlj_lim,
+                                                                             pair_lja, pair_ljb);
+                    blk_xz[m] = evalLennardJonesCSCND<Tcalc4, Tcalc2, Tcalc>(lj_softcore_abcd,
+                                                                             blk_xz[m], rlj_lim,
+                                                                             pair_lja, pair_ljb);
+                    blk_yz[m] = evalLennardJonesCSCND<Tcalc4, Tcalc2, Tcalc>(lj_softcore_abcd,
+                                                                             blk_yz[m], rlj_lim,
+                                                                             pair_lja, pair_ljb);
+                    blk_cn[m] = evalLennardJonesCSCND<Tcalc4, Tcalc2, Tcalc>(lj_softcore_abcd,
+                                                                             blk_cn[m], rlj_lim,
+                                                                             pair_lja, pair_ljb);
+                  }
+                  break;
+                case NonbondedPotential::CLASH:
+                  break;
+                }
               }
             }
             break;
-          case NonbondedPotential::CLASH:
+          }
+
+          // Accumulate the function derivatives.  First derivatives along each Cartesian axis at
+          // the mesh element corners are obligatory and calculated by all stencils.
+          du_dx = radialFirstDerivative<Tcalc>(du, disp_x, r);
+          du_dy = radialFirstDerivative<Tcalc>(du, disp_y, r);
+          du_dz = radialFirstDerivative<Tcalc>(du, disp_z, r);
+
+          // Accumulate additional derivatives or function values at other points inside the mesh
+          // element, as necessary to determine a solution to the interpolant coefficients.
+          switch (measurements.getStencilKind()) {
+          case Interpolant::SMOOTHNESS:
+            du_dxy = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_y, r);
+            du_dxz = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_z, r);
+            du_dyz = radialSecondDerivative<Tcalc>(du, d2u, disp_y, disp_z, r);
+            du_dxyz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, disp_z, r);
+            if (unit_cell == UnitCellType::TRICLINIC) {
+              du_dxx = radialSecondDerivative<Tcalc>(du, d2u, disp_x, r);
+              du_dyy = radialSecondDerivative<Tcalc>(du, d2u, disp_y, r);
+              du_dxxx = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, r);
+              du_dxxy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, r);
+              du_dxxz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_z, r);
+              du_dxyy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_y, disp_x, r);
+            }
+            break;
+          case Interpolant::FUNCTION_VALUE:
             break;
           }
 
-          // Log the results
+          // Log the results.  All interpolants make use of function values and first Cartesian
+          // derivatives at the mesh element corners.
           const size_t nijk = (((k * ngrid_b) + j) * ngrid_a) + i;
-          u_grid[nijk] += u;
-          dudx_grid[nijk] += du_dx;
-          dudy_grid[nijk] += du_dy;
-          dudz_grid[nijk] += du_dz;
-          dudxy_grid[nijk] += du_dxy;
-          dudxz_grid[nijk] += du_dxz;
-          dudyz_grid[nijk] += du_dyz;
-          dudxyz_grid[nijk] += du_dxyz;
-          if (unit_cell == UnitCellType::TRICLINIC) {
-            dudxx_grid[nijk] += du_dxx;
-            dudyy_grid[nijk] += du_dyy;
-            dudzz_grid[nijk] += du_dzz;
-          }
-        }
-      }
-    }
-  }
-
-  // Convert the computed grid data into a functional mesh
-  computeCoefficients(u_grid, dudx_grid, dudy_grid, dudz_grid, dudxy_grid, dudxz_grid,
-                      dudyz_grid, dudxyz_grid);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
-std::vector<Txfrm> interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const Tcoord* xcrd,
-                               const Tcoord* ycrd, const Tcoord* zcrd, const Tprop* prop_a,
-                               const Tprop* prop_b, const int natom, const int* xcrd_ovrf,
-                               const int* ycrd_ovrf, const int* zcrd_ovrf,
-                               const int coord_scaling_bits) {
-
-  // Check whether the grid works in a format that would restrict the fixed-precision math to just
-  // the first 64 bits of the representation.
-  const size_t data_ct = std::type_index(typeid(Tdata)).hash_code();
-  const bool mesh_data_is_double = (data_ct == double_type_index);  
-  const bool coord_is_integral = isSignedIntegralScalarType<Tcoord>();
-  const bool coordinate_overflow_active = (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr &&
-                                           zcrd_ovrf != nullptr);
-  std::vector<Txfrm> result;
-
-  // Loop over all particles
-  for (int pos = 0; pos < natom; pos++) {
-  
-    // Determine the grid bin using a transformation into mesh space followed by a local check and,
-    // if necessary, a correction.  The precision of the mesh coefficients will determine the
-    // precision of the fixed-precision coordinate representation, following the standard set forth
-    // in validateScalingBits() above.
-    if (mesh_data_is_double) {
-      int95_t ixcrd, iycrd, izcrd;
-      if (coord_is_integral) {
-
-        // The coordinates may not have the same precision as the positions expected by the mesh.
-        // Harmonize the representations.
-        if (coord_scaling_bits == bgmr.dims.scale_bits) {
-          ixcrd.x = xcrd[pos];
-          iycrd.x = ycrd[pos];
-          izcrd.x = zcrd[pos];
-          if (coordinate_overflow_active) {
-            ixcrd.y = xcrd[pos];
-            iycrd.y = ycrd[pos];
-            izcrd.y = zcrd[pos];          
-          }
-        }
-        else {
-          int95_t orep_xcrd, orep_ycrd, orep_zcrd;
-          if (coordinate_overflow_active) {
-            orep_xcrd = { xcrd[pos], xcrd_ovrf[pos] };
-            orep_ycrd = { ycrd[pos], ycrd_ovrf[pos] };
-            orep_zcrd = { zcrd[pos], zcrd_ovrf[pos] };
+          if (tcalc_is_double) {
+            u_grid[nijk] += llround(u * coeff_scl);
+            dudx_grid[nijk] += llround(du_dx * coeff_scl);
+            dudy_grid[nijk] += llround(du_dy * coeff_scl);
+            dudz_grid[nijk] += llround(du_dz * coeff_scl);
           }
           else {
-            orep_xcrd = { xcrd[pos], 0 };
-            orep_ycrd = { ycrd[pos], 0 };
-            orep_zcrd = { zcrd[pos], 0 };
+            u_grid[nijk] += llroundf(u * coeff_scl);
+            dudx_grid[nijk] += llroundf(du_dx * coeff_scl);
+            dudy_grid[nijk] += llroundf(du_dy * coeff_scl);
+            dudz_grid[nijk] += llroundf(du_dz * coeff_scl);
           }
-          ixcrd = changeFPBits(orep_xcrd, coord_scaling_bits, bgmr.dims.scale_bits);
-          iycrd = changeFPBits(orep_ycrd, coord_scaling_bits, bgmr.dims.scale_bits);
-          izcrd = changeFPBits(orep_zcrd, coord_scaling_bits, bgmr.dims.scale_bits);
+
+          // Interpolants that only use first derivatives carry the advantage that additional
+          // mixed partial derivatives do not need to be calculated.  However, for interpolants
+          // fitted using second- and third-order derivatives spanning cells with non-othogonal
+          // axes, additional partial derivatives need to be computed and stored.  In contrast,
+          // storage requirements for other kernels grow in some arrays 
+          switch (measurements.getStencilKind()) {
+          case Interpolant::SMOOTHNESS:
+            if (tcalc_is_double) {
+              dudxy_grid[nijk]  += llround(du_dxy * coeff_scl);
+              dudxz_grid[nijk]  += llround(du_dxz * coeff_scl);
+              dudyz_grid[nijk]  += llround(du_dyz * coeff_scl);
+              dudxyz_grid[nijk] += llround(du_dxyz * coeff_scl);
+            }
+            else {
+              dudxy_grid[nijk]  += llroundf(du_dxy * coeff_scl);
+              dudxz_grid[nijk]  += llroundf(du_dxz * coeff_scl);
+              dudyz_grid[nijk]  += llroundf(du_dyz * coeff_scl);
+              dudxyz_grid[nijk] += llroundf(du_dxyz * coeff_scl);
+            }
+            if (unit_cell == UnitCellType::TRICLINIC) {
+              if (tcalc_is_double) {
+                dudxx_grid[nijk]  += llround(du_dxx * coeff_scl);
+                dudyy_grid[nijk]  += llround(du_dyy * coeff_scl);
+                dudxxx_grid[nijk] += llround(du_dxxx * coeff_scl);
+                dudxxy_grid[nijk] += llround(du_dxxy * coeff_scl);
+                dudxxz_grid[nijk] += llround(du_dxxz * coeff_scl);
+                dudxyy_grid[nijk] += llround(du_dxyy * coeff_scl);
+              }
+              else {
+                dudxx_grid[nijk]  += llroundf(du_dxx * coeff_scl);
+                dudyy_grid[nijk]  += llroundf(du_dyy * coeff_scl);
+                dudxxx_grid[nijk] += llroundf(du_dxxx * coeff_scl);
+                dudxxy_grid[nijk] += llroundf(du_dxxy * coeff_scl);
+                dudxxz_grid[nijk] += llroundf(du_dxxz * coeff_scl);
+                dudxyy_grid[nijk] += llroundf(du_dxyy * coeff_scl);
+              }
+            }
+            break;
+          case Interpolant::FUNCTION_VALUE:
+            {
+              // Because additional partial derivatives are not needed when building an interpolant
+              // based on additional function values, there is no distinction between triclinic and
+              // orthorhombic unit cells at this stage.  However, the arrays holding this
+              // information, relating to points within each element and off of the mesh lattice,
+              // are only valid for i, j, and k less than the mesh's own na, nb, and nc dimensions.
+              if (i < mps.na && j < mps.nb && k < mps.nc) {
+                const size_t nijk_element = 8LLU *
+                                            static_cast<size_t>((((k * mps.nb) + j) * mps.na) + i);
+                if (tcalc_is_double) {
+                  for (size_t m = 0; m < 8; m++) {
+                    dudxy_grid[nijk_element + m]  += llround(blk_xy[m] * coeff_scl);
+                    dudxz_grid[nijk_element + m]  += llround(blk_xz[m] * coeff_scl);
+                    dudyz_grid[nijk_element + m]  += llround(blk_yz[m] * coeff_scl);
+                    dudxyz_grid[nijk_element + m] += llround(blk_cn[m] * coeff_scl);
+                  }
+                }
+                else {
+                  for (size_t m = 0; m < 8; m++) {
+                    dudxy_grid[nijk_element + m]  += llroundf(blk_xy[m] * coeff_scl);
+                    dudxz_grid[nijk_element + m]  += llroundf(blk_xz[m] * coeff_scl);
+                    dudyz_grid[nijk_element + m]  += llroundf(blk_yz[m] * coeff_scl);
+                    dudxyz_grid[nijk_element + m] += llroundf(blk_cn[m] * coeff_scl);
+                  }
+                }
+              }
+            }
+            break;
+          }
         }
       }
-      else {
-        ixcrd = hostDoubleToInt95(xcrd[pos]);
-        iycrd = hostDoubleToInt95(ycrd[pos]);
-        izcrd = hostDoubleToInt95(zcrd[pos]);
-      }
-
-      // Obtain the coordinates of the atom, relative to the mesh origin, in the precision of the
-      // transformation matrices.  Estimate the appropriate mesh element, then test by computing
-      // the location of the atom relative to the origin of this element.
-      const int95_t ipt_rel_x = hostSplitFPSum(ixcrd, -bgmr.dims.orig_x.x, -bgmr.dims.orig_x.y);
-      const int95_t ipt_rel_y = hostSplitFPSum(iycrd, -bgmr.dims.orig_y.x, -bgmr.dims.orig_y.y);
-      const int95_t ipt_rel_z = hostSplitFPSum(izcrd, -bgmr.dims.orig_z.x, -bgmr.dims.orig_z.y);
-      const Txfrm pt_rel_x = hostInt95ToDouble(ipt_rel_x);
-      const Txfrm pt_rel_y = hostInt95ToDouble(ipt_rel_y);
-      const Txfrm pt_rel_z = hostInt95ToDouble(ipt_rel_z);
-      const Txfrm pt_grid_a = (bgmr.dims.umat[0] * pt_rel_x) + (bgmr.dims.umat[3] * pt_rel_y) +
-                              (bgmr.dims.umat[6] * pt_rel_z);
-      const Txfrm pt_grid_b = (bgmr.dims.umat[1] * pt_rel_x) + (bgmr.dims.umat[4] * pt_rel_y) +
-                              (bgmr.dims.umat[7] * pt_rel_z);
-      const Txfrm pt_grid_c = (bgmr.dims.umat[2] * pt_rel_x) + (bgmr.dims.umat[5] * pt_rel_y) +
-                              (bgmr.dims.umat[8] * pt_rel_z);
-      int cell_a = floor(pt_grid_a);
-      int cell_b = floor(pt_grid_b);
-      int cell_c = floor(pt_grid_c);
-
-      // If the initial estimate is already off the grid, bail out
-      if (cell_a < 0 || cell_a >= bgmr.dims.na || cell_b < 0 || cell_b >= bgmr.dims.nb ||
-          cell_c < 0 || cell_c >= bgmr.dims.nc) {
-        result[pos] = 0.0;
-        continue;
-      }
-      int95_t element_origin_x = { bgmr.avec_abs_x[cell_a], bgmr.avec_abs_x_ovrf[cell_a] };
-      int95_t element_origin_y = { bgmr.avec_abs_y[cell_a], bgmr.avec_abs_y_ovrf[cell_a] };
-      int95_t element_origin_z = { bgmr.avec_abs_z[cell_a], bgmr.avec_abs_z_ovrf[cell_a] };
-      element_origin_x = hostSplitFPSum(element_origin_x, bgmr.bvec_x[cell_b],
-                                        bgmr.bvec_x_ovrf[cell_b]);
-      element_origin_y = hostSplitFPSum(element_origin_y, bgmr.bvec_y[cell_b],
-                                        bgmr.bvec_y_ovrf[cell_b]);
-      element_origin_z = hostSplitFPSum(element_origin_z, bgmr.bvec_z[cell_b],
-                                        bgmr.bvec_z_ovrf[cell_b]);
-      element_origin_x = hostSplitFPSum(element_origin_x, bgmr.cvec_x[cell_b],
-                                        bgmr.cvec_x_ovrf[cell_b]);
-      element_origin_y = hostSplitFPSum(element_origin_y, bgmr.cvec_y[cell_b],
-                                        bgmr.cvec_y_ovrf[cell_b]);
-      element_origin_z = hostSplitFPSum(element_origin_z, bgmr.cvec_z[cell_b],
-                                        bgmr.cvec_z_ovrf[cell_b]);
-      const int95_t idisp_x = hostSplitFPSum(ixcrd, -element_origin_x.x, -element_origin_x.y);
-      const int95_t idisp_y = hostSplitFPSum(iycrd, -element_origin_y.x, -element_origin_y.y);
-      const int95_t idisp_z = hostSplitFPSum(izcrd, -element_origin_z.x, -element_origin_z.y);
-      const Txfrm disp_x = hostInt95ToDouble(idisp_x);
-      const Txfrm disp_y = hostInt95ToDouble(idisp_y);
-      const Txfrm disp_z = hostInt95ToDouble(idisp_z);
-      Txfrm test_a = (bgmr.dims.umat[0] * disp_x) + (bgmr.dims.umat[3] * disp_y) +
-                     (bgmr.dims.umat[6] * disp_z);
-      Txfrm test_b = (bgmr.dims.umat[1] * disp_x) + (bgmr.dims.umat[4] * disp_y) +
-                     (bgmr.dims.umat[7] * disp_z);
-      Txfrm test_c = (bgmr.dims.umat[2] * disp_x) + (bgmr.dims.umat[5] * disp_y) +
-                     (bgmr.dims.umat[8] * disp_z);
-      cell_a += (test_a < 0.0) - (test_a >= 1.0);
-      cell_b += (test_b < 0.0) - (test_b >= 1.0);
-      cell_c += (test_c < 0.0) - (test_c >= 1.0);
-
     }
-    else {
-    }
+  }
   
-    switch (bgmr.kind) {
-    case GridDetail::OCCLUSION:
-      break;
-    case GridDetail::NONBONDED_FIELD:
-    case GridDetail::NONBONDED_ATOMIC:
-      break;
+  // Mimic the GPU-based protocol by converting the long long integer accumulators to
+  // double-precision real numbers prior to multiplying by double-precision transformations to
+  // obtain each elements' coefficients, which can then be stored in the mesh's native type.  By
+  // converting one array at a time and then resizing the original to zero, memory is conserved.
+  std::vector<double> ru_grid = convertData<llint, double>(&u_grid, coeff_scl);
+  std::vector<double> rdudx_grid = convertData<llint, double>(&dudx_grid, coeff_scl);
+  std::vector<double> rdudy_grid = convertData<llint, double>(&dudy_grid, coeff_scl);
+  std::vector<double> rdudz_grid = convertData<llint, double>(&dudz_grid, coeff_scl);
+  std::vector<double> rdudxy_grid = convertData<llint, double>(&dudxy_grid, coeff_scl);
+  std::vector<double> rdudxz_grid = convertData<llint, double>(&dudxz_grid, coeff_scl);
+  std::vector<double> rdudyz_grid = convertData<llint, double>(&dudyz_grid, coeff_scl);
+  std::vector<double> rdudxyz_grid = convertData<llint, double>(&dudxyz_grid, coeff_scl);
+  std::vector<double> rdudxx_grid, rdudyy_grid;
+  std::vector<double> rdudxxx_grid, rdudxxy_grid, rdudxxz_grid, rdudxyy_grid;
+  switch (measurements.getStencilKind()) {
+  case Interpolant::SMOOTHNESS:
+    if (unit_cell == UnitCellType::TRICLINIC) {
+      rdudxx_grid = convertData<llint, double>(&dudxx_grid, coeff_scl);
+      rdudyy_grid = convertData<llint, double>(&dudyy_grid, coeff_scl);
+      rdudxxx_grid = convertData<llint, double>(&dudxxx_grid, coeff_scl);
+      rdudxxy_grid = convertData<llint, double>(&dudxxy_grid, coeff_scl);
+      rdudxxz_grid = convertData<llint, double>(&dudxxz_grid, coeff_scl);
+      rdudxyy_grid = convertData<llint, double>(&dudxyy_grid, coeff_scl);
     }
+    break;
+  case Interpolant::FUNCTION_VALUE:
+    break;
+  }
+  
+  // Convert the computed grid data into a functional mesh
+  switch (unit_cell) {
+  case UnitCellType::ORTHORHOMBIC:
+    computeCoefficients(ru_grid, rdudx_grid, rdudy_grid, rdudz_grid, rdudxy_grid, rdudxz_grid,
+                        rdudyz_grid, rdudxyz_grid, tc_weights);
+    break;
+  case UnitCellType::TRICLINIC:
+    computeCoefficients(ru_grid, rdudx_grid, rdudy_grid, rdudz_grid, rdudxx_grid, rdudxy_grid,
+                        rdudxz_grid, rdudyy_grid, rdudyz_grid, rdudxxx_grid, rdudxxy_grid,
+                        rdudxxz_grid, rdudxyy_grid, rdudxyz_grid, tc_weights);
+    break;
+  case UnitCellType::NONE:
+    break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Txfrm, typename Tdata, typename Tcoord, typename Tprop>
-Txfrm interpolate(const BackgroundMeshReader<Txfrm, Tdata> &bgmr, const std::vector<Tcoord> &xcrd,
-                  const std::vector<Tcoord> &ycrd, const std::vector<Tcoord> &zcrd,
-                  const std::vector<Tprop> &prop_a, const std::vector<Tprop> &prop_b,
-                  const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
-                  const int coord_scaling_bits) {
+template <typename T>
+void BackgroundMesh<T>::mapPureNonbondedPotential(const MeshKlManager &launcher,
+                                                  const PrecisionModel prec,
+                                                  const HybridTargetLevel availability,
+                                                  const std::vector<double> &sigma_table,
+                                                  const std::vector<double> &eps_table) {
 
+  // Compute the weights matrix
+  TricubicStencil tc_weights(measurements.getStencilKind());
+  
+  // Use the HPC kernel to color the mesh if a GPU is available
+#ifdef STORMM_USE_HPC
+  tc_weights.upload();
+  const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+  const CoordinateFrameReader cfr = (availability == HybridTargetLevel::HOST) ?
+                                    basis.getCoordinatePointer()->deviceViewToHostData() :
+                                    basis.getCoordinatePointer()->data(devc_tier);
+  if (launcher.getGpu() != null_gpu) {
+
+    // Upload critical components of the mesh object so that they will be available on the GPU.
+    // No changes will be made to the coordinate object or the topology.
+    uploadFrame();
+    uploadForceField();
+
+    // Color the mesh on the GPU.  During evaluations on the mesh, the mesh non-bonded parameters
+    // are taken in whatever form the mesh coefficients are found in.  However, for mesh
+    // construction, there is a possibility of using double precision arithmetic for coefficients
+    // that will ultimately be stored in single precision.  Therefore, always provide
+    // double-precision non-bonded mesh parameters, and convert them to the appropriate calculation
+    // mode in the kernel.  This mirrors what occurs on the CPU.
+    const MeshFFKit<double> mnbk = getReferenceNonbondedKit(devc_tier);
+    BackgroundMeshWriter<void> bgmw = templateFreeData(devc_tier);
+    launchColorNonbondedFieldMesh(&bgmw, std::type_index(typeid(T)).hash_code(), mnbk, prec,
+                                  tc_weights.data(), basis.getTopologyPointer(), cfr, launcher,
+                                  availability);
+
+    // Synchronize the computed coefficients on the host and device.
+    cudaDeviceSynchronize();
+    coefficients.download();
+    return;
+  }
+  else {
+#endif
+    // Color the mesh on the CPU.  The mesh non-bonded parameters are taken in whatever form the
+    // mesh coefficients are found in.  If the calculation mode is SINGLE but the coefficients are
+    // double-precision, these coefficients will be converted to single-precision values before
+    // being used to compute mesh-based potentials.
+    const AtomGraph *ag_ptr = basis.getTopologyPointer();
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      {
+        const NonbondedKit<double> nbk = ag_ptr->getDoublePrecisionNonbondedKit();
+        colorNonbondedField<double, double2, double3, double4>(nbk, tc_weights, sigma_table,
+                                                               eps_table);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      {
+        const NonbondedKit<float> nbk = ag_ptr->getSinglePrecisionNonbondedKit();
+        colorNonbondedField<float, float2, float3, float4>(nbk, tc_weights, sigma_table,
+                                                           eps_table);
+      }
+      break;
+    }
+#ifdef STORMM_USE_HPC
+  }
+#endif
 }
 
 } // namespace structure

@@ -150,8 +150,8 @@ void imageCoordinates(Tcoord *x, Tcoord *y, Tcoord *z, const double* umat, const
         local_z = (*z);
       }
       Tcalc ndx = (umat[0] * local_x) + (umat[3] * local_y) + (umat[6] * local_z);
-      Tcalc ndy = (umat[1] * local_x) + (umat[4] * local_y) + (umat[7] * local_z);
-      Tcalc ndz = (umat[2] * local_x) + (umat[5] * local_y) + (umat[8] * local_z);
+      Tcalc ndy =                       (umat[4] * local_y) + (umat[7] * local_z);
+      Tcalc ndz =                                             (umat[8] * local_z);
       switch (style) {
       case ImagingMethod::PRIMARY_UNIT_CELL:
         if (tcalc_is_double) {
@@ -183,13 +183,13 @@ void imageCoordinates(Tcoord *x, Tcoord *y, Tcoord *z, const double* umat, const
       }
       if (tcoord_is_sgnint) {
         *x = llround(((invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz)) * gpos_scale_factor);
-        *y = llround(((invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz)) * gpos_scale_factor);
-        *z = llround(((invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz)) * gpos_scale_factor);
+        *y = llround((                  (invu[4] * ndy) + (invu[7] * ndz)) * gpos_scale_factor);
+        *z = llround((                                    (invu[8] * ndz)) * gpos_scale_factor);
       }
       else {
         *x = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);
-        *y = (invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz);
-        *z = (invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz);
+        *y =                   (invu[4] * ndy) + (invu[7] * ndz);
+        *z =                                     (invu[8] * ndz);
       }
     }
     break;
@@ -315,8 +315,8 @@ void imageCoordinates(Tcoord* x, Tcoord* y, Tcoord* z, const int length, const d
         local_z = z[i];
       }
       Tcalc ndx = (umat[0] * local_x) + (umat[3] * local_y) + (umat[6] * local_z);
-      Tcalc ndy = (umat[1] * local_x) + (umat[4] * local_y) + (umat[7] * local_z);
-      Tcalc ndz = (umat[2] * local_x) + (umat[5] * local_y) + (umat[8] * local_z);
+      Tcalc ndy =                       (umat[4] * local_y) + (umat[7] * local_z);
+      Tcalc ndz =                                             (umat[8] * local_z);
       switch (style) {
       case ImagingMethod::PRIMARY_UNIT_CELL:
         if (tcalc_is_double) {
@@ -350,10 +350,8 @@ void imageCoordinates(Tcoord* x, Tcoord* y, Tcoord* z, const int length, const d
         if (xtra_bits) {
           const double t_rx = ((invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz)) *
                               gpos_scale_factor;
-          const double t_ry = ((invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz)) *
-                              gpos_scale_factor;
-          const double t_rz = ((invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz)) *
-                              gpos_scale_factor;
+          const double t_ry = ((invu[4] * ndy) + (invu[7] * ndz)) * gpos_scale_factor;
+          const double t_rz = ((invu[8] * ndz)) * gpos_scale_factor;
           const int95_t it_rx = hostDoubleToInt95(t_rx);
           const int95_t it_ry = hostDoubleToInt95(t_ry);
           const int95_t it_rz = hostDoubleToInt95(t_rz);
@@ -367,16 +365,14 @@ void imageCoordinates(Tcoord* x, Tcoord* y, Tcoord* z, const int length, const d
         else {
           x[i] = llround(((invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz)) *
                          gpos_scale_factor);
-          y[i] = llround(((invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz)) *
-                         gpos_scale_factor);
-          z[i] = llround(((invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz)) *
-                         gpos_scale_factor);
+          y[i] = llround(((invu[4] * ndy) + (invu[7] * ndz)) * gpos_scale_factor);
+          z[i] = llround(((invu[8] * ndz)) * gpos_scale_factor);
         }
       }
       else {
         x[i] = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);
-        y[i] = (invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz);
-        z[i] = (invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz);
+        y[i] =                   (invu[4] * ndy) + (invu[7] * ndz);
+        z[i] =                                     (invu[8] * ndz);
       }
     }
     break;
@@ -487,32 +483,50 @@ void imageCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index,
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcalc4, typename Tcalc>
+Tcalc4 distance(const int95_t pti_x, const int95_t pti_y, const int95_t pti_z, const int95_t ptj_x,
+                const int95_t ptj_y, const int95_t ptj_z, const double* umat, const double* invu,
+                const UnitCellType unit_cell, const Tcalc gpos_scale_factor) {
+  const int95_t fp_disp_x = hostInt95Sum(ptj_x.x, ptj_x.y, -pti_x.x, -pti_x.y);
+  const int95_t fp_disp_y = hostInt95Sum(ptj_y.x, ptj_y.y, -pti_y.x, -pti_y.y);
+  const int95_t fp_disp_z = hostInt95Sum(ptj_z.x, ptj_z.y, -pti_z.x, -pti_z.y);
+  const Tcalc inv_gpos_factor = static_cast<Tcalc>(1.0) / gpos_scale_factor;
+  Tcalc dx = hostInt95ToDouble(fp_disp_x) * inv_gpos_factor;
+  Tcalc dy = hostInt95ToDouble(fp_disp_y) * inv_gpos_factor;
+  Tcalc dz = hostInt95ToDouble(fp_disp_z) * inv_gpos_factor;
+  imageCoordinates<Tcalc, Tcalc>(&dx, &dy, &dz, umat, invu, unit_cell,
+                                 ImagingMethod::MINIMUM_IMAGE);
+  const Tcalc r = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) ?
+                  sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                  sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+  return { r, dx, dy, dz };
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 Tcalc distance(const int atom_i, const int atom_j, const Tcoord* xcrd, const Tcoord* ycrd,
                const Tcoord* zcrd, const double* umat, const double* invu,
                const UnitCellType unit_cell, const Tcalc gpos_scale_factor, const int* xcrd_ovrf,
                const int* ycrd_ovrf, const int* zcrd_ovrf) {
-  Tcoord dx = xcrd[atom_j] - xcrd[atom_i];
-  Tcoord dy = ycrd[atom_j] - ycrd[atom_i];
-  Tcoord dz = zcrd[atom_j] - zcrd[atom_i];
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE,
-                   gpos_scale_factor);
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
+  Tcalc dx, dy, dz;
   if (tcoord_is_sgnint) {
-    const Tcalc value_one = 1.0;
-    const Tcalc inv_gpos_factor = value_one / gpos_scale_factor;
-    const Tcalc rdx = static_cast<Tcalc>(dx * inv_gpos_factor);
-    const Tcalc rdy = static_cast<Tcalc>(dy * inv_gpos_factor);
-    const Tcalc rdz = static_cast<Tcalc>(dz * inv_gpos_factor);
-    return (tcalc_is_double) ? sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz)) :
-                               sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));    
+    const Tcalc inv_gpos_factor = static_cast<Tcalc>(1.0) / gpos_scale_factor;
+    dx = static_cast<Tcalc>(xcrd[atom_j] - xcrd[atom_i]) * inv_gpos_factor;
+    dy = static_cast<Tcalc>(ycrd[atom_j] - ycrd[atom_i]) * inv_gpos_factor;
+    dz = static_cast<Tcalc>(zcrd[atom_j] - zcrd[atom_i]) * inv_gpos_factor;
   }
   else {
-    return (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
-                               sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    dx = xcrd[atom_j] - xcrd[atom_i];
+    dy = ycrd[atom_j] - ycrd[atom_i];
+    dz = zcrd[atom_j] - zcrd[atom_i];
   }
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE,
+                   gpos_scale_factor);
+  return (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                             sqrtf((dx * dx) + (dy * dy) + (dz * dz));    
   __builtin_unreachable();
 }
 

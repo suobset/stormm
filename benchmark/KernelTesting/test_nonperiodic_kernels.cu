@@ -7,7 +7,7 @@
 #include <vector>
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"
-#include "../../src/Accelerator/kernel_manager.h"
+#include "../../src/Accelerator/core_kernel_manager.h"
 #include "../../src/Constants/split_fixed_precision.h"
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
@@ -110,7 +110,7 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
   StaticExclusionMaskSynthesis poly_se(ag_vec, ag_idx);
   SeMaskSynthesisReader poly_ser = poly_se.data();
   poly_ag.loadNonbondedWorkUnits(poly_se);
-  KernelManager launcher(gpu, poly_ag);
+  CoreKlManager launcher(gpu, poly_ag);
   ScoreCard sc(nrep, 1, 32);
   const int2 valence_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg, acc_meth,
                                                         purpose);

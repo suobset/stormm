@@ -73,46 +73,28 @@ public:
   /// \param igseed  The pseudo-randome number seed
   Ran2Generator(int igseed = default_random_seed);  
 
-  /// \brief Return a single random number distributed over a uniform distribution.  This is an
-  ///        internal generator based on an integer vector state which will provide reproducible
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1).  This is
+  ///        an internal generator based on an integer vector state which will provide reproducible
   ///        results across platforms.
-  ///
-  /// Overloaded:
-  ///   - Issue a single random number
-  ///   - Issue multiple random numbers as a std::vector<double>
-  ///   - Issue random numbers to fill a Standard Template Library vector of arbitrary type (these
-  ///     random numbers will still be issued as double-precision, using a procedure that draws on
-  ///     53 bits of the 64-bit string)
-  ///
-  /// \param count     The quantity of random numbers to produce
-  /// \param rows      The total rows of a matrix to fill up with random numbers
-  /// \param columns   The total columns of a matrix to fill up with random numbers
-  /// \param xv        Pre-allocated array to fill with random numbers
-  /// \param fp_scale  Fixed precision scaling factor to apply when filling arrays of integer type
-  /// \{
   double uniformRandomNumber();
-  std::vector<double> uniformRandomNumber(size_t count);
-  std::vector<double> uniformRandomNumber(size_t rows, size_t columns,
-                                          RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void uniformRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1), in
+  ///        single-precision.  While the XOR-shift random generators have a distinct method for
+  ///        producing single-precision random numbers (selecting the highest-quality bits), this
+  ///        merely calls uniformRandomNumber() and exists for compatibility with the other
+  ///        generators in templated xxxxRand() functions.
+  float spUniformRandomNumber();
 
-  /// \brief Return a normally distributed random number.  This works off of the uniform random
-  ///        number generator and will thus advance the state vector of the RandomNumberGenerator
-  ///        that produces the result.  This functon is overloaded in a manner similar to the
-  ///        uniformRandomNumber() member function (see above) and accepts input parameters with
-  ///        similar descriptions.
-  /// \{
+  /// \brief Return a normally distributed random number with standard deviation 1.0.  This works
+  ///        off of the uniform random number generator and will thus advance the state vector of
+  ///        the random number generator that produces the result.
   double gaussianRandomNumber();
-  std::vector<double> gaussianRandomNumber(size_t count);
-  std::vector<double> gaussianRandomNumber(size_t rows, size_t columns,
-                                           RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void gaussianRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
+  /// \brief Produce a single-precision random number on the normal distribution with a standard
+  ///        deviation of 1.0.  Like spUniformRandomNumber(), this function merely calls
+  ///        gaussianRandomNumber() and exists for compatibility with other random number
+  ///        generators in templated functions.
+  float spGaussianRandomNumber();
 
 private:
   int iunstable_a;
@@ -162,72 +144,28 @@ public:
   Xoroshiro128pGenerator(const ullint2 state_in);
   /// \}
   
-  /// \brief Return a single random number distributed over a uniform distribution.  This is an
-  ///        internal generator based on an integer vector state which will provide reproducible
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1).  This is
+  ///        an internal generator based on an integer vector state which will provide reproducible
   ///        results across platforms.
-  ///
-  /// Overloaded:
-  ///   - Issue a single random number
-  ///   - Issue multiple random numbers as a std::vector<double>
-  ///   - Issue random numbers to fill a Standard Template Library vector of arbitrary type (these
-  ///     random numbers will still be issued as double-precision, using a procedure that draws on
-  ///     53 bits of the 64-bit string)
-  ///
-  /// \param count     The quantity of random numbers to produce
-  /// \param rows      The total rows of a matrix to fill up with random numbers
-  /// \param columns   The total columns of a matrix to fill up with random numbers
-  /// \param xv        Pre-allocated array to fill with random numbers
-  /// \param fp_scale  Fixed precision scaling factor to apply when filling arrays of integer type
-  /// \{
   double uniformRandomNumber();
-  std::vector<double> uniformRandomNumber(size_t count);
-  std::vector<double> uniformRandomNumber(size_t rows, size_t columns,
-                                          RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void uniformRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a single-precision random number obtained from a uniform distribution.
-  ///        Various overloads as well as descriptions for their parameters follow from the
-  ///        uniformRandomNumber() member function, above.
-  /// \{
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1), in
+  ///        single-precision.  While the XOR-shift random generators have a distinct method for
+  ///        producing single-precision random numbers (selecting the highest-quality bits), this
+  ///        merely calls uniformRandomNumber() and exists for compatibility with the other
+  ///        generators in templated xxxxRand() functions.
   float spUniformRandomNumber();
-  std::vector<float> spUniformRandomNumber(size_t count);
-  std::vector<float> spUniformRandomNumber(size_t rows, size_t columns,
-                                           RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void spUniformRandomNumber(std::vector<T> *xv, float fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a normally distributed random number.  This works off of the uniform random
-  ///        number generator and will thus advance the state vector of the RandomNumberGenerator
-  ///        that produces the result.  This functon is overloaded in a manner similar to the
-  ///        uniformRandomNumber() member function (see above) and accepts input parameters with
-  ///        similar descriptions.
-  /// \{
+  /// \brief Return a normally distributed random number with standard deviation 1.0.  This works
+  ///        off of the uniform random number generator and will thus advance the state vector of
+  ///        the random number generator that produces the result.
   double gaussianRandomNumber();
-  std::vector<double> gaussianRandomNumber(size_t count);
-  std::vector<double> gaussianRandomNumber(size_t rows, size_t columns,
-                                           RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void gaussianRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a single-precision random number obtained from a normal distribution.  This
-  ///        functon is overloaded in a manner similar to the uniformRandomNumber() member function
-  ///        (see above) and accepts input parameters with similar descriptions.
-  /// \{
+  /// \brief Produce a single-precision random number on the normal distribution with a standard
+  ///        deviation of 1.0.  Like spUniformRandomNumber(), this function merely calls
+  ///        gaussianRandomNumber() and exists for compatibility with other random number
+  ///        generators in templated functions.
   float spGaussianRandomNumber();
-  std::vector<float> spGaussianRandomNumber(size_t count);
-  std::vector<float> spGaussianRandomNumber(size_t rows, size_t columns,
-                                            RngFillMode mode = RngFillMode::COLUMNS);
-
-  template <typename T>
-  void spGaussianRandomNumber(std::vector<T> *xv, float fp_scale = 1.0);
-  /// \}
 
   /// \brief Jump forward 2^64 iterations in the sequence.
   void jump();
@@ -279,72 +217,28 @@ public:
   Xoshiro256ppGenerator(int igseed = default_random_seed, int niter = 50);
   Xoshiro256ppGenerator(const ullint4 state_in);
 
-  /// \brief Return a single random number distributed over a uniform distribution.  This is an
-  ///        internal generator based on an integer vector state which will provide reproducible
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1).  This is
+  ///        an internal generator based on an integer vector state which will provide reproducible
   ///        results across platforms.
-  ///
-  /// Overloaded:
-  ///   - Issue a single random number
-  ///   - Issue multiple random numbers as a std::vector<double>
-  ///   - Issue random numbers to fill a Standard Template Library vector of arbitrary type (these
-  ///     random numbers will still be issued as double-precision, using a procedure that draws on
-  ///     53 bits of the 64-bit string)
-  ///
-  /// \param count     The quantity of random numbers to produce
-  /// \param rows      The total rows of a matrix to fill up with random numbers
-  /// \param columns   The total columns of a matrix to fill up with random numbers
-  /// \param xv        Pre-allocated array to fill with random numbers
-  /// \param fp_scale  Fixed precision scaling factor to apply when filling arrays of integer type
-  /// \{
   double uniformRandomNumber();
-  std::vector<double> uniformRandomNumber(size_t count);
-  std::vector<double> uniformRandomNumber(size_t rows, size_t columns,
-                                          RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void uniformRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a single-precision random number obtained from a uniform distribution.
-  ///        Various overloads as well as descriptions for their parameters follow from the
-  ///        uniformRandomNumber() member function, above.
-  /// \{
+  /// \brief Return a single random number distributed over a uniform distribution [0, 1), in
+  ///        single-precision.  While the XOR-shift random generators have a distinct method for
+  ///        producing single-precision random numbers (selecting the highest-quality bits), this
+  ///        merely calls uniformRandomNumber() and exists for compatibility with the other
+  ///        generators in templated xxxxRand() functions.
   float spUniformRandomNumber();
-  std::vector<float> spUniformRandomNumber(size_t count);
-  std::vector<float> spUniformRandomNumber(size_t rows, size_t columns,
-                                           RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void spUniformRandomNumber(std::vector<T> *xv, float fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a normally distributed random number.  This works off of the uniform random
-  ///        number generator and will thus advance the state vector of the RandomNumberGenerator
-  ///        that produces the result.  This functon is overloaded in a manner similar to the
-  ///        uniformRandomNumber() member function (see above) and accepts input parameters with
-  ///        similar descriptions.
-  /// \{
+  /// \brief Return a normally distributed random number with standard deviation 1.0.  This works
+  ///        off of the uniform random number generator and will thus advance the state vector of
+  ///        the random number generator that produces the result.
   double gaussianRandomNumber();
-  std::vector<double> gaussianRandomNumber(size_t count);
-  std::vector<double> gaussianRandomNumber(size_t rows, size_t columns,
-                                           RngFillMode mode = RngFillMode::COLUMNS);
 
-  template <typename T>
-  void gaussianRandomNumber(std::vector<T> *xv, double fp_scale = 1.0);
-  /// \}
-
-  /// \brief Return a single-precision random number obtained from a normal distribution.  This
-  ///        functon is overloaded in a manner similar to the uniformRandomNumber() member function
-  ///        (see above) and accepts input parameters with similar descriptions.
-  /// \{
+  /// \brief Produce a single-precision random number on the normal distribution with a standard
+  ///        deviation of 1.0.  Like spUniformRandomNumber(), this function merely calls
+  ///        gaussianRandomNumber() and exists for compatibility with other random number
+  ///        generators in templated functions.
   float spGaussianRandomNumber();
-  std::vector<float> spGaussianRandomNumber(size_t count);
-  std::vector<float> spGaussianRandomNumber(size_t rows, size_t columns,
-                                            RngFillMode mode = RngFillMode::COLUMNS);
-
-  template <typename T>
-  void spGaussianRandomNumber(std::vector<T> *xv, float fp_scale = 1.0);
-  /// \}
 
   /// \brief Jump forward 2^64 iterations in the sequence.
   void jump();
@@ -471,6 +365,80 @@ private:
   ///                   uniform or a normal distribution
   void initializeBank(RandomNumberKind init_kind);
 };
+
+/// \brief Return double-precision random number(s) distributed over a uniform distribution.
+///
+/// Overloaded:
+///   - Issue a single random number
+///   - Issue multiple random numbers as a std::vector<double>
+///   - Issue random numbers to fill a Standard Template Library vector of arbitrary type (these
+///     random numbers will still be issued as double-precision, using a procedure that draws on
+///     53 bits of the 64-bit string)
+///
+/// \param count     The quantity of random numbers to produce
+/// \param rows      The total rows of a matrix to fill up with random numbers
+/// \param columns   The total columns of a matrix to fill up with random numbers
+/// \param xv        Pre-allocated array to fill with random numbers
+/// \param fp_scale  Fixed precision scaling factor to apply when filling arrays of integer type
+/// \param scale     Scaling factor to apply to all random numbers
+/// \{
+template <typename Tprng> double uniformRand(Tprng *rng, double scale = 1.0);
+
+template <typename Tprng> std::vector<double> uniformRand(Tprng *rng, size_t count,
+                                                          double scale);
+
+template <typename Tprng>
+std::vector<double> uniformRand(Tprng *rng, size_t rows, size_t columns, double scale,
+                                RngFillMode mode = RngFillMode::COLUMNS);
+
+template <typename Tprng, typename Tprod>
+void uniformRand(Tprng *rng, std::vector<Tprod> *xv, double fp_scale = 1.0, double scale = 1.0);
+/// \}
+
+/// \brief Return single-precision random number(s) distributed over a uniform distribution.
+///        Descriptions of parameters and overloading follows from uniformRand() above.
+/// \{
+template <typename Tprng> float spUniformRand(Tprng *rng, float scale = 1.0);
+
+template <typename Tprng> std::vector<float> spUniformRand(Tprng *rng, size_t count, float scale);
+
+template <typename Tprng>
+std::vector<float> spUniformRand(Tprng *rng, size_t rows, size_t columns, float scale,
+                                 RngFillMode mode = RngFillMode::COLUMNS);
+
+template <typename Tprng, typename Tprod>
+void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, float fp_scale = 1.0, float scale = 1.0);
+/// \}
+
+/// \brief Return double-precision random number(s) distributed over a normal distribution.
+///        Descriptions of parameters and overloading follows from uniformRand() above.
+/// \{
+template <typename Tprng> double guassianRand(Tprng *rng, double scale = 1.0);
+
+template <typename Tprng> std::vector<double> guassianRand(Tprng *rng, size_t count, double scale);
+
+template <typename Tprng>
+std::vector<double> guassianRand(Tprng *rng, size_t rows, size_t columns, double scale,
+                                 RngFillMode mode = RngFillMode::COLUMNS);
+
+template <typename Tprng, typename Tprod>
+void guassianRand(Tprng *rng, std::vector<Tprod> *xv, double fp_scale = 1.0, double scale = 1.0);
+/// \}
+
+/// \brief Return single-precision random number(s) distributed over a normal distribution.  
+///        Descriptions of parameters and overloading follows from uniformRand() above.
+/// \{
+template <typename Tprng> float spGuassianRand(Tprng *rng, float scale = 1.0);
+
+template <typename Tprng> std::vector<float> spGuassianRand(Tprng *rng, size_t count, float scale);
+
+template <typename Tprng>
+std::vector<float> spGuassianRand(Tprng *rng, size_t rows, size_t columns, float scale,
+                                  RngFillMode mode = RngFillMode::COLUMNS);
+
+template <typename Tprng, typename Tprod>
+void spGuassianRand(Tprng *rng, std::vector<Tprod> *xv, float fp_scale = 1.0, float scale = 1.0);
+/// \}
 
 /// \brief Initialize an array of Xoroshiro128p generators using CPU-based code.
 ///

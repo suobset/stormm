@@ -138,11 +138,14 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                   const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   if (eval_vdw_force == EvaluateForce::YES) {
-                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb,
+                                                   nbk.lj_sigma[(ljt_j * nbk.n_lj_types) + ljt_i],
+                                                   &vdw_contrib, &fmag);
                   }
                   else {
-                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib,
-                                                   nullptr);
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb,
+                                                   nbk.lj_sigma[(ljt_j * nbk.n_lj_types) + ljt_i],
+                                                   &vdw_contrib, nullptr);
                   }
 
                   // Evaluate the force, if requested
@@ -275,11 +278,14 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                   const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   if (eval_vdw_force == EvaluateForce::YES) {
-                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb,
+                                                   nbk.lj_sigma[(ljt_j * nbk.n_lj_types) + ljt_i],
+                                                   &vdw_contrib, &fmag);
                   }
                   else {
-                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib,
-                                                   nullptr);
+                    quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb,
+                                                   nbk.lj_sigma[(ljt_j * nbk.n_lj_types) + ljt_i],
+                                                   &vdw_contrib, nullptr);
                   }
 
                   // Evaluate the force, if requested

@@ -8,6 +8,7 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
+#include "Constants/symbol_values.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
@@ -25,18 +26,13 @@ using constants::PrecisionModel;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using parse::Citation;
+using symbols::amber_ancient_bioq;
 
 /// \brief Use the lowest bit of a 32-bit float representing the range [1.0, 2.0) as the default
 ///        input for the smoothCharges function, ensuring that all charges in the range (-2e, +2e)
 ///        will be expressed in increments that a floating point number can represent exactly.
 ///        The hexfloat would read 0x1p-23.
 constexpr double charge_precision_inc = 1.1920928955078125E-7;
-
-/// \brief Various takes on Coulomb's constant in kcal-Angstrom / mol-e^2
-/// \{
-constexpr double accepted_coulomb_constant = 332.063711;
-constexpr double amber_coulomb_constant    = 332.0522173;
-/// \}
 
 /// \brief A struct to hold information relating to an Amber topology.  This struct's member
 ///        functions are limited to getters for its private data.  Because the primary means of
@@ -186,7 +182,7 @@ public:
   /// \param policy     Indicates the alert level to raise if a problem is encountered
   void buildFromPrmtop(const std::string &file_name,
                        const ExceptionResponse policy = ExceptionResponse::WARN,
-                       double coulomb_constant_in = amber_coulomb_constant,
+                       double coulomb_constant_in = amber_ancient_bioq,
                        double default_elec14_screening = 1.2, double default_vdw14_screening = 2.0,
                        double charge_rounding_tol = 0.001,
                        double charge_discretization = charge_precision_inc);
@@ -496,6 +492,10 @@ public:
   char4 getAtomType(int index) const;
   /// \}
 
+  /// \brief Get a table with the names of all unique atom types, arranged according to their
+  ///        Lennard-Jones indices as they appear in the topology (in ascending order).
+  std::vector<char4> getAtomTypeNameTable() const;
+  
   /// \brief Get the names of residues in the system.
   ///
   /// Overloaded:
@@ -932,6 +932,54 @@ public:
   /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
   ConstraintKit<float>
   getSinglePrecisionConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  /// \brief Get a double-precision abstract for calculating valence terms, visible on the GPU
+  ///        device with data stored on the CPU host.
+  ValenceKit<double> getDeviceViewToHostDPValenceKit() const;
+
+  /// \brief Get a single-precision abstract for calculating valence terms, visible on the GPU
+  ///        device with data stored on the CPU host.
+  ValenceKit<float> getDeviceViewToHostSPValenceKit() const;
+
+  /// \brief Get a double-precision abstract for calculating non-bonded terms, visible on the GPU
+  ///        device with data stored on the CPU host.
+  NonbondedKit<double> getDeviceViewToHostDPNonbondedKit() const;
+
+  /// \brief Get a single-precision abstract for calculating non-bonded terms, visible on the GPU
+  ///        device with data stored on the CPU host.
+  NonbondedKit<float> getDeviceViewToHostSPNonbondedKit() const;
+
+  /// \brief Get a double-precision abstract for the system's implicit solvent details, visible on
+  ///        the GPU device with data stored on the CPU host.
+  ImplicitSolventKit<double> getDeviceViewToHostDPImplicitSolventKit() const;
+
+  /// \brief Get a single-precision abstract for the system's implicit solvent details, visible on
+  ///        the GPU device with data stored on the CPU host.
+  ImplicitSolventKit<float> getDeviceViewToHostSPImplicitSolventKit() const;
+
+  /// \brief Get an abstract for the system's chemical details, visible on the GPU device with data
+  ///        stored on the CPU host.
+  ChemicalDetailsKit getDeviceViewToHostChemicalDetailsKit() const;
+
+  /// \brief Get a double-precision abstract for placing or transmuting forces from virtual sites,
+  ///        visible on the GPU device with data stored on the CPU host.
+  VirtualSiteKit<double> getDeviceViewToHostDPVirtualSiteKit() const;
+
+  /// \brief Get a single-precision abstract for placing or transmuting forces from virtual sites,
+  ///        visible on the GPU device with data stored on the CPU host.
+  VirtualSiteKit<float> getDeviceViewToHostSPVirtualSiteKit() const;
+
+  /// \brief Get a double-precision abstract for implementing constraints, visible on the GPU
+  ///        device with data stored on the CPU host.
+  ConstraintKit<double> getDeviceViewToHostDPConstraintKit() const;
+
+  /// \brief Get a single-precision abstract for implementing constraints, visible on the GPU
+  ///        device with data stored on the CPU host.
+  ConstraintKit<float> getDeviceViewToHostSPConstraintKit() const;
+#  endif
+#endif
 
   /// \brief Get a pointer to the object itself.
   ///

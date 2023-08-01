@@ -1088,9 +1088,10 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const Tcalc coulomb_constant, const Tcalc* charges,
                                      const int* lj_param_idx, const Tcalc* attn14_elec_factors,
                                      const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const int ljtab_offset,
-                                     const int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
-                                     const Tcoord* zcrd, const double* umat, const double* invu,
+                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                     const int ljtab_offset, const int n_lj_types,
+                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                     const double* umat, const double* invu,
                                      const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, const EvaluateForce eval_elec_force,
                                      const EvaluateForce eval_vdw_force,
@@ -1119,8 +1120,9 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   const int ilj_t = lj_param_idx[i_atom];
   const int jlj_t = lj_param_idx[l_atom] + ljtab_offset;
   const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
-  const Tcalc lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
-  const Tcalc ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  const size_t ij_ljidx = (ilj_t * n_lj_types) + jlj_t;
+  const Tcalc lja = lja_14_coeff[ij_ljidx] / vdw_scale;
+  const Tcalc ljb = ljb_14_coeff[ij_ljidx] / vdw_scale;
   const Tcalc ele_scale = attn14_elec_factors[attn_idx];
   const Tcalc qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
   const bool mitigate_clashes = (clash_distance > value_nil || clash_ratio > value_nil);
@@ -1137,10 +1139,12 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
       quadraticCoreElectrostatics<Tcalc>(r, clash_distance, qiqj, &ele_contrib, nullptr);
     }
     if (eval_vdw_force == EvaluateForce::YES) {
-      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, &fmag);
+      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, lj_14_sigma[ij_ljidx],
+                                     &vdw_contrib, &fmag);
     }
     else {
-      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, &vdw_contrib, nullptr);
+      quarticCoreLennardJones<Tcalc>(r, clash_ratio, lja, ljb, lj_14_sigma[ij_ljidx],
+                                     &vdw_contrib, nullptr);
     }
   }
   else {
@@ -1198,9 +1202,9 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const Tcalc coulomb_constant, const Tcalc* charges,
                                      const int* lj_param_idx, const Tcalc* attn14_elec_factors,
                                      const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const int n_lj_types,
-                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
+                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                     const int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
+                                     const Tcoord* zcrd, const double* umat, const double* invu,
                                      const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, const EvaluateForce eval_elec_force,
                                      const EvaluateForce eval_vdw_force,
@@ -1208,9 +1212,9 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const Tcalc clash_distance, const Tcalc clash_ratio) {
   return evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, coulomb_constant, charges,
                                   lj_param_idx, attn14_elec_factors, attn14_vdw_factors,
-                                  lja_14_coeff, ljb_14_coeff, 0, n_lj_types, xcrd, ycrd, zcrd,
-                                  umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                  eval_vdw_force, inv_gpos_factor, force_factor,
+                                  lja_14_coeff, ljb_14_coeff, lj_14_sigma, 0, n_lj_types, xcrd,
+                                  ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
+                                  eval_elec_force, eval_vdw_force, inv_gpos_factor, force_factor,
                                   clash_distance, clash_ratio);
 }
 
@@ -1252,10 +1256,11 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                                       attn_idx, nbk.coulomb_constant, nbk.charge,
                                                       nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
                                                       nbk.lja_14_coeff, nbk.ljb_14_coeff,
-                                                      nbk.n_lj_types, xcrd, ycrd, zcrd, umat, invu,
-                                                      unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                                      eval_vdw_force, inv_gpos_factor,
-                                                      force_factor, clash_distance, clash_ratio);
+                                                      nbk.lj_14_sigma, nbk.n_lj_types, xcrd, ycrd,
+                                                      zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                                      zfrc, eval_elec_force, eval_vdw_force,
+                                                      inv_gpos_factor, force_factor,
+                                                      clash_distance, clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);
@@ -1274,11 +1279,11 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
                                Tforce, Tcalc>(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
                                               attn_idx, nbk.coulomb_constant, nbk.charge,
                                               nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
-                                              nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
-                                              xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                              zfrc, eval_elec_force, eval_vdw_force,
-                                              inv_gpos_factor, force_factor, clash_distance,
-                                              clash_ratio);
+                                              nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.lj_14_sigma,
+                                              nbk.n_lj_types, xcrd, ycrd, zcrd, umat, invu,
+                                              unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
+                                              eval_vdw_force, inv_gpos_factor, force_factor,
+                                              clash_distance, clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);

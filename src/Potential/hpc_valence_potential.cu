@@ -19,7 +19,7 @@ namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using constants::large_block_size;
 using constants::medium_block_size;
@@ -1266,7 +1266,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                           const VwuGoal purpose, const AccumulationMethod force_sum,
-                          const KernelManager &launcher, const double clash_distance,
+                          const CoreKlManager &launcher, const double clash_distance,
                           const double clash_ratio) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
@@ -1311,7 +1311,7 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                          const VwuGoal purpose, const KernelManager &launcher,
+                          const VwuGoal purpose, const CoreKlManager &launcher,
                           const double clash_distance, const double clash_ratio) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,

@@ -176,7 +176,7 @@ public:
   ///        isomeric bonds) used in reconciling general settings to the known values emerging from
   ///        a collection of structures for each molecule.
   VariableTorsionAdjustment getTorsionAdjustmentProtocol() const;
-
+  
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;
   

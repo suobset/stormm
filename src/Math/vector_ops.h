@@ -13,10 +13,11 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/mixed_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
-#include "sorting.h"
+#include "sorting_enumerators.h"
 #include "statistics.h"
 
 namespace stormm {
@@ -31,6 +32,9 @@ using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
 using data_types::ValueWithCounter;
+using numerics::hostChangeFPBits;
+using numerics::hostDoubleToInt95;
+using numerics::hostInt95ToDouble;
 using parse::NumberFormat;
 using parse::realToString;
 using testing::Approx;
@@ -671,7 +675,53 @@ template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx, size_t nrep = 1);
 /// \}
 
-/// \brief Construct a vector based on a regular series of 
+/// \brief Construct a vector of a new type to replace an existing vector.  The new vector will
+///        contain all data from the original, scaled by an optional constant to facilitate
+///        conversions between real and scaled integral types.  The original vector will be resized
+///        and shrunk to zero after transferring its data to the new vector.
+///
+/// Overloaded:
+///   - Convert from an int95_t vector to an arbitrary type
+///   - Convert from an arbitrary type to an int95_t vector
+///   - Convert between two arbitrary templated types
+///   - Work in Standard Template Library vectors or Hybrid objects (only data on the host will be
+///     copied)
+///
+/// \param input         The original data
+/// \param input_scale   Scaling factor already applied to the input vector
+/// \param output_scale  Optional scaling factor to apply to the output vector 
+/// \{
+template <typename Tout>
+std::vector<Tout> convertData(std::vector<int95_t> *input, double input_scale = 1.0,
+                              double output_scale = 1.0);
+
+template <typename Tout>
+std::vector<Tout> convertData(std::vector<llint> *primary, std::vector<int> *overflow,
+                              double input_scale = 1.0, double output_scale = 1.0);
+
+template <typename Tin>
+std::vector<int95_t> convertData(std::vector<Tin> *input, double input_scale = 1.0,
+                                 double output_scale = 1.0);
+
+template <typename Tin, typename Tout>
+std::vector<Tout> convertData(std::vector<Tin> *input, double input_scale = 1.0,
+                              double output_scale = 1.0);
+
+template <typename Tout>
+Hybrid<Tout> convertData(Hybrid<int95_t> *input, double input_scale = 1.0,
+                         double output_scale = 1.0);
+
+template <typename Tout>
+Hybrid<Tout> convertData(Hybrid<llint> *primary, Hybrid<int> *overflow, double input_scale = 1.0,
+                         double output_scale = 1.0);
+
+template <typename Tin>
+Hybrid<int95_t> convertData(Hybrid<Tin> *input, double input_scale = 1.0,
+                            double output_scale = 1.0);
+
+template <typename Tin, typename Tout>
+Hybrid<Tout> convertData(Hybrid<Tin> *input, double input_scale = 1.0, double output_scale = 1.0);
+/// \}
   
 } // namespace stmath
 } // namespace stormm

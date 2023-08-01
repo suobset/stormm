@@ -565,20 +565,20 @@ int main(const int argc, const char* argv[]) {
   }
   check(radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
         "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
-        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".",
+        "topologies.  Precision setting: " + getEnumerationName(PrecisionModel::DOUBLE) + ".",
         do_new_tests);
   check(sp_radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
         "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
-        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::SINGLE) + ".",
+        "topologies.  Precision setting: " + getEnumerationName(PrecisionModel::SINGLE) + ".",
         do_new_tests);
   check(abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
         "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
         "disagree with the underlying topologies.  Precision setting: " +
-        getPrecisionModelName(PrecisionModel::DOUBLE) + ".", do_new_tests);
+        getEnumerationName(PrecisionModel::DOUBLE) + ".", do_new_tests);
   check(sp_abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
         "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
         "disagree with the underlying topologies.  Precision setting: " +
-        getPrecisionModelName(PrecisionModel::SINGLE) + ".", do_new_tests);
+        getEnumerationName(PrecisionModel::SINGLE) + ".", do_new_tests);
 
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

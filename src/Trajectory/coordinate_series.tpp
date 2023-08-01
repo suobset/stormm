@@ -691,6 +691,16 @@ const CoordinateSeries<T>* CoordinateSeries<T>::getSelfPointer() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+const CoordinateSeriesReader<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) const {
+  return CoordinateSeriesReader<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                   globalpos_scale, inverse_globalpos_scale,
+                                   x_coordinates.data(tier), y_coordinates.data(tier),
+                                   z_coordinates.data(tier), box_space_transforms.data(tier),
+                                   inverse_transforms.data(tier), box_dimensions.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 CoordinateSeriesWriter<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) {
   return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
                                    globalpos_scale, inverse_globalpos_scale,
@@ -701,12 +711,28 @@ CoordinateSeriesWriter<T> CoordinateSeries<T>::data(const HybridTargetLevel tier
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-const CoordinateSeriesReader<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) const {
-  return CoordinateSeriesReader<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
-                                   globalpos_scale, inverse_globalpos_scale,
-                                   x_coordinates.data(tier), y_coordinates.data(tier),
-                                   z_coordinates.data(tier), box_space_transforms.data(tier),
-                                   inverse_transforms.data(tier), box_dimensions.data(tier));
+const CoordinateSeriesReader<void>
+CoordinateSeries<T>::templateFreeData(const HybridTargetLevel tier) const {
+  return CoordinateSeriesReader<void>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                      globalpos_scale, inverse_globalpos_scale,
+                                      reinterpret_cast<const void*>(x_coordinates.data(tier)),
+                                      reinterpret_cast<const void*>(y_coordinates.data(tier)),
+                                      reinterpret_cast<const void*>(z_coordinates.data(tier)),
+                                      box_space_transforms.data(tier),
+                                      inverse_transforms.data(tier), box_dimensions.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+CoordinateSeriesWriter<void>
+CoordinateSeries<T>::templateFreeData(const HybridTargetLevel tier) {
+  return CoordinateSeriesWriter<void>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                      globalpos_scale, inverse_globalpos_scale,
+                                      reinterpret_cast<const void*>(x_coordinates.data(tier)),
+                                      reinterpret_cast<const void*>(y_coordinates.data(tier)),
+                                      reinterpret_cast<const void*>(z_coordinates.data(tier)),
+                                      box_space_transforms.data(tier),
+                                      inverse_transforms.data(tier), box_dimensions.data(tier));
 }
 
 #ifdef STORMM_USE_HPC
@@ -735,6 +761,40 @@ template <typename T> CoordinateSeriesWriter<T> CoordinateSeries<T>::deviceViewT
   return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
                                    globalpos_scale, inverse_globalpos_scale, xcrd, ycrd, zcrd,
                                    umat, invu, boxdim);  
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const CoordinateSeriesReader<void> CoordinateSeries<T>::deviceViewToTemplateFreeHostData() const {
+  const T* xcrd = x_coordinates.getDeviceValidHostPointer();
+  const T* ycrd = y_coordinates.getDeviceValidHostPointer();
+  const T* zcrd = z_coordinates.getDeviceValidHostPointer();
+  const void* v_xcrd = reinterpret_cast<const void*>(xcrd);
+  const void* v_ycrd = reinterpret_cast<const void*>(ycrd);
+  const void* v_zcrd = reinterpret_cast<const void*>(zcrd);
+  const double* umat = box_space_transforms.getDeviceValidHostPointer();
+  const double* invu = inverse_transforms.getDeviceValidHostPointer();
+  const double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateSeriesReader<void>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                      globalpos_scale, inverse_globalpos_scale, v_xcrd, v_ycrd,
+                                      v_zcrd, umat, invu, boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+CoordinateSeriesWriter<void> CoordinateSeries<T>::deviceViewToTemplateFreeHostData() {
+  T* xcrd = x_coordinates.getDeviceValidHostPointer();
+  T* ycrd = y_coordinates.getDeviceValidHostPointer();
+  T* zcrd = z_coordinates.getDeviceValidHostPointer();
+  void* v_xcrd = reinterpret_cast<void*>(xcrd);
+  void* v_ycrd = reinterpret_cast<void*>(ycrd);
+  void* v_zcrd = reinterpret_cast<void*>(zcrd);
+  double* umat = box_space_transforms.getDeviceValidHostPointer();
+  double* invu = inverse_transforms.getDeviceValidHostPointer();
+  double* boxdim = box_dimensions.getDeviceValidHostPointer();
+  return CoordinateSeriesWriter<void>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                      globalpos_scale, inverse_globalpos_scale, v_xcrd, v_ycrd,
+                                      v_zcrd, umat, invu, boxdim);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1162,6 +1222,50 @@ void CoordinateSeries<T>::allocate(const int new_frame_capacity) {
     inverse_transforms.resize(total_xfrm);
     box_dimensions.resize(total_bdim);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+CoordinateSeriesWriter<T> restoreType(CoordinateSeriesWriter<void> *rasa) {
+  return CoordinateSeriesWriter<T>(rasa->natom, rasa->nframe, rasa->unit_cell, rasa->gpos_bits,
+                                   rasa->gpos_scale, rasa->inv_gpos_scale,
+                                   reinterpret_cast<T*>(rasa->xcrd),
+                                   reinterpret_cast<T*>(rasa->ycrd),
+                                   reinterpret_cast<T*>(rasa->zcrd), rasa->umat, rasa->invu,
+                                   rasa->boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+CoordinateSeriesWriter<T> restoreType(const CoordinateSeriesWriter<void> &rasa) {
+  return CoordinateSeriesWriter<T>(rasa.natom, rasa.nframe, rasa.unit_cell, rasa.gpos_bits,
+                                   rasa.gpos_scale, rasa.inv_gpos_scale,
+                                   reinterpret_cast<T*>(const_cast<void*>(rasa.xcrd)),
+                                   reinterpret_cast<T*>(const_cast<void*>(rasa.ycrd)),
+                                   reinterpret_cast<T*>(const_cast<void*>(rasa.zcrd)), rasa.umat,
+                                   rasa.invu, rasa.boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const CoordinateSeriesReader<T> restoreType(const CoordinateSeriesReader<void> *rasa) {
+  return CoordinateSeriesReader<T>(rasa->natom, rasa->nframe, rasa->unit_cell, rasa->gpos_bits,
+                                   rasa->gpos_scale, rasa->inv_gpos_scale,
+                                   reinterpret_cast<const T*>(rasa->xcrd),
+                                   reinterpret_cast<const T*>(rasa->ycrd),
+                                   reinterpret_cast<const T*>(rasa->zcrd), rasa->umat, rasa->invu,
+                                   rasa->boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const CoordinateSeriesReader<T> restoreType(const CoordinateSeriesReader<void> &rasa) {
+  return CoordinateSeriesReader<T>(rasa.natom, rasa.nframe, rasa.unit_cell, rasa.gpos_bits,
+                                   rasa.gpos_scale, rasa.inv_gpos_scale,
+                                   reinterpret_cast<const T*>(rasa.xcrd),
+                                   reinterpret_cast<const T*>(rasa.ycrd),
+                                   reinterpret_cast<const T*>(rasa.zcrd), rasa.umat, rasa.invu,
+                                   rasa.boxdim);
 }
 
 //-------------------------------------------------------------------------------------------------

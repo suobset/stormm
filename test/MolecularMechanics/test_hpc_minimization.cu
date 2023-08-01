@@ -1,7 +1,7 @@
 // -*-c++-*-
-#include "../../src/Accelerator/hybrid.h"
+#include "../../src/Accelerator/core_kernel_manager.h"
 #include "../../src/Accelerator/gpu_details.h"
-#include "../../src/Accelerator/kernel_manager.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
@@ -411,7 +411,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   ScoreCard sc(mol_id_vec.size(), mincon.getTotalCycles(), 32);
   
   // Obtain kernel launch parameters for the workload
-  KernelManager launcher(gpu, poly_ag);
+  CoreKlManager launcher(gpu, poly_ag);
       
   // Lay out GPU cache resources
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
@@ -801,13 +801,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     const int ave_atom_count = poly_ag.getAtomCount() / poly_ag.getSystemCount();
     check(cpu_total_e, RelationalOperator::EQUAL, Approx(gpu_total_e).margin(nrg_tol),
           "Energies of relaxed structures did not agree.  Average structure size: " +
-          std::to_string(ave_atom_count) + ".  Precision level: " + getPrecisionModelName(prec) +
+          std::to_string(ave_atom_count) + ".  Precision level: " + getEnumerationName(prec) +
           ".  Test name: " + test_name + ".", do_tests);
     check(force_mue, RelationalOperator::EQUAL,
           Approx(std::vector<double>(n_mm_sample, 0.0)).margin(frc_tol), "Snapshots of forces "
           "taken during energy minimization on the GPU do not agree with their CPU-derived "
           "counterparts.  Average structure size: " + std::to_string(ave_atom_count) +
-          ".  Precision level: " + getPrecisionModelName(prec) + ".  Test name: " + test_name +
+          ".  Precision level: " + getEnumerationName(prec) + ".  Test name: " + test_name +
           ".", do_tests);
   }
   
@@ -831,7 +831,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
     snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-5, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
-             test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
+             test_name + ".  Precision model: " + getEnumerationName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
     const int n_unique_systems = maxValue(mol_id_vec) + 1;
     const int nsystems = mol_id_vec.size();
@@ -928,7 +928,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   check(mismatch, RelationalOperator::EQUAL, std::vector<int>(poly_ps.getSystemCount(), 0),
         "Mismatches were detected in back-to-back minimizations of the same batch of perturbed "
         "starting coordinates.  Test: " + test_name + ".  Precision model: " +
-        getPrecisionModelName(prec) + ".", do_tests);
+        getEnumerationName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------

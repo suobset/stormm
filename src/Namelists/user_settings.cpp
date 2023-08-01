@@ -41,7 +41,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   std::string cval_report_file, cval_traj_file_name, cval_input_transcript_file;
   std::vector<std::string> cval_topology_file_names;
   std::vector<std::string> cval_coordinate_file_names;
-
+  
   // Make a record of the command-line arguments for future reference
   command_line_args.reserve(argc);
   for (int i = 0; i < argc; i++) {

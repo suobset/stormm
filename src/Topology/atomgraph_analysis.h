@@ -2,12 +2,22 @@
 #ifndef STORMM_ATOMGRAPH_ANALYSIS_H
 #define STORMM_ATOMGRAPH_ANALYSIS_H
 
+#include <cmath>
 #include <vector>
 #include "copyright.h"
+#include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
+#include "Constants/scaling.h"
+#include "Potential/energy_enumerators.h"
+#include "Reporting/error_format.h"
 #include "atomgraph.h"
 
 namespace stormm {
 namespace topology {
+
+using card::Hybrid;
+using constants::ExceptionResponse;
+using energy::VdwCombiningRule;
 
 /// \brief Apply a series of checks to identify the water model in use within a topology.  If there
 ///        is no water, the model will be set to NONE.
@@ -75,8 +85,46 @@ std::vector<int> selectRotatingAtoms(const AtomGraph &ag, int atom_i, int atom_j
 std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j);
 /// \}
 
+/// \brief Compute the number of Lennard-Jones atom types given two vectors of a particular length,
+///        assuming them to be square matrice of the A and B coefficients.
+///
+/// \param length_a  The number of values in the matrix of A coefficients
+/// \param length_b  The number of values in the matrix of B coefficients
+/// \param caller    Name of the calling function
+int inferLennardJonesTypeCount(const int length_a, const int length_b,
+                               const char* caller = nullptr);
+
+/// \brief Determine the Lennard-Jones combining rule in effect.  The function will accept either
+///        single- or double-precision data, but internally it uses double-precision calculations.
+///
+/// Overloaded:
+///   - Provide the A and B coefficient arrays by C-style arrays with trusted length
+///   - Provide the A and B coefficient arrays as Standard Template Library vectors
+///   - Provide the A and B coefficient arrays as Hybrid objects
+///
+/// \param lja            Array of Lennard-Jones A coefficients
+/// \param ljb            Array of Lennard-Jones B coefficients
+/// \param lj_type_count  The number of Lennard-Jones types, indicating the trusted lengths of lja
+///                       and ljb by the number's square
+/// \param policy         Course of action in the event that there are only one (fewer) atom types
+/// \{
+template <typename T>
+VdwCombiningRule inferCombiningRule(const T* lja, const T* ljb, int lj_type_count,
+                                    ExceptionResponse policy = ExceptionResponse::WARN);
   
+template <typename T>
+VdwCombiningRule inferCombiningRule(const std::vector<T> &lja, const std::vector<T> &ljb,
+                                    int lj_type_count,
+                                    ExceptionResponse policy = ExceptionResponse::WARN);
+
+template <typename T>
+VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb, int lj_type_count,
+                                    ExceptionResponse policy = ExceptionResponse::WARN);
+/// \}
+
 } // namespace topology
 } // namespace stormm
+
+#include "atomgraph_analysis.tpp"
 
 #endif

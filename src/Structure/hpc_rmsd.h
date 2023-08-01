@@ -6,8 +6,8 @@
 #include <cuda_runtime.h>
 #endif
 #include "copyright.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Accelerator/hybrid.h"
-#include "Accelerator/kernel_manager.h"
 #include "Analysis/comparison_guide.h"
 #include "Constants/behavior.h"
 #include "Synthesis/phasespace_synthesis.h"
@@ -18,7 +18,7 @@ namespace structure {
 
 using analysis::ComparisonGuide;
 using card::Hybrid;
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using synthesis::PhaseSpaceSynthesis;
 
@@ -47,17 +47,17 @@ cudaFuncAttributes queryRMSDKernelRequirements(PrecisionModel prec, RMSDTask ord
 /// \{
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<double> *result,
-          const KernelManager &launcher);
+          const CoreKlManager &launcher);
 
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
           const Hybrid<int> &reference_frames, Hybrid<float> *result,
-          const KernelManager &launcher);
+          const CoreKlManager &launcher);
 
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-          Hybrid<double> *result, const KernelManager &launcher);
+          Hybrid<double> *result, const CoreKlManager &launcher);
 
 void rmsd(const ComparisonGuide &cg, const RMSDPlan &rplan, const PhaseSpaceSynthesis &poly_ps,
-          Hybrid<float> *result, const KernelManager &launcher);
+          Hybrid<float> *result, const CoreKlManager &launcher);
 /// \}
 
 } // namespace structure

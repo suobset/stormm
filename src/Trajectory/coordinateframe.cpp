@@ -648,16 +648,8 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateFrame::allocate() {
-  const int padded_atom_count  = (atom_count > 0) ? roundUp(atom_count, warp_size_int) : 1;
-  const int padded_matrix_size = roundUp(9, warp_size_int);
-  storage.resize((3 * padded_atom_count) + (3 * padded_matrix_size));
-  x_coordinates.setPointer(&storage,                           0, atom_count);
-  y_coordinates.setPointer(&storage,           padded_atom_count, atom_count);
-  z_coordinates.setPointer(&storage,       2 * padded_atom_count, atom_count);
-  box_space_transform.setPointer(&storage, 3 * padded_atom_count,                             9);
-  inverse_transform.setPointer(&storage,  (3 * padded_atom_count) +      padded_matrix_size,  9);
-  box_dimensions.setPointer(&storage,     (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
+const CoordinateFrame* CoordinateFrame::getSelfPointer() const {
+  return this;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -870,6 +862,19 @@ std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const in
                                           const ExceptionResponse policy) {
   const TextFile tf(file_name);
   return getAllFrames(tf, atom_count, unit_cell, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateFrame::allocate() {
+  const int padded_atom_count  = (atom_count > 0) ? roundUp(atom_count, warp_size_int) : 1;
+  const int padded_matrix_size = roundUp(9, warp_size_int);
+  storage.resize((3 * padded_atom_count) + (3 * padded_matrix_size));
+  x_coordinates.setPointer(&storage,                           0, atom_count);
+  y_coordinates.setPointer(&storage,           padded_atom_count, atom_count);
+  z_coordinates.setPointer(&storage,       2 * padded_atom_count, atom_count);
+  box_space_transform.setPointer(&storage, 3 * padded_atom_count,                             9);
+  inverse_transform.setPointer(&storage,  (3 * padded_atom_count) +      padded_matrix_size,  9);
+  box_dimensions.setPointer(&storage,     (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
 }
 
 } // namespace trajectory

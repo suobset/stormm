@@ -148,10 +148,10 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
           const Vec2<double> uc =
             evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, syvk.coulomb, sh_charges, sh_lj_idx,
                                      syvk.attn14_elec, syvk.attn14_vdw, syvk.lja_14_coeff,
-                                     syvk.ljb_14_coeff, ljabc_offset, nljt, sh_xcrd, sh_ycrd,
-                                     sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                     sh_yfrc, sh_zfrc, eval_force, eval_force, inv_gpos_scale,
-                                     force_scale);
+                                     syvk.ljb_14_coeff, syvk.lj_14_sigma, ljabc_offset, nljt,
+                                     sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr,
+                                     UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc, eval_force,
+                                     eval_force, inv_gpos_scale, force_scale);
           if (log_term) {
             qq14_acc += llround(uc.x * nrg_scale_factor);
             lj14_acc += llround(uc.y * nrg_scale_factor);
@@ -293,9 +293,10 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
       const Vec2<double> uc =
         evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, syvk.coulomb, sh_charges,
                                  sh_lj_idx, syvk.attn14_elec, syvk.attn14_vdw, syvk.lja_14_coeff,
-                                 syvk.ljb_14_coeff, ljabc_offset, nljt, sh_xcrd, sh_ycrd, sh_zcrd,
-                                 nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                                 eval_force, eval_force, inv_gpos_scale, force_scale);
+                                 syvk.ljb_14_coeff, syvk.lj_14_sigma, ljabc_offset, nljt, sh_xcrd,
+                                 sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                                 sh_yfrc, sh_zfrc, eval_force, eval_force, inv_gpos_scale,
+                                 force_scale);
       if (log_term) {
         qq14_acc += llround(uc.x * nrg_scale_factor);
         lj14_acc += llround(uc.y * nrg_scale_factor);

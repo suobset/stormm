@@ -13,7 +13,7 @@ void checkCompatibility(const ComparisonGuide &cg, const RMSDPlan &rplan,
   const int ntop = poly_psr.unique_topology_count;
   if (ntop != rplan.getPlanCount()) {
     rtErr("The number of unique topologies in the synthesis " + std::to_string(ntop) + "must "
-          "comport with the number of individual RMSD calculation plans (" +
+          "match the number of individual RMSD calculation plans (" +
           std::to_string(rplan.getPlanCount()) + ").", "checkComatibility");
   }
   switch (process) {

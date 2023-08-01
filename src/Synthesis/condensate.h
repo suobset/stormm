@@ -129,19 +129,21 @@ public:
   /// \param mode_in     Compression mode to use
   /// \param gpu         Details of the available GPU
   /// \{
-  Condensate(const PhaseSpaceSynthesis *poly_ps_in = nullptr,
-             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
+  Condensate();
+  
+  Condensate(const PhaseSpaceSynthesis *poly_ps_in, PrecisionModel mode_in,
+             const GpuDetails &gpu = null_gpu);
 
-  Condensate(const PhaseSpaceSynthesis &poly_ps_in,
-             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
-
-  template <typename T>
-  Condensate(const CoordinateSeries<T> *cs_in,
-             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
+  Condensate(const PhaseSpaceSynthesis &poly_ps_in, PrecisionModel mode_in,
+             const GpuDetails &gpu = null_gpu);
 
   template <typename T>
-  Condensate(const CoordinateSeries<T> &cs_in,
-             PrecisionModel mode_in = PrecisionModel::SINGLE, const GpuDetails &gpu = null_gpu);
+  Condensate(const CoordinateSeries<T> *cs_in, PrecisionModel mode_in,
+             const GpuDetails &gpu = null_gpu);
+
+  template <typename T>
+  Condensate(const CoordinateSeries<T> &cs_in, PrecisionModel mode_in,
+             const GpuDetails &gpu = null_gpu);
   /// \}
 
   /// \brief Copy and move constructors as well as copy and move assignment operator overloads

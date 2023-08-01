@@ -3,8 +3,8 @@
 #define STORMM_HPC_MINIMIZATION_H
 
 #include "copyright.h"
+#include "Accelerator/core_kernel_manager.h"
 #include "Accelerator/gpu_details.h"
-#include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "MolecularMechanics/line_minimization.h"
@@ -24,7 +24,7 @@ namespace stormm {
 namespace mm {
 
 using card::GpuDetails;
-using card::KernelManager;
+using card::CoreKlManager;
 using constants::PrecisionModel;
 using energy::CacheResource;
 using energy::ScoreCard;
@@ -62,7 +62,7 @@ cudaFuncAttributes queryMinimizationKernelRequirements(const PrecisionModel prec
 /// \param scw          Read-only access to the current energy of each system
 /// \param lmw          Writeable abstract for a line minimization manager
 /// \param move_number  The number of the move--values of 0 to 3 will lead to different behavior
-/// \param redu_lp      Launch parameters for the kernel (an abstract of the KernelManager object)
+/// \param redu_lp      Launch parameters for the kernel (an abstract of the CoreKlManager object)
 /// \{
 void launchLineAdvance(PrecisionModel prec, PsSynthesisWriter *poly_psw, const ReductionKit &redk,
                        const ScoreCardWriter &scw, LinMinWriter *lmw, int move_number,
@@ -71,7 +71,7 @@ void launchLineAdvance(PrecisionModel prec, PsSynthesisWriter *poly_psw, const R
 void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
                        const AtomGraphSynthesis &poly_ag, ScoreCard *sc,
                        LineMinimization *line_record, int move_number,
-                       const KernelManager &launcher);
+                       const CoreKlManager &launcher);
 /// \}
 
 /// \brief Run energy minimizations of all structures in a synthesis based on user input or other
@@ -135,7 +135,7 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         CacheResource *nonb_cache, CacheResource *nonb_cd_cache,
                         ImplicitSolventWorkspace *ism_space, ReductionBridge *rbg,
                         LineMinimization *line_record, const AccumulationMethod acc_meth,
-                        const GpuDetails &gpu, const KernelManager &launcher,
+                        const GpuDetails &gpu, const CoreKlManager &launcher,
                         StopWatch *timer = nullptr,
                         const std::string &task_name = std::string(""));
 

@@ -5,6 +5,8 @@
 namespace stormm {
 namespace trajectory {
 
+using card::HybridFormat;
+
 //-------------------------------------------------------------------------------------------------
 void coordCopyValidateAtomCounts(const int destination_atoms, const int origin_atoms) {
   if (origin_atoms != destination_atoms) {
@@ -33,8 +35,9 @@ void coordCopyValidateSystemIndex(const int system_index, const int system_count
 //-------------------------------------------------------------------------------------------------
 void copyBoxInformation(double* dest_boxdim, double* dest_umat, double* dest_invu,
                         const int index_dest, const double* orig_boxdim, const double* orig_umat,
-                        const double* orig_invu, const int index_orig, llint* boxvecs,
-                        int* boxvec_ovrf) {
+                        const double* orig_invu, const int index_orig, llint* dest_boxvecs,
+                        int* dest_boxvec_ovrf, const double dest_scale, const llint* orig_boxvecs,
+                        const int* orig_boxvec_ovrf, const int dest_bits, const int orig_bits) {
   const int xfrm_w = roundUp(9, warp_size_int);
   const int bdim_w = roundUp(6, warp_size_int);
   const int dest_xfrm_offset = xfrm_w * index_dest;
@@ -50,11 +53,21 @@ void copyBoxInformation(double* dest_boxdim, double* dest_umat, double* dest_inv
   }
 
   // Fill out the fixed-precision box vectors for PhaseSpaceSynthesis objects
-  if (boxvecs != nullptr) {
-    for (int i = 0; i < 9; i++) {
-      const int95_t ival = hostDoubleToInt95(orig_invu[i]);
-      boxvecs[dest_xfrm_offset + i]     = ival.x;
-      boxvec_ovrf[dest_xfrm_offset + i] = ival.y;
+  if (dest_boxvecs != nullptr) {
+    if (orig_boxvecs != nullptr) {
+      for (int i = 0; i < 9; i++) {
+        const int95_t orig_ival = { orig_boxvecs[i], orig_boxvec_ovrf[i] };
+        const int95_t ival = hostChangeFPBits(orig_ival, orig_bits, dest_bits);
+        dest_boxvecs[dest_xfrm_offset + i]     = ival.x;
+        dest_boxvec_ovrf[dest_xfrm_offset + i] = ival.y;
+      }
+    }
+    else {
+      for (int i = 0; i < 9; i++) {
+        const int95_t ival = hostDoubleToInt95(orig_invu[i] * dest_scale);
+        dest_boxvecs[dest_xfrm_offset + i]     = ival.x;
+        dest_boxvec_ovrf[dest_xfrm_offset + i] = ival.y;
+      }
     }
   }
 }
@@ -1422,6 +1435,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
   coordCopyValidateSystemIndex(index_orig, origin.system_count);
   llint *xdest, *ydest, *zdest;
   int *xdest_ovrf, *ydest_ovrf, *zdest_ovrf;
+  int dest_bits;
   double dest_scale;
   switch (kind) {
   case TrajectoryKind::POSITIONS:
@@ -1432,6 +1446,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
     ydest_ovrf = destination->ycrd_ovrf;
     zdest_ovrf = destination->zcrd_ovrf;
     dest_scale = destination->gpos_scale;
+    dest_bits  = destination->gpos_bits;
     break;
   case TrajectoryKind::VELOCITIES:
     xdest = destination->xvel;
@@ -1441,6 +1456,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
     ydest_ovrf = destination->yvel_ovrf;
     zdest_ovrf = destination->zvel_ovrf;
     dest_scale = destination->vel_scale;
+    dest_bits  = destination->vel_bits;
     break;
   case TrajectoryKind::FORCES:
     xdest = destination->xfrc;
@@ -1450,6 +1466,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
     ydest_ovrf = destination->yfrc_ovrf;
     zdest_ovrf = destination->zfrc_ovrf;
     dest_scale = destination->frc_scale;
+    dest_bits  = destination->frc_bits;
     break;
   }
 
@@ -1514,17 +1531,17 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
     switch (origin.mode) {
     case PrecisionModel::DOUBLE:
       launchCopyCoordinateXYZBox(xdest, ydest, zdest, xdest_ovrf, ydest_ovrf, zdest_ovrf,
-                                 dest_scale, destination->gpos_bits, origin.xcrd, origin.ycrd,
-                                 origin.zcrd, 1.0, 0, double_type_index, natom, destination->umat,
-                                 destination->invu, destination->boxdims, origin.umat, origin.invu,
-                                 origin.boxdims, destination->boxvecs, destination->boxvec_ovrf,
-                                 dest_atom_start, orig_atom_start, dest_xfrm_start,
-                                 orig_xfrm_start, dest_bdim_start, orig_bdim_start, gpu);
+                                 dest_scale, dest_bits, origin.xcrd, origin.ycrd, origin.zcrd, 1.0,
+                                 0, double_type_index, natom, destination->umat, destination->invu,
+                                 destination->boxdims, origin.umat, origin.invu, origin.boxdims,
+                                 destination->boxvecs, destination->boxvec_ovrf, dest_atom_start,
+                                 orig_atom_start, dest_xfrm_start, orig_xfrm_start,
+                                 dest_bdim_start, orig_bdim_start, gpu);
       break;
     case PrecisionModel::SINGLE:
       launchCopyCoordinateXYZBox(xdest, ydest, zdest, xdest_ovrf, ydest_ovrf, zdest_ovrf,
-                                 dest_scale, destination->gpos_bits, origin.xcrd_sp,
-                                 origin.ycrd_sp, origin.zcrd_sp, 1.0, 0, float_type_index, natom,
+                                 dest_scale, dest_bits, origin.xcrd_sp, origin.ycrd_sp,
+                                 origin.zcrd_sp, 1.0, 0, float_type_index, natom,
                                  destination->umat, destination->invu, destination->boxdims,
                                  origin.umat, origin.invu, origin.boxdims, destination->boxvecs,
                                  destination->boxvec_ovrf, dest_atom_start, orig_atom_start,
@@ -1538,14 +1555,14 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
     switch (origin.mode) {
     case PrecisionModel::DOUBLE:
       launchCopyCoordinateXYZ(xdest, ydest, zdest, xdest_ovrf, ydest_ovrf, zdest_ovrf,
-                              dest_scale, destination->gpos_bits, origin.xcrd, origin.ycrd,
+                              dest_scale, dest_bits, origin.xcrd, origin.ycrd,
                               origin.zcrd, 1.0, 0, double_type_index, natom, dest_atom_start,
                               orig_atom_start, gpu);
       break;
     case PrecisionModel::SINGLE:
       launchCopyCoordinateXYZ(xdest, ydest, zdest, xdest_ovrf, ydest_ovrf, zdest_ovrf,
-                              dest_scale, destination->gpos_bits, origin.xcrd_sp, origin.ycrd_sp,
-                              origin.zcrd_sp, 1.0, 0, double_type_index, natom, dest_atom_start,
+                              dest_scale, dest_bits, origin.xcrd_sp, origin.ycrd_sp,
+                              origin.zcrd_sp, 1.0, 0, float_type_index, natom, dest_atom_start,
                               orig_atom_start, gpu);
       break;
     }
@@ -1648,10 +1665,13 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
+
       // Copy the present positions, velocities, and forces
       copyBoxInformation(destination->boxdims, destination->umat, destination->invu, index_dest,
                          origin.boxdims, origin.umat, origin.invu, index_orig,
-                         destination->boxvecs, destination->boxvec_ovrf);
+                         destination->boxvecs, destination->boxvec_ovrf, destination->gpos_scale,
+                         origin.boxvecs, origin.boxvec_ovrf, destination->gpos_bits,
+                         origin.gpos_bits);
       copyCoordinateXYZ(&destination->xcrd[dest_atom_start],
                         &destination->xcrd_ovrf[dest_atom_start],
                         &destination->ycrd[dest_atom_start],
@@ -1686,7 +1706,9 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
       // Copy the alternate positions, velocities, and forces
       copyBoxInformation(destination->alt_boxdims, destination->umat_alt, destination->invu_alt,
                          index_dest, origin.alt_boxdims, origin.umat_alt, origin.invu_alt,
-                         index_orig, destination->alt_boxvecs, destination->alt_boxvec_ovrf);
+                         index_orig, destination->alt_boxvecs, destination->alt_boxvec_ovrf,
+                         destination->gpos_scale, origin.alt_boxvecs, origin.alt_boxvec_ovrf,
+                         destination->gpos_bits, origin.gpos_bits);
       copyCoordinateXYZ(&destination->xalt[dest_atom_start],
                         &destination->xalt_ovrf[dest_atom_start],
                         &destination->yalt[dest_atom_start],
@@ -1723,7 +1745,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       launchCopyCoordinates(destination, dest_atom_start, index_dest, origin, orig_atom_start,
-                            index_orig, gpu);
+                            index_orig, natom, gpu);
       break;
 #endif
     }
@@ -1731,7 +1753,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     launchCopyCoordinates(destination, dest_atom_start, index_dest, origin, orig_atom_start,
-                          index_orig, gpu);
+                          index_orig, natom, gpu);
     break;
 #endif
   }
@@ -2106,14 +2128,16 @@ void coordCopy(Condensate *destination, const int index_dest, const PhaseSpace &
                const TrajectoryKind kind, const HybridTargetLevel destination_tier,
                const HybridTargetLevel origin_tier, const GpuDetails &gpu,
                const HpcKernelSync sync) {
-  coordCopy(destination, index_dest, origin, kind, origin.getCyclePosition());
+  coordCopy(destination, index_dest, origin, kind, origin.getCyclePosition(), destination_tier,
+            origin_tier, gpu, sync);
 }
 
 //-------------------------------------------------------------------------------------------------
 void coordCopy(Condensate *destination, const int index_dest, const PhaseSpace &origin,
                const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
                const GpuDetails &gpu, const HpcKernelSync sync) {
-  coordCopy(destination, index_dest, origin, TrajectoryKind::POSITIONS, origin.getCyclePosition());
+  coordCopy(destination, index_dest, origin, TrajectoryKind::POSITIONS, origin.getCyclePosition(),
+            destination_tier, origin_tier, gpu, sync);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2289,7 +2313,7 @@ void coordCopy(Condensate *destination, const int index_dest, const PhaseSpaceSy
   coordCopyValidateSystemIndex(index_orig, origin.getSystemCount());
   const int natom = origin.getAtomCount(index_orig);
   const size_t dest_atom_start = destination->getAtomOffset(index_dest);
-  const size_t orig_atom_start = origin.getAtomOffset(index_dest);
+  const size_t orig_atom_start = origin.getAtomOffset(index_orig);
   coordCopyValidateAtomCounts(natom, destination->getAtomCount(index_orig));
   switch (destination_tier) {
   case HybridTargetLevel::HOST:
@@ -2421,7 +2445,7 @@ void coordCopy(CondensateWriter *destination, const int dest_atom_start, const i
 #endif
   }
 
-  // Any oeprations concerning data on the GPU will fall through the switch above and execute the
+  // Any operations concerning data on the GPU will fall through the switch above and execute the
   // following code.  Unroll the switch over the destination object's precision mode.
 #ifdef STORMM_USE_HPC
   launchPreparation(sync, destination_tier, origin_tier);
@@ -2429,8 +2453,8 @@ void coordCopy(CondensateWriter *destination, const int dest_atom_start, const i
   const int bdim_w = roundUp(6, warp_size_int);
   const int dest_xfrm_start = xfrm_w * index_dest;
   const int dest_bdim_start = bdim_w * index_dest;
-  const int orig_xfrm_start = xfrm_w * index_dest;
-  const int orig_bdim_start = bdim_w * index_dest;
+  const int orig_xfrm_start = xfrm_w * index_orig;
+  const int orig_bdim_start = bdim_w * index_orig;
   size_t ct_dest;
   void *dest_xptr, *dest_yptr, *dest_zptr;
   switch (destination->mode) {
@@ -2476,9 +2500,9 @@ void coordCopy(Condensate *destination, const int index_dest, const Condensate &
                const HpcKernelSync sync) {
   coordCopyValidateSystemIndex(index_dest, destination->getSystemCount());
   coordCopyValidateSystemIndex(index_orig, origin.getSystemCount());
-  const int natom = origin.getAtomCount(index_dest);
+  const int natom = origin.getAtomCount(index_orig);
   const size_t dest_atom_start = destination->getAtomOffset(index_dest);
-  const size_t orig_atom_start = origin.getAtomOffset(index_dest);
+  const size_t orig_atom_start = origin.getAtomOffset(index_orig);
   coordCopyValidateAtomCounts(natom, destination->getAtomCount(index_dest));
   switch (destination_tier) {
   case HybridTargetLevel::HOST:
@@ -2513,6 +2537,839 @@ void coordCopy(Condensate *destination, const int index_dest, const Condensate &
       case HybridTargetLevel::DEVICE:
         coordCopy(&cdnsw, dest_atom_start, index_dest, origin.data(origin_tier), orig_atom_start,
                   index_orig, natom, destination_tier, origin_tier, gpu, sync);
+        break;
+      }
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
+               const CoordinateSeriesReader<void> &origin, const size_t ct_orig,
+               const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // Restore the type of the destination coordinate object, then execute the same switch
+        // over the origin object's possible data types.
+        if (ct_dest == double_type_index) {
+          CoordinateSeriesWriter<double> tr_dest = restoreType<double>(*destination);
+          unrollCCXYZOrigin<double>(&tr_dest, origin, ct_orig, system_pairs, copy_count,
+                                    destination_tier, origin_tier);
+        }
+        else if (ct_dest == float_type_index) {
+          CoordinateSeriesWriter<float> tr_dest = restoreType<float>(*destination);
+          unrollCCXYZOrigin<float>(&tr_dest, origin, ct_orig, system_pairs, copy_count,
+                                   destination_tier, origin_tier);
+        }
+        else if (ct_dest == short_type_index) {
+          CoordinateSeriesWriter<short int> tr_dest = restoreType<short int>(*destination);
+          unrollCCXYZOrigin<short int>(&tr_dest, origin, ct_orig, system_pairs, copy_count,
+                                       destination_tier, origin_tier);
+        }
+        else if (ct_dest == int_type_index) {
+          CoordinateSeriesWriter<int> tr_dest = restoreType<int>(*destination);
+          unrollCCXYZOrigin<int>(&tr_dest, origin, ct_orig, system_pairs, copy_count,
+                                 destination_tier, origin_tier);
+        }
+        else if (ct_dest == llint_type_index) {
+          CoordinateSeriesWriter<llint> tr_dest = restoreType<llint>(*destination);
+          unrollCCXYZOrigin<llint>(&tr_dest, origin, ct_orig, system_pairs, copy_count,
+                                   destination_tier, origin_tier);
+        }
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations invovling the GPU will fall through the above switch to execute the following
+  // code.  Multi-copy operations reinstate the templates prior to calling a templated kernel on
+  // the GPU, and rely on templated C++ functions on the CPU.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, ct_dest, origin, ct_orig, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
+               const PsSynthesisReader &origin, const TrajectoryKind kind,
+               const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // Execute the loop over the various systems after restoring the data type of the
+        // destination object.  This is the most efficient means of arranging the nesting, and
+        // does not generate significantly more code or detract from the legibility of the code.
+        if (ct_dest == double_type_index) {
+          CoordinateSeriesWriter<double> tr_dest = restoreType<double>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      kind, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == float_type_index) {
+          CoordinateSeriesWriter<float> tr_dest = restoreType<float>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      kind, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == short_type_index) {
+          CoordinateSeriesWriter<short int> tr_dest = restoreType<short int>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      kind, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == int_type_index) {
+          CoordinateSeriesWriter<int> tr_dest = restoreType<int>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      kind, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == llint_type_index) {
+          CoordinateSeriesWriter<llint> tr_dest = restoreType<llint>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      kind, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations invovling the GPU will fall through the above switch to execute the following
+  // code.  Multi-copy operations reinstate the templates prior to calling a templated kernel on
+  // the GPU, and rely on templated C++ functions on the CPU.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, ct_dest, origin, kind, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
+               const CondensateReader &origin, const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // Restore the type of the destination coordinate object, then execute the loop over the
+        // various systems.
+        if (ct_dest == double_type_index) {
+          CoordinateSeriesWriter<double> tr_dest = restoreType<double>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == float_type_index) {
+          CoordinateSeriesWriter<float> tr_dest = restoreType<float>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == short_type_index) {
+          CoordinateSeriesWriter<short int> tr_dest = restoreType<short int>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == int_type_index) {
+          CoordinateSeriesWriter<int> tr_dest = restoreType<int>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_dest == llint_type_index) {
+          CoordinateSeriesWriter<llint> tr_dest = restoreType<llint>(*destination);
+          for (int i = 0; i < copy_count; i++) {
+            const int orig_atom_start = origin.atom_starts[system_pairs[i].x];
+            coordCopy(&tr_dest, system_pairs[i].y, origin, orig_atom_start, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations invovling the GPU will fall through the above switch to execute the following
+  // code.  Multi-copy operations reinstate the templates prior to calling a templated kernel on
+  // the GPU, and rely on templated C++ functions on the CPU.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, ct_dest, origin, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PsSynthesisWriter *destination, const TrajectoryKind kind,
+               const CoordinateSeriesReader<void> &origin, const size_t ct_orig,
+               const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // Restore the type of the destination coordinate object, then execute the loop over the
+        // various systems.
+        if (ct_orig == double_type_index) {
+          const CoordinateSeriesReader<double> tr_orig = restoreType<double>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, kind, tr_orig,
+                      system_pairs[i].x, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == float_type_index) {
+          const CoordinateSeriesReader<float> tr_orig = restoreType<float>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, kind, tr_orig,
+                      system_pairs[i].x, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == short_type_index) {
+          const CoordinateSeriesReader<short int> tr_orig = restoreType<short int>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, kind, tr_orig,
+                      system_pairs[i].x, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == int_type_index) {
+          const CoordinateSeriesReader<int> tr_orig = restoreType<int>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, kind, tr_orig,
+                      system_pairs[i].x, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == llint_type_index) {
+          const CoordinateSeriesReader<llint> tr_orig = restoreType<llint>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, kind, tr_orig,
+                      system_pairs[i].x, destination_tier, origin_tier, gpu, sync);
+          }
+        }
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations invovling the GPU will fall through the above switch to execute the following
+  // code.  Multi-copy operations reinstate the templates prior to calling a templated kernel on
+  // the GPU, and rely on templated C++ functions on the CPU.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, kind, origin, ct_orig, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PsSynthesisWriter *destination, const PsSynthesisReader &origin,
+               const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+
+      // For HOST to HOST transmission, both abstracts must be valid on the host and can therefore
+      // be de-referenced for the data behind their array pointers.  Loop over all system pairs.
+      for (int i = 0; i < copy_count; i++) {
+        const int index_dest = system_pairs[i].y;
+        const int index_orig = system_pairs[i].x;
+        coordCopy(destination, destination->atom_starts[index_dest], system_pairs[i].y, origin,
+                  origin.atom_starts[index_orig], system_pairs[i].x,
+                  origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations concerning data on the GPU will fall through the switch above and execute the
+  // following code.  Unroll the switch over the destination object's precision mode.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, origin, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const PhaseSpaceSynthesis &origin,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  const Hybrid<int2> hsys_tmp(system_pairs, "xfer_temporary", HybridFormat::HOST_ONLY);
+  coordCopy(destination, origin, hsys_tmp, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const PhaseSpaceSynthesis &origin,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // In the case of host-to-host copying, the GPU device will not be involved.  Therefore,
+        // take the pointer to the system_pairs array on the host, accessible to the host.
+        // Otherwise, take a pointer to that data useable by the device.
+        PsSynthesisWriter destw = destination->data(destination_tier);
+        coordCopy(&destw, origin.data(origin_tier), system_pairs.data(), system_pairs.size(),
+                  destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        PsSynthesisWriter destw = destination->deviceViewToHostData();
+        coordCopy(&destw, origin.data(origin_tier), system_pairs.getDeviceValidHostPointer(),
+                  system_pairs.size(), destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      PsSynthesisWriter destw = destination->data(destination_tier);
+      const int2* sys_ptr = system_pairs.getDeviceValidHostPointer();
+      const int npairs = system_pairs.size();
+      switch (origin_tier) {
+      case HybridTargetLevel::HOST:
+        coordCopy(&destw, origin.deviceViewToHostData(), sys_ptr, npairs, destination_tier,
+                  origin_tier, gpu, sync);
+        break;
+      case HybridTargetLevel::DEVICE:
+        coordCopy(&destw, origin.data(origin_tier), sys_ptr, npairs,  destination_tier,
+                  origin_tier, gpu, sync);
+        break;
+      }
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PsSynthesisWriter *destination, const TrajectoryKind kind,
+               const CondensateReader &origin, const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      for (int i = 0; i < copy_count; i++) {
+        const int index_dest = system_pairs[i].y;
+        const int index_orig = system_pairs[i].x;
+        coordCopy(destination, destination->atom_starts[index_dest], system_pairs[i].y, kind,
+                  origin, origin.atom_starts[index_orig], system_pairs[i].x,
+                  origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations concerning data on the GPU will fall through the switch above and execute the
+  // following code.  Unroll the switch over the destination object's precision mode.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, kind, origin, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const TrajectoryKind kind,
+               const CoordinateCycle orientation, const Condensate &origin,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  const Hybrid<int2> hsys_pairs(system_pairs, "xfer_temporary", HybridFormat::HOST_ONLY);
+  coordCopy(destination, kind, orientation, origin, hsys_pairs, destination_tier, origin_tier,
+            gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const TrajectoryKind kind,
+               const Condensate &origin, const std::vector<int2> &system_pairs,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  coordCopy(destination, kind, destination->getCyclePosition(), origin, system_pairs,
+            destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const Condensate &origin,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  coordCopy(destination, TrajectoryKind::POSITIONS, destination->getCyclePosition(), origin,
+            system_pairs, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const TrajectoryKind kind,
+               const CoordinateCycle orientation, const Condensate &origin,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        PsSynthesisWriter destw = destination->data(orientation, destination_tier);
+        coordCopy(&destw, kind, origin.data(origin_tier), system_pairs.data(), system_pairs.size(),
+                  destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        PsSynthesisWriter destw = destination->deviceViewToHostData(orientation);
+        coordCopy(&destw, kind, origin.data(origin_tier), system_pairs.getDeviceValidHostPointer(),
+                  system_pairs.size(), destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      PsSynthesisWriter destw = destination->data(orientation, destination_tier);
+      const int2* sys_ptr = system_pairs.getDeviceValidHostPointer();
+      const int npairs = system_pairs.size();
+      switch (origin_tier) {
+      case HybridTargetLevel::HOST:
+        coordCopy(&destw, kind, origin.deviceViewToHostData(), sys_ptr, npairs, destination_tier,
+                  origin_tier, gpu, sync);
+        break;
+      case HybridTargetLevel::DEVICE:
+        coordCopy(&destw, kind, origin.data(origin_tier), sys_ptr, npairs, destination_tier,
+                  origin_tier, gpu, sync);
+        break;
+      }
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const TrajectoryKind kind,
+               const Condensate &origin, const Hybrid<int2> &system_pairs,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  coordCopy(destination, kind, destination->getCyclePosition(), origin, system_pairs,
+            destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(PhaseSpaceSynthesis *destination, const Condensate &origin,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  coordCopy(destination, TrajectoryKind::POSITIONS, destination->getCyclePosition(), origin,
+            system_pairs, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CondensateWriter *destination, const CoordinateSeriesReader<void> &origin,
+               const size_t ct_orig, const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        // Restore the type of the destination coordinate object, then execute the loop over the
+        // various systems.
+        if (ct_orig == double_type_index) {
+          const CoordinateSeriesReader<double> tr_orig = restoreType<double>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, tr_orig, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == float_type_index) {
+          const CoordinateSeriesReader<float> tr_orig = restoreType<float>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, tr_orig, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == short_type_index) {
+          const CoordinateSeriesReader<short int> tr_orig = restoreType<short int>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, tr_orig, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == int_type_index) {
+          const CoordinateSeriesReader<int> tr_orig = restoreType<int>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, tr_orig, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+        else if (ct_orig == llint_type_index) {
+          const CoordinateSeriesReader<llint> tr_orig = restoreType<llint>(origin);
+          for (int i = 0; i < copy_count; i++) {
+            const int dest_atom_start = destination->atom_starts[system_pairs[i].y];
+            coordCopy(destination, dest_atom_start, system_pairs[i].y, tr_orig, system_pairs[i].x,
+                      destination_tier, origin_tier, gpu, sync);
+          }
+        }
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations invovling the GPU will fall through the above switch to execute the following
+  // code.  Multi-copy operations reinstate the templates prior to calling a templated kernel on
+  // the GPU, and rely on templated C++ functions on the CPU.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, origin, ct_orig, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CondensateWriter *destination, const PsSynthesisReader &origin,
+               const TrajectoryKind kind, const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      for (int i = 0; i < copy_count; i++) {
+        const int index_dest = system_pairs[i].y;
+        const int index_orig = system_pairs[i].x;
+        coordCopy(destination, destination->atom_starts[index_dest], system_pairs[i].y,
+                  origin, origin.atom_starts[index_orig], system_pairs[i].x,
+                  origin.atom_counts[index_orig], kind, destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations concerning data on the GPU will fall through the switch above and execute the
+  // following code.  Unroll the switch over the destination object's precision mode.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, origin, kind, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin,
+               const TrajectoryKind kind, const CoordinateCycle orientation,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  const Hybrid<int2> hsys_tmp(system_pairs, "xfer_temporary", HybridFormat::HOST_ONLY);
+  coordCopy(destination, origin, kind, orientation, hsys_tmp, destination_tier, origin_tier,
+            gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin,
+               const TrajectoryKind kind, const std::vector<int2> &system_pairs,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  coordCopy(destination, origin, kind, origin.getCyclePosition(), system_pairs, destination_tier,
+            origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  coordCopy(destination, origin, TrajectoryKind::POSITIONS, origin.getCyclePosition(),
+            system_pairs, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin,
+               const TrajectoryKind kind, const CoordinateCycle orientation,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        CondensateWriter destw = destination->data(destination_tier);
+        coordCopy(&destw, origin.data(orientation, origin_tier), kind, system_pairs.data(),
+                  system_pairs.size(), destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        CondensateWriter destw = destination->deviceViewToHostData();
+        coordCopy(&destw, origin.data(orientation, origin_tier), kind,
+                  system_pairs.getDeviceValidHostPointer(), system_pairs.size(), destination_tier,
+                  origin_tier, gpu, sync);
+      }
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      CondensateWriter destw = destination->data(destination_tier);
+      const int2* sys_ptr = system_pairs.getDeviceValidHostPointer();
+      const int npairs = system_pairs.size();
+      switch (origin_tier) {
+      case HybridTargetLevel::HOST:
+        coordCopy(&destw, origin.deviceViewToHostData(orientation), kind, sys_ptr, npairs,
+                  destination_tier, origin_tier, gpu, sync);
+        break;
+      case HybridTargetLevel::DEVICE:
+        coordCopy(&destw, origin.data(orientation, origin_tier), kind, sys_ptr, npairs,
+                  destination_tier, origin_tier, gpu, sync);
+        break;
+      }
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin, TrajectoryKind kind,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  coordCopy(destination, origin, kind, origin.getCyclePosition(), system_pairs, destination_tier,
+            origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const PhaseSpaceSynthesis &origin,
+               const Hybrid<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  coordCopy(destination, origin, TrajectoryKind::POSITIONS, origin.getCyclePosition(),
+            system_pairs, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(CondensateWriter *destination, const CondensateReader &origin,
+               const int2* system_pairs, const int copy_count,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      for (int i = 0; i < copy_count; i++) {
+        const int index_dest = system_pairs[i].y;
+        const int index_orig = system_pairs[i].x;
+        coordCopy(destination, destination->atom_starts[index_dest], system_pairs[i].y,
+                  origin, origin.atom_starts[index_orig], system_pairs[i].x,
+                  origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+
+  // Any operations concerning data on the GPU will fall through the switch above and execute the
+  // following code.  Unroll the switch over the destination object's precision mode.
+#ifdef STORMM_USE_HPC
+  launchPreparation(sync, destination_tier, origin_tier);
+  launchCopyCoordinates(destination, origin, system_pairs, copy_count, gpu);
+  launchResolution(sync, destination_tier, origin_tier);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const Condensate &origin,
+               const std::vector<int2> &system_pairs, const HybridTargetLevel destination_tier,
+               const HybridTargetLevel origin_tier, const GpuDetails &gpu,
+               const HpcKernelSync sync) {
+  const Hybrid<int2> hsys_tmp(system_pairs, "xfer_temporary", HybridFormat::HOST_ONLY);
+  coordCopy(destination, origin, hsys_tmp, destination_tier, origin_tier, gpu, sync);
+}
+
+//-------------------------------------------------------------------------------------------------
+void coordCopy(Condensate *destination, const Condensate &origin, const Hybrid<int2> &system_pairs,
+               const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
+               const GpuDetails &gpu, const HpcKernelSync sync) {
+  switch (destination_tier) {
+  case HybridTargetLevel::HOST:
+    switch (origin_tier) {
+    case HybridTargetLevel::HOST:
+      {
+        CondensateWriter destw = destination->data(destination_tier);
+        coordCopy(&destw, origin.data(origin_tier), system_pairs.data(), system_pairs.size(),
+                  destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        CondensateWriter destw = destination->deviceViewToHostData();
+        coordCopy(&destw, origin.data(origin_tier), system_pairs.getDeviceValidHostPointer(),
+                  system_pairs.size(), destination_tier, origin_tier, gpu, sync);
+      }
+      break;
+#endif
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      CondensateWriter destw = destination->data(destination_tier);
+      const int2* sys_ptr = system_pairs.getDeviceValidHostPointer();
+      const int npairs = system_pairs.size();
+      switch (origin_tier) {
+      case HybridTargetLevel::HOST:
+        coordCopy(&destw, origin.deviceViewToHostData(), sys_ptr, npairs, destination_tier,
+                  origin_tier, gpu, sync);
+        break;
+      case HybridTargetLevel::DEVICE:
+        coordCopy(&destw, origin.data(origin_tier), sys_ptr, npairs, destination_tier,
+                  origin_tier, gpu, sync);
         break;
       }
     }

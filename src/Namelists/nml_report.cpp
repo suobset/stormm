@@ -24,16 +24,16 @@ using structure::DataRequestKind;
   
 //-------------------------------------------------------------------------------------------------
 ReportControls::ReportControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
-  policy{policy_in}, report_layout{OutputSyntax::STANDALONE}, report_scope{OutputScope::AVERAGES},
-  username{std::string("")}, start_date{}, print_walltime_data{true},
-  report_file_width{default_output_file_width},
-  common_path_limit{default_common_path_limit},
-  common_path_threshold{default_common_path_threshold},
-  energy_decimal_places{default_energy_decimal_places},
-  outlier_sigma_factor{default_energy_outlier_sigmas},
-  outlier_count{default_outlier_limit},
-  reported_quantities{}, sdf_addons{},
-  nml_transcript{"report"}
+    policy{policy_in}, report_layout{OutputSyntax::STANDALONE},
+    report_scope{OutputScope::AVERAGES}, username{std::string("")}, start_date{},
+    print_walltime_data{true}, report_file_width{default_output_file_width},
+    common_path_limit{default_common_path_limit},
+    common_path_threshold{default_common_path_threshold},
+    energy_decimal_places{default_energy_decimal_places},
+    outlier_sigma_factor{default_energy_outlier_sigmas},
+    outlier_count{default_outlier_limit},
+    reported_quantities{}, sdf_addons{},
+    nml_transcript{"report"}
 {
   // Detect the time of day
   gettimeofday(&start_date, nullptr);
@@ -54,7 +54,7 @@ ReportControls::ReportControls(const ExceptionResponse policy_in, const WrapText
 //-------------------------------------------------------------------------------------------------
 ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_nml,
                                const ExceptionResponse policy_in, const WrapTextSearch wrap) :
-  ReportControls(policy_in, wrap)
+    ReportControls(policy_in, wrap)
 {
   NamelistEmulator t_nml = reportInput(tf, start_line, found_nml, policy, wrap);
   nml_transcript = t_nml;

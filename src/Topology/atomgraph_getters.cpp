@@ -322,6 +322,34 @@ char4 AtomGraph::getAtomType(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<char4> AtomGraph::getAtomTypeNameTable() const {
+  std::vector<char4> result(atom_type_count);
+  std::vector<bool> coverage(atom_type_count, false);
+  int types_located = 0;
+  int i = 0;
+  const int* ljidx_ptr = lennard_jones_indices.data();
+  const char4* atyp_ptr = atom_types.data();
+  while (i < atom_count && types_located < atom_type_count) {
+    if (ljidx_ptr[i] < 0 || ljidx_ptr[i] >= atom_type_count) {
+      rtErr("Lennard-Jones type index " + std::to_string(ljidx_ptr[i]) + " is invalid.",
+            "AtomGraph", "getAtomTypeNameTable");
+    }
+    if (coverage[ljidx_ptr[i]] == false) {
+      coverage[ljidx_ptr[i]] = true;
+      result[ljidx_ptr[i]] = atyp_ptr[i];
+      types_located++;
+    }
+    i++;
+  }
+  if (types_located < atom_type_count) {
+    rtErr("The topology contains only " + std::to_string(types_located) + " unique Lennard-Jones "
+          "atom types, whereas it is stated to contain " + std::to_string(atom_type_count) + ".",
+          "AtomGraph", "getAtomTypeNameTable");
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 const Hybrid<char4>& AtomGraph::getResidueName() const {
   return residue_names;
 }
@@ -680,7 +708,7 @@ std::vector<int> AtomGraph::getNonbonded14Exclusions(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(HybridTargetLevel tier) const {
+ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(const HybridTargetLevel tier) const {
   return ValenceKit<double>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                             bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                             inferred_14_attenuations, attenuated_14_type_count,
@@ -734,7 +762,7 @@ ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(HybridTargetLevel tie
 }
 
 //-------------------------------------------------------------------------------------------------
-ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(HybridTargetLevel tier) const {
+ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(const HybridTargetLevel tier) const {
   return ValenceKit<float>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                            bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                            inferred_14_attenuations, attenuated_14_type_count,
@@ -843,7 +871,7 @@ AtomGraph::getSinglePrecisionImplicitSolventKit(const HybridTargetLevel tier) co
 }
 
 //-------------------------------------------------------------------------------------------------
-ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(HybridTargetLevel tier) const {
+ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(const HybridTargetLevel tier) const {
   return ChemicalDetailsKit(atom_count, residue_count, molecule_count, atom_names.data(tier),
                             residue_names.data(tier), atom_types.data(tier),
                             atomic_numbers.data(tier), residue_limits.data(tier),
@@ -919,6 +947,356 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
                               sp_constraint_inverse_masses.data(tier),
                               sp_constraint_target_lengths.data(tier));
 }
+
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+//-------------------------------------------------------------------------------------------------
+ValenceKit<double> AtomGraph::getDeviceViewToHostDPValenceKit() const {
+  return ValenceKit<double>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
+                            bond_parameter_count, angl_parameter_count, dihe_parameter_count,
+                            inferred_14_attenuations, attenuated_14_type_count,
+                            urey_bradley_term_count, charmm_impr_term_count, cmap_term_count,
+                            urey_bradley_parameter_count, charmm_impr_parameter_count,
+                            cmap_surface_count, bond_stiffnesses.getDeviceValidHostPointer(),
+                            bond_equilibria.getDeviceValidHostPointer(),
+                            angl_stiffnesses.getDeviceValidHostPointer(),
+                            angl_equilibria.getDeviceValidHostPointer(),
+                            dihe_amplitudes.getDeviceValidHostPointer(),
+                            dihe_periodicities.getDeviceValidHostPointer(),
+                            dihe_phase_angles.getDeviceValidHostPointer(),
+                            attn14_elec_factors.getDeviceValidHostPointer(),
+                            attn14_vdw_factors.getDeviceValidHostPointer(),
+                            bond_i_atoms.getDeviceValidHostPointer(),
+                            bond_j_atoms.getDeviceValidHostPointer(),
+                            bond_parameter_indices.getDeviceValidHostPointer(),
+                            bond_modifiers.getDeviceValidHostPointer(),
+                            angl_i_atoms.getDeviceValidHostPointer(),
+                            angl_j_atoms.getDeviceValidHostPointer(),
+                            angl_k_atoms.getDeviceValidHostPointer(),
+                            angl_parameter_indices.getDeviceValidHostPointer(),
+                            angl_modifiers.getDeviceValidHostPointer(),
+                            dihe_i_atoms.getDeviceValidHostPointer(),
+                            dihe_j_atoms.getDeviceValidHostPointer(),
+                            dihe_k_atoms.getDeviceValidHostPointer(),
+                            dihe_l_atoms.getDeviceValidHostPointer(),
+                            dihe_parameter_indices.getDeviceValidHostPointer(),
+                            dihe14_parameter_indices.getDeviceValidHostPointer(),
+                            dihe_modifiers.getDeviceValidHostPointer(),
+                            infr14_i_atoms.getDeviceValidHostPointer(),
+                            infr14_l_atoms.getDeviceValidHostPointer(),
+                            infr14_parameter_indices.getDeviceValidHostPointer(),
+                            urey_bradley_i_atoms.getDeviceValidHostPointer(),
+                            urey_bradley_k_atoms.getDeviceValidHostPointer(),
+                            urey_bradley_parameter_indices.getDeviceValidHostPointer(),
+                            charmm_impr_i_atoms.getDeviceValidHostPointer(),
+                            charmm_impr_j_atoms.getDeviceValidHostPointer(),
+                            charmm_impr_k_atoms.getDeviceValidHostPointer(),
+                            charmm_impr_l_atoms.getDeviceValidHostPointer(),
+                            charmm_impr_parameter_indices.getDeviceValidHostPointer(),
+                            cmap_i_atoms.getDeviceValidHostPointer(),
+                            cmap_j_atoms.getDeviceValidHostPointer(),
+                            cmap_k_atoms.getDeviceValidHostPointer(),
+                            cmap_l_atoms.getDeviceValidHostPointer(),
+                            cmap_m_atoms.getDeviceValidHostPointer(),
+                            cmap_surface_dimensions.getDeviceValidHostPointer(),
+                            cmap_surface_bounds.getDeviceValidHostPointer(),
+                            cmap_patch_bounds.getDeviceValidHostPointer(),
+                            cmap_surface_indices.getDeviceValidHostPointer(),
+                            urey_bradley_stiffnesses.getDeviceValidHostPointer(),
+                            urey_bradley_equilibria.getDeviceValidHostPointer(),
+                            charmm_impr_stiffnesses.getDeviceValidHostPointer(),
+                            charmm_impr_phase_angles.getDeviceValidHostPointer(),
+                            cmap_surfaces.getDeviceValidHostPointer(),
+                            cmap_phi_derivatives.getDeviceValidHostPointer(),
+                            cmap_psi_derivatives.getDeviceValidHostPointer(),
+                            cmap_phi_psi_derivatives.getDeviceValidHostPointer(),
+                            cmap_patches.getDeviceValidHostPointer(),
+                            bond_assigned_atoms.getDeviceValidHostPointer(),
+                            bond_assigned_index.getDeviceValidHostPointer(),
+                            bond_assigned_terms.getDeviceValidHostPointer(),
+                            bond_assigned_bounds.getDeviceValidHostPointer(),
+                            angl_assigned_atoms.getDeviceValidHostPointer(),
+                            angl_assigned_index.getDeviceValidHostPointer(),
+                            angl_assigned_terms.getDeviceValidHostPointer(),
+                            angl_assigned_bounds.getDeviceValidHostPointer(),
+                            dihe_assigned_atoms.getDeviceValidHostPointer(),
+                            dihe_assigned_index.getDeviceValidHostPointer(),
+                            dihe_assigned_terms.getDeviceValidHostPointer(),
+                            dihe_assigned_bounds.getDeviceValidHostPointer(),
+                            urey_bradley_assigned_atoms.getDeviceValidHostPointer(),
+                            urey_bradley_assigned_index.getDeviceValidHostPointer(),
+                            urey_bradley_assigned_terms.getDeviceValidHostPointer(),
+                            urey_bradley_assigned_bounds.getDeviceValidHostPointer(),
+                            charmm_impr_assigned_atoms.getDeviceValidHostPointer(),
+                            charmm_impr_assigned_index.getDeviceValidHostPointer(),
+                            charmm_impr_assigned_terms.getDeviceValidHostPointer(),
+                            charmm_impr_assigned_bounds.getDeviceValidHostPointer(),
+                            cmap_assigned_atoms.getDeviceValidHostPointer(),
+                            cmap_assigned_index.getDeviceValidHostPointer(),
+                            cmap_assigned_terms.getDeviceValidHostPointer(),
+                            cmap_assigned_bounds.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+ValenceKit<float> AtomGraph::getDeviceViewToHostSPValenceKit() const {
+  return ValenceKit<float>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
+                           bond_parameter_count, angl_parameter_count, dihe_parameter_count,
+                           inferred_14_attenuations, attenuated_14_type_count,
+                           urey_bradley_term_count, charmm_impr_term_count, cmap_term_count,
+                           urey_bradley_parameter_count, charmm_impr_parameter_count,
+                           cmap_surface_count, sp_bond_stiffnesses.getDeviceValidHostPointer(),
+                           sp_bond_equilibria.getDeviceValidHostPointer(),
+                           sp_angl_stiffnesses.getDeviceValidHostPointer(),
+                           sp_angl_equilibria.getDeviceValidHostPointer(),
+                           sp_dihe_amplitudes.getDeviceValidHostPointer(),
+                           sp_dihe_periodicities.getDeviceValidHostPointer(),
+                           sp_dihe_phase_angles.getDeviceValidHostPointer(),
+                           sp_attn14_elec_factors.getDeviceValidHostPointer(),
+                           sp_attn14_vdw_factors.getDeviceValidHostPointer(),
+                           bond_i_atoms.getDeviceValidHostPointer(),
+                           bond_j_atoms.getDeviceValidHostPointer(),
+                           bond_parameter_indices.getDeviceValidHostPointer(),
+                           bond_modifiers.getDeviceValidHostPointer(),
+                           angl_i_atoms.getDeviceValidHostPointer(),
+                           angl_j_atoms.getDeviceValidHostPointer(),
+                           angl_k_atoms.getDeviceValidHostPointer(),
+                           angl_parameter_indices.getDeviceValidHostPointer(),
+                           angl_modifiers.getDeviceValidHostPointer(),
+                           dihe_i_atoms.getDeviceValidHostPointer(),
+                           dihe_j_atoms.getDeviceValidHostPointer(),
+                           dihe_k_atoms.getDeviceValidHostPointer(),
+                           dihe_l_atoms.getDeviceValidHostPointer(),
+                           dihe_parameter_indices.getDeviceValidHostPointer(),
+                           dihe14_parameter_indices.getDeviceValidHostPointer(),
+                           dihe_modifiers.getDeviceValidHostPointer(),
+                           infr14_i_atoms.getDeviceValidHostPointer(),
+                           infr14_l_atoms.getDeviceValidHostPointer(),
+                           infr14_parameter_indices.getDeviceValidHostPointer(),
+                           urey_bradley_i_atoms.getDeviceValidHostPointer(),
+                           urey_bradley_k_atoms.getDeviceValidHostPointer(),
+                           urey_bradley_parameter_indices.getDeviceValidHostPointer(),
+                           charmm_impr_i_atoms.getDeviceValidHostPointer(),
+                           charmm_impr_j_atoms.getDeviceValidHostPointer(),
+                           charmm_impr_k_atoms.getDeviceValidHostPointer(),
+                           charmm_impr_l_atoms.getDeviceValidHostPointer(),
+                           charmm_impr_parameter_indices.getDeviceValidHostPointer(),
+                           cmap_i_atoms.getDeviceValidHostPointer(),
+                           cmap_j_atoms.getDeviceValidHostPointer(),
+                           cmap_k_atoms.getDeviceValidHostPointer(),
+                           cmap_l_atoms.getDeviceValidHostPointer(),
+                           cmap_m_atoms.getDeviceValidHostPointer(),
+                           cmap_surface_dimensions.getDeviceValidHostPointer(),
+                           cmap_surface_bounds.getDeviceValidHostPointer(),
+                           cmap_patch_bounds.getDeviceValidHostPointer(),
+                           cmap_surface_indices.getDeviceValidHostPointer(),
+                           sp_urey_bradley_stiffnesses.getDeviceValidHostPointer(),
+                           sp_urey_bradley_equilibria.getDeviceValidHostPointer(),
+                           sp_charmm_impr_stiffnesses.getDeviceValidHostPointer(),
+                           sp_charmm_impr_phase_angles.getDeviceValidHostPointer(),
+                           sp_cmap_surfaces.getDeviceValidHostPointer(),
+                           sp_cmap_phi_derivatives.getDeviceValidHostPointer(),
+                           sp_cmap_psi_derivatives.getDeviceValidHostPointer(),
+                           sp_cmap_phi_psi_derivatives.getDeviceValidHostPointer(),
+                           sp_cmap_patches.getDeviceValidHostPointer(),
+                           bond_assigned_atoms.getDeviceValidHostPointer(),
+                           bond_assigned_index.getDeviceValidHostPointer(),
+                           bond_assigned_terms.getDeviceValidHostPointer(),
+                           bond_assigned_bounds.getDeviceValidHostPointer(),
+                           angl_assigned_atoms.getDeviceValidHostPointer(),
+                           angl_assigned_index.getDeviceValidHostPointer(),
+                           angl_assigned_terms.getDeviceValidHostPointer(),
+                           angl_assigned_bounds.getDeviceValidHostPointer(),
+                           dihe_assigned_atoms.getDeviceValidHostPointer(),
+                           dihe_assigned_index.getDeviceValidHostPointer(),
+                           dihe_assigned_terms.getDeviceValidHostPointer(),
+                           dihe_assigned_bounds.getDeviceValidHostPointer(),
+                           urey_bradley_assigned_atoms.getDeviceValidHostPointer(),
+                           urey_bradley_assigned_index.getDeviceValidHostPointer(),
+                           urey_bradley_assigned_terms.getDeviceValidHostPointer(),
+                           urey_bradley_assigned_bounds.getDeviceValidHostPointer(),
+                           charmm_impr_assigned_atoms.getDeviceValidHostPointer(),
+                           charmm_impr_assigned_index.getDeviceValidHostPointer(),
+                           charmm_impr_assigned_terms.getDeviceValidHostPointer(),
+                           charmm_impr_assigned_bounds.getDeviceValidHostPointer(),
+                           cmap_assigned_atoms.getDeviceValidHostPointer(),
+                           cmap_assigned_index.getDeviceValidHostPointer(),
+                           cmap_assigned_terms.getDeviceValidHostPointer(),
+                           cmap_assigned_bounds.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+NonbondedKit<double>
+AtomGraph::getDeviceViewToHostDPNonbondedKit() const {
+  return NonbondedKit<double>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+                              atomic_charges.getDeviceValidHostPointer(),
+                              charge_indices.getDeviceValidHostPointer(),
+                              lennard_jones_indices.getDeviceValidHostPointer(),
+                              charge_parameters.getDeviceValidHostPointer(),
+                              lj_a_values.getDeviceValidHostPointer(),
+                              lj_b_values.getDeviceValidHostPointer(),
+                              lj_c_values.getDeviceValidHostPointer(),
+                              lj_14_a_values.getDeviceValidHostPointer(),
+                              lj_14_b_values.getDeviceValidHostPointer(),
+                              lj_14_c_values.getDeviceValidHostPointer(),
+                              lj_sigma_values.getDeviceValidHostPointer(),
+                              lj_14_sigma_values.getDeviceValidHostPointer(),
+                              nb11_exclusion_list.getDeviceValidHostPointer(),
+                              nb11_exclusion_bounds.getDeviceValidHostPointer(),
+                              nb12_exclusion_list.getDeviceValidHostPointer(),
+                              nb12_exclusion_bounds.getDeviceValidHostPointer(),
+                              nb13_exclusion_list.getDeviceValidHostPointer(),
+                              nb13_exclusion_bounds.getDeviceValidHostPointer(),
+                              nb14_exclusion_list.getDeviceValidHostPointer(),
+                              nb14_exclusion_bounds.getDeviceValidHostPointer(),
+                              lj_type_corrections.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+NonbondedKit<float> AtomGraph::getDeviceViewToHostSPNonbondedKit() const {
+  return NonbondedKit<float>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+                             sp_atomic_charges.getDeviceValidHostPointer(),
+                             charge_indices.getDeviceValidHostPointer(),
+                             lennard_jones_indices.getDeviceValidHostPointer(),
+                             sp_charge_parameters.getDeviceValidHostPointer(),
+                             sp_lj_a_values.getDeviceValidHostPointer(),
+                             sp_lj_b_values.getDeviceValidHostPointer(),
+                             sp_lj_c_values.getDeviceValidHostPointer(),
+                             sp_lj_14_a_values.getDeviceValidHostPointer(),
+                             sp_lj_14_b_values.getDeviceValidHostPointer(),
+                             sp_lj_14_c_values.getDeviceValidHostPointer(),
+                             sp_lj_sigma_values.getDeviceValidHostPointer(),
+                             sp_lj_14_sigma_values.getDeviceValidHostPointer(),
+                             nb11_exclusion_list.getDeviceValidHostPointer(),
+                             nb11_exclusion_bounds.getDeviceValidHostPointer(),
+                             nb12_exclusion_list.getDeviceValidHostPointer(),
+                             nb12_exclusion_bounds.getDeviceValidHostPointer(),
+                             nb13_exclusion_list.getDeviceValidHostPointer(),
+                             nb13_exclusion_bounds.getDeviceValidHostPointer(),
+                             nb14_exclusion_list.getDeviceValidHostPointer(),
+                             nb14_exclusion_bounds.getDeviceValidHostPointer(),
+                             sp_lj_type_corrections.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventKit<double>
+AtomGraph::getDeviceViewToHostDPImplicitSolventKit() const {
+  return ImplicitSolventKit<double>(atom_count, gb_style, dielectric_constant, salt_concentration,
+                                    neck_gb_indices.getDeviceValidHostPointer(),
+                                    atomic_pb_radii.getDeviceValidHostPointer(),
+                                    gb_screening_factors.getDeviceValidHostPointer(),
+                                    gb_alpha_parameters.getDeviceValidHostPointer(),
+                                    gb_beta_parameters.getDeviceValidHostPointer(),
+                                    gb_gamma_parameters.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventKit<float>
+AtomGraph::getDeviceViewToHostSPImplicitSolventKit() const {
+  return ImplicitSolventKit<float>(atom_count, gb_style, dielectric_constant, salt_concentration,
+                                   neck_gb_indices.getDeviceValidHostPointer(),
+                                   sp_atomic_pb_radii.getDeviceValidHostPointer(),
+                                   sp_gb_screening_factors.getDeviceValidHostPointer(),
+                                   sp_gb_alpha_parameters.getDeviceValidHostPointer(),
+                                   sp_gb_beta_parameters.getDeviceValidHostPointer(),
+                                   sp_gb_gamma_parameters.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+  ChemicalDetailsKit AtomGraph::getDeviceViewToHostChemicalDetailsKit() const {
+  return ChemicalDetailsKit(atom_count, residue_count, molecule_count,
+                            atom_names.getDeviceValidHostPointer(),
+                            residue_names.getDeviceValidHostPointer(),
+                            atom_types.getDeviceValidHostPointer(),
+                            atomic_numbers.getDeviceValidHostPointer(),
+                            residue_limits.getDeviceValidHostPointer(),
+                            atom_struc_numbers.getDeviceValidHostPointer(),
+                            residue_numbers.getDeviceValidHostPointer(),
+                            molecule_membership.getDeviceValidHostPointer(),
+                            molecule_contents.getDeviceValidHostPointer(),
+                            molecule_limits.getDeviceValidHostPointer(),
+                            atomic_masses.getDeviceValidHostPointer(),
+                            sp_atomic_masses.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteKit<double>
+AtomGraph::getDeviceViewToHostDPVirtualSiteKit() const {
+  return VirtualSiteKit<double>(virtual_site_count, virtual_site_parameter_set_count,
+                                virtual_site_atoms.getDeviceValidHostPointer(),
+                                virtual_site_frame1_atoms.getDeviceValidHostPointer(),
+                                virtual_site_frame2_atoms.getDeviceValidHostPointer(),
+                                virtual_site_frame3_atoms.getDeviceValidHostPointer(),
+                                virtual_site_frame4_atoms.getDeviceValidHostPointer(),
+                                virtual_site_parameter_indices.getDeviceValidHostPointer(),
+                                virtual_site_frame_types.getDeviceValidHostPointer(),
+                                virtual_site_frame_dim1.getDeviceValidHostPointer(),
+                                virtual_site_frame_dim2.getDeviceValidHostPointer(),
+                                virtual_site_frame_dim3.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteKit<float>
+AtomGraph::getDeviceViewToHostSPVirtualSiteKit() const {
+  return VirtualSiteKit<float>(virtual_site_count, virtual_site_parameter_set_count,
+                               virtual_site_atoms.getDeviceValidHostPointer(),
+                               virtual_site_frame1_atoms.getDeviceValidHostPointer(),
+                               virtual_site_frame2_atoms.getDeviceValidHostPointer(),
+                               virtual_site_frame3_atoms.getDeviceValidHostPointer(),
+                               virtual_site_frame4_atoms.getDeviceValidHostPointer(),
+                               virtual_site_parameter_indices.getDeviceValidHostPointer(),
+                               virtual_site_frame_types.getDeviceValidHostPointer(),
+                               sp_virtual_site_frame_dim1.getDeviceValidHostPointer(),
+                               sp_virtual_site_frame_dim2.getDeviceValidHostPointer(),
+                               sp_virtual_site_frame_dim3.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+ConstraintKit<double>
+AtomGraph::getDeviceViewToHostDPConstraintKit() const {
+  return ConstraintKit<double>(settle_group_count, settle_parameter_count, constraint_group_count,
+                               constraint_parameter_count,
+                               settle_oxygen_atoms.getDeviceValidHostPointer(),
+                               settle_hydro1_atoms.getDeviceValidHostPointer(),
+                               settle_hydro2_atoms.getDeviceValidHostPointer(),
+                               settle_parameter_indices.getDeviceValidHostPointer(),
+                               constraint_group_atoms.getDeviceValidHostPointer(),
+                               constraint_group_bounds.getDeviceValidHostPointer(),
+                               constraint_parameter_indices.getDeviceValidHostPointer(),
+                               constraint_parameter_bounds.getDeviceValidHostPointer(),
+                               settle_mormt.getDeviceValidHostPointer(),
+                               settle_mhrmt.getDeviceValidHostPointer(),
+                               settle_ra.getDeviceValidHostPointer(),
+                               settle_rb.getDeviceValidHostPointer(),
+                               settle_rc.getDeviceValidHostPointer(),
+                               settle_invra.getDeviceValidHostPointer(),
+                               constraint_inverse_masses.getDeviceValidHostPointer(),
+                               constraint_target_lengths.getDeviceValidHostPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+ConstraintKit<float>
+AtomGraph::getDeviceViewToHostSPConstraintKit() const {
+  return ConstraintKit<float>(settle_group_count, settle_parameter_count, constraint_group_count,
+                              constraint_parameter_count,
+                              settle_oxygen_atoms.getDeviceValidHostPointer(),
+                              settle_hydro1_atoms.getDeviceValidHostPointer(),
+                              settle_hydro2_atoms.getDeviceValidHostPointer(),
+                              settle_parameter_indices.getDeviceValidHostPointer(),
+                              constraint_group_atoms.getDeviceValidHostPointer(),
+                              constraint_group_bounds.getDeviceValidHostPointer(),
+                              constraint_parameter_indices.getDeviceValidHostPointer(),
+                              constraint_parameter_bounds.getDeviceValidHostPointer(),
+                              sp_settle_mormt.getDeviceValidHostPointer(),
+                              sp_settle_mhrmt.getDeviceValidHostPointer(),
+                              sp_settle_ra.getDeviceValidHostPointer(),
+                              sp_settle_rb.getDeviceValidHostPointer(),
+                              sp_settle_rc.getDeviceValidHostPointer(),
+                              sp_settle_invra.getDeviceValidHostPointer(),
+                              sp_constraint_inverse_masses.getDeviceValidHostPointer(),
+                              sp_constraint_target_lengths.getDeviceValidHostPointer());
+}
+#  endif
+#endif
 
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* AtomGraph::getSelfPointer() const {

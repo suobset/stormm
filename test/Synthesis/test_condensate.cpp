@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+#include "copyright.h"
 #include "../../src/Analysis/comparison_guide.h"
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/hpc_config.h"
@@ -243,7 +246,10 @@ PhaseSpaceSynthesis spawnMutableCoordinateObjects(const TestSystemManager &tsm,
                                                   std::vector<PhaseSpaceReader> *tsm_psr,
                                                   std::vector<CoordinateSeries<T>> *tsm_cs,
                                                   std::vector<CoordinateSeriesReader<T>> *tsm_csr,
-                                                  const int random_seed = 57983) {
+                                                  const int random_seed = 57983,
+                                                  const int gpos_bits = 26,
+                                                  const int vel_bits = 28,
+                                                  const int frc_bits = 21) {
   Xoroshiro128pGenerator xrs(random_seed);
   tsm_cf->reserve(tsm.getSystemCount());
   tsm_ps->reserve(tsm.getSystemCount());
@@ -289,7 +295,8 @@ PhaseSpaceSynthesis spawnMutableCoordinateObjects(const TestSystemManager &tsm,
   
   // Return a synthesis of everything, times two
   const std::vector<int> replicator = replicateSeries(tsm.getSystemCount(), 2);
-  return PhaseSpaceSynthesis(*tsm_ps, tsm.getTopologyPointer(), replicator, 26, 24, 28, 21);
+  return PhaseSpaceSynthesis(*tsm_ps, tsm.getTopologyPointer(), replicator, gpos_bits, 24,
+                             vel_bits, frc_bits);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -708,8 +715,8 @@ void copySetup(const PhaseSpace &ps, const CoordinateSeries<T> &cs,
                const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
                const GpuDetails &gpu, const TestPriority do_test) {
 
-  // Duplicate the inputs. Add random forces and velocities to the PhaseSpace object.
-  Xoroshiro128pGenerator xrs(817252330);
+  // Duplicate the inputs.  Add random forces and velocities to the PhaseSpace object.
+  Xoroshiro128pGenerator xrs(30184725);
   PhaseSpace active_ps = ps;
   CoordinateSeries<T> active_cs = cs;
   PhaseSpaceWriter psw = active_ps.data();
@@ -776,7 +783,623 @@ void copySetup(const PhaseSpace &ps, const CoordinateSeries<T> &cs,
                   "snapshot (alt. velocities), " + getEnumerationName(orig_tier) + " to " +
                   getEnumerationName(dest_tier), do_test);
 }
+
+void copySetup(const PhaseSpace &ps, const Condensate &cdns, const int sys_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+  
+  // Duplicate the inputs. 
+  Xoroshiro128pGenerator xrs(7719382);
+  PhaseSpace active_ps = ps;
+  Condensate active_cdns = cdns;
+  PhaseSpaceWriter psw = active_ps.data();
+  CondensateWriter cdnsw = active_cdns.data();
+  active_ps.upload();
+  active_cdns.upload();
+
+  // Copy one system from the condensate into the PhaseSpace object.
+  coordCopy(&active_ps, active_cdns, sys_idx, dest_tier, orig_tier, gpu);
+  const size_t atom_offset = active_cdns.getAtomOffset(sys_idx);
+  const int xfrm_offset = roundUp(9, warp_size_int) * sys_idx;
+  criticalCoordTransfer(&active_ps, &active_cdns, dest_tier, orig_tier);
+  diffCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, &cdnsw.xcrd_sp[atom_offset],
+                  &cdnsw.ycrd_sp[atom_offset], &cdnsw.zcrd_sp[atom_offset], psw.natom, psw.umat,
+                  &cdnsw.umat[xfrm_offset], "a Condensate into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Copy the system from the condensate into an alternate aspect of the PhaseSpace object.
+  addRandomNoise(&xrs, &cdnsw.xcrd_sp[atom_offset], &cdnsw.ycrd_sp[atom_offset],
+                 &cdnsw.zcrd_sp[atom_offset], cdns.getAtomCount(sys_idx), 1.7);
+  active_cdns.upload();
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = xrs.gaussianRandomNumber();
+    psw.umat[i] = umat_hold[i];
+  }
+  active_ps.upload();
+  coordCopy(&active_ps, TrajectoryKind::VELOCITIES, CoordinateCycle::ALTERNATE, active_cdns,
+            sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_ps, &active_cdns, dest_tier, orig_tier);
+  diffCoordinates(psw.vxalt, psw.vyalt, psw.vzalt, &cdnsw.xcrd_sp[atom_offset],
+                  &cdnsw.ycrd_sp[atom_offset], &cdnsw.zcrd_sp[atom_offset], psw.natom, psw.umat,
+                  umat_hold.data(), "a Condensate into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Reload and copy the PhaseSpace object to one system in the Condensate
+  coordCopy(&active_ps, ps);
+  active_ps.upload();
+  for (int i = 0; i < cdns.getSystemCount(); i++) {
+    coordCopy(&active_cdns, i, cdns, i);
+  }
+  active_cdns.upload();
+  coordCopy(&active_cdns, sys_idx, active_ps, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(&cdnsw.xcrd_sp[atom_offset], &cdnsw.ycrd_sp[atom_offset],
+                  &cdnsw.zcrd_sp[atom_offset], psw.xcrd, psw.ycrd, psw.zcrd, psw.natom,
+                  &cdnsw.umat[xfrm_offset], psw.umat, "a PhaseSpace object into a Condensate, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  7.5e-7, 1.5e-6);
+
+  // Copy information from another aspect of the PhaseSpace object into the Condensate
+  addRandomNoise(&xrs, psw.fxalt, psw.fyalt, psw.fzalt, psw.natom, 5.4);
+  active_ps.upload();
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = xrs.gaussianRandomNumber();
+    cdnsw.umat[xfrm_offset + i] = umat_hold[i];
+  }
+  active_cdns.upload();
+  coordCopy(&active_cdns, sys_idx, active_ps, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE,
+            dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(&cdnsw.xcrd_sp[atom_offset], &cdnsw.ycrd_sp[atom_offset],
+                  &cdnsw.zcrd_sp[atom_offset], psw.fxalt, psw.fyalt, psw.fzalt, psw.natom,
+                  &cdnsw.umat[xfrm_offset], umat_hold.data(), "a PhaseSpace object (alt. forces) "
+                  "into a Condensate, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test, 7.5e-7, 1.5e-6);  
+}
+
+void copySetup(const PhaseSpace &ps, const PhaseSpaceSynthesis &poly_ps, const int sys_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+  
+  // Duplicate the inputs and copy one system from the synthesis into the PhaseSpace object.
+  Xoroshiro128pGenerator xrs(7719382);
+  PhaseSpace active_ps = ps;
+  PhaseSpaceSynthesis active_pps = poly_ps;
+  PhaseSpaceWriter psw = active_ps.data();
+  PsSynthesisWriter poly_psw = active_pps.data();
+  coordCopy(&active_ps, active_pps, sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_ps, &active_pps, dest_tier, orig_tier);
+  const int atom_offset = active_pps.getAtomOffset(sys_idx);
+  const int xfrm_offset = roundUp(9, warp_size_int) * sys_idx;
+  diffCoordinates(psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xcrd[atom_offset], &poly_psw.ycrd[atom_offset],
+                  &poly_psw.zcrd[atom_offset], &poly_psw.ycrd_ovrf[atom_offset],
+                  &poly_psw.xcrd_ovrf[atom_offset], &poly_psw.zcrd_ovrf[atom_offset],
+                  poly_psw.gpos_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (primary positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(psw.xvel, psw.yvel, psw.zvel, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xvel[atom_offset], &poly_psw.yvel[atom_offset],
+                  &poly_psw.zvel[atom_offset], &poly_psw.yvel_ovrf[atom_offset],
+                  &poly_psw.xvel_ovrf[atom_offset], &poly_psw.zvel_ovrf[atom_offset],
+                  poly_psw.vel_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (primary velocities) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(psw.xfrc, psw.yfrc, psw.zfrc, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xfrc[atom_offset], &poly_psw.yfrc[atom_offset],
+                  &poly_psw.zfrc[atom_offset], &poly_psw.yfrc_ovrf[atom_offset],
+                  &poly_psw.xfrc_ovrf[atom_offset], &poly_psw.zfrc_ovrf[atom_offset],
+                  poly_psw.frc_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (primary forces) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(psw.xalt, psw.yalt, psw.zalt, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xalt[atom_offset], &poly_psw.yalt[atom_offset],
+                  &poly_psw.zalt[atom_offset], &poly_psw.yalt_ovrf[atom_offset],
+                  &poly_psw.xalt_ovrf[atom_offset], &poly_psw.zalt_ovrf[atom_offset],
+                  poly_psw.gpos_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(psw.vxalt, psw.vyalt, psw.vzalt, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.vxalt[atom_offset], &poly_psw.vyalt[atom_offset],
+                  &poly_psw.vzalt[atom_offset], &poly_psw.vyalt_ovrf[atom_offset],
+                  &poly_psw.vxalt_ovrf[atom_offset], &poly_psw.vzalt_ovrf[atom_offset],
+                  poly_psw.vel_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+  diffCoordinates(psw.fxalt, psw.fyalt, psw.fzalt, nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.fxalt[atom_offset], &poly_psw.fyalt[atom_offset],
+                  &poly_psw.fzalt[atom_offset], &poly_psw.fyalt_ovrf[atom_offset],
+                  &poly_psw.fxalt_ovrf[atom_offset], &poly_psw.fzalt_ovrf[atom_offset],
+                  poly_psw.frc_scale, psw.natom, psw.umat, &poly_psw.umat[xfrm_offset],
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Copy a system from the synthesis into the single-structure object.
+  coordCopy(&active_ps, ps);
+  active_ps.upload();
+  coordCopy(&active_pps, sys_idx, poly_ps, sys_idx);
+  active_pps.upload();
+  coordCopy(&active_pps, sys_idx, active_ps, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_ps, dest_tier, orig_tier);
+  diffCoordinates(&poly_psw.xcrd[atom_offset], &poly_psw.ycrd[atom_offset],
+                  &poly_psw.zcrd[atom_offset], &poly_psw.ycrd_ovrf[atom_offset],
+                  &poly_psw.xcrd_ovrf[atom_offset], &poly_psw.zcrd_ovrf[atom_offset],
+                  poly_psw.gpos_scale, psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr, nullptr,
+                  1.0, psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (primary positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_gpos_scale, poly_psw.inv_gpos_scale);
+  diffCoordinates(&poly_psw.xvel[atom_offset], &poly_psw.yvel[atom_offset],
+                  &poly_psw.zvel[atom_offset], &poly_psw.yvel_ovrf[atom_offset],
+                  &poly_psw.xvel_ovrf[atom_offset], &poly_psw.zvel_ovrf[atom_offset],
+                  poly_psw.vel_scale, psw.xvel, psw.yvel, psw.zvel, nullptr, nullptr, nullptr, 1.0,
+                  psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (primary velocities) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_vel_scale, poly_psw.inv_vel_scale);
+  diffCoordinates(&poly_psw.xfrc[atom_offset], &poly_psw.yfrc[atom_offset],
+                  &poly_psw.zfrc[atom_offset], &poly_psw.yfrc_ovrf[atom_offset],
+                  &poly_psw.xfrc_ovrf[atom_offset], &poly_psw.zfrc_ovrf[atom_offset],
+                  poly_psw.frc_scale, psw.xfrc, psw.yfrc, psw.zfrc, nullptr, nullptr, nullptr, 1.0,
+                  psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (primary forces) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_frc_scale, poly_psw.inv_frc_scale);
+  diffCoordinates(&poly_psw.xalt[atom_offset], &poly_psw.yalt[atom_offset],
+                  &poly_psw.zalt[atom_offset], &poly_psw.yalt_ovrf[atom_offset],
+                  &poly_psw.xalt_ovrf[atom_offset], &poly_psw.zalt_ovrf[atom_offset],
+                  poly_psw.gpos_scale, psw.xalt, psw.yalt, psw.zalt, nullptr, nullptr, nullptr,
+                  1.0, psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_gpos_scale, poly_psw.inv_gpos_scale);
+  diffCoordinates(&poly_psw.vxalt[atom_offset], &poly_psw.vyalt[atom_offset],
+                  &poly_psw.vzalt[atom_offset], &poly_psw.vyalt_ovrf[atom_offset],
+                  &poly_psw.vxalt_ovrf[atom_offset], &poly_psw.vzalt_ovrf[atom_offset],
+                  poly_psw.vel_scale, psw.vxalt, psw.vyalt, psw.vzalt, nullptr, nullptr, nullptr,
+                  1.0, psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_vel_scale, poly_psw.inv_vel_scale);
+  diffCoordinates(&poly_psw.fxalt[atom_offset], &poly_psw.fyalt[atom_offset],
+                  &poly_psw.fzalt[atom_offset], &poly_psw.fyalt_ovrf[atom_offset],
+                  &poly_psw.fxalt_ovrf[atom_offset], &poly_psw.fzalt_ovrf[atom_offset],
+                  poly_psw.frc_scale, psw.fxalt, psw.fyalt, psw.fzalt, nullptr, nullptr, nullptr,
+                  1.0, psw.natom, &poly_psw.umat[xfrm_offset], psw.umat,
+                  "a PhaseSpaceSynthesis (alternate positions) into a PhaseSpace object, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  poly_psw.inv_frc_scale, poly_psw.inv_frc_scale);
+}
+
+template <typename Tdest, typename Torig>
+void copySetup(const CoordinateSeries<Tdest> &dest, const CoordinateSeries<Torig> &orig,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Duplicate the inputs and copy one into the other.
+  CoordinateSeries<Tdest> active_dest = dest;
+  CoordinateSeries<Torig> active_orig = orig;
+  CoordinateSeriesWriter<Tdest> destw = active_dest.data();
+  CoordinateSeriesWriter<Torig> origw = active_orig.data();
+  const int frame_dest = active_dest.getFrameCount() - 1;
+  const int frame_orig = std::max(0, active_orig.getFrameCount() - 2);
+  const int natom = active_orig.getAtomCount();
+  const int padded_natom = roundUp(natom, warp_size_int);
+  const int padded_xfrm  = roundUp(9, warp_size_int);
+  const int orig_atom_offset = padded_natom * frame_orig;
+  const int dest_atom_offset = padded_natom * frame_dest;
+  const int orig_xfrm_offset = padded_xfrm  * frame_orig;
+  const int dest_xfrm_offset = padded_xfrm  * frame_dest;
+  coordCopy<Tdest, Torig>(&active_dest, frame_dest, active_orig, frame_orig, dest_tier, orig_tier,
+                          gpu);
+  criticalCoordTransfer(&active_dest, &active_orig, dest_tier, orig_tier);
+  diffCoordinates(&destw.xcrd[dest_atom_offset], &destw.ycrd[dest_atom_offset],
+                  &destw.zcrd[dest_atom_offset], destw.gpos_scale, &origw.xcrd[orig_atom_offset],
+                  &origw.ycrd[orig_atom_offset], &origw.zcrd[orig_atom_offset], origw.gpos_scale,
+                  natom, &destw.umat[dest_xfrm_offset], &origw.umat[orig_xfrm_offset],
+                  "one CoordinateSeries snapshot into another, " + getEnumerationName(orig_tier) +
+                  " to " + getEnumerationName(dest_tier), do_test);
+}
+
+template <typename T>
+void copySetup(const CoordinateSeries<T> &cs, const PhaseSpaceSynthesis &poly_ps,
+               const int sys_idx, const HybridTargetLevel dest_tier,
+               const HybridTargetLevel orig_tier, const GpuDetails &gpu,
+               const TestPriority do_test) {
+
+  // Duplicate the inputs and copy the PhaseSpaceSynthesis positions into the CoordinateSeries at
+  // a selected frame.
+  CoordinateSeries<T> active_cs = cs;
+  PhaseSpaceSynthesis active_pps = poly_ps;
+  CoordinateSeriesWriter<T> csw = active_cs.data();
+  PsSynthesisWriter poly_psw = active_pps.data();
+  const int frm_idx = std::max(0, cs.getFrameCount() - 2);
+  const int natom = cs.getAtomCount();
+  const int padded_xfrm = roundUp(9, warp_size_int);
+  const int cs_atom_offset = roundUp(natom, warp_size_int) * frm_idx;
+  const int cs_xfrm_offset = padded_xfrm * frm_idx;
+  const int pps_atom_offset = poly_ps.getAtomOffset(sys_idx);
+  const int pps_xfrm_offset = padded_xfrm * sys_idx;
+  coordCopy(&active_cs, frm_idx, active_pps, sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_pps, dest_tier, orig_tier);
+  diffCoordinates(&csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset],
+                  &csw.zcrd[cs_atom_offset], nullptr, nullptr, nullptr, csw.gpos_scale,
+                  &poly_psw.xcrd[pps_atom_offset], &poly_psw.ycrd[pps_atom_offset],
+                  &poly_psw.zcrd[pps_atom_offset], &poly_psw.xcrd_ovrf[pps_atom_offset],
+                  &poly_psw.ycrd_ovrf[pps_atom_offset], &poly_psw.zcrd_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, natom, &csw.umat[cs_xfrm_offset],
+                  &poly_psw.umat[pps_xfrm_offset], "a PhaseSpaceSynthesis system into a "
+                  "CoordinateSeries snapshot, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Copy a different aspect of the PhaseSpaceSynthesis
+  Xoroshiro128pGenerator xrs(7719382);
+  addRandomNoise(&xrs, &poly_psw.xalt[pps_atom_offset], &poly_psw.xalt_ovrf[pps_atom_offset],
+                 &poly_psw.yalt[pps_atom_offset], &poly_psw.yalt_ovrf[pps_atom_offset],
+                 &poly_psw.zalt[pps_atom_offset], &poly_psw.zalt_ovrf[pps_atom_offset], natom,
+                 4.9, poly_psw.gpos_scale);
+  for (int i = 0; i < 9; i++) {
+    poly_psw.umat_alt[pps_xfrm_offset + i] = xrs.gaussianRandomNumber();
+  }
+  active_pps.upload();
+  coordCopy(&active_cs, frm_idx, active_pps, sys_idx, TrajectoryKind::POSITIONS,
+            CoordinateCycle::ALTERNATE, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_pps, dest_tier, orig_tier);
+  diffCoordinates(&csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset],
+                  &csw.zcrd[cs_atom_offset], nullptr, nullptr, nullptr, csw.gpos_scale,
+                  &poly_psw.xalt[pps_atom_offset], &poly_psw.yalt[pps_atom_offset],
+                  &poly_psw.zalt[pps_atom_offset], &poly_psw.xalt_ovrf[pps_atom_offset],
+                  &poly_psw.yalt_ovrf[pps_atom_offset], &poly_psw.zalt_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, natom, &csw.umat[cs_xfrm_offset],
+                  &poly_psw.umat_alt[pps_xfrm_offset], "a PhaseSpaceSynthesis system into a "
+                  "CoordinateSeries snapshot, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Reload and copy form the CoordinateSeries to the PhaseSpaceSynthesis
+  for (int i = 0; i < cs.getFrameCount(); i++) {
+    coordCopy<T, T>(&active_cs, i, cs, i);
+  }
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    coordCopy(&active_pps, i, poly_ps, i);
+  }
+  active_cs.upload();
+  active_pps.upload();
+  coordCopy(&active_pps, sys_idx, active_cs, frm_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cs, dest_tier, orig_tier);
+  diffCoordinates(&poly_psw.xcrd[pps_atom_offset], &poly_psw.ycrd[pps_atom_offset],
+                  &poly_psw.zcrd[pps_atom_offset], &poly_psw.xcrd_ovrf[pps_atom_offset],
+                  &poly_psw.ycrd_ovrf[pps_atom_offset], &poly_psw.zcrd_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, &csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset],
+                  &csw.zcrd[cs_atom_offset], nullptr, nullptr, nullptr, csw.gpos_scale,
+                  natom, &poly_psw.umat[pps_xfrm_offset], &csw.umat[cs_xfrm_offset],
+                  "a CoordinateSeries snapshot into a PhaseSpaceSynthesis system, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  7.5e-7, 1.5e-6);
+  addRandomNoise(&xrs, &csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset],
+                 &csw.zcrd[cs_atom_offset], natom, 3.1);
+  active_cs.upload();
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = xrs.gaussianRandomNumber();
+    poly_psw.umat_alt[pps_xfrm_offset + i] = umat_hold[i];
+  }
+  active_pps.upload();
+  coordCopy(&active_pps, sys_idx, TrajectoryKind::FORCES, CoordinateCycle::ALTERNATE, active_cs,
+            frm_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cs, dest_tier, orig_tier);
+  diffCoordinates(&poly_psw.fxalt[pps_atom_offset], &poly_psw.fyalt[pps_atom_offset],
+                  &poly_psw.fzalt[pps_atom_offset], &poly_psw.fxalt_ovrf[pps_atom_offset],
+                  &poly_psw.fyalt_ovrf[pps_atom_offset], &poly_psw.fzalt_ovrf[pps_atom_offset],
+                  poly_psw.frc_scale, &csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset],
+                  &csw.zcrd[cs_atom_offset], nullptr, nullptr, nullptr, csw.gpos_scale, natom,
+                  &poly_psw.umat_alt[pps_xfrm_offset], umat_hold.data(),
+                  "a CoordinateSeries snapshot into a PhaseSpaceSynthesis system (alt. forces), " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  3.2e-7, 1.5e-6);
+}
+
+template <typename T>
+void copySetup(const CoordinateSeries<T> &cs, const Condensate &cdns, const int sys_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Duplicate the inputs and copy the PhaseSpaceSynthesis positions into the CoordinateSeries at
+  // a selected frame.
+  CoordinateSeries<T> active_cs = cs;
+  Condensate active_cdns = cdns;
+  CoordinateSeriesWriter<T> csw = active_cs.data();
+  CondensateWriter cdnsw = active_cdns.data();
+  const int frm_idx = std::max(0, cs.getFrameCount() - 3);
+  const int natom = cs.getAtomCount();
+  const int padded_xfrm = roundUp(9, warp_size_int);
+  const int cs_atom_offset = roundUp(natom, warp_size_int) * frm_idx;
+  const int cs_xfrm_offset = padded_xfrm * frm_idx;
+  const int cdns_atom_offset = cdns.getAtomOffset(sys_idx);
+  const int cdns_xfrm_offset = padded_xfrm * sys_idx;
+  coordCopy(&active_cs, frm_idx, active_cdns, sys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cs, &active_cdns, dest_tier, orig_tier);
+  diffCoordinates(&csw.xcrd[cs_atom_offset], &csw.ycrd[cs_atom_offset], &csw.zcrd[cs_atom_offset],
+                  csw.gpos_scale, &cdnsw.xcrd_sp[cdns_atom_offset],
+                  &cdnsw.ycrd_sp[cdns_atom_offset], &cdnsw.zcrd_sp[cdns_atom_offset], 1.0, natom,
+                  &csw.umat[cs_xfrm_offset], &cdnsw.umat[cdns_xfrm_offset], "a Condensate system "
+                  "into a CoordinateSeries snapshot, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Reload and perform the reverse copy operation.
+  for (int i = 0; i < cs.getFrameCount(); i++) {
+    coordCopy<T, T>(&active_cs, i, cs, i);
+  }
+  for (int i = 0; i < cdns.getSystemCount(); i++) {
+    coordCopy(&active_cdns, i, cdns, i);
+  }
+  active_cs.upload();
+  active_cdns.upload();
+  coordCopy(&active_cdns, sys_idx, active_cs, frm_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_cs, dest_tier, orig_tier);  
+  diffCoordinates(&cdnsw.xcrd_sp[cdns_atom_offset], &cdnsw.ycrd_sp[cdns_atom_offset],
+                  &cdnsw.zcrd_sp[cdns_atom_offset], 1.0, &csw.xcrd[cs_atom_offset],
+                  &csw.ycrd[cs_atom_offset], &csw.zcrd[cs_atom_offset], csw.gpos_scale, natom,
+                  &cdnsw.umat[cdns_xfrm_offset], &csw.umat[cs_xfrm_offset], "a CoordinateSeries "
+                  "snapshot into a Condensate system, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test, 7.5e-7, 1.0e-6);
+}
+
+void copySetup(const PhaseSpaceSynthesis &poly_ps, const int psys_idx, const Condensate &cdns,
+               const int csys_idx, const HybridTargetLevel dest_tier,
+               const HybridTargetLevel orig_tier, const GpuDetails &gpu,
+               const TestPriority do_test) {
+
+  // Duplicate the inputs and copy the PhaseSpaceSynthesis positions into the CoordinateSeries at
+  // a selected frame.
+  PhaseSpaceSynthesis active_pps = poly_ps;
+  Condensate active_cdns = cdns;
+  PsSynthesisWriter poly_psw = active_pps.data();
+  CondensateWriter cdnsw = active_cdns.data();
+  const int natom = cdns.getAtomCount(csys_idx);
+  const int padded_xfrm = roundUp(9, warp_size_int);
+  const int pps_atom_offset = poly_ps.getAtomOffset(psys_idx);
+  const int pps_xfrm_offset = padded_xfrm * psys_idx;
+  const int cdns_atom_offset = cdns.getAtomOffset(csys_idx);
+  const int cdns_xfrm_offset = padded_xfrm * csys_idx;
+  coordCopy(&active_pps, psys_idx, active_cdns, csys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cdns, dest_tier, orig_tier);  
+  diffCoordinates(&poly_psw.xcrd[pps_atom_offset], &poly_psw.ycrd[pps_atom_offset],
+                  &poly_psw.zcrd[pps_atom_offset], &poly_psw.xcrd_ovrf[pps_atom_offset],
+                  &poly_psw.ycrd_ovrf[pps_atom_offset], &poly_psw.zcrd_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, &cdnsw.xcrd_sp[cdns_atom_offset],
+                  &cdnsw.ycrd_sp[cdns_atom_offset], &cdnsw.zcrd_sp[cdns_atom_offset], nullptr,
+                  nullptr, nullptr, 1.0, natom, &poly_psw.umat[pps_xfrm_offset],
+                  &cdnsw.umat[cdns_xfrm_offset], "a Condensate system into a "
+                  "PhaseSpaceSynthesis, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+
+  // Load the Condensate data into different aspects of the PhaseSpaceSynthesis.
+  coordCopy(&active_pps, psys_idx, TrajectoryKind::POSITIONS, CoordinateCycle::ALTERNATE,
+            active_cdns, csys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cdns, dest_tier, orig_tier);  
+  diffCoordinates(&poly_psw.xalt[pps_atom_offset], &poly_psw.yalt[pps_atom_offset],
+                  &poly_psw.zalt[pps_atom_offset], &poly_psw.xalt_ovrf[pps_atom_offset],
+                  &poly_psw.yalt_ovrf[pps_atom_offset], &poly_psw.zalt_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, &cdnsw.xcrd_sp[cdns_atom_offset],
+                  &cdnsw.ycrd_sp[cdns_atom_offset], &cdnsw.zcrd_sp[cdns_atom_offset], nullptr,
+                  nullptr, nullptr, 1.0, natom, &poly_psw.umat_alt[pps_xfrm_offset],
+                  &cdnsw.umat[cdns_xfrm_offset], "a Condensate system into a "
+                  "PhaseSpaceSynthesis (alt. positions), " + getEnumerationName(orig_tier) +
+                  " to " + getEnumerationName(dest_tier), do_test);
+  Xoroshiro128pGenerator xrs(260148296);
+  std::vector<double> umat_hold(9);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = xrs.gaussianRandomNumber();
+    poly_psw.umat[pps_xfrm_offset + i] = umat_hold[i];
+  }
+  active_pps.upload();
+  coordCopy(&active_pps, psys_idx, TrajectoryKind::VELOCITIES, active_cdns, csys_idx, dest_tier,
+            orig_tier, gpu);
+  criticalCoordTransfer(&active_pps, &active_cdns, dest_tier, orig_tier);  
+  diffCoordinates(&poly_psw.xvel[pps_atom_offset], &poly_psw.yvel[pps_atom_offset],
+                  &poly_psw.zvel[pps_atom_offset], &poly_psw.xvel_ovrf[pps_atom_offset],
+                  &poly_psw.yvel_ovrf[pps_atom_offset], &poly_psw.zvel_ovrf[pps_atom_offset],
+                  poly_psw.vel_scale, &cdnsw.xcrd_sp[cdns_atom_offset],
+                  &cdnsw.ycrd_sp[cdns_atom_offset], &cdnsw.zcrd_sp[cdns_atom_offset], nullptr,
+                  nullptr, nullptr, 1.0, natom, &poly_psw.umat[pps_xfrm_offset], umat_hold.data(),
+                  "a PhaseSpaceSynthesis system into a Condensate, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+
+  // Reload and transfer information from the PhaseSpaceSynthesis to the Condensate.
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    coordCopy(&active_pps, i, poly_ps, i);
+  }
+  for (int i = 0; i < cdns.getSystemCount(); i++) {
+    coordCopy(&active_cdns, i, cdns, i);    
+  }
+  active_pps.upload();
+  active_cdns.upload();
+  coordCopy(&active_cdns, csys_idx, active_pps, psys_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_pps, dest_tier, orig_tier);  
+  diffCoordinates(&cdnsw.xcrd_sp[cdns_atom_offset], &cdnsw.ycrd_sp[cdns_atom_offset],
+                  &cdnsw.zcrd_sp[cdns_atom_offset], nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xcrd[pps_atom_offset], &poly_psw.ycrd[pps_atom_offset],
+                  &poly_psw.zcrd[pps_atom_offset], &poly_psw.xcrd_ovrf[pps_atom_offset],
+                  &poly_psw.ycrd_ovrf[pps_atom_offset], &poly_psw.zcrd_ovrf[pps_atom_offset],
+                  poly_psw.gpos_scale, natom, &cdnsw.umat[cdns_xfrm_offset],
+                  &poly_psw.umat[pps_xfrm_offset], "a PhaseSpaceSynthesis system into a "
+                  "Condensate, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test, 7.5e-7, 1.0e-6);
+  for (int i = 0; i < 9; i++) {
+    umat_hold[i] = xrs.gaussianRandomNumber();
+    cdnsw.umat[cdns_xfrm_offset + i] = umat_hold[i];
+  }
+  active_cdns.upload();
+  coordCopy(&active_cdns, csys_idx, active_pps, psys_idx, TrajectoryKind::FORCES, dest_tier,
+            orig_tier, gpu);
+  criticalCoordTransfer(&active_cdns, &active_pps, dest_tier, orig_tier);  
+  diffCoordinates(&cdnsw.xcrd_sp[cdns_atom_offset], &cdnsw.ycrd_sp[cdns_atom_offset],
+                  &cdnsw.zcrd_sp[cdns_atom_offset], nullptr, nullptr, nullptr, 1.0,
+                  &poly_psw.xfrc[pps_atom_offset], &poly_psw.yfrc[pps_atom_offset],
+                  &poly_psw.zfrc[pps_atom_offset], &poly_psw.xfrc_ovrf[pps_atom_offset],
+                  &poly_psw.yfrc_ovrf[pps_atom_offset], &poly_psw.zfrc_ovrf[pps_atom_offset],
+                  poly_psw.frc_scale, natom, &cdnsw.umat[cdns_xfrm_offset], umat_hold.data(),
+                  "a PhaseSpaceSynthesis (primary forces) system into a Condensate, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test,
+                  7.5e-7, 1.0e-6);
+}
+
+void copySetup(const PhaseSpaceSynthesis &dest, const int dest_idx,
+               const PhaseSpaceSynthesis &orig, const int orig_idx,
+               const HybridTargetLevel dest_tier, const HybridTargetLevel orig_tier,
+               const GpuDetails &gpu, const TestPriority do_test) {
+
+  // Duplicate the inputs and copy the PhaseSpaceSynthesis positions into the CoordinateSeries at
+  // a selected frame.
+  PhaseSpaceSynthesis active_dest = dest;
+  PhaseSpaceSynthesis active_orig = orig;
+  PsSynthesisWriter destw = active_dest.data();
+  PsSynthesisWriter origw = active_orig.data();
+  coordCopy(&active_dest, dest_idx, active_orig, orig_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_dest, &active_orig, dest_tier, orig_tier);
+  const int natom = orig.getAtomCount(orig_idx);
+  const int dest_atom_start = dest.getAtomOffset(dest_idx);
+  const int orig_atom_start = orig.getAtomOffset(orig_idx);
+  const int padded_xfrm = roundUp(9, warp_size_int);
+  const int dest_xfrm_start = padded_xfrm * dest_idx;
+  const int orig_xfrm_start = padded_xfrm * orig_idx;
+  diffCoordinates(&destw.xcrd[dest_atom_start], &destw.ycrd[dest_atom_start],
+                  &destw.zcrd[dest_atom_start], &destw.xcrd_ovrf[dest_atom_start],
+                  &destw.ycrd_ovrf[dest_atom_start], &destw.zcrd_ovrf[dest_atom_start],
+                  destw.gpos_scale, &origw.xcrd[orig_atom_start], &origw.ycrd[orig_atom_start],
+                  &origw.zcrd[orig_atom_start], &origw.xcrd_ovrf[orig_atom_start],
+                  &origw.ycrd_ovrf[orig_atom_start], &origw.zcrd_ovrf[orig_atom_start],
+                  origw.gpos_scale, natom, &destw.umat[dest_xfrm_start],
+                  &origw.umat[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another, " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+  diffCoordinates(&destw.xvel[dest_atom_start], &destw.yvel[dest_atom_start],
+                  &destw.zvel[dest_atom_start], &destw.xvel_ovrf[dest_atom_start],
+                  &destw.yvel_ovrf[dest_atom_start], &destw.zvel_ovrf[dest_atom_start],
+                  destw.vel_scale, &origw.xvel[orig_atom_start], &origw.yvel[orig_atom_start],
+                  &origw.zvel[orig_atom_start], &origw.xvel_ovrf[orig_atom_start],
+                  &origw.yvel_ovrf[orig_atom_start], &origw.zvel_ovrf[orig_atom_start],
+                  origw.vel_scale, natom, &destw.umat[dest_xfrm_start],
+                  &origw.umat[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another (velocities), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+  diffCoordinates(&destw.xfrc[dest_atom_start], &destw.yfrc[dest_atom_start],
+                  &destw.zfrc[dest_atom_start], &destw.xfrc_ovrf[dest_atom_start],
+                  &destw.yfrc_ovrf[dest_atom_start], &destw.zfrc_ovrf[dest_atom_start],
+                  destw.frc_scale, &origw.xfrc[orig_atom_start], &origw.yfrc[orig_atom_start],
+                  &origw.zfrc[orig_atom_start], &origw.xfrc_ovrf[orig_atom_start],
+                  &origw.yfrc_ovrf[orig_atom_start], &origw.zfrc_ovrf[orig_atom_start],
+                  origw.frc_scale, natom, &destw.umat[dest_xfrm_start],
+                  &origw.umat[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another (forces), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+  diffCoordinates(&destw.xalt[dest_atom_start], &destw.yalt[dest_atom_start],
+                  &destw.zalt[dest_atom_start], &destw.xalt_ovrf[dest_atom_start],
+                  &destw.yalt_ovrf[dest_atom_start], &destw.zalt_ovrf[dest_atom_start],
+                  destw.gpos_scale, &origw.xalt[orig_atom_start], &origw.yalt[orig_atom_start],
+                  &origw.zalt[orig_atom_start], &origw.xalt_ovrf[orig_atom_start],
+                  &origw.yalt_ovrf[orig_atom_start], &origw.zalt_ovrf[orig_atom_start],
+                  origw.gpos_scale, natom, &destw.umat_alt[dest_xfrm_start],
+                  &origw.umat_alt[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another (alt. positions), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+  diffCoordinates(&destw.vxalt[dest_atom_start], &destw.vyalt[dest_atom_start],
+                  &destw.vzalt[dest_atom_start], &destw.vxalt_ovrf[dest_atom_start],
+                  &destw.vyalt_ovrf[dest_atom_start], &destw.vzalt_ovrf[dest_atom_start],
+                  destw.vel_scale, &origw.vxalt[orig_atom_start], &origw.vyalt[orig_atom_start],
+                  &origw.vzalt[orig_atom_start], &origw.vxalt_ovrf[orig_atom_start],
+                  &origw.vyalt_ovrf[orig_atom_start], &origw.vzalt_ovrf[orig_atom_start],
+                  origw.vel_scale, natom, &destw.umat_alt[dest_xfrm_start],
+                  &origw.umat_alt[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another (alt. velocities), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+  diffCoordinates(&destw.fxalt[dest_atom_start], &destw.fyalt[dest_atom_start],
+                  &destw.fzalt[dest_atom_start], &destw.fxalt_ovrf[dest_atom_start],
+                  &destw.fyalt_ovrf[dest_atom_start], &destw.fzalt_ovrf[dest_atom_start],
+                  destw.frc_scale, &origw.fxalt[orig_atom_start], &origw.fyalt[orig_atom_start],
+                  &origw.fzalt[orig_atom_start], &origw.fxalt_ovrf[orig_atom_start],
+                  &origw.fyalt_ovrf[orig_atom_start], &origw.fzalt_ovrf[orig_atom_start],
+                  origw.frc_scale, natom, &destw.umat_alt[dest_xfrm_start],
+                  &origw.umat_alt[orig_xfrm_start], "a system in one PhaseSpaceSynthesis to "
+                  "another (alt. forces), " + getEnumerationName(orig_tier) + " to " +
+                  getEnumerationName(dest_tier), do_test);
+}
+
+void copySetup(const Condensate &dest, const int dest_idx, const Condensate &orig,
+               const int orig_idx, const HybridTargetLevel dest_tier,
+               const HybridTargetLevel orig_tier, const GpuDetails &gpu,
+               const TestPriority do_test) {
+
+  // Duplicae the inputs and copy one to the other.
+  Condensate active_dest = dest;
+  Condensate active_orig = orig;
+  CondensateWriter destw = active_dest.data();
+  CondensateWriter origw = active_orig.data();
+  coordCopy(&active_dest, dest_idx, active_orig, orig_idx, dest_tier, orig_tier, gpu);
+  criticalCoordTransfer(&active_dest, &active_orig, dest_tier, orig_tier);
+  const int dest_atom_offset = dest.getAtomOffset(dest_idx);
+  const int orig_atom_offset = orig.getAtomOffset(orig_idx);
+  const int padded_xfrm = roundUp(9, warp_size_int);
+  const int dest_xfrm_offset = padded_xfrm * dest_idx;
+  const int orig_xfrm_offset = padded_xfrm * orig_idx;
+  diffCoordinates(&destw.xcrd_sp[dest_atom_offset], &destw.ycrd_sp[dest_atom_offset],
+                  &destw.zcrd_sp[dest_atom_offset], 1.0, &origw.xcrd_sp[orig_atom_offset],
+                  &origw.ycrd_sp[orig_atom_offset], &origw.zcrd_sp[orig_atom_offset], 1.0,
+                  orig.getAtomCount(orig_idx), &destw.umat[dest_xfrm_offset],
+                  &origw.umat[orig_xfrm_offset],"one system of a Condensate into another, " +
+                  getEnumerationName(orig_tier) + " to " + getEnumerationName(dest_tier), do_test);
+}
 #endif
+
+//-------------------------------------------------------------------------------------------------
+// Add noise to a PhaseSpace object, all aspects in both coordinate cycles.  The abstract must be
+// valid on the CPU host.
+//
+// Arguments:
+//   xrs:  Source of random numbers
+//   psw:  Abstract of the coordinate object
+//-------------------------------------------------------------------------------------------------
+void perturbPhaseSpace(Xoroshiro128pGenerator *xrs, PhaseSpaceWriter *psw) {
+  addRandomNoise(xrs, psw->xcrd, psw->ycrd, psw->zcrd, psw->natom, 0.1);
+  addRandomNoise(xrs, psw->xvel, psw->yvel, psw->zfrc, psw->natom, 0.1);
+  addRandomNoise(xrs, psw->xfrc, psw->yfrc, psw->zvel, psw->natom, 0.1);
+  addRandomNoise(xrs, psw->xalt, psw->yalt, psw->zalt, psw->natom, 0.1);
+  addRandomNoise(xrs, psw->vxalt, psw->vyalt, psw->vzalt, psw->natom, 0.1);
+  addRandomNoise(xrs, psw->fxalt, psw->fyalt, psw->fzalt, psw->natom, 0.1);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Add noise to one system of a PhaseSpaceSynthesis based on the abstract taken in one orientation.
+// The abstract must be valid on the CPU host.
+//
+// Arguments:
+//   xrs:       Source of random numbers
+//   poly_psw:  Abstract of the coordinate synthesis
+//   istart:    Staring index of atoms to perturb
+//   natom:     The number of atoms in the system of interest
+//-------------------------------------------------------------------------------------------------
+void perturbSynthesis(Xoroshiro128pGenerator *xrs, PsSynthesisWriter *poly_psw, const int istart,
+                      const int natom) {
+  addRandomNoise(xrs, &poly_psw->xcrd[istart], &poly_psw->xcrd_ovrf[istart],
+                 &poly_psw->ycrd[istart], &poly_psw->ycrd_ovrf[istart], &poly_psw->zcrd[istart],
+                 &poly_psw->zcrd_ovrf[istart], natom, 0.1, poly_psw->gpos_scale);
+  addRandomNoise(xrs, &poly_psw->xvel[istart], &poly_psw->xvel_ovrf[istart],
+                 &poly_psw->yvel[istart], &poly_psw->yvel_ovrf[istart], &poly_psw->zvel[istart],
+                 &poly_psw->zvel_ovrf[istart], natom, 0.1, poly_psw->vel_scale);
+  addRandomNoise(xrs, &poly_psw->xfrc[istart], &poly_psw->xfrc_ovrf[istart],
+                 &poly_psw->yfrc[istart], &poly_psw->yfrc_ovrf[istart], &poly_psw->zfrc[istart],
+                 &poly_psw->zfrc_ovrf[istart], natom, 0.1, poly_psw->frc_scale);
+  addRandomNoise(xrs, &poly_psw->xalt[istart], &poly_psw->xalt_ovrf[istart],
+                 &poly_psw->yalt[istart], &poly_psw->yalt_ovrf[istart], &poly_psw->zalt[istart],
+                 &poly_psw->zalt_ovrf[istart], natom, 0.1, poly_psw->gpos_scale);
+  addRandomNoise(xrs, &poly_psw->vxalt[istart], &poly_psw->vxalt_ovrf[istart],
+                 &poly_psw->vyalt[istart], &poly_psw->vyalt_ovrf[istart], &poly_psw->vzalt[istart],
+                 &poly_psw->vzalt_ovrf[istart], natom, 0.1, poly_psw->vel_scale);
+  addRandomNoise(xrs, &poly_psw->fxalt[istart], &poly_psw->fxalt_ovrf[istart],
+                 &poly_psw->fyalt[istart], &poly_psw->fyalt_ovrf[istart], &poly_psw->fzalt[istart],
+                 &poly_psw->fzalt_ovrf[istart], natom, 0.1, poly_psw->frc_scale);
+}
 
 //-------------------------------------------------------------------------------------------------
 // main
@@ -1083,7 +1706,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<CoordinateSeriesReader<llint>> tsm_csr;
   PhaseSpaceSynthesis tsm_psyn = spawnMutableCoordinateObjects(tsm, &tsm_cf, &tsm_cfr, &tsm_ps,
                                                                &tsm_psr, &tsm_cs, &tsm_csr);
-  Condensate tsm_cdns(tsm_psyn);
+  Condensate tsm_cdns(tsm_psyn, PrecisionModel::SINGLE);
 
   // Test coordinate copying into a PhaseSpace object
   PhaseSpace recv(tsm_cf[0].getAtomCount());
@@ -1256,6 +1879,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<PhaseSpaceWriter> host_clone_psw;
   std::vector<CoordinateSeriesWriter<double>> host_clone_csw;
   PsSynthesisWriter host_clone_psynw = clone_pbc_psyn.data();
+  PsSynthesisWriter host_tsm_psynw = tsm_pbc_psyn.data();
   CondensateWriter host_clone_cdnsw = clone_pbc_cdns.data();
   for (int i = 0; i < tsm_pbc.getSystemCount(); i++) {
     host_clone_cfw.push_back(clone_pbc_cf[i].data());
@@ -1265,25 +1889,17 @@ int main(const int argc, const char* argv[]) {
     const int padded_natom = roundUp(natom, warp_size_int);
     addRandomNoise(&xrs, host_clone_cfw[i].xcrd, host_clone_cfw[i].ycrd, host_clone_cfw[i].zcrd,
                    natom, 0.1);
-    addRandomNoise(&xrs, host_clone_psw[i].xcrd, host_clone_psw[i].ycrd, host_clone_psw[i].zcrd,
-                   natom, 0.1);
-    addRandomNoise(&xrs, host_clone_psw[i].xvel, host_clone_psw[i].yvel, host_clone_psw[i].zvel,
-                   natom, 0.1);
-    addRandomNoise(&xrs, host_clone_psw[i].xfrc, host_clone_psw[i].yfrc, host_clone_psw[i].zfrc,
-                   natom, 0.1);
+    perturbPhaseSpace(&xrs, &host_clone_psw[i]);
     for (int j = 0; j < host_clone_csw[i].nframe; j++) {
       const int jpos = j * padded_natom;
       addRandomNoise(&xrs, &host_clone_csw[i].xcrd[jpos], &host_clone_csw[i].ycrd[jpos],
                      &host_clone_csw[i].zcrd[jpos], natom, 0.1);
     }
     const int istart = host_clone_psynw.atom_starts[i];
-    addRandomNoise(&xrs, &host_clone_psynw.xcrd[istart], &host_clone_psynw.xcrd_ovrf[istart],
-                   &host_clone_psynw.ycrd[istart], &host_clone_psynw.ycrd_ovrf[istart],
-                   &host_clone_psynw.zcrd[istart], &host_clone_psynw.zcrd_ovrf[istart],
-                   natom, 0.1, host_clone_psynw.gpos_scale);
+    perturbSynthesis(&xrs, &host_clone_psynw, istart, natom);
+    perturbSynthesis(&xrs, &host_tsm_psynw, istart, natom);
     addRandomNoise(&xrs, &host_clone_cdnsw.xcrd[istart], &host_clone_cdnsw.ycrd[istart],
                    &host_clone_cdnsw.zcrd[istart], natom, 0.1);
-
 
     // After these uploads, all structures will hold the same coordinates on both the host and
     // the device, but each structure will have unique perturbations.
@@ -1292,6 +1908,7 @@ int main(const int argc, const char* argv[]) {
     clone_pbc_cs[i].upload();
   }
   clone_pbc_psyn.upload();
+  tsm_pbc_psyn.upload();
   clone_pbc_cdns.upload();
 
   // The various coordinate objects now contain unique structures, but the host and device memory
@@ -1309,6 +1926,17 @@ int main(const int argc, const char* argv[]) {
     copySetup(clone_pbc_cf[1], clone_pbc_psyn, 1, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
     copySetup(clone_pbc_ps[3], tsm_pbc_ps[3], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
     copySetup(clone_pbc_ps[2], tsm_pbc_cs[2], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_ps[1], clone_pbc_cdns, 1, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_ps[0], clone_pbc_psyn, 0, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cs[3], tsm_pbc_cs[3], dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cs[2], clone_pbc_psyn, 2, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_cs[1], clone_pbc_cdns, 1, dest_tiers[i], orig_tiers[i], gpu, do_pbc_tests);
+    copySetup(clone_pbc_psyn, 0, clone_pbc_cdns, 4, dest_tiers[i], orig_tiers[i], gpu,
+              do_pbc_tests);
+    copySetup(clone_pbc_psyn, 5, tsm_pbc_psyn, 1, dest_tiers[i], orig_tiers[i], gpu,
+              do_pbc_tests);
+    copySetup(clone_pbc_cdns, 2, clone_pbc_cdns, 6, dest_tiers[i], orig_tiers[i], gpu,
+              do_pbc_tests);
   }
 #endif
   

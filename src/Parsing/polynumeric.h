@@ -7,6 +7,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
+#include "parsing_enumerators.h"
 
 namespace stormm {
 namespace parse {
@@ -18,16 +19,10 @@ using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
 
-/// \brief An enumerator for all types of numbers that might be encountered in an ascii text file.
-///        This goes hand-in-hand with the PolyNumeric union below.
-enum class NumberFormat {
-  SCIENTIFIC, STANDARD_REAL, INTEGER, LONG_LONG_INTEGER, UNSIGNED_INTEGER,
-  UNSIGNED_LONG_LONG_INTEGER, CHAR4
-};
-
 /// \brief Union for storing numbers or other 4-8 byte pieces of information
 union PolyNumeric {
   double d;
+  float f;
   float2 f2;
   int i;
   unsigned int ui;

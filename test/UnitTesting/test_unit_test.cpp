@@ -1,3 +1,4 @@
+#include <string>
 #include "copyright.h"
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
@@ -5,6 +6,8 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/series_ops.h"
 #include "../../src/Parsing/polynumeric.h"
+#include "../../src/Parsing/parsing_enumerators.h"
+#include "../../src/Parsing/textfile.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -12,6 +15,7 @@
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/coordinate_series.h"
+#include "../../src/UnitTesting/dissect_textfile.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/test_system_manager.h"
@@ -25,6 +29,8 @@ using stormm::data_types::int4;
 using stormm::errors::rtWarn;
 using stormm::stmath::incrementingSeries;
 using stormm::parse::polyNumericVector;
+using stormm::parse::TextFile;
+using stormm::parse::TextOrigin;
 using stormm::random::Ran2Generator;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
@@ -56,6 +62,9 @@ int main(const int argc, const char* argv[]) {
   // Section 4
   section("Timings");
 
+  // Section 5
+  section("Text file parsing");
+  
   // Perform basic checks of the Approx object
   StopWatch section_timer("Trial Timer");
   section_timer.addCategory(unitTestSectionName(1));
@@ -363,6 +372,61 @@ int main(const int argc, const char* argv[]) {
         Approx(2.0).margin(0.1), "Timings should roughly double for producing twice the quantity "
         "of random numbers.", TestPriority::NON_CRITICAL);
 
+  // Test the finer points of text file parsing
+  section(5);
+  const std::string test_tfstr("Two gluggish dworps gleeped bretly in a thiggy glipment.  They "
+                               "really gleeped, and it was bretly.");
+  const TextFile test_tf(test_tfstr, TextOrigin::RAM);
+  const std::vector<char> text_separators = { ',', '.' };
+  const std::vector<char> text_delimiters = { '[', ']', '(', ')', '\n' };
+  const int n_two = countInstances(test_tf, "Two", text_separators, text_delimiters);
+  const int n_dwo = countInstances(test_tf, "dworps", text_separators, text_delimiters);
+  const int n_glp = countInstances(test_tf, "glipment", text_separators, text_delimiters);
+  const int n_gbr = countInstances(test_tf, "gleeped bretly", text_separators, text_delimiters);
+  const std::vector<std::string> dual_words = { "gleeped", "bretly" };
+  const int n_dwd = countInstances(test_tf, dual_words, text_separators, text_delimiters);
+  const std::vector<std::string> comma_words = { "gleeped", ",", "and" };
+  const int n_cma = countInstances(test_tf, comma_words, text_separators, text_delimiters);
+  check(n_two, RelationalOperator::EQUAL, 1, "The word 'Two' was not found the expected number of "
+        "times in a short paragraph.");
+  check(n_dwo, RelationalOperator::EQUAL, 1, "The word 'dworps' was not found the expected number "
+        "of times in a short paragraph.");
+  check(n_glp, RelationalOperator::EQUAL, 1, "The word 'glipment' was not found the expected "
+        "number of times in a short paragraph.");
+  check(n_gbr, RelationalOperator::EQUAL, 1, "The words 'gleeped bretly' were not found the "
+        "expected number of times in a short paragraph.");
+  check(n_dwd, RelationalOperator::EQUAL, 1, "The sequence of words 'gleeped bretly' was not "
+        "found the expected number of times in a short paragraph.");
+  check(n_cma, RelationalOperator::EQUAL, 1, "The sequence of words 'gleeped, and' was not "
+        "found the expected number of times in a short paragraph.");
+  const std::string poem_tfstr("Mary (had a) little lamb,\n  Its fleece was white as snow\nAnd "
+                               "everywhere that Mary went\nThe lamb was sure to go.");
+  const TextFile poem_tf(poem_tfstr, TextOrigin::RAM);
+  const int n_mary = countInstances(poem_tf, "Mary", text_separators, text_delimiters);
+  const int n_have = countInstances(poem_tf, { "Mary", "had", "a", "little" }, text_separators,
+                                    text_delimiters);
+  const int n_lnbr = countInstances(poem_tf, { "lamb", ",", "Its", "fleece" }, text_separators,
+                                    text_delimiters);
+  check(n_mary, RelationalOperator::EQUAL, 2, "The number of instances of 'Mary' counted in a "
+        "short poem is incorrect.");
+  check(n_have, RelationalOperator::EQUAL, 1, "The number of instances of 'Mary had a little' "
+        "counted in a short poem is incorrect.");
+  check(n_lnbr, RelationalOperator::EQUAL, 1, "The   number of instances of 'lamb, Its fleece' "
+        "counted in a short poem is incorrect.");
+  const std::string tech_tfstr("Some text can be hidden behind comments\n"
+                               "To hide it from being accessible to grep.\n"
+                               "Do it // like this.  Some text here is not greppable.\n"
+                               "See?  Some text is not greppable.\n");
+  const TextFile tech_tf(tech_tfstr, TextOrigin::RAM);
+  const std::vector<std::string> some_text_vec = { "Some", "text" };
+  const int n_smtx = countInstances(tech_tf, some_text_vec, text_separators, text_delimiters);
+  const int n_smtx_comm = countInstances(tech_tf, some_text_vec, text_separators,
+                                         text_delimiters, {}, { TextGuard("//") });
+  check(n_smtx, RelationalOperator::EQUAL, 3, "The words 'Some text' do not appear the expected "
+        "number of times in a short paragraph with technical markup.");
+  check(n_smtx_comm, RelationalOperator::EQUAL, 2, "The words 'Some text' are not protected "
+        "from analysis by comment symbols as they should be.");
+  
   // Print results
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

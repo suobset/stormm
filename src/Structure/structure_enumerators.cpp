@@ -77,6 +77,8 @@ std::string getEnumerationName(const GridDetail input) {
   switch (input) {
   case GridDetail::OCCLUSION:
     return std::string("OCCLUSION");
+  case GridDetail::OCCLUSION_FIELD:
+    return std::string("OCCLUSION_FIELD");
   case GridDetail::NONBONDED_FIELD:
     return std::string("NONBONDED_FIELD");
   case GridDetail::NONBONDED_ATOMIC:
@@ -86,12 +88,36 @@ std::string getEnumerationName(const GridDetail input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MappingActivity input) {
+  switch (input) {
+  case MappingActivity::PARTICLE_TO_MESH:
+    return std::string("PARTICLE_TO_MESH");
+  case MappingActivity::MESH_TO_PARTICLE:
+    return std::string("MESH_TO_PARTICLE");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const ClashKind input) {
   switch (input) {
   case ClashKind::VAN_DER_WAALS:
     return std::string("VAN_DER_WAALS");
   case ClashKind::PURE_DISTANCE:
     return std::string("PURE_DISTANCE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const OffMeshProtocol input) {
+  switch (input) {
+  case OffMeshProtocol::DIE:
+    return std::string("DIE");
+  case OffMeshProtocol::EXTRAPOLATE:
+    return std::string("EXTRAPOLATE");
+  case OffMeshProtocol::ZERO:
+    return std::string("ZERO");
   }
   __builtin_unreachable();
 }

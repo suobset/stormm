@@ -66,9 +66,16 @@ void summaryHeader(const std::string &description, std::ofstream *foutp, int fil
 ///        program or sort of program will be used to run the output file as a script and plot the
 ///        data.
 ///
-/// \param syntax  Indicate the type of program which will interpret the output
+/// Overloaded:
+///   - Produce comment symbols for report file syntax
+///   - Produce comment symbols for grid files
+///
+/// \param syntax  Indicate the type of program which will interpret the output, or the file type
+/// \{
 char commentSymbol(OutputSyntax format);
-
+char commentSymbol(GridFileSyntax format);
+/// \}
+  
 /// \brief Indent text, possibly behind a special marker symbol.  The protectText() function below
 ///        calls this with zero indentation to produce text protect behind its chosen marker
 ///        symbol.

@@ -169,6 +169,47 @@ std::string getEnumerationName(const EnergySample input) {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SplineScaffold input) {
+  switch (input) {
+  case SplineScaffold::LINEAR:
+    return std::string("LINEAR");
+  case SplineScaffold::SIGMOIDAL:
+    return std::string("SIGMOIDAL");
+  case SplineScaffold::QUADRATIC_HILL:
+    return std::string("QUADRATIC_HILL");
+  case SplineScaffold::QUADRATIC_VALLEY:
+    return std::string("QUADRATIC_VALLEY");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+NonbondedPotential translateNonbondedPotential(const std::string &input) {
+  if (strcmpCased(input, std::string("electrostatic"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("elec"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("charge-charge"), CaseSensitivity::NO)) {
+    return NonbondedPotential::ELECTROSTATIC;
+  }
+  else if (strcmpCased(input, std::string("vdw"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("lennard-jones"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("van-der waals"), CaseSensitivity::NO)) {
+    return NonbondedPotential::VAN_DER_WAALS;
+  }
+  else if (strcmpCased(input, std::string("clash"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("occlusion"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("exclusion"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("bump"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("steric"), CaseSensitivity::NO)) {
+    return NonbondedPotential::CLASH;
+  }
+  else {
+    rtErr("The input \"" + input + "\" does not have a valid enumeration.",
+          "translateNonbondedPotential");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace energy
 } // namespace stormm

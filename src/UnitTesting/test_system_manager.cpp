@@ -359,6 +359,12 @@ PhaseSpace TestSystemManager::exportPhaseSpace(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+AtomGraph TestSystemManager::exportAtomGraph(const int index) const {
+  checkIndexing(index, "exportAtomGraph");
+  return all_topologies[index];
+}
+
+//-------------------------------------------------------------------------------------------------
 PhaseSpace& TestSystemManager::viewCoordinates(const int index) {
   checkIndexing(index, "viewCoordinates");
   return all_coordinates[index];

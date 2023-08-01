@@ -5,6 +5,27 @@ namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NumberFormat input) {
+  switch (input) {
+  case NumberFormat::SCIENTIFIC:
+    return std::string("SCIENTIFIC");
+  case NumberFormat::STANDARD_REAL:
+    return std::string("STANDARD_REAL");
+  case NumberFormat::INTEGER:
+    return std::string("INTEGER");
+  case NumberFormat::LONG_LONG_INTEGER:
+    return std::string("LONG_LONG_INTEGER");
+  case NumberFormat::UNSIGNED_INTEGER:
+    return std::string("UNSIGNED_INTEGER");
+  case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
+    return std::string("UNSIGNED_LONG_LONG_INTEGER");
+  case NumberFormat::CHAR4:
+    return std::string("CHAR4");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const NumberPrintStyle input) {
   switch (input) {
   case NumberPrintStyle::STANDARD:

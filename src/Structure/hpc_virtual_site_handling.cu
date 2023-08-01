@@ -151,7 +151,7 @@ void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<flo
 //-------------------------------------------------------------------------------------------------
 void launchVirtualSiteHandling(const PrecisionModel prec, const VirtualSiteActivity purpose,
                                PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
-                               const AtomGraphSynthesis &poly_ag, const KernelManager &launcher) {
+                               const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher) {
 
   // Bail out if there are no virtual sites in the synthesis
   if (poly_ag.getVirtualSiteCount() == 0) {

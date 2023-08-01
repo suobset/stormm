@@ -25,6 +25,28 @@ std::string operator+(const std::string &lhs, const char4 rhs) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string char2ToString(const char2 value) {
+  std::string result;
+  if (value.x == '\0') return result;
+  result += value.x;
+  if (value.y == '\0') return result;
+  result += value.y;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string char3ToString(const char3 value) {
+  std::string result;
+  if (value.x == '\0') return result;
+  result += value.x;
+  if (value.y == '\0') return result;
+  result += value.y;
+  if (value.z == '\0') return result;
+  result += value.z;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string char4ToString(const char4 value) {
   std::string result;
   if (value.x == '\0') return result;
@@ -81,6 +103,24 @@ std::string alphabetNumber(ullint input) {
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string rgbHexCode(const uchar4 color_in) {
+  std::string result(6, '0');
+  const std::vector<int> hexdigits = {
+    static_cast<int>((color_in.x >> 4) & 0xf), static_cast<int>(color_in.x & 0xf),
+    static_cast<int>((color_in.y >> 4) & 0xf), static_cast<int>(color_in.y & 0xf),
+    static_cast<int>((color_in.z >> 4) & 0xf), static_cast<int>(color_in.z & 0xf)
+  };
+  const int ascii_zero = '0';
+  const int ascii_nine = '9';
+  const int ascii_a = 'a';
+  for (size_t i = 0; i < 6; i++) {
+    result[i] = (hexdigits[i] >= 0 && hexdigits[i] <= 9) ? hexdigits[i] + ascii_zero :
+                                                           hexdigits[i] - 10 + ascii_a;
+  }
+  return result;
+}
+  
 //-------------------------------------------------------------------------------------------------
 bool verifyNumberFormat(const char* a, const NumberFormat cform, const int read_begin,
                         const int len) {
@@ -907,7 +947,7 @@ std::string minimalRealFormat(const double value, const double rel) {
 std:: string intToString(const llint value, const int width, const NumberPrintStyle style) {
 
   // Examine the given dimensions
-  if (abs(width) >= 62) {
+  if (width != free_number_format && abs(width) >= 62) {
     rtErr("The requested number exceeds format limits (maximum 64 characters, " +
           std::to_string(width) + " requested).", "intToString");
   }
@@ -969,6 +1009,32 @@ bool detectGuard(const char* line, const int pos_idx, const std::string &guard_s
 }
 
 //-------------------------------------------------------------------------------------------------
+bool detectGuard(const char* line, const size_t pos_idx, const size_t line_limit,
+                 const std::string &guard_seq) {
+  const size_t gsq_length = guard_seq.size();
+  if (gsq_length == 0 || pos_idx + gsq_length > line_limit) {
+    return false;
+  }
+  bool matched = true;
+  for (size_t i = 0; i < gsq_length; i++) {
+    matched = (matched && guard_seq[i] == line[pos_idx + i]);
+  }
+  return matched;
+}
+
+//-------------------------------------------------------------------------------------------------
+int applyGuard(const char* line, const size_t pos_idx, const size_t line_limit,
+               const std::vector<TextGuard> &markers) {
+  const int n_markers = markers.size();
+  for (int i = 0; i < n_markers; i++) {
+    if (detectGuard(line, pos_idx, line_limit, markers[i].getLeft())) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+//-------------------------------------------------------------------------------------------------
 int applyGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                const std::vector<TextGuard> &markers) {
   const int n_markers = markers.size();
@@ -978,6 +1044,27 @@ int applyGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
     }
   }
   return -1;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> markEscapedCharacters(const char* textstr, const size_t n_char,
+                                        const std::vector<TextGuard> &escapes) {
+  const int n_escape = escapes.size();
+  std::vector<bool> result(n_char, false);
+  for (size_t i = 0; i < n_char; i++) {
+    for (int j = 0; j < n_escape; j++) {
+      if (detectGuard(textstr, i, escapes[j].getLeft())) {
+        result[i + escapes[j].leftSize()] = true;
+      }
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> markEscapedCharacters(const std::string &textstr,
+                                        const std::vector<TextGuard> &escapes) {
+  return markEscapedCharacters(textstr.data(), textstr.size(), escapes);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -992,45 +1079,29 @@ std::vector<bool> markEscapedCharacters(const TextFileReader &tfr,
       }
     }
   }
-
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<bool> markEscapedCharacters(const char* textstr, const int n_char,
-                                        const std::vector<TextGuard> &escapes) {
-  const int n_escape = escapes.size();
-  std::vector<bool> result(n_char, false);
-  for (int i = 0; i < n_char; i++) {
-    for (int j = 0; j < n_escape; j++) {
-      if (detectGuard(textstr, i, escapes[j].getLeft())) {
-        result[i + escapes[j].leftSize()] = true;
-      }
-    }
-  }
-
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<bool> markGuardedText(const TextFileReader &tfr,
+std::vector<bool> markGuardedText(const char* textstr, const size_t n_char,
+                                  const size_t* line_limits, const int line_count,
                                   const std::vector<TextGuard> &markers,
                                   const std::vector<TextGuard> &alternatives,
                                   const std::vector<TextGuard> &escapes) {
-  const int n_markers = markers.size();
-  std::vector<bool> result(tfr.line_limits[tfr.line_count], false);
 
   // Make all characters affected by an escape sequence.  Escapes are TextGuards with only a
   // left-hand sequence (by default, '\') and affect only the character directly behind them.
-  std::vector<bool> literals = markEscapedCharacters(tfr, escapes);
+  std::vector<bool> literals = markEscapedCharacters(textstr, n_char, escapes);
 
-  // Search each line of the text file
+  // Make an array of all markers containing the primary markers followed by the secondaries.
+  // Record the number of primary markers, as these will take priority.
   std::vector<TextGuard> all_markers(markers);
-  const int n_all_markers = all_markers.size();
+  const int n_primary_markers = all_markers.size();
   all_markers.insert(all_markers.end(), alternatives.begin(), alternatives.end());
   int guarded = -1;
-  for (int i = 0; i < tfr.line_count; i++) {
-    for (int j = tfr.line_limits[i]; j < tfr.line_limits[i + 1]; j++) {
+  std::vector<bool> result(n_char, false);
+  for (int i = 0; i < line_count; i++) {
+    for (size_t j = line_limits[i]; j < line_limits[i + 1]; j++) {
 
       // Process literals to have the same guarded state the escape sequences that preceded them
       if (literals[j]) {
@@ -1040,8 +1111,8 @@ std::vector<bool> markGuardedText(const TextFileReader &tfr,
 
       // Check for any single-character text guard markers
       if (guarded >= 0) {
-        if (detectGuard(tfr, i, j - tfr.line_limits[i], all_markers[guarded].getRight())) {
-          if (guarded < n_markers) {
+        if (detectGuard(textstr, j, line_limits[i + 1], all_markers[guarded].getRight())) {
+          if (guarded < n_primary_markers) {
 
             // Characters in the guard sequence count as part of the guarded section of text,
             // and this section was guarded in one of the manners we want to detect.
@@ -1053,7 +1124,7 @@ std::vector<bool> markGuardedText(const TextFileReader &tfr,
           guarded = -1;
         }
         else {
-          if (guarded < n_markers) {
+          if (guarded < n_primary_markers) {
             result[j] = true;
           }
         }
@@ -1063,22 +1134,21 @@ std::vector<bool> markGuardedText(const TextFileReader &tfr,
         // Try detecting a right guard in the absence of a guarded state.  If the left guard
         // of that guard pair is the same as the right guard, it doesn't count (false alarm),
         // as it means a sequence is just beginning.
-        for (int k = 0; k < n_all_markers; k++) {
-          if (detectGuard(tfr, i, j - tfr.line_limits[i], all_markers[k].getRight()) &&
-              detectGuard(tfr, i, j - tfr.line_limits[i], all_markers[k].getLeft()) == false) {
-            rtErr("A mismatched right-hand text guard was detected at line " +
-                  std::to_string(i + 1) + ", position " + std::to_string(j + 1) + " in file " +
-                  tfr.file_name + ".", "markGuardedText");
+        for (int k = 0; k < n_primary_markers; k++) {
+          if (detectGuard(textstr, j, line_limits[i + 1], all_markers[k].getRight()) &&
+              detectGuard(textstr, j, line_limits[i + 1], all_markers[k].getLeft()) == false) {
+            rtErr("A mismatched right-hand text guard was detected on line " + std::to_string(i) +
+                  ".", "markGuardedText");
           }
         }
 
         // Try detecting a guard
-        guarded = applyGuard(tfr, i, j - tfr.line_limits[i], all_markers);
+        guarded = applyGuard(textstr, j, line_limits[i + 1], all_markers);
         if (guarded >= 0) {
 
           // A guarded sequence of one of the types we want to detect just began.  The left
           // delimiter is a part of the sequence.
-          if (guarded < n_markers) {
+          if (guarded < n_primary_markers) {
             for (int k = 0; k < all_markers[guarded].leftSize(); k++) {
               result[j + k] = true;
             }
@@ -1087,19 +1157,18 @@ std::vector<bool> markGuardedText(const TextFileReader &tfr,
 
           // If the guard extends to the end of the line, take it there and no further
           if (all_markers[guarded].rightSize() == 0) {
-            if (guarded < n_markers) {
-              for (int k = j; k < tfr.line_limits[i + 1]; k++) {
+            if (guarded < n_primary_markers) {
+              for (int k = j; k < line_limits[i + 1]; k++) {
                 result[k] = true;
               }
             }
-            j = tfr.line_limits[i + 1];
+            j = line_limits[i + 1];
             guarded = -1;
           }
 
           // Decrement j before the loop iteration increments it
           j--;
         }
-
       }
     }
 
@@ -1109,12 +1178,63 @@ std::vector<bool> markGuardedText(const TextFileReader &tfr,
         all_markers[guarded].getSpan() != LineSpan::MULTIPLE) {
       rtErr("Guard sequence (\"" + all_markers[guarded].getLeft() + "\", \"" +
             all_markers[guarded].getRight() + "\") begins on line " + std::to_string(i + 1) +
-            " of file " + tfr.file_name + ".  It requires a terminating sequence and cannot span "
-            "multiple lines.", "markGuardedText");
+            ".  It requires a terminating sequence and cannot span multiple lines.",
+            "markGuardedText");
     }
   }
-
   return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> markGuardedText(const char* textstr, const size_t n_char,
+                                  const std::vector<TextGuard> &markers,
+                                  const std::vector<TextGuard> &alternatives,
+                                  const std::vector<TextGuard> &escapes) {
+
+  // Create a catalog of points at which line breaks occur, after each carriage return.  Include
+  // line limits at the front of the string, and at the back if the final character is not a
+  // carriage return.
+  std::vector<size_t> line_limits;
+  size_t ncr = 1;
+  for (size_t i = 0; i < n_char; i++) {
+    if (textstr[i] == '\n') {
+      ncr++;
+    }
+  }
+  if (textstr[n_char - 1] != '\n') {
+    ncr++;
+  }
+  line_limits.reserve(ncr);
+  line_limits.push_back(0);
+  for (size_t i = 0; i < n_char; i++) {
+    if (textstr[i] == '\n') {
+      line_limits.push_back(i + 1);
+    }
+  }
+  if (textstr[n_char - 1] != '\n') {
+    line_limits.push_back(n_char);
+  }
+
+  // Process the text with line demarcations using the same operations as a TextFile object.
+  return markGuardedText(textstr, n_char, line_limits.data(), line_limits.size() - 1,
+                         markers, alternatives, escapes);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> markGuardedText(const std::string &str,
+                                  const std::vector<TextGuard> &markers,
+                                  const std::vector<TextGuard> &alternatives,
+                                  const std::vector<TextGuard> &escapes) {
+  return markGuardedText(str.data(), str.size(), markers, alternatives, escapes);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> markGuardedText(const TextFileReader &tfr,
+                                  const std::vector<TextGuard> &markers,
+                                  const std::vector<TextGuard> &alternatives,
+                                  const std::vector<TextGuard> &escapes) {
+  return markGuardedText(tfr.text, tfr.line_limits[tfr.line_count], tfr.line_limits,
+                         tfr.line_count, markers, alternatives, escapes);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1215,17 +1335,34 @@ std::vector<int> resolveScopes(const std::string &input_text,
 }
 
 //-------------------------------------------------------------------------------------------------
-int countDelimiters(const std::string &text, const std::vector<char> &delms) {
-  int nd = 0;
-  const int n_char = text.size();
-  const int n_delm = delms.size();
-  for (int i = 0; i < n_char; i++) {
-    const char tmpc = text[i];
-    for (int j = 0; j < n_delm; j++) {
-      nd += (tmpc == delms[j]);
+int countDelimiters(const char* text, const size_t start_pos, const size_t length,
+                    const char* delimiters, const int ndelim, const std::vector<bool> &quote_mask,
+                    const std::vector<bool> &comment_mask) {
+  int result = 0;
+  const bool has_quote_mask   = (quote_mask.size() >= start_pos + length);
+  const bool has_comment_mask = (comment_mask.size() >= start_pos + length);
+  for (size_t i = 0; i < length; i++) {
+    const size_t sp_i = start_pos + i;
+    if ((has_quote_mask && quote_mask[sp_i]) || (has_comment_mask && comment_mask[sp_i])) {
+      continue;
+    }
+    const char tmpc = text[sp_i];
+    bool is_delimiter = false;
+    for (int j = 0; j < ndelim; j++) {
+      is_delimiter = (is_delimiter || (tmpc == delimiters[j]));
+    }
+    if (is_delimiter) {
+      result++;
     }
   }
-  return nd;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int countDelimiters(const std::string &text, const std::vector<char> &delimiters,
+                    const std::vector<bool> &quote_mask, const std::vector<bool> &comment_mask) {
+  return countDelimiters(text.data(), 0, text.size(), delimiters.data(), delimiters.size(),
+                         quote_mask, comment_mask);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1277,6 +1414,134 @@ int countWords(const TextFile &tf, const int line, const int start_pos, const in
     return countWords(tf.getLinePointer(line), start_pos, length);
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void digestText(const char* text, const size_t start_pos, const size_t length,
+                const char* separators, const int n_separators, const char* delimiters,
+                const int n_delimiters, char* output, const std::vector<bool> &quote_mask,
+                const std::vector<bool> &comment_mask, std::vector<bool> *output_quoted,
+                std::vector<bool> *output_commented) {
+
+  // Iterate over the output positions, asuming that the output begins at array position 0.
+  size_t i = 0;
+  const size_t hlim = start_pos + length;
+  const bool has_quote_mask = (quote_mask.size() >= hlim);
+  const bool has_comment_mask = (comment_mask.size() >= hlim);
+  const bool has_quote_output = (output_quoted != nullptr && output_quoted->size() >= hlim);
+  const bool has_comment_output = (output_commented != nullptr &&
+                                   output_commented->size() >= hlim);
+  for (size_t j = start_pos; j < hlim; j++) {
+    if ((has_comment_mask && comment_mask[j]) || (has_quote_mask && quote_mask[j])) {
+      
+      // Because std::vector<bool> stores multiple boolean bits in one byte, it does not have a
+      // .data() member variable and must be accessed using the at() member function.
+      if (has_comment_output) {
+        output_commented->at(i) = comment_mask[j];
+      }
+      if (has_quote_output) {
+        output_quoted->at(i) = quote_mask[j];
+      }
+      output[i] = text[j];
+      i++;
+      continue;
+    }
+    bool is_delimiter = false;
+    for (size_t k = 0; k < n_delimiters; k++) {
+      is_delimiter = (is_delimiter || (text[j] == delimiters[k]));
+    }
+    if (is_delimiter) {
+      output[i] = ' ';
+      i++;
+      continue;
+    }
+    bool is_separator = false;
+    for (size_t k = 0; k < n_separators; k++) {
+      is_separator = (is_separator || (text[j] == separators[k]));
+    }
+    if (is_separator) {
+      output[i] = ' ';
+      i++;
+      output[i] = text[j];
+      i++;
+      output[i] = ' ';
+      i++;
+    }
+    else {
+      output[i] = text[j];
+      i++;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string digestText(const char* text, const size_t start_pos, const size_t length,
+                       const char* separators, const int n_separators, const char* delimiters,
+                       const int n_delimiters, const std::vector<bool> &quote_mask,
+                       const std::vector<bool> &comment_mask, std::vector<bool> *output_quoted,
+                       std::vector<bool> *output_commented) {
+  
+  // Count the number of separators.  The countDelimiters() function can be used in this respect.
+  const int sep_instances = countDelimiters(text, start_pos, length, separators, n_separators,
+                                            quote_mask, comment_mask);
+
+  // Allocate the result to accommodate the number of separators identified.
+  const size_t total_length = length + static_cast<size_t>(2 * sep_instances);
+  std::string result(total_length, ' ');
+  if (output_quoted != nullptr && output_quoted->size() < total_length) {
+    output_quoted->resize(total_length);
+  }
+  if (output_commented != nullptr && output_commented->size() < total_length) {
+    output_commented->resize(total_length);
+  }
+  digestText(text, start_pos, length, separators, n_separators, delimiters, n_delimiters,
+             result.data(), quote_mask, comment_mask, output_quoted, output_commented);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void digestText(const std::string &text, const std::vector<char> &separators,
+                const std::vector<char> &delimiters, std::string *output,
+                const std::vector<bool> &quote_mask, const std::vector<bool> &comment_mask,
+                std::vector<bool> *output_quoted, std::vector<bool> *output_commented) {
+
+  // Count the number of separators in preparation for re-allocating the output if necessary.
+  const int sep_instances = countDelimiters(text.data(), 0, text.size(), separators.data(),
+                                            separators.size(), quote_mask, comment_mask);
+  const size_t total_length = text.size() + static_cast<size_t>(2 * sep_instances);
+  if (output->size() < total_length) {
+    output->resize(total_length);
+  }
+  if (output_quoted != nullptr && output_quoted->size() < total_length) {
+    output_quoted->resize(total_length);
+  }
+  if (output_commented != nullptr && output_commented->size() < total_length) {
+    output_commented->resize(total_length);
+  }
+  digestText(text.data(), 0, text.size(), separators.data(), separators.size(), delimiters.data(),
+             delimiters.size(), output->data(), quote_mask, comment_mask, output_quoted,
+             output_commented);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string digestText(const std::string &text, const std::vector<char> &separators,
+                       const std::vector<char> &delimiters, const std::vector<bool> &quote_mask,
+                       const std::vector<bool> &comment_mask, std::vector<bool> *output_quoted,
+                       std::vector<bool> *output_commented) {
+  const int sep_instances = countDelimiters(text.data(), 0, text.size(), separators.data(),
+                                            separators.size(), quote_mask, comment_mask);
+  const size_t total_length = text.size() + static_cast<size_t>(2 * sep_instances);
+  std::string result(total_length, ' ');
+  if (output_quoted != nullptr && output_quoted->size() < total_length) {
+    output_quoted->resize(total_length);
+  }
+  if (output_commented != nullptr && output_commented->size() < total_length) {
+    output_commented->resize(total_length);
+  }
+  digestText(text.data(), 0, text.size(), separators.data(), separators.size(), delimiters.data(),
+             delimiters.size(), result.data(), quote_mask, comment_mask, output_quoted,
+             output_commented);
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

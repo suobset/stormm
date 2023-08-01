@@ -1234,5 +1234,350 @@ std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tout>
+std::vector<Tout> convertData(std::vector<int95_t> *input, const double input_scale,
+                              const double output_scale) {
+  const int95_t* inp_ptr = input->data();
+  const size_t npt = input->size();
+  std::vector<Tout> output(npt);
+  if (isFloatingPointScalarType<Tout>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      output[i] = hostInt95ToDouble(inp_ptr[i]) * conv_fac;
+    }
+  }
+  else if (isSignedIntegralScalarType<Tout>() || isUnsignedIntegralScalarType<Tout>()) {
+    const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+    if (ct_out == llint_type_index || ct_out == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t adj = hostChangeFPBits(inp_ptr[i], input_scale_bits, output_scale_bits);
+
+        // Only the 64-bit part can be copied into the output.  Conversions between int95_t
+        // vectors should be handled by running hostChangeFPBits() over the one vector.
+        output[i] = adj.x;
+      }
+    }
+    else {
+
+      // Double-precision can handle other conversions without loss of information.
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = llround(hostInt95ToDouble(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrink_to_fit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tout>
+std::vector<Tout> convertData(std::vector<llint> *primary, std::vector<int> *overflow,
+                              const double input_scale, const double output_scale) {
+  const llint* prim_ptr = primary->data();
+  const int* ovrf_ptr = overflow->data();
+  const size_t npt = primary->size();
+  if (overflow->size() != npt) {
+    rtErr("Input primary and overflow arrays must be of equal size (provided " +
+          std::to_string(npt) + " and " + std::to_string(overflow->size()) + ").", "convertData");
+  }
+  std::vector<Tout> output(npt);
+  if (isFloatingPointScalarType<Tout>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      output[i] = hostInt95ToDouble(prim_ptr[i], ovrf_ptr[i]) * conv_fac;
+    }
+  }
+  else if (isSignedIntegralScalarType<Tout>() || isUnsignedIntegralScalarType<Tout>()) {
+    const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+    if (ct_out == llint_type_index || ct_out == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t orig = { prim_ptr[i], ovrf_ptr[i] };
+        const int95_t adj = hostChangeFPBits(orig, input_scale_bits, output_scale_bits);
+
+        // Only the 64-bit part can be copied into the output.  Conversions between int95_t
+        // vectors should be handled by running hostChangeFPBits() over the one vector.
+        output[i] = adj.x;
+      }
+    }
+    else {
+
+      // Double-precision can handle other conversions without loss of information.
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = llround(hostInt95ToDouble(prim_ptr[i], ovrf_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  primary->resize(0);
+  primary->shrink_to_fit();
+  overflow->resize(0);
+  overflow->shrink_to_fit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tin>
+std::vector<int95_t> convertData(std::vector<Tin> *input, const double input_scale,
+                                 const double output_scale) {
+  const Tin* inp_ptr = input->data();
+  const size_t npt = input->size();
+  std::vector<int95_t> output(npt);
+  if (isFloatingPointScalarType<Tin>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      output[i] = hostDoubleToInt95(input[i] * conv_fac);
+    }
+  }
+  else if (isSignedIntegralScalarType<Tin>() || isUnsignedIntegralScalarType<Tin>()) {
+    const size_t ct_in = std::type_index(typeid(Tin)).hash_code();
+    if (ct_in == llint_type_index || ct_in == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t orig = { inp_ptr[i], 0 };
+        const int95_t adj = hostChangeFPBits(orig, input_scale_bits, output_scale_bits);
+        output[i] = adj;
+      }
+    }
+    else {
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = hostDoubleToInt95(static_cast<double>(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrink_to_fit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tin, typename Tout>
+std::vector<Tout> convertData(std::vector<Tin> *input, const double input_scale,
+                              const double output_scale) {
+  const Tin* inp_ptr = input->data();
+  const size_t npt = input->size();
+  std::vector<Tout> output(npt);
+  const size_t ct_in  = std::type_index(typeid(Tin)).hash_code();
+  const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+  if ((ct_in  == llint_type_index || ct_in  == ullint_type_index) &&
+      (ct_out == llint_type_index || ct_out == ullint_type_index)) {
+    if (input_scale > output_scale) {
+      const int bit_delta = round(log2(input_scale / output_scale));
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = (inp_ptr[i] >> bit_delta);
+      }
+    }
+    else if (output_scale > input_scale) {
+      const int bit_delta = round(log2(output_scale / input_scale));
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = (inp_ptr[i] << bit_delta);
+      }
+    }
+    else {
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = inp_ptr[i];
+      }
+    }
+  }
+  else {
+    const double conv_fac = output_scale / input_scale;
+    if (isFloatingPointScalarType<Tout>()) {
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = static_cast<double>(inp_ptr[i]) * conv_fac;
+      }
+    }
+    else {
+      for (size_t i = 0; i < npt; i++) {
+        output[i] = llround(static_cast<double>(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrink_to_fit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tout>
+Hybrid<Tout> convertData(Hybrid<int95_t> *input, const double input_scale,
+                         const double output_scale) {
+  const int95_t* inp_ptr = input->data();
+  const size_t npt = input->size();
+  Hybrid<Tout> output(npt, input->getLabel().name, input->getFormat());
+  Tout* out_ptr = output.data();
+  if (isFloatingPointScalarType<Tout>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      out_ptr[i] = hostInt95ToDouble(inp_ptr[i]) * conv_fac;
+    }
+  }
+  else if (isSignedIntegralScalarType<Tout>() || isUnsignedIntegralScalarType<Tout>()) {
+    const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+    if (ct_out == llint_type_index || ct_out == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t adj = hostChangeFPBits(inp_ptr[i], input_scale_bits, output_scale_bits);
+
+        // Only the 64-bit part can be copied into the output.  Conversions between int95_t
+        // vectors should be handled by running hostChangeFPBits() over the one vector.
+        out_ptr[i] = adj.x;
+      }
+    }
+    else {
+
+      // Double-precision can handle other conversions without loss of information.
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = llround(hostInt95ToDouble(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrinkToFit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tout>
+Hybrid<Tout> convertData(Hybrid<llint> *primary, Hybrid<int> *overflow,
+                         const double input_scale, const double output_scale) {
+  const llint* prim_ptr = primary->data();
+  const int* ovrf_ptr = overflow->data();
+  const size_t npt = primary->size();
+  if (overflow->size() != npt) {
+    rtErr("Input primary and overflow arrays must be of equal size (provided " +
+          std::to_string(npt) + " and " + std::to_string(overflow->size()) + ").", "convertData");
+  }
+  Hybrid<Tout> output(npt, primary->getLabel().name, primary->getFormat());
+  Tout* out_ptr = output.data();
+  if (isFloatingPointScalarType<Tout>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      out_ptr[i] = hostInt95ToDouble(prim_ptr[i], ovrf_ptr[i]) * conv_fac;
+    }
+  }
+  else if (isSignedIntegralScalarType<Tout>() || isUnsignedIntegralScalarType<Tout>()) {
+    const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+    if (ct_out == llint_type_index || ct_out == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t orig = { prim_ptr[i], ovrf_ptr[i] };
+        const int95_t adj = hostChangeFPBits(orig, input_scale_bits, output_scale_bits);
+
+        // Only the 64-bit part can be copied into the output.  Conversions between int95_t
+        // vectors should be handled by running hostChangeFPBits() over the one vector.
+        out_ptr[i] = adj.x;
+      }
+    }
+    else {
+
+      // Double-precision can handle other conversions without loss of information.
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = llround(hostInt95ToDouble(prim_ptr[i], ovrf_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  primary->resize(0);
+  primary->shrinkToFit();
+  overflow->resize(0);
+  overflow->shrinkToFit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tin>
+Hybrid<int95_t> convertData(Hybrid<Tin> *input, const double input_scale,
+                            const double output_scale) {
+  const Tin* inp_ptr = input->data();
+  const size_t npt = input->size();
+  Hybrid<int95_t> output(npt, input->getLabel().name, input->getFormat());
+  int95_t* out_ptr = output.data();
+  if (isFloatingPointScalarType<Tin>()) {
+    const double conv_fac = output_scale / input_scale;
+    for (size_t i = 0; i < npt; i++) {
+      out_ptr[i] = hostDoubleToInt95(input[i] * conv_fac);
+    }
+  }
+  else if (isSignedIntegralScalarType<Tin>() || isUnsignedIntegralScalarType<Tin>()) {
+    const size_t ct_in = std::type_index(typeid(Tin)).hash_code();
+    if (ct_in == llint_type_index || ct_in == ullint_type_index) {
+      const int input_scale_bits  = log2(input_scale);
+      const int output_scale_bits = log2(output_scale);
+      for (size_t i = 0; i < npt; i++) {
+        const int95_t orig = { inp_ptr[i], 0 };
+        const int95_t adj = hostChangeFPBits(orig, input_scale_bits, output_scale_bits);
+        out_ptr[i] = adj;
+      }
+    }
+    else {
+      const double conv_fac = output_scale / input_scale;
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = hostDoubleToInt95(static_cast<double>(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrinkToFit();
+  return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tin, typename Tout>
+Hybrid<Tout> convertData(Hybrid<Tin> *input, const double input_scale, const double output_scale) {
+  const Tin* inp_ptr = input->data();
+  const size_t npt = input->size();
+  Hybrid<Tout> output(npt, input->getLabel().name, input->getFormat());
+  Tout* out_ptr = output.data();
+  const size_t ct_in  = std::type_index(typeid(Tin)).hash_code();
+  const size_t ct_out = std::type_index(typeid(Tout)).hash_code();
+  if ((ct_in  == llint_type_index || ct_in  == ullint_type_index) &&
+      (ct_out == llint_type_index || ct_out == ullint_type_index)) {
+    if (input_scale > output_scale) {
+      const int bit_delta = round(log2(input_scale / output_scale));
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = (inp_ptr[i] >> bit_delta);
+      }
+    }
+    else if (output_scale > input_scale) {
+      const int bit_delta = round(log2(output_scale / input_scale));
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = (inp_ptr[i] << bit_delta);
+      }
+    }
+    else {
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = inp_ptr[i];
+      }
+    }
+  }
+  else {
+    const double conv_fac = output_scale / input_scale;
+    if (isFloatingPointScalarType<Tout>()) {
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = static_cast<double>(inp_ptr[i]) * conv_fac;
+      }
+    }
+    else {
+      for (size_t i = 0; i < npt; i++) {
+        out_ptr[i] = llround(static_cast<double>(inp_ptr[i]) * conv_fac);
+      }
+    }
+  }
+  input->resize(0);
+  input->shrinkToFit();
+  return output;
+}
+
 } // namespace stmath
 } // namespace stormm

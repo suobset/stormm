@@ -141,7 +141,7 @@ int main(const int argc, const char* argv[]) {
   }
   std::vector<double> box_xfrm(9);
   std::vector<double> inv_xfrm(9);
-  computeBoxTransform(gdims, box_xfrm.data(), inv_xfrm.data());
+  computeBoxTransform(gdims, &box_xfrm, &inv_xfrm);
   const std::vector<double> t3box = (tip3p_exists) ? tip3p.getBoxSpaceTransform() :
                                                      std::vector<double>(9, 0.0);
   check(t3box, RelationalOperator::EQUAL, Approx(box_xfrm).margin(1.0e-7), "The box "

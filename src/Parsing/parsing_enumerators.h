@@ -8,6 +8,18 @@
 namespace stormm {
 namespace parse {
 
+/// \brief An enumerator for all types of numbers that might be encountered in an ascii text file.
+///        This goes hand-in-hand with the PolyNumeric union below.
+enum class NumberFormat {
+  SCIENTIFIC,                  ///< Exponential, base ten notation
+  STANDARD_REAL,               ///< General accounting notation
+  INTEGER,                     ///< Print signed integers
+  LONG_LONG_INTEGER,           ///< Print very large signed integers
+  UNSIGNED_INTEGER,            ///< Print unsigned integers
+  UNSIGNED_LONG_LONG_INTEGER,  ///< Print very large unsigned integers
+  CHAR4                        ///< Print four-tuples of ASCII test characters
+};
+  
 /// \brief Specify the way in which to print a standard real number or integer (with or without
 ///        leading zeros)
 enum class NumberPrintStyle {
@@ -67,6 +79,7 @@ enum class TextOrigin {
 ///
 /// \param input  The enumeration of interest
 /// \{
+std::string getEnumerationName(NumberFormat input);
 std::string getEnumerationName(NumberPrintStyle input);
 std::string getEnumerationName(WildCardKind input);
 std::string getEnumerationName(JustifyText input);

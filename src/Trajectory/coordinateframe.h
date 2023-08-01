@@ -273,6 +273,9 @@ public:
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN) const;
 
+  /// \brief Get a pointer to the object itself, useful when working with a const reference.
+  const CoordinateFrame* getSelfPointer() const;
+  
   /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
   ///        access to any of its member variables.
   ///
