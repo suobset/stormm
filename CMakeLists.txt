@@ -66,6 +66,35 @@ if (STORMM_ENABLE_TEST_COVERAGE)
     endif()
 endif()
 
+# --- Create a version file ---
+
+## We pull the version information directly from Git tags, so that automating releases is much
+## easier.
+
+find_package(Git)
+
+if(GIT_EXECUTABLE)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --dirty
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_DESCRIBE_VERSION
+        RESULT_VARIABLE GIT_DESCRIBE_ERROR_CODE
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT GIT_DESCRIBE_ERROR_CODE)
+        set(STORMM_VERSION ${GIT_DESCRIBE_VERSION})
+    endif()
+endif()
+
+if(NOT DEFINED STORMM_VERSION)
+    set(STORMM_VERSION 0+unknown)
+    message(WARNING "Could not find STORMM_VERSION using git... using default version \"${STORMM_VERSION}\".")
+endif()
+
+configure_file(
+        "${CMAKE_SOURCE_DIR}/src/version.h.in" 
+        "${CMAKE_BINARY_DIR}/version.h" 
+        @ONLY)
+
 # --- Define any source files ---
 
 ## Using GLOB is not considered a 'best practice' as new files aren't always detected by CMake's
