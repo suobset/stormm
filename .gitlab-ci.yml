@@ -16,7 +16,7 @@ test:
     - $CONDA create --prefix=${CI_PROJECT_DIR}/.conda cmake
 
     - if [ "$RDKIT" == "YES" ]; then
-         $CONDA install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen;
+         $CONDA install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen boost;
       fi
 
     - CUDA_VISIBLE_DEVICES=$CI_RUNNER_ID
