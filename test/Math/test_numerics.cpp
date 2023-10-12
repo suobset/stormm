@@ -6,16 +6,20 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
-#include "../../src/Math/radial_derivatives.h"
+#include "../../src/Math/juffa.h"
+#include "../../src/Math/log_scale_spline.h"
 #include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/radial_derivatives.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Parsing/polynumeric.h"
+#include "../../src/Potential/pme_util.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
-#include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
+#include "../../src/UnitTesting/stopwatch.h"
+#include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::PrecisionModel;
 using stormm::constants::tiny;
@@ -24,12 +28,16 @@ using stormm::data_types::int95_t;
 using stormm::data_types::llint;
 #ifndef STORMM_USE_HPC
 using stormm::data_types::int2;
+using stormm::data_types::double4;
 using stormm::data_types::float2;
+using stormm::data_types::float4;
 #endif
 using stormm::data_types::double_type_index;
+using stormm::data_types::double4_type_index;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
+using stormm::energy::ewaldCoefficient;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
@@ -323,12 +331,16 @@ void testPolynomialDerivatives(const long double rmax, const int level, Xoshiro2
         }
       }
     }
+    const T tr2 = tr * tr;
     if (level == 2) {
-      dxx_err[n] = fabs(eval_ddxyz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, r));
-      dxy_err[n] = fabs(eval_dxdyz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, yval, r));
-      dxz_err[n] = fabs(eval_dxydz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, zval, r));
+      dxx_err[n] = fabs(eval_ddxyz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, tr));
+      dxy_err[n] = fabs(eval_dxdyz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, yval, tr,
+                                                                   tr2));
+      dxz_err[n] = fabs(eval_dxydz[13] - radialSecondDerivative<T>(dfunc, ddfunc, xval, zval, tr,
+                                                                   tr2));
       dyy_err[n] = fabs(eval_xddyz[13] - radialSecondDerivative<T>(dfunc, ddfunc, yval, r));
-      dzx_err[n] = fabs(eval_dzydx[13] - radialSecondDerivative<T>(dfunc, ddfunc, zval, xval, r));
+      dzx_err[n] = fabs(eval_dzydx[13] - radialSecondDerivative<T>(dfunc, ddfunc, zval, xval, tr,
+                                                                   tr2));
       continue;
     }
     const int xp_shift = 1;
@@ -346,13 +358,18 @@ void testPolynomialDerivatives(const long double rmax, const int level, Xoshiro2
                                     inv_inc;
     const long double eval_dzyddx = (eval_ddxyz[13 + zp_shift] - eval_ddxyz[13 - zp_shift]) *
                                     inv_inc;
-    dxxx_err[n] = fabs(eval_dddxyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tr));
-    dxxy_err[n] = fabs(eval_ddxdyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, ty, tr));
-    dxxz_err[n] = fabs(eval_ddxydz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tz, tr));
-    dxyy_err[n] = fabs(eval_dxddyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, ty, tx, tr));
+    dxxx_err[n] = fabs(eval_dddxyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tr,
+                                                              tr2));
+    dxxy_err[n] = fabs(eval_ddxdyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, ty, tr,
+                                                              tr2));
+    dxxz_err[n] = fabs(eval_ddxydz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tz, tr,
+                                                              tr2));
+    dxyy_err[n] = fabs(eval_dxddyz - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, ty, tx, tr,
+                                                              tr2));
     dxyz_err[n] = fabs(eval_dxdydz -
-                       radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, ty, tz, tr));
-    dzxx_err[n] = fabs(eval_dzyddx - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tz, tr));
+                       radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, ty, tz, tr, tr2));
+    dzxx_err[n] = fabs(eval_dzyddx - radialThirdDerivative<T>(dfunc, ddfunc, dddfunc, tx, tz, tr,
+                                                              tr2));
   }
 
   // Perform the appropriate checks
@@ -467,20 +484,21 @@ void testCoulombDerivatives(const double rmax, Xoshiro256ppGenerator *xrs) {
     long double u[4] = { invr, -invr2, 2.0 * invr2 * invr, -6.0 * invr2 * invr2 };
 
     // Compute d2/dxx and then d2/dxy
+    const long double r2 = r * r;
     anlt_dxx[i] = radialSecondDerivative<T>(u[1], u[2], x, r);
-    anlt_dxy[i] = radialSecondDerivative<T>(u[1], u[2], x, y, r);
-    webs_dxx[i] = ((3.0 * x * x) - (r * r)) * invr2 * invr2 * invr;
+    anlt_dxy[i] = radialSecondDerivative<T>(u[1], u[2], x, y, r, r2);
+    webs_dxx[i] = ((3.0 * x * x) - r2) * invr2 * invr2 * invr;
     webs_dxy[i] = 3.0 * x * y * invr2 * invr2 * invr;
 
     // Compute d3/dxxx, d3/dxxy, d3/dxyy, and d3/dxyz.  Check against their web-based solutions.
-    anlt_dxxx[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, r);
-    anlt_dxxy[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, y, r);
-    anlt_dxyy[i] = radialThirdDerivative<T>(u[1], u[2], u[3], y, x, r);
-    anlt_dxyz[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, y, z, r);
+    anlt_dxxx[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, r, r2);
+    anlt_dxxy[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, y, r, r2);
+    anlt_dxyy[i] = radialThirdDerivative<T>(u[1], u[2], u[3], y, x, r, r2);
+    anlt_dxyz[i] = radialThirdDerivative<T>(u[1], u[2], u[3], x, y, z, r, r2);
     const long double invr7 = invr2 * invr2 * invr2 * invr;
-    webs_dxxx[i] = 3.0 * x * ((3.0 * r * r) - (5.0 * x * x)) * invr7;
-    webs_dxxy[i] = 3.0 * y * ((r * r) - (5.0 * x * x)) * invr7;
-    webs_dxyy[i] = 3.0 * x * ((r * r) - (5.0 * y * y)) * invr7;
+    webs_dxxx[i] = 3.0 * x * ((3.0 * r2) - (5.0 * x * x)) * invr7;
+    webs_dxxy[i] = 3.0 * y * (r2 - (5.0 * x * x)) * invr7;
+    webs_dxyy[i] = 3.0 * x * (r2 - (5.0 * y * y)) * invr7;
     webs_dxyz[i] = -15.0 * x * y * z * invr7;
   }
   check(anlt_dxx, RelationalOperator::EQUAL, Approx(webs_dxx).margin(stormm::constants::small),
@@ -504,6 +522,125 @@ void testCoulombDerivatives(const double rmax, Xoshiro256ppGenerator *xrs) {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the logarithmic spline production.
+//
+// Arguments:
+//   style:         The type of spline to produce and test
+//   idx_meth:      Indexing method for the spline table
+//   ew_coeff:      The Ewald coefficient governing the splitting factor
+//   manissa_bits:  The number of bits of the mantissa with which to build the table index
+//   tol:           Tolerance for errors in the spline tables generated under the specified
+//                  precision model
+//   xrs:           Random number generator for creating inputs to spline evaluation
+//   timer:         Timings object to help track how long these tables take to build on CPU or GPU
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void testLogSplineRendering(const LogSplineForm style, const TableIndexing idx_meth,
+                            const double ew_coeff, const int mantissa_bits, const double tol,
+                            Xoshiro256ppGenerator *xrs, StopWatch *timer) {
+  const std::string desc = (std::type_index(typeid(T4)).hash_code() == double4_type_index) ?
+                           "dp" : "sp";
+  const int spl_timings = timer->addCategory("Compute " + desc + " PME energy by " +
+                                             getEnumerationName(idx_meth) + " (" +
+                                             std::to_string(mantissa_bits) + " bits)");
+  const int npts = 1024;
+  std::vector<double> rpts = uniformRand(xrs, npts, 10.0);
+  std::vector<double> dbl_eval(npts), spl_eval(npts), flt_eval(npts);
+  addScalarToVector(&rpts, 0.9);
+  timer->assignTime(0);
+  const double kcoul = stormm::symbols::charmm_gromacs_bioq;
+  const float kcoulf = stormm::symbols::charmm_gromacs_bioq;
+  const LogScaleSpline<T4> lgsp(style, ew_coeff, kcoul, mantissa_bits, 64.0, 0.015625, idx_meth);
+  timer->assignTime(spl_timings);
+  const float ew_coeff_f = ew_coeff;
+  const double beta = 2.0 * ew_coeff / sqrt(pi);
+  const float betaf = static_cast<float>(2.0 / sqrt(pi)) * ew_coeff_f;
+  for (int i = 0; i < npts; i++) {
+    const double r = rpts[i];
+    const float rf = r;
+    switch (style) {
+    case LogSplineForm::ELEC_PME_DIRECT:
+      dbl_eval[i] = kcoul * erfc(ew_coeff * r) / r;
+      flt_eval[i] = kcoulf * erfcf(ew_coeff_f * rf) / rf;
+      break;
+    case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+      dbl_eval[i] = kcoul * (erfc(ew_coeff * r) - 1.0) / r;
+      flt_eval[i] = kcoulf * (erfcf(ew_coeff_f * rf) - 1.0f) / rf;
+      break;
+    case LogSplineForm::DELEC_PME_DIRECT:
+      {
+        const double ew_coeff_r = ew_coeff * r;
+        const float ew_coeff_rf = ew_coeff_f * rf;
+        dbl_eval[i] = -kcoul * ((beta * exp(-ew_coeff_r * ew_coeff_r)) +
+                                (erfc(ew_coeff_r) / r)) / (r * r);
+        flt_eval[i] = -kcoulf * ((betaf * expf(-ew_coeff_rf * ew_coeff_rf)) +
+                                 (erfcf(ew_coeff_rf) / rf)) / (rf * rf);
+      }
+      break;
+    case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+      {
+        const double ew_coeff_r = ew_coeff * r;
+        const double invr = 1.0 / r;
+        const float ew_coeff_rf = ew_coeff_f * rf;
+        const double invrf = 1.0f / rf;
+        dbl_eval[i] = -kcoul * ((beta * exp(-ew_coeff_r * ew_coeff_r)) +
+                                ((erfc(ew_coeff_r) - 1.0) * invr)) * invr * invr;
+        flt_eval[i] = -kcoulf * ((betaf * expf(-ew_coeff_rf * ew_coeff_rf)) +
+                                 ((erfcf(ew_coeff_rf) - 1.0f) * invrf)) * invrf * invrf;
+      }
+      break;
+    case LogSplineForm::CUSTOM:
+      break;
+    }
+    spl_eval[i] = lgsp.evaluateByRealArg(r);
+  }
+  check(spl_eval, RelationalOperator::EQUAL, Approx(dbl_eval).margin(tol), "The spline table "
+        "for " + getEnumerationName(style) + ", indexed by " + getEnumerationName(idx_meth) +
+        ", does not meet expectations for accuracy.");
+  timer->assignTime(0);
+  const LogScaleSpline<T4> lgsp_frac(style, ew_coeff, kcoul, mantissa_bits, 64.0, 0.015625,
+                                     idx_meth, BasisFunctions::MIXED_FRACTIONS);
+  timer->assignTime(spl_timings);
+  for (int i = 0; i < npts; i++) {
+    spl_eval[i] = lgsp_frac.evaluateByRealArg(rpts[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test various implementations from Norbert Juffa's math library for calculating important
+// functions in 32-bit arithmetic.
+//-------------------------------------------------------------------------------------------------
+void testJuffaImplementations() {
+
+  // Check the expf() function
+  const int npts = 401;
+  std::vector<float> fpts(npts);
+  std::vector<double> exp_ref(npts), exp_jff(npts), exp_isc(npts);
+  for (int i = 0; i < npts; i++) {
+    fpts[i] = static_cast<double>(i - 200) * 0.05;
+    exp_ref[i] = exp(fpts[i]);
+    exp_jff[i] = expJf(fpts[i]);
+    exp_isc[i] = expf(fpts[i]);
+  }
+  check(exp_jff, RelationalOperator::EQUAL, Approx(exp_ref).margin(1.5e-3), "The erfc() "
+        "approximation for a given Ewald coefficient does not match the reference for values in "
+        "a range [0, 12.9).");
+
+  // Check the erfcf() function
+  JfErfc ewld(0.31);
+  std::vector<double> erfc_ref(npts), erfc_jff(npts), erfc_isc(npts);
+  for (int i = 0; i < npts; i++) {
+    fpts[i] = static_cast<double>(i + 30) * 0.03;
+    erfc_ref[i] = erfc(0.31f * fpts[i]);
+    erfc_jff[i] = ewld.erfcJf(fpts[i]);
+    erfc_isc[i] = erfcf(0.31f * fpts[i]);
+  }
+  check(erfc_jff, RelationalOperator::EQUAL, Approx(erfc_ref).margin(8.0e-8), "The erfc() "
+        "approximation for a given Ewald coefficient does not match the reference for values in "
+        "a range [0, 12.9).");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -513,6 +650,7 @@ int main(const int argc, const char* argv[]) {
   if (oe.getVerbosity() == TestVerbosity::FULL) {
     stormmSplash();
   }
+  StopWatch timer;
 
   // Section 1
   section("Long long int <=> float2 conversion");
@@ -528,7 +666,13 @@ int main(const int argc, const char* argv[]) {
 
   // Section 5
   section("Compute partial derivatives of radially-symmetric functions");
-  
+
+  // Section 6
+  section("Compute logarithmically indexed spline tables");
+
+  // Section 7
+  section("Test adaptations of Norbert Juffa's 32-bit math functions");
+
   // Make a series of prime numbers
   std::vector<llint> primes(1, 2);
   int p = 3;
@@ -610,7 +754,6 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_large_tests = (exact_passes) ? TestPriority::CRITICAL :
                                                        TestPriority::ABORT;
 
-
   // Test direct conversion
   section(2);
   testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26, PrecisionModel::SINGLE);
@@ -691,6 +834,7 @@ int main(const int argc, const char* argv[]) {
   testFixedPrecisionChange(-76.329, 70, 63);
 
   // Test the numerical precision of analytic partial derivatives for radially symmetric functions
+  section(5);
   testPolynomialDerivatives<double>(1.7, 1, &xrs);
   testPolynomialDerivatives<double>(1.7, 2, &xrs);
   testPolynomialDerivatives<double>(1.7, 3, &xrs);
@@ -700,8 +844,59 @@ int main(const int argc, const char* argv[]) {
 
   // Test Coulomb-like functions with radial differentiation
   testCoulombDerivatives<double>(2.6, &xrs);
+
+  // Test logarithmic spline tables and associated computations
+  section(6);
+  const double ew_loose = ewaldCoefficient(10.0, 1.0e-5);
+  const double ew_tight = ewaldCoefficient(12.0, 2.0e-7);
+  check(ew_loose, RelationalOperator::EQUAL, Approx(0.2751063906).margin(1.0e-8), "The Ewald "
+        "coefficient was not computed as expected for a cutoff of 10.0 Angstroms and direct sum "
+        "tolerance 1.0e-5.");
+  check(ew_tight, RelationalOperator::EQUAL, Approx(0.2779192472).margin(1.0e-8), "The Ewald "
+        "coefficient was not computed as expected for a cutoff of 12.0 Angstroms and direct sum "
+        "tolerance 1.0e-7.");
+  testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG, ew_loose,
+                                  8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG, ew_loose,
+                                 5, 2.5e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
+                                  ew_loose, 8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
+                                 ew_loose, 5, 3.5e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
+                                  ew_loose, 8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::ARG, ew_loose,
+                                 5, 1.1e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
+                                  ew_loose, 8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
+                                 ew_loose, 5, 1.5e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::ARG, ew_loose,
+                                  8, 1.5e-8, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::ARG, ew_loose,
+                                 5, 9.6e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
+                                  ew_loose, 8, 3.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
+                                 ew_loose, 5, 1.2e-4, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
+                                  ew_loose, 8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
+                                 ew_loose, 5, 3.0e-5, &xrs, &timer);
+  testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
+                                  ew_loose, 8, 1.0e-9, &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
+                                 ew_loose, 5, 3.0e-5, &xrs, &timer);
+
+  // Test Norbert Juffa's various 32-bit floating point functions
+  section(7);
+  testJuffaImplementations();
   
   // Print results
+  if (oe.getDisplayTimingsOrder()) {
+    timer.assignTime(0);
+    timer.printResults();
+  }
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {
     stormmWatermark();

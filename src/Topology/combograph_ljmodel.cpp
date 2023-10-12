@@ -7,31 +7,23 @@ namespace topology {
 using topology::NonbondedKit;
   
 //-------------------------------------------------------------------------------------------------
-PairLJInteraction::PairLJInteraction(const char4 type_a_in, const char4 type_b_in,
-                                     const double lja_in, const double ljb_in) :
-    type_a{type_a_in}, type_b{type_b_in}, lja{lja_in}, ljb{ljb_in}
-{}
-
-//-------------------------------------------------------------------------------------------------
-ComboGraphLJModel::ComboGraphLJModel(const AtomGraph *base_ag_in, const AtomGraph *ag_othr_in,
+ComboGraphLJModel::ComboGraphLJModel(const AtomGraph *primary_ag_in,
+                                     const AtomGraph *ag_secondary_in,
                                      const VdwCombiningRule default_rule_in,
                                      const std::vector<PairLJInteraction> &edits) :
     set_count{0},
     default_rule{default_rule_in},
-    base_topology_rule{VdwCombiningRule::LORENTZ_BERTHELOT},
-    base_atom_type_count{0},
-    othr_atom_type_counts{},
-    othr_topology_rules{},
+    primary_topology_rule{VdwCombiningRule::LORENTZ_BERTHELOT},
+    primary_atom_type_count{0},
+    secondary_atom_type_counts{},
+    secondary_topology_rules{},
     set_lja{}, set_ljb{}, set_edits{},
-    base_ag_pointer{const_cast<AtomGraph*>(base_ag_in)},
-    othr_ag_pointers{}
+    primary_ag_pointer{const_cast<AtomGraph*>(primary_ag_in)},
+    secondary_ag_pointers{}
 {
-  if (base_ag_pointer == nullptr) {
-    rtErr("A base topology must be specified in order to create parameter combination matrices.",
-          "ComboGraphLJModel");
-  }
-  if (ag_othr_in == nullptr) {
-    return;
+  if (primary_ag_pointer == nullptr) {
+    rtErr("A primary topology must be specified in order to create parameter combination "
+          "matrices.", "ComboGraphLJModel");
   }
 
   // The default mixing rule cannot be NBFix (this would imply that there is, in effect, no rule).
@@ -43,52 +35,66 @@ ComboGraphLJModel::ComboGraphLJModel(const AtomGraph *base_ag_in, const AtomGrap
     rtErr("A default combining rule of " + getEnumerationName(default_rule) + " would imply that "
           "there is no combining rule and is therefore invalid.", "ComboGraphLJModel");
   }
-  
-  // Infer the Lennard-Jone combination rules present in the original topology.
-  const NonbondedKit<double> base_nbk = base_ag_pointer->getDoublePrecisionNonbondedKit();
-  base_topology_rule = inferCombiningRule(base_nbk.lja_coeff, base_nbk.ljb_coeff,
-                                          base_nbk.n_lj_types);
-  base_atom_type_count = base_nbk.n_lj_types;
-  addCombination(ag_othr_in, edits);
+
+  // Infer the Lennard-Jones combination rule of the original topology and get its atom count.
+  const NonbondedKit<double> primary_nbk = primary_ag_pointer->getDoublePrecisionNonbondedKit();
+  primary_topology_rule = inferCombiningRule(primary_nbk.lja_coeff, primary_nbk.ljb_coeff,
+                                          primary_nbk.n_lj_types);
+  primary_atom_type_count = primary_nbk.n_lj_types;
+
+  // Return if there is no other topology provided (yet).  If such a topology is available,
+  // process it.
+  if (ag_secondary_in == nullptr) {
+    return;
+  }
+  addCombination(ag_secondary_in, edits);
 }
 
 //-------------------------------------------------------------------------------------------------
-ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &base_ag_in, const AtomGraph &ag_othr_in,
+ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &primary_ag_in,
+                                     const AtomGraph &ag_secondary_in,
                                      const VdwCombiningRule default_rule_in,
                                      const std::vector<PairLJInteraction> &edits) :
-    ComboGraphLJModel(base_ag_in.getSelfPointer(), ag_othr_in.getSelfPointer(), default_rule_in,
-                      edits)
+    ComboGraphLJModel(primary_ag_in.getSelfPointer(), ag_secondary_in.getSelfPointer(),
+                      default_rule_in, edits)
 {}
 
 //-------------------------------------------------------------------------------------------------
-ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &base_ag_in,
-                                     const AtomGraphSynthesis &poly_ag_othr,
+ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &primary_ag_in,
+                                     const AtomGraphSynthesis &poly_ag_secondary,
                                      const VdwCombiningRule default_rule_in,
                                      const std::vector<PairLJInteraction> &edits) :
-    ComboGraphLJModel(base_ag_in.getSelfPointer(), nullptr, default_rule_in, edits)
-{}
+    ComboGraphLJModel(primary_ag_in.getSelfPointer(), nullptr, default_rule_in, edits)
+{
+  // Add new matrices of Lennard-Jones parameters for each topology in the synthesis.
+  const int ntop = poly_ag_secondary.getUniqueTopologyCount();
+  const std::vector<AtomGraph*>& unique_tops = poly_ag_secondary.getUniqueTopologies();
+  for (int i = 0; i < ntop; i++) {
+    addCombination(unique_tops[i], edits);
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
-ComboGraphLJModel::ComboGraphLJModel(const AtomGraph *base_ag_in,
+ComboGraphLJModel::ComboGraphLJModel(const AtomGraph *primary_ag_in,
                                      const std::vector<double> &lj_a_in,
                                      const std::vector<double> &lj_b_in,
                                      const std::vector<char4> &lj_type_names,
                                      const VdwCombiningRule default_rule_in,
                                      const std::vector<PairLJInteraction> &edits) :
-    ComboGraphLJModel(base_ag_in, nullptr, default_rule_in, edits)
+    ComboGraphLJModel(primary_ag_in, nullptr, default_rule_in, edits)
 {
   addCombination(lj_a_in, lj_b_in, lj_type_names, edits);
 }
 
 //-------------------------------------------------------------------------------------------------
-ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &base_ag_in,
+ComboGraphLJModel::ComboGraphLJModel(const AtomGraph &primary_ag_in,
                                      const std::vector<double> &lj_a_in,
                                      const std::vector<double> &lj_b_in,
                                      const std::vector<char4> &lj_type_names,
                                      const VdwCombiningRule default_rule_in,
                                      const std::vector<PairLJInteraction> &edits) :
-  ComboGraphLJModel(base_ag_in.getSelfPointer(), lj_a_in, lj_b_in, lj_type_names, default_rule_in,
-                    edits)
+  ComboGraphLJModel(primary_ag_in.getSelfPointer(), lj_a_in, lj_b_in, lj_type_names,
+                    default_rule_in, edits)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -97,14 +103,25 @@ int ComboGraphLJModel::getSetCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-VdwCombiningRule ComboGraphLJModel::getCombiningRule() const {
+VdwCombiningRule ComboGraphLJModel::getDefaultCombiningRule() const {
   return default_rule;
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwCombiningRule ComboGraphLJModel::getPrimaryTopologyRule() const {
+  return primary_topology_rule;
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwCombiningRule ComboGraphLJModel::getSecondaryTopologyRule(const int index) const {
+  validateSetIndex(index);
+  return secondary_topology_rules[index];
 }
 
 //-------------------------------------------------------------------------------------------------
 int2 ComboGraphLJModel::getMatrixSize(const int index) const {
   validateSetIndex(index);
-  return {base_atom_type_count, othr_atom_type_counts[index] };
+  return {primary_atom_type_count, secondary_atom_type_counts[index] };
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -120,6 +137,20 @@ const std::vector<double>& ComboGraphLJModel::getBCoefficients(const int index) 
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> ComboGraphLJModel::computeConsensusParameters() const {
+
+  // There are at least as many types as appear in the original topology.  Loop over all sets,
+  // form the super-matrix of the primary topology and one of the others, and see how it can
+  // be reduced.  Repeat this process and accumulate a consensus matrix.  This will necessarily
+  // involve mixing an two of the secondary topologies, if there is a list of those, and that will
+  // be done using the default mixing rule plus any 
+  int n_consensus_types = primary_atom_type_count;
+  for (int i = 0; i < set_count; i++) {
+
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ComboGraphLJModel::validateSetIndex(const int index) const {
   if (index < 0 || index >= set_count) {
     rtErr("Combination index " + std::to_string(index) + " is invalid for a collection of " +
@@ -129,22 +160,22 @@ void ComboGraphLJModel::validateSetIndex(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ComboGraphLJModel::addCombination(const AtomGraph *ag_othr,
+void ComboGraphLJModel::addCombination(const AtomGraph *ag_secondary,
                                        const std::vector<PairLJInteraction> &edits) {
-  if (ag_othr == nullptr) {
+  if (ag_secondary == nullptr) {
     return;
   }
-  const NonbondedKit<double> othr_nbk = ag_othr->getDoublePrecisionNonbondedKit();
-  addCombination(othr_nbk.lja_coeff, othr_nbk.ljb_coeff, othr_nbk.n_lj_types);
+  const NonbondedKit<double> secondary_nbk = ag_secondary->getDoublePrecisionNonbondedKit();
+  addCombination(secondary_nbk.lja_coeff, secondary_nbk.ljb_coeff, secondary_nbk.n_lj_types);
 
   // Replace the nullptr appended by the topology-free overload of this function.
-  othr_ag_pointers.back() = const_cast<AtomGraph*>(ag_othr);
+  secondary_ag_pointers.back() = const_cast<AtomGraph*>(ag_secondary);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ComboGraphLJModel::addCombination(const AtomGraph &ag_othr,
+void ComboGraphLJModel::addCombination(const AtomGraph &ag_secondary,
                                        const std::vector<PairLJInteraction> &edits) {
-  addCombination(ag_othr.getSelfPointer(), edits);
+  addCombination(ag_secondary.getSelfPointer(), edits);
 }
 
 } // namespace topology

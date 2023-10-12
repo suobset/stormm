@@ -72,16 +72,6 @@ char4 stringToChar4(const std::string &value) {
 }
 
 //-------------------------------------------------------------------------------------------------
-bool operator==(const char4 lhs, const char4 rhs) {
-  return (lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z && lhs.w == rhs.w);
-}
-
-//-------------------------------------------------------------------------------------------------
-bool operator!=(const char4 lhs, const char4 rhs) {
-  return (lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z || lhs.w != rhs.w);
-}
-
-//-------------------------------------------------------------------------------------------------
 std::string alphabetNumber(ullint input) {
   int nchar = 1;
   ullint factor = 26;
@@ -508,7 +498,7 @@ std::string addLeadingWhiteSpace(const std::string &input, const size_t target_l
     return input;
   }
   std::string result;
-  result.reserve(target_length);
+  result.reserve(target_length + target_length - input.size());
   const size_t nadd = target_length - input.size();
   for (size_t i = 0; i < nadd; i++) {
     result.append(" ");

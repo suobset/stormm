@@ -133,7 +133,7 @@ template <typename Tdata, typename Tloc>
 void indexingArray(const Hybrid<Tdata> &raw_values, Hybrid<Tloc> *value_locations,
                    Hybrid<Tloc> *value_bounds, size_t value_limit = 0);
 /// \}
-  
+
 } // namespace stmath
 } // namespace stormm
 

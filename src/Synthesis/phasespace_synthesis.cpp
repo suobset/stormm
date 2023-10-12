@@ -446,7 +446,36 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     acc_limit += roundUp(natom, warp_size_int);
   }
 
-  // Loop over all systems
+  // Establish the unit cell type
+  bool uc_none = false;
+  bool uc_orth = false;
+  bool uc_tric = false;
+  for (int i = 0; i < system_count; i++) {
+    switch (ps_list[i].getUnitCellType()) {
+    case UnitCellType::NONE:
+      uc_none = true;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+      uc_orth = true;
+      break;
+    case UnitCellType::TRICLINIC:
+      uc_tric = true;
+      break;
+    }
+  }
+  if (uc_none) {
+    if (uc_orth || uc_tric) {
+      rtErr("A coordinate synthesis cannot be formed with a combination of systems having "
+            "periodic boundary conditions as well as systems having no boundary conditions.",
+            "PhaseSpaceSynthesis");
+    }
+    unit_cell = UnitCellType::NONE;
+  }
+  if (uc_orth || uc_tric) {
+    unit_cell = (uc_tric) ? UnitCellType::TRICLINIC : UnitCellType::ORTHORHOMBIC;
+  }
+  
+  // Loop over all systems and import coordinates
   const int mtrx_stride = roundUp(9, warp_size_int);
   const int dim_stride = roundUp(6, warp_size_int);
   llint* xpos_ptr = x_coordinates.data();
@@ -532,7 +561,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       globalpos_scale);
     for (int j = 0; j < 9; j++) {
       const size_t imj = (i * mtrx_stride) + j;
-      const double d_invu = hostInt95ToDouble(bv_ptr[imj], bv_ovrf_ptr[imj]);
+      const double d_invu = hostInt95ToDouble(bv_ptr[imj], bv_ovrf_ptr[imj]) *
+                            inverse_globalpos_scale;
       inverse_transforms.putHost(d_invu, imj);
       alt_inverse_transforms.putHost(d_invu, imj);
     }
@@ -798,6 +828,191 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     topologies{std::move(original.topologies)},
     unique_topologies{std::move(original.unique_topologies)}
 {}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis& PhaseSpaceSynthesis::operator=(const PhaseSpaceSynthesis &other) {
+
+  // Guard against self-assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Perform a deep copy of all elements
+  system_count = other.system_count;
+  unique_topology_count = other.unique_topology_count;
+  unit_cell = other.unit_cell;
+  cycle_position = other.cycle_position;
+  heat_bath_kind = other.heat_bath_kind;
+  piston_kind = other.piston_kind;
+  time_step = other.time_step;
+  globalpos_scale = other.globalpos_scale;
+  localpos_scale = other.localpos_scale;
+  velocity_scale = other.velocity_scale;
+  force_scale = other.force_scale;
+  inverse_globalpos_scale = other.inverse_globalpos_scale;
+  inverse_localpos_scale = other.inverse_localpos_scale;
+  inverse_velocity_scale = other.inverse_velocity_scale;
+  inverse_force_scale = other.inverse_force_scale;
+  globalpos_scale_bits = other.globalpos_scale_bits;
+  localpos_scale_bits = other.localpos_scale_bits;
+  velocity_scale_bits = other.velocity_scale_bits;
+  force_scale_bits = other.force_scale_bits;
+  atom_starts = other.atom_starts;
+  atom_counts = other.atom_counts;
+  shared_topology_instances = other.shared_topology_instances;
+  shared_topology_instance_bounds = other.shared_topology_instance_bounds;
+  unique_topology_reference = other.unique_topology_reference;
+  shared_topology_instance_index = other.shared_topology_instance_index;
+  x_coordinates = other.x_coordinates;
+  y_coordinates = other.y_coordinates;
+  z_coordinates = other.z_coordinates;
+  x_coordinate_overflow = other.x_coordinate_overflow;
+  y_coordinate_overflow = other.y_coordinate_overflow;
+  z_coordinate_overflow = other.z_coordinate_overflow;
+  x_alt_coordinates = other.x_alt_coordinates;
+  y_alt_coordinates = other.y_alt_coordinates;
+  z_alt_coordinates = other.z_alt_coordinates;
+  x_alt_coord_overflow = other.x_alt_coord_overflow;
+  y_alt_coord_overflow = other.y_alt_coord_overflow;
+  z_alt_coord_overflow = other.z_alt_coord_overflow;
+  x_velocities = other.x_velocities;
+  y_velocities = other.y_velocities;
+  z_velocities = other.z_velocities;
+  x_velocity_overflow = other.x_velocity_overflow;
+  y_velocity_overflow = other.y_velocity_overflow;
+  z_velocity_overflow = other.z_velocity_overflow;
+  x_alt_velocities = other.x_alt_velocities;
+  y_alt_velocities = other.y_alt_velocities;
+  z_alt_velocities = other.z_alt_velocities;
+  x_alt_velocity_overflow = other.x_alt_velocity_overflow;
+  y_alt_velocity_overflow = other.y_alt_velocity_overflow;
+  z_alt_velocity_overflow = other.z_alt_velocity_overflow;
+  x_forces = other.x_forces;
+  y_forces = other.y_forces;
+  z_forces = other.z_forces;
+  x_force_overflow = other.x_force_overflow;
+  y_force_overflow = other.y_force_overflow;
+  z_force_overflow = other.z_force_overflow;
+  x_alt_forces = other.x_alt_forces;
+  y_alt_forces = other.y_alt_forces;
+  z_alt_forces = other.z_alt_forces;
+  x_alt_force_overflow = other.x_alt_force_overflow;
+  y_alt_force_overflow = other.y_alt_force_overflow;
+  z_alt_force_overflow = other.z_alt_force_overflow;
+  box_vectors = other.box_vectors;
+  box_vector_overflow = other.box_vector_overflow;
+  box_space_transforms = other.box_space_transforms;
+  inverse_transforms = other.inverse_transforms;
+  box_dimensions = other.box_dimensions;
+  alt_box_vectors = other.alt_box_vectors;
+  alt_box_vector_overflow = other.alt_box_vector_overflow;
+  alt_box_transforms = other.alt_box_transforms;
+  alt_inverse_transforms = other.alt_inverse_transforms;
+  alt_box_dimensions = other.alt_box_dimensions;
+  int_data = other.int_data;
+  llint_data = other.llint_data;
+  double_data = other.double_data;
+  topologies = other.topologies;
+  unique_topologies = other.unique_topologies;
+
+  // As before, compute the total number of padded atoms and use the allocator to reset pointers.
+  int atom_stride = 0;
+  for (int i = 0; i < system_count; i++) {
+    atom_stride += roundUp(topologies[i]->getAtomCount(), warp_size_int);
+  }
+  allocate(atom_stride);
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis& PhaseSpaceSynthesis::operator=(PhaseSpaceSynthesis &&other) {
+
+  // Guard against self-assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Copy scalar values such as sizing constants.  Move arrays.
+  system_count = other.system_count;
+  unique_topology_count = other.unique_topology_count;
+  unit_cell = other.unit_cell;
+  cycle_position = other.cycle_position;
+  heat_bath_kind = other.heat_bath_kind;
+  piston_kind = other.piston_kind;
+  time_step = other.time_step;
+  globalpos_scale = other.globalpos_scale;
+  localpos_scale = other.localpos_scale;
+  velocity_scale = other.velocity_scale;
+  force_scale = other.force_scale;
+  inverse_globalpos_scale = other.inverse_globalpos_scale;
+  inverse_localpos_scale = other.inverse_localpos_scale;
+  inverse_velocity_scale = other.inverse_velocity_scale;
+  inverse_force_scale = other.inverse_force_scale;
+  globalpos_scale_bits = other.globalpos_scale_bits;
+  localpos_scale_bits = other.localpos_scale_bits;
+  velocity_scale_bits = other.velocity_scale_bits;
+  force_scale_bits = other.force_scale_bits;
+  atom_starts = std::move(other.atom_starts);
+  atom_counts = std::move(other.atom_counts);
+  shared_topology_instances = std::move(other.shared_topology_instances);
+  shared_topology_instance_bounds = std::move(other.shared_topology_instance_bounds);
+  unique_topology_reference = std::move(other.unique_topology_reference);
+  shared_topology_instance_index = std::move(other.shared_topology_instance_index);
+  x_coordinates = std::move(other.x_coordinates);
+  y_coordinates = std::move(other.y_coordinates);
+  z_coordinates = std::move(other.z_coordinates);
+  x_coordinate_overflow = std::move(other.x_coordinate_overflow);
+  y_coordinate_overflow = std::move(other.y_coordinate_overflow);
+  z_coordinate_overflow = std::move(other.z_coordinate_overflow);
+  x_alt_coordinates = std::move(other.x_alt_coordinates);
+  y_alt_coordinates = std::move(other.y_alt_coordinates);
+  z_alt_coordinates = std::move(other.z_alt_coordinates);
+  x_alt_coord_overflow = std::move(other.x_alt_coord_overflow);
+  y_alt_coord_overflow = std::move(other.y_alt_coord_overflow);
+  z_alt_coord_overflow = std::move(other.z_alt_coord_overflow);
+  x_velocities = std::move(other.x_velocities);
+  y_velocities = std::move(other.y_velocities);
+  z_velocities = std::move(other.z_velocities);
+  x_velocity_overflow = std::move(other.x_velocity_overflow);
+  y_velocity_overflow = std::move(other.y_velocity_overflow);
+  z_velocity_overflow = std::move(other.z_velocity_overflow);
+  x_alt_velocities = std::move(other.x_alt_velocities);
+  y_alt_velocities = std::move(other.y_alt_velocities);
+  z_alt_velocities = std::move(other.z_alt_velocities);
+  x_alt_velocity_overflow = std::move(other.x_alt_velocity_overflow);
+  y_alt_velocity_overflow = std::move(other.y_alt_velocity_overflow);
+  z_alt_velocity_overflow = std::move(other.z_alt_velocity_overflow);
+  x_forces = std::move(other.x_forces);
+  y_forces = std::move(other.y_forces);
+  z_forces = std::move(other.z_forces);
+  x_force_overflow = std::move(other.x_force_overflow);
+  y_force_overflow = std::move(other.y_force_overflow);
+  z_force_overflow = std::move(other.z_force_overflow);
+  x_alt_forces = std::move(other.x_alt_forces);
+  y_alt_forces = std::move(other.y_alt_forces);
+  z_alt_forces = std::move(other.z_alt_forces);
+  x_alt_force_overflow = std::move(other.x_alt_force_overflow);
+  y_alt_force_overflow = std::move(other.y_alt_force_overflow);
+  z_alt_force_overflow = std::move(other.z_alt_force_overflow);
+  box_vectors = std::move(other.box_vectors);
+  box_vector_overflow = std::move(other.box_vector_overflow);
+  box_space_transforms = std::move(other.box_space_transforms);
+  inverse_transforms = std::move(other.inverse_transforms);
+  box_dimensions = std::move(other.box_dimensions);
+  alt_box_vectors = std::move(other.alt_box_vectors);
+  alt_box_vector_overflow = std::move(other.alt_box_vector_overflow);
+  alt_box_transforms = std::move(other.alt_box_transforms);
+  alt_inverse_transforms = std::move(other.alt_inverse_transforms);
+  alt_box_dimensions = std::move(other.alt_box_dimensions);
+  int_data = std::move(other.int_data);
+  llint_data = std::move(other.llint_data);
+  double_data = std::move(other.double_data);
+  topologies = std::move(other.topologies);
+  unique_topologies = std::move(other.unique_topologies);
+
+  // Re-allocation is not necessary.
+  return *this;
+}
 
 //-------------------------------------------------------------------------------------------------
 int PhaseSpaceSynthesis::getSystemCount() const {
@@ -1541,7 +1756,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
                                                        const TrajectoryKind trajkind,
                                                        const HybridTargetLevel tier) const {
   validateSystemIndex(index, "exportCoordinates");
-  CoordinateFrame result(atom_counts.readHost(index));
+  CoordinateFrame result(atom_counts.readHost(index), unit_cell);
   const int astart = atom_starts.readHost(index);
   CoordinateFrameWriter rsw = result.data();
   std::vector<llint> xbuffer, ybuffer, zbuffer;

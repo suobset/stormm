@@ -467,6 +467,9 @@ public:
   void download();
 #endif
 
+  /// \brief Get the total number of atoms.
+  int getAtomCount() const;
+  
   /// \brief Get the number of planar atoms.
   int getPlanarAtomCount() const;
 

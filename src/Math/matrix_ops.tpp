@@ -350,7 +350,7 @@ void matrixVectorMultiply(const std::vector<T> &a, const std::vector<T> &x, std:
     }
     break;
   }
-  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_b, scale_x,
+  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_x, scale_b,
                        x_a);
 }
 
@@ -391,7 +391,7 @@ void matrixVectorMultiply(const Hybrid<T> &a, const Hybrid<T> &x, Hybrid<T> *b,
     }
     break;
   }
-  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_b, scale_x,
+  matrixVectorMultiply(a.data(), x.data(), b->data(), row_a, col_a, scale_a, scale_x, scale_b,
                        x_a);  
 }
 
@@ -1381,6 +1381,26 @@ void qrSolver(const std::vector<T> &amat, std::vector<T> *xvec, const std::vecto
   qrSolver(amat_copy.data(), xvec->data(), bvec_copy.data(), bvec.size(), xvec->size());
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void qrSolver(Hybrid<T> *amat, Hybrid<T> *xvec, Hybrid<T> *bvec) {
+  if (amat->size() != xvec->size() * bvec->size()) {
+    rtErr("The stiffness matrix must hold data commensurate with the sizes of the solution "
+          "vector (" + std::to_string(bvec->size()) + ") and coefficients vector (" +
+          std::to_string(xvec->size()) + ") counts.  The stiffness matrix holds " +
+          std::to_string(amat->size()) + " elements.", "qrSolver");
+  }
+  qrSolver(amat->data(), xvec->data(), bvec->data(), bvec->size(), xvec->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void qrSolver(const Hybrid<T> &amat, Hybrid<T> *xvec, const Hybrid<T> &bvec) {
+  std::vector<T> amat_copy = amat;
+  std::vector<T> bvec_copy = bvec;
+  qrSolver(amat_copy.data(), xvec->data(), bvec_copy.data(), bvec.size(), xvec->size());
+}
+  
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 double leibnizDeterminant(const T* amat, const size_t rank) {

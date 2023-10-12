@@ -153,7 +153,8 @@ double4 checkTricubicElectrostatics(const AtomGraph &ag, const CoordinateFrame &
           const double dx = xloc - cfr.xcrd[m];
           const double dy = yloc - cfr.ycrd[m];
           const double dz = zloc - cfr.zcrd[m];
-          const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+          const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+          const double r = sqrt(r2);
           const double invr = 1.0 / r;
           const double invr2 = invr * invr;
           const double scaled_q = nbk.charge[m] * nbk.coulomb_constant;
@@ -164,15 +165,15 @@ double4 checkTricubicElectrostatics(const AtomGraph &ag, const CoordinateFrame &
           du_dy[pt_idx] += radialFirstDerivative<double>(qq.y, dy, r);
           du_dz[pt_idx] += radialFirstDerivative<double>(qq.y, dz, r);
           du_dxx[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dx, r);
-          du_dxy[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dx, dy, r);
-          du_dxz[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dx, dz, r);
+          du_dxy[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dx, dy, r, r2);
+          du_dxz[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dx, dz, r, r2);
           du_dyy[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dy, r);
-          du_dyz[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dy, dz, r);
-          du_dxxx[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, r);
-          du_dxxy[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dy, r);
-          du_dxxz[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dz, r);
-          du_dxyy[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dy, dx, r);
-          du_dxyz[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dy, dz, r);
+          du_dyz[pt_idx] += radialSecondDerivative<double>(qq.y, qq.z, dy, dz, r, r2);
+          du_dxxx[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, r, r2);
+          du_dxxy[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dy, r, r2);
+          du_dxxz[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dz, r, r2);
+          du_dxyy[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dy, dx, r, r2);
+          du_dxyz[pt_idx] += radialThirdDerivative<double>(qq.y, qq.z, qq.w, dx, dy, dz, r, r2);
         }
       }
     }

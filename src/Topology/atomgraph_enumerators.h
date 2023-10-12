@@ -51,7 +51,7 @@ enum class SanderDescriptor {
 
 /// \brief List the basic unit cell types (this gives some more color to sander's IFBOX term)
 enum class UnitCellType {
-  NONE, ORTHORHOMBIC, TRICLINIC
+  NONE = 0, ORTHORHOMBIC, TRICLINIC
 };
 
 /// \brief Enumerate the ways to modify an atom's mobility in the toplogy

@@ -134,6 +134,32 @@ std::string getEnumerationName(const NonbondedPotential input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NonbondedTheme input) {
+  switch (input) {
+  case NonbondedTheme::ELECTROSTATIC:
+    return std::string("ELECTROSTATIC");
+  case NonbondedTheme::VAN_DER_WAALS:
+    return std::string("VAN_DER_WAALS");
+  case NonbondedTheme::ALL:
+    return std::string("ALL");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const DecomposablePotential input) {
+  switch (input) {
+  case DecomposablePotential::ELECTROSTATIC:
+    return std::string("ELECTROSTATIC");
+  case DecomposablePotential::DISPERSION:
+    return std::string("DISPERSION");
+  case DecomposablePotential::ELEC_PME_DIRECT:
+    return std::string("ELEC_PME_DIRECT");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const VdwCombiningRule input) {
   switch (input) {
   case VdwCombiningRule::LORENTZ_BERTHELOT:
@@ -181,6 +207,36 @@ std::string getEnumerationName(const SplineScaffold input) {
     return std::string("QUADRATIC_HILL");
   case SplineScaffold::QUADRATIC_VALLEY:
     return std::string("QUADRATIC_VALLEY");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const CellGridAction input) {
+  switch (input) {
+  case CellGridAction::INIT_FORCES:
+    return std::string("INIT_FORCES");
+  case CellGridAction::XFER_FORCES:
+    return std::string("XFER_FORCES");
+  case CellGridAction::UPDATE_IMG_COORD:
+    return std::string("UPDATE_IMG_COORD");
+  case CellGridAction::UPDATE_IMG_CELLS:
+    return std::string("UPDATE_IMG_CELLS");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const QMapMethod input) {
+  switch (input) {
+  case QMapMethod::ACC_REGISTER:
+    return std::string("ACC_REGISTER");
+  case QMapMethod::ACC_SHARED:
+    return std::string("ACC_SHARED");
+  case QMapMethod::GENERAL_PURPOSE:
+    return std::string("GENERAL_PURPOSE");
+  case QMapMethod::AUTOMATIC:
+    return std::string("AUTOMATIC");
   }
   __builtin_unreachable();
 }

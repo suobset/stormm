@@ -5,12 +5,14 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 endif()
 
 project(stormm LANGUAGES CXX)
+project(stormm VERSION 0.1)
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 
 #--- Define any options the user can set ---
 
 option(STORMM_BUILD_APPS "Build the apps" ON)
 option(STORMM_BUILD_TESTS "Build the tests" ON)
+option(STORMM_BUILD_BENCHMARKS "Build the benchmarks" ON)
 
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
@@ -26,6 +28,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3")
+set(STORMM_VERSION "0.3")
 
 if (STORMM_ENABLE_RDKIT) 
     message("-- RDKit support will be enabled")
@@ -46,7 +49,7 @@ if (STORMM_ENABLE_CUDA)
 
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --compiler-options=-O0 -g")
 
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --ptxas-options=\"-v\"")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --ptxas-options=\"-v\" -lcufft")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
 
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -149,14 +152,17 @@ install(EXPORT ${PROJECT_NAME_UPPER}Targets
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})        
 
 #--- Build the tests ---
-
 if (STORMM_BUILD_TESTS)
     include(CTest)
     add_subdirectory(test)
 endif()
 
 #--- Build the apps ---
-
 if (STORMM_BUILD_APPS)
     add_subdirectory(apps)
 endif()
+
+#--- Build the benchmarks ---
+if (STORMM_BUILD_BENCHMARKS)
+    add_subdirectory(benchmark)
+endif()  

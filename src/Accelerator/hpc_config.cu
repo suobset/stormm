@@ -28,6 +28,7 @@ GpuDetails::GpuDetails(const cudaDeviceProp &dev_prop, const int dev_index) :
     max_blocks_per_smp{16},
     max_shared_per_block{static_cast<int>(dev_prop.sharedMemPerBlock)},
     max_shared_per_smp{static_cast<int>(dev_prop.sharedMemPerMultiprocessor)},
+    global_cache_size{dev_prop.l2CacheSize},
     registers_per_block{dev_prop.regsPerBlock},
     registers_per_smp{dev_prop.regsPerMultiprocessor},
     card_name{std::string(dev_prop.name)}

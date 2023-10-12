@@ -45,7 +45,7 @@ template <typename T> T radialSecondDerivative(const T dfunc, const T ddfunc, co
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T radialSecondDerivative(const T dfunc, const T ddfunc, const T disp_x,
-                                               const T disp_y, const T r) {
+                                               const T disp_y, const T r, const T r2) {
 
   // Mixed partial derivatives are generally easier to compute than partial derivatives with
   // multiple differentiations along the same direction.
@@ -64,14 +64,15 @@ template <typename T> T radialSecondDerivative(const T dfunc, const T ddfunc, co
                                                                       constants::small);
   }
   else {
-    return disp_x * disp_y * (ddfunc - (dfunc / r)) / (r * r);
+    const T use_r2 = (r2 >= constants::small) ? r2 : r * r;
+    return disp_x * disp_y * (ddfunc - (dfunc / r)) / use_r2;
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, const T dddfunc,
-                                              const T disp, const T r) {
+                                              const T disp, const T r, const T r2) {
 
   // The tensor of third partial derivatives is even more complicated, but there are only three
   // base cases to solve: (d3u / dx3), (d3u / dx2y), and (d3u / dxyz).  All other mixed partial
@@ -109,19 +110,21 @@ template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, con
   //   = (d3u / dr3)(x / r)^3 +
   //     (d2u / dr2) (x) ((3 r^2 - 3 x^2) / (r^4)) +
   //     (du/dr) (x) ((3 x^2 - 3 r^2) / r^5)
+  const T value_one   = 1.0;
   const T value_three = 3.0;
-  const T invr = (r < constants::small) ? static_cast<T>(1.0) / constants::small :
-                                          static_cast<T>(1.0) / r;
-  const T invr2 = invr * invr;
-  return disp * ((dddfunc * disp * disp) +
-                 (ddfunc * ((value_three * r * r) - (value_three * disp * disp)) * invr) +
-                 (dfunc * ((value_three * disp * disp) - (value_three * r * r)) *
+  const T invr = (r < constants::small) ? value_one / constants::small : value_one / r;
+  const T invr2 = value_one / r2;
+  const T disp2 = disp * disp;
+  return disp * ((dddfunc * disp2) +
+                 (ddfunc * ((value_three * r2) - (value_three * disp2)) * invr) +
+                 (dfunc * ((value_three * disp2) - (value_three * r2)) *
                   invr2)) * invr2 * invr;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, const T dddfunc,
-                                              const T disp_x, const T disp_y, const T r) {
+                                              const T disp_x, const T disp_y, const T r,
+                                              const T r2) {
 
   // The two-and-one mixed partial is perhaps the most difficult to compute.
   // 
@@ -159,19 +162,19 @@ template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, con
   //   = (d3u / dr3) (x * x * y / r^3) +
   //     (d2u / dr2) (y) ( (r^2 - (3 * x * x) ) / r^4) +
   //     (du / dr) ( (y) (3x^2 - r^2) / r^5 )
+  const T value_one   = 1.0;
   const T value_three = 3.0;
-  const T invr = (r < constants::small) ? static_cast<T>(1.0) / constants::small :
-                                          static_cast<T>(1.0) / r;
-  const T invr2 = invr * invr;
-  return disp_y * ((dddfunc * disp_x * disp_x) +
-                   (ddfunc * ((r * r) - (value_three * disp_x * disp_x)) * invr) + 
-                   (dfunc * ((value_three * disp_x * disp_x) - (r * r)) * invr2)) * invr2 * invr;
+  const T invr = (r < constants::small) ? value_one / constants::small : value_one / r;
+  const T invr2 = value_one / r2;
+  const T disp_x2 = disp_x * disp_x;
+  return disp_y * ((dddfunc * disp_x2) + (ddfunc * (r2 - (value_three * disp_x2)) * invr) + 
+                   (dfunc * ((value_three * disp_x2) - r2) * invr2)) * invr2 * invr;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, const T dddfunc,
                                               const T disp_x, const T disp_y, const T disp_z,
-                                              const T r) {
+                                              const T r, const T r2) {
 
   // The full mixed partial, where differentiation occurs only once in each direction, is the
   // simplest to compute.
@@ -179,12 +182,61 @@ template <typename T> T radialThirdDerivative(const T dfunc, const T ddfunc, con
   // (d/dx) [ (y * z) [ (d2u / dr2)(1 / r^2) - (du / dr)(1 / r^3) ] ]
   //   = (y * z) (d/dx) [ (d2u / dr2)(1 / r^2) - (du / dr)(1 / r^3) ]
   //   = (x * y * z) [ (1 / r^3) (d3u / dr3) - (d2u / dr2) (3 / r^4) + (du / dr) (3 / r^5) ]
+  const T value_one   = 1.0;
   const T value_three = 3.0;
-  const T invr = (r < constants::small) ? static_cast<T>(1.0) / constants::small :
-                                          static_cast<T>(1.0) / r;
-  const T invr2 = invr * invr;
+  const T invr = (r < constants::small) ? value_one / constants::small : value_one / r;
+  const T invr2 = value_one / r2;
   return (disp_x * disp_y * disp_z * invr2 * invr) *
          (dddfunc - (value_three * ddfunc * invr) + (value_three * dfunc * invr2));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> T radialPartialDerivative(const T du, const T d2u, const T d3u, const T dx,
+                                                const T dy, const T dz, const T r, const T r2,
+                                                const FunctionLevel order) {
+  switch (order) {
+  case FunctionLevel::VALUE:
+    rtErr("The value of the function is not a valid derivative.", "radialPartialDerivative");
+  case FunctionLevel::DX:
+    return radialFirstDerivative(du, dx, r);
+  case FunctionLevel::DY:
+    return radialFirstDerivative(du, dy, r);
+  case FunctionLevel::DZ:
+    return radialFirstDerivative(du, dz, r);
+  case FunctionLevel::DXX:
+    return radialSecondDerivative(du, d2u, dx, r);
+  case FunctionLevel::DXY:
+    return radialSecondDerivative(du, d2u, dx, dy, r, r2);
+  case FunctionLevel::DXZ:
+    return radialSecondDerivative(du, d2u, dx, dz, r, r2);
+  case FunctionLevel::DYY:
+    return radialSecondDerivative(du, d2u, dy, r);
+  case FunctionLevel::DYZ:
+    return radialSecondDerivative(du, d2u, dy, dz, r, r2);
+  case FunctionLevel::DZZ:
+    return radialSecondDerivative(du, d2u, dz, r);
+  case FunctionLevel::DXXX:
+    return radialThirdDerivative(du, d2u, d3u, dx, r, r2);
+  case FunctionLevel::DXXY:
+    return radialThirdDerivative(du, d2u, d3u, dx, dy, r, r2);
+  case FunctionLevel::DXXZ:
+    return radialThirdDerivative(du, d2u, d3u, dx, dz, r, r2);
+  case FunctionLevel::DXYY:
+    return radialThirdDerivative(du, d2u, d3u, dy, dx, r, r2);
+  case FunctionLevel::DXYZ:
+    return radialThirdDerivative(du, d2u, d3u, dx, dy, dz, r, r2);
+  case FunctionLevel::DXZZ:
+    return radialThirdDerivative(du, d2u, d3u, dz, dx, r, r2);
+  case FunctionLevel::DYYY:
+    return radialThirdDerivative(du, d2u, d3u, dy, r, r2);
+  case FunctionLevel::DYYZ:
+    return radialThirdDerivative(du, d2u, d3u, dy, dz, r, r2);
+  case FunctionLevel::DYZZ:
+    return radialThirdDerivative(du, d2u, d3u, dz, dy, r, r2);
+  case FunctionLevel::DZZZ:
+    return radialThirdDerivative(du, d2u, d3u, dz, r, r2);
+  }
+  __builtin_unreachable();
 }
 
 } // namespace stmath

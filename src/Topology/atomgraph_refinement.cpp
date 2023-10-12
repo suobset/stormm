@@ -48,7 +48,19 @@ BasicValenceTable::BasicValenceTable() :
 
 //-------------------------------------------------------------------------------------------------
 BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
-                                     const int nangl_in, const int ndihe_in) :
+                                     const int nangl_in, const int ndihe_in,
+                                     const std::vector<int> &bond_i_atoms_in,
+                                     const std::vector<int> &bond_j_atoms_in,
+                                     const std::vector<int> &bond_param_idx_in,
+                                     const std::vector<int> &angl_i_atoms_in,
+                                     const std::vector<int> &angl_j_atoms_in,
+                                     const std::vector<int> &angl_k_atoms_in,
+                                     const std::vector<int> &angl_param_idx_in,
+                                     const std::vector<int> &dihe_i_atoms_in,
+                                     const std::vector<int> &dihe_j_atoms_in,
+                                     const std::vector<int> &dihe_k_atoms_in,
+                                     const std::vector<int> &dihe_l_atoms_in,
+                                     const std::vector<int> &dihe_param_idx_in) :
     BasicValenceTable()
 {
   total_bonds = nbond_in;
@@ -84,6 +96,45 @@ BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
   bond_assigned_mods.resize(nbond_in);
   angl_assigned_mods.resize(nangl_in);
   dihe_assigned_mods.resize(ndihe_in);
+
+  // Fill out the valence term information
+  bool bonds_provided = false;
+  bool angls_provided = false;
+  bool dihes_provided = false;
+  if (bond_i_atoms.size() == nbond_in && bond_j_atoms.size() == nbond_in &&
+      bond_param_idx_in.size() == nbond_in) {
+    for (int pos = 0; pos < nbond_in; pos++) {
+      bond_i_atoms[pos] = bond_i_atoms_in[pos];
+      bond_j_atoms[pos] = bond_j_atoms_in[pos];
+      bond_param_idx[pos] = bond_param_idx_in[pos];
+    }
+    bonds_provided = true;
+  }
+  if (angl_i_atoms.size() == nangl_in && angl_j_atoms.size() == nangl_in &&
+      angl_k_atoms.size() == nangl_in && angl_param_idx_in.size() == nangl_in) {
+    for (int pos = 0; pos < nangl_in; pos++) {
+      angl_i_atoms[pos] = angl_i_atoms_in[pos];
+      angl_j_atoms[pos] = angl_j_atoms_in[pos];
+      angl_k_atoms[pos] = angl_k_atoms_in[pos];
+      angl_param_idx[pos] = angl_param_idx_in[pos];
+    }
+    angls_provided = true;
+  }
+  if (dihe_i_atoms.size() == ndihe_in && dihe_j_atoms.size() == ndihe_in &&
+      dihe_k_atoms.size() == ndihe_in && dihe_l_atoms.size() == ndihe_in &&
+      dihe_param_idx_in.size() == ndihe_in) {
+    for (int pos = 0; pos < ndihe_in; pos++) {
+      dihe_i_atoms[pos] = dihe_i_atoms_in[pos];
+      dihe_j_atoms[pos] = dihe_j_atoms_in[pos];
+      dihe_k_atoms[pos] = dihe_k_atoms_in[pos];
+      dihe_l_atoms[pos] = dihe_l_atoms_in[pos];
+      dihe_param_idx[pos] = dihe_param_idx_in[pos];
+    }
+    dihes_provided = true;
+  }
+  if (bonds_provided && angls_provided && dihes_provided) {
+    makeAtomAssignments();
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -163,20 +214,34 @@ CharmmValenceTable::CharmmValenceTable() :
 
 //-------------------------------------------------------------------------------------------------
 CharmmValenceTable::CharmmValenceTable(const int natom_in, const int nubrd_in,
-                                       const int ncimp_in, const int ncmap_in) :
+                                       const int nimpr_in, const int ncmap_in,
+                                       const std::vector<int> &ubrd_i_atoms_in,
+                                       const std::vector<int> &ubrd_k_atoms_in,
+                                       const std::vector<int> &ubrd_param_idx_in,
+                                       const std::vector<int> &impr_i_atoms_in,
+                                       const std::vector<int> &impr_j_atoms_in,
+                                       const std::vector<int> &impr_k_atoms_in,
+                                       const std::vector<int> &impr_l_atoms_in,
+                                       const std::vector<int> &impr_param_idx_in,
+                                       const std::vector<int> &cmap_i_atoms_in,
+                                       const std::vector<int> &cmap_j_atoms_in,
+                                       const std::vector<int> &cmap_k_atoms_in,
+                                       const std::vector<int> &cmap_l_atoms_in,
+                                       const std::vector<int> &cmap_m_atoms_in,
+                                       const std::vector<int> &cmap_param_idx_in) :
     CharmmValenceTable()
 {
   total_ub_angles = nubrd_in;
-  total_impropers = ncimp_in;
+  total_impropers = nimpr_in;
   total_cmaps     = ncmap_in;
   ubrd_i_atoms.resize(nubrd_in);
   ubrd_k_atoms.resize(nubrd_in);
   ubrd_param_idx.resize(nubrd_in);
-  impr_i_atoms.resize(ncimp_in);
-  impr_j_atoms.resize(ncimp_in);
-  impr_k_atoms.resize(ncimp_in);
-  impr_l_atoms.resize(ncimp_in);
-  impr_param_idx.resize(ncimp_in);
+  impr_i_atoms.resize(nimpr_in);
+  impr_j_atoms.resize(nimpr_in);
+  impr_k_atoms.resize(nimpr_in);
+  impr_l_atoms.resize(nimpr_in);
+  impr_param_idx.resize(nimpr_in);
   cmap_i_atoms.resize(ncmap_in);
   cmap_j_atoms.resize(ncmap_in);
   cmap_k_atoms.resize(ncmap_in);
@@ -184,18 +249,59 @@ CharmmValenceTable::CharmmValenceTable(const int natom_in, const int nubrd_in,
   cmap_m_atoms.resize(ncmap_in);
   cmap_param_idx.resize(ncmap_in);
   ubrd_assigned_atoms.resize(    nubrd_in);
-  impr_assigned_atoms.resize(3 * ncimp_in);
+  impr_assigned_atoms.resize(3 * nimpr_in);
   cmap_assigned_atoms.resize(4 * ncmap_in);
   ubrd_assigned_index.resize(nubrd_in);
-  impr_assigned_index.resize(ncimp_in);
+  impr_assigned_index.resize(nimpr_in);
   cmap_assigned_index.resize(ncmap_in);
   ubrd_assigned_terms.resize(nubrd_in);
-  impr_assigned_terms.resize(ncimp_in);
+  impr_assigned_terms.resize(nimpr_in);
   cmap_assigned_terms.resize(ncmap_in);
   ubrd_assigned_bounds.resize(natom_in + 1, 0);
   impr_assigned_bounds.resize(natom_in + 1, 0);
   cmap_assigned_bounds.resize(natom_in + 1, 0);
 
+  // Fill out the valecne term information
+  bool ubrd_provided = false;
+  bool impr_provided = false;
+  bool cmap_provided = false;
+  if (ubrd_i_atoms_in.size() == nubrd_in && ubrd_k_atoms_in.size() == nubrd_in &&
+      ubrd_param_idx_in.size() == nubrd_in) {
+    for (int pos = 0; pos < nubrd_in; pos++) {
+      ubrd_i_atoms[pos] = ubrd_i_atoms_in[pos];
+      ubrd_k_atoms[pos] = ubrd_k_atoms_in[pos];
+      ubrd_param_idx[pos] = ubrd_param_idx_in[pos];
+    }
+    ubrd_provided = true;
+  }
+  if (impr_i_atoms_in.size() == nimpr_in && impr_j_atoms_in.size() == nimpr_in &&
+      impr_k_atoms_in.size() == nimpr_in && impr_l_atoms_in.size() == nimpr_in &&
+      impr_param_idx_in.size() == nimpr_in) {
+    for (int pos = 0; pos < nimpr_in; pos++) {
+      impr_i_atoms[pos] = impr_i_atoms_in[pos]; 
+      impr_j_atoms[pos] = impr_j_atoms_in[pos];
+      impr_k_atoms[pos] = impr_k_atoms_in[pos];
+      impr_l_atoms[pos] = impr_l_atoms_in[pos];
+      impr_param_idx[pos] = impr_param_idx_in[pos];
+    }
+    impr_provided = true;
+  }
+  if (cmap_i_atoms_in.size() == ncmap_in && cmap_j_atoms_in.size() == ncmap_in &&
+      cmap_k_atoms_in.size() == ncmap_in && cmap_l_atoms_in.size() == ncmap_in &&
+      cmap_m_atoms_in.size() == ncmap_in && cmap_param_idx_in.size() == ncmap_in) {
+    for (int pos = 0; pos < ncmap_in; pos++) {
+      cmap_i_atoms[pos] = cmap_i_atoms_in[pos]; 
+      cmap_j_atoms[pos] = cmap_j_atoms_in[pos];
+      cmap_k_atoms[pos] = cmap_k_atoms_in[pos];
+      cmap_l_atoms[pos] = cmap_l_atoms_in[pos];
+      cmap_m_atoms[pos] = cmap_m_atoms_in[pos];
+      cmap_param_idx[pos] = cmap_param_idx_in[pos];
+    }
+    cmap_provided = true;
+  }
+  if (ubrd_provided && impr_provided && cmap_provided) {
+    makeAtomAssignments();
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -907,6 +1013,81 @@ CondensedExclusions processExclusions(const std::vector<int> &raw_counts,
 }
 
 //-------------------------------------------------------------------------------------------------
+CondensedExclusions calculatePrmtopExclusions(const Map1234 nb_excl) {
+
+  // Allocate to hold the reduced number of exclusions.
+  CondensedExclusions result;
+  const int natom = nb_excl.nb11_excl_bounds.size() - 1;
+  result.total_exclusions = (nb_excl.nb11_excl_bounds[natom] +
+                             nb_excl.nb12_excl_bounds[natom] +
+                             nb_excl.nb13_excl_bounds[natom] +
+                             nb_excl.nb14_excl_bounds[natom]) / 2;
+  result.atom_excl_list.resize(result.total_exclusions);
+  result.atom_excl_bounds.resize(natom + 1, 0);
+
+  // Set up a prefix sum over each atom's forward exclusion complement.  Fill out the exclusions
+  // list as the prefix sum accumulates.
+  int excl_idx = 0;
+  for (int i = 0; i < natom; i++) {
+    int ni_excl = 0;
+    for (int j = nb_excl.nb11_excl_bounds[i]; j < nb_excl.nb11_excl_bounds[i + 1]; j++) {
+      if (nb_excl.nb11_excl_list[j] > i) {
+        result.atom_excl_list[excl_idx] = nb_excl.nb11_excl_list[j];
+        excl_idx++;
+        ni_excl++;
+      }
+    }
+    for (int j = nb_excl.nb12_excl_bounds[i]; j < nb_excl.nb12_excl_bounds[i + 1]; j++) {
+      if (nb_excl.nb12_excl_list[j] > i) {
+        result.atom_excl_list[excl_idx] = nb_excl.nb12_excl_list[j];
+        excl_idx++;
+        ni_excl++;
+      }
+    }
+    for (int j = nb_excl.nb13_excl_bounds[i]; j < nb_excl.nb13_excl_bounds[i + 1]; j++) {
+      if (nb_excl.nb13_excl_list[j] > i) {
+        result.atom_excl_list[excl_idx] = nb_excl.nb13_excl_list[j];
+        excl_idx++;
+        ni_excl++;
+      }
+    }
+    for (int j = nb_excl.nb14_excl_bounds[i]; j < nb_excl.nb14_excl_bounds[i + 1]; j++) {
+      if (nb_excl.nb14_excl_list[j] > i) {
+        result.atom_excl_list[excl_idx] = nb_excl.nb14_excl_list[j];
+        excl_idx++;
+        ni_excl++;
+      }
+    }
+    result.atom_excl_bounds[i] = ni_excl;
+  }
+  prefixSumInPlace(&result.atom_excl_bounds, PrefixSumType::EXCLUSIVE);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int countPrmtopZeroExclusions(const Map1234 nb_excl) {
+  int result = 0;
+  const int natom = nb_excl.nb11_excl_bounds.size() - 1;
+  for (int i = 0; i < natom; i++) {
+    bool fw_excl = false;
+    for (int j = nb_excl.nb11_excl_bounds[i]; j < nb_excl.nb11_excl_bounds[i + 1]; j++) {
+      fw_excl = (fw_excl || (nb_excl.nb11_excl_list[j] > i));
+    }
+    for (int j = nb_excl.nb12_excl_bounds[i]; j < nb_excl.nb12_excl_bounds[i + 1]; j++) {
+      fw_excl = (fw_excl || (nb_excl.nb12_excl_list[j] > i));
+    }
+    for (int j = nb_excl.nb13_excl_bounds[i]; j < nb_excl.nb13_excl_bounds[i + 1]; j++) {
+      fw_excl = (fw_excl || (nb_excl.nb13_excl_list[j] > i));
+    }
+    for (int j = nb_excl.nb14_excl_bounds[i]; j < nb_excl.nb14_excl_bounds[i + 1]; j++) {
+      fw_excl = (fw_excl || (nb_excl.nb14_excl_list[j] > i));
+    }
+    result += (fw_excl == false);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 BasicValenceTable basicValenceIndexing(const int atom_count,
                                        const std::vector<int> &tmp_bond_atoms_h,
                                        const std::vector<int> &tmp_bond_atoms_noh,
@@ -1106,7 +1287,7 @@ AttenuationParameterSet condenseScreeningFactors(const BasicValenceTable &bvt,
     attn_parm.elec_screening_factors.push_back(default_elec14_screening);
     attn_parm.vdw_screening_factors.push_back(default_vdw14_screening);
     set_map.resize(ndihe_param, 1);
-    attn_parm.total_14_sets += (ndihe_param > 0);
+    attn_parm.total_14_sets += 1;
   }
 
   // Map all dihedrals to the correct scaling factors, using both their modifiers (to detect
@@ -1764,8 +1945,9 @@ void cullPriorExclusions(std::vector<int> *excl_list, std::vector<int> *excl_bou
 }
 
 //-------------------------------------------------------------------------------------------------
-Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
-                      const CharmmValenceTable &mvt, const VirtualSiteTable &vst) {
+Map1234 mapExclusions(const int atom_count, const std::vector<int> &vs_particles,
+                      const std::vector<int> &vs_parent_atoms,
+                      const std::vector<int> &bond_i_atoms, const std::vector<int> &bond_j_atoms) {
   Map1234 result;
 
   // Allocate arrays for the numbers of exclusions
@@ -1773,30 +1955,36 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   result.nb12_excl_bounds.resize(atom_count + 1);
   result.nb13_excl_bounds.resize(atom_count + 1);
   result.nb14_excl_bounds.resize(atom_count + 1);
-
+  
   // Allocate an extra array of counters that will serve for each atom in various situations
   std::vector<int> atom_counters(atom_count, 0);
+  if (vs_particles.size() != vs_parent_atoms.size()) {
+    rtErr("The number of virtual site particle indices and parent atoms (" +
+          std::to_string(vs_particles.size()) + ", " + std::to_string(vs_parent_atoms.size()) +
+          ") must be the same.", "mapExclusions");
+  }
+  const int virtual_site_count = vs_particles.size();
 
   // Make a list of all virtual site children for every parent atom.  Because every virtual site
   // will have one and only one parent atom, this list will tell us how many 1:1 interactions to
   // expect, in addition to 1:1 interactions (exclusions) between virtual sites and their parents.
   std::vector<int> vsite_child_bounds(atom_count + 1, 0);
-  for (int i = 0; i < vst.vs_count; i++) {
-    vsite_child_bounds[vst.frame1_atoms[i]] += 1;
+  for (int i = 0; i < virtual_site_count; i++) {
+    vsite_child_bounds[vs_parent_atoms[i]] += 1;
   }
   prefixSumInPlace(&vsite_child_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   std::vector<int> vsite_child_list(vsite_child_bounds[atom_count], -1);
-  for (int i = 0; i < vst.vs_count; i++) {
-    const int parent = vst.frame1_atoms[i];
-    vsite_child_list[vsite_child_bounds[parent] + atom_counters[parent]] = vst.vs_atoms[i];
+  for (int i = 0; i < virtual_site_count; i++) {
+    const int parent = vs_parent_atoms[i];
+    vsite_child_list[vsite_child_bounds[parent] + atom_counters[parent]] = vs_particles[i];
     atom_counters[parent] += 1;
   }
 
   // List all 1:1 interactions as virtual sites interacting with their parents.  Virtual sites
   // that have the same parent atom are also 1:1 to one another.
-  for (int i = 0; i < vst.vs_count; i++) {
-    const int vsite  = vst.vs_atoms[i];
-    const int parent = vst.frame1_atoms[i];
+  for (int i = 0; i < virtual_site_count; i++) {
+    const int vsite  = vs_particles[i];
+    const int parent = vs_parent_atoms[i];
     result.nb11_excl_bounds[vsite] += vsite_child_bounds[parent + 1] -
                                       vsite_child_bounds[parent];
     result.nb11_excl_bounds[parent] += 1;
@@ -1822,12 +2010,17 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   }
   
   // Estimate the 1:2 exclusion bounds, then populate them, then cull duplicates
-  const int bond_count = bvt.bond_i_atoms.size();
+  if (bond_i_atoms.size() != bond_j_atoms.size()) {
+    rtErr("The number of bonded atoms (" + std::to_string(bond_i_atoms.size()) + ", " +
+          std::to_string(bond_j_atoms.size()) + ") must be the same in both I and J arrays.",
+          "mapExclusions");
+  }
+  const int bond_count = bond_i_atoms.size();
   for (int i = 0; i < atom_count + 1; i++) {
     result.nb12_excl_bounds[i] = 0;
   }
   for (int i = 0; i < bond_count; i++) {
-    accumulateExclusionBounds(&result.nb12_excl_bounds, bvt.bond_i_atoms[i], bvt.bond_j_atoms[i],
+    accumulateExclusionBounds(&result.nb12_excl_bounds, bond_i_atoms[i], bond_j_atoms[i],
                               vsite_child_bounds, vsite_child_list);
   }
   prefixSumInPlace(&result.nb12_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
@@ -1837,7 +2030,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   }
   for (int i = 0; i < bond_count; i++) {
     markExclusions(&result.nb12_excl_list, &atom_counters, result.nb12_excl_bounds,
-                   bvt.bond_i_atoms[i], bvt.bond_j_atoms[i], vsite_child_bounds, vsite_child_list);
+                   bond_i_atoms[i], bond_j_atoms[i], vsite_child_bounds, vsite_child_list);
   }
   cullDuplicateExclusions(&result.nb12_excl_list, &result.nb12_excl_bounds);
   cullPriorExclusions(&result.nb12_excl_list, &result.nb12_excl_bounds, result.nb11_excl_list,
@@ -1946,6 +2139,13 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   result.nb14_excl_list.shrink_to_fit();
 
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
+                      const VirtualSiteTable &vst) {
+  return mapExclusions(atom_count, vst.vs_atoms, vst.frame1_atoms, bvt.bond_i_atoms,
+                       bvt.bond_j_atoms);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2363,7 +2563,7 @@ std::vector<double> cubicSplineDerivativeStencil(const int npts) {
 }
 
 //-------------------------------------------------------------------------------------------------
-CmapAccessories ComputeCmapDerivatives(const int cmap_surf_count,
+CmapAccessories computeCmapDerivatives(const int cmap_surf_count,
                                        const std::vector<int> tmp_cmap_surf_dims,
                                        const std::vector<int> tmp_cmap_surf_bounds,
                                        const std::vector<double> tmp_cmap_surfaces) {
@@ -2379,7 +2579,7 @@ CmapAccessories ComputeCmapDerivatives(const int cmap_surf_count,
   if (static_cast<size_t>(cmap_surf_count) > tmp_cmap_surf_dims.size()) {
     rtErr("Topology specifies " + std::to_string(cmap_surf_count) + " CMAP surfaces but provides "
           "dimensions for only " + std::to_string(tmp_cmap_surf_dims.size()) + ".",
-          "ComputeCmapDerivatives");
+          "computeCmapDerivatives");
   }
   int boundary = 0;
   for (int i = 0; i < cmap_surf_count; i++) {
@@ -2404,7 +2604,7 @@ CmapAccessories ComputeCmapDerivatives(const int cmap_surf_count,
   std::vector<double> stencil;
   std::vector<double> patch_buffer(16);
   for (int i = 0; i < cmap_surf_count; i++) {
-
+    
     // Compute the stencil for a CMAP of this dimension
     if (current_stencil_size != tmp_cmap_surf_dims[i]) {
       stencil = cubicSplineDerivativeStencil(tmp_cmap_surf_dims[i]);

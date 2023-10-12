@@ -26,6 +26,7 @@ using constants::PrecisionModel;
 using energy::ClashResponse;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
+using energy::QMapMethod;
 using stmath::ReductionStage;
 using namelist::default_dynamics_time_step;
 using namelist::default_minimize_dx0;
@@ -181,20 +182,36 @@ public:
   /// \brief Prime the work unit counters based on a particular GPU configuration.
   ///
   /// Overloaded:
-  ///   - Assume clashes are not handled specially
+  ///   - Provide information about the PME charge mapping approach
   ///   - Make provisions for clashes to be forgiven (or not) with softcore potential functions
+  ///   - Provide only basic information for a vacuum-phase MM calculation
   /// 
-  /// \param launcher  Object containing launch parameters for all kernels
-  /// \param eval_frc  Indicate whether forces are to be evaluated--some kernels allocate different
-  ///                  numbers of blocks in the launch grid if forces are not required.
-  /// \param eval_nrg  Indicate whether energy is to be evaluated--some kernels allocate different
-  ///                  numbers of blocks in the launch grid if the energy is not required.
-  /// \param softcore  Indicate whether the control counters should take clash handling kernel
-  ///                  variants into account
-  /// \param prec      Precision model for calculations
-  /// \param poly_ag   Compilation of topologies describing the workload (used here for general
-  ///                  descriptors such as the non-bonded work unit type)
+  /// \param launcher          Object containing launch parameters for all kernels
+  /// \param eval_frc          Indicate whether forces are to be evaluated--some kernels allocate
+  ///                          different numbers of blocks in the launch grid if forces are not
+  ///                          required.
+  /// \param eval_nrg          Indicate whether energy is to be evaluated--some kernels allocate
+  ///                          different numbers of blocks in the launch grid if the energy is not
+  ///                          required.
+  /// \param softcore          Indicate whether the control counters should take clash handling
+  ///                          kernel variants into account
+  /// \param prec              Precision model for calculations
+  /// \param qspread_approach  The approach taken by GPU kernels to spread charge density onto the
+  ///                          particle-mesh interaction grids
+  /// \param acc_prec          Precision model for accumulations (needed in case the density
+  ///                          mapping approach is accumulation in the __shared__ memory space)
+  /// \param image_coord_type  Data type used to represent coordinates in the neighbor list images
+  /// \param qspread_order     The order of B-spline interpolation used to spread charge density to
+  ///                          the particle-mesh interaction grids
+  /// \param poly_ag           Compilation of topologies describing the workload (used here for
+  ///                          general descriptors such as the non-bonded work unit type)
   /// \{
+  void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
+                             EvaluateEnergy eval_nrg, ClashResponse softcore, PrecisionModel prec,
+                             QMapMethod qspread_approach, PrecisionModel acc_prec,
+                             size_t image_coord_type, int qspread_order,
+                             const AtomGraphSynthesis &poly_ag);
+
   void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, const ClashResponse softcore,
                              PrecisionModel prec, const AtomGraphSynthesis &poly_ag); 

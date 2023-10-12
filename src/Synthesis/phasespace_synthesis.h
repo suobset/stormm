@@ -412,12 +412,12 @@ public:
   PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original);
   /// \}
 
-  /// \brief Copy and move assignment operators are deleted.
+  /// \brief Copy and move assignment operators must also be explicitly written out.
   ///
   /// \param other  The other PhaseSpaceSynthesis object
   /// \{
-  PhaseSpaceSynthesis& operator=(const PhaseSpaceSynthesis &other) = delete;
-  PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other) = delete;
+  PhaseSpaceSynthesis& operator=(const PhaseSpaceSynthesis &other);
+  PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other);
   /// \}
 
   /// \brief Get the number of systems in the object.
@@ -872,19 +872,19 @@ private:
   double time_step;               ///< The time step for every system, in femtoseconds
 
   // Scaling constants for fixed-precision coordinates (position, velocity) and also forces
-  // in this PhaseSpaceSynthesis are fixed upon creation
-  const double globalpos_scale;         ///< Global position coordinate scaling factor
-  const double localpos_scale;          ///< Local position coordinate scaling factor
-  const double velocity_scale;          ///< Velocity coordinate scaling factor
-  const double force_scale;             ///< Scaling factor for fixed-precision force accumulation
-  const double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
-  const double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
-  const double inverse_velocity_scale;  ///< Inverse velocity scaling factor
-  const double inverse_force_scale;     ///< Inverse force scaling factor
-  const int globalpos_scale_bits;       ///< Global position coordinate bits after the decimal
-  const int localpos_scale_bits;        ///< Local position coordinate bits after the decimal
-  const int velocity_scale_bits;        ///< Velocity coordinate bits after the decimal
-  const int force_scale_bits;           ///< Force component bits after the decimal
+  // in this PhaseSpaceSynthesis apply identically to all systems
+  double globalpos_scale;         ///< Global position coordinate scaling factor
+  double localpos_scale;          ///< Local position coordinate scaling factor
+  double velocity_scale;          ///< Velocity coordinate scaling factor
+  double force_scale;             ///< Scaling factor for fixed-precision force accumulation
+  double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
+  double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
+  double inverse_velocity_scale;  ///< Inverse velocity scaling factor
+  double inverse_force_scale;     ///< Inverse force scaling factor
+  int globalpos_scale_bits;       ///< Global position coordinate bits after the decimal
+  int localpos_scale_bits;        ///< Local position coordinate bits after the decimal
+  int velocity_scale_bits;        ///< Velocity coordinate bits after the decimal
+  int force_scale_bits;           ///< Force component bits after the decimal
 
   /// Starting positions for each system's stretch of atoms in xyz_qlj, (x,y,z)_velocities, and
   /// (x,y,z)_forces.  Atoms in each of those arrays will remain in their original orders, as

@@ -176,12 +176,13 @@ template <typename T, typename T2> struct SyNonbondedKit {
                           const int* atom_offsets, const int* atom_counts, T coulomb_in,
                           ImplicitSolventModel igb_in, int neck_table_size_in, T dielectric_in,
                           T kappa_in, T saltcon_in, T gb_offset_in, T gb_neckscale_in,
-                          T gb_neckcut_in, const T* charge_in, const int* lj_idx_in,
-                          const int* n_lj_types_in, const int* ljabc_offsets_in,
-                          const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in,
-                          const T* lj_sigma_in, const int* neck_gb_idx_in, const T* pb_radii_in,
-                          const T* gb_screen_in, const T* gb_alpha_in, const T* gb_beta_in,
-                          const T* gb_gamma_in, const T2* neck_limits_in);
+                          T gb_neckcut_in, const T* charge_in, const int* q_idx_in,
+                          const T* q_params_in, const int* lj_idx_in, const int* n_lj_types_in,
+                          const int* ljabc_offsets_in, const T* lja_coeff_in,
+                          const T* ljb_coeff_in, const T* ljc_coeff_in, const T* lj_sigma_in,
+                          const int* neck_gb_idx_in, const T* pb_radii_in, const T* gb_screen_in,
+                          const T* gb_alpha_in, const T* gb_beta_in, const T* gb_gamma_in,
+                          const T2* neck_limits_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -215,6 +216,12 @@ template <typename T, typename T2> struct SyNonbondedKit {
   const T* charge;                ///< Partial charges for all atoms in the synthesis (one
                                   ///<   concatenated array, with each system's atoms padded by the
                                   ///<   warp size)
+  const int* q_idx;               ///< Indices of atomic charge parameters.  The charge for atom i
+                                  ///<   can be obtained by accessing the ith element of the array
+                                  ///<   charge, or by accessing the ith element of this array and
+                                  ///<   then following that index into the q_params array.
+  const T* q_params;              ///< List of unique atomic partial charge parameters, indexed by
+                                  ///<   q_idx above.
   const int* lj_idx;              ///< Lennard-Jones indices for all atoms.  Each system may have
                                   ///<   its own specific parameter matricies, with offsets given
                                   ///<   in the ljabc_offsets array (see below).

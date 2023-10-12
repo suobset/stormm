@@ -91,6 +91,10 @@ KernelManager::KernelManager(const GpuDetails &gpu_in) :
 {}
 
 //-------------------------------------------------------------------------------------------------
+KernelManager::~KernelManager() {
+}
+
+//-------------------------------------------------------------------------------------------------
 const GpuDetails& KernelManager::getGpu() const {
   return gpu;
 }

@@ -26,6 +26,13 @@ struct SeMaskSynthesisReader {
                         const int* supertile_map_bounds_in, const int* tile_map_idx_in,
                         const uint* mask_data_in);
 
+  /// \brief Like other abstracts, this one is compatible with the default copy and move
+  ///        constructors, but the copy and move assignment operators are implicitly deleted.
+  /// \{
+  SeMaskSynthesisReader(const SeMaskSynthesisReader &original) = default;
+  SeMaskSynthesisReader(SeMaskSynthesisReader &&original) = default;
+  /// \}
+  
   const int nsys;                   ///< The number of systems covered by this object
   const int* atom_counts;           ///< Counts of atoms in all systems
   const int* atom_offsets;          ///< Offsets for the atoms of any given system within a
@@ -77,6 +84,19 @@ public:
                                const std::vector<int> &topology_indices);
   /// \}
 
+  /// \brief With no const members or pointers to repair (including POINTER-kind Hybrid) objects,
+  ///        this object is compatible with the default copy and move constructors as well as copy
+  ///        and move assignment operators.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     Another object placed on the right hand side of the assignment statement
+  /// \{
+  StaticExclusionMaskSynthesis(const StaticExclusionMaskSynthesis &original) = default;
+  StaticExclusionMaskSynthesis(StaticExclusionMaskSynthesis &&original) = default;
+  StaticExclusionMaskSynthesis& operator=(const StaticExclusionMaskSynthesis &original) = default;
+  StaticExclusionMaskSynthesis& operator=(StaticExclusionMaskSynthesis &&original) = default;  
+  /// \}
+  
   /// \brief Get the number of systems covered by this object
   int getSystemCount() const;
   

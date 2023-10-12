@@ -4,6 +4,7 @@
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/bspline.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/hpc_summation.cuh"
 #include "../../src/Reporting/error_format.h"
@@ -39,6 +40,8 @@ using stormm::random::default_xoshiro256pp_scrub;
 using namespace stormm::stmath;
 using namespace stormm::hpc_math;
 using namespace stormm::testing;
+
+#include "../../src/Math/bspline.cui"
 
 //-------------------------------------------------------------------------------------------------
 // Load a vector of random numbers using a CPU-based Ran2 generator.
@@ -335,6 +338,110 @@ double pinpointXoshiro256pp(std::vector<ullint2> &rng_xy_states,
 }
 
 //-------------------------------------------------------------------------------------------------
+// This kernel will fill in some arrays with B-spline coefficients based on values of the delta.
+// Derivatives can be computed by providing a negative value of the interpolation order.
+//
+// Arguments:
+//   dx:              The array of deltas for computing B-splines
+//   n:               The trusted length of dx
+//   order:           The order of B-spline coefficients to compute.  Specifying negative values
+//                    will have derivatives computed.
+//   coefficients:    Array of coefficients, filled and returned, ordered in stretches of values
+//                    for dx(0), dx(1), ..., dx(n)
+//   derivatives:     Array of derivatives, filled and returned, ordered in stretches of values
+//                    for dx(0), dx(1), ..., dx(n)
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+kCalculateBSplines(const double* dx, const int n, const int order, double* coefficients,
+                   double* derivatives) {
+  double bspln_knots[6], bspln_dervs[6];
+  int pos = threadIdx.x + (blockIdx.x * blockDim.x);
+  while (pos < n) {
+    if (order == 4) {
+      devcBSpline4(dx[pos], bspln_knots);
+    }
+    else if (order == 5) {
+      devcBSpline5(dx[pos], bspln_knots);
+    }
+    else if (order == 6) {
+      devcBSpline6(dx[pos], bspln_knots);
+    }
+    else if (order == -4) {
+      devcBSpline4(dx[pos], bspln_knots, bspln_dervs);
+    }
+    else if (order == -5) {
+      devcBSpline5(dx[pos], bspln_knots, bspln_dervs);
+    }
+    else if (order == -6) {
+      devcBSpline6(dx[pos], bspln_knots, bspln_dervs);
+    }
+
+    // Transfer the results to global memory
+    const int abs_order = abs(order);
+    for (int i = 0; i < abs_order; i++) {
+      coefficients[(pos * abs_order) + i] = bspln_knots[i];
+    }
+    if (order < 0) {
+      for (int i = 0; i < abs_order; i++) {
+        derivatives[(pos * abs_order) + i] = bspln_dervs[i];
+      }
+    }
+    pos += (blockDim.x * gridDim.x);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test various B-spline device functions.
+//-------------------------------------------------------------------------------------------------
+void testBSplineDeviceFuncs() {
+  const int npts = 2048;
+  Hybrid<double> dx(npts), coefficients(6 * npts), derivatives(6 * npts);
+  for (int i = 0; i < npts; i++) {
+    dx.putHost((static_cast<double>(i) + 0.28) / static_cast<double>(npts), i);
+  }
+  dx.upload();
+  const HybridTargetLevel devc_layer = HybridTargetLevel::DEVICE;
+  for (int ordr = 4; ordr < 7; ordr++) {
+
+    // Compute B-spline knots only
+    kCalculateBSplines<<<1, 1024>>>(dx.data(devc_layer), npts, ordr, coefficients.data(devc_layer),
+                                    derivatives.data(devc_layer));
+    coefficients.download();
+    
+    // Check the result against the CPU function
+    std::vector<double> host_knots(ordr * npts);
+    double* hkn_ptr = host_knots.data();
+    for (int i = 0; i < npts; i++) {
+      bSpline(dx.readHost(i), ordr, &hkn_ptr[i * ordr]);
+    }
+    check(coefficients.readHost(0, ordr * npts), RelationalOperator::EQUAL,
+          Approx(host_knots).margin(1.0e-8), "B-spline knots of order " + std::to_string(ordr) +
+          " were not computed correctly by the GPU device function.");
+    
+    // Compute B-spline knots and derivatives
+    kCalculateBSplines<<<1, 1024>>>(dx.data(devc_layer), npts, -ordr,
+                                    coefficients.data(devc_layer), derivatives.data(devc_layer));
+    coefficients.download();
+    derivatives.download();
+    
+    // Check the result against the CPU function
+    std::vector<double> host_dervs(ordr * npts);
+    double* hdv_ptr = host_dervs.data();
+    for (int i = 0; i < npts; i++) {
+      bSpline(dx.readHost(i), ordr, &hkn_ptr[i * ordr], &hdv_ptr[i * ordr]);
+    }
+    check(coefficients.readHost(0, ordr * npts), RelationalOperator::EQUAL,
+          Approx(host_knots).margin(1.0e-8), "B-spline knots of order " + std::to_string(ordr) +
+          " were not computed correctly by the GPU device function when derivatives are "
+          "requested.");
+    check(derivatives.readHost(0, ordr * npts), RelationalOperator::EQUAL,
+          Approx(host_dervs).margin(1.0e-8), "B-spline derivatives of order " +
+          std::to_string(ordr) + " were not computed correctly by the GPU device function when "
+          "derivatives are requested.");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -350,6 +457,9 @@ int main(const int argc, const char* argv[]) {
   
   // Section 2
   section("GPU-based Xoroshiro128+ PRNG");
+
+  // Section 3
+  section("Included device functions");
   
   // Perform a summation over a double-precision real vector using the GPU
   section(1);
@@ -481,6 +591,10 @@ int main(const int argc, const char* argv[]) {
   check(random_output.readHost(), RelationalOperator::EQUAL, random_output.readDevice(), "Random "
         "numbers from an array of Xoshiro256++ generators computed on the CPU and GPU do not "
         "agree.");
+
+  // Test other device
+  section(3);
+  testBSplineDeviceFuncs();
   
   // Print results
   printTestSummary(oe.getVerbosity());

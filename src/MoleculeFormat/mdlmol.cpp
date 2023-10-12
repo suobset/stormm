@@ -25,7 +25,7 @@ using parse::strncmpCased;
 using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyContents;
-using parse::operator==;
+using data_types::operator==;
 using topology::TorsionKind;
 using topology::ValenceKit;
 using trajectory::writeFrame;
@@ -465,6 +465,11 @@ std::vector<double> MdlMol::getCoordinates(const CartesianDimension dim) const {
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const MdlMol* MdlMol::getSelfPointer() const {
+  return this;
 }
 
 //-------------------------------------------------------------------------------------------------

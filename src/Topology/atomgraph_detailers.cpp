@@ -37,7 +37,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                                  const std::vector<int> &tmp_charge_indices,
                                  const std::vector<int> &tmp_lennard_jones_indices,
                                  const std::vector<int> &tmp_inferred_14_i_atoms,
-                                 const std::vector<int> &tmp_inferred_14_j_atoms,
+                                 const std::vector<int> &tmp_inferred_14_l_atoms,
                                  const std::vector<int> &tmp_inferred_14_param_idx,
                                  const std::vector<int> &tmp_neck_gb_indices,
                                  const std::vector<int> &tmp_tree_joining_info,
@@ -81,7 +81,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                                  const AttenuationParameterSet &attn_parm,
                                  const VirtualSiteTable &vsite_table,
                                  const Map1234 &all_nb_excl, const ConstraintTable &cnst_table) {
-
+  
   // Allocate the Hybrid ARRAY-kind objects based on the compiled data
   size_t int_items = roundUp<int>(tmp_desc.size(), warp_size_int) +
                      roundUp(residue_count + 1, warp_size_int) +
@@ -117,8 +117,8 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                          2 * roundUp(angl_parameter_count, warp_size_int) +
                          3 * roundUp(dihe_parameter_count, warp_size_int) +
                          3 * roundUp(virtual_site_count, warp_size_int) +
-                        10 * roundUp(atom_type_count * atom_type_count, warp_size_int) +
-                         2 * roundUp(atom_type_count, warp_size_int) +
+                        10 * roundUp(lj_type_count * lj_type_count, warp_size_int) +
+                         2 * roundUp(lj_type_count, warp_size_int) +
                          roundUp(charge_type_count,  warp_size_int) +
                          2 * roundUp(attenuated_14_type_count, warp_size_int) +
                          6 * roundUp(cnst_table.settle_parameter_count, warp_size_int) +
@@ -133,7 +133,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   double_data.resize(double_items);
   float_data.resize(float_items);
   char4_data.resize(char4_items);
-
+  
   // Lay out Hybrid POINTER-kind int objects based on the compiled data.  The putHost member
   // function of the Hybrid class has an overloaded version that sets a POINTER-kind object to its
   // target and then fills the object, thus populating the appropriate segment of the target.
@@ -235,7 +235,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   ic = nb14_exclusion_bounds.putHost(&int_data, all_nb_excl.nb14_excl_bounds, ic, warp_size_zu);
   ic = nb14_exclusion_list.putHost(&int_data, all_nb_excl.nb14_excl_list, ic, warp_size_zu);
   ic = infr14_i_atoms.putHost(&int_data, tmp_inferred_14_i_atoms, ic, warp_size_zu);
-  ic = infr14_l_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
+  ic = infr14_l_atoms.putHost(&int_data, tmp_inferred_14_l_atoms, ic, warp_size_zu);
   ic = infr14_parameter_indices.putHost(&int_data, tmp_inferred_14_param_idx, ic, warp_size_zu);
   ic = neck_gb_indices.putHost(&int_data, tmp_neck_gb_indices, ic, warp_size_zu);
   ic = settle_oxygen_atoms.putHost(&int_data, cnst_table.settle_ox_atoms, ic, warp_size_zu);
@@ -306,7 +306,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   dc = lj_14_c_values.putHost(&double_data, tmp_lj_14_c_values, dc, warp_size_zu);
   dc = lj_sigma_values.putHost(&double_data, tmp_lj_sigma_values, dc, warp_size_zu);
   dc = lj_14_sigma_values.putHost(&double_data, tmp_lj_14_sigma_values, dc, warp_size_zu);
-  dc = lj_type_corrections.putHost(&double_data, std::vector<double>(atom_type_count, 0.0), dc,
+  dc = lj_type_corrections.putHost(&double_data, std::vector<double>(lj_type_count, 0.0), dc,
                                    warp_size_zu);
   dc = attn14_elec_factors.putHost(&double_data, attn_parm.elec_screening_factors, dc,
                                    warp_size_zu);
@@ -463,7 +463,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   const std::vector<float>sp_tmp_lj_14_sigma_values(tmp_lj_14_sigma_values.begin(),
                                                     tmp_lj_14_sigma_values.end());
   fc = sp_lj_14_sigma_values.putHost(&float_data, sp_tmp_lj_14_sigma_values, fc, warp_size_zu);
-  fc = sp_lj_type_corrections.putHost(&float_data, std::vector<float>(atom_type_count, 0.0), fc,
+  fc = sp_lj_type_corrections.putHost(&float_data, std::vector<float>(lj_type_count, 0.0), fc,
                                       warp_size_zu);
   const std::vector<float> sp_tmp_elec_screening_factors(attn_parm.elec_screening_factors.begin(),
                                                          attn_parm.elec_screening_factors.end());
@@ -633,7 +633,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   virtual_site_count = tmp_desc[30];
 
   // Assign descriptors relevant to the non-bonded calculation
-  atom_type_count = tmp_desc[1];
+  lj_type_count = tmp_desc[1];
   total_exclusions = tmp_desc[10];
   switch (tmp_desc[27]) {
   case 0:
@@ -730,7 +730,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   // Read non-bonded parameter indices
   lstart = scanToFlag(fmem, "NONBONDED_PARM_INDEX", &dfmt, TopologyRequirement::ESSENTIAL, lstart);
   std::vector<int> tmp_nonbonded_parameter_index =
-    iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z, atom_type_count * atom_type_count);
+    iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z, lj_type_count * lj_type_count);
   addScalarToVector(&tmp_nonbonded_parameter_index, -1);
 
   // Read residue labels
@@ -882,7 +882,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   }
 
   // Read Lennard-Jones coefficients
-  const int nljparm = atom_type_count * (atom_type_count + 1) / 2;
+  const int nljparm = lj_type_count * (lj_type_count + 1) / 2;
   lstart = scanToFlag(fmem, "LENNARD_JONES_ACOEF", &dfmt, TopologyRequirement::ESSENTIAL,
                       lstart);
   std::vector<double> tmp_lj_a_values = eAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z,
@@ -974,7 +974,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   }
   expandLennardJonesTables(&tmp_lj_a_values, &tmp_lj_b_values, &tmp_lj_c_values,
                            &tmp_lj_14_a_values, &tmp_lj_14_b_values, &tmp_lj_14_c_values,
-                           &tmp_hbond_a_values, &tmp_hbond_b_values, atom_type_count,
+                           &tmp_hbond_a_values, &tmp_hbond_b_values, lj_type_count,
                            tmp_nonbonded_parameter_index);
 
   // Read the atom type names
@@ -1137,7 +1137,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
       tmp_cmap_atoms = iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z, 6 * cmap_term_count);
     }
   }
-  CmapAccessories cmap_table = ComputeCmapDerivatives(cmap_surface_count, tmp_cmap_surf_dims,
+  CmapAccessories cmap_table = computeCmapDerivatives(cmap_surface_count, tmp_cmap_surf_dims,
                                                       tmp_cmap_surf_bounds, tmp_cmap_surfaces);
 
   // Condense the exclusion list to avoid counting atoms with no actual exclusions as having one
@@ -1158,6 +1158,8 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
 
   // Condense the non-bonded 1:4 scaling factors, and flag dihedrals that are responsible for no
   // such interaction.
+  elec14_screening_factor = default_elec14_screening;
+  vdw14_screening_factor = default_vdw14_screening;
   AttenuationParameterSet attn_parm =
     condenseScreeningFactors(basic_vtable, tmp_dihe_elec_screenings, tmp_dihe_vdw_screenings,
                              default_elec14_screening, default_vdw14_screening);
@@ -1179,7 +1181,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   // atom), 1:2 (bonded atoms), 1:3 (atoms connected by a shortest path of two bonds), and 1:4
   // (atoms connected by a shortest path of three bonds) exclusions, double-counting everything to
   // list every excluded pair interaction, atom by atom.
-  Map1234 all_nb_excl = mapExclusions(atom_count, basic_vtable, charmm_vtable, vsite_table);
+  Map1234 all_nb_excl = mapExclusions(atom_count, basic_vtable, vsite_table);
   checkExclusions(cond_excl, all_nb_excl, source);
 
   // If the atomic numbers were not read from the topology file itself, infer them from the masses.
@@ -1197,11 +1199,11 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
                             attn_parm, policy);
   inferred_14_attenuations = outstanding_14_pairs.size();
   std::vector<int> tmp_inferred_14_i_atoms(inferred_14_attenuations);
-  std::vector<int> tmp_inferred_14_j_atoms(inferred_14_attenuations);
+  std::vector<int> tmp_inferred_14_l_atoms(inferred_14_attenuations);
   std::vector<int> tmp_inferred_14_param_idx(inferred_14_attenuations);
   for (int i = 0; i < inferred_14_attenuations; i++) {
     tmp_inferred_14_i_atoms[i]   = outstanding_14_pairs[i].x;
-    tmp_inferred_14_j_atoms[i]   = outstanding_14_pairs[i].y;
+    tmp_inferred_14_l_atoms[i]   = outstanding_14_pairs[i].y;
     tmp_inferred_14_param_idx[i] = outstanding_14_pairs[i].z;
   }
   
@@ -1264,7 +1266,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
                    tmp_molecule_limits, tmp_atomic_numbers, tmp_molecule_membership,
                    tmp_mobile_atoms, tmp_molecule_contents, tmp_cmap_surf_dims,
                    tmp_cmap_surf_bounds, tmp_charge_indices, tmp_lennard_jones_indices,
-                   tmp_inferred_14_i_atoms, tmp_inferred_14_j_atoms, tmp_inferred_14_param_idx,
+                   tmp_inferred_14_i_atoms, tmp_inferred_14_l_atoms, tmp_inferred_14_param_idx,
                    tmp_neck_gb_indices, tmp_tree_joining_info, tmp_last_rotator_info, tmp_charges,
                    tmp_masses, tmp_ub_stiffnesses, tmp_ub_equilibria, tmp_charmm_impr_stiffnesses,
                    tmp_charmm_impr_phase_angles, tmp_cmap_surfaces, tmp_bond_stiffnesses,

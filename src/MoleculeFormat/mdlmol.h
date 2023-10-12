@@ -232,6 +232,10 @@ public:
   std::vector<double> getCoordinates(CartesianDimension dim) const;
   /// \}
 
+  /// \brief Get a const pointer to the object, useful if a pointer is needed and the object is
+  ///        available by const reference.
+  const MdlMol* getSelfPointer() const;
+  
   /// \brief Export the coordinates as a PhaseSpace object suitable for basic molecular mechanics
   ///        force computations.
   PhaseSpace exportPhaseSpace() const ;

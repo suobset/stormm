@@ -28,12 +28,27 @@ struct BasicValenceTable {
   ///   - Create an object with pre-allocated memory for each type of basic valence term
   ///
   /// \param natom_in  The number of atoms in the system (for bounds arrays)
-  /// \param nbond_in  The number of bonds to prepare for
-  /// \param nangl_in  The number of angles to prepare for
-  /// \param ndihe_in  The number of dihedrals to prepare for
+  /// \param nbond_in  The number of bonds to prepare for (atom indices will be filled if more
+  ///                  information is provided)
+  /// \param nangl_in  The number of angles to prepare for (atom indices will be filled if more
+  ///                  information is provided)
+  /// \param ndihe_in  The number of dihedrals to prepare for (atom indices will be filled if more
+  ///                  information is provided)
   /// \{
   BasicValenceTable();
-  BasicValenceTable(int natom_in, int nbond_in, int nangl_in, int ndihe_in);
+  BasicValenceTable(int natom_in, int nbond_in, int nangl_in, int ndihe_in,
+                    const std::vector<int> &bond_i_atoms_in = {},
+                    const std::vector<int> &bond_j_atoms_in = {},
+                    const std::vector<int> &bond_param_idx_in = {},
+                    const std::vector<int> &angl_i_atoms_in = {},
+                    const std::vector<int> &angl_j_atoms_in = {},
+                    const std::vector<int> &angl_k_atoms_in = {},
+                    const std::vector<int> &angl_param_idx_in = {},
+                    const std::vector<int> &dihe_i_atoms_in = {},
+                    const std::vector<int> &dihe_j_atoms_in = {},
+                    const std::vector<int> &dihe_k_atoms_in = {},
+                    const std::vector<int> &dihe_l_atoms_in = {},
+                    const std::vector<int> &dihe_param_idx_in = {});
   /// \}
 
   /// \brief Populate the atom assignments for this object.  This can only be called once the
@@ -111,12 +126,29 @@ struct CharmmValenceTable {
   ///   - Create an object with pre-allocated memory for each type of CHARMM valence term
   ///
   /// \param natom_in  The number of atoms in the system (for bounds arrays)
-  /// \param nubrd_in  The number of Urey-Bradley harmonic angles terms to prepare for
-  /// \param ncimp_in  The number of CHARMM improper dihedrals to prepare for
-  /// \param ncmap_in  The number of CMAP terms to prepare for
+  /// \param nubrd_in  The number of Urey-Bradley harmonic angles terms to prepare for (atom
+  ///                  indices will be filled if enough information is provided)
+  /// \param nimpr_in  The number of CHARMM improper dihedrals to prepare for (atom indices will
+  ///                  be filled if enough information is provided)
+  /// \param ncmap_in  The number of CMAP terms to prepare for (atom indices will be filled if
+  ///                  enough information is provided)
   /// \{
   CharmmValenceTable();
-  CharmmValenceTable(int natom_in, int nubrd_in, int ncimp_in, int ncmap_in);
+  CharmmValenceTable(int natom_in, int nubrd_in, int nimpr_in, int ncmap_in,
+                     const std::vector<int> &ubrd_i_atoms_in = {},
+                     const std::vector<int> &ubrd_k_atoms_in = {},
+                     const std::vector<int> &ubrd_param_idx_in = {},
+                     const std::vector<int> &impr_i_atoms_in = {},
+                     const std::vector<int> &impr_j_atoms_in = {},
+                     const std::vector<int> &impr_k_atoms_in = {},
+                     const std::vector<int> &impr_l_atoms_in = {},
+                     const std::vector<int> &impr_param_idx_in = {},
+                     const std::vector<int> &cmap_i_atoms_in = {},
+                     const std::vector<int> &cmap_j_atoms_in = {},
+                     const std::vector<int> &cmap_k_atoms_in = {},
+                     const std::vector<int> &cmap_l_atoms_in = {},
+                     const std::vector<int> &cmap_m_atoms_in = {},
+                     const std::vector<int> &cmap_param_idx_in = {});
   /// \}
 
   /// \brief Populate the atom assignments for this object.  This can only be called once the
@@ -288,7 +320,7 @@ struct CmapAccessories {
   ///
   /// Overloaded:
   ///   - Create an empty object
-  ///   - Create an object with pre-allocated memory for each virtual site
+  ///   - Create an object with pre-allocated memory for each CMAP surface
   ///
   /// \param cmap_dimensions_in  Dimensions of each CMAP surface
   /// \{
@@ -473,6 +505,22 @@ CondensedExclusions processExclusions(const std::vector<int> &raw_counts,
                                       const std::vector<int> &raw_exclusions,
                                       const std::string &file_name);
 
+/// \brief Back-calculate the exclusions for each atom in a non-redundant format that would be more
+///        suitable for printing into a topology file.  The indexing of atoms continues to begin at
+///        zero, and exclusions j of atom i will be such that j > i.  All of 1:1, 1:2, 1:3, and 1:4
+///        exclusions will be included.  In addition, if an atom has no forward exclusions, it will
+///        be recorded as having one exclusion to the zeroth atom (index -1).
+///
+/// \param nb_excl  Tables of 1:1, 1:2, 1:3, and 1:4 exclusions
+CondensedExclusions calculatePrmtopExclusions(const Map1234 nb_excl);
+
+/// \brief The total number of exclusions reported in an Amber prmtop will have explicit zeros
+///        listed for atoms that exclude no atoms of higher topological index.  This function will
+///        identify all such atoms based on the complete list of exclusions.
+///
+/// \param nb_excl  Tables of 1:1, 1:2, 1:3, and 1:4 exclusions
+int countPrmtopZeroExclusions(const Map1234 nb_excl);
+
 /// \brief Process indexing for "basic" family valence parameters from an Amber topology.  Note the
 ///        meaning of "basic" family parameters: harmonic bonds based on the distance between atoms
 ///        I and J; harmonic angles for atoms I, J, and K; and cosine-based dihedrals for atoms I,
@@ -621,13 +669,27 @@ void cullPriorExclusions(std::vector<int> *excl_list, std::vector<int> *excl_bou
 ///        virtue of the fact that they have no mass, so that their parent atoms and other features
 ///        can be detected appropriately.
 ///
-/// \param atom_count  Total number of atoms in the system (for allocating exclusion bounds arrays,
-///                    each atom has a given number of 1:1, 1:2, 1:3, or 1:4 exclusions)
-/// \param bvt         Table of basic valence terms and their indexing into the original topology
-/// \param bvt         Table of CHARMM valence terms and their indexing into the original topology
-/// \param vst         Table of virtual sites and their frames
-Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
-                      const CharmmValenceTable &mvt, const VirtualSiteTable &vst);
+/// Overloaded:
+///   - Provide the minimal arrays for the computation
+///   - Provide some scratch work objects from which the necessary arrays can be extracted
+///
+/// \param atom_count       Total number of atoms in the system (for allocating exclusion bounds
+///                         arrays, each atom has a given number of 1:1, 1:2, 1:3, or 1:4
+///                         exclusions)
+/// \param vs_particles     List of all virtual sites in the system
+/// \param vs_parent_atoms  List of all virtual sites in the system
+/// \param bond_i_atoms     List of I atoms in all bonds I -> J
+/// \param bond_j_atoms     List of J atoms in all bonds I -> J
+/// \param bvt              Table of basic valence terms and their indexing into the original
+///                         topology
+/// \param vst              Table of virtual sites and their frames
+/// \{
+Map1234 mapExclusions(int atom_count, const std::vector<int> &vs_particles,
+                      const std::vector<int> &vs_parent_atoms,
+                      const std::vector<int> &bond_i_atoms, const std::vector<int> &bond_j_atoms);
+  
+Map1234 mapExclusions(int atom_count, const BasicValenceTable &bvt, const VirtualSiteTable &vst);
+/// \}
 
 /// \brief Check over each atom's exclusions one by one, searching for its match within a range,
 ///        incrementing an array to indicate coverage if the matching exclusion is found.
@@ -723,7 +785,7 @@ std::vector<double> cubicSplineDerivativeStencil(const int npts);
 /// \param tmp_cmap_surf_dims    Dimensions of each CMAP surface
 /// \param tmp_cmap_surf_bounds  Bounds of each surface in tmp_cmap_surfaces
 /// \param tmp_cmap_surfaces     Values of CMAP surfaces at the actual grid points
-CmapAccessories ComputeCmapDerivatives(int cmap_surf_count,
+CmapAccessories computeCmapDerivatives(int cmap_surf_count,
                                        const std::vector<int> tmp_cmap_surf_dims,
                                        const std::vector<int> tmp_cmap_surf_bounds,
                                        const std::vector<double> tmp_cmap_surfaces);

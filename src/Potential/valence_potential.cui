@@ -161,8 +161,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       pos += blockDim.x;
     }
 #ifdef COMPUTE_FORCE
-    // Initialize the force accumulators, including the GMEM-based, non-shared force accumulators
-    // that will have their atomic operations occur in L2.
+    // Initialize the force accumulators.
     while (pos < 6 * import_stride) {
       const int rel_pos = pos - (5 * import_stride);
       if (rel_pos < import_count) {
@@ -807,10 +806,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
             if (r < clash_distance) {
               const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
                                                    (clash_distance + (TCALC)(1.0)));
+#  ifdef COMPUTE_ENERGY
               const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
                                   (aparm * (clash_distance + (TCALC)(1.0)) *
                                    (clash_distance + (TCALC)(1.0)));
-#  ifdef COMPUTE_ENERGY
               if (accflag) {
                 const TCALC qq14_contrib = qq_il * ((aparm * (r + (TCALC)(1.0)) *
                                                      (r + (TCALC)(1.0))) + bparm);

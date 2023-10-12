@@ -34,6 +34,7 @@
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Structure/local_arrangement.h"
+#include "../../src/Synthesis/brickwork.h"
 #include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
@@ -65,6 +66,7 @@ using stormm::parse::findStringInVector;
 using stormm::parse::TextFile;
 using stormm::parse::TextOrigin;
 using stormm::random::Xoroshiro128pGenerator;
+using stormm::random::addRandomNoise;
 using stormm::restraints::applyHydrogenBondPreventors;
 using stormm::restraints::applyPositionalRestraints;
 using stormm::restraints::BoundedRestraint;
@@ -875,6 +877,40 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
 }
 
 //-------------------------------------------------------------------------------------------------
+// Verify that a given set of volume partitions exactly covers all volume of each periodic system.
+//-------------------------------------------------------------------------------------------------
+void verifyBrickCoverage(const Brickwork &bw) {
+  const int nsys = bw.getSystemCount();
+  const int nbricks = bw.getBrickCount();
+  std::vector<std::vector<int>> coverage(nsys);
+  for (int i = 0; i < nsys; i++) {
+    const int3 idims = bw.getSystemDimensions(i);
+    coverage[i] = std::vector<int>(idims.x * idims.y * idims.z, 0);
+  }
+  for (int bci = 0; bci < nbricks; bci++) {
+    const int sysid = bw.getSystemMembership(bci);
+    const int3 br_orig = bw.getBrickOrigin(bci);
+    const int3 br_len  = bw.getBrickLengths(bci);
+    for (int k = 0; k < br_len.z; k++) {
+      for (int j = 0; j < br_len.y; j++) {
+        const int jk_idx = (((br_orig.z + k) * br_len.y) + br_orig.y + j) * br_len.x;
+        for (int i = 0; i < br_len.x; i++) {
+          coverage[sysid][jk_idx + br_orig.x + i] += 1;
+        }
+      }
+    }
+  }
+  std::vector<double> mean_coverage(nsys);
+  std::vector<double> max_coverage(nsys);
+  std::vector<double> min_coverage(nsys);
+  for (int i = 0; i < nsys; i++) {
+    mean_coverage[i] = mean(coverage[i]);
+  }
+  check(mean_coverage, RelationalOperator::EQUAL, std::vector<double>(nsys, 1.0), "The mean "
+        "coverage of volume partitions is incorrect.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -902,6 +938,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 6
   section("Reduction work unit construction");
+
+  // Section 7
+  section("Periodic unit cell subdivision");
 
   // Test the construction of a systems cache (one possible precursor to a synthesis of
   // coordinates and / or topologies)
@@ -1080,8 +1119,8 @@ int main(const int argc, const char* argv[]) {
       pswi.zcrd[j] += 0.02 * my_prng.gaussianRandomNumber();
     }
   }
-  PhaseSpaceSynthesis psynth(psv, agv);   
-  
+  PhaseSpaceSynthesis psynth(psv, agv);
+
   // Try extracting a system from it
   PhaseSpace tip3p_ps_copy(tip3p_ps.getAtomCount(), tip3p_ps.getUnitCellType());
   psynth.extractSystem(&tip3p_ps_copy, 3);
@@ -1131,6 +1170,45 @@ int main(const int argc, const char* argv[]) {
         do_tests);
   check(psynth_w.time_step, RelationalOperator::EQUAL, 1.0, "The time step was not correctly "
         "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
+
+  // Check that the copy assignment works
+  PhaseSpaceSynthesis psynth_copy = psynth;
+  std::vector<double> orig_xyz, copy_xyz;
+  for (int i = 0; i < psynth.getSystemCount(); i++) {
+    const CoordinateFrame icf = psynth.exportCoordinates(i);
+    const std::vector<double> icf_xyz = icf.getInterlacedCoordinates();
+    orig_xyz.insert(orig_xyz.end(), icf_xyz.begin(), icf_xyz.end());
+    const CoordinateFrame ccf = psynth_copy.exportCoordinates(i);
+    const std::vector<double> ccf_xyz = ccf.getInterlacedCoordinates();
+    copy_xyz.insert(copy_xyz.end(), ccf_xyz.begin(), ccf_xyz.end());
+  }
+  check(orig_xyz, RelationalOperator::EQUAL, copy_xyz, "Atom positions were not properly "
+        "replicated by a deep copy of the PhaseSpaceSynthesis.", do_tests);
+  PsSynthesisWriter copy_psw = psynth_copy.data();
+  Xoroshiro128pGenerator xrs_dc;
+  const size_t np_atom_count = orig_xyz.size();
+  for (int i = 0; i < copy_psw.system_count; i++) {
+    addRandomNoise(&xrs_dc, copy_psw.xcrd, copy_psw.xcrd_ovrf, np_atom_count, 1.0,
+                   copy_psw.gpos_scale);
+    addRandomNoise(&xrs_dc, copy_psw.ycrd, copy_psw.ycrd_ovrf, np_atom_count, 1.0,
+                   copy_psw.gpos_scale);
+    addRandomNoise(&xrs_dc, copy_psw.zcrd, copy_psw.zcrd_ovrf, np_atom_count, 1.0,
+                   copy_psw.gpos_scale);
+  }
+  std::vector<double> orig_xyz2, copy_xyz2;
+  for (int i = 0; i < psynth.getSystemCount(); i++) {
+    const CoordinateFrame icf = psynth.exportCoordinates(i);
+    const std::vector<double> icf_xyz = icf.getInterlacedCoordinates();
+    orig_xyz2.insert(orig_xyz2.end(), icf_xyz.begin(), icf_xyz.end());
+    const CoordinateFrame ccf = psynth_copy.exportCoordinates(i);
+    const std::vector<double> ccf_xyz = ccf.getInterlacedCoordinates();
+    copy_xyz2.insert(copy_xyz2.end(), ccf_xyz.begin(), ccf_xyz.end());
+  }
+  check(orig_xyz, RelationalOperator::EQUAL, orig_xyz2, "Atom positions of the original "
+        "PhaseSpaceSynthesis were corrupted by modifying the deep copy.", do_tests);
+  const double noise_introduced = meanUnsignedError(orig_xyz, copy_xyz2);
+  check(noise_introduced, RelationalOperator::EQUAL, Approx(9.06563).margin(3.0e-5),
+        "Modifying the deep copy was ineffective.");
 
   // Create a SystemCache containing all of the systems of the first synthesis, plus meta data.
   std::string mock_sysc_deck("&files\n");
@@ -1513,7 +1591,32 @@ int main(const int argc, const char* argv[]) {
                 large_system_prop_y);
   testReduction(large_system_counts, large_system_offsets, large_system_prop_x,
                 large_system_prop_y, large_system_prop_z);
-  
+
+  // Test subdivisions of periodic systems
+  section(7);
+  std::vector<int3> cell_dims(1);
+  cell_dims[0] = { 10, 12, 10 };
+  Brickwork lego(cell_dims, 5, 16, 1, 0);
+  lego.subdivide();
+  check(lego.getBrickCount(), RelationalOperator::EQUAL, 54, "The subdivision of a single grid "
+        "did not proceed as expected.");
+  lego.subdivide(68);
+  check(lego.getBrickCount(), RelationalOperator::EQUAL, 68, "The subdivision of a single grid "
+        "did not proceed as expected when presented with a larger target number of bricks.");
+  verifyBrickCoverage(lego);
+  cell_dims.push_back({ 8, 8, 4 });
+  cell_dims.push_back({ 18, 17, 14 });
+  cell_dims.push_back({ 9, 9, 6 });
+  cell_dims.push_back({ 50, 2, 15 });
+  Brickwork lego_ii(cell_dims, 5, 16, 1, 0);
+  lego_ii.subdivide(68);
+  verifyBrickCoverage(lego_ii);
+  CHECK_THROWS(Brickwork bad_bw(cell_dims, 8, 12, 1, 0, 4, 15), "A Brickwork with an inadequate "
+               "maximum non-halo volume for its cross-sectional area was created.");
+  Brickwork lego_iii(cell_dims, 5, 16, 2, 0);
+  lego_iii.subdivide(68);
+  verifyBrickCoverage(lego_iii);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

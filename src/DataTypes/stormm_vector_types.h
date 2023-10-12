@@ -11,6 +11,7 @@
 #endif
 #include "copyright.h"
 #include "Reporting/error_format.h"
+#include "common_types.h"
 
 namespace stormm {
 namespace data_types {
@@ -316,7 +317,7 @@ template <typename T> struct Vec4 {
   T z;  ///< The third member, equivalent to the z member of a float4 or int4 tuple
   T w;  ///< The fourth member, equivalent to the w member of a float4 or int4 tuple
 };
-
+  
 /// \brief Provide options for selected vector type conversions, and vector forms thereof:
 ///        double(2,3,4) <--> float(2,3,4), double(2,3,4) <-- int(2,3,4),
 ///        double(2,3,4) <-- uint(2,3,4), double(2,3,4) <-- llint(2,3,4),
@@ -340,6 +341,107 @@ template <typename T> std::vector<double4> vtConv4(const std::vector<T> &rhs);
 template <typename T> std::vector<float2> vtConv2f(const std::vector<T> &rhs);
 template <typename T> std::vector<float3> vtConv3f(const std::vector<T> &rhs);
 template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs);
+/// \}
+
+/// \brief Provide a means to convert various 32-bit tuple types to unsigned 32-bit integers.
+///
+/// \param ctuple  The character tuple to convert
+/// \{
+uint short2ToUint(const short2 ituple);
+uint ushort2ToUint(const ushort2 ituple);
+uint char4ToUint(const char4 ctuple);
+uint uchar4ToUint(const uchar4 ctuple);
+/// \}
+
+/// \brief Provide a means to convert various 32-bit tuple types to unsigned 32-bit integers.
+///
+/// \param ctuple  The character tuple to convert
+/// \{
+short2 uintToShort2(const uint val);
+ushort2 uintToUshort2(const uint val);
+char4 uintToChar4(const uint val);
+uchar4 uintToUchar4(const uint val);
+/// \}
+
+/// \brief Operators for particular vector types.
+///
+/// \param lhs  Left-hand argument, basis for comparison
+/// \param rhs  Right-hand argument, basis for comparison
+/// \{
+bool operator==(const short2 lhs, const short2 rhs);
+bool operator!=(const short2 lhs, const short2 rhs);
+bool operator==(const short3 lhs, const short3 rhs);
+bool operator!=(const short3 lhs, const short3 rhs);
+bool operator==(const short4 lhs, const short4 rhs);
+bool operator!=(const short4 lhs, const short4 rhs);
+
+bool operator==(const ushort2 lhs, const ushort2 rhs);
+bool operator!=(const ushort2 lhs, const ushort2 rhs);
+bool operator==(const ushort3 lhs, const ushort3 rhs);
+bool operator!=(const ushort3 lhs, const ushort3 rhs);
+bool operator==(const ushort4 lhs, const ushort4 rhs);
+bool operator!=(const ushort4 lhs, const ushort4 rhs);
+
+bool operator==(const int2 lhs, const int2 rhs);
+bool operator!=(const int2 lhs, const int2 rhs);
+bool operator==(const int3 lhs, const int3 rhs);
+bool operator!=(const int3 lhs, const int3 rhs);
+bool operator==(const int4 lhs, const int4 rhs);
+bool operator!=(const int4 lhs, const int4 rhs);
+
+bool operator==(const uint2 lhs, const uint2 rhs);
+bool operator!=(const uint2 lhs, const uint2 rhs);
+bool operator==(const uint3 lhs, const uint3 rhs);
+bool operator!=(const uint3 lhs, const uint3 rhs);
+bool operator==(const uint4 lhs, const uint4 rhs);
+bool operator!=(const uint4 lhs, const uint4 rhs);
+
+bool operator==(const llint2 lhs, const llint2 rhs);
+bool operator!=(const llint2 lhs, const llint2 rhs);
+bool operator==(const llint3 lhs, const llint3 rhs);
+bool operator!=(const llint3 lhs, const llint3 rhs);
+bool operator==(const llint4 lhs, const llint4 rhs);
+bool operator!=(const llint4 lhs, const llint4 rhs);
+
+bool operator==(const ullint2 lhs, const ullint2 rhs);
+bool operator!=(const ullint2 lhs, const ullint2 rhs);
+bool operator==(const ullint3 lhs, const ullint3 rhs);
+bool operator!=(const ullint3 lhs, const ullint3 rhs);
+bool operator==(const ullint4 lhs, const ullint4 rhs);
+bool operator!=(const ullint4 lhs, const ullint4 rhs);
+
+bool operator<(const char4 lhs, const char4 rhs);
+bool operator<=(const char4 lhs, const char4 rhs);
+bool operator>(const char4 lhs, const char4 rhs);
+bool operator>=(const char4 lhs, const char4 rhs);
+bool operator==(const char4 lhs, const char4 rhs);
+bool operator!=(const char4 lhs, const char4 rhs);
+/// \}
+
+/// \brief Mimic critical CUDA typecasting intrinsics with simple unions
+/// {
+union Ecumenical2 {
+  short si;
+  ushort usi;
+  char2 c2;
+  uchar2 uc2;
+};
+
+union Ecumenical4 {
+  int i;
+  uint ui;
+  float f;
+  char4 c4;
+  uchar4 uc4;
+};
+
+union Ecumenical8 {
+  llint lli;
+  ullint ulli;
+  double d;
+  int2 i2;
+  uint2 ui2;
+};
 /// \}
 
 } // namespace data_types
@@ -441,6 +543,27 @@ using data_types::vtConv4;
 using data_types::vtConv2f;
 using data_types::vtConv3f;
 using data_types::vtConv4f;
+using data_types::short2ToUint;
+using data_types::ushort2ToUint;
+using data_types::char4ToUint;
+using data_types::uchar4ToUint;
+using data_types::uintToShort2;
+using data_types::uintToUshort2;
+using data_types::uintToChar4;
+using data_types::uintToUchar4;
+
+/// Include the ecumenical types for byte-wise conversions (in absence of various HPC intrinsics)
+using data_types::Ecumenical2;
+using data_types::Ecumenical4;
+using data_types::Ecumenical8;
+  
+// Overloaded assignment and comparison operators
+using data_types::operator<;
+using data_types::operator<=;
+using data_types::operator>;
+using data_types::operator>=;
+using data_types::operator==;
+using data_types::operator!=;
 
 } // namespace stormm
 

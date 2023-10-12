@@ -75,7 +75,8 @@ enum class StateVariable {
                           ///<   not define its own index in the subsequent tracking arrays).
 };
 
-/// \brief Enumerate the specific kinds of non-bonded potentials.
+/// \brief Enumerate the specific kinds of non-bonded potentials.  This is typically used in the
+///        context of a mesh-based potential for a rigid or semi-rigid molecule.
 enum class NonbondedPotential {
   ELECTROSTATIC,  ///< Interactions between charges
   VAN_DER_WAALS,  ///< Dispersion iteractions between particles, likely a Lennard-Jones potential
@@ -83,6 +84,28 @@ enum class NonbondedPotential {
                   ///<   width of some probe sphere representing heavy atoms in the ligand
 };
 
+/// \brief Enumerate the specific kinds of non-bonded potentials.  This is typically used in the
+///        context of a neighbor list, decribing what potential the neighbors are relevant to.
+enum class NonbondedTheme {
+  ELECTROSTATIC,  ///< Interactions between charges
+  VAN_DER_WAALS,  ///< Dispersion iteractions between particles, likely a Lennard-Jones potential
+  ALL             ///< All non-bonded interactions are covered, typically both electrostatic and
+                  ///<   van der Waals
+};
+
+/// \brief Various non-bonded potentials can be decomposed into smoothed components which add to
+///        recover the whole but can individually be interpolated from meshes with varying degrees
+///        of accuracy.
+enum class DecomposablePotential {
+  ELECTROSTATIC,   ///< The complete Coulombic potential
+  DISPERSION,      ///< Dispersion interactions decaying as the sixth power of the distance between
+                   ///<   particles.  These interactions may be modified by a switching function to
+                   ///<   apply geometric mixing rules after a short-ranged domain in which
+                   ///<   Lorentz-Berthelot or NBFix comining rules dominate
+  ELEC_PME_DIRECT  ///< The direct particle-particle interactions found in the electrostatic
+                   ///<   (Smooth) Particle-Mesh Ewald method
+};
+  
 /// \brief List the methods for combining Lennard-Jones (or other van-der Waals potential)
 ///        parameters in pairs of interacting atoms.
 enum class VdwCombiningRule {
@@ -126,6 +149,34 @@ enum class SplineScaffold {
                     ///<   r = 0.
 };
 
+/// \brief The actions to take with a cell grid, necessary to evaluate finite non-bonded
+///        contributions and exclusions in a piecemeal fashion.  These actions are useful for
+///        analysis of individual functions regarding the most complex component of a typical MD
+///        simulation.
+enum class CellGridAction {
+  INIT_FORCES,       ///< Initialize forces, setting all accumulators of the current image to zero.
+  XFER_FORCES,       ///< Transfer forces from the current image to the associated coordinate
+                     ///<   synthesis.
+  UPDATE_IMG_COORD,  ///< Update the coordinates, the first step in turning the current image into
+                     ///<   the new image.  This will leave the CellGrid in an intermediate state,
+                     ///<   without a valid current image until executing processes associated with
+                     ///<   UPDATE_IMG_CELLS.
+  UPDATE_IMG_CELLS   ///< Complete the new image by re-organizing cells.
+};
+
+/// \brief Differentiate between different strategies of mapping (spreading) particle density to
+///        the particle-mesh interaction grid.
+enum class QMapMethod {
+  ACC_REGISTER,     ///< Force the use of the register accumulation method, which involves no
+                    ///<   atomic operations, if the precision model allows (otherwise, the
+                    ///<   selection mechanism reverts to "AUTOMATIC")
+  ACC_SHARED,       ///< Force the use of the __shared__ cache accumulation method in whatever
+                    ///<   precision model
+  GENERAL_PURPOSE,  ///< Force the use of the general-purpose method in whatever precision model
+  AUTOMATIC         ///< Use the fastest kernel available based on internal heuristics and
+                    ///<   availability under a given precision model
+};
+  
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///
 /// \param input  The enumeration of interest
@@ -136,10 +187,14 @@ std::string getEnumerationName(EvaluateVirial input);
 std::string getEnumerationName(DihedralStyle input);
 std::string getEnumerationName(StateVariable input);
 std::string getEnumerationName(NonbondedPotential input);
+std::string getEnumerationName(NonbondedTheme input);
+std::string getEnumerationName(DecomposablePotential input);
 std::string getEnumerationName(VdwCombiningRule input);
 std::string getEnumerationName(ClashResponse input);
 std::string getEnumerationName(EnergySample input);
 std::string getEnumerationName(SplineScaffold input);
+std::string getEnumerationName(CellGridAction input);
+std::string getEnumerationName(QMapMethod input);
 /// \}
 
 /// \brief Produce a potential enumeration based on a selection of sanctioned input strings.

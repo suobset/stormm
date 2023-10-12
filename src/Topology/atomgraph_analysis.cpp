@@ -710,6 +710,22 @@ int inferLennardJonesTypeCount(const int length_a, const int length_b, const cha
   }
   return n_lj_types;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+VdwCombiningRule inferCombiningRule(const AtomGraph *ag, const ExceptionResponse policy,
+                                    const bool seek_prevalent) {
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  return inferCombiningRule<double>(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types, policy,
+                                    seek_prevalent);
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwCombiningRule inferCombiningRule(const AtomGraph &ag, const ExceptionResponse policy,
+                                    const bool seek_prevalent) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  return inferCombiningRule<double>(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types, policy,
+                                    seek_prevalent);
+}
+
 } // namespace topology
 } // namespace stormm

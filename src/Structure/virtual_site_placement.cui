@@ -314,8 +314,6 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
               int95SumToDouble(frame3_y, frame3_y_ovrf, -frame2_y, -frame2_y_ovrf),
               int95SumToDouble(frame3_z, frame3_z_ovrf, -frame2_z, -frame2_z_ovrf) };
 #endif
-            const TCALC invr2_p_f2 = (TCALC)(1.0) / ((p_f2.x * p_f2.x) + (p_f2.y * p_f2.y) +
-                                                     (p_f2.z * p_f2.z));
             const TCALC3 f23_t_pf2 = perpendicular(f2_f3, p_f2);
             const TCALC invr_p_f2 = (TCALC)(1.0) / SQRT_FUNC((p_f2.x * p_f2.x) +
                                                              (p_f2.y * p_f2.y) +

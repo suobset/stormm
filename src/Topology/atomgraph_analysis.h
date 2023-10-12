@@ -11,6 +11,7 @@
 #include "Potential/energy_enumerators.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
+#include "atomgraph_abstracts.h"
 
 namespace stormm {
 namespace topology {
@@ -86,7 +87,7 @@ std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j
 /// \}
 
 /// \brief Compute the number of Lennard-Jones atom types given two vectors of a particular length,
-///        assuming them to be square matrice of the A and B coefficients.
+///        assuming them to be square matrices of the A and B coefficients.
 ///
 /// \param length_a  The number of values in the matrix of A coefficients
 /// \param length_b  The number of values in the matrix of B coefficients
@@ -101,25 +102,42 @@ int inferLennardJonesTypeCount(const int length_a, const int length_b,
 ///   - Provide the A and B coefficient arrays by C-style arrays with trusted length
 ///   - Provide the A and B coefficient arrays as Standard Template Library vectors
 ///   - Provide the A and B coefficient arrays as Hybrid objects
+///   - Provide a topology and extract the Lennard-Jones parameters from it
 ///
-/// \param lja            Array of Lennard-Jones A coefficients
-/// \param ljb            Array of Lennard-Jones B coefficients
-/// \param lj_type_count  The number of Lennard-Jones types, indicating the trusted lengths of lja
-///                       and ljb by the number's square
-/// \param policy         Course of action in the event that there are only one (fewer) atom types
+/// \param lja             Array of Lennard-Jones A coefficients
+/// \param ljb             Array of Lennard-Jones B coefficients
+/// \param lj_type_count   The number of Lennard-Jones types, indicating the trusted lengths of
+///                        lja and ljb by the number's square
+/// \param policy          Protocol in the event that there are only one (fewer) atom types
+/// \param seek_prevalent  A rare boolean input that, if set to TRUE, will avoid declaring a
+///                        parameter set "NBFIX" and instead declare it to be "GEOMETRIC" or
+///                        "LORENTZ_BERTHELOT" depending on whether more cases of either combining
+///                        rule can be found.  A parameter set might still be decalred "NBFIX" if
+///                        no instances of the other combining rules can describe any off-diagonal
+///                        interactions in the matrix.
 /// \{
 template <typename T>
 VdwCombiningRule inferCombiningRule(const T* lja, const T* ljb, int lj_type_count,
-                                    ExceptionResponse policy = ExceptionResponse::WARN);
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
   
 template <typename T>
 VdwCombiningRule inferCombiningRule(const std::vector<T> &lja, const std::vector<T> &ljb,
-                                    int lj_type_count,
-                                    ExceptionResponse policy = ExceptionResponse::WARN);
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
 
 template <typename T>
-VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb, int lj_type_count,
-                                    ExceptionResponse policy = ExceptionResponse::WARN);
+VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
+
+VdwCombiningRule inferCombiningRule(const AtomGraph *ag,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
+
+VdwCombiningRule inferCombiningRule(const AtomGraph &ag,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
 /// \}
 
 } // namespace topology

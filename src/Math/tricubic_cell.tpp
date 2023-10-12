@@ -223,8 +223,8 @@ TricubicCell<T>::TricubicCell(const TricubicStencil weights_matrix,
     break;
   case Interpolant::FUNCTION_VALUE:
 
-    // Additional partial derivatives are not necessary when using a stencil with involving only
-    // first derivatives.
+    // Additional partial derivatives are unnecessary with a stencil involving only first
+    // derivatives.
     break;
   }
 }
@@ -254,7 +254,7 @@ template <typename T>
 void TricubicCell<T>::setCoefficient(const T value, const int i, const int j, const int k) {
   if (i > 3 || j > 3 || k > 3 || i < 0 || j < 0 || k < 0) {
     rtErr("A coefficient for x, y, and z powers " + std::to_string(i) + ", " + std::to_string(j) +
-          ", and " + std::to_string(k) + " is not acceptable.", "TricubicCell", "getCoefficient");
+          ", and " + std::to_string(k) + " is not acceptable.", "TricubicCell", "setCoefficient");
   }
   coefficients[(4 * ((4 * k) + j)) + i] = value;
 }

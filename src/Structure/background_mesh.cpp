@@ -1,9 +1,12 @@
 #include "copyright.h"
+#include "Numerics/host_popc.h"
 #include "background_mesh.h"
 
 namespace stormm {
 namespace structure {
-  
+
+using numerics::hostPopcll;
+
 //-------------------------------------------------------------------------------------------------
 void accumulateOcclusionMesh(BackgroundMeshWriter<llint> *target,
                              const BackgroundMeshReader<llint> &contribution) {
@@ -71,10 +74,7 @@ void accumulateOcclusionMesh(BackgroundMeshWriter<llint> *target,
                                                        ci_cubelet);
               const ullint ocval = contribution.coeffs[ocidx];
               if (ocval > 0LLU) {
-                for (int m = 0; m < 16; m++) {
-                  const ullint octmp = ((ocval >> (m * 4)) & 0xfLLU);
-                  nbits += bit_counts[octmp];
-                }
+                nbits += hostPopcll(ocval);
               }
             }
           }

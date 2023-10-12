@@ -19,7 +19,7 @@ using parse::char4ToString;
 using parse::realToString;
 using parse::stringToChar4;
 using parse::strncmpCased;
-using parse::operator==;
+using data_types::operator==;
 using testing::Approx;
 using testing::ComparisonType;
 using namespace generalized_born_defaults;

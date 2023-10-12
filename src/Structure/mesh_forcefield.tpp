@@ -72,7 +72,7 @@ MeshForceField<T>::MeshForceField(const VdwCombiningRule mixing_protocol_in,
                                   const double clash_ratio_in, const double clash_distance_in,
                                   const AtomGraph *ag) :
     MeshForceField(mixing_protocol_in, ag->getCoulombConstant(), clash_ratio_in, clash_distance_in,
-                   ag->getAtomTypeCount())
+                   ag->getLJTypeCount())
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ MeshForceField<T>::MeshForceField(const VdwCombiningRule mixing_protocol_in,
                                   const double clash_ratio_in, const double clash_distance_in,
                                   const AtomGraph &ag) :
     MeshForceField(mixing_protocol_in, ag.getCoulombConstant(), clash_ratio_in, clash_distance_in,
-                   ag.getAtomTypeCount())
+                   ag.getLJTypeCount())
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -450,8 +450,8 @@ void MeshForceField<T>::setLJCoefficients(const AtomGraph *ag,
   // If there is not the right amount of space to store the Lennard-Jones types listed in the
   // topology, this is an error.  Reallocate, but store the electrostatic softcore potential in
   // the process as this would be blown away.
-  if (ag->getAtomTypeCount() != lj_type_count) {
-    reallocate(ag->getAtomTypeCount());
+  if (ag->getLJTypeCount() != lj_type_count) {
+    reallocate(ag->getLJTypeCount());
   }
   const std::vector<double> ag_sigma = ag->getLennardJonesSigma<double>();
   const std::vector<double> ag_eps = ag->getLennardJonesEpsilon<double>();    
@@ -502,7 +502,7 @@ void MeshForceField<T>::setLJCoefficients(const AtomGraph &ag,
 template <typename T>
 void MeshForceField<T>::setLJCoefficients(const AtomGraph *ag, const double probe_radius,
                                           const double probe_well_depth) {
-  const size_t nt = ag->getAtomTypeCount();
+  const size_t nt = ag->getLJTypeCount();
   setLJCoefficients(ag, std::vector<double>(nt, probe_radius),
                     std::vector<double>(nt, probe_well_depth));
 }
@@ -511,7 +511,7 @@ void MeshForceField<T>::setLJCoefficients(const AtomGraph *ag, const double prob
 template <typename T>
 void MeshForceField<T>::setLJCoefficients(const AtomGraph &ag, const double probe_radius,
                                           const double probe_well_depth) {
-  const size_t nt = ag.getAtomTypeCount();
+  const size_t nt = ag.getLJTypeCount();
   setLJCoefficients(ag.getSelfPointer(), std::vector<double>(nt, probe_radius),
                     std::vector<double>(nt, probe_well_depth));
 }

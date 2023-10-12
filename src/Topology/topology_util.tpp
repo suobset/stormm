@@ -156,5 +156,46 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+bool hasVdwProperties(const NonbondedKit<T> &nbk, const int atom_index,
+                      const VdwCombiningRule lj_rule) {
+  if (atom_index < 0 || atom_index >= nbk.natom) {
+    rtErr("Atom index " + std::to_string(atom_index) + " is invalid for a topology with " +
+          std::to_string(nbk.natom) + " atoms.", "hasVdwProperties");
+  }
+  const int lj_idx = nbk.lj_idx[atom_index];
+  switch (lj_rule) {
+  case VdwCombiningRule::GEOMETRIC:
+  case VdwCombiningRule::LORENTZ_BERTHELOT:
+    return (nbk.ljb_coeff[(nbk.n_lj_types + 1) * lj_idx] > constants::small);
+  case VdwCombiningRule::NBFIX:
+    {
+      bool result = false;
+      for (int i = 0; i < nbk.n_lj_types; i++) {
+        result = (result || nbk.ljb_coeff[(nbk.n_lj_types * lj_idx) + i] > constants::small);
+      }
+      return result;
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+bool hasRelevantProperties(const NonbondedKit<T> &nbk, const int atom_index,
+                           const NonbondedTheme theme, const VdwCombiningRule lj_rule) {
+  switch (theme) {
+  case NonbondedTheme::ELECTROSTATIC:
+    return (fabs(nbk.charge[atom_index]) > constants::small);
+  case NonbondedTheme::VAN_DER_WAALS:
+    return hasVdwProperties<double>(nbk, atom_index, lj_rule);
+  case NonbondedTheme::ALL:
+    return true;
+  }
+  __builtin_unreachable();
+}
+
 } // namespace topology
 } // namespace stormm

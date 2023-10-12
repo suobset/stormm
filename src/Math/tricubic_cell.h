@@ -88,11 +88,11 @@ public:
   /// \param weights_matrix  The inverse matrix of polynomial weights obtained from
   ///                        getTricubicMatrix() in this library
   /// \param bounds          Array containing the Cartesian x, y, and z coordinates of the grid
-  ///                        cell origin plus its lengths along each axis (the grid cell is assumed
-  ///                        to be orthorhombic).  This array can have four entries (in which case
-  ///                        the final entry is assumed to be the isotropic length parameter), six
-  ///                        (for anisotropic cells), or twelve entries, in which case the last
-  ///                        nine represent the column matrix of cell vectors.
+  ///                        cell origin plus its lengths along each axis (the grid cell is NOT
+  ///                        required to be orthorhombic).  This array can have four entries (in
+  ///                        which case the final entry is assumed to be the isotropic length
+  ///                        parameter), six (for anisotropic cells), or twelve entries, in which
+  ///                        case the last nine represent the column matrix of cell vectors.
   /// \{
   TricubicCell();
 

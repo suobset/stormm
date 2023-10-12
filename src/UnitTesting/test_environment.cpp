@@ -27,7 +27,8 @@ using parse::NumberFormat;
 
 //-------------------------------------------------------------------------------------------------
 TestEnvironment::TestEnvironment(const int argc, const char* argv[],
-                                 const TmpdirStatus tmpdir_required) :
+                                 const TmpdirStatus tmpdir_required,
+                                 const ExceptionResponse policy) :
     verbose_level{TestVerbosity::COMPACT},
     general_tolerance{1.0e-4},
     random_seed{827493},
@@ -64,9 +65,18 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
         general_tolerance = strtod(argv[i + 1], nullptr);
       }
       else {
-        rtWarn("Failed to detect a number in specifying the general tolerance for tests (" +
-               std::string(argv[i + 1]) + ").  The default value of 1.0e-4 will be taken "
-               "instead.", "TestEnvironment");
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("Failed to detect a valid number in specifying the general tolerance for tests (" +
+                std::string(argv[i + 1]) + ").", "TestEnvironment");
+        case ExceptionResponse::WARN:
+          rtWarn("Failed to detect a number in specifying the general tolerance for tests (" +
+                 std::string(argv[i + 1]) + ").  The default value of 1.0e-4 will be taken "
+                 "instead.", "TestEnvironment");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
       }
       i++;
       cli_tol = true;
@@ -77,9 +87,18 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
         random_seed = strtol(argv[i + 1], nullptr, 10);
       }
       else {
-        rtWarn("Failed to detect a valid integer in specifying the pseudo-random number seed (" +
-               std::string(argv[i + 1]) + ").  The default value of 827493 will be taken "
-               "instead.", "TestEnvironment");
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("Failed to detect a valid integer in specifying the pseudo-random number seed (" +
+                std::string(argv[i + 1]) + ").", "TestEnvironemnt");
+        case ExceptionResponse::WARN:
+          rtWarn("Failed to detect a valid integer in specifying the pseudo-random number seed (" +
+                 std::string(argv[i + 1]) + ").  The default value of 827493 will be taken "
+                 "instead.", "TestEnvironment");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
       }
       i++;
       cli_rng = true;
@@ -95,9 +114,19 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
         verbose_level = TestVerbosity::FAILURE_ONLY;
       }
       else {
-        rtWarn("Valid settings for verbosity include FULL > COMPACT > FAILURE_ONLY (a.k.a. "
-               "FAIL).  The default value of COMPACT will be taken instead of " +
-               std::string(argv[i + 1]) + ".", "TestEnvironment");
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("Valid settings for verbosity include FULL > COMPACT > FAILURE_ONLY (a.k.a. "
+                "FAIL).  A value of " + std::string(argv[i + 1]) + " is invalid.",
+                "TestEnvironment");
+        case ExceptionResponse::WARN:
+          rtWarn("Valid settings for verbosity include FULL > COMPACT > FAILURE_ONLY (a.k.a. "
+                 "FAIL).  The default value of COMPACT will be taken instead of " +
+                 std::string(argv[i + 1]) + ".", "TestEnvironment");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
       }
       i++;
       cli_vbs = true;
@@ -138,7 +167,15 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       display_time = true;
     }
     else {
-      rtWarn("Unrecognized flag " + std::string(argv[i]) + ".", "TestEnvironment");
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Unrecognized flag " + std::string(argv[i]) + ".", "TestEnvironment");
+      case ExceptionResponse::WARN:
+        rtWarn("Unrecognized flag " + std::string(argv[i]) + ".", "TestEnvironment");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
     }
   }
 
@@ -332,6 +369,12 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
   // merely pointers to memory pertaining to environment variables that already existed prior
   // to calling std::getenv(), and will be free'd by whatever machinery created the memory.
 }
+
+//-------------------------------------------------------------------------------------------------
+TestEnvironment::TestEnvironment(const int argc, const char* argv[],
+                                 const ExceptionResponse policy) :
+    TestEnvironment(argc, argv, TmpdirStatus::NOT_REQUIRED, policy)
+{}
 
 //-------------------------------------------------------------------------------------------------
 TestEnvironment::~TestEnvironment() {

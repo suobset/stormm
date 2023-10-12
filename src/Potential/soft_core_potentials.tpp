@@ -346,12 +346,10 @@ void quinticSoftCore(Tcalc4* abcd_coefficients, Tcalc2* ef_coefficients, const d
   bvec[3] = d3f_rswitch;
 
   // The slope of the spline at the left hand side limit is set to the requested value.
-  // projected targets.
   amat[28] = 1.0;
   bvec[4] = target_zero;
       
   // The second derivative of the spline at the left hand side will be set to zero.
-  // targets.
   amat[23] = 2.0;
   bvec[5] = 0.0;
 
@@ -365,6 +363,43 @@ void quinticSoftCore(Tcalc4* abcd_coefficients, Tcalc2* ef_coefficients, const d
   abcd_coefficients->w = xvec[3];
   ef_coefficients->x   = xvec[4];
   ef_coefficients->y   = xvec[5];
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc4>
+void exponentialSoftCore(Tcalc4 *abcd_coefficients, const double v, const double rswitch,
+                         const double f_rswitch, const double df_rswitch, const double d2f_rswitch,
+                         const double d3f_rswitch) {
+  std::vector<double> amat(16), inv_amat(16);
+  amat[ 0] = 1.0;
+  amat[ 4] = 1.0;
+  amat[ 8] = 1.0;
+  amat[12] = 1.0;
+  amat[ 1] =  2.0 * v;
+  amat[ 5] =  3.0 * v;
+  amat[ 9] =  4.0 * v;
+  amat[13] = 0.0;
+  amat[ 2] =  4.0 * v * v;
+  amat[ 6] =  9.0 * v * v;
+  amat[10] = 16.0 * v * v;
+  amat[14] = 0.0;
+
+  // Use pow to get the cube to higher precision than straight multiplication
+  const double v3 = pow(v, 3.0);
+  amat[ 3] =  4.0 * v3;
+  amat[ 7] =  9.0 * v3;
+  amat[11] = 16.0 * v3;
+  amat[15] = 0.0;
+
+  // Form the result vector and solve the linear system of equations
+  const std::vector<double> bvec = { f_rswitch, df_rswitch, d2f_rswitch, d3f_rswitch };
+  std::vector<double> xvec(4, 0.0);
+  invertSquareMatrix(amat.data(), inv_amat.data(), 4);
+  matrixVectorMultiply(inv_amat, bvec, &xvec, 4, 4, 1.0, 1.0, 0.0);
+  abcd_coefficients->x = xvec[0];
+  abcd_coefficients->y = xvec[1];
+  abcd_coefficients->z = xvec[2];
+  abcd_coefficients->w = xvec[3];
 }
 
 } // namespace energy

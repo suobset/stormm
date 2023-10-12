@@ -1303,7 +1303,7 @@ void BackgroundMesh<T>::validateCombiningRule(const VdwCombiningRule mixing_prot
     }
     break;
   case VdwCombiningRule::NBFIX:
-    if (probe_sigma.size() != basis.getTopologyPointer()->getAtomTypeCount() ||
+    if (probe_sigma.size() != basis.getTopologyPointer()->getLJTypeCount() ||
         probe_sigma.size() != probe_epsilon.size()) {
       rtErr("For " + getEnumerationName(VdwCombiningRule::NBFIX) + " combining rules, all "
             "pairwise parameters between atoms in the topology and the probe must be provided.",
@@ -1384,7 +1384,7 @@ void BackgroundMesh<T>::setNonbondedModel(const VdwCombiningRule mixing_protocol
     }
     break;
   case VdwCombiningRule::NBFIX:
-    if (probe_sigma.size() != ag_ptr->getAtomTypeCount() ||
+    if (probe_sigma.size() != ag_ptr->getLJTypeCount() ||
         probe_sigma.size() != probe_epsilon.size()) {
       rtErr("For " + getEnumerationName(VdwCombiningRule::NBFIX) + " combining rules, all "
             "pairwise parameters between atoms in the topology and the probe must be provided.",
@@ -2364,17 +2364,17 @@ void BackgroundMesh<T>::colorNonbondedField(const NonbondedKit<Tcalc> &nbk,
           // element, as necessary to determine a solution to the interpolant coefficients.
           switch (measurements.getStencilKind()) {
           case Interpolant::SMOOTHNESS:
-            du_dxy = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_y, r);
-            du_dxz = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_z, r);
-            du_dyz = radialSecondDerivative<Tcalc>(du, d2u, disp_y, disp_z, r);
-            du_dxyz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, disp_z, r);
+            du_dxy = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_y, r, r2);
+            du_dxz = radialSecondDerivative<Tcalc>(du, d2u, disp_x, disp_z, r, r2);
+            du_dyz = radialSecondDerivative<Tcalc>(du, d2u, disp_y, disp_z, r, r2);
+            du_dxyz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, disp_z, r, r2);
             if (unit_cell == UnitCellType::TRICLINIC) {
               du_dxx = radialSecondDerivative<Tcalc>(du, d2u, disp_x, r);
               du_dyy = radialSecondDerivative<Tcalc>(du, d2u, disp_y, r);
-              du_dxxx = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, r);
-              du_dxxy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, r);
-              du_dxxz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_z, r);
-              du_dxyy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_y, disp_x, r);
+              du_dxxx = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, r, r2);
+              du_dxxy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_y, r, r2);
+              du_dxxz = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_x, disp_z, r, r2);
+              du_dxyy = radialThirdDerivative<Tcalc>(du, d2u, d3u, disp_y, disp_x, r, r2);
             }
             break;
           case Interpolant::FUNCTION_VALUE:

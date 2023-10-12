@@ -75,12 +75,15 @@ public:
   /// \brief Get the available L1 __shared__ memory per streaming multiprocessor on this GPU
   int getMaxSharedPerSMP() const;
 
+  /// \brief Get the total amount of global cache (L2) on the card, in bytes
+  int getGlobalCacheSize() const;
+
   /// \brief Get the maximum number of registers available per block on this GPU
   int getRegistersPerBlock() const;
   
   /// \brief Get the maximum number of registers available per streaming multiprocessor on this GPU
   int getRegistersPerSMP() const;
-
+  
   /// \brief Get the name of the GPU
   std::string getCardName() const;
 
@@ -110,6 +113,7 @@ private:
   int max_blocks_per_smp;    ///< Maximum number of blocks permissible on one SMP
   int max_shared_per_block;  ///< Maximum shared memory available per block (bytes)
   int max_shared_per_smp;    ///< Maximum shared memory available per SMP (bytes)
+  int global_cache_size;     ///< The amount of L2 cache available, in bytes
   int registers_per_block;   ///< Number of registers available for each thread block
   int registers_per_smp;     ///< Size of the register file on each SMP
   std::string card_name;     ///< Name of the card according to the server

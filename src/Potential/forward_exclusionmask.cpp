@@ -27,7 +27,7 @@ ForwardExclusionMask::ForwardExclusionMask(const AtomGraph *ag_in) :
   primary_mask_indices{static_cast<size_t>(atom_count), "fwdmask_idx"},
   primary_masks{static_cast<size_t>(atom_count), "fwdmask_primary"},
   secondary_masks{0, "fwdmask_secondary"},
-  ag_pointer{ag_in}
+  ag_pointer{const_cast<AtomGraph*>(ag_in)}
 {
   // Return immediately if the pointer was null.
   if (ag_in == nullptr) {
@@ -204,6 +204,11 @@ ForwardExclusionMask::ForwardExclusionMask(const AtomGraph *ag_in) :
   secondary_masks.resize(tmp_secondary_masks.size());
   secondary_masks.putHost(tmp_secondary_masks);
 }
+
+//-------------------------------------------------------------------------------------------------
+ForwardExclusionMask::ForwardExclusionMask(const AtomGraph &ag_in) :
+    ForwardExclusionMask(ag_in.getSelfPointer())
+{}
 
 //-------------------------------------------------------------------------------------------------
 int ForwardExclusionMask::getAtomCount() const {

@@ -5,6 +5,8 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/bspline.h"
+#include "../../src/Math/formulas.h"
 #include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/matrix.h"
 #include "../../src/Math/matrix_ops.h"
@@ -21,6 +23,7 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/UnitTesting/approx.h"
@@ -32,8 +35,11 @@ using stormm::llint;
 using stormm::ulint;
 using stormm::ullint;
 #ifndef STORMM_USE_HPC
+using stormm::int2;
 using stormm::double2;
 using stormm::double3;
+using stormm::double4;
+using stormm::float4;
 #endif
 using stormm::ullint2;
 using stormm::constants::tiny;
@@ -52,6 +58,8 @@ using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
 using stormm::structure::BoundaryCondition;
+using stormm::structure::imageValue;
+using stormm::structure::ImagingMethod;
 using stormm::symbols::pi;
 using stormm::symbols::twopi;
 using stormm::topology::getEnumerationName;
@@ -1026,7 +1034,8 @@ void testTricubicCorners(const std::vector<double> &invu) {
         const double dx = x - q_x;
         const double dy = y - q_y;
         const double dz = z - q_z;
-        const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+        const double r = sqrt(r2);
         const double invr = 1.0 / r;
         const double invr2 = invr * invr;
 
@@ -1039,15 +1048,15 @@ void testTricubicCorners(const std::vector<double> &invu) {
         du_dy[ijk_idx] = radialFirstDerivative<double>(du, dy, r);
         du_dz[ijk_idx] = radialFirstDerivative<double>(du, dz, r);
         du_dxx[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, r);
-        du_dxy[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dy, r);
-        du_dxz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dz, r);
+        du_dxy[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dy, r, r2);
+        du_dxz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dx, dz, r, r2);
         du_dyy[ijk_idx] = radialSecondDerivative<double>(du, d2u, dy, r);
-        du_dyz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dy, dz, r);
-        du_dxxx[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, r);
-        du_dxxy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, r);
-        du_dxxz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dz, r);
-        du_dxyy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dy, dx, r);
-        du_dxyz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, dz, r);
+        du_dyz[ijk_idx] = radialSecondDerivative<double>(du, d2u, dy, dz, r, r2);
+        du_dxxx[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, r, r2);
+        du_dxxy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, r, r2);
+        du_dxxz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dz, r, r2);
+        du_dxyy[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dy, dx, r, r2);
+        du_dxyz[ijk_idx] = radialThirdDerivative<double>(du, d2u, d3u, dx, dy, dz, r, r2);
 
         // Compute the derivatives in the cell space by analytic methods
         du_da[ijk_idx] = (du_dx[ijk_idx] * invu[0]);
@@ -1170,7 +1179,8 @@ void testCoulombInterpolation(const std::vector<double> &invu, const TricubicSte
           const double dx = vert_x - q_x[m];
           const double dy = vert_y - q_y[m];
           const double dz = vert_z - q_z[m];
-          const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+          const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+          const double r = sqrt(r2);
           const double invr = 1.0 / r;
           const double invr2 = invr * invr;
           const double dqqe  = -invr2;
@@ -1183,15 +1193,15 @@ void testCoulombInterpolation(const std::vector<double> &invu, const TricubicSte
           switch (tcs.getKind()) {
           case Interpolant::SMOOTHNESS:
             dudxx[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, r);
-            dudxy[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dy, r);
-            dudxz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dz, r);
+            dudxy[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dy, r, r2);
+            dudxz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dx, dz, r, r2);
             dudyy[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dy, r);
-            dudyz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dy, dz, r);
-            dudxxx[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, r);
-            dudxxy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, r);
-            dudxxz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dz, r);
-            dudxyy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dy, dx, r);
-            dudxyz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, dz, r);
+            dudyz[idx] += q_v[m] * radialSecondDerivative(dqqe, d2qqe, dy, dz, r, r2);
+            dudxxx[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, r, r2);
+            dudxxy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, r, r2);
+            dudxxz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dz, r, r2);
+            dudxyy[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dy, dx, r, r2);
+            dudxyz[idx] += q_v[m] * radialThirdDerivative(dqqe, d2qqe, d3qqe, dx, dy, dz, r, r2);
             break;
           case Interpolant::FUNCTION_VALUE:
             {
@@ -1288,6 +1298,80 @@ void testCoulombInterpolation(const std::vector<double> &invu, const TricubicSte
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the sigmoid and sigmoidf functions to verify their returned values and derivatives.
+//-------------------------------------------------------------------------------------------------
+void testSigmoid(const double crossover, const double intensity) {
+  const int npts = 40;
+  std::vector<double4> sigm(npts);
+  std::vector<double> sigm_x(npts), sigm_y(npts), sigm_z(npts), sigm_w(npts), vchk(npts);
+  std::vector<double> sole_x(npts), sole_y(npts), sole_z(npts), sole_w(npts);
+  std::vector<double> fd_one(npts), fd_two(npts), fd_thr(npts);
+  std::vector<float> fsigm_x(npts), fsigm_y(npts), fsigm_z(npts), fsigm_w(npts);
+  std::vector<float> fsole_x(npts), fsole_y(npts), fsole_z(npts), fsole_w(npts);
+  const double delta = pow(2.0, -16.0);
+  double r = -10.0;
+  for (int i = 0; i < npts; i++) {
+    sigm[i] = sigmoid(r, crossover, intensity);
+    const double4 sigm_p = sigmoid(r + delta, crossover, intensity);
+    const double4 sigm_n = sigmoid(r - delta, crossover, intensity);
+    vchk[i] = 1.0 / (exp(intensity * (r - crossover)) + 1.0);
+    sigm_x[i] = sigm[i].x;
+    sigm_y[i] = sigm[i].y;
+    sigm_z[i] = sigm[i].z;
+    sigm_w[i] = sigm[i].w;
+    fd_one[i] = (sigm_p.x - sigm_n.x) / (2.0 * delta);
+    fd_two[i] = (sigm_p.y - sigm_n.y) / (2.0 * delta);
+    fd_thr[i] = (sigm_p.z - sigm_n.z) / (2.0 * delta);
+    sole_x[i] = sigmoid(r, crossover, intensity, 0);
+    sole_y[i] = sigmoid(r, crossover, intensity, 1);
+    sole_z[i] = sigmoid(r, crossover, intensity, 2);
+    sole_w[i] = sigmoid(r, crossover, intensity, 3);
+    const float4 fsigm = sigmoidf(r, crossover, intensity);
+    fsigm_x[i] = fsigm.x;
+    fsigm_y[i] = fsigm.y;
+    fsigm_z[i] = fsigm.z;
+    fsigm_w[i] = fsigm.w;
+    fsole_x[i] = sigmoidf(r, crossover, intensity, 0);
+    fsole_y[i] = sigmoidf(r, crossover, intensity, 1);
+    fsole_z[i] = sigmoidf(r, crossover, intensity, 2);
+    fsole_w[i] = sigmoidf(r, crossover, intensity, 3);
+    r += 0.5;
+  }
+  check(sigm_x, RelationalOperator::EQUAL, Approx(vchk).margin(stormm::constants::tiny),
+        "The sigmoid function does not return the expected function values.");
+  check(sigm_y, RelationalOperator::EQUAL, fd_one, "The sigmoid function does not agree with the "
+        "first derivative computed by a finite difference approximation.");
+  check(sigm_z, RelationalOperator::EQUAL, fd_two, "The sigmoid function does not agree with the "
+        "second derivative computed by a finite difference approximation.");
+  check(sigm_w, RelationalOperator::EQUAL, fd_thr, "The sigmoid function does not agree with "
+        "the third derivative computed by a finite difference approximation.");
+  check(sole_x, RelationalOperator::EQUAL, sigm_x, "The sigmoid function does not return the "
+        "expected result when called explicitly for the function value.");
+  check(sole_y, RelationalOperator::EQUAL, sigm_y, "The sigmoid function does not return the "
+        "expected result when called explicitly for the first derivative.");
+  check(sole_z, RelationalOperator::EQUAL, sigm_z, "The sigmoid function does not return the "
+        "expected result when called explicitly for the second derivative.");
+  check(sole_w, RelationalOperator::EQUAL, sigm_w, "The sigmoid function does not return the "
+        "expected result when called explicitly for the third derivative.");
+  check(fsigm_x, RelationalOperator::EQUAL, sigm_x, "The sigmoidf function does not return the "
+        "correct result in the function value.");
+  check(fsigm_y, RelationalOperator::EQUAL, sigm_y, "The sigmoidf function does not return the "
+        "correct result in the first derivative.");
+  check(fsigm_z, RelationalOperator::EQUAL, sigm_z, "The sigmoidf function does not return the "
+        "correct result in the second derivative.");
+  check(fsigm_w, RelationalOperator::EQUAL, Approx(sigm_w).margin(1.65e-6), "The sigmoidf "
+        "function does not return the correct result in the third derivative.");
+  check(fsole_x, RelationalOperator::EQUAL, sigm_x, "The sigmoidf function does not return the "
+        "correct result when queried for the function value.");
+  check(fsole_y, RelationalOperator::EQUAL, sigm_y, "The sigmoidf function does not return the "
+        "correct result when queried for the first derivative.");
+  check(fsole_z, RelationalOperator::EQUAL, sigm_z, "The sigmoidf function does not return the "
+        "correct result when queried for the second derivative.");
+  check(fsole_w, RelationalOperator::EQUAL, Approx(sigm_w).margin(1.65e-6), "The sigmoidf "
+        "function does not return the correct result when queried for the third derivative.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1316,6 +1400,9 @@ int main(const int argc, const char* argv[]) {
   // Section 6
   section("Test tricubic interpolation methods");
 
+  // Section 7
+  section("Customized formulas");
+  
   // Check vector processing capabilities
   section(1);
   const std::vector<double> dv_i = { 0.1, 0.5, 0.9, 0.7, 0.8 };
@@ -1628,6 +1715,17 @@ int main(const int argc, const char* argv[]) {
   check(near_factor_e, RelationalOperator::EQUAL, 70, "The nearest factor of 12612600 to 69 was "
         "not found correctly when approaching from " + getEnumerationName(LimitApproach::ABOVE) +
         ".");
+  const ullint big_product = ipowl(2, 14) * ipowl(3, 10) * ipowl(5, 6) * ipowl(7, 4);
+  const int near_factor_f = nearestFactor(big_product, 77, primes, LimitApproach::BELOW, 4);
+  check(near_factor_f, RelationalOperator::EQUAL, 75, "The nearest factor of a massive product "
+        "of 2, 3, 5, and 7 to the target of 77 was not computed correctly when approaching "
+        "from " + getEnumerationName(LimitApproach::ABOVE) + ".");
+  const std::vector<int> fctr_comps = { factorial(0), factorial(1), factorial(4), factorial(6) };
+  const std::vector<int> fctr_ans = { 1, 1, 24, 720 };
+  check(fctr_comps, RelationalOperator::EQUAL, fctr_ans, "Factorials of small integers were not "
+        "computed correctly.");
+  CHECK_THROWS(factorial(-1), "A factorial of a negative number was computed.");
+  CHECK_THROWS(factorial(13), "A factorial of an unwieldy number was computed.");
   
   // Check matrix math from the lightweight, onboard library
   section(4);
@@ -2169,6 +2267,167 @@ int main(const int argc, const char* argv[]) {
   testCoulombInterpolation(triclinic_i, tcstencil_cont, &xrs256pp);
   testCoulombInterpolation(triclinic_i, tcstencil_accr, &xrs256pp);
 
+  // Check customized formulas in STORMM's math library
+  testSigmoid(4.3, 2.6);
+  check(ipow(5, 5), RelationalOperator::EQUAL, 3125, "The integer power function does not produce "
+        "the correct result.");
+  check(ipow(1, 20853835), RelationalOperator::EQUAL, 1, "The integer power function does not "
+        "produce the correct result.");
+  check(ipow(-1, 9816837), RelationalOperator::EQUAL, -1, "The integer power function does not "
+        "produce the correct result.");
+  check(ipow(-2, 14), RelationalOperator::EQUAL, 16384, "The integer power function does not "
+        "produce the correct result.");
+  check(ipowl(5, 5), RelationalOperator::EQUAL, 3125, "The integer power function does not "
+        "produce the correct result.");
+  check(ipowl(-7, 13), RelationalOperator::EQUAL, -96889010407, "The long long integer power "
+        "function does not produce the correct result.");
+  check(ipowl(2, 37), RelationalOperator::EQUAL, 137438953472, "The long long integer power "
+        "function does not produce the correct result.");
+  check(ipowl(-1, 30683237), RelationalOperator::EQUAL, -1, "The long long integer power "
+        "function does not produce the correct result.");
+  CHECK_THROWS(ipow(6, -7), "The integer power function accepted a negative exponent.");
+  CHECK_THROWS(ipowl(3, -29), "The long long integer power function accepted a negative "
+               "exponent.");
+  CHECK_THROWS(bSpline<float>(0.5, 1), "B-spline computations were permitted with order 1.");
+  CHECK_THROWS(bSpline<double>(1.01, 3), "B-spline computations were permitted using a coordinate "
+               "outside the allowed range of [0.0, 1.0].");
+  const std::vector<double> bspl2 = bSpline<double>(0.5, 2);
+  check(bspl2, RelationalOperator::EQUAL, std::vector<double>(2, 0.5), "B-spline computation "
+        "for the hat function with coordinate 0.5 did not yield the expected results.");
+  const std::vector<double> bspl3 = bSpline<double>(0.5, 3);
+  const std::vector<double> bspl3_ans = { 0.125, 0.750, 0.125 };
+  check(bspl3, RelationalOperator::EQUAL, bspl3_ans, "B-spline computation for the parabolic "
+        "function with coordinate 0.5 did not yield the expected results.");
+  const std::vector<double> bspl3_asm = bSpline<double>(0.15, 3);
+  const std::vector<double> bspl3_asm_ans = { 0.361250000, 0.627500000, 0.011250000 };
+  check(bspl3_asm, RelationalOperator::EQUAL, bspl3_asm_ans, "B-spline computation for the "
+        "parabolic function with coordinate 0.15 did not yield the expected results.");
+  const std::vector<double> bspl4 = bSpline<double>(0.5, 4);
+  const std::vector<double> bspl4_ans = { 0.020833333, 0.479166667, 0.479166667, 0.020833333 };
+  check(bspl4, RelationalOperator::EQUAL, bspl4_ans, "B-spline computation for the cubic function "
+        "with coordinate 0.5 did not yield the expected results.");
+  const std::vector<double> bspl4_asm = bSpline<double>(0.38, 4);
+  const std::vector<double> bspl4_asm_ans = { 0.039721333, 0.549702667, 0.401430667, 0.009145333 };
+  check(bspl4_asm, RelationalOperator::EQUAL, bspl4_asm_ans, "B-spline computation for the cubic "
+        "function with coordinate 0.38 did not yield the expected results.");
+  const std::vector<double> bspl5 = bSpline<double>(0.137, 5);
+  const std::vector<double> bspl5_ans = { 0.023111703, 0.386368047, 0.520943476, 0.069562096,
+                                          0.000014678 };
+  check(bspl5, RelationalOperator::EQUAL, bspl5_ans, "B-spline computation for the quartic "
+        "function with coordinate 0.137 did not yield the expected results.");
+  const std::vector<double> dbspl5 = dBSpline<double>(0.137, 5);
+  const std::vector<double> dbspl5_ans = { -0.107122608, -0.542060735, 0.405917853, 0.242836931,
+                                            0.000428559 };
+  check(dbspl5, RelationalOperator::EQUAL, dbspl5_ans, "B-spline derivative computation for the "
+        "quartic function with coordinate 0.137 did not yield the expected results.");
+  const std::vector<double> xb_crd = {  0.54,  1.50,  2.09,  -0.51, -10.88 };
+  const std::vector<double> yb_crd = {  0.47,  1.31,  2.14,  -6.56, -10.05 };
+  const std::vector<double> zb_crd = {  8.11,  9.22, 10.58, -10.73,   4.43 };
+  const std::vector<double> b_umat = {  0.1, 0.0, 0.0, 0.0,  0.1, 0.0, 0.0, 0.0,  0.1 };
+  const std::vector<double> b_invu = { 10.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0 };
+  const std::vector<double> e_invu = {  1.0, 0.0, 0.0, 0.0,  1.0, 0.0, 0.0, 0.0,  1.0 };
+  std::vector<double> xbspl_coef(20), ybspl_coef(20), zbspl_coef(20);
+  std::vector<double> dxbspl_coef(20), dybspl_coef(20), dzbspl_coef(20);
+  std::vector<int> a_init(5), b_init(5), c_init(5);
+  check(bSplineNoUnity(0.02, 4), RelationalOperator::EQUAL, bSpline(0.02, 4), "B-spline "
+        "computations that do not apply the smooth partition of unity do not produce similar "
+        "answers to B-splines that do when the order is 4.");
+  check(bSplineNoUnity(0.71, 5), RelationalOperator::EQUAL, bSpline(0.71, 5), "B-spline "
+        "computations that do not apply the smooth partition of unity do not produce similar "
+        "answers to B-splines that do when the order is 5.");
+  check(bSplineNoUnity(0.63, 8), RelationalOperator::EQUAL, bSpline(0.63, 8), "B-spline "
+        "computations that do not apply the smooth partition of unity do not produce similar "
+        "answers to B-splines that do when the order is 8.");
+  bSpline<double, double>(xb_crd, yb_crd, zb_crd, 4, b_umat.data(), b_invu.data(), 10, 10, 10,
+                          e_invu.data(), &xbspl_coef, &ybspl_coef, &zbspl_coef, &a_init, &b_init,
+                          &c_init, &dxbspl_coef, &dybspl_coef, &dzbspl_coef);
+  std::vector<double> xbspl_ans, ybspl_ans, zbspl_ans;
+  const ImagingMethod img_meth = ImagingMethod::PRIMARY_UNIT_CELL;
+  std::vector<int> xbins(5), ybins(5), zbins(5);
+  for (int i = 0; i < 5; i++) {
+    const double reim_x = imageValue(xb_crd[i], 10.0, img_meth);
+    const double reim_y = imageValue(yb_crd[i], 10.0, img_meth);
+    const double reim_z = imageValue(zb_crd[i], 10.0, img_meth);
+    xbins[i] = floor(reim_x);
+    ybins[i] = floor(reim_y);
+    zbins[i] = floor(reim_z);
+    const std::vector<double> tmp_xb = bSpline(reim_x - floor(reim_x), 4);
+    const std::vector<double> tmp_yb = bSpline(reim_y - floor(reim_y), 4);
+    const std::vector<double> tmp_zb = bSpline(reim_z - floor(reim_z), 4);
+    xbspl_ans.insert(xbspl_ans.end(), tmp_xb.begin(), tmp_xb.end());
+    ybspl_ans.insert(ybspl_ans.end(), tmp_yb.begin(), tmp_yb.end());
+    zbspl_ans.insert(zbspl_ans.end(), tmp_zb.begin(), tmp_zb.end());
+  }
+  const std::vector<double> dx_ans = { -0.105800000, -0.642600000,  0.602600000,  0.145800000, 
+                                       -0.125000000, -0.625000000,  0.625000000,  0.125000000,
+                                       -0.414050000, -0.167850000,  0.577850000,  0.004050000, 
+                                       -0.130050000, -0.619850000,  0.629850000,  0.120050000, 
+                                       -0.387200000, -0.218400000,  0.598400000,  0.007200000 };
+  const std::vector<double> dy_ans = { -0.140450000, -0.608650000,  0.638650000,  0.110450000, 
+                                       -0.238050000, -0.475850000,  0.665850000,  0.048050000, 
+                                       -0.369800000, -0.250600000,  0.610600000,  0.009800000, 
+                                       -0.156800000, -0.589600000,  0.649600000,  0.096800000, 
+                                       -0.001250000, -0.546250000,  0.096250000,  0.451250000 };
+  const std::vector<double> dz_ans = { -0.396050000, -0.201850000,  0.591850000,  0.006050000, 
+                                       -0.304200000, -0.367400000,  0.647400000,  0.024200000, 
+                                       -0.088200000, -0.655400000,  0.575400000,  0.168200000, 
+                                       -0.266450000, -0.430650000,  0.660650000,  0.036450000, 
+                                       -0.162450000, -0.582650000,  0.652650000,  0.092450000 };
+  check(dxbspl_coef, RelationalOperator::EQUAL, dx_ans, "B-spline derivatives along the unit "
+        "cell A axis were not computed as expected.");
+  check(dybspl_coef, RelationalOperator::EQUAL, dy_ans, "B-spline derivatives along the unit "
+        "cell B axis were not computed as expected.");
+  check(dzbspl_coef, RelationalOperator::EQUAL, dz_ans, "B-spline derivatives along the unit "
+        "cell C axis were not computed as expected.");
+  check(xbspl_coef, RelationalOperator::EQUAL, xbspl_ans, "B-spline coefficients along the unit "
+        "cell A axis were not computed properly based on real coordinates in double-precision "
+        "mode.");
+  check(ybspl_coef, RelationalOperator::EQUAL, ybspl_ans, "B-spline coefficients along the unit "
+        "cell B axis were not computed properly based on real coordinates in double-precision "
+        "mode.");
+  check(zbspl_coef, RelationalOperator::EQUAL, zbspl_ans, "B-spline coefficients along the unit "
+        "cell C axis were not computed properly based on real coordinates in double-precision "
+        "mode.");
+  check(a_init, RelationalOperator::EQUAL, xbins, "Initial seedings of particles along the unit "
+        "cell A axis were not computed as expected.");
+  check(b_init, RelationalOperator::EQUAL, ybins, "Initial seedings of particles along the unit "
+        "cell B axis were not computed as expected.");
+  check(c_init, RelationalOperator::EQUAL, zbins, "Initial seedings of particles along the unit "
+        "cell C axis were not computed as expected.");
+
+  // Check the application of a sorted template
+  const int nwild = 10;
+  std::vector<int2> wildcards(nwild);
+  std::vector<double> associated(nwild);
+  for (int i = 0; i < nwild; i++) {
+    wildcards[i].x = 100.0 * xrs128p.uniformRandomNumber();
+    wildcards[i].y = i;
+    associated[i] = xrs128p.gaussianRandomNumber();
+  }
+  const std::vector<int2> wildcards_cpy = wildcards;
+  const std::vector<double> associated_cpy = associated;
+  std::sort(wildcards.begin(), wildcards.end(), [](int2 a, int2 b) { return a.x < b.x; });
+  const std::vector<double> sorted_association = applyAssociatedSort(associated, wildcards);
+  std::vector<size_t> extracted_order(nwild);
+  for (int i = 0; i < nwild; i++) {
+    extracted_order[i] = wildcards[i].y;
+  }
+  const std::vector<double> sorted_assoc_ii = applyAssociatedSort(associated, extracted_order);
+  bool correspondence = true;
+  for (int i = 0; i < nwild; i++) {
+    bool match_found = false;
+    for (int j = 0; j < nwild; j++) {
+      match_found = (match_found ||
+                     (wildcards[i].x == wildcards_cpy[j].x &&
+                      fabs(sorted_association[i] - associated_cpy[j]) < stormm::constants::tiny));
+    }
+    correspondence = (correspondence && match_found);
+  }
+  check(correspondence, "Sorting an array based on an associated, tagged sort did not work as "
+        "expected.");
+  check(sorted_association, RelationalOperator::EQUAL, sorted_assoc_ii, "Ordering an array based "
+        "on the extracted ordering from an assoicated sort does not produce the expected result.");
+  
   // Print results
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

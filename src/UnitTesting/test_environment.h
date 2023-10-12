@@ -5,11 +5,14 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "unit_test_enumerators.h"
 
 namespace stormm {
 namespace testing {
 
+using constants::ExceptionResponse;
+  
 /// \brief Object for parsing as well as storing environment and command-line input relevant to
 ///        unit testing (Test Driven Development) in STORMM.  Environment variables will be sought,
 ///        but command-line inputs addressing the same information will take precedence.
@@ -26,8 +29,15 @@ public:
   ///                         not required and the temporary directory cannot be created or written
   ///                         to, no warnings will be printed.  The directory's status will still
   ///                         be noted.
+  /// \param policy           Policy to take in the event that a command line argument is not
+  ///                         recognized
+  /// \{
   TestEnvironment(int argc, const char* argv[],
-                  TmpdirStatus tmpdir_required = TmpdirStatus::NOT_REQUIRED);
+                  TmpdirStatus tmpdir_required = TmpdirStatus::NOT_REQUIRED,
+                  ExceptionResponse policy = ExceptionResponse::WARN);
+
+  TestEnvironment(int argc, const char* argv[], ExceptionResponse policy);
+  /// \}
 
   /// \brief Destructor for the TestEnvironment object must delete the temporary directory if it
   ///        was created by the constructor.  This can only be done after STORMM removes files in

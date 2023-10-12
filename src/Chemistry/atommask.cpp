@@ -21,7 +21,7 @@ using parse::resolveScopes;
 using parse::separateText;
 using parse::stringToChar4;
 using parse::strcmpWildCard;
-using parse::operator==;
+using data_types::operator==;
 using topology::ChemicalDetailsKit;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
