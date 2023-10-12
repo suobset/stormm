@@ -176,7 +176,7 @@ AtomGraph::AtomGraph() :
     sp_virtual_site_frame_dim3{HybridKind::POINTER, "tp_vsdim3_sp"},
 
     // Relevant information for the non-bonded calculation
-    charge_type_count{0}, atom_type_count{0}, total_exclusions{0}, attenuated_14_type_count{0},
+    charge_type_count{0}, lj_type_count{0}, total_exclusions{0}, attenuated_14_type_count{0},
     inferred_14_attenuations{0}, periodic_box_class{UnitCellType::NONE},
     gb_style{ImplicitSolventModel::NONE}, dielectric_constant{1.0}, salt_concentration{0.0},
     coulomb_constant{amber_ancient_bioq}, pb_radii_set{""},
@@ -1130,7 +1130,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
 
     // Relevant information for the non-bonded calculation
     charge_type_count{original.charge_type_count},
-    atom_type_count{original.atom_type_count},
+    lj_type_count{original.lj_type_count},
     total_exclusions{original.total_exclusions},
     attenuated_14_type_count{original.attenuated_14_type_count},
     inferred_14_attenuations{original.inferred_14_attenuations},
@@ -1468,7 +1468,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
 
   // Copy relevant information for the non-bonded calculation
   charge_type_count = other.charge_type_count;
-  atom_type_count = other.atom_type_count;
+  lj_type_count = other.lj_type_count;
   total_exclusions = other.total_exclusions;
   attenuated_14_type_count = other.attenuated_14_type_count;
   inferred_14_attenuations = other.inferred_14_attenuations;
@@ -1790,7 +1790,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
 
     // Move information relevant to the non-bonded calculation
     charge_type_count{original.charge_type_count},
-    atom_type_count{original.atom_type_count},
+    lj_type_count{original.lj_type_count},
     total_exclusions{original.total_exclusions},
     attenuated_14_type_count{original.attenuated_14_type_count},
     inferred_14_attenuations{original.inferred_14_attenuations},
@@ -2122,7 +2122,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
 
   // Copy or move information relevant to the non-bonded calculation
   charge_type_count = other.charge_type_count;
-  atom_type_count = other.atom_type_count;
+  lj_type_count = other.lj_type_count;
   total_exclusions = other.total_exclusions;
   attenuated_14_type_count = other.attenuated_14_type_count;
   inferred_14_attenuations = other.inferred_14_attenuations;

@@ -56,18 +56,6 @@ std::string char4ToString(const char4 value);
 /// \param value  The string to convert
 char4 stringToChar4(const std::string &value);
   
-/// \brief Overload == to handle two char4 tuples
-///
-/// \param lhs  The first value to compare
-/// \param rhs  The second value to compare
-bool operator==(const char4 lhs, const char4 rhs);
-
-/// \brief Overload != to handle two char4 tuples
-///
-/// \param lhs  The first value to compare
-/// \param rhs  The second value to compare
-bool operator!=(const char4 lhs, const char4 rhs);
-
 /// \brief Convert a positive integer to an alphabetic string, essentially a base-26 number.
 ///
 /// \param input  The integer to convert
@@ -354,13 +342,13 @@ std::string minimalRealFormat(const double value, const double rel);
 ///                        (this is STANDARD_REAL in the NumberFormat enumerations)
 /// \param count           Trusted length of numbers, if providing a C-style array
 /// \param decimal_places  The number of digits after the decimal
-/// \param skip            Skip this many numbers at regular intervals in the sequence
+/// \param advance         Advance this many numbers with each step through the sequence
 /// \{
 template <typename T>
-int findAlignmentWidth(const T* numbers, size_t count, int decimal_places, size_t skip = 1);
+int findAlignmentWidth(const T* numbers, size_t count, int decimal_places, size_t advance = 1);
 
 template <typename T>
-int findAlignmentWidth(const std::vector<T> &numbers, int decimal_places, size_t skip = 1);
+int findAlignmentWidth(const std::vector<T> &numbers, int decimal_places, size_t advance = 1);
 /// \}
   
 /// Convert an integer to a formatted string.

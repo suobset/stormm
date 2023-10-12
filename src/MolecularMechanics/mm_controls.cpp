@@ -11,7 +11,8 @@ using card::HybridKind;
 using stmath::ReductionGoal;
 using numerics::AccumulationMethod;
 using synthesis::VwuGoal;
-
+using topology::UnitCellType;
+  
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
                                                        const double rattle_tol_in,
@@ -299,6 +300,10 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        const EvaluateEnergy eval_nrg,
                                                        const ClashResponse softcore,
                                                        const PrecisionModel prec,
+                                                       const QMapMethod qspread_approach,
+                                                       const PrecisionModel acc_prec,
+                                                       const size_t image_coord_type,
+                                                       const int qspread_order,
                                                        const AtomGraphSynthesis &poly_ag) {
   const GpuDetails wgpu = launcher.getGpu();
   const ImplicitSolventModel igb = poly_ag.getImplicitSolventModel();
@@ -314,29 +319,44 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
   const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
                                                     AccumulationMethod::SPLIT,
                                                     VwuGoal::ACCUMULATE, softcore);
-  const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                        AccumulationMethod::SPLIT, igb);
-  const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                             AccumulationMethod::SPLIT, igb);
-  const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                       eval_frc, eval_nrg,
-                                                       AccumulationMethod::SPLIT, igb, softcore);
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    {
+      const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
+                                                            AccumulationMethod::SPLIT, igb);
+      const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec,
+                                                                 poly_ag.getNonbondedWorkType(),
+                                                                 AccumulationMethod::SPLIT, igb);
+      const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
+                                                           eval_frc, eval_nrg,
+                                                           AccumulationMethod::SPLIT, igb,
+                                                           softcore);
+      for (int i = 0; i < twice_warp_size_int; i++) {
+        nbwu_progress.putHost(nbwu_lp.x, i);
+        gbrwu_progress.putHost(gbrwu_lp.x, i);
+        gbdwu_progress.putHost(gbdwu_lp.x, i);
+      }
+    }
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    {
+      const int2 pmewu_lp = launcher.getDensityMappingKernelDims(qspread_approach, prec, acc_prec,
+                                                                 image_coord_type, qspread_order);
+      for (int i = 0; i < twice_warp_size_int; i++) {
+        pmewu_progress.putHost(pmewu_lp.x, i);
+      }
+    }
+    break;
+  }
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
   const int vwu_block_count = vwu_lp.x;
-  const int nbwu_block_count = nbwu_lp.x;
-  const int gbrwu_block_count = gbrwu_lp.x;
-  const int gbdwu_block_count = gbdwu_lp.x;
-  const int pmewu_block_count = smp_count;
   const int gtwu_block_count = rdwu_lp.x;
   const int scwu_block_count = rdwu_lp.x;
   const int rdwu_block_count = rdwu_lp.x;
   for (int i = 0; i < twice_warp_size_int; i++) {
     vwu_progress.putHost(vwu_block_count, i);
-    nbwu_progress.putHost(nbwu_block_count, i);
-    pmewu_progress.putHost(pmewu_block_count, i);
-    gbrwu_progress.putHost(gbrwu_block_count, i);
-    gbdwu_progress.putHost(gbdwu_block_count, i);
     gather_wu_progress.putHost(gtwu_block_count, i);
     scatter_wu_progress.putHost(scwu_block_count, i);
     all_reduce_wu_progress.putHost(rdwu_block_count, i);
@@ -350,9 +370,21 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
 void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &launcher,
                                                        const EvaluateForce eval_frc,
                                                        const EvaluateEnergy eval_nrg,
+                                                       const ClashResponse softcore,
                                                        const PrecisionModel prec,
                                                        const AtomGraphSynthesis &poly_ag) {
-  primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, prec, poly_ag);
+  primeWorkUnitCounters(launcher, eval_frc, eval_nrg, softcore, prec, QMapMethod::GENERAL_PURPOSE,
+                        prec, int_type_index, 4, poly_ag);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &launcher,
+                                                       const EvaluateForce eval_frc,
+                                                       const EvaluateEnergy eval_nrg,
+                                                       const PrecisionModel prec,
+                                                       const AtomGraphSynthesis &poly_ag) {
+  primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, prec,
+                        QMapMethod::GENERAL_PURPOSE, prec, int_type_index, 4, poly_ag);
 }
 
 //-------------------------------------------------------------------------------------------------

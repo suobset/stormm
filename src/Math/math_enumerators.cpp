@@ -73,5 +73,59 @@ std::string getEnumerationName(const LimitApproach input) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const LogSplineForm input) {
+  switch (input) {
+  case LogSplineForm::ELEC_PME_DIRECT:
+    return std::string("ELEC_PME_DIRECT");
+  case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+    return std::string("ELEC_PME_DIRECT_EXCL");
+  case LogSplineForm::DELEC_PME_DIRECT:
+    return std::string("DELEC_PME_DIRECT");
+  case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+    return std::string("DELEC_PME_DIRECT_EXCL");
+  case LogSplineForm::CUSTOM:
+    return std::string("CUSTOM");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TableIndexing input) {
+  switch (input) {
+  case TableIndexing::ARG:
+    return std::string("ARG");
+  case TableIndexing::SQUARED_ARG:
+    return std::string("SQUARED_ARG");
+  case TableIndexing::ARG_OFFSET:
+    return std::string("ARG_OFFSET");
+  case TableIndexing::SQ_ARG_OFFSET:
+    return std::string("SQ_ARG_OFFSET");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const BasisFunctions input) {
+  switch (input) {
+  case BasisFunctions::MIXED_FRACTIONS:
+    return std::string("MIXED_FRACTIONS");
+  case BasisFunctions::POLYNOMIAL:
+    return std::string("POLYNOMIAL");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const BSplineUnity input) {
+  switch (input) {
+  case BSplineUnity::CENTER_FILL:
+    return std::string("CENTER_FILL");
+  case BSplineUnity::NONE:
+    return std::string("NONE");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace stormm
 } // namespace stmath

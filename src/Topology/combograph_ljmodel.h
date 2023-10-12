@@ -12,45 +12,15 @@
 #include "atomgraph.h"
 #include "atomgraph_abstracts.h"
 #include "atomgraph_analysis.h"
+#include "lennard_jones_analysis.h"
 
 namespace stormm {
 namespace topology {
 
 using energy::getEnumerationName;
-using parse::operator==;
+using data_types::operator==;
 using synthesis::AtomGraphSynthesis;
 using topology::AtomGraph;
-  
-/// \brief A struct to encode two atom types and the Lennard-Jones parameters by which they
-///        interact.
-struct PairLJInteraction {
-public:
-
-  /// \brief The default constructor will initialize atom types and parameters, but they are almost
-  ///        certain to register as invalid in later searches if left unspecified.
-  /// \{
-  PairLJInteraction(const char4 type_a_in = { ' ', ' ', ' ', ' ' },
-                    const char4 type_b_in = { ' ', ' ', ' ', ' ' }, double lja_in = 0.0,
-                    double ljb_in = 0.0);
-
-  /// \brief The default copy and move constructions as well as assignment operators are valid,
-  ///        making this object easy to manipulate.
-  //                                                                                               
-  /// \param original  The original object to copy or move
-  /// \param other     Another object placed on the right hand side of an assignment statement
-  /// \{
-  PairLJInteraction(const PairLJInteraction &original) = default;
-  PairLJInteraction(PairLJInteraction &&original) = default;
-  PairLJInteraction& operator=(const PairLJInteraction &original) = default;
-  PairLJInteraction& operator=(PairLJInteraction &&original) = default;
-  /// \}
-  
-  // All member variables are public.
-  char4 type_a;  ///< Atom type of the first atom in the pair
-  char4 type_b;  ///< Atom type of the second atom in the pair
-  double lja;    ///< Lennard-Jones A coefficient for the interaction, as in U = A/r^12 - B/r^6
-  double ljb;    ///< Lennard-Jones B coefficient for the interaction
-};
   
 /// \brief An object to manage the combination of Lennard-Jones parameters from two topologies.
 ///        This can be used to insert "NBFix" pair-specific (off-rule) parameters where neither
@@ -63,27 +33,30 @@ public:
   /// \brief The constructor accepts two topologies or two Lennard-Jones parameter sets.  Edits
   ///        to the Lennard-Jones parameters can be provided to the constructor or entered later.
   ///
-  /// \param poly_ag_othr  
+  /// \param poly_ag_secondary  A synthesis of topologies form which to harvest unique
+  ///                           Lennard-Jones types
+  /// \param edits_in           A list of edits to apply to modify pair-specific Lennard-Jones
+  //                            interactions
   /// \{
-  ComboGraphLJModel(const AtomGraph *base_ag_in, const AtomGraph *ag_othr_in = nullptr,
+  ComboGraphLJModel(const AtomGraph *primary_ag_in, const AtomGraph *ag_secondary_in = nullptr,
                     VdwCombiningRule default_rule_in = VdwCombiningRule::LORENTZ_BERTHELOT,
                     const std::vector<PairLJInteraction> &edits = {});
 
-  ComboGraphLJModel(const AtomGraph &base_ag_in, const AtomGraph &ag_othr_in,
+  ComboGraphLJModel(const AtomGraph &primary_ag_in, const AtomGraph &ag_secondary_in,
                     VdwCombiningRule default_rule_in = VdwCombiningRule::LORENTZ_BERTHELOT,
                     const std::vector<PairLJInteraction> &edits = {});
 
-  ComboGraphLJModel(const AtomGraph &base_ag_in, const AtomGraphSynthesis &poly_ag_othr,
+  ComboGraphLJModel(const AtomGraph &primary_ag_in, const AtomGraphSynthesis &poly_ag_secondary,
                     VdwCombiningRule default_rule_in = VdwCombiningRule::LORENTZ_BERTHELOT,
                     const std::vector<PairLJInteraction> &edits = {});
   
-  ComboGraphLJModel(const AtomGraph *base_ag_in, const std::vector<double> &lj_a_in,
+  ComboGraphLJModel(const AtomGraph *primary_ag_in, const std::vector<double> &lj_a_in,
                     const std::vector<double> &lj_b_in,
                     const std::vector<char4> &lj_type_names = {},
                     VdwCombiningRule default_rule_in = VdwCombiningRule::LORENTZ_BERTHELOT,
                     const std::vector<PairLJInteraction> &edits = {});
 
-  ComboGraphLJModel(const AtomGraph &base_ag_in, const std::vector<double> &lj_a_in,
+  ComboGraphLJModel(const AtomGraph &primary_ag_in, const std::vector<double> &lj_a_in,
                     const std::vector<double> &lj_b_in,
                     const std::vector<char4> &lj_type_names = {},
                     VdwCombiningRule default_rule_in = VdwCombiningRule::LORENTZ_BERTHELOT,
@@ -94,29 +67,44 @@ public:
   int getSetCount() const;
 
   /// \brief Get the default combining rule for mixing parameters of different topologies.
-  VdwCombiningRule getCombiningRule() const;
+  VdwCombiningRule getDefaultCombiningRule() const;
+
+  /// \brief Get the combining rule effective in the primary topology.
+  VdwCombiningRule getPrimaryTopologyRule() const;
+
+  /// \brief Get the combining rule effective in one of the secondary topologies.
+  ///
+  /// \param index  The secondarry topology of interest (the ith secondary topology takes part in
+  ///               the ith combination with the primary topology)
+  VdwCombiningRule getSecondaryTopologyRule(int index) const;
+
+  /// \brief Get the number of atom types in the primary topology.
 
   /// \brief Get the size of a particular combination matrix.  The matrix has as many rows as the
-  ///        base topology has atom types and as many columns as the new (other) topology has
+  ///        primary topology has atom types and as many columns as the new (other) topology has
   ///        atom types.
   ///
   /// \param index  The combination of interest
   int2 getMatrixSize(int index) const;
 
-  /// \brief Get the matrix of Lennard-Jones A coefficients between the base topology and another
-  ///        topology.  The base atom types control rows of the matrix, while the other topology's
-  ///        atom types control columns.  The matrix has column format, like others in STORMM.
+  /// \brief Get the matrix of Lennard-Jones A coefficients between the primary topology and
+  ///        another topology.  The primary atom types control rows of the matrix, while the other
+  ///        topology's atom types control columns.  The matrix has column format, like others in
+  ///        STORMM.
   ///
   /// \param index  The combination of interest
   const std::vector<double>& getACoefficients(int index) const;
   
-  /// \brief Get the matrix of Lennard-Jones B coefficients between the base topology and another
-  ///        topology.  The base atom types control rows of the matrix, while the other topology's
-  ///        atom types control columns.  The matrix has column format, like others in STORMM.
+  /// \brief Get the matrix of Lennard-Jones B coefficients between the primary topology and
+  ///        another topology.  The primary atom types control rows of the matrix, while the other
+  ///        topology's atom types control columns.  The matrix has column format, like others in
+  ///        STORMM.
   ///
   /// \param index  The combination of interest
   const std::vector<double>& getBCoefficients(int index) const;
 
+  std::vector<int> computeConsensusParameters() const;
+    
   /// \brief Add an interaction matrix to the list of combinations.
   ///
   /// Overloaded:
@@ -142,10 +130,20 @@ public:
                       const std::vector<char4> &lj_type_names = {},
                       const std::vector<PairLJInteraction> &edits = {});
 
-  void addCombination(const AtomGraph *ag_othr, const std::vector<PairLJInteraction> &edits = {});
+  void addCombination(const AtomGraph *ag_secondary,
+                      const std::vector<PairLJInteraction> &edits = {});
 
-  void addCombination(const AtomGraph &ag_othr, const std::vector<PairLJInteraction> &edits = {});
+  void addCombination(const AtomGraph &ag_secondary,
+                      const std::vector<PairLJInteraction> &edits = {});
   /// \}
+  
+  /// \brief Compute the number of unique atom types across all topologies other than the primary.
+  ///        This is done by finding unique fingerprints among the columns of the A and B
+  ///        coefficient matrices for each combination parameter set.
+  int getAtomTypeUnionSize();
+
+  /// \brief Count the number of consensus atom types that would be needed in order to span all
+  ///        unique Lennard-Jones interactions in the 
   
 private:
 
@@ -158,17 +156,17 @@ private:
   
   /// The rule governing Lennard-Jones parameter mixing in the original topology.  This will be
   /// inferred from the parameter matrices contained therein.
-  VdwCombiningRule base_topology_rule;
+  VdwCombiningRule primary_topology_rule;
 
-  /// The number of Lennard-Jones types in the base topology
-  int base_atom_type_count;
+  /// The number of Lennard-Jones types in the primary topology
+  int primary_atom_type_count;
   
   /// The numbers of Lennard-Jones atom types in each additional topology.
-  std::vector<int> othr_atom_type_counts;
+  std::vector<int> secondary_atom_type_counts;
 
   /// Rules inferred for Lennard-Jones parameter mixing in all other topologies.  The ith index of
   /// this array corresponds to the secondary topology in the ith combination.
-  std::vector<VdwCombiningRule> othr_topology_rules;
+  std::vector<VdwCombiningRule> secondary_topology_rules;
   
   /// The rules by which each combination can be taken to occur.
   std::vector<VdwCombiningRule> set_rules;
@@ -187,11 +185,11 @@ private:
 
   /// Pointer to the original topology, whose atom types (or types derived thereof) feed into each
   /// row of the resulting parameter matrices.
-  AtomGraph *base_ag_pointer;
+  AtomGraph *primary_ag_pointer;
 
   /// Pointers to new topologies, whose atom types (or types derived thereof) appear in the columns
   /// of the resulting parameter matrices.
-  std::vector<AtomGraph*> othr_ag_pointers;
+  std::vector<AtomGraph*> secondary_ag_pointers;
 
   /// \brief Validate the index of some requested matrix set.
   ///

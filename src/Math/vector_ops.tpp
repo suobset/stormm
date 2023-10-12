@@ -1107,7 +1107,6 @@ template <typename T> void reduceUniqueValues(std::vector<T> *va) {
   // Take the standard sorting approach
   std::sort(va->begin(), va->end(), [](T a, T b) { return a < b; });
   size_t nunique = 0LLU;
-  const size_t nvalm1 = nval - 1LLU;
   T last_unique;
   for (size_t i = 0LLU; i < nval; i++) {
     if (i == 0LLU || va_ptr[i] != last_unique) {
@@ -1222,6 +1221,21 @@ template <typename T> std::vector<T> tileVector(const std::vector<T> &va, const 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx,
+                          const size_t nrep) {
+  std::vector<T> result;
+  const size_t n_tidx = tidx.size();
+  result.reserve(n_tidx * nrep);
+  for (size_t pos = 0LLU; pos < nrep; pos++) {
+    for (size_t i = 0LLU; i < n_tidx; i++) {
+      result.emplace_back(va[tidx[i]]);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<size_t> &tidx,
                           const size_t nrep) {
   std::vector<T> result;
   const size_t n_tidx = tidx.size();
@@ -1577,6 +1591,32 @@ Hybrid<Tout> convertData(Hybrid<Tin> *input, const double input_scale, const dou
   input->resize(0);
   input->shrinkToFit();
   return output;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<int> &sorting_pattern) {
+  return tileVector<T>(unsorted_data, sorting_pattern, 1);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<size_t> &sorting_pattern) {
+  return tileVector<T>(unsorted_data, sorting_pattern, 1);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T2>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<T2> &sorting_pattern) {
+  const size_t plen = sorting_pattern.size();
+  std::vector<T> result(plen);
+  for (size_t i = 0; i < plen; i++) {
+    result[i] = unsorted_data[sorting_pattern[i].y];
+  }
+  return result;
 }
 
 } // namespace stmath

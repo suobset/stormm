@@ -6,7 +6,7 @@
 namespace stormm {
 namespace structure {
 
-using parse::operator==;
+using data_types::operator==;
   
 //-------------------------------------------------------------------------------------------------
 MdlMolPropertyKind translateMdlMolPropertyKind(char4 input) {

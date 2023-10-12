@@ -120,6 +120,10 @@ protected:
   /// \brief The constructor for this base class takes the GPU specifications
   KernelManager(const GpuDetails &gpu_in = null_gpu);
 
+  /// \brief A virtual destructor ensures proper behavior in the destructors of derived classes
+  ///        for managing particular groups of kernels.
+  virtual ~KernelManager();
+
   /// The details of the GPU in use are simply copied into this object.
   GpuDetails gpu;
 

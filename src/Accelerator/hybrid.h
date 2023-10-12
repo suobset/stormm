@@ -388,10 +388,24 @@ public:
 
   /// \brief Mimic the C++ std::vector push_back functionality.  A bounds check is followed by
   ///        extension of the data arrays in the current format if necessary.  The new element is
-  ///        placed at the end of the host_data array.
+  ///        placed at the end of the host_data array.  The Hybrid object must be ARRAY-kind or a
+  ///        POINTER-kind with sufficient maximum capacity (no reallocation needed).  Additions
+  ///        will go to the CPU host memory.
   ///
-  /// \param element   The new item to add
+  /// Overloaded:
+  ///   - Add a single element
+  ///   - Add multiple elements from a C-style array, Standard Template Library vector, or another
+  ///     Hybrid object.
+  ///
+  /// \param element        The new item to add
+  /// \param elements       An array of new elements to add
+  /// \param element_count  The trusted length of elements, if adding from a C-style array
+  /// \{
   void pushBack(const T element);
+  void pushBack(const T* elements, const size_t element_count);
+  void pushBack(const std::vector<T> &elements);
+  void pushBack(const Hybrid<T> &elements);
+  /// \}
 
   /// \brief A std::vector-like resize() feature.
   ///
@@ -415,11 +429,12 @@ public:
   /// \param position    The location in target where this Hybrid pointer shall direct its own
   ///                    data array(s)
   /// \param new_length  The new, maximum length of data that this pointer shall occupy.  If
-  ///                    left unset, it will default to the remaining elements of the Hybrid array
-  ///                    struct as it is currently found (target.size() - position).  The
-  ///                    pointer's maximum capacity will likewise be set to new_length, or if
-  ///                    new_length is not set it will default to (target.capacity() - position).
-  void setPointer(Hybrid<T> *target, size_t position = 0, size_t new_length = 0);
+  ///                    left unset or set to a negative value, it will default to the remaining
+  ///                    elements of the Hybrid array struct as it is currently found
+  ///                    (target.size() - position).  The pointer's maximum capacity will likewise
+  ///                    be set to new_length, or if new_length is not set it will default to
+  ///                    (target.capacity() - position).
+  void setPointer(Hybrid<T> *target, size_t position = 0, llint new_length = -1LL);
 
   /// \brief Swap the target of a POINTER-kind Hybrid object, transferring its starting index and
   ///        current length to apply instead to the new target.  Bounds checks will still be
@@ -538,8 +553,64 @@ private:
   ///
   /// \param tag  The name for this Hybrid object
   HybridLabel assignLabel(const char* tag);
+#if 0
+  /// \brief Making the reinterpretHybridData function a friend of the Hybrid class does not
+  ///        represent a risk of significant code bloat, any more than making an extra member
+  ///        function for accomplishing the same thing.  Creating the free function provides a
+  ///        clearer API, as to type {Hybrid Name}.template <template type>reinterpretCast() or
+  ///        the like is an uncommon expression, particularly for novice C++ programmers.
+  /// \{
+  template <typename Treturn>
+  friend const Hybrid<Treturn> reinterpretCast(const Hybrid *target, size_t offset, size_t length,
+                                               const char* output_name);
+
+  template <typename Treturn>
+  friend Hybrid<Treturn> reinterpretCast(Hybrid *target, size_t offset, size_t length,
+                                         const char* output_name);
+  /// \}
+#endif
 };
-  
+
+/// \brief A free function can create a const POINTER-kind Hybrid set to target another const
+///        Hybrid, even though a const constructor is not possible and a non-const Hybrid cannot
+///        be set to target anything.  The const casting is handled internally.
+///
+/// Overloaded:
+///   - Return a const POINTER-kind Hybrid targeting an existing const Hybrid of the same type.
+///   - Return a non-const POINTER-kind Hybrid targeting a non-const Hybrid of the same type.
+///     This can also be accomplished by using an existing Hybrid's setPointer() member function,
+///     given compatible template types.
+///
+/// \param target       The existing Hybrid object to target
+/// \param offset       The offset in the target array (this will be checked for validity by the
+///                     Hybrid class's setPointer() member function)
+/// \param length       The length of the resulting pointer array (also checked for validity)
+/// \param output_name  New label to apply to the output Hybrid object (if unspecified, the name
+///                     of the input Hybrid object will be taken instead)
+/// \{
+template <typename T>
+const Hybrid<T> setPointer(const Hybrid<T> *target, size_t offset, size_t length,
+                           const char* output_name = nullptr);
+
+template <typename T>
+Hybrid<T> setPointer(Hybrid<T> *target, size_t offset, size_t length,
+                     const char* output_name = nullptr);
+/// \}
+
+#if 0
+/// \brief Re-interpret the data in one ARRAY-kind Hybrid object as another data type using a
+///        POINTER-kind Hybrid.  The data types must be of the same sizes.  Overloading and
+///        descriptions of parameters follow from setPointer() above.
+/// \{
+template <typename Treturn, typename Ttarget>
+const Hybrid<Treturn> reinterpretCast(const Hybrid<Ttarget> *target, size_t offset,
+                                      size_t length, const char* output_name = nullptr);
+
+template <typename Treturn, typename Ttarget>
+Hybrid<Treturn> reinterpretCast(Hybrid<Ttarget> *target, size_t offset, size_t length,
+                                const char* output_name = nullptr);
+/// \}
+#endif
 } // namespace card
 } // namespace stormm
 

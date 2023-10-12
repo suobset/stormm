@@ -30,6 +30,18 @@ public:
   /// \brief Default destructor
   ~StopWatch() = default;
 
+  /// \brief With no const members or points to repair, the default copy and move constructors, as
+  ///        well as copy and move assignment operators, will be applicable.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     Another object placed on the right hand side of the assignment statement
+  /// \{
+  StopWatch(const StopWatch &original) = default;
+  StopWatch(StopWatch &&original) = default;
+  StopWatch& operator=(const StopWatch &original) = default;
+  StopWatch& operator=(StopWatch &&original) = default;
+  /// \}
+  
   /// \brief Get the time at which this StopWatch was first started
   double getTimeAtStart() const;
 
@@ -153,7 +165,7 @@ public:
   
 private:
   int category_count;                         ///< Number of categories tracked by this StopWatch
-  const double initial_time;                  ///< The time at which this StopWatch was initialized
+  double initial_time;                        ///< The time at which this StopWatch was initialized
   double time_at_last_test;                   ///< The time at which any section of this StopWatch
                                               ///<   was last tested
   std::vector<double> category_start_times;   ///< The initial times at which each category began

@@ -2,11 +2,13 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
+#include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #ifdef STORMM_USE_HPC
 #include "Math/hpc_reduction.h"
 #include "Math/reduction_workunit.h"
+#include "Potential/hpc_map_density.h"
 #include "Potential/hpc_nonbonded_potential.h"
 #include "Potential/hpc_valence_potential.h"
 #include "Structure/hpc_rmsd.h"
@@ -19,10 +21,13 @@ namespace card {
 
 using constants::ExceptionResponse;
 #ifdef STORMM_USE_HPC
-using energy::queryValenceKernelRequirements;
-using energy::queryNonbondedKernelRequirements;
 using energy::queryBornRadiiKernelRequirements;
 using energy::queryBornDerivativeKernelRequirements;
+using energy::queryGeneralQMapKernelRequirements;
+using energy::queryRegAccQMapKernelRequirements;
+using energy::queryShrAccQMapKernelRequirements;
+using energy::queryNonbondedKernelRequirements;
+using energy::queryValenceKernelRequirements;
 using stmath::queryReductionKernelRequirements;
 using stmath::optReductionKernelSubdivision;
 using structure::queryRMSDKernelRequirements;
@@ -48,6 +53,18 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     gbradii_block_multiplier_sp{gbRadiiBlockMultiplier(gpu_in, PrecisionModel::SINGLE)},
     gbderiv_block_multiplier_dp{gbDerivativeBlockMultiplier(gpu_in, PrecisionModel::DOUBLE)},
     gbderiv_block_multiplier_sp{gbDerivativeBlockMultiplier(gpu_in, PrecisionModel::SINGLE)},
+    gen_qmap_block_multiplier_dp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::DOUBLE,
+                                                               QMapMethod::GENERAL_PURPOSE)},
+    gen_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
+                                                               QMapMethod::GENERAL_PURPOSE)},
+    rac_qmap_block_multiplier_dp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::DOUBLE,
+                                                               QMapMethod::ACC_REGISTER)},
+    rac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
+                                                               QMapMethod::ACC_REGISTER)},
+    sac_qmap_block_multiplier_dp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::DOUBLE,
+                                                               QMapMethod::ACC_SHARED)},
+    sac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
+                                                               QMapMethod::ACC_SHARED)},
     reduction_block_multiplier{reductionBlockMultiplier()},
     virtual_site_block_multiplier_dp{virtualSiteBlockMultiplier(PrecisionModel::DOUBLE)},
     virtual_site_block_multiplier_sp{virtualSiteBlockMultiplier(PrecisionModel::SINGLE)},
@@ -183,7 +200,61 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
       }
     }
   }
-  
+
+  // PME density mapping (spreading) kernel entries
+  const std::vector<PrecisionModel> all_prec = { PrecisionModel::DOUBLE, PrecisionModel::SINGLE };
+  for (int order = 4; order <= 6; order++) {
+    for (size_t i = 0; i < all_prec.size(); i++) {
+      std::string prec_ordr;
+      switch (all_prec[i]) {
+      case PrecisionModel::DOUBLE:
+        prec_ordr = "d";
+        break;
+      case PrecisionModel::SINGLE:
+        prec_ordr = "f";
+        break;
+      }
+      prec_ordr += std::to_string(order);
+      catalogGeneralQMapKernel(all_prec[i], int_type_index, order,
+                               "ksi" + prec_ordr + "MapDensity");
+      catalogGeneralQMapKernel(all_prec[i], llint_type_index, order,
+                               "kli" + prec_ordr + "MapDensity");
+      catalogGeneralQMapKernel(all_prec[i], float_type_index, order,
+                               "ksr" + prec_ordr + "MapDensity");
+      catalogGeneralQMapKernel(all_prec[i], double_type_index, order,
+                               "klr" + prec_ordr + "MapDensity");
+      for (size_t j = 0; j < all_prec.size(); j++) {
+        std::string aprec_ordr = prec_ordr;
+        switch (all_prec[j]) {
+        case PrecisionModel::DOUBLE:
+          aprec_ordr += "d";
+          break;
+        case PrecisionModel::SINGLE:
+          aprec_ordr += "s";
+          break;
+        }
+        catalogShrAccQMapKernel(all_prec[i], all_prec[j], int_type_index, order,
+                                "kSAsi" + aprec_ordr + "MapDensity");
+        catalogShrAccQMapKernel(all_prec[i], all_prec[j], llint_type_index, order,
+                                "kSAli" + aprec_ordr + "MapDensity");
+        catalogShrAccQMapKernel(all_prec[i], all_prec[j], float_type_index, order,
+                                "kSAsr" + aprec_ordr + "MapDensity");
+        catalogShrAccQMapKernel(all_prec[i], all_prec[j], double_type_index, order,
+                                "kSAlr" + aprec_ordr + "MapDensity");
+      }
+    }
+  }
+  for (int order = 5; order <= 6; order++) {
+    catalogRegAccQMapKernel(PrecisionModel::SINGLE, int_type_index, order,
+                            "kRAsif" + std::to_string(order) + "MapDensity");
+    catalogRegAccQMapKernel(PrecisionModel::SINGLE, llint_type_index, order,
+                            "kRAlif" + std::to_string(order) + "MapDensity");
+    catalogRegAccQMapKernel(PrecisionModel::SINGLE, float_type_index, order,
+                            "kRAsrf" + std::to_string(order) + "MapDensity");
+    catalogRegAccQMapKernel(PrecisionModel::SINGLE, double_type_index, order,
+                            "kRAlrf" + std::to_string(order) + "MapDensity");
+  }
+
   // Reduction kernel entries
   const int reduction_div = optReductionKernelSubdivision(poly_ag.getSystemAtomCounts(), gpu_in);
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
@@ -347,6 +418,92 @@ void CoreKlManager::catalogBornDerivativeKernel(const PrecisionModel prec, const
 }
 
 //-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogGeneralQMapKernel(const PrecisionModel prec, const size_t cg_tmat,
+                                             const int order, const std::string &kernel_name) {
+  const std::string k_key = generalQMapKernelKey(prec, cg_tmat, order);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Particle density mapping kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "CoreKlManager", "catalogGeneralQMapKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryGeneralQMapKernelRequirements(prec, cg_tmat, order);
+  int gen_qmap_block_multiplier;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    gen_qmap_block_multiplier = gen_qmap_block_multiplier_dp[order];
+    break;
+  case PrecisionModel::SINGLE:
+    gen_qmap_block_multiplier = gen_qmap_block_multiplier_sp[order];
+    break;
+  }
+  k_dictionary[k_key] = KernelFormat(attr, gen_qmap_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogRegAccQMapKernel(const PrecisionModel prec, const size_t cg_tmat,
+                                            const int order, const std::string &kernel_name) {
+  const std::string k_key = regAccQMapKernelKey(prec, cg_tmat, order);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Particle density mapping kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "CoreKlManager", "catalogRegAccQMapKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryRegAccQMapKernelRequirements(prec, cg_tmat, order);
+  int rac_qmap_block_multiplier;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    rac_qmap_block_multiplier = rac_qmap_block_multiplier_dp[order];
+    break;
+  case PrecisionModel::SINGLE:
+    rac_qmap_block_multiplier = rac_qmap_block_multiplier_sp[order];
+    break;
+  }
+  k_dictionary[k_key] = KernelFormat(attr, rac_qmap_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogShrAccQMapKernel(const PrecisionModel calc_prec,
+                                            const PrecisionModel acc_prec, const size_t cg_tmat,
+                                            const int order, const std::string &kernel_name) {
+  const std::string k_key = shrAccQMapKernelKey(calc_prec, acc_prec, cg_tmat, order);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Particle density mapping kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "CoreKlManager", "catalogShrAccQMapKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryShrAccQMapKernelRequirements(calc_prec, acc_prec, cg_tmat,
+                                                                    order);
+  int sac_qmap_block_multiplier;
+  switch (calc_prec) {
+  case PrecisionModel::DOUBLE:
+    sac_qmap_block_multiplier = sac_qmap_block_multiplier_dp[order];
+    break;
+  case PrecisionModel::SINGLE:
+    sac_qmap_block_multiplier = sac_qmap_block_multiplier_sp[order];
+    break;
+  }
+  k_dictionary[k_key] = KernelFormat(attr, sac_qmap_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 void CoreKlManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process, const int subdivision,
                                            const std::string &kernel_name) {
@@ -485,6 +642,50 @@ int2 CoreKlManager::getBornDerivativeKernelDims(const PrecisionModel prec, const
           "the kernel map.", "CoreKlManager", "getBornRadiiKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
+                                                const PrecisionModel calc_prec,
+                                                const PrecisionModel acc_prec,
+                                                const size_t cg_tmat, const int order) const {
+  std::string k_key;
+  switch (approach) {
+  case QMapMethod::ACC_REGISTER:
+    k_key = regAccQMapKernelKey(calc_prec, cg_tmat, order);
+    break;
+  case QMapMethod::ACC_SHARED:
+    k_key = shrAccQMapKernelKey(calc_prec, acc_prec, cg_tmat, order);
+    break;
+  case QMapMethod::GENERAL_PURPOSE:
+    k_key = generalQMapKernelKey(calc_prec, cg_tmat, order);
+    break;
+  case QMapMethod::AUTOMATIC:
+    rtErr("A density mapping strategy must be decided before requesting kernel launch parameters.",
+          "CoreKlManager", "getDensityMappingKernelDims");
+  }
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Particle density mapping kernel identifier " + k_key + " was not found in "
+          "the kernel map.", "CoreKlManager", "getDensityMappingKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
+                                                const PrecisionModel prec,
+                                                const size_t cg_tmat, const int order) const {
+  switch (approach) {
+  case QMapMethod::ACC_REGISTER:
+  case QMapMethod::GENERAL_PURPOSE:
+  case QMapMethod::AUTOMATIC:
+    return getDensityMappingKernelDims(approach, prec, prec, cg_tmat, order);
+  case QMapMethod::ACC_SHARED:
+    rtErr("Both the calculation and accumulation precisions are required inputs for kernels that "
+          "carry out " + getEnumerationName(approach) + ".", "CoreKlManager",
+          "getDensityMappingKernelDims");
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -633,6 +834,63 @@ int gbDerivativeBlockMultiplier(const GpuDetails &gpu, const PrecisionModel prec
 #else
   return 1;
 #endif  
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> densityMappingBlockMultiplier(const GpuDetails &gpu, const PrecisionModel prec,
+                                               const QMapMethod approach) {
+#ifdef STORMM_USE_HPC
+  switch (approach) {
+  case QMapMethod::ACC_REGISTER:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      return std::vector<int>(8, 2);
+    case PrecisionModel::SINGLE:
+      return std::vector<int>(8, 2);
+    }
+    break;
+  case QMapMethod::ACC_SHARED:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      return std::vector<int>(8, 4);
+    case PrecisionModel::SINGLE:
+      if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
+        return std::vector<int>(8, 4);
+      }
+      else {
+        return std::vector<int>(8, 4);
+      }
+      break;
+    }
+    break;
+  case QMapMethod::GENERAL_PURPOSE:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
+        return { 4, 4, 4, 4, 4, 4, 3, 3 };
+      }
+      else {
+        return { 5, 5, 5, 5, 5, 4, 3, 3 };
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
+        return std::vector<int>(8, 4);
+      }
+      else {
+        return { 6, 6, 6, 6, 5, 4, 4, 4 };
+      }
+      break;
+    }
+    break;
+  case QMapMethod::AUTOMATIC:
+    rtErr("Specify a particular method for density accumulation.",
+          "densityMappingBlockMultiplier");
+  }
+  __builtin_unreachable();
+#else
+  return std::vector<int>(8, 1);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -875,6 +1133,62 @@ std::string bornDerivativeKernelKey(const PrecisionModel prec, const NbwuKind ki
                                     const ImplicitSolventModel igb) {
   std::string k_key("gbdv_");
   return k_key + appendBornKernelKey(prec, kind, acc_meth, igb);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string appendQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
+                                const int order) {
+  std::string result;
+  if (cg_tmat == int_type_index) {
+    result += "si_";
+  }
+  else if (cg_tmat == llint_type_index) {
+    result += "li_";
+  }
+  else if (cg_tmat == float_type_index) {
+    result += "sr_";
+  }
+  else if (cg_tmat == double_type_index) {
+    result += "lr_";
+  }
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    result += "d_";
+    break;
+  case PrecisionModel::SINGLE:
+    result += "f_";
+    break;
+  }
+  result += std::to_string(order);
+  return result;
+
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::string generalQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
+                                 const int order) {
+  return "qmap_" + appendQMapKernelKey(prec, cg_tmat, order);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string regAccQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
+                                const int order) {
+  return "qmap_racc_" + appendQMapKernelKey(prec, cg_tmat, order);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string shrAccQMapKernelKey(const PrecisionModel calc_prec, const PrecisionModel acc_prec,
+                                const size_t cg_tmat, const int order) {
+  std::string base_key("qmap_sacc_");
+  switch (acc_prec) {
+  case PrecisionModel::DOUBLE:
+    base_key += "d_";
+    break;
+  case PrecisionModel::SINGLE:
+    base_key += "s_";
+    break;
+  }
+  return base_key + appendQMapKernelKey(calc_prec, cg_tmat, order);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
-#include "UnitTesting/test_environment.h"
+#include "test_environment.h"
 
 namespace stormm {
 namespace testing {
@@ -35,7 +35,6 @@ using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::SystemCache;
-using testing::TestEnvironment;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::CoordinateFileKind;

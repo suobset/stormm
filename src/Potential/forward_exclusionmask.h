@@ -43,20 +43,23 @@ struct ForwardExclusionMaskReader {
 class ForwardExclusionMask {
 public:
 
-  /// \brief Constructor requires a topology, and creates a blank object if nullptr is supplied.
+  /// \brief The constructor requires a topology and creates a blank object if given nullptr.
+  /// \{
   ForwardExclusionMask(const AtomGraph *ag_in = nullptr);
+  ForwardExclusionMask(const AtomGraph &ag_in);
+  /// \}
 
-  /// \brief The default copy and move constructors as well as the copy assignment operator will
-  ///        suffice for this object, which has no POINTER-kind Hybrid objects among its members.
-  ///        The move assignment operator will be implicitly deleted due to the presence of a
-  ///        const pointer to the original topology.
+  /// \brief The default copy and move constructors as well as the copy and move assignment
+  ///        operator will suffice for this object, which has no POINTER-kind Hybrid objects among
+  ///        its members.
   /// \{
   ForwardExclusionMask(const ForwardExclusionMask &original) = default;
   ForwardExclusionMask(ForwardExclusionMask &&original) = default;
   ForwardExclusionMask& operator=(const ForwardExclusionMask &other) = default;
+  ForwardExclusionMask& operator=(ForwardExclusionMask &&other) = default;
   /// \}
 
-  /// \brief Get the number of atoms in the system
+  /// \brief Get the number of atoms in the system.
   int getAtomCount() const;
 
   /// \brief Get the number of unique primary masks that the system requires to store all of its
@@ -146,7 +149,7 @@ private:
   Hybrid<uint2> secondary_masks;
 
   /// Pointer to the original topology
-  const AtomGraph *ag_pointer;
+  AtomGraph *ag_pointer;
 };
 
 }

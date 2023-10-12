@@ -626,7 +626,7 @@ size_t Hybrid<T>::putHost(Hybrid<T> *target, const std::vector<T> &values, const
                           const size_t padding, const size_t count) {
   const size_t actual_count = (count == 0) ? values.size() : count;
   const size_t padded_count = (padding > 0) ? roundUp<size_t>(actual_count, padding) :
-    actual_count;
+                                              actual_count;
   if (offset > target->length || offset + padded_count > target->length) {
     rtErr("The Hybrid object " + std::string(target->label.name) + " (targeted by " +
           std::string(label.name) + " at index " + std::to_string(offset) + ") holds only " +
@@ -635,7 +635,7 @@ size_t Hybrid<T>::putHost(Hybrid<T> *target, const std::vector<T> &values, const
           " zero padding.", "Hybrid", "putHost");
   }
   setPointer(target, offset, actual_count);
-  
+
   // Check that there is data on the host
   if (host_data == nullptr) {
     rtErr("No host data exists in Hybrid object " + std::string(label.name), "Hybrid",
@@ -858,6 +858,64 @@ template <typename T> void Hybrid<T>::pushBack(const T element) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::pushBack(const T* elements, const size_t element_count) {
+  if (length + element_count < max_capacity) {
+    for (size_t i = 0; i < element_count; i++) {
+      host_data[length + i] = elements[i];
+    }
+    length += element_count;
+  }
+  else {
+    const size_t old_length = length;
+    switch (kind) {
+    case HybridKind::POINTER:
+      rtErr("A " + getEnumerationName(HybridKind::POINTER) + "-kind object cannot assign "
+            "element " + std::to_string(length) + " beyond its capacity.", "Hybrid", "pushBack");
+    case HybridKind::ARRAY:
+      reallocate(length + element_count, 0);
+      break;
+    }
+    for (size_t i = 0; i < element_count; i++) {
+      host_data[old_length + i] = elements[i];
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::pushBack(const std::vector<T> &elements) {
+  pushBack(elements.data(), elements.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void Hybrid<T>::pushBack(const Hybrid<T> &elements) {
+  if (label.serial_number == elements.label.serial_number) {
+
+    // Take care when pushing a Hybrid object to the back of itself.  This requires a special
+    // procedure but a full out-of-place copy is not necessary.
+    if (length + length < max_capacity) {
+      pushBack(host_data, length);
+    }
+    else {
+      const size_t old_length = length;
+      switch (kind) {
+      case HybridKind::POINTER:
+        rtErr("A " + getEnumerationName(HybridKind::POINTER) + "-kind object cannot assign "
+              "element " + std::to_string(length) + " beyond its capacity.", "Hybrid", "pushBack");
+      case HybridKind::ARRAY:
+        reallocate(length + length, 0);
+        break;
+      }
+      for (size_t i = 0; i < old_length; i++) {
+        host_data[old_length + i] = host_data[i];
+      }
+    }
+  }
+  else {
+    pushBack(elements.data(), elements.size());
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::resize(const size_t new_length) {
   if (new_length <= max_capacity) {
     length = new_length;
@@ -886,7 +944,7 @@ template <typename T> void Hybrid<T>::resize(const size_t new_length, const T va
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_t new_length) {
+void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const llint new_length) {
 
   // Check that this Hybrid object is a pointer, and that the target is an array
   const HybridLabel tlbl = target->label;
@@ -907,7 +965,7 @@ void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_
 
   // Set the target, length, and capacity of the pointer
   pointer_index = position;
-  if (new_length > 0) {
+  if (new_length >= 0) {
     if (new_length > target->max_capacity - position) {
       rtErr("object " + std::string(tlbl.name) + " of length " +
             std::to_string(target->max_capacity) + " cannot accept a pointer from " +
@@ -1431,6 +1489,26 @@ template <typename T> HybridLabel Hybrid<T>::assignLabel(const char* tag) {
   hlbl.serial_number = gbl_mem_balance_sheet.getSerialNumber();
 
   return hlbl;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+const Hybrid<T> setPointer(const Hybrid<T> *target, const size_t offset, const size_t length,
+                           const char* output_name) {
+  Hybrid<T> result(HybridKind::POINTER,
+                   (output_name == nullptr) ? target->getLabel().name : output_name);
+  result.setPointer(const_cast<Hybrid<T>*>(target), offset, length);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+Hybrid<T> setPointer(Hybrid<T> *target, const size_t offset, const size_t length,
+                     const char* output_name) {
+  Hybrid<T> result(HybridKind::POINTER,
+                   (output_name == nullptr) ? target->getLabel().name : output_name);
+  result.setPointer(target, offset, length);
+  return result;
 }
 
 } // namespace card

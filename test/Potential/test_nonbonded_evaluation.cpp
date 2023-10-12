@@ -11,6 +11,9 @@
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
+#include "../../src/Potential/layered_potential_metrics.h"
+#include "../../src/Potential/layered_potential.h"
+#include "../../src/Potential/pme_util.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/soft_core_potentials.h"
 #include "../../src/Potential/static_exclusionmask.h"
@@ -47,6 +50,8 @@ using stormm::data_types::getStormmScalarTypeName;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
+using stormm::energy::ewaldCoefficient;
+using stormm::energy::elecPMEDirectSpace;
 using stormm::errors::rtWarn;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
@@ -598,6 +603,227 @@ void testSplineSoftCore(const AtomGraph &ag, const double sigma_factor, const do
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run tests of the benchmark PME direct space interaction functions.
+//-------------------------------------------------------------------------------------------------
+void runPMEDirectSpaceTests() {
+  const double ew_coeff = ewaldCoefficient(12.0, 1.0e-7);
+  const double kcoul = stormm::symbols::charmm_gromacs_bioq;
+
+  // Run direct space one-dimensional tests
+  const int npts = 128;
+  std::vector<double> du_eval(npts), du_fd(npts);
+  std::vector<double> d2u_eval(npts), d2u_fd(npts), d3u_eval(npts), d3u_fd(npts);
+  const double fd_dr = pow(2.0, -18.0);
+  double r = 0.9;
+  for (int i = 0; i < npts; i++) {
+    const double r_p = r + fd_dr;
+    const double r_n = r - fd_dr;
+
+    // First derivative
+    du_eval[i] = elecPMEDirectSpace(ew_coeff, kcoul, r, r * r, 1);
+    const double u_p = kcoul * erfc(ew_coeff * r_p) / r_p;
+    const double u_n = kcoul * erfc(ew_coeff * r_n) / r_n;
+    du_fd[i] = (u_p - u_n) / (2.0 * fd_dr);
+
+    // Second derivative
+    d2u_eval[i] = elecPMEDirectSpace(ew_coeff, kcoul, r, r * r, 2);
+    const double du_p = elecPMEDirectSpace(ew_coeff, kcoul, r_p, r_p * r_p, 1);
+    const double du_n = elecPMEDirectSpace(ew_coeff, kcoul, r_n, r_n * r_n, 1);
+    d2u_fd[i] = (du_p - du_n) / (2.0 * fd_dr);
+
+    // Third derivative
+    d3u_eval[i] = elecPMEDirectSpace(ew_coeff, kcoul, r, r * r, 3);
+    const double d2u_p = elecPMEDirectSpace(ew_coeff, kcoul, r_p, r_p * r_p, 2);
+    const double d2u_n = elecPMEDirectSpace(ew_coeff, kcoul, r_n, r_n * r_n, 2);
+    d3u_fd[i] = (d2u_p - d2u_n) / (2.0 * fd_dr);
+
+    // Increment the range variable
+    r += 0.1;
+  }
+  check(du_eval, RelationalOperator::EQUAL, du_fd, "The first derivative of the electrostatic PME "
+        "direct-space interaction was not computed as expected.");
+  check(d2u_eval, RelationalOperator::EQUAL, d2u_fd, "The second derivative of the electrostatic "
+        "PME direct-space interaction was not computed as expected.");
+  check(d3u_eval, RelationalOperator::EQUAL, d3u_fd, "The third derivative of the electrostatic "
+        "PME direct-space interaction was not computed as expected.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Run tests of the layered potential decomposition in the Coulomb potential.
+//
+// Arguments:
+//   oe:                Testing environment details, including the path to the STORMM ${tmpdir}
+//   u_type:            The type of potential to decompose
+//   prt_prt_cutoff:    Cutoff between particle-particle interactions
+//   first_pass_write:  Indicate how to open the snapshot file if it needs to be revised
+//-------------------------------------------------------------------------------------------------
+void runLayeredCoulombTests(const TestEnvironment &oe, const DecomposablePotential u_type,
+                            const double prt_prt_cutoff = 5.4,
+                            const PrintSituation first_pass_write = PrintSituation::APPEND) {
+  LayeredPotentialMetrics lpm;
+  lpm.setForm(u_type);
+  lpm.setBoundaryCondition(BoundaryCondition::ISOLATED);
+  lpm.setCutoff(prt_prt_cutoff);
+  lpm.setRangeCompounding(2.0);
+  lpm.setMaximumRange(100.0);
+  lpm.setEwaldCoefficient(ewaldCoefficient(4.0 * prt_prt_cutoff, 1.0e-10));
+
+  // Perform general checks on the management class for only one of the potential types--these are
+  // agnostic to the form.
+  if (u_type == DecomposablePotential::ELECTROSTATIC) {
+    check(lpm.getCutoff(0), RelationalOperator::EQUAL, 5.4, "The LayeredPotentialMetrics object "
+          "did not return the expected value of the cutoff.");
+    check(lpm.getCutoff(1), RelationalOperator::EQUAL, 10.8, "The LayeredPotentialMetrics object "
+          "did not return the expected value of the cutoff.");
+    check(lpm.getCutoff(4), RelationalOperator::EQUAL, 86.4, "The LayeredPotentialMetrics object "
+          "did not return the expected value of the cutoff.");
+    const std::vector<double> etest = { 1.25, 1.75, 2.25 };
+    lpm.setExponentFactor(etest);
+    std::vector<double> rpt_efac(9);
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        rpt_efac[(3 * j) + i] = lpm.getExponentFactor(i, j);        
+      }
+    }
+    const std::vector<double> chk_efac = { 0.000, 0.000, 0.000,
+                                           1.250, 1.750, 2.250,
+                                           0.625, 0.875, 1.125 };
+    check(rpt_efac, RelationalOperator::EQUAL, chk_efac, "The exponential factors for a layereed "
+          "potential are not computed as expected.");
+  }
+  LayeredPotential<double, double4> lnrg(lpm);
+  const double4 layer_a_smc = lnrg.getSmoothingCoefficients(0);
+  const double4 layer_b_smc = lnrg.getSmoothingCoefficients(1);
+  const double4 layer_d_smc = lnrg.getSmoothingCoefficients(3);
+  const std::vector<double> rpt_coef = { layer_a_smc.x, layer_a_smc.y, layer_a_smc.z,
+                                         layer_a_smc.w, layer_b_smc.x, layer_b_smc.y,
+                                         layer_b_smc.z, layer_b_smc.w, layer_d_smc.x,
+                                         layer_d_smc.y, layer_d_smc.z, layer_d_smc.w };
+  std::vector<double> chk_coef;
+  switch (u_type) {
+  case DecomposablePotential::ELECTROSTATIC:
+    chk_coef = {    0.00000000,    0.00000000,    0.00000000,    0.00000000,
+                 -102.48056614,  112.29930802,  -35.47125849,   87.14366796,
+                  -25.62014153,   28.07482701,   -8.86781462,   21.78591699 };
+    break;
+  case DecomposablePotential::DISPERSION:
+    chk_coef = {    0.00000000,    0.00000000,    0.00000000,    0.00000000,
+                    0.00084762,   -0.00093321,    0.00029850,   -0.00025324,
+                    0.00000021,   -0.00000023,    0.00000007,   -0.00000006 };
+    break;
+  case DecomposablePotential::ELEC_PME_DIRECT:
+    chk_coef = {    0.00000000,    0.00000000,    0.00000000,    0.00000000,
+                  -69.52872751,   71.38184892,  -21.75725140,   28.17895772,
+                   -0.00003361,    0.00004208,   -0.00001487,    0.00000643 };
+    break;
+  }
+  check(rpt_coef, RelationalOperator::EQUAL, chk_coef, "The fitted coefficients for various "
+        "layers of the " + getEnumerationName(u_type) + " potential decomposition do not meet "
+        "expectations.");
+  const int npts = 500;
+  std::vector<double> base_layer(npts), first_layer(npts), second_layer(npts), third_layer(npts);
+  double rp = 0.5;
+  for (int i = 0; i < npts; i++) {
+    base_layer[i] = lnrg.getAnalyticValue(0, rp);
+    first_layer[i] = lnrg.getAnalyticValue(1, rp);
+    second_layer[i] = lnrg.getAnalyticValue(2, rp);
+    third_layer[i] = lnrg.getAnalyticValue(3, rp);
+    rp += 0.1;
+  }
+  const char osc = osSeparator();
+  const std::string snp_name = oe.getStormmSourcePath() + osc + "test" + osc + "Potential" + osc +
+                               "potential_decomp.m";
+  const bool snp_exists = (getDrivePathType(snp_name) == DrivePathType::FILE);
+  const TestPriority do_snps = (snp_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snp_exists == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
+    rtWarn("The snapshot file " + snp_name + " could not be found.  Check the STORMM source "
+           "path for validity.", "runHAILCoulombicTests");
+  }
+  std::string var_ext;
+  switch (u_type) {
+  case DecomposablePotential::ELECTROSTATIC:
+    var_ext = "_elec";
+    break;
+  case DecomposablePotential::DISPERSION:
+    var_ext = "_disp";
+    break;
+  case DecomposablePotential::ELEC_PME_DIRECT:
+    var_ext = "_epme";
+    break;
+  }
+  snapshot(snp_name, polyNumericVector(base_layer), "base" + var_ext , 1.0e-6, "Values of the "
+           "decomposed " + getEnumerationName(u_type) + " particle-particle interaction do not "
+           "meet expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           first_pass_write, do_snps);
+  snapshot(snp_name, polyNumericVector(first_layer), "first" + var_ext, 1.0e-6, "Values of the "
+           "decomposed " + getEnumerationName(u_type) + " first mesh-based potential do not meet "
+           "expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::APPEND, do_snps);
+  snapshot(snp_name, polyNumericVector(second_layer), "second" + var_ext, 1.0e-6, "Values of the "
+           "decomposed " + getEnumerationName(u_type) + " second mesh-based potential do not meet "
+           "expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::APPEND, do_snps);
+  snapshot(snp_name, polyNumericVector(third_layer), "third" + var_ext, 1.0e-6, "Values of the "
+           "decomposed " + getEnumerationName(u_type) + " third mesh-based potential do not meet "
+           "expectations.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::APPEND, do_snps);
+
+  // Check derivatives of the potential by successive finite difference approximations.
+  const std::vector<std::string> deriv_names = { "first", "second", "third" };
+  for (int dlev = 1; dlev < 4; dlev++) {
+    std::vector<double> base_dlyr(npts), first_dlyr(npts), second_dlyr(npts), third_dlyr(npts);
+    std::vector<double> base_fd(npts), first_fd(npts), second_fd(npts), third_fd(npts);
+    const double delta = pow(2.0, -20.0);
+    rp = 0.5;
+    for (int i = 0; i < npts; i++) {
+      base_dlyr[i] = lnrg.getAnalyticDerivative(0, rp, rp * rp, dlev);
+      first_dlyr[i] = lnrg.getAnalyticDerivative(1, rp, rp * rp, dlev);
+      second_dlyr[i] = lnrg.getAnalyticDerivative(2, rp, rp * rp, dlev);
+      third_dlyr[i] = lnrg.getAnalyticDerivative(3, rp, rp * rp, dlev);
+      const double rp_p = rp + delta;
+      const double rp_n = rp - delta;
+      const double base_p = lnrg.getAnalyticDerivative(0, rp_p, rp_p * rp_p, dlev - 1);
+      const double base_n = lnrg.getAnalyticDerivative(0, rp_n, rp_n * rp_n, dlev - 1);
+      base_fd[i] = (base_p - base_n) / (2.0 * delta);
+      const double first_p = lnrg.getAnalyticDerivative(1, rp_p, rp_p * rp_p, dlev - 1);
+      const double first_n = lnrg.getAnalyticDerivative(1, rp_n, rp_n * rp_n, dlev - 1);
+      first_fd[i] = (first_p - first_n) / (2.0 * delta);
+      const double second_p = lnrg.getAnalyticDerivative(2, rp_p, rp_p * rp_p, dlev - 1);
+      const double second_n = lnrg.getAnalyticDerivative(2, rp_n, rp_n * rp_n, dlev - 1);
+      second_fd[i] = (second_p - second_n) / (2.0 * delta);
+      const double third_p = lnrg.getAnalyticDerivative(3, rp_p, rp_p * rp_p, dlev - 1);
+      const double third_n = lnrg.getAnalyticDerivative(3, rp_n, rp_n * rp_n, dlev - 1);
+      third_fd[i] = (third_p - third_n) / (2.0 * delta);
+    }
+    double dthr_tol;
+    switch (u_type) {
+    case DecomposablePotential::ELECTROSTATIC:
+      dthr_tol = 3.0e-6;
+      break;
+    case DecomposablePotential::DISPERSION:
+      dthr_tol = 1.2e-5;
+      break;
+    case DecomposablePotential::ELEC_PME_DIRECT:
+      dthr_tol = 3.0e-6;
+      break;
+    }
+    check(base_dlyr, RelationalOperator::EQUAL, Approx(base_fd).margin(dthr_tol), "The " +
+          deriv_names[dlev - 1] + " derivative of the decomposed " + getEnumerationName(u_type) +
+          " potential does not agree with a finite difference approximation in the "
+          "particle-particle layer.");
+    check(first_dlyr, RelationalOperator::EQUAL, first_fd, "The " + deriv_names[dlev - 1] +
+          " derivative of the decomposed " + getEnumerationName(u_type) + " potential does not "
+          "agree with a finite difference approximation in the first mesh-based layer.");
+    check(second_dlyr, RelationalOperator::EQUAL, second_fd, "The " + deriv_names[dlev - 1] +
+          " derivative of the decomposed " + getEnumerationName(u_type) + " potential does not "
+          "agree with a finite difference approximation in the second mesh-based layer.");
+    check(third_dlyr, RelationalOperator::EQUAL, third_fd, "The " + deriv_names[dlev - 1] +
+          " derivative of the decomposed " + getEnumerationName(u_type) + " potential does not "
+          "agree with a finite difference approximation in the third mesh-based layer.");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -623,7 +849,7 @@ int main(const int argc, const char* argv[]) {
   section("Non-bonded energy evaluation");
 
   // Section 4
-  section("Non-bonded force evaluation");
+  section("Non-bonded all-to-all force evaluation");
 
   // Section 5
   section("Fixed-precision energy accumulator checks");
@@ -639,7 +865,13 @@ int main(const int argc, const char* argv[]) {
 
   // Section 9
   section("Soft core potential evaluation");
-  
+
+  // Section 10
+  section("PME direct space interactions");
+
+  // Section 11
+  section("Layered potential decomposition");
+
   // Locate topologies and coordinate files
   const char osc = osSeparator();
   const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -1508,6 +1740,16 @@ int main(const int argc, const char* argv[]) {
                       xrs.uniformRandomNumber() * stormm::symbols::twopi);
     }
   }
+
+  // Check the non-bonded PME direct space interaction and its derivatives
+  section(10);
+  runPMEDirectSpaceTests();
+
+  // Check the potential decomposition
+  section(11);
+  runLayeredCoulombTests(oe, DecomposablePotential::ELECTROSTATIC, 5.4, PrintSituation::OVERWRITE);
+  runLayeredCoulombTests(oe, DecomposablePotential::DISPERSION, 5.4);
+  runLayeredCoulombTests(oe, DecomposablePotential::ELEC_PME_DIRECT);
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {

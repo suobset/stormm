@@ -103,6 +103,18 @@ public:
                      StopWatch *timer_in = nullptr);
   /// \}
 
+  /// \brief The presence of POINTER-kind Hybrid objects necessitates manually written copy and
+  ///        move constructors as well as copy and move assignment operators, but all are valid.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     Another object placed on the right hand side of the assignment statement
+  /// \{
+  AtomGraphSynthesis(const AtomGraphSynthesis &original);
+  AtomGraphSynthesis(AtomGraphSynthesis &&original);
+  AtomGraphSynthesis& operator=(const AtomGraphSynthesis &original);
+  AtomGraphSynthesis& operator=(AtomGraphSynthesis &&original);
+  /// \}
+  
   /// \brief Get the number of unique topologies described by the synthesis
   int getUniqueTopologyCount() const;
 
@@ -135,57 +147,71 @@ public:
   /// \brief Get the number of systems that this synthesis describes
   int getSystemCount() const;
 
-  /// \brief Get the total number of atoms, summed over all systems, including replicas.  This
-  ///        does not include padding.
+  /// \brief Get the number of atoms in one or more systems.
+  ///
+  /// Overloaded:
+  /// - Get the total number of atoms, summed over all systems, including replicas.  This does not
+  ///   include padding.
+  /// - Get the total number of atoms in a specific sytem, without padding.
+  ///
+  /// \param system_index  index of the system of interest
+  /// \{
   int getAtomCount() const;
+  int getAtomCount(int system_index) const;
+  /// \}
 
   /// \brief Get the entire padded number of atoms covering all systems.
   int getPaddedAtomCount() const;
 
-  /// \brief Get the total number of virtual sites across all systems, including replicas
+  /// \brief Get the starting point for atoms of a specific system in the lineup of all topologies.
+  ///
+  /// \param system_index  index of the system of interest
+  int getAtomOffset(int system_index) const;
+  
+  /// \brief Get the total number of virtual sites across all systems, including replicas.
   int getVirtualSiteCount() const;
 
-  /// \brief Get the total number of bond terms across all systems, including replicas
+  /// \brief Get the total number of bond terms across all systems, including replicas.
   int getBondTermCount() const;
 
-  /// \brief Get the total number of bond angle terms across all systems, including replicas
+  /// \brief Get the total number of bond angle terms across all systems, including replicas.
   int getAngleTermCount() const;
   
-  /// \brief Get the total number of cosine-based dihedral terms across all systems and replicas
+  /// \brief Get the total number of cosine-based dihedral terms across all systems and replicas.
   int getDihedralTermCount() const;
   
-  /// \brief Get the total number of Urey-Bradley terms across all systems and replicas
+  /// \brief Get the total number of Urey-Bradley terms across all systems and replicas.
   int getUreyBradleyTermCount() const;
   
-  /// \brief Get the total number of CHARMM improper terms across all systems and replicas
+  /// \brief Get the total number of CHARMM improper terms across all systems and replicas.
   int getCharmmImproperTermCount() const;
   
-  /// \brief Get the total number of CMAP terms across all systems and replicas
+  /// \brief Get the total number of CMAP terms across all systems and replicas.
   int getCmapTermCount() const;
 
   /// \brief Get the number of unique atom types (a parameter, not an extensive quantity dependent
-  ///        on the number of systems)
-  int getAtomTypeCount() const;
+  ///        on the number of systems).
+  int getLJTypeCount() const;
 
-  /// \brief Get the number of unique charge parameters
+  /// \brief Get the number of unique charge parameters.
   int getChargeTypeCount() const;
 
-  /// \brief Get the number of unique harmonic bond parameter sets
+  /// \brief Get the number of unique harmonic bond parameter sets.
   int getBondParameterCount() const;
   
-  /// \brief Get the number of unique harmonic bond angle parameter sets
+  /// \brief Get the number of unique harmonic bond angle parameter sets.
   int getAngleParameterCount() const;
   
-  /// \brief Get the number of unique cosine-based dihedral parameter sets
+  /// \brief Get the number of unique cosine-based dihedral parameter sets.
   int getDihedralParameterCount() const;
 
-  /// \brief Get the number of unique Urey-Bradley harmonic angle parameter sets
+  /// \brief Get the number of unique Urey-Bradley harmonic angle parameter sets.
   int getUreyBradleyParameterCount() const;
 
-  /// \brief Get the number of unique CHARMM improper parameter sets
+  /// \brief Get the number of unique CHARMM improper parameter sets.
   int getCharmmImproperParameterCount() const;
 
-  /// \brief Get the number of unique CMAP surfaces
+  /// \brief Get the number of unique CMAP surfaces.
   int getCmapSurfaceCount() const;
 
   /// \brief Get the sizes of all individual systems as a const reference to the Hybrid array
@@ -197,19 +223,19 @@ public:
   const Hybrid<int>& getSystemAtomOffsets() const;
 
   /// \brief Get the unit cell type that will be taken for all systems (TRICLINIC subsumes
-  ///        ORTHORHOMBIC in a sort of type promotion)
+  ///        ORTHORHOMBIC in a sort of type promotion).
   UnitCellType getUnitCellType() const;
 
-  /// \brief Get the implicit solvent model in use across all systems
+  /// \brief Get the implicit solvent model in use across all systems.
   ImplicitSolventModel getImplicitSolventModel() const;
 
-  /// \brief Get the dielectric constant (supporting the implicit solvent model) for all systems
+  /// \brief Get the dielectric constant (supporting the implicit solvent model) for all systems.
   double getDielectricConstant() const;
 
-  /// \brief Get the salt concentration (supporting the implicit solvent model) for all systems
+  /// \brief Get the salt concentration (supporting the implicit solvent model) for all systems.
   double getSaltConcentration() const;
 
-  /// \brief Get the fundamental Coulomb constant defining the electrostatics of all systems
+  /// \brief Get the fundamental Coulomb constant defining the electrostatics of all systems.
   double getCoulombConstant() const;
 
   /// \brief Get the name of the PB radii set for one or more systems.
@@ -454,7 +480,8 @@ private:
   int total_ubrd_terms;           ///< Total number of Urey-Bradley angles, spanning all topologies
   int total_cimp_terms;           ///< Total number of CHARMM impropers, spanning all topologies
   int total_cmap_terms;           ///< Total number of CMAPs, spanning all topologies
-  int total_atom_types;           ///< Total number of unique atom types, spanning all topologies
+  int total_lj_types;             ///< Total number of unique Lennard-Jones interaction types,
+                                  ///<   spanning all topologies
   int total_charge_types;         ///< Total number of unique atomic partial charges, spanning all
                                   ///<   topologies
   int total_bond_params;          ///< Total number of unique bond parameter sets
@@ -538,19 +565,20 @@ private:
   // target the ARRAY-kind object int_system_data, at intervals of the number of systems in the
   // work plan, with no padding for the warp size.  If these POINTER-kind objects list bounds, the
   // bounds themselves will reflect padding for the HPC warp size.
-  Hybrid<int> atom_counts;             ///< Total number of atoms and virtual sites
+  Hybrid<int> atom_counts;             ///< Total number of atoms and virtual sites in each system
   Hybrid<int> residue_counts;          ///< Total number of residues, including solvent molecules
-  Hybrid<int> molecule_counts;         ///< Total number of molecules in the system
-  Hybrid<int> largest_residue_sizes;   ///< Number of atoms in the largest residue
-  Hybrid<int> last_solute_residues;    ///< Last residue of the solute, indexed according to the
+                                       ///<   in each system
+  Hybrid<int> molecule_counts;         ///< Total number of molecules in each system
+  Hybrid<int> largest_residue_sizes;   ///< Number of atoms in the largest residue of each system
+  Hybrid<int> last_solute_residues;    ///< Last residue of the solutes, indexed according to the
                                        ///<   overall order in this synthesis rather than the
                                        ///<   original topologies
-  Hybrid<int> last_solute_atoms;       ///< Last atom of the solute (a typical solute is a
+  Hybrid<int> last_solute_atoms;       ///< Last atoms of the solutes (a typical solute is a
                                        ///<   biomolecule), indexed according to the overall order
                                        ///<   in this synthesis rather than the original topologies
-  Hybrid<int> first_solvent_molecules; ///< First molecule in what is deemed to be solvent, indexed
-                                       ///<   according to the overall order in this synthesis
-                                       ///<   rather than the original topologies
+  Hybrid<int> first_solvent_molecules; ///< First molecule in what is deemed to be solvent in each
+                                       ///<   system, indexed according to the overall order in
+                                       ///<   this synthesis rather than the original topologies
 
   // Valence term and off-center particle quantities
   Hybrid<int> ubrd_term_counts;     ///< Number of Urey-Bradley angle stretch terms in each system
@@ -569,7 +597,7 @@ private:
   Hybrid<int> dihe_restraint_counts;  ///< Number of four-point dihedral restraints per system
   
   // Information relevant to non-bonded calculations
-  Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types in each system
+  Hybrid<int> lj_type_counts;          ///< Number of distinct Lennard-Jones types in each system
   Hybrid<int> total_exclusion_counts;  ///< Total number of non-bonded exclusions, including 1-4
 
   // Information relevant to the MD propagation algorithm
@@ -796,8 +824,12 @@ private:
                                                 ///<   chem_int_data as a convenient and sensible
                                                 ///<   way to keep the data stored
   Hybrid<int> lennard_jones_indices;            ///< Lennard-Jones indices, 0 to
-                                                ///<   atom_type_count - 1, pointed to target
+                                                ///<   lj_type_count - 1, pointed to target
                                                 ///<   chem_int_data
+  Hybrid<double> charge_parameters;             ///< Unique charge parameters for all systems.
+                                                ///<   These are pooled over all systems, and the
+                                                ///<   union of all unique charges is queried
+                                                ///<   for each atom according to charge_indices.
   Hybrid<double> lennard_jones_a_coeff;         ///< Lennard-Jones A coefficients, a series
                                                 ///<   of tables covering all systems
   Hybrid<double> lennard_jones_b_coeff;         ///< Lennard-Jones B coefficients, a series
@@ -814,6 +846,8 @@ private:
                                                 ///<   covering all systems
   Hybrid<double> lennard_jones_14_sigma;        ///< Lennard-Jones 1:4 sigma values, a series of
                                                 ///<   tables covering all systems
+  Hybrid<float> sp_charge_parameters;           ///< Unique charge parameters for all systems
+                                                ///<    (single precision)
   Hybrid<float> sp_lennard_jones_a_coeff;       ///< Lennard-Jones A coefficients, a series of
                                                 ///<   tables covering all systems (single
                                                 ///<   precision)
@@ -1077,10 +1111,6 @@ private:
   Hybrid<int> virtual_site_parameter_indices; ///< Parameter indices for each virtual site,
                                               ///<   indexing into the frame type and dimension
                                               ///<   arrays above.
-  Hybrid<int> virtual_site_param_map;         ///< Map of virtual site parameter sets from each
-                                              ///<   unique topology to the consensus table
-  Hybrid<int> virtual_site_param_map_bounds;  ///< Bounds array for each topology's virtual site
-                                              ///<   parameter set map
   Hybrid<int> vsite_int_data;                 ///< Virtual site integer data, storing virtual site
                                               ///<   and frame atom indices as well as virtual
                                               ///<   site parameter sets, but not frame types
@@ -1341,6 +1371,9 @@ private:
   /// Timings data, for reporting purposes
   StopWatch* timer;
 
+  /// \brief Repair pointers in the copy and copy assignment constructors.
+  void rebasePointers();
+  
   /// \brief Create a series of dummy restraints for all topologies, then redirect any systems
   ///        which have nullptr for the restraint network (RestraintApparatus) pointer to the
   ///        topology-specific set of dummy restraints.

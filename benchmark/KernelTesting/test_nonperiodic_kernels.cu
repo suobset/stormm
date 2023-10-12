@@ -8,17 +8,19 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/core_kernel_manager.h"
-#include "../../src/Constants/split_fixed_precision.h"
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/Namelists/nml_files.h"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/cacheresource.h"
+#include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Synthesis/implicit_solvent_workspace.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -33,8 +35,8 @@
 
 using namespace stormm::card;
 using namespace stormm::constants;
-using namespace stormm::errors;
 using namespace stormm::diskutil;
+using namespace stormm::errors;
 using namespace stormm::energy;
 using namespace stormm::stmath;
 using namespace stormm::mm;
@@ -49,9 +51,9 @@ using namespace stormm::trajectory;
 //-------------------------------------------------------------------------------------------------
 // Constant expressions to guide testing
 //-------------------------------------------------------------------------------------------------
-constexpr int null_kernel_repeats = 25000;
-constexpr int args_kernel_repeats = 25000;
-constexpr int gmem_kernel_repeats = 25000;
+constexpr int null_kernel_repeats = 2500;
+constexpr int args_kernel_repeats = 2500;
+constexpr int gmem_kernel_repeats = 2500;
 
 //-------------------------------------------------------------------------------------------------
 // Get a SystemCache object containing all topologies and coordinates in a pair of directories.
@@ -89,50 +91,60 @@ SystemCache directorySweep(const std::vector<std::string> &topol_path,
 // timings.
 //
 // Arguments:
-//   ag:       The topology to replicate
-//   ps:       The coordinates to replicate
+//   ag_vec:   The topologies to replicate
+//   ps_vec:   The coordinates to replicate
 //   nrep:     The number of replicas to make
 //   mmctrl:   Step counter and progress counters for all work units
 //   gpu:      Details of the GPU to use in calculations
 //   timer:    Object to record the timings
 //   desc:     Description of the system to run (this will factor into the timings section names)
 //-------------------------------------------------------------------------------------------------
-void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
+void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
+                       const std::vector<PhaseSpace> &ps_vec, const int nrep,
                        MolecularMechanicsControls *mmctrl, const GpuDetails &gpu,
                        StopWatch *timer, const PrecisionModel prec, const EvaluateForce eval_frc,
                        const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
-                       const VwuGoal purpose) {
-  std::vector<AtomGraph*> ag_vec(1, ag);
-  std::vector<PhaseSpace> ps_vec(1, ps);
-  std::vector<int> ag_idx(nrep, 0);
+                       const VwuGoal purpose, const std::string &batch_name) {
+  std::vector<int> ag_idx = tileVector(incrementingSeries<int>(0, ag_vec.size()), nrep);
   AtomGraphSynthesis poly_ag(ag_vec, ag_idx, ExceptionResponse::SILENT, gpu);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_vec, ag_idx);
   StaticExclusionMaskSynthesis poly_se(ag_vec, ag_idx);
   SeMaskSynthesisReader poly_ser = poly_se.data();
   poly_ag.loadNonbondedWorkUnits(poly_se);
   CoreKlManager launcher(gpu, poly_ag);
-  ScoreCard sc(nrep, 1, 32);
+  ScoreCard sc(poly_ag.getSystemCount(), 1, 32);
   const int2 valence_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg, acc_meth,
-                                                        purpose);
+                                                        purpose, ClashResponse::NONE);
   const int2 nonbond_lp = launcher.getNonbondedKernelDims(prec, NbwuKind::TILE_GROUPS, eval_frc,
-                                                          eval_nrg, acc_meth);
+                                                          eval_nrg, acc_meth,
+                                                          ImplicitSolventModel::NONE,
+                                                          ClashResponse::NONE);
+  const int2 gbr_lp = launcher.getBornRadiiKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
+                                                      ImplicitSolventModel::NONE);
+  const int2 gbd_lp = launcher.getBornDerivativeKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
+                                                           ImplicitSolventModel::NONE);
   CacheResource valence_tb_space(valence_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_space(nonbond_lp.x, small_block_max_atoms);
-  mmctrl->primeWorkUnitCounters(launcher, prec, poly_ag);
-  
+  mmctrl->primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, prec, poly_ag);
+  Thermostat tstat;
+  ImplicitSolventWorkspace isw(poly_ag.getSystemAtomOffsets(), poly_ag.getSystemAtomCounts(),
+                               prec);
+
   // Upload the critical components
   poly_ag.upload();
   poly_se.upload();
   poly_ps.upload();
 
   // Some common variables for either branch
-  const std::string valk_name = valenceKernelKey(prec, eval_frc, eval_nrg, acc_meth, purpose);
+  const std::string valk_name = valenceKernelKey(prec, eval_frc, eval_nrg, acc_meth, purpose,
+                                                 ClashResponse::NONE);
   const std::string nnbk_name = nonbondedKernelKey(prec, NbwuKind::TILE_GROUPS, eval_frc,
-                                                   eval_nrg, acc_meth);
-  const int sys_val_time = timer->addCategory(getBaseName(ag->getFileName()) + " on " +
-                                              valk_name + " (" + std::to_string(nrep) + ")");
-  const int sys_nb_time = timer->addCategory(getBaseName(ag->getFileName()) + " on " +
-                                             nnbk_name + " (" + std::to_string(nrep) + ")");
+                                                   eval_nrg, acc_meth, ImplicitSolventModel::NONE,
+                                                   ClashResponse::NONE);
+  const int sys_val_time = timer->addCategory(batch_name + " on " + valk_name + " (" +
+                                              std::to_string(nrep) + ")");
+  const int sys_nb_time = timer->addCategory(batch_name + " on " + nnbk_name + " (" +
+                                             std::to_string(nrep) + ")");
   
   // Obtain abstracts outside the inner loop, in case this is a significant contributor to the
   // run time.  Forces will only be initialized once, and thereafter calculated repeatedly to test
@@ -147,7 +159,12 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
       const SyRestraintKit<double,
                            double2,
                            double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(devc_tier);
+      const SyAtomUpdateKit<double,
+                            double2,
+                            double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
       MMControlKit<double> ctrl = mmctrl->dpData(devc_tier);
+      ThermostatWriter<double> tstw = tstat.dpData(devc_tier);
+      ISWorkspaceKit<double> iswk = isw.dpData(devc_tier);
       PsSynthesisWriter poly_psw = poly_ps.data(devc_tier);
       ScoreCardWriter scw = sc.data(devc_tier);
       CacheResourceKit<double> gmem_rval = valence_tb_space.dpData(devc_tier);
@@ -158,8 +175,8 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
       // Test the valence kernel
       for (int i = 0; i < 1000; i++) {
         ctrl.step += 1;
-        launchValenceDp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_rval, eval_frc, eval_nrg,
-                        purpose, launcher);
+        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_rval,
+                      eval_frc, eval_nrg, purpose, valence_lp);
       }
       cudaDeviceSynchronize();
       timer->assignTime(sys_val_time);
@@ -169,8 +186,8 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
       timer->assignTime(0);
       for (int i = 0; i < 1000; i++) {
         ctrl.step += 1;
-        launchNonbondedTileGroupsDp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_rnnb,
-                                    eval_frc, eval_nrg, launcher);
+        launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
+                        &gmem_rnnb, &iswk, eval_frc, eval_nrg, nonbond_lp, gbr_lp, gbd_lp);
       }
       cudaDeviceSynchronize();
       timer->assignTime(sys_nb_time);
@@ -184,7 +201,12 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
       const SyRestraintKit<float,
                            float2,
                            float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(devc_tier);
+      const SyAtomUpdateKit<float,
+                            float2,
+                            float4> poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
       MMControlKit<float> ctrl = mmctrl->spData(devc_tier);
+      ThermostatWriter<float> tstw = tstat.spData(devc_tier);
+      ISWorkspaceKit<float> iswk = isw.spData(devc_tier);
       PsSynthesisWriter poly_psw = poly_ps.data(devc_tier);
       ScoreCardWriter scw = sc.data(devc_tier);
       CacheResourceKit<float> gmem_rval = valence_tb_space.spData(devc_tier);
@@ -195,19 +217,20 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
       // Test the valence kernel
       for (int i = 0; i < 1000; i++) {
         ctrl.step += 1;
-        launchValenceSp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_rval, eval_frc, eval_nrg,
-                        purpose, acc_meth, launcher);
+        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_rval,
+                      eval_frc, eval_nrg, purpose, acc_meth, valence_lp);
       }
       cudaDeviceSynchronize();
       timer->assignTime(sys_val_time);
-
+      
       // Test the non-bonded kernel
       poly_ps.initializeForces(gpu, devc_tier);      
       timer->assignTime(0);
       for (int i = 0; i < 1000; i++) {
         ctrl.step += 1;
-        launchNonbondedTileGroupsSp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_rnnb,
-                                    eval_frc, eval_nrg, acc_meth, launcher);
+        launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
+                        &gmem_rnnb, &iswk, eval_frc, eval_nrg, acc_meth, nonbond_lp, gbr_lp,
+                        gbd_lp);
       }
       cudaDeviceSynchronize();
       timer->assignTime(sys_nb_time);
@@ -238,34 +261,41 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
   // Loop over the dipeptides one at a time, make syntheses of each of them individually, and
   // test kernels.
   const int mol_count = sc.getSystemCount();
-  const std::vector<int> batch_multiplier = { 1, 3, 5, 10, 20 };
+  const std::vector<int> batch_multiplier = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 75, 100, 125,
+                                              150, 2000 };
+  //175, 200, 225, 250, 300, 350, 400, 450, 500,
+  //                                            600, 700, 800, 900, 1000, 1250, 1500, 1750, 2000 };
+  std::vector<AtomGraph*> ag_vec(mol_count);
+  std::vector<PhaseSpace> ps_vec;
+  ps_vec.reserve(mol_count);
   for (int i = 0; i < mol_count; i++) {
-    AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
-    for (int j = 0; j < 5; j++) {
-      const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
-      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                        PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+    ag_vec[i] = sc.getSystemTopologyPointer(i);
+    ps_vec.push_back(sc.getCoordinates(i));
+  }
+  for (size_t i = 0; i < batch_multiplier.size(); i++) {
+    const int ncopy = batch_multiplier[i];
+    replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
+                      VwuGoal::ACCUMULATE, batch_name);
+    replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      VwuGoal::ACCUMULATE, batch_name);
+    replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::WHOLE,
+                      VwuGoal::ACCUMULATE, batch_name);
+    replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::WHOLE,
+                      VwuGoal::ACCUMULATE, batch_name);
 
-      // Only do double-precision calculations for low replica numbers--this can be strenuous on
-      // many architectures, particularly in the non-bonded kernel.
-      if (ncopy < 10) {
-        replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                          PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-        replicaProcessing(iag_ptr, sc.getCoordinates(i), ncopy, &mmctrl, gpu, timer,
-                          PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      }
+    // Only do double-precision calculations for low replica numbers--this can be strenuous on
+    // many architectures, particularly in the non-bonded kernel.
+    if (batch_multiplier[i] < 3) {
+      replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
+                        EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
+                        VwuGoal::ACCUMULATE, batch_name);
+      replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
+                        EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                        VwuGoal::ACCUMULATE, batch_name);
     }
   }
 }

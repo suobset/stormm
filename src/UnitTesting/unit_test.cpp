@@ -38,7 +38,7 @@ using parse::char4ToString;
 using parse::findStringInVector;
 using parse::intToString;
 using parse::NumberFormat;
-using parse::operator==;
+using data_types::operator==;
 using parse::polyNumericVector;
 using parse::printTable;
 using parse::realDecimalPlaces;

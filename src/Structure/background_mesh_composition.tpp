@@ -6,13 +6,12 @@ namespace structure {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &basis_in,
-                                                        const MeshParameters &measurements_in,
-                                                        const MeshRulers &tick_marks,
-                                                        const GridDetail purpose_in,
-                                                        const std::vector<double> probe_radii,
-                                                        const VdwCombiningRule lj_rule_in,
-                                                        const double clash_forgiveness) :
+BackgroundMeshComposition<T>::
+BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
+                          const MeshRulers &tick_marks, const GridDetail purpose_in,
+                          const std::vector<double> probe_radii, const VdwCombiningRule lj_rule_in,
+                          const double clash_forgiveness,
+                          const std::vector<PairLJInteraction> &edits) :
   basis{basis_in},
   measurements{measurements_in},
   tick_marks{measurements_in},
@@ -55,15 +54,12 @@ BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &ba
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &basis_in,
-                                                        const MeshParameters &measurements_in,
-                                                        const MeshRulers &tick_marks,
-                                                        const GridDetail purpose_in,
-                                                        const AtomGraph &ag_other,
-                                                        const VdwCombiningRule lj_rule_in,
-                                                        const double clash_ratio_in,
-                                                        const double clash_distance_in,
-                                                        const ComboGraphLJModel &interact_nbfx) :
+BackgroundMeshComposition<T>::
+BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
+                          const MeshRulers &tick_marks, const GridDetail purpose_in,
+                          const AtomGraph &ag_other, const VdwCombiningRule lj_rule_in,
+                          const double clash_ratio_in, const double clash_distance_in,
+                          const std::vector<PairLJInteraction> &edits) :
 {
   // In this construction, the meshes will serve the electrostatics of a system and any of its
   // Lennard-Jones atom types.  The non-bonded model will be set based on the supplied topology.
@@ -82,20 +78,22 @@ BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &ba
     }
     break;
   }
+  if (basis_in.getTopologyPointer() != nullptr) {
+    const ComboGraphLJModel lj_tables(basis_in.getTopologyPointer(), poly_ag_other, lj_rule_in,
+                                      edits);
+  }
   allocate();
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &basis_in,
-                                                        const MeshParameters &measurements_in,
-                                                        const MeshRulers &tick_marks,
-                                                        const GridDetail purpose_in,
-                                                        const AtomGraphSynthesis &poly_ag_other,
-                                                        const VdwCombiningRule lj_rule_in,
-                                                        const double clash_ratio_in,
-                                                        const double clash_distance_in,
-                                                        const ComboGraphLJModel &interact_nbfx) :
+BackgroundMeshComposition<T>:
+BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
+                          const MeshRulers &tick_marks, const GridDetail purpose_in,
+                          const AtomGraphSynthesis &poly_ag_other,
+                          const VdwCombiningRule lj_rule_in, const double clash_ratio_in,
+                          const double clash_distance_in,
+                          const std::vector<PairLJInteraction> &edits) :
 {
   // In this construction, the meshes again will serve the electrostatics and a series of
   // Lennard-Jones atom types, but spanning a whole series of topologies.  The non-bonded model
@@ -119,7 +117,10 @@ BackgroundMeshComposition<T>::BackgroundMeshComposition(const MeshFoundation &ba
   // Count the number of meshes that will be needed.  The electrostatic mesh will get index zero.
   mesh_count = 1;
   electrostatic_mesh_index = 0;
-  for (int i = 0; i < 
+  if (basis_in.getTopologyPointer() != nullptr) {
+    const ComboGraphLJModel lj_tables(basis_in.getTopologyPointer(), poly_ag_other, lj_rule_in,
+                                      edits);
+  }
   allocate();
 }
 

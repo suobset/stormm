@@ -564,25 +564,6 @@ void hostInt95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
 }
 
 //-------------------------------------------------------------------------------------------------
-void hostSplitAccumulation(const float fval, int *primary, int *overflow) {
-  int ival;
-  if (fabsf(fval) >= max_int_accumulation_f) {
-    const int spillover = fval / max_int_accumulation_f;
-    ival = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
-    *overflow += spillover;
-  }
-  else {
-    ival = fval;
-  }
-  const int prim_old = *primary;
-  *primary += ival;
-  const int prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    *overflow += (1 - (2 * (ival < 0))) * 2;
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
 void hostSplitAccumulation(const double dval, llint *primary, int *overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
@@ -598,6 +579,25 @@ void hostSplitAccumulation(const double dval, llint *primary, int *overflow) {
   const llint prim_old_plus_ival = prim_old + ival;
   if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
     *overflow += (1 - (2 * (ival < 0LL))) * 2;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostSplitAccumulation(const float fval, int *primary, int *overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    ival = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    *overflow += spillover;
+  }
+  else {
+    ival = fval;
+  }
+  const int prim_old = *primary;
+  *primary += ival;
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    *overflow += (1 - (2 * (ival < 0))) * 2;
   }
 }
 

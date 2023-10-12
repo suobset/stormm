@@ -12,9 +12,9 @@ void checkCompatibility(const ComparisonGuide &cg, const RMSDPlan &rplan,
   const PsSynthesisReader poly_psr = poly_ps.data();
   const int ntop = poly_psr.unique_topology_count;
   if (ntop != rplan.getPlanCount()) {
-    rtErr("The number of unique topologies in the synthesis " + std::to_string(ntop) + "must "
+    rtErr("The number of unique topologies in the synthesis (" + std::to_string(ntop) + ") must "
           "match the number of individual RMSD calculation plans (" +
-          std::to_string(rplan.getPlanCount()) + ").", "checkComatibility");
+          std::to_string(rplan.getPlanCount()) + ").", "checkCompatibility");
   }
   switch (process) {
   case RMSDTask::REFERENCE:

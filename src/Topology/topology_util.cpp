@@ -100,5 +100,17 @@ int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph> &repo)
   return matchTopology(query_ag.getSelfPointer(), repo);
 }
 
+//-------------------------------------------------------------------------------------------------
+bool hasVdwProperties(const AtomGraph *ag, const int atom_index, const VdwCombiningRule lj_rule) {
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  return hasVdwProperties<double>(nbk, atom_index, lj_rule);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool hasVdwProperties(const AtomGraph &ag, const int atom_index, const VdwCombiningRule lj_rule) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  return hasVdwProperties<double>(nbk, atom_index, lj_rule);
+}
+
 } // namespace topology
 } // namespace stormm

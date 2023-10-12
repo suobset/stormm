@@ -59,6 +59,6 @@ std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset, int *n_
   }
   return result;
 }
-
+  
 } // namespace stmath
 } // namespace stormm

@@ -322,7 +322,29 @@ int main(const int argc, const char* argv[]) {
   check(iha_allocations - orig_allocations <= 5, "Hybrid::pushBack() is generating too "
         "many reallocations (" + std::to_string(ihybrid_a.getAllocations() - orig_allocations) +
         " to grow from 100 to 500 elements).");
-
+  Hybrid<double> grow_by_strides;
+  const std::vector<double> real_numbers = { 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 0.9, -0.8, -1.7 };
+  grow_by_strides.pushBack(9.3);
+  grow_by_strides.pushBack(real_numbers);
+  check(grow_by_strides.size(), RelationalOperator::EQUAL, 10, "The vectorized pushBack() member "
+        "function of the Hybrid class does not function as intended.");
+  check(grow_by_strides.readHost(3), RelationalOperator::EQUAL, real_numbers[2], "The vectorized "
+        "pushBack() member function does not convey the correct data to a Hybrid object.");
+  grow_by_strides.pushBack(grow_by_strides);
+  check(grow_by_strides.size(), RelationalOperator::EQUAL, 20, "Pushing a Hybrid object to the "
+        "back of itself does not work as intended.");
+  check(grow_by_strides.readHost(14), RelationalOperator::EQUAL, real_numbers[3], "Pushing a "
+        "Hybrid object to the back of itself does not convey data correctly.");
+  grow_by_strides.resize(50);
+  grow_by_strides.resize(20);
+  grow_by_strides.pushBack(grow_by_strides);
+  check(grow_by_strides.size(), RelationalOperator::EQUAL, 40, "Resizing a Hybrid object in "
+        "advance, such that there is ample room to double its size, results in unexpected "
+        "behavior when pushing the object to the back of itself.");
+  check(grow_by_strides.readHost(35), RelationalOperator::EQUAL, real_numbers[4], "Pushing a "
+        "Hybrid object to the back of itself, when the object does not get reallocated, does not "
+        "convey data correctly.");
+  
   // Test the copy constructor
   section(5);
   Hybrid<int> icpy_a = ihybrid_a;

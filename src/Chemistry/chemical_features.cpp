@@ -2568,6 +2568,11 @@ void ChemicalFeatures::download() {
 #endif
 
 //-------------------------------------------------------------------------------------------------
+int ChemicalFeatures::getAtomCount() const {
+  return atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 int ChemicalFeatures::getPlanarAtomCount() const {
   return planar_atom_count;
 }

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <sys/time.h>
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
@@ -33,6 +34,16 @@ using symbols::amber_ancient_bioq;
 ///        will be expressed in increments that a floating point number can represent exactly.
 ///        The hexfloat would read 0x1p-23.
 constexpr double charge_precision_inc = 1.1920928955078125E-7;
+
+/// \brief Default 1:4 non-bonded screening factors are taken from various major codes.
+/// \{
+constexpr double amber_default_elec14_screen = 1.2;
+constexpr double amber_default_vdw14_screen = 2.0;
+constexpr double charmm_default_elec14_screen = 1.0;
+constexpr double charmm_default_vdw14_screen = 1.0;
+constexpr double glycam_default_elec14_screen = 1.0;
+constexpr double glycam_default_vdw14_screen = 1.0;
+/// \}
 
 /// \brief A struct to hold information relating to an Amber topology.  This struct's member
 ///        functions are limited to getters for its private data.  Because the primary means of
@@ -183,7 +194,8 @@ public:
   void buildFromPrmtop(const std::string &file_name,
                        const ExceptionResponse policy = ExceptionResponse::WARN,
                        double coulomb_constant_in = amber_ancient_bioq,
-                       double default_elec14_screening = 1.2, double default_vdw14_screening = 2.0,
+                       double default_elec14_screening = amber_default_elec14_screen,
+                       double default_vdw14_screening = amber_default_vdw14_screen,
                        double charge_rounding_tol = 0.001,
                        double charge_discretization = charge_precision_inc);
 
@@ -192,6 +204,9 @@ public:
   // For Hybrid object member variables, getThisHybridObjectStuff() will return the entirety of
   // the POINTER-kind object's host_data vector, up to its stated length.
 
+  /// \brief Get the title of the topology (may be blank).
+  std::string getTitle() const;
+  
   /// \brief Get the file name where a topology originated (may be blank, indicating that the
   ///        topology was produced by some other means).
   std::string getFileName() const;
@@ -494,7 +509,7 @@ public:
 
   /// \brief Get a table with the names of all unique atom types, arranged according to their
   ///        Lennard-Jones indices as they appear in the topology (in ascending order).
-  std::vector<char4> getAtomTypeNameTable() const;
+  std::vector<std::vector<char4>> getAtomTypeNameTable() const;
   
   /// \brief Get the names of residues in the system.
   ///
@@ -656,7 +671,7 @@ public:
   int getChargeTypeCount() const;
   
   /// \brief Get the number of atom types in the system.
-  int getAtomTypeCount() const;
+  int getLJTypeCount() const;
 
   /// \brief Get the number of exclusions in the entire topology.
   int getTotalExclusions() const;
@@ -676,7 +691,13 @@ public:
   /// \brief Get the fundamental coulomb constant that this system uses in electrostatic
   ///        calculations.
   double getCoulombConstant() const;
-  
+
+  /// \brief Get the general 1:4 screening factor on electrostatic interactions.
+  double getElectrostatic14Screening() const;
+
+  /// \brief Get the general 1:4 screening factor on van-der Waals interactions.
+  double getVanDerWaals14Screening() const;
+
   /// \brief Get the PB Radii set
   std::string getPBRadiiSet() const;
 
@@ -1310,7 +1331,7 @@ private:
   Hybrid<int> cmap_l_atoms;                   ///< 4th:3rd atom of each CMAP 2-D surface term
   Hybrid<int> cmap_m_atoms;                   ///< UNK:4th atom of each CMAP 2-D surface term
   Hybrid<int> cmap_surface_dimensions;        ///< Sizes of each CMAP surface (this array has a
-                                              ///<  size based on the number of unique CMAP terms)
+                                              ///<   size based on the number of unique CMAP terms)
   Hybrid<int> cmap_surface_bounds;            ///< Starting points for each CMAP surface (this
                                               ///<   array has a size based on the number of unique
                                               ///<   CMAP terms)
@@ -1494,7 +1515,7 @@ private:
 
   // Relevant information for the non-bonded calculation
   int charge_type_count;                 ///< Number of distinct atomic partial charges
-  int atom_type_count;                   ///< Number of distinct Lennard-Jones types
+  int lj_type_count;                     ///< Number of distinct Lennard-Jones types
   int total_exclusions;                  ///< Total number of non-bonded exclusions, including 1:4
   int attenuated_14_type_count;          ///< The number of distinct 1:4 scaling factor pairs 
   int inferred_14_attenuations;          ///< Most 1:4 exclusions are actually attenuations
@@ -1522,6 +1543,11 @@ private:
   double coulomb_constant;               ///< Coulomb's constant in units of kcal-A/mol-e^2
                                          ///<   (Amber differs from other programs in terms of
                                          ///<   what this is, so it can be set here)
+  double elec14_screening_factor;        ///< General screening factor for electrostatic 1:4
+                                         ///<   interactions, applied if no pair-specific factor is
+                                         ///<   available
+  double vdw14_screening_factor;         ///< General screening factor for 1:4 van-der Waals
+                                         ///<   interactions
   std::string pb_radii_set;              ///< The Poisson-Boltzmann radii set, also used in GB
   Hybrid<int> charge_indices;            ///< Atomic charge indices, 0 to charge_type_count - 1
   Hybrid<int> lennard_jones_indices;     ///< Lennard-Jones indices, 0 to atom_type_count - 1
@@ -1714,6 +1740,10 @@ private:
   /// \brief Function to wrap pointer re-assignments after copy constructor initialization or
   ///        a copy assignment operation.
   void rebasePointers();
+
+  /// Allow the AtomGraphStage to access private members directly to modify and guide construction
+  /// of topologies used in STORMM's production calculations.
+  friend class AtomGraphStage;
 };
 
 } // namespace topology

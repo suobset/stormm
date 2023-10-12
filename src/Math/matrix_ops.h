@@ -336,7 +336,8 @@ void pseudoInverse(const Hybrid<T> &amat, Hybrid<T> *result, Hybrid<T> *workspac
 /// Overloaded:
 ///   - Provide C-style arrays, all modifiable and with trusted row and column counts, for the
 ///     stiffness matrix, the solution vector, and the coefficients vector.
-///   - Proivde Standard Template Library vectors with compatible lengths
+///   - Provide Standard Template Library vectors with compatible lengths
+///   - Provide Hybrid objects (work will be done by the host CPU with host-side data)
 ///
 /// \param amat    The stiffness matrix
 /// \param xvec    The vector of coefficients to be solved
@@ -352,8 +353,14 @@ void qrSolver(std::vector<T> *amat, std::vector<T> *xvec, std::vector<T> *bvec);
 
 template <typename T>
 void qrSolver(const std::vector<T> &amat, std::vector<T> *xvec, const std::vector<T> &bvec);
-/// \}
 
+template <typename T>
+void qrSolver(Hybrid<T> *amat, Hybrid<T> *xvec, Hybrid<T> *bvec);  
+
+template <typename T>
+void qrSolver(const Hybrid<T> &amat, Hybrid<T> *xvec, const Hybrid<T> &bvec);
+/// \}
+  
 /// \brief Compute the determinant of a rank N matrix using the Leibniz formula.
 ///
 /// Overloaded:
@@ -373,7 +380,7 @@ double leibnizDeterminant(const std::vector<T> &amat);
 template <typename T>
 double leibnizDeterminant(const Hybrid<T> &amat);
 /// \}
-
+  
 /// \brief Compute the box space transformation matrix given a sequence of six real numbers.
 ///        Templated for single- and double-precision real forms.
 ///

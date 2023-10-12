@@ -6,10 +6,12 @@
 #include <vector>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/sorting_enumerators.h"
 #include "Math/vector_ops.h"
+#include "Potential/energy_enumerators.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 #include "atomgraph_abstracts.h"
@@ -24,6 +26,8 @@ using data_types::getStormmScalarTypeName;
 using data_types::getStormmHpcVectorTypeName;
 using data_types::isScalarType;
 using data_types::isHpcVectorType;
+using energy::NonbondedTheme;
+using energy::VdwCombiningRule;
 using stmath::UniqueValueHandling;
 using stmath::reduceUniqueValues;
 
@@ -122,6 +126,44 @@ int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph*> &repo
 int matchTopology(const AtomGraph *query_ag, const std::vector<AtomGraph> &repo);
 int matchTopology(const AtomGraph &query_ag, const std::vector<AtomGraph> &repo);
 /// \}
+
+/// \brief Determine whether an atom in a topology has significant van-der Waals properties.  This
+///        will check all interactions of the atom's type with other types, if necessary.
+///
+/// Overloaded:
+///   - Provide a pointer or reference to the original abstract
+///   - Provide the non-bonded parameter kit
+///   - Provide the detected Lennard-Jones combining rule for optimization
+///
+/// \param ag          The topology to analyze
+/// \param nbk         The non-bonded parameters obtained from the topology
+/// \param lj_rule     The detected (and trusted) Lennard-Jones combining rule
+/// \param atom_index  The index of the atom of interest
+/// \{
+template <typename T>
+bool hasVdwProperties(const NonbondedKit<T> &nbk, int atom_index,
+                      VdwCombiningRule lj_rule = VdwCombiningRule::NBFIX);
+
+bool hasVdwProperties(const AtomGraph *ag, int atom_index,
+                      VdwCombiningRule lj_rule = VdwCombiningRule::NBFIX);
+
+bool hasVdwProperties(const AtomGraph &ag, int atom_index,
+                      VdwCombiningRule lj_rule = VdwCombiningRule::NBFIX);
+/// \}
+
+/// \brief Determine whether an atom is relevant to a particular kind of non-bonded interactions.
+///
+/// \param nbk         Non-bonded parameters obtained from the topology
+/// \param atom_index  Index of the atom of interest
+/// \param theme       Indicate the kind of non-bonded properties to seek out in the atom (or
+///                    virtual site)s
+/// \param lj_rule     The perceived Lennard-Jones combining rule (important as NBFix combining
+///                    rules require that all possible combinations of the atom with other types be
+///                    checked, whereas Lorentz-Berthelot and geometric combining rules require
+///                    only that the atom have significant self interations)
+template <typename T>
+bool hasRelevantProperties(const NonbondedKit<T> &nbk, int atom_index, NonbondedTheme theme,
+                           VdwCombiningRule lj_rule = VdwCombiningRule::NBFIX);
 
 } // namespace topology
 } // namespace stormm

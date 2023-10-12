@@ -337,10 +337,16 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #define TCALC float
 #  define TCALC2 float2
 #  define TCALC_IS_SINGLE
-#  if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
-#    define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
-#    define GBRADII_KERNEL_BLOCKS_MULTIPLIER 4
-#    define GBDERIV_KERNEL_BLOCKS_MULTIPLIER 4
+#  ifdef STORMM_USE_CUDA
+#    if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#      define GBRADII_KERNEL_BLOCKS_MULTIPLIER 4
+#      define GBDERIV_KERNEL_BLOCKS_MULTIPLIER 4
+#    else
+#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#      define GBRADII_KERNEL_BLOCKS_MULTIPLIER 5
+#      define GBDERIV_KERNEL_BLOCKS_MULTIPLIER 5
+#    endif
 #  else
 #    define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
 #    define GBRADII_KERNEL_BLOCKS_MULTIPLIER 5

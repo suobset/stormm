@@ -8,10 +8,10 @@ namespace data_types {
 template <typename T> bool isScalarType() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   return (ct == int_type_index || ct == uint_type_index || ct == double_type_index ||
-          ct == float_type_index || ct == char_type_index || ct == uchar_type_index ||
-          ct == llint_type_index || ct == ullint_type_index || ct == short_type_index ||
-          ct == ushort_type_index || ct == ulint_type_index || ct == bool_type_index ||
-          ct == size_t_type_index);
+          ct == float_type_index || ct == longdouble_type_index || ct == char_type_index ||
+          ct == uchar_type_index || ct == llint_type_index || ct == ullint_type_index ||
+          ct == short_type_index || ct == ushort_type_index || ct == ulint_type_index ||
+          ct == bool_type_index || ct == size_t_type_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -32,7 +32,7 @@ template <typename T> bool isUnsignedIntegralScalarType() {
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool isFloatingPointScalarType() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
-  return (ct == double_type_index || ct == float_type_index);
+  return (ct == double_type_index || ct == float_type_index || ct == longdouble_type_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -41,6 +41,7 @@ template <typename T> std::string getStormmScalarTypeName() {
   if (ct == int_type_index) return "int";
   else if (ct == uint_type_index) return "unsigned_int";
   else if (ct == ulint_type_index) return "unsigned_long_int";
+  else if (ct == longdouble_type_index) return "long double";
   else if (ct == double_type_index) return "double";
   else if (ct == float_type_index) return "float";
   else if (ct == char_type_index) return "char";

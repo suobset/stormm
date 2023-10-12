@@ -361,10 +361,10 @@ template <typename T>
 T AtomGraph::getLennardJonesSigma(const int index_a, const int index_b) const {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
-    return sp_lj_sigma_values.readHost((index_a * atom_type_count) + index_b);
+    return sp_lj_sigma_values.readHost((index_a * lj_type_count) + index_b);
   }
   else if (ct == double_type_index) {
-    return lj_sigma_values.readHost((index_a * atom_type_count) + index_b);
+    return lj_sigma_values.readHost((index_a * lj_type_count) + index_b);
   }
   else {
     rtErr("Lennard-Jones sigma values may be specified as single- or double-precision real "
@@ -380,8 +380,8 @@ template <typename T> T AtomGraph::getLennardJonesSigma(const int index_a) const
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> AtomGraph::getLennardJonesSigma() const {
-  std::vector<T> result(atom_type_count);
-  for (int i = 0; i < atom_type_count; i++) {
+  std::vector<T> result(lj_type_count);
+  for (int i = 0; i < lj_type_count; i++) {
     result[i] = getLennardJonesSigma<T>(i, i);
   }
   return result;
@@ -392,13 +392,13 @@ template <typename T>
 T AtomGraph::getLennardJonesEpsilon(const int index_a, const int index_b) const {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
-    const double lj_a = sp_lj_a_values.readHost((index_a * atom_type_count) + index_b);
-    const double lj_b = sp_lj_b_values.readHost((index_a * atom_type_count) + index_b);
+    const double lj_a = sp_lj_a_values.readHost((index_a * lj_type_count) + index_b);
+    const double lj_b = sp_lj_b_values.readHost((index_a * lj_type_count) + index_b);
     return (lj_a < constants::tiny) ? 0.0 : static_cast<T>(0.25 * lj_b * lj_b / lj_a);
   }
   else if (ct == double_type_index) {
-    const double lj_a = lj_a_values.readHost((index_a * atom_type_count) + index_b);
-    const double lj_b = lj_b_values.readHost((index_a * atom_type_count) + index_b);
+    const double lj_a = lj_a_values.readHost((index_a * lj_type_count) + index_b);
+    const double lj_b = lj_b_values.readHost((index_a * lj_type_count) + index_b);
     return (lj_a < constants::tiny) ? 0.0 : static_cast<T>(0.25 * lj_b * lj_b / lj_a);
   }
   else {
@@ -415,8 +415,8 @@ template <typename T> T AtomGraph::getLennardJonesEpsilon(const int index_a) con
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> AtomGraph::getLennardJonesEpsilon() const {
-  std::vector<T> result(atom_type_count);
-  for (int i = 0; i < atom_type_count; i++) {
+  std::vector<T> result(lj_type_count);
+  for (int i = 0; i < lj_type_count; i++) {
     result[i] = getLennardJonesEpsilon<T>(i, i);
   }
   return result;

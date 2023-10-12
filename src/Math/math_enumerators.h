@@ -75,7 +75,54 @@ enum class LimitApproach {
   BELOW,  ///< Approach the limit from below, with the function argument ascending
   ABOVE   ///< Approach the limit from above, with the function argument descending
 };
- 
+
+/// \brief Enumerate various functions that can be mapped to a logarthimic spline table by
+///        hard-coded methods.
+enum class LogSplineForm {
+  ELEC_PME_DIRECT,        ///< Electrostatic PME direct space functional form (this will include
+                          ///<   Coulomb's constant, in the program's internal units)
+  ELEC_PME_DIRECT_EXCL,   ///< Electrostatic PME direct space functional form, plus a Coulombic
+                          ///<   exclusion
+  DELEC_PME_DIRECT,       ///< Electrostatic PME direct space functional form.  This will include
+                          ///<   Coulomb's constant, in the program's internal units, as well as an
+                          ///<   additional factor of the inverse interparticle distance, in the
+                          ///<   interest of rolling as many factors as possible together in
+                          ///<   double-precision before creating the spline.
+  DELEC_PME_DIRECT_EXCL,  ///< Electrostatic PME direct space functional form, plus a Coulombic
+                          ///<   exclusion.  See above for additional factors in this quantity.
+  CUSTOM                  ///< Custom potential drawn from developer-supplied data tables
+};
+
+/// \brief Enumerate various methods by which a function can be indexed.
+enum class TableIndexing {
+  ARG,           ///< Indexing into the spline tables is by the value of the function argument
+  SQUARED_ARG,   ///< Indexing is based on the square of the value of the function argument
+  ARG_OFFSET,    ///< Indexing into the spline tables is by the value of the function argument plus
+                 ///<   an offset (some power of 2), which eliminates all of the table elements
+                 ///<   with applicable ranges smaller than the offset
+  SQ_ARG_OFFSET  ///< Indexing into the spline tables is base on the square of the value of the
+                 ///<   function argument plus an offset (some power of 2)
+};
+
+/// \brief List different combinations of basis functions that might be used to construct splines
+///        for interpolation.
+enum class BasisFunctions {
+  MIXED_FRACTIONS,  ///< The basis functions include a fractional series, e.g. x, 1, 1/x, 1/x^2
+  POLYNOMIAL        ///< The basis functions are a polynomial series, e.g. 1, x, x^2, x^3
+};
+
+/// \brief B-spline coefficients are, by definition, a smooth partition of unity.  However, that
+///        result is only guaranteed to the precision of the calculating machine, and even then
+///        there are many ways of achieving or enforcing it.  List those methods.
+enum class BSplineUnity {
+  CENTER_FILL,  ///< One of the central coefficients, the largest for odd orders of interpolation
+                ///<   and likely to be the largest for even orders, will be left uncalculated at
+                ///<   each step of the recursive calculation.  This coefficient will be computed
+                ///<   subtracting all others from 1.0 in the final step.
+  NONE          ///< The standard recursive procedure is applied to all coefficients, allowing the
+                ///<   sum to diverge from unity as roundoff error seeps in over each iteration.
+};
+  
 /// \brief Get a human-readable string describing an enumeration of the provided type.  Various
 ///        overloads of this function serve enumerators across many libraries.
 ///
@@ -84,6 +131,10 @@ enum class LimitApproach {
 std::string getEnumerationName(FunctionLevel input);
 std::string getEnumerationName(Interpolant input);
 std::string getEnumerationName(LimitApproach input);
+std::string getEnumerationName(LogSplineForm input);
+std::string getEnumerationName(TableIndexing input);
+std::string getEnumerationName(BasisFunctions input);
+std::string getEnumerationName(BSplineUnity input);
 /// \}
 
 } // namespace stmath

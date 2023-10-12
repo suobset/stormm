@@ -6,6 +6,7 @@
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
+#include "Topology/combograph_ljmodel.h"
 #include "mesh_forcefield.h"
 #include "mesh_foundation.h"
 #include "mesh_parameters.h"
@@ -15,6 +16,9 @@
 namespace stormm {
 namespace structure {
 
+using topology::ComboGraphLJModel;
+using topology::PairLJInteraction;
+  
 /// \brief A class to hold the details of multiple BackgroundMesh objects taking the same molecular
 ///        basis.  It is termed a composition, not a synthesis, as it deals with multiple aspects
 ///        of a single system (or multiple aspects of many snapshots of the same system), not a
@@ -53,17 +57,19 @@ public:
   BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
                             const MeshRulers &tick_marks, const GridDetail purpose_in,
                             const std::vector<double> probe_radii, VdwCombiningRule lj_rule_in,
-                            double clash_forgiveness);
+                            double clash_forgiveness, const std::vector<PairLJInteraction> &edits);
 
   BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
                             const MeshRulers &tick_marks, GridDetail purpose_in,
                             const AtomGraph &ag_other, VdwCombiningRule lj_rule_in,
-                            double clash_ratio_in, double clash_distance_in);
+                            double clash_ratio_in, double clash_distance_in,
+                            const std::vector<PairLJInteraction> &edits);
 
   BackgroundMeshComposition(const MeshFoundation &basis_in, const MeshParameters &measurements_in,
                             const MeshRulers &tick_marks, GridDetail purpose_in,
                             const AtomGraphSynthesis &poly_ag_other, VdwCombiningRule lj_rule_in,
-                            double clash_ratio_in, double clash_distance_in);
+                            double clash_ratio_in, double clash_distance_in,
+                            const std::vector<PairLJInteraction> &edits);
   /// \}
 
   /// \brief With no POINTER-kind Hybrid objects or other pointers to repair, the default copy and

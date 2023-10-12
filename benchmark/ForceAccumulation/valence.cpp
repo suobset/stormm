@@ -5,6 +5,7 @@
 #include "copyright.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/hpc_bounds.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
@@ -25,9 +26,11 @@ using stormm::numerics::default_globalpos_scale_f;
 using stormm::numerics::default_inverse_globalpos_scale_lf;
 using stormm::numerics::default_inverse_globalpos_scale_f;
 using stormm::data_types::double_type_index;
+#ifndef STORMM_USE_HPC
 using stormm::data_types::double3;
 using stormm::data_types::float2;
 using stormm::data_types::float3;
+#endif
 using stormm::data_types::llint;
 using stormm::data_types::llint3;
 using stormm::diskutil::DrivePathType;

@@ -14,8 +14,14 @@ namespace topology {
 using card::HybridTargetLevel;
 using stmath::findBin;
 using stmath::locateValue;
+using stmath::reduceUniqueValues;
 using parse::char4ToString;
   
+//-------------------------------------------------------------------------------------------------
+std::string AtomGraph::getTitle() const {
+  return title;
+}
+
 //-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getFileName() const {
   return source;
@@ -322,28 +328,47 @@ char4 AtomGraph::getAtomType(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<char4> AtomGraph::getAtomTypeNameTable() const {
-  std::vector<char4> result(atom_type_count);
-  std::vector<bool> coverage(atom_type_count, false);
+std::vector<std::vector<char4>> AtomGraph::getAtomTypeNameTable() const {
+  std::vector<std::vector<char4>> result(lj_type_count);
+  std::vector<bool> coverage(lj_type_count, false);
   int types_located = 0;
   int i = 0;
   const int* ljidx_ptr = lennard_jones_indices.data();
   const char4* atyp_ptr = atom_types.data();
-  while (i < atom_count && types_located < atom_type_count) {
-    if (ljidx_ptr[i] < 0 || ljidx_ptr[i] >= atom_type_count) {
+  while (i < atom_count && types_located < lj_type_count) {
+    if (ljidx_ptr[i] < 0 || ljidx_ptr[i] >= lj_type_count) {
       rtErr("Lennard-Jones type index " + std::to_string(ljidx_ptr[i]) + " is invalid.",
             "AtomGraph", "getAtomTypeNameTable");
     }
     if (coverage[ljidx_ptr[i]] == false) {
       coverage[ljidx_ptr[i]] = true;
-      result[ljidx_ptr[i]] = atyp_ptr[i];
+      std::vector<uint> tmp_tname_list;
+      int n_sharing = 1;
+      for (int j = i + 1; j < atom_count; j++) {
+        n_sharing += (ljidx_ptr[j] == ljidx_ptr[i]);
+      }
+      tmp_tname_list.resize(n_sharing);
+      tmp_tname_list[0] = char4ToUint(atyp_ptr[i]);
+      n_sharing = 1;
+      for (int j = i + 1; j < atom_count; j++) {
+        if (ljidx_ptr[j] == ljidx_ptr[i]) {
+          tmp_tname_list[n_sharing] = char4ToUint(atyp_ptr[j]);
+          n_sharing++;
+        }
+      }
+      reduceUniqueValues(&tmp_tname_list);
+      result[ljidx_ptr[i]] = std::vector<char4>(tmp_tname_list.size());
+      const size_t n_tname = tmp_tname_list.size();
+      for (size_t j = 0; j < n_tname; j++) {
+        result[ljidx_ptr[i]][j] = uintToChar4(tmp_tname_list[j]);
+      }
       types_located++;
     }
     i++;
   }
-  if (types_located < atom_type_count) {
+  if (types_located < lj_type_count) {
     rtErr("The topology contains only " + std::to_string(types_located) + " unique Lennard-Jones "
-          "atom types, whereas it is stated to contain " + std::to_string(atom_type_count) + ".",
+          "atom types, whereas it is stated to contain " + std::to_string(lj_type_count) + ".",
           "AtomGraph", "getAtomTypeNameTable");
   }
   return result;
@@ -511,8 +536,8 @@ int AtomGraph::getChargeTypeCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int AtomGraph::getAtomTypeCount() const {
-  return atom_type_count;
+int AtomGraph::getLJTypeCount() const {
+  return lj_type_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -545,6 +570,16 @@ double AtomGraph::getCoulombConstant() const {
   return coulomb_constant;
 }
 
+//-------------------------------------------------------------------------------------------------
+double AtomGraph::getElectrostatic14Screening() const {
+  return elec14_screening_factor;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraph::getVanDerWaals14Screening() const {
+  return vdw14_screening_factor;
+}
+  
 //-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getPBRadiiSet() const {
   return pb_radii_set;
@@ -819,7 +854,7 @@ ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(const HybridTargetLeve
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<double>
 AtomGraph::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return NonbondedKit<double>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<double>(atom_count, charge_type_count, lj_type_count, coulomb_constant,
                               atomic_charges.data(tier), charge_indices.data(tier),
                               lennard_jones_indices.data(tier), charge_parameters.data(tier),
                               lj_a_values.data(tier), lj_b_values.data(tier),
@@ -835,7 +870,7 @@ AtomGraph::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
 
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<float> AtomGraph::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return NonbondedKit<float>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<float>(atom_count, charge_type_count, lj_type_count, coulomb_constant,
                              sp_atomic_charges.data(tier), charge_indices.data(tier),
                              lennard_jones_indices.data(tier), sp_charge_parameters.data(tier),
                              sp_lj_a_values.data(tier), sp_lj_b_values.data(tier),
@@ -1127,7 +1162,7 @@ ValenceKit<float> AtomGraph::getDeviceViewToHostSPValenceKit() const {
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<double>
 AtomGraph::getDeviceViewToHostDPNonbondedKit() const {
-  return NonbondedKit<double>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<double>(atom_count, charge_type_count, lj_type_count, coulomb_constant,
                               atomic_charges.getDeviceValidHostPointer(),
                               charge_indices.getDeviceValidHostPointer(),
                               lennard_jones_indices.getDeviceValidHostPointer(),
@@ -1153,7 +1188,7 @@ AtomGraph::getDeviceViewToHostDPNonbondedKit() const {
 
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<float> AtomGraph::getDeviceViewToHostSPNonbondedKit() const {
-  return NonbondedKit<float>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<float>(atom_count, charge_type_count, lj_type_count, coulomb_constant,
                              sp_atomic_charges.getDeviceValidHostPointer(),
                              charge_indices.getDeviceValidHostPointer(),
                              lennard_jones_indices.getDeviceValidHostPointer(),

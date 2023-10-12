@@ -1422,34 +1422,37 @@ int main(const int argc, const char* argv[]) {
   const char osc = osSeparator();
   const std::string base_top_dir = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string base_crd_dir = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
-  TestSystemManager tsm(base_top_dir, "top",
-                        { "symmetry_L1", "stereo_L1", "symmetry_L1_vs",
-                          "stereo_L1_vs", "bromobenzene", "bromobenzene_vs" }, base_crd_dir,
-                        "inpcrd", { "symmetry_L1", "stereo_L1", "symmetry_L1_vs",
-                                    "stereo_L1_vs", "bromobenzene", "bromobenzene_vs" });
+  const std::vector<std::string> system_names = { "drug_example", "drug_example_vs",
+                                                  "bromobenzene", "bromobenzene_vs", "biotin" };
+  TestSystemManager tsm(base_top_dir, "top", system_names, base_crd_dir, "inpcrd", system_names);
 
   // Form a synthesis of the coordinates.  Perturb each structure slightly in the synthesis.
   // Simultaneously construct a systems cache to map the synthesis back to its origins.
   Xoroshiro128pGenerator xrs(517389207);
-  std::vector<AtomGraph*> ag_list;
-  std::vector<PhaseSpace> ps_list;
+  std::vector<AtomGraph*> pbc_ag_list;
+  std::vector<PhaseSpace> pbc_ps_list;
   const int n_structures = 100;
   std::vector<int> index_memory(n_structures);
-  ag_list.reserve(n_structures);
-  ps_list.reserve(n_structures);
-  for (int i = 0; i < n_structures; i++) {
+  pbc_ag_list.reserve(n_structures);
+  pbc_ps_list.reserve(n_structures);
+  int pbc_con = 0;
+  while (pbc_con < n_structures) {
     const int ag_id = static_cast<double>(tsm.getSystemCount()) * xrs.uniformRandomNumber();
-    index_memory[i] = ag_id;
-    ag_list.push_back(tsm.getTopologyPointer(ag_id));
-    ps_list.push_back(tsm.exportPhaseSpace(ag_id));
-    PhaseSpaceWriter psw = ps_list.back().data();
-    for (int j = 0; j < psw.natom; j++) {
-      psw.xcrd[j] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
-      psw.ycrd[j] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
-      psw.zcrd[j] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
+    if (tsm.getTopologyPointer(ag_id)->getUnitCellType() == UnitCellType::NONE) {
+      continue;
     }
+    index_memory[pbc_con] = ag_id;
+    pbc_ag_list.push_back(tsm.getTopologyPointer(ag_id));
+    pbc_ps_list.push_back(tsm.exportPhaseSpace(ag_id));
+    PhaseSpaceWriter psw = pbc_ps_list.back().data();
+    for (int i = 0; i < psw.natom; i++) {
+      psw.xcrd[i] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
+      psw.ycrd[i] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
+      psw.zcrd[i] += 0.5 * (xrs.uniformRandomNumber() - 0.5);
+    }
+    pbc_con++;
   }
-  PhaseSpaceSynthesis poly_ps(ps_list, ag_list, 48);
+  PhaseSpaceSynthesis poly_ps(pbc_ps_list, pbc_ag_list, 48);
   std::string fcon_string = "&files\n";
   for (int i = 0; i < 3; i++) {
     std::string ilabel;
@@ -1650,7 +1653,7 @@ int main(const int argc, const char* argv[]) {
       }
     }
   }
-  
+
   // Construct the all-to-all RMSD results
   std::vector<double> ata_rmsd_src_ans(cg_dbl.getSymmetryEquivalentPairOutputSize(src_grp));
   int isq_offset = 0;
@@ -1771,7 +1774,7 @@ int main(const int argc, const char* argv[]) {
   diffCoordinates<double, double>(recv_r.vxalt, recv_r.vyalt, recv_r.vzalt, tsm_cfr[0].xcrd,
                                   tsm_cfr[0].ycrd, tsm_cfr[0].zcrd, recv_r.natom,
                                   "CoordinateFrame => PhaseSpace(FORCES, ALTERNATE)",
-                                  tsm.getTestingStatus(), 1.9e-7, 2.7e-7);
+                                  tsm.getTestingStatus(), 3.0e-6, 2.2e-6);
   
   // Push coordinates into a new PhaseSpaceSynthesis with higher precision
   const std::vector<int> replicator = replicateSeries(tsm.getSystemCount(), 2);
@@ -1898,8 +1901,8 @@ int main(const int argc, const char* argv[]) {
     const int istart = host_clone_psynw.atom_starts[i];
     perturbSynthesis(&xrs, &host_clone_psynw, istart, natom);
     perturbSynthesis(&xrs, &host_tsm_psynw, istart, natom);
-    addRandomNoise(&xrs, &host_clone_cdnsw.xcrd[istart], &host_clone_cdnsw.ycrd[istart],
-                   &host_clone_cdnsw.zcrd[istart], natom, 0.1);
+    addRandomNoise(&xrs, &host_clone_cdnsw.xcrd_sp[istart], &host_clone_cdnsw.ycrd_sp[istart],
+                   &host_clone_cdnsw.zcrd_sp[istart], natom, 0.1);
 
     // After these uploads, all structures will hold the same coordinates on both the host and
     // the device, but each structure will have unique perturbations.

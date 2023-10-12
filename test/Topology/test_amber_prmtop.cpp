@@ -4,9 +4,11 @@
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
+#include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph_refinement.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
 
@@ -16,16 +18,20 @@ using stormm::data_types::ulint;
 #ifndef STORMM_USE_HPC
 using stormm::data_types::char4;
 #endif
+using stormm::data_types::char4ToUint;
+using stormm::data_types::uintToChar4;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
+using stormm::energy::getEnumerationName;
+using stormm::energy::VdwCombiningRule;
 using stormm::errors::rtWarn;
 using stormm::stmath::sum;
 using stormm::parse::polyNumericVector;
 using stormm::parse::stringToChar4;
 using stormm::parse::TextFile;
-using stormm::parse::operator==;
+using stormm::data_types::operator==;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
 using namespace stormm::testing;
@@ -124,9 +130,9 @@ std::vector<int> integerAGProp(const std::vector<AtomGraph*> &topols, const bool
         for (size_t j = 0; j < natom; j++) {
           maxtype = std::max(ati[j], maxtype);
         }
-        if (maxtype + 1 != topols[i]->getAtomTypeCount()) {
+        if (maxtype + 1 != topols[i]->getLJTypeCount()) {
           rtWarn("Topology " + topols[i]->getFileName() + " states that it contains " +
-                 std::to_string(topols[i]->getAtomTypeCount()) + "  atom types, but its "
+                 std::to_string(topols[i]->getLJTypeCount()) + "  atom types, but its "
                  "Lennard-Jones arrays only index " + std::to_string(maxtype + 1) + ".",
                  "test_amber_prmtop", "integerAGProp");
         }
@@ -137,7 +143,7 @@ std::vector<int> integerAGProp(const std::vector<AtomGraph*> &topols, const bool
       {
         const std::vector<int> ati = topols[i]->getLennardJonesIndex();
         const size_t natom = topols[i]->getAtomCount();
-        const int n_lj_type = topols[i]->getAtomTypeCount();
+        const int n_lj_type = topols[i]->getLJTypeCount();
         std::vector<int> atype_populations(n_lj_type, 0);
         for (size_t j = 0; j < natom; j++) {
           if (ati[j] >= 0 && ati[j] < n_lj_type) {
@@ -703,19 +709,19 @@ int main(const int argc, const char* argv[]) {
   const AtomGraph *tip3p_self_ptr = tip3p.getSelfPointer();
   const WaterModel should_be_tip3p = identifyWaterModel(*tip3p_self_ptr);
   const AtomGraph& tip4p_ref = tip4p;
-  check(tip4p_ref.getSelfPointer() == tip4p.getSelfPointer(), "A reference to a topology does not return "
-        "the same self pointer as the original object.", top_check);
-  check(should_be_tip3p == WaterModel::TIP3P, "The self-pointer of a TIP3P water system's topology does "
-        "not correctly identify the water model.", top_check);
+  check(tip4p_ref.getSelfPointer() == tip4p.getSelfPointer(), "A reference to a topology does not "
+        "return the same self pointer as the original object.", top_check);
+  check(should_be_tip3p == WaterModel::TIP3P, "The self-pointer of a TIP3P water system's "
+        "topology does not correctly identify the water model.", top_check);
   const std::vector<int> clone_system_sizes_ans = { 12, 304, 2489, 632 };
   std::vector<int> clone_system_sizes(clones.size());
   for (size_t i = 0; i < clones.size(); i++) {
     const AtomGraph *iclone_ptr = clones[i].getSelfPointer();
     clone_system_sizes[i] = iclone_ptr->getAtomCount();
   }
-  check(clone_system_sizes, RelationalOperator::EQUAL, clone_system_sizes_ans, "AtomGraph self-pointers "
-        "are no longer reporting accurate atom counts after going through an STL vector manipulation that "
-        "invokes the move assignment operator.", top_check);
+  check(clone_system_sizes, RelationalOperator::EQUAL, clone_system_sizes_ans, "AtomGraph "
+        "self-pointers are no longer reporting accurate atom counts after going through an STL "
+        "vector manipulation that invokes the move assignment operator.", top_check);
   
   // Create a vector of many topologies for subsequent analyses.  This will implicitly test copy
   // and move constructors, as the vector of all topologies will be created based on a product of
@@ -1026,6 +1032,69 @@ int main(const int argc, const char* argv[]) {
         RelationalOperator::EQUAL, Approx(mean_cmap_val).margin(1.0e-7), "Average CMAP surface "
         "values of each system do not meet expectations when computed in single precision.",
         top_check);
+
+  // Check the ability to detect Lennard-Jones combining rules
+  check(inferCombiningRule(tip3p) == VdwCombiningRule::LORENTZ_BERTHELOT, "TIP3P water should "
+        "register as having a " + getEnumerationName(VdwCombiningRule::LORENTZ_BERTHELOT) +
+        " Lennard-Jones combining rule.", top_check);
+  check(inferCombiningRule(tip4p_error) == VdwCombiningRule::LORENTZ_BERTHELOT, "TIP4P water, "
+        "even when improperly created, should register as having a " +
+        getEnumerationName(VdwCombiningRule::LORENTZ_BERTHELOT) + " Lennard-Jones combining rule.",
+        top_check);
+  check(inferCombiningRule(trpcage_noz) == VdwCombiningRule::LORENTZ_BERTHELOT, "The ancient "
+        "Amber Trp-cage topology should register as having a " +
+        getEnumerationName(VdwCombiningRule::LORENTZ_BERTHELOT) + " Lennard-Jones combining rule.",
+        top_check);
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const TestSystemManager tsm(base_top_name, "top", { "tamavidin" }, base_crd_name, "inpcrd",
+                              { "tamavidin" });
+  const VdwCombiningRule tama_rule = (tsm.getTestingStatus() == TestPriority::CRITICAL) ?
+    inferCombiningRule(tsm.getTopologyPointer(0)) : VdwCombiningRule::NBFIX;
+  check(tama_rule == VdwCombiningRule::LORENTZ_BERTHELOT, "The tamavidin topology should register "
+        "as having a " + getEnumerationName(VdwCombiningRule::LORENTZ_BERTHELOT) +
+        " Lennard-Jones combining rule.", tsm.getTestingStatus());
+
+  // Create a matrix that should register as having a geometric Lennard-Jones combining rule.
+  const std::vector<double> mock_sigma   = { 3.15, 2.90, 1.50, 3.00 };
+  const std::vector<double> mock_epsilon = { 0.10, 0.20, 0.05, 0.30 };
+  std::vector<double> mock_lja(16), mock_ljb(16);
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j <= i; j++) {
+      const double sig_ij = sqrt(mock_sigma[i] * mock_sigma[j]);
+      const double eps_ij = sqrt(mock_epsilon[i] * mock_epsilon[j]);
+      const double sig6_ij = sig_ij * sig_ij * sig_ij * sig_ij * sig_ij * sig_ij;
+      const size_t ij_idx = (4 * j) + i;
+      const size_t ji_idx = (4 * i) + j;
+      mock_ljb[ij_idx] = 4.0 * eps_ij * sig6_ij;
+      mock_lja[ij_idx] = mock_ljb[ij_idx] * sig6_ij;
+      if (i != j) {
+        mock_lja[ji_idx] = mock_lja[ij_idx];
+        mock_ljb[ji_idx] = mock_ljb[ij_idx];
+      }
+    }
+  }
+  const VdwCombiningRule geom_test_rule = inferCombiningRule(mock_lja, mock_ljb);
+  check(geom_test_rule == VdwCombiningRule::GEOMETRIC, "A matrix that should register as having "
+        "a " + getEnumerationName(VdwCombiningRule::GEOMETRIC) + " Lennard-Jones combining rule "
+        "instead has a " + getEnumerationName(geom_test_rule) + ".");
+
+  // Modify the test to have NBFix characteristics.
+  mock_lja[(4 * 2) + 3] += 8.1;
+  mock_lja[(4 * 3) + 2] += 8.1;
+  const VdwCombiningRule nbfx_test_rule = inferCombiningRule(mock_lja, mock_ljb);
+  check(nbfx_test_rule == VdwCombiningRule::NBFIX, "A matrix that should register as having a " +
+        getEnumerationName(VdwCombiningRule::NBFIX) + " Lennard-Jones combining rule instead has "
+        "a " + getEnumerationName(nbfx_test_rule) + ".");
+
+  // Check the correspondence in atom type names and Lennard-Jones indices
+  bool type_dictionary_passes = false;
+  if (tsm.getSystemCount() == 1) {
+    type_dictionary_passes = true;
+    const std::vector<std::vector<char4>> atyp_dict =
+      tsm.getTopologyPointer(0)->getAtomTypeNameTable();
+  }
+  
+  // Resume checking atomic details
   section(1);
   const std::vector<char4> fifth_atom_name_answer = {
     stringToChar4("H1  "), stringToChar4("O   "), stringToChar4("O   "), stringToChar4("EP2 "),

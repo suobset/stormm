@@ -23,7 +23,7 @@ using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
-using stormm::parse::operator==;
+using stormm::data_types::operator==;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
 using stormm::topology::AtomGraph;

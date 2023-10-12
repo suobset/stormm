@@ -673,10 +673,6 @@ std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const Energ
                                                const SystemGrouping organization,
                                                const std::vector<StateVariable> &quantities,
                                                const ReportControls &repcon) {
-
-  // CHECK
-  printf("Point A\n");
-  // END CHECK
   
   // Determine the outliers based on the final energies, whether across the entire synthesis or
   // in terms of specific groups of systems.

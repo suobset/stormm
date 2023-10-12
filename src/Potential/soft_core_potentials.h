@@ -18,6 +18,8 @@ namespace energy {
 using card::Hybrid;
 using parse::NumberFormat;
 using parse::realToString;
+using stmath::invertSquareMatrix;
+using stmath::matrixVectorMultiply;
 using stmath::qrSolver;
 
 /// \brief The maximum number of quartic splines that can define any tabulated softcore function
@@ -171,6 +173,26 @@ template <typename Tcalc4, typename Tcalc2>
 void quinticSoftCore(Tcalc4* abcd_coefficients, Tcalc2* ef_coefficients, double rswitch,
                      double f_rswitch, double df_rswitch, double d2f_rswitch, double d3f_rswitch,
                      double target_zero = 0.0);
+
+/// \brief Compute a softcore potential based on exponentials.  The function has the form
+///
+///            U = Ae^(2v(x - rswitch)) + Be^(3v(x - rswitch)) + C e^(4v(x - rswitch)) + D
+///
+///        where k is a constant defined in the input.  The function will seek to fit the value
+///        and the first three derivatives of the function at the handoff point.
+///
+/// \param abcd_coefficients  The coefficients A, B, C, and D from the equation above, computed
+///                           and returned in the "x", "y", "z", and "w" coefficients of the tuple
+/// \param v                  The exponential factor v in the equation above
+/// \param rswitch            The point below which the standard potential transitions to the
+///                           softcore form
+/// \param f_rswitch          Value of the original potential function at the switching distance
+/// \param df_rswitch         Derivative of the original potential at the switching distance
+/// \param d2f_rswitch        Second derivative of the original potential at the switching distance
+/// \param d3f_rswitch        Third derivative of the original potential at the switching distance
+template <typename Tcalc4>
+void exponentialSoftCore(Tcalc4 *abcd_coefficients, double v, double rswitch, double f_rswitch,
+                         double df_rswitch, double d2f_rswitch, double d3f_rswitch);
 
 } // namespace energy
 } // namespace stormm

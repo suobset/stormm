@@ -673,6 +673,10 @@ template <typename T> std::vector<T> tileVector(const std::vector<T> &va, size_t
 
 template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx, size_t nrep = 1);
+
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<size_t> &tidx,
+                          size_t nrep = 1);
 /// \}
 
 /// \brief Construct a vector of a new type to replace an existing vector.  The new vector will
@@ -722,7 +726,39 @@ Hybrid<int95_t> convertData(Hybrid<Tin> *input, double input_scale = 1.0,
 template <typename Tin, typename Tout>
 Hybrid<Tout> convertData(Hybrid<Tin> *input, double input_scale = 1.0, double output_scale = 1.0);
 /// \}
-  
+
+/// \brief Perform an out-of-place rearrangement of a vector of data based on a sorted pattern.
+///        The newly sorted pattern is returned.  This array returns a vector with length equal
+///        to the sorting pattern--any rearrangement, even one with missing elements or replication
+///        of some elements is permissible.
+///
+/// Overloaded:
+///   - Provide a vector of int or size_t numbers indicating the elements of the original array to
+///     transfer, in order, to the new array
+///   - Provide a vector of tuples with "x" and "y" members indicating the sorting pattern
+///
+/// \param unsorted_data    The data set with some or all elements out of their proper place
+/// \param sorting_pattern  A sequence of new array positions for the contents of unsorted data,
+///                         with the ith element indicating (in its "y" member if this is a
+///                         two-tuple with a second template argument), where in the unsorted data
+///                         array to obtain the value for the ith position of the output.  If this
+///                         is a tuple, its "x" member is irrelevant, and probably was the data
+///                         used to perform the sorting and place the "y" members of each tuple in
+///                         the proper places.
+/// \{
+template <typename T>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<int> &sorting_pattern);
+
+template <typename T>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<size_t> &sorting_pattern);
+
+template <typename T, typename T2>
+std::vector<T> applyAssociatedSort(const std::vector<T> &unsorted_data,
+                                   const std::vector<T2> &sorting_pattern);
+/// \}
+
 } // namespace stmath
 } // namespace stormm
 

@@ -6,6 +6,7 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/ptx_macros.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
@@ -14,6 +15,8 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::warp_size_int;
+using stormm::constants::warp_size_zu;
+using stormm::constants::warp_bits;
 using stormm::constants::ExceptionResponse;
 using stormm::data_types::int95_t;
 using stormm::data_types::llint;
@@ -117,13 +120,13 @@ __global__ void __launch_bounds__(512, 2) kAddUnified(llint* result) {
       incr = 1.3f;
     }
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], (ullint)(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], (ullint)(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], (ullint)(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], (ullint)(__float2ll_rn(contrib * 256.0f)));
   }
   result[(blockIdx.x * blockDim.x) + threadIdx.x] = primary[threadIdx.x];
 }

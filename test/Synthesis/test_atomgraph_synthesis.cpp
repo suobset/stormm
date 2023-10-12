@@ -301,6 +301,38 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check that the atomic partial charges obtained by looking up charge parameter indices and then
+// reading from the array of unique partial charges match those obtained by reading directly from
+// the array of atomic partial charges.  Accessing the index and then the parameter may seem like
+// an extra step, but in some contexts the charge and Lennard-Jones parameter indices can be
+// encoded in the same 32-bit word, saving memory bandwidth and conserving L1 cache.
+//
+// Arguments:
+//   poly_ag:   The topology synthesis to check
+//   do_tests:  Indicate whether the tests are possible absed on previous file reading
+//-------------------------------------------------------------------------------------------------
+void inspectChargeIndexing(const AtomGraphSynthesis &poly_ag, const TestPriority do_tests) {
+  const SyNonbondedKit<double, double2> synbk = poly_ag.getDoublePrecisionNonbondedKit();
+  int total_atoms = 0;
+  for (int i = 0; i < synbk.nsys; i++) {
+    total_atoms += synbk.atom_counts[i];
+  }
+  std::vector<double> indexed_q(total_atoms), stored_q(total_atoms);
+  int pos = 0;
+  for (int i = 0; i < synbk.nsys; i++) {
+    const int jllim = synbk.atom_offsets[i];
+    const int jhlim = jllim + synbk.atom_counts[i];
+    for (int j = jllim; j < jhlim; j++) {
+      indexed_q[pos] = synbk.q_params[synbk.q_idx[j]];
+      stored_q[pos]  = synbk.charge[j];
+    }
+  }
+  check(indexed_q, RelationalOperator::EQUAL, stored_q, "Charges obtained by lookup in the "
+        "parameter array do not agree with those obtained by direct reference to the unrolled "
+        "array.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -379,7 +411,13 @@ int main(const int argc, const char* argv[]) {
   const StaticExclusionMaskSynthesis poly_se(poly_ag.getUniqueTopologies(),
                                              poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
-  
+
+  // Create a copy of the synthesis
+  AtomGraphSynthesis poly_ag_copy(poly_ag);
+  const StaticExclusionMaskSynthesis poly_se_copy(poly_ag_copy.getUniqueTopologies(),
+                                                  poly_ag_copy.getTopologyIndices());
+  poly_ag_copy.loadNonbondedWorkUnits(poly_se_copy);
+
   // Check various descriptors
   section(1);
   check(poly_ag.getAtomCount(), RelationalOperator::EQUAL, 50570, "The topology synthesis does "
@@ -465,6 +503,10 @@ int main(const int argc, const char* argv[]) {
   }
   PhaseSpaceSynthesis poly_ps(ps_list, ag_list);
   checkSynthesis(poly_ag, poly_se, &poly_ps, do_tests, EvaluateNonbonded::NO);
+  checkSynthesis(poly_ag_copy, poly_se_copy, &poly_ps, do_tests, EvaluateNonbonded::NO);
+
+  // Check the charge indexing.
+  inspectChargeIndexing(poly_ag_copy, do_per_eval);
 
   // Prepare some more systems
   const std::string tiso_top_name = base_top_name + osc + "trpcage.top";
@@ -526,6 +568,16 @@ int main(const int argc, const char* argv[]) {
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);
   checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_new_tests, EvaluateNonbonded::YES);
+
+  // Create a copy of the new topology synthesis (including restraints), and check whether
+  // an exclusion mask object created for the first topology synthesis (which should be equivalent)
+  // works in conjunction with the new synthesis.
+  AtomGraphSynthesis poly_agn_rst_copy(poly_agn_rst);
+  poly_agn_rst_copy.loadNonbondedWorkUnits(poly_sen);
+  checkSynthesis(poly_agn_rst_copy, poly_sen, &poly_psn, do_new_tests, EvaluateNonbonded::YES);
+
+  // Check the charge indexing.
+  inspectChargeIndexing(poly_agn_rst, do_new_tests);
   
   // Apply implicit solvent models to the synthesis
   NeckGeneralizedBornTable ngb_tab;
