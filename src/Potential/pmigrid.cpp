@@ -22,11 +22,12 @@ using stmath::PrefixSumType;
 //-------------------------------------------------------------------------------------------------
 PMIGridWriter::PMIGridWriter(const NonbondedTheme theme_in, const PrecisionModel mode_in,
                              const int fp_bits_in, const int nsys_in, const int order_in,
-                             const int wu_count_in, const uint4* dims_in, double* ddata_in,
-                             float* fdata_in, const uint* work_units_in) :
+                             const int wu_count_in, const int max_grid_points_in,
+                             const uint4* dims_in, double* ddata_in, float* fdata_in,
+                             const uint* work_units_in) :
     theme{theme_in}, mode{mode_in}, shacc_fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
-    nsys{nsys_in}, order{order_in}, wu_count{wu_count_in}, dims{dims_in}, ddata{ddata_in},
-    fdata{fdata_in}, work_units{work_units_in}
+    nsys{nsys_in}, order{order_in}, wu_count{wu_count_in}, max_grid_points{max_grid_points_in},
+    dims{dims_in}, ddata{ddata_in}, fdata{fdata_in}, work_units{work_units_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -189,8 +190,8 @@ int PMIGrid::getWorkUnitCount() const {
 //-------------------------------------------------------------------------------------------------
 PMIGridWriter PMIGrid::data(const HybridTargetLevel tier) {
   return PMIGridWriter(theme, mode, shared_fp_accumulation_bits, system_count, b_spline_order,
-                       work_unit_count, grid_dimensions.data(tier), dgrid_stack.data(tier),
-                       fgrid_stack.data(tier), work_units.data(tier));
+                       work_unit_count, largest_work_unit_grid_points, grid_dimensions.data(tier),
+                       dgrid_stack.data(tier), fgrid_stack.data(tier), work_units.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -497,10 +498,7 @@ void PMIGrid::prepareFixedPrecisionModel(const int fp_accumulation_bits_in,
 //-------------------------------------------------------------------------------------------------
 void PMIGrid::setRecommendedMappingMethod(const GpuDetails &gpu) {
   const CellGridReader<void, void, void, void> cgr_vc = getTemplateFreeCellGridReader();
-  if (b_spline_order <= 6 && b_spline_order <= cgr_vc.mesh_ticks + 1) {
-    recommendation = QMapMethod::ACC_REGISTER;
-  }
-  else {
+  if (b_spline_order <= 6 && b_spline_order <= cgr_vc.mesh_ticks * 2) {
 
     // Check that the grid points of at least four spatial decomposition cells will fit in the
     // allotted __shared__memory space.
@@ -523,6 +521,9 @@ void PMIGrid::setRecommendedMappingMethod(const GpuDetails &gpu) {
       }
       break;
     }
+  }
+  else {
+    recommendation = QMapMethod::GENERAL_PURPOSE;
   }
 }
 
@@ -552,32 +553,6 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
     setRecommendedMappingMethod(gpu);
     prepareWorkUnits(recommendation, gpu);
     return;
-  case QMapMethod::ACC_REGISTER:
-    {
-      // Check that other parameters are suitable for the register accumulation kernel.  If not,
-      // recursively call the work unit preparation with a feasible method.
-      if (b_spline_order >= 6 || b_spline_order > cgr_vc.mesh_ticks + 1) {
-        recommendation = QMapMethod::GENERAL_PURPOSE;
-        prepareWorkUnits(recommendation, gpu);
-        return;
-      }
-      switch (b_spline_order) {
-      case 4:
-        bw = Brickwork(ext_dims, max4s_atom_bearing_region_adim, max4s_atom_bearing_cross_section,
-                       1, 0, max4s_grid_mapping_volume, gpu.getSMPCount());
-        break;
-      case 5:
-        bw = Brickwork(ext_dims, max5s_atom_bearing_region_adim, max5s_atom_bearing_cross_section,
-                       1, 0, max5s_grid_mapping_volume, gpu.getSMPCount());
-        break;
-      case 6:
-        bw = Brickwork(ext_dims, max6s_atom_bearing_region_adim, max6s_atom_bearing_cross_section,
-                       1, 0, max6s_grid_mapping_volume, gpu.getSMPCount());
-        break;
-      }
-      halo = 1;
-    }
-    break;
   case QMapMethod::ACC_SHARED:
     {
       // Compute the largest cross-sectional area based on the allowed size of the __shared__
@@ -603,7 +578,7 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
         prepareWorkUnits(QMapMethod::GENERAL_PURPOSE, gpu);
         return;
       }
-      int max_xsection = std::min((halo + 3) * (halo + 3),
+      int max_xsection = std::min((halo + 3) * (halo + 4),
                                   (max_buffered_cells + halo) * (halo + 1));
 
       // If the maximum cross section permits no cells, a new mapping method must be determined.
@@ -631,6 +606,7 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
                 i_dims.y, i_dims.z, cgr_vc, halo);
   }
   work_units.putHost(tmp_wu);
+  computeLargestWorkUnitGridPoints();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -645,36 +621,7 @@ void PMIGrid::prepareWorkUnits(const GpuDetails &gpu) {
 
 //-------------------------------------------------------------------------------------------------
 int PMIGrid::getLargestWorkUnitGridPoints() const {
-  const CellGridReader<void, void, void, void> cgr_vc = getTemplateFreeCellGridReader();
-
-  // The largest work unit will be at the front of the list, per ordering in prepareWorkUnits().
-  // However, the size of the work unit refers to the atom-bearing region, which may not guarantee
-  // that the work unit with the largest volume of atoms has the largest volume of grid points to
-  // map.
-  const int gp_per_cell = cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks;
-  const uint* wu_ptr = work_units.data();
-  uint largest_gm_region = 0;
-  switch (work_unit_configuration) {
-  case QMapMethod::GENERAL_PURPOSE:
-  case QMapMethod::AUTOMATIC:
-    return 0;
-  case QMapMethod::ACC_REGISTER:
-    for (int i = 0; i < work_unit_count; i++) {
-      const int ofs = i * density_mapping_wu_size;
-      largest_gm_region = std::max(largest_gm_region,
-                                   (wu_ptr[ofs + 20] - 1) * (wu_ptr[ofs + 21] - 1) *
-                                   (wu_ptr[ofs + 22] - 1));
-    }
-    break;
-  case QMapMethod::ACC_SHARED:
-    for (int i = 0; i < work_unit_count; i++) {
-      const int ofs = i * density_mapping_wu_size;
-      largest_gm_region = std::max(largest_gm_region,
-                                   wu_ptr[ofs + 10] * wu_ptr[ofs + 11] * wu_ptr[ofs + 12]);
-    }
-    break;
-  }
-  return largest_gm_region * gp_per_cell;    
+  return largest_work_unit_grid_points;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -874,7 +821,7 @@ int PMIGrid::findSharedBufferSize(const GpuDetails &gpu) const {
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
   if (gpu.getArchMajor() >= 7) {
-    return 24000;
+    return 25000;
   }
   else {
     return 15360;
@@ -883,7 +830,7 @@ int PMIGrid::findSharedBufferSize(const GpuDetails &gpu) const {
   return 10800;
 #  endif
 #else
-  return 24000;
+  return 25000;
 #endif
 }
 
@@ -900,52 +847,6 @@ void PMIGrid::addWorkUnit(std::vector<uint> *result, const int sysid, const int 
   
   // Tailor the work units to the chosen mapping approach
   switch (work_unit_configuration) {
-  case QMapMethod::ACC_REGISTER:
-    {
-      // Push the new work unit to the back, padding any of the unused 32 indices with zeros.  The
-      // register-based accumulation comes with an implicit assumption that all atoms that map to
-      // any given grid point can be found in the same spatial decomposition cell, or an adjacent
-      // cell down / back / to the left of it.
-      int ncs = 0;
-      int reim_i = pos_a - 1;
-      reim_i += ((reim_i < 0) - (reim_i >= system_cell_adim)) * system_cell_adim;
-      for (int j = pos_b - 1; j < pos_b + gmap_b; j++) {
-        const int reim_j = j + (((j < 0) - (j >= system_cell_bdim)) * system_cell_bdim);
-        for (int k = pos_c - 1; k < pos_c + gmap_c; k++) {
-         const int reim_k = k - (((k < 0) - (k >= system_cell_cdim)) * system_cell_cdim);
-           const int bc_cell_init = system_init_cell +
-                                   (((reim_k * system_cell_bdim) + reim_j) * system_cell_adim);
-          result->push_back((bc_cell_init + reim_i) | ((gmap_a + 1) << 28));
-          ncs++;
-        }
-      }
-      for (int i = ncs; i < 16; i++) {
-        result->push_back(0);
-      }
-      result->push_back(sysid);
-      result->push_back(reim_i);
-      result->push_back(pos_b - 1 + ((pos_b - 1 < 0) * system_cell_bdim));
-      result->push_back(pos_c - 1 + ((pos_c - 1 < 0) * system_cell_cdim));
-      result->push_back(gmap_a + 1);
-      result->push_back(gmap_b + 1);
-      result->push_back(gmap_c + 1);
-      const uint4 pmig_dims = grid_dimensions.readHost(sysid);
-      result->push_back(pmig_dims.x);
-      result->push_back(pmig_dims.y);
-      result->push_back(pmig_dims.z);
-      result->push_back(pmig_dims.w);
-      int warp_strides_per_cell;  
-      warp_strides_per_cell = ((cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks) +
-                               warp_size_int - 1) / warp_size_int;
-      result->push_back((gmap_a * gmap_b * gmap_c * warp_strides_per_cell) |
-                        (warp_strides_per_cell << 16));
-
-      // Indices 28-31 are filled in with zeros
-      for (int i = 0; i < 4; i++) {
-        result->push_back(0);
-      }
-    }
-    break;
   case QMapMethod::ACC_SHARED:
     {
       int reim_i = pos_a - halo;
@@ -1001,6 +902,33 @@ void PMIGrid::addWorkUnit(std::vector<uint> *result, const int sysid, const int 
     // These cases will never be reached and imply no work units
     break;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PMIGrid::computeLargestWorkUnitGridPoints() {
+  const CellGridReader<void, void, void, void> cgr_vc = getTemplateFreeCellGridReader();
+
+  // The largest work unit will be at the front of the list, per ordering in prepareWorkUnits().
+  // However, the size of the work unit refers to the atom-bearing region, which may not guarantee
+  // that the work unit with the largest volume of atoms has the largest volume of grid points to
+  // map.
+  const int gp_per_cell = cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks;
+  const uint* wu_ptr = work_units.data();
+  uint largest_gm_region = 0;
+  switch (work_unit_configuration) {
+  case QMapMethod::GENERAL_PURPOSE:
+  case QMapMethod::AUTOMATIC:
+    largest_work_unit_grid_points = 0;
+    break;
+  case QMapMethod::ACC_SHARED:
+    for (int i = 0; i < work_unit_count; i++) {
+      const int ofs = i * density_mapping_wu_size;
+      largest_gm_region = std::max(largest_gm_region,
+                                   wu_ptr[ofs + 10] * wu_ptr[ofs + 11] * wu_ptr[ofs + 12]);
+    }
+    break;
+  }
+  largest_work_unit_grid_points = largest_gm_region * gp_per_cell;    
 }
 
 } // namespace energy

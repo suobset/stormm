@@ -105,6 +105,22 @@ template <typename T> double meanUnsignedError(const std::vector<T> &va, const s
 template <typename T> double meanUnsignedError(const Hybrid<T> &va, const Hybrid<T> &vb);
 /// \}
 
+/// \brief Compute the root mean squared error between two vectors.
+///
+/// Overloaded:
+///   - Operate on two C-style vectors of a stated (and trusted) length
+///   - Operate on two Standard Template Library vectors
+///   - Operate on to Hybrid objects
+///
+/// \param va      The first vector
+/// \param vb      The second vector, taken as the reference
+/// \param length  The length of the C-style arrays
+/// \{
+template <typename T> double rmsError(const T* va, const T* vb, size_t length);
+template <typename T> double rmsError(const std::vector<T> &va, const std::vector<T> &vb);
+template <typename T> double rmsError(const Hybrid<T> &va, const Hybrid<T> &vb);
+/// \}
+
 /// \brief Compute the root mean squared error between two vectors, normalized by the mean value
 ///        of the reference vector.
 ///

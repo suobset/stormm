@@ -460,13 +460,12 @@ void mapDensity(PMIGrid *pm, const CellGrid<T, Tacc, Tcalc, T4> &cg,
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tacc, typename Tcalc, typename T4>
-void mapDensity(PMIGrid *pm, MappingResource *mrs, MolecularMechanicsControls *mm_ctrl,
+void mapDensity(PMIGrid *pm, MolecularMechanicsControls *mm_ctrl,
                 const CellGrid<T, Tacc, Tcalc, T4> *cg, const AtomGraphSynthesis *poly_ag,
                 const CoreKlManager &launcher, const QMapMethod approach) {
   
   // Handle the automated kernel selection here to avoid work needed for specific cases below.
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
   case QMapMethod::ACC_SHARED:
     if (mm_ctrl == nullptr) {
       rtErr("A kernel based on asynchronous work units must be launched with a valid "
@@ -479,7 +478,7 @@ void mapDensity(PMIGrid *pm, MappingResource *mrs, MolecularMechanicsControls *m
       // and settings in the two grid representations.
       const QMapMethod revised_approach = (mm_ctrl == nullptr) ? QMapMethod::GENERAL_PURPOSE :
                                                                  pm->getRecommendedMappingMethod();
-      mapDensity(pm, mrs, mm_ctrl, cg, poly_ag, launcher, revised_approach);
+      mapDensity(pm, mm_ctrl, cg, poly_ag, launcher, revised_approach);
     }
     break;
   case QMapMethod::GENERAL_PURPOSE:
@@ -499,38 +498,18 @@ void mapDensity(PMIGrid *pm, MappingResource *mrs, MolecularMechanicsControls *m
   const int2 lp = launcher.getDensityMappingKernelDims(approach, calc_prec, pm_wrt.mode, cg_tmat,
                                                        pm_wrt.order);
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
-    if (tcalc_is_double) {
-      const SyNonbondedKit<double,
-                           double2> synbk = poly_ag->getDoublePrecisionNonbondedKit(devc_tier);
-      MMControlKit<double> ctrl = mm_ctrl->dpData(devc_tier);
-      mapDensity(&pm_wrt, nullptr, nullptr, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp,
-                 approach, pm);
-    }
-    else {
-      const SyNonbondedKit<float,
-                           float2> synbk = poly_ag->getSinglePrecisionNonbondedKit(devc_tier);
-      MMControlKit<float> ctrl = mm_ctrl->spData(devc_tier);
-      mapDensity(&pm_wrt, nullptr, nullptr, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp,
-                 approach, pm);
-    }
-    break;
   case QMapMethod::ACC_SHARED:
     if (tcalc_is_double) {
       const SyNonbondedKit<double,
                            double2> synbk = poly_ag->getDoublePrecisionNonbondedKit(devc_tier);
       MMControlKit<double> ctrl = mm_ctrl->dpData(devc_tier);
-      MappingResourceKit mrsk = mrs->data(devc_tier);
-      mapDensity(&pm_wrt, nullptr, &mrsk, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp, approach,
-                 pm);
+      mapDensity(&pm_wrt, nullptr, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp, approach, pm);
     }
     else {
       const SyNonbondedKit<float,
                            float2> synbk = poly_ag->getSinglePrecisionNonbondedKit(devc_tier);
       MMControlKit<float> ctrl = mm_ctrl->spData(devc_tier);
-      MappingResourceKit mrsk = mrs->data(devc_tier);
-      mapDensity(&pm_wrt, nullptr, &mrsk, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp, approach,
-                 pm);
+      mapDensity(&pm_wrt, nullptr, &ctrl, v_cgr, cg_tmat, synbk, block_count, lp, approach, pm);
     }
     break;
   case QMapMethod::GENERAL_PURPOSE:
@@ -539,14 +518,14 @@ void mapDensity(PMIGrid *pm, MappingResource *mrs, MolecularMechanicsControls *m
       if (tcalc_is_double) {
         const SyNonbondedKit<double,
                              double2> synbk = poly_ag->getDoublePrecisionNonbondedKit(devc_tier);
-        mapDensity(&pm_wrt, &pm_acc, nullptr, nullptr, v_cgr, cg_tmat, synbk, block_count, lp,
-                   approach, pm);
+        mapDensity(&pm_wrt, &pm_acc, nullptr, v_cgr, cg_tmat, synbk, block_count, lp, approach,
+                   pm);
       }
       else {
         const SyNonbondedKit<float,
                              float2> synbk = poly_ag->getSinglePrecisionNonbondedKit(devc_tier);
-        mapDensity(&pm_wrt, &pm_acc, nullptr, nullptr, v_cgr, cg_tmat, synbk, block_count, lp,
-                   approach, pm);
+        mapDensity(&pm_wrt, &pm_acc, nullptr, v_cgr, cg_tmat, synbk, block_count, lp, approach,
+                   pm);
       }
     }
     break;

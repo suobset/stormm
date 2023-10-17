@@ -17,7 +17,6 @@
 #include "Synthesis/synthesis_abstracts.h"
 #include "cellgrid.h"
 #include "energy_enumerators.h"
-#include "mapping_resource.h"
 #include "pmigrid.h"
 
 namespace stormm {
@@ -198,18 +197,18 @@ void mapDensity(PMIGrid *pm, const CellGrid<T, Tacc, Tcalc, T4> &cg,
                 const AtomGraphSynthesis &poly_ag);
 
 #ifdef STORMM_USE_HPC
-void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MappingResourceKit *mrsk,
-                MMControlKit<double> *ctrl, const CellGridReader<void, void, void, void> &v_cgr,
-                size_t cg_tmat, const SyNonbondedKit<double, double2> &synbk, int block_count,
-                const int2 lp, QMapMethod approach, PMIGrid *pm);
+void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<double> *ctrl,
+                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
+                const SyNonbondedKit<double, double2> &synbk, int block_count, const int2 lp,
+                QMapMethod approach, PMIGrid *pm);
 
-void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MappingResourceKit *mrsk,
-                MMControlKit<float> *ctrl, const CellGridReader<void, void, void, void> &v_cgr,
-                size_t cg_tmat, const SyNonbondedKit<float, float2> &synbk, int block_count,
-                const int2 lp, QMapMethod approach, PMIGrid *pm);
+void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<float> *ctrl,
+                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
+                const SyNonbondedKit<float, float2> &synbk, int block_count, const int2 lp,
+                QMapMethod approach, PMIGrid *pm);
 
 template <typename T, typename Tacc, typename Tcalc, typename T4>
-void mapDensity(PMIGrid *pm, MappingResource *mrs, MolecularMechanicsControls *mm_ctrl,
+void mapDensity(PMIGrid *pm, MolecularMechanicsControls *mm_ctrl,
                 const CellGrid<T, Tacc, Tcalc, T4> *cg, const AtomGraphSynthesis *poly_ag,
                 const CoreKlManager &launcher, QMapMethod approach);
 #endif
@@ -275,7 +274,6 @@ void unrollMapDensityCall(PMIGrid *pm, size_t cg_tcalc, const AtomGraphSynthesis
 ///                  accumulation
 /// \param ctrl      Tracking object containing the time step and global counters directing
 ///                  asynchronous work unit progress
-/// \param mrsk      Contains private global memory resources for each thread block
 /// \param v_cgr     Read-only, template-free abstract for the cell grid
 /// \param cg_tmat   Representation of the spatial decomposition cell dimensions in the cell grid
 ///                  (transformation matrices from fractional coordinates in each cell into
@@ -288,21 +286,11 @@ void unrollMapDensityCall(PMIGrid *pm, size_t cg_tcalc, const AtomGraphSynthesis
 ///                  the PMIGrid and the CellGrid.  This function is designed to take pre-assembled
 ///                  abstracts for the fastest possible execution.
 /// \{
-void launchRegAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<double> *ctrl,
+void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<double> *ctrl,
                                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
                                const SyNonbondedKit<double, double2> &synbk, const int2 lp);
   
-void launchRegAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<float> *ctrl,
-                               const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
-                               const SyNonbondedKit<float, float2> &synbk, const int2 lp);
-
-void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MappingResourceKit *mrsk,
-                               MMControlKit<double> *ctrl,
-                               const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
-                               const SyNonbondedKit<double, double2> &synbk, const int2 lp);
-  
-void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MappingResourceKit *mrsk,
-                               MMControlKit<float> *ctrl,
+void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<float> *ctrl,
                                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
                                const SyNonbondedKit<float, float2> &synbk, const int2 lp);
 

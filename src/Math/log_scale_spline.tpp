@@ -47,8 +47,7 @@ LogScaleSpline<T4>::LogScaleSpline(const TableIndexing indexing_method_in,
   }
   else {
     rtErr("The only allowed table types are float and double four-tuples.", "LogScaleSpline");
-  }
-  
+  }  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -59,6 +58,7 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
                                    const double max_range_in, const double min_range_in,
                                    const TableIndexing indexing_method_in,
                                    const BasisFunctions basis_set_in,
+                                   const int ulp_optimization_depth_in,
                                    const float indexing_offset_in,
                                    const ExceptionResponse policy) :
     LogScaleSpline(indexing_method_in, basis_set_in, indexing_offset_in)
@@ -69,6 +69,7 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
   setEwaldCoefficient(ewald_coefficient_in, policy);
   setMantissaBits(mantissa_bits_in, policy);
   setMinimumAbsoluteRange(min_range_in);
+  setULPDepth(ulp_optimization_depth_in);
   allocate(max_range_in);
   switch (target_form) {
   case LogSplineForm::ELEC_PME_DIRECT:
@@ -94,6 +95,7 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
                                    const double min_range_in,
                                    const TableIndexing indexing_method_in,
                                    const BasisFunctions basis_set_in,
+                                   const int ulp_optimization_depth_in,
                                    const float indexing_offset_in,
                                    const ExceptionResponse policy) :
     LogScaleSpline(indexing_method_in, basis_set_in, indexing_offset_in)
@@ -101,6 +103,7 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
   setTargetForm(target_form_in, custom_form_in);
   setMantissaBits(mantissa_bits_in, policy);
   setMinimumAbsoluteRange(min_range_in);
+  setULPDepth(ulp_optimization_depth_in);
   allocate(max_range_in, custom_form_in);
   evaluateCustomTable();
 }
@@ -464,6 +467,21 @@ void LogScaleSpline<T4>::setMinimumAbsoluteRange(const double min_range_in) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
+void LogScaleSpline<T4>::setULPDepth(const int ulp_optimization_depth_in) {
+  if (ulp_optimization_depth < 0) {
+    ulp_optimization_depth = 0;
+  }
+  else if (ulp_optimization_depth > 12) {
+    rtErr("Coefficients can only be perturbed in the range +/-12 ULPs.", "LogScaleSpline",
+          "setULPDepth");
+  }
+  else {
+    ulp_optimization_depth = ulp_optimization_depth_in;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
 float LogScaleSpline<T4>::checkIndexingOffset(float indexing_offset_in) {
 
   // Check that the number is positive, and greater than zero.
@@ -600,7 +618,7 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
   }
 
   // Pre-allocate workspace arrays to hold the function value and its derivatives.
-  std::vector<double> amat(32), bwrk(8), bref(8), xvec(4);
+  std::vector<double> amat(32), bwrk(8), bref(8), xvec(4), fine_pts(32), pred_pts(32);
 
   // Establish the matrix for solving the spline coefficients in the case of polynomial basis
   // functions.  Lay out the matrix such that the nth column controls the coefficient for x^n.
@@ -633,7 +651,6 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
   const double dseg_per_stride = segments_per_stride;
   int pos = 0;
   const int tbl_length = table.size();
-  const double bfac = 2.0 * ewald_coefficient / sqrt(symbols::pi);
   T4* table_ptr = table.data();
   while (pos < tbl_length) {
 
@@ -703,7 +720,7 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
       // Evaluate the function at eight points to make an over-determined system and obtain the
       // best answer in a least-squares sense.
       for (int j = 0; j < 8; j++) {
-        double r_ij = r2_i + ((0.0625 + (0.125 * static_cast<double>(j))) * segment_width);
+        const double r_ij = r2_i + ((0.0625 + (0.125 * static_cast<double>(j))) * segment_width);
         
         // Revise the fitting matrix for the medley of fractional basis functions.
         switch (basis_set) {
@@ -716,54 +733,8 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
         case BasisFunctions::POLYNOMIAL:
           break;
         }
-
-        // Adjust the argument as needed to evaluate the actual target function.
-        switch (indexing_method) {
-        case TableIndexing::ARG:
-          break;
-        case TableIndexing::SQUARED_ARG:
-          r_ij = sqrt(r_ij);
-          break;
-        case TableIndexing::ARG_OFFSET:
-          r_ij = r_ij - static_cast<double>(indexing_offset);
-          break;
-        case TableIndexing::SQ_ARG_OFFSET:
-          if (r_ij - static_cast<double>(indexing_offset) < constants::tiny) {
-            r_ij = constants::tiny;
-          }
-          else {
-            r_ij = sqrt(r_ij - static_cast<double>(indexing_offset));
-          }
-          break;
-        }
-
-        // Evaluate the target function for this spline index.
-        switch (target_form) {
-        case LogSplineForm::ELEC_PME_DIRECT:
-          bwrk[j] = coulomb_constant * erfc(ewald_coefficient * r_ij) / r_ij;
-          break;
-        case LogSplineForm::ELEC_PME_DIRECT_EXCL:
-          bwrk[j] = coulomb_constant * (erfc(ewald_coefficient * r_ij) - 1.0) / r_ij;
-          break;
-        case LogSplineForm::DELEC_PME_DIRECT:
-          {
-            const double ewr = ewald_coefficient * r_ij;
-            bwrk[j] = -coulomb_constant *
-                      ((bfac * exp(-ewr * ewr)) + (erfc(ewr) / r_ij)) / (r_ij * r_ij);
-          }
-          break;
-        case LogSplineForm::DELEC_PME_DIRECT_EXCL:
-          {
-            const double ewr = ewald_coefficient * r_ij;
-            bwrk[j] = -coulomb_constant *
-                      ((bfac * exp(-ewr * ewr)) + ((erfc(ewr) - 1.0) / r_ij)) / (r_ij * r_ij);
-          }
-          break;
-        case LogSplineForm::CUSTOM:
-          break;
-        }
-        bref[j] = bwrk[j];
       }
+      evaluateTargetInSegment(&bwrk, &bref, r2_i, segment_width);
 
       // Refresh the fitting matrix for polynomial basis functions (which work in a relative
       // coordinate frame), or store the reference form of the fitting matrix for the mixed
@@ -801,10 +772,68 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
         // For single-precision spline tables, optimize a number of ULPs of the developer's
         // choosing in order to try and find better fits of the splines, when evaluated in single
         // precision, to the data at hand.
-        if (r2_i >= minimum_significant_range) {
-          
+        if (r2_i >= minimum_significant_range && ulp_optimization_depth > 0) {
+          evaluateTargetInSegment(&fine_pts, nullptr, r2_i, segment_width);
+          evaluateSplineInSegment(&pred_pts, spl_tmp, r2_i, segment_width);
+          double best_fit = rmsError(pred_pts, fine_pts);
+          T4 spl_best = spl_tmp;
+          Ecumenical4 incr_xe = { .f = static_cast<float>(spl_tmp.x) };
+          Ecumenical4 incr_ye = { .f = static_cast<float>(spl_tmp.y) };
+          Ecumenical4 incr_ze = { .f = static_cast<float>(spl_tmp.z) };
+          Ecumenical4 incr_we = { .f = static_cast<float>(spl_tmp.w) };
+          incr_xe.ui &= 0x7f800001;
+          incr_ye.ui &= 0x7f800001;
+          incr_ze.ui &= 0x7f800001;
+          incr_we.ui &= 0x7f800001;
+          float incr_x = incr_xe.f;
+          float incr_y = incr_ye.f;
+          float incr_z = incr_ze.f;
+          float incr_w = incr_we.f;
+          incr_xe.ui &= 0x7f800000;
+          incr_ye.ui &= 0x7f800000;
+          incr_ze.ui &= 0x7f800000;
+          incr_we.ui &= 0x7f800000;
+          incr_x -= incr_xe.f;
+          incr_y -= incr_ye.f;
+          incr_z -= incr_ze.f;
+          incr_w -= incr_we.f;
+          const int nsx = ulp_optimization_depth;
+          const int nsy = ulp_optimization_depth;
+          const int nsz = ulp_optimization_depth;
+          const int nsw = ulp_optimization_depth;
+          for (int ix = -nsx; ix <= nsx; ix++) {
+            const float trial_x = spl_tmp.x + (static_cast<float>(ix) * incr_x);
+            for (int iy = -nsy; iy <= nsy; iy++) {
+              const float trial_y = spl_tmp.y + (static_cast<float>(iy) * incr_y);
+              for (int iz = -nsz; iz <= nsz; iz++) {
+                const float trial_z = spl_tmp.z + (static_cast<float>(iz) * incr_z);
+                for (int iw = -nsw; iw <= nsw; iw++) {
+
+                  // Skip the original case, which was evaluated first.
+                  if (ix == 0 && iy == 0 && iz == 0 && iw == 0) {
+                    continue;
+                  }
+
+                  // Evaluate the spline with perturbed coefficients
+                  const float trial_w = spl_tmp.w + (static_cast<float>(iw) * incr_w);
+                  T4 trial;
+                  trial.x = trial_x;
+                  trial.y = trial_y;
+                  trial.z = trial_z;
+                  trial.w = trial_w;
+                  evaluateSplineInSegment(&pred_pts, trial, r2_i, segment_width);
+                  const double trial_fit = rmsError(pred_pts, fine_pts);
+                  if (trial_fit < best_fit) {
+                    best_fit = trial_fit;
+                    spl_best = trial;
+                  }
+                }
+              }
+            }
+          }
+          spl_tmp = spl_best;
         }
-        
+
         // Rather than the matrix-vector multiplication, evaluate each point as would occur in a
         // single-precision calculation setting.
         switch (basis_set) {
@@ -820,7 +849,7 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
 
           // This number will still be exact due to its composition from various powers of two
           for (int j = 0; j < 8; j++) {
-            const float dj = 1.0625f + 0.125f * static_cast<float>(j);
+            const float dj = 1.0625f + (0.125f * static_cast<float>(j));
             bwrk[j] = (((((spl_tmp.w * dj) + spl_tmp.z) * dj) + spl_tmp.y) * dj) + spl_tmp.x;
           }
           break;
@@ -857,6 +886,126 @@ void LogScaleSpline<T4>::evaluatePrescribedTable() {
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
 void LogScaleSpline<T4>::evaluateCustomTable() {
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void LogScaleSpline<T4>::evaluateTargetInSegment(std::vector<double> *bwrk,
+                                                 std::vector<double> *bref, const double r2_i,
+                                                 const double width) {
+  const int n = bwrk->size();
+  double* bwrk_ptr = bwrk->data();
+  double* bref_ptr = (bref != nullptr) ? bref->data() : nullptr;
+  const double half_spc = width / static_cast<double>(2 * n);
+  const double interval = width / static_cast<double>(n);
+  const double bfac = 2.0 * ewald_coefficient / sqrt(symbols::pi);
+  for (int j = 0; j < n; j++) {
+    double r_ij = r2_i + half_spc + (static_cast<double>(j) * interval);
+      
+    // Adjust the argument as needed to evaluate the actual target function.
+    switch (indexing_method) {
+    case TableIndexing::ARG:
+      break;
+    case TableIndexing::SQUARED_ARG:
+      r_ij = sqrt(r_ij);
+      break;
+    case TableIndexing::ARG_OFFSET:
+      r_ij = r_ij - static_cast<double>(indexing_offset);
+      break;
+    case TableIndexing::SQ_ARG_OFFSET:
+      if (r_ij - static_cast<double>(indexing_offset) < constants::tiny) {
+        r_ij = constants::tiny;
+      }
+      else {
+        r_ij = sqrt(r_ij - static_cast<double>(indexing_offset));
+      }
+      break;
+    }
+
+    // Evaluate the target function for this spline index.
+    switch (target_form) {
+    case LogSplineForm::ELEC_PME_DIRECT:
+      bwrk_ptr[j] = coulomb_constant * erfc(ewald_coefficient * r_ij) / r_ij;
+      break;
+    case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+      bwrk_ptr[j] = coulomb_constant * (erfc(ewald_coefficient * r_ij) - 1.0) / r_ij;
+      break;
+    case LogSplineForm::DELEC_PME_DIRECT:
+      {
+        const double ewr = ewald_coefficient * r_ij;
+        bwrk_ptr[j] = -coulomb_constant *
+                      ((bfac * exp(-ewr * ewr)) + (erfc(ewr) / r_ij)) / (r_ij * r_ij);
+      }
+      break;
+    case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+      {
+        const double ewr = ewald_coefficient * r_ij;
+        bwrk_ptr[j] = -coulomb_constant *
+                      ((bfac * exp(-ewr * ewr)) + ((erfc(ewr) - 1.0) / r_ij)) / (r_ij * r_ij);
+      }
+      break;
+    case LogSplineForm::CUSTOM:
+      break;
+    }
+    if (bref != nullptr) {
+      bref_ptr[j] = bwrk_ptr[j];
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void LogScaleSpline<T4>::evaluateSplineInSegment(std::vector<double> *estm, const T4 spl_tmp,
+                                                 const double r2_i, const double width) {
+  const int n = estm->size();
+  double* estm_ptr = estm->data();
+  const double half_spc = width / static_cast<double>(2 * n);
+  const double interval = width / static_cast<double>(n);
+  switch (precision) {
+  case PrecisionModel::DOUBLE:
+    for (int j = 0; j < n; j++) {
+      double r_ij = r2_i + half_spc + (static_cast<double>(j) * interval);
+      switch (basis_set) {
+      case BasisFunctions::MIXED_FRACTIONS:
+        estm_ptr[j] = (r_ij * spl_tmp.x) + spl_tmp.y + ((spl_tmp.z + (spl_tmp.w / r_ij)) / r_ij);
+        break;
+      case BasisFunctions::POLYNOMIAL:
+        {
+          Ecumenical8 xfrm = { .d = r_ij };
+          xfrm.ulli = (((xfrm.ulli & dp_detail_bitmask) << mantissa_bits) | 0x3ff0000000000000ULL);
+          double dr = xfrm.d;
+          estm_ptr[j] = (((((spl_tmp.w * dr) + spl_tmp.z) * dr) + spl_tmp.y) * dr) + spl_tmp.x;
+        }
+        break;
+      }
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    for (int j = 0; j < n; j++) {
+
+      // The displacement is computed in double-precision and converted to single-precision
+      // at the very end so as to give an unbiased estimate of the spline performance at a
+      // series of specific points, not the error introduced by uncertainty in the locations of
+      // the points themselves.  Once computed in single-precision arithmetic, the result can
+      // be stored in double precision so as to get the best indication of how it differs from
+      // the target.
+      float r_ij = r2_i + half_spc + (static_cast<double>(j) * interval);
+      switch (basis_set) {
+      case BasisFunctions::MIXED_FRACTIONS:
+        estm_ptr[j] = (r_ij * spl_tmp.x) + spl_tmp.y + ((spl_tmp.z + (spl_tmp.w / r_ij)) / r_ij);
+        break;
+      case BasisFunctions::POLYNOMIAL:
+        {
+          Ecumenical4 xfrm = { .f = r_ij };
+          xfrm.ui = (((xfrm.ui & sp_detail_bitmask) << mantissa_bits) | 0x3f800000U);
+          float dr = xfrm.f;
+          estm_ptr[j] = (((((spl_tmp.w * dr) + spl_tmp.z) * dr) + spl_tmp.y) * dr) + spl_tmp.x;
+        }
+        break;
+      }
+    }
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

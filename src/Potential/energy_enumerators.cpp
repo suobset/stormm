@@ -229,14 +229,35 @@ std::string getEnumerationName(const CellGridAction input) {
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const QMapMethod input) {
   switch (input) {
-  case QMapMethod::ACC_REGISTER:
-    return std::string("ACC_REGISTER");
   case QMapMethod::ACC_SHARED:
     return std::string("ACC_SHARED");
   case QMapMethod::GENERAL_PURPOSE:
     return std::string("GENERAL_PURPOSE");
   case QMapMethod::AUTOMATIC:
     return std::string("AUTOMATIC");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const PMIStrategy input) {
+  switch (input) {
+  case PMIStrategy::RECOMMENDED:
+    return std::string("RECOMMENDED");
+  case PMIStrategy::TIGHT:
+    return std::string("TIGHT");
+  case PMIStrategy::VERY_TIGHT:
+    return std::string("VERY_TIGHT");
+  case PMIStrategy::RECOMMENDED_PM_HEAVY:
+    return std::string("RECOMMENDED_PM_HEAVY");
+  case PMIStrategy::RECOMMENDED_PP_HEAVY:
+    return std::string("RECOMMENDED_PP_HEAVY");
+  case PMIStrategy::TIGHT_PM_HEAVY:
+    return std::string("TIGHT_PM_HEAVY");
+  case PMIStrategy::TIGHT_PP_HEAVY:
+    return std::string("TIGHT_PP_HEAVY");
+  case PMIStrategy::NO_AUTOMATION:
+    return std::string("NO_AUTOMATION");
   }
   __builtin_unreachable();
 }
@@ -263,6 +284,83 @@ NonbondedPotential translateNonbondedPotential(const std::string &input) {
   else {
     rtErr("The input \"" + input + "\" does not have a valid enumeration.",
           "translateNonbondedPotential");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+NonbondedTheme translateNonbondedTheme(const std::string &input) {
+  if (strcmpCased(input, std::string("electrostatic"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("elec"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("charge-charge"), CaseSensitivity::NO)) {
+    return NonbondedTheme::ELECTROSTATIC;
+  }
+  else if (strcmpCased(input, std::string("vdw"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("lennard-jones"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("van-der waals"), CaseSensitivity::NO)) {
+    return NonbondedTheme::VAN_DER_WAALS;
+  }
+  else if (strcmpCased(input, std::string("all"), CaseSensitivity::NO)) {
+    return NonbondedTheme::ALL;
+  }
+  else {
+    rtErr("The input \"" + input + "\" does not have a valid enumeration.",
+          "translateNonbondedTheme");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+PMIStrategy translatePMIStrategy(const std::string &input) {
+  if (strcmpCased(input, std::string("recommended"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("standard"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("default"), CaseSensitivity::NO)) {
+    return PMIStrategy::RECOMMENDED;
+  }
+  else if (strcmpCased(input, std::string("tight"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("high"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("fine"), CaseSensitivity::NO)) {
+    return PMIStrategy::TIGHT;
+  }
+  else if (strcmpCased(input, std::string("verytight"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("veryhigh"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("veryfine"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("very_tight"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("very_high"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("very_fine"), CaseSensitivity::NO)) {
+    return PMIStrategy::VERY_TIGHT;
+  }
+  else if (strcmpCased(input, std::string("gridheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("pmheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("grid_heavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("pm_heavy"), CaseSensitivity::NO)) {
+    return PMIStrategy::RECOMMENDED_PM_HEAVY;
+  }
+  else if (strcmpCased(input, std::string("pairheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("ppheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("pair_heavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("pp_heavy"), CaseSensitivity::NO)) {
+    return PMIStrategy::RECOMMENDED_PP_HEAVY;
+  }
+  else if (strcmpCased(input, std::string("tight_gridheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_pmheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_grid_heavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_pm_heavy"), CaseSensitivity::NO)) {
+    return PMIStrategy::TIGHT_PM_HEAVY;
+  }
+  else if (strcmpCased(input, std::string("tight_pairheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_ppheavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_pair_heavy"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("tight_pp_heavy"), CaseSensitivity::NO)) {
+    return PMIStrategy::TIGHT_PP_HEAVY;
+  }
+  else if (strcmpCased(input, std::string("no_auto"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("none"), CaseSensitivity::NO)) {
+    return PMIStrategy::NO_AUTOMATION;
+  }
+  else {
+    rtErr("The input \"" + input + "\" does not have a valid enumeration.",
+          "translatePMIStrategy");
   }
   __builtin_unreachable();
 }

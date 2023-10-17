@@ -19,7 +19,7 @@ PMIGrid::PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> *cg_in, const NonbondedTheme
     recommendation{QMapMethod::GENERAL_PURPOSE},
     work_unit_configuration{work_unit_configuration_in},
     grid_dimensions{HybridKind::ARRAY, "pmig_dims"},
-    capacity{0}, work_unit_count{0},
+    capacity{0}, work_unit_count{0}, largest_work_unit_grid_points{0},
     dgrid_stack{HybridKind::ARRAY, "pmig_ddata"},
     fgrid_stack{HybridKind::ARRAY, "pmig_fdata"},
     overflow_stack{HybridKind::ARRAY, "pmig_ovrf_data"},

@@ -13,16 +13,6 @@ namespace energy {
 
 using constants::PrecisionModel;
 
-/// \brief Get the kernel attributes for one of the register-centered density mapping kernels, to
-///        fill out tables in the core kernel manager.
-///
-/// \param prec     Indicate whether to carry out calculations in single- or double-precision
-/// \param cg_tacc  Type identifier code for the coordinate representation of the associated
-///                 CellGrid object
-/// \param order    The order of B-spline interpolation
-cudaFuncAttributes queryRegAccQMapKernelRequirements(PrecisionModel prec, size_t cg_tmat,
-                                                     int order);
-
 /// \brief Get the kernel attributes for one of the __shared__ accumulation density mapping
 ///        kernels, to fill out tables in the core kernel manager.
 ///

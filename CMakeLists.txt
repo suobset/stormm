@@ -49,7 +49,7 @@ if (STORMM_ENABLE_CUDA)
 
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --compiler-options=-O0 -g")
 
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --ptxas-options=\"-v\" -lcufft")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --generate-line-info --ptxas-options=\"-v\" -lcufft")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
 
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)

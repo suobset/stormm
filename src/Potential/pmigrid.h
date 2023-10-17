@@ -66,8 +66,8 @@ struct PMIGridWriter {
 
   /// \brief The constructor take a straight list of inputs for all member variables.
   PMIGridWriter(NonbondedTheme theme_in, PrecisionModel mode_in, int fp_bits_in, int nsys_in,
-                int order_in, int wu_count_in, const uint4* dims_in, double* ddata_in,
-                float* fdata_in, const uint* work_units_in);
+                int order_in, int wu_count_in, int max_grid_points_in, const uint4* dims_in,
+                double* ddata_in, float* fdata_in, const uint* work_units_in);
 
   /// \brief As with other abstracts, the presence of one or more const members forbids definition
   ///        of the copy and move assignment operators, but with no pointers to repair the default
@@ -89,6 +89,8 @@ struct PMIGridWriter {
   const int wu_count;          ///< The number of work units built to guide special-purpose GPU
                                ///<   kernels.  When multiplied by 32, this is the trusted length
                                ///<   of work_units.
+  const int max_grid_points;   ///< The naximum number of grid points that any one work unit deals
+                               ///<   with
   const uint4* dims;           ///< Dimensions of each PMI grid.  A-, B-, and C-axis lengths are
                                ///<   found in the "x", "y", and "z" members of the tuple, with the
                                ///<   offset for the start of each grid in the "w" member.
@@ -473,7 +475,7 @@ public:
   void prepareWorkUnits(const GpuDetails &gpu);
   /// \}
 
-  /// \brief Compute the number of grid points present in the largest work unit.
+  /// \brief Report the number of grid points present in the largest work unit.
   int getLargestWorkUnitGridPoints() const;
   
   /// \brief Initialize the particle-mesh interaction grids, respecting the object's precision and
@@ -552,6 +554,9 @@ private:
 
   /// The number of work units to execute in the optimized kernel.
   int work_unit_count;
+
+  /// The largest number of grid points involved in any one work unit
+  int largest_work_unit_grid_points;
   
   /// The master array of FFT-ready double-precision data.  This can also serve as the primary
   /// accumulator for 95-bit fixed-precision accumulations that will be transformed into the
@@ -691,6 +696,9 @@ private:
                    int gmap_a, int gmap_b, int gmap_c,
                    const CellGridReader<void, void, void, void> &cgr_vc, int halo = 1);
 
+  /// \brief Compute the number of grid points present in the largest work unit.
+  void computeLargestWorkUnitGridPoints();
+  
   /// \brief Unroll the inner data types of the attached cell grid and return the read-only
   ///        abstract for the attached CellGrid object.
   ///
