@@ -24,7 +24,6 @@ using constants::ExceptionResponse;
 using energy::queryBornRadiiKernelRequirements;
 using energy::queryBornDerivativeKernelRequirements;
 using energy::queryGeneralQMapKernelRequirements;
-using energy::queryRegAccQMapKernelRequirements;
 using energy::queryShrAccQMapKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using energy::queryValenceKernelRequirements;
@@ -57,10 +56,6 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                                                                QMapMethod::GENERAL_PURPOSE)},
     gen_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
                                                                QMapMethod::GENERAL_PURPOSE)},
-    rac_qmap_block_multiplier_dp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::DOUBLE,
-                                                               QMapMethod::ACC_REGISTER)},
-    rac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
-                                                               QMapMethod::ACC_REGISTER)},
     sac_qmap_block_multiplier_dp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::DOUBLE,
                                                                QMapMethod::ACC_SHARED)},
     sac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
@@ -243,16 +238,6 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                                 "kSAlr" + aprec_ordr + "MapDensity");
       }
     }
-  }
-  for (int order = 5; order <= 6; order++) {
-    catalogRegAccQMapKernel(PrecisionModel::SINGLE, int_type_index, order,
-                            "kRAsif" + std::to_string(order) + "MapDensity");
-    catalogRegAccQMapKernel(PrecisionModel::SINGLE, llint_type_index, order,
-                            "kRAlif" + std::to_string(order) + "MapDensity");
-    catalogRegAccQMapKernel(PrecisionModel::SINGLE, float_type_index, order,
-                            "kRAsrf" + std::to_string(order) + "MapDensity");
-    catalogRegAccQMapKernel(PrecisionModel::SINGLE, double_type_index, order,
-                            "kRAlrf" + std::to_string(order) + "MapDensity");
   }
 
   // Reduction kernel entries
@@ -446,34 +431,6 @@ void CoreKlManager::catalogGeneralQMapKernel(const PrecisionModel prec, const si
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoreKlManager::catalogRegAccQMapKernel(const PrecisionModel prec, const size_t cg_tmat,
-                                            const int order, const std::string &kernel_name) {
-  const std::string k_key = regAccQMapKernelKey(prec, cg_tmat, order);
-  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
-  if (it != k_dictionary.end()) {
-    rtErr("Particle density mapping kernel identifier " + k_key + " already exists in the kernel "
-          "map.", "CoreKlManager", "catalogRegAccQMapKernel");
-  }
-#ifdef STORMM_USE_HPC
-#  ifdef STORMM_USE_CUDA
-  const cudaFuncAttributes attr = queryRegAccQMapKernelRequirements(prec, cg_tmat, order);
-  int rac_qmap_block_multiplier;
-  switch (prec) {
-  case PrecisionModel::DOUBLE:
-    rac_qmap_block_multiplier = rac_qmap_block_multiplier_dp[order];
-    break;
-  case PrecisionModel::SINGLE:
-    rac_qmap_block_multiplier = rac_qmap_block_multiplier_sp[order];
-    break;
-  }
-  k_dictionary[k_key] = KernelFormat(attr, rac_qmap_block_multiplier, 1, gpu, kernel_name);
-#  endif
-#else
-  k_dictionary[k_key] = KernelFormat();
-#endif
-}
-
-//-------------------------------------------------------------------------------------------------
 void CoreKlManager::catalogShrAccQMapKernel(const PrecisionModel calc_prec,
                                             const PrecisionModel acc_prec, const size_t cg_tmat,
                                             const int order, const std::string &kernel_name) {
@@ -651,9 +608,6 @@ int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
                                                 const size_t cg_tmat, const int order) const {
   std::string k_key;
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
-    k_key = regAccQMapKernelKey(calc_prec, cg_tmat, order);
-    break;
   case QMapMethod::ACC_SHARED:
     k_key = shrAccQMapKernelKey(calc_prec, acc_prec, cg_tmat, order);
     break;
@@ -676,7 +630,6 @@ int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
                                                 const PrecisionModel prec,
                                                 const size_t cg_tmat, const int order) const {
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
   case QMapMethod::GENERAL_PURPOSE:
   case QMapMethod::AUTOMATIC:
     return getDensityMappingKernelDims(approach, prec, prec, cg_tmat, order);
@@ -841,14 +794,6 @@ std::vector<int> densityMappingBlockMultiplier(const GpuDetails &gpu, const Prec
                                                const QMapMethod approach) {
 #ifdef STORMM_USE_HPC
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
-    switch (prec) {
-    case PrecisionModel::DOUBLE:
-      return std::vector<int>(8, 2);
-    case PrecisionModel::SINGLE:
-      return std::vector<int>(8, 2);
-    }
-    break;
   case QMapMethod::ACC_SHARED:
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -1168,12 +1113,6 @@ std::string appendQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
 std::string generalQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
                                  const int order) {
   return "qmap_" + appendQMapKernelKey(prec, cg_tmat, order);
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string regAccQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat,
-                                const int order) {
-  return "qmap_racc_" + appendQMapKernelKey(prec, cg_tmat, order);
 }
 
 //-------------------------------------------------------------------------------------------------

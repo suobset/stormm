@@ -807,10 +807,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
               const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
                                                    (clash_distance + (TCALC)(1.0)));
 #  ifdef COMPUTE_ENERGY
-              const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
-                                  (aparm * (clash_distance + (TCALC)(1.0)) *
-                                   (clash_distance + (TCALC)(1.0)));
               if (accflag) {
+                const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
+                                    (aparm * (clash_distance + (TCALC)(1.0)) *
+                                     (clash_distance + (TCALC)(1.0)));
                 const TCALC qq14_contrib = qq_il * ((aparm * (r + (TCALC)(1.0)) *
                                                      (r + (TCALC)(1.0))) + bparm);
                 qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
@@ -861,13 +861,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                   (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
                                      (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
               const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
-              const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
-                                                     rlimit_plus_one * rlimit_plus_one);
-              const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - (arlimit_po_four);
               const TCALC r_plus_one = r + (TCALC)(1.0);
               const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
 #  ifdef COMPUTE_ENERGY
               if (accflag) {
+                const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
+                                                       rlimit_plus_one * rlimit_plus_one);
+                const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - arlimit_po_four;
                 const TCALC lj14_contrib = (arpo_three * r_plus_one) + bparm;
                 lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
               }
@@ -1398,11 +1398,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         if (r < clash_distance) {
           const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
                                               (clash_distance + (TCALC)(1.0)));
-          const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
-                              (aparm * (clash_distance + (TCALC)(1.0)) *
-                               (clash_distance + (TCALC)(1.0)));
 #  ifdef COMPUTE_ENERGY
           if (accflag) {
+            const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
+                                (aparm * (clash_distance + (TCALC)(1.0)) *
+                                 (clash_distance + (TCALC)(1.0)));
             const TCALC qq14_contrib = qq_il * ((aparm * (r + (TCALC)(1.0)) *
                                                  (r + (TCALC)(1.0))) + bparm);
             qq14_acc += LLCONV_FUNC(qq14_contrib * scw.nrg_scale_f);
@@ -1453,13 +1453,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                               (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
                                  (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
           const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
-          const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
-                                                 rlimit_plus_one * rlimit_plus_one);
-          const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - (arlimit_po_four);
           const TCALC r_plus_one = r + (TCALC)(1.0);
           const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
 #  ifdef COMPUTE_ENERGY
           if (accflag) {
+            const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
+                                                   rlimit_plus_one * rlimit_plus_one);
+            const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - arlimit_po_four;
             const TCALC lj14_contrib = (arpo_three * r_plus_one) + bparm;
             lj14_acc += LLCONV_FUNC(lj14_contrib * scw.nrg_scale_f);
           }

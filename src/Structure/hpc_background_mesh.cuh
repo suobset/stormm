@@ -14,6 +14,8 @@
 namespace stormm {
 namespace structure {
 
+#include "Accelerator/syncwarp.cui"
+
 using numerics::max_int_accumulation;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;

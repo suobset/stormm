@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include "copyright.h"
+#include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Constants/symbol_values.h"
@@ -20,6 +21,7 @@
 namespace stormm {
 namespace stmath {
 
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::ExceptionResponse;
@@ -152,6 +154,7 @@ public:
                  double min_range_in = default_logtab_min_range,
                  TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
                  BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
+                 int ulp_optimization_depth_in = 12,
                  float indexing_offset_in = 0.0,
                  ExceptionResponse policy = ExceptionResponse::DIE);
 
@@ -162,6 +165,7 @@ public:
                  double min_range_in = default_logtab_min_range,
                  TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
                  BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
+                 int ulp_optimization_depth_in = 12,
                  float indexing_offset_in = 0.0,
                  ExceptionResponse policy = ExceptionResponse::WARN);
   /// \}
@@ -398,6 +402,13 @@ private:
   /// \param min_range_in  The minimum range to apply
   void setMinimumAbsoluteRange(double min_range_in);
 
+  /// \brief Set the number of optimization depth in terms of the units of least place (ULPs) for
+  ///        each coefficient.
+  ///
+  /// \param ulp_optimization_depth_in  The portions of each cofficient's ULP to apply in trying to
+  ///                                   optimize the spline results
+  void setULPDepth(int ulp_optimization_depth_in);
+  
   /// \brief Check the indexing offset to ensure its validity (that is is non-negative and a
   ///        power of two).  Return the input as the result if valid.
   ///
@@ -413,14 +424,38 @@ private:
   void allocate(double max_range_in, const std::vector<std::vector<double2>> &custom_form_in = {},
                 const ExceptionResponse policy = ExceptionResponse::WARN);
 
-  /// \brief Evaluate the spline table based on a 
-  ///        constant rolled in.
+  /// \brief Evaluate the spline table based on a constant rolled in.
   void evaluatePrescribedTable();
 
-  /// \brief Compute the potential due to a custom, pre-tabulated potential.  This is a means for
+  /// \brief Compute the spline table due to a custom, pre-tabulated function.  This is a means for
   ///        reducing the size of a potential table, if it is well behaved at long range and very
   ///        steep at short range.
   void evaluateCustomTable();
+
+  /// \brief Compute the function at a series of points over a segment.
+  ///
+  /// \param bwrk   Values of the function evaluated at even intervals, modified and returned
+  /// \param bref   Reference values, a copy of bwrk.  If set to nullptr these values will not
+  ///               be recorded.
+  /// \param r2_i   The leftmost point of the segment, whether defined in terms of the squared
+  ///               argument of the original function or the actual argument of the original
+  ///               function
+  /// \param width  The width of the segment in question
+  void evaluateTargetInSegment(std::vector<double> *bwrk, std::vector<double> *bref, double r2_i,
+                               double width);
+
+  /// \brief Estimate the function at a series of points over a segment.
+  ///
+  /// \param estm     Values of the function evaluated at even intervals, modified and returned
+  /// \param spl_tmp  Current guess for the spline parameter set
+  /// \param r2_i     The leftmost point of the segment, whether defined in terms of the squared
+  ///                 argument of the original function or the actual argument of the original
+  ///                 function.  This is used when evaluating splines based on MIXED_FRACTION
+  ///                 basis functions but not POLYNOMIAL basis functions.
+  /// \param width    The width of the segment in question, used with evaluating splines based on
+  ///                 MIXED_FRACTION basis functions
+  void evaluateSplineInSegment(std::vector<double> *estm, const T4 spl_tmp, double r2_i,
+                               double width);
 
   /// \brief Evaluate the errors over the range of splines deemed most relevant.
   void evaluateOverallError();
@@ -435,13 +470,6 @@ template <typename T4> LogSplineTable<T4> restoreType(const LogSplineTable<void>
 
 template <typename T4> LogSplineTable<T4> restoreType(const LogSplineTable<void> &rasa);
 /// \}
-
-/// \brief Compute the index of a floating point number into a logarithmic spline.
-///
-/// Overloaded:
-///   - Compute the index for a single-precision spline table
-///   - Compute the index for a double-precision spline table
-
   
 } // namespace stmath
 } // namespace stormm

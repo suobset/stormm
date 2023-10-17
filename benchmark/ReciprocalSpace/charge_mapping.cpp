@@ -416,10 +416,8 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
                                 ClashResponse::NONE, prec, pm_fx.getWorkUnitConfiguration(),
                                 pm_fx.getMode(), cg_tmat, order, poly_ag);
   mm_ctrl.upload();
-  MappingResource mrs(pm_fx, launcher);
   MMControlKit<double> ctrl_d = mm_ctrl.dpData(devc_tier);
   MMControlKit<float>  ctrl_f = mm_ctrl.spData(devc_tier);
-  MappingResourceKit mrsk = mrs.data(devc_tier);
   
   // Add categories to the timer, if they are not already present
   const int init_timings = timer->addCategory(category_label + ", Init");
@@ -459,14 +457,14 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
     if (tcalc_is_double) {
       timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
-        mapDensity(&pm_wrt, &pm_acc, nullptr, nullptr, v_cgr, cg_tmat, synbk_d, gpu.getSMPCount(),
+        mapDensity(&pm_wrt, &pm_acc, nullptr, v_cgr, cg_tmat, synbk_d, gpu.getSMPCount(),
                    lp_genp, QMapMethod::GENERAL_PURPOSE, &pm_fx);
       }
     }
     else {
       timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
-        mapDensity(&pm_wrt, &pm_acc, nullptr, nullptr, v_cgr, cg_tmat, synbk_f, gpu.getSMPCount(),
+        mapDensity(&pm_wrt, &pm_acc, nullptr, v_cgr, cg_tmat, synbk_f, gpu.getSMPCount(),
                    lp_genp, QMapMethod::GENERAL_PURPOSE, &pm_fx);
       }
     }
@@ -498,16 +496,16 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
     if (tcalc_is_double) {
       timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
-        mapDensity(&pm_wrt, &pm_acc, &mrsk, &ctrl_d, v_cgr, cg_tmat, synbk_d, gpu.getSMPCount(),
-                   lp_sacc, QMapMethod::ACC_SHARED, &pm_fx);
+        mapDensity(&pm_wrt, &pm_acc, &ctrl_d, v_cgr, cg_tmat, synbk_d, gpu.getSMPCount(), lp_sacc,
+                   QMapMethod::ACC_SHARED, &pm_fx);
         ctrl_d.step += 1;
       }
     }
     else {
       timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
-        mapDensity(&pm_wrt, &pm_acc, &mrsk, &ctrl_f, v_cgr, cg_tmat, synbk_f, gpu.getSMPCount(),
-                   lp_sacc, QMapMethod::ACC_SHARED, &pm_fx);
+        mapDensity(&pm_wrt, &pm_acc, &ctrl_f, v_cgr, cg_tmat, synbk_f, gpu.getSMPCount(), lp_sacc,
+                   QMapMethod::ACC_SHARED, &pm_fx);
         ctrl_f.step += 1;
       }
     }

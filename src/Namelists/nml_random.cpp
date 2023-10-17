@@ -8,8 +8,6 @@
 namespace stormm {
 namespace namelist {
 
-using data_types::uint;
-
 //-------------------------------------------------------------------------------------------------
 RandomControls::RandomControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in},

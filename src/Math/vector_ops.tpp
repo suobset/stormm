@@ -164,6 +164,30 @@ template <typename T> double meanUnsignedError(const Hybrid<T> &va, const Hybrid
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> double rmsError(const T* va, const T* vb, const size_t length) {
+  double rmse = 0.0;
+  for (size_t i = 0; i < length; i++) {
+    double dvai = static_cast<double>(va[i]);
+    double dvbi = static_cast<double>(vb[i]);
+    double tdev = (dvai - dvbi);
+    rmse += tdev * tdev;
+  }
+  return sqrt(rmse / static_cast<double>(length));
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> double rmsError(const std::vector<T> &va, const std::vector<T> &vb) {
+  vectorComparisonCheck(va, vb, "rmsError");
+  return rmsError(va.data(), vb.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double rmsError(const Hybrid<T> &va, const Hybrid<T> &vb) {
+  vectorComparisonCheck(va, vb, "relativeRmsError");
+  return rmsError(va.data(), vb.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> double relativeRmsError(const T* va, const T* vb, const size_t length) {
 
   // Accumulate the root mean squared error and mean unsigned

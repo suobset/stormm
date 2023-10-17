@@ -19,7 +19,6 @@
 #include "../../src/Potential/cellgrid.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/map_density.h"
-#include "../../src/Potential/mapping_resource.h"
 #include "../../src/Potential/pmigrid.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -330,8 +329,7 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
     // either the cell grid or the particle-mesh interaction grids, and therefore does not need
     // either object to have been created with the particular GPU specifications as part of the
     // input.
-    mapDensity(&pm_copy, nullptr, nullptr, &cg_copy, poly_ag, launcher,
-               QMapMethod::GENERAL_PURPOSE);
+    mapDensity(&pm_copy, nullptr, &cg_copy, poly_ag, launcher, QMapMethod::GENERAL_PURPOSE);
     pm_copy.download();
     for (int sysid = 0; sysid < pm_copy.getSystemCount(); sysid++) {
       chrg_conservation[sysid] = pm_copy.getTotalOnGrid(sysid);
@@ -364,8 +362,7 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
                                 ClashResponse::NONE, tcalc_prec,
                                 pm_copy_ii.getWorkUnitConfiguration(), pm_copy_ii.getMode(),
                                 cg_tmat, pm_order, *poly_ag);
-  MappingResource mrs(pm_copy_ii, launcher);
-  mapDensity(&pm_copy_ii, &mrs, &mm_ctrl, &cg_copy_ii, poly_ag, launcher, QMapMethod::ACC_SHARED);
+  mapDensity(&pm_copy_ii, &mm_ctrl, &cg_copy_ii, poly_ag, launcher, QMapMethod::ACC_SHARED);
   pm_copy_ii.download();
   for (int sysid = 0; sysid < pm_copy_ii.getSystemCount(); sysid++) {
     chrg_conservation[sysid] = pm_copy_ii.getTotalOnGrid(sysid);

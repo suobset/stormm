@@ -167,14 +167,33 @@ enum class CellGridAction {
 /// \brief Differentiate between different strategies of mapping (spreading) particle density to
 ///        the particle-mesh interaction grid.
 enum class QMapMethod {
-  ACC_REGISTER,     ///< Force the use of the register accumulation method, which involves no
-                    ///<   atomic operations, if the precision model allows (otherwise, the
-                    ///<   selection mechanism reverts to "AUTOMATIC")
   ACC_SHARED,       ///< Force the use of the __shared__ cache accumulation method in whatever
                     ///<   precision model
   GENERAL_PURPOSE,  ///< Force the use of the general-purpose method in whatever precision model
   AUTOMATIC         ///< Use the fastest kernel available based on internal heuristics and
                     ///<   availability under a given precision model
+};
+
+/// \brief Enumerate various strategies, including non-automation, for choosing the particle-mesh
+///        interaction grid parameters in &namelist input.
+enum class PMIStrategy {
+  RECOMMENDED,           ///< Take the recommended settings, which will ensure stability in most
+                         ///<   simulations without excessive calculations for excessive accuracy.
+                         ///<   These settings are akin to the accuracy of Amber default settings,
+                         ///<   perhaps slightly better.
+  TIGHT,                 ///< Use settings that will produce a level of accuracy, about one order
+                         ///<   of magnitude higher than the recommended settings.
+  VERY_TIGHT,            ///< Use settings that will produce an extreme level of accuracy, about
+                         ///<   two orders of magnitude higher than the recommended strategy.
+  RECOMMENDED_PM_HEAVY,  ///< Take settings that would produce the recommended level of accuracy,
+                         ///<   but shifting more work into particle-mesh interactions.
+  RECOMMENDED_PP_HEAVY,  ///< Take settings that would produce the recommended level of accuracy,
+                         ///<   but shifting more work into particle-particle interactions.
+  TIGHT_PM_HEAVY,        ///< Take settings that would produce a tight level of accuracy, but
+                         ///<   shifting more work into the particle-mesh interactions.
+  TIGHT_PP_HEAVY,        ///< Take settings that would produce a tight level of accuracy, but
+                         ///<   shifting more work into the particle-mesh interactions.
+  NO_AUTOMATION          ///< Do not use any automated settings.
 };
   
 /// \brief Get a human-readable name for the enumerations detailed above.
@@ -195,13 +214,25 @@ std::string getEnumerationName(EnergySample input);
 std::string getEnumerationName(SplineScaffold input);
 std::string getEnumerationName(CellGridAction input);
 std::string getEnumerationName(QMapMethod input);
+std::string getEnumerationName(PMIStrategy input);
 /// \}
 
-/// \brief Produce a potential enumeration based on a selection of sanctioned input strings.
+/// \brief Produce a potential enumeration based on a selection of recognized input strings.
 ///
 /// \param input  The string describing the potential
 NonbondedPotential translateNonbondedPotential(const std::string &input);
 
+/// \brief Produce a potential enumeration based on a selection of recognized input strings.
+///
+/// \param input  The string describing the potential
+NonbondedTheme translateNonbondedTheme(const std::string &input);
+
+/// \brief Produce an enumerated accuracy target for the particle-mesh interaction grid based on a
+///        selection of recognized input strings.
+///
+/// \param input  The string describing the accuracy level
+PMIStrategy translatePMIStrategy(const std::string &input);
+  
 } // namespace energy
 } // namespace stormm
 

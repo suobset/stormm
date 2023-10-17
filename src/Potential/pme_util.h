@@ -23,7 +23,9 @@ using stmath::radialPartialDerivative;
   
 /// \brief Default settings for PME calculations
 /// \{
-constexpr double default_dsum_tol = 1.0e-5;
+constexpr int default_charge_mapping_order = 5;
+constexpr double default_dsum_tol = 5.0e-6;
+constexpr double max_dsum_tol = 1.0e-4;
 constexpr double default_pme_cutoff = 8.0;
 constexpr double default_pme_grid_spacing_target = 1.0;
 /// \}

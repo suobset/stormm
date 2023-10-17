@@ -35,18 +35,14 @@ void matchThemes(const NonbondedTheme pm_theme, const NonbondedTheme cg_theme) {
 
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
-void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MappingResourceKit *mrsk,
-                MMControlKit<double> *ctrl, const CellGridReader<void, void, void, void> &v_cgr,
-                const size_t cg_tmat, const SyNonbondedKit<double, double2> &synbk,
-                const int block_count, const int2 lp, const QMapMethod approach,
-                PMIGrid *pm) {
+void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<double> *ctrl,
+                const CellGridReader<void, void, void, void> &v_cgr, const size_t cg_tmat,
+                const SyNonbondedKit<double, double2> &synbk, const int block_count, const int2 lp,
+                const QMapMethod approach, PMIGrid *pm) {
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
-    launchRegAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
-    break;
   case QMapMethod::ACC_SHARED:
-    launchShrAccDensityKernel(pm_wrt, mrsk, ctrl, v_cgr, cg_tmat, synbk, lp);
+    launchShrAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
     break;
   case QMapMethod::GENERAL_PURPOSE:
     launchPMIGridInitialization(pm_acc, block_count);
@@ -62,18 +58,14 @@ void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MappingResour
 }
 
 //-------------------------------------------------------------------------------------------------
-void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MappingResourceKit *mrsk,
-                MMControlKit<float> *ctrl, const CellGridReader<void, void, void, void> &v_cgr,
-                const size_t cg_tmat, const SyNonbondedKit<float, float2> &synbk,
-                const int block_count, const int2 lp, const QMapMethod approach,
-                PMIGrid *pm) {
+void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<float> *ctrl,
+                const CellGridReader<void, void, void, void> &v_cgr, const size_t cg_tmat,
+                const SyNonbondedKit<float, float2> &synbk, const int block_count, const int2 lp,
+                const QMapMethod approach, PMIGrid *pm) {
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   switch (approach) {
-  case QMapMethod::ACC_REGISTER:
-    launchRegAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
-    break;
   case QMapMethod::ACC_SHARED:
-    launchShrAccDensityKernel(pm_wrt, mrsk, ctrl, v_cgr, cg_tmat, synbk, lp);
+    launchShrAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
     break;
   case QMapMethod::GENERAL_PURPOSE:
     launchPMIGridInitialization(pm_acc, block_count);
