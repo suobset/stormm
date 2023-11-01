@@ -22,7 +22,12 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
   __shared__ volatile int sh_chain_cell_init[small_block_size >> warp_bits];
   __shared__ volatile uint sh_final_cell_atom_limits[small_block_size >> warp_bits];
   __shared__ volatile int sh_warp_intake, sh_total_warps, sh_warps_per_chain;
-  
+#if 0
+  // When stepping through the cell lists in a single loop, it is necessary to recover the exact
+  // stencil point at each iteration.  This can be labrious when done in the innermost loop.  It is
+  // more efficient to pre-compute these values during setup and store them in a block-wide array.
+  __shared__ volatile stencil_indices[warp_size_int * ((ORDER * ORDER * ORDER + 3) / 4)];
+#endif
   // The atoms are in a list with significant gaps, the CellGrid's image array.  In order to
   // traverse that list with reasonably dense thread occupancy, work chain by chain, assigning
   // a certain number of warps out of the launch grid to each chain.  The number of warps that will
@@ -362,29 +367,87 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
       // Loop over all grid points, issuing atomic additions to the particle-mesh interaction grid.
       int itp = lane_idx / sh_warp_intake;
       const uint4 sys_pm_dims = pm_acc.dims[sh_system_idx[warp_idx]];
-      while (itp < ORDER * ORDER * ORDER) {
-        const int itp_c = itp / (ORDER * ORDER);
-        const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
-        const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
-        uint gpos_a = ida + itp_a;
-        uint gpos_b = idb + itp_b;
-        uint gpos_c = idc + itp_c;
-        gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
-        gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
-        gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
-        const uint gpos = sys_pm_dims.w +
-                          (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
-        const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
-                         pm_acc.fp_scale;
-        switch (pm_acc.mode) {
-        case PrecisionModel::DOUBLE:
-          atomicSplit(dq, gpos, pm_acc.lldata, pm_acc.overflow);
-          break;
-        case PrecisionModel::SINGLE:
-          atomicSplit(dq, gpos, pm_acc.idata, pm_acc.overflow);
-          break;
+      switch (pm_acc.mode) {
+      case PrecisionModel::DOUBLE:
+        if (pm_acc.use_overflow) {
+          while (itp < ORDER * ORDER * ORDER) {
+            const int itp_c = itp / (ORDER * ORDER);
+            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
+            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
+            uint gpos_a = ida + itp_a;
+            uint gpos_b = idb + itp_b;
+            uint gpos_c = idc + itp_c;
+            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
+            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
+            const uint gpos = sys_pm_dims.w +
+                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
+            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
+                             pm_acc.fp_scale;
+            atomicSplit(dq, gpos, pm_acc.lldata, pm_acc.overflow);
+            itp += map_stride;
+          }
         }
-        itp += map_stride;
+        else {
+          while (itp < ORDER * ORDER * ORDER) {
+            const int itp_c = itp / (ORDER * ORDER);
+            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
+            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
+            uint gpos_a = ida + itp_a;
+            uint gpos_b = idb + itp_b;
+            uint gpos_c = idc + itp_c;
+            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
+            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
+            const uint gpos = sys_pm_dims.w +
+                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
+            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
+                             pm_acc.fp_scale;
+            atomicAdd((ullint*)&pm_acc.lldata[gpos], (ullint)(__double2ll_rn(dq)));
+            itp += map_stride;
+          }
+        }
+        break;
+      case PrecisionModel::SINGLE:
+        if (pm_acc.use_overflow) {
+          while (itp < ORDER * ORDER * ORDER) {
+            const int itp_c = itp / (ORDER * ORDER);
+            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
+            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
+            uint gpos_a = ida + itp_a;
+            uint gpos_b = idb + itp_b;
+            uint gpos_c = idc + itp_c;
+            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
+            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
+            const uint gpos = sys_pm_dims.w +
+                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
+            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
+                             pm_acc.fp_scale;
+            atomicSplit(dq, gpos, pm_acc.idata, pm_acc.overflow);
+            itp += map_stride;
+          }
+        }
+        else {
+          while (itp < ORDER * ORDER * ORDER) {
+            const int itp_c = itp / (ORDER * ORDER);
+            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
+            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
+            uint gpos_a = ida + itp_a;
+            uint gpos_b = idb + itp_b;
+            uint gpos_c = idc + itp_c;
+            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
+            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
+            const uint gpos = sys_pm_dims.w +
+                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
+            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
+                             pm_acc.fp_scale;
+            atomicAdd(&pm_acc.idata[gpos], (int)(__float2int_rn(dq)));
+            itp += map_stride;
+          }
+        }
+        break;
       }
     } while (BALLOT(chain_apos >= 0));
 

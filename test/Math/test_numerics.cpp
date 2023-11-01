@@ -38,6 +38,7 @@ using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::energy::ewaldCoefficient;
+using stormm::energy::recoverDirectSumTolerance;
 using stormm::errors::rtWarn;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
@@ -859,6 +860,10 @@ int main(const int argc, const char* argv[]) {
   check(ew_tight, RelationalOperator::EQUAL, Approx(0.2779192472).margin(1.0e-8), "The Ewald "
         "coefficient was not computed as expected for a cutoff of 12.0 Angstroms and direct sum "
         "tolerance 1.0e-7.");
+  const double dsum_tol_loose = recoverDirectSumTolerance(10.5, 0.31);
+  check(dsum_tol_loose, RelationalOperator::EQUAL, Approx(3.961125e-7).margin(1.0e-10),
+        "The inverse method of computing the direct sum tolerance for a given Ewald coefficient "
+        "does not produce the expected result.");  
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,
                                   BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,

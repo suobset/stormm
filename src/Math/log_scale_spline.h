@@ -154,7 +154,7 @@ public:
                  double min_range_in = default_logtab_min_range,
                  TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
                  BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
-                 int ulp_optimization_depth_in = 12,
+                 int ulp_optimization_depth_in = 2,
                  float indexing_offset_in = 0.0,
                  ExceptionResponse policy = ExceptionResponse::DIE);
 
@@ -165,7 +165,7 @@ public:
                  double min_range_in = default_logtab_min_range,
                  TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
                  BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
-                 int ulp_optimization_depth_in = 12,
+                 int ulp_optimization_depth_in = 2,
                  float indexing_offset_in = 0.0,
                  ExceptionResponse policy = ExceptionResponse::WARN);
   /// \}
@@ -182,6 +182,16 @@ public:
   LogScaleSpline& operator=(LogScaleSpline &&original) = default;
   /// \}
 
+  /// \brief Get the target form of the function represented by the table.
+  LogSplineForm getForm() const;
+
+  /// \brief Get the method of indexing the table, an expression based on the target function's
+  ///        argument, e.g. the squared distance.
+  TableIndexing getIndexingMethod() const;
+
+  /// \brief Get the basis functions used to construt each spline.
+  BasisFunctions getBasisSet() const;
+  
   /// \brief Get the number of leading bits in the mantissa used to determine the array index.
   int getBitStride() const;
 
@@ -200,8 +210,14 @@ public:
   /// \brief Get the maximum range of the spline.
   double getMaximumRange() const;
 
+  /// \brief Get the minimum absolute range of the spline.
+  double getMinimumRange() const;
+
   /// \brief Get the indexing offset.
   float getIndexingOffset() const;
+
+  /// \brief Get the optimization depth.
+  int getOptimizationDepth() const;
   
   /// \brief Get the spline index for a particular value of the argument of the tabulated function
   ///        which has already been transformed to meet the object's indexing system.
@@ -271,6 +287,9 @@ public:
   const LogSplineTable<void>
   templateFreeData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a pointer to the original object.
+  const LogScaleSpline<T4>* getSelfPointer() const;
+  
 #ifdef STORMM_USE_HPC
   /// \brief Upload the table data to the device.
   void upload();

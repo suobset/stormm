@@ -33,7 +33,29 @@ using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesReader;
+
+/// \brief A read-only abstract for the system demarcations in the object.  This information is
+///        sometimes critical, and needed on the CPU host even as the general abstract is needed on
+///        the GPU device.
+struct CondensateBorders {
+
+  /// \brief The constructor accepts the total number of systems as well as pointers to the number
+  ///        of atoms and starting indices of each system.
+  CondensateBorders(int system_count_in, const size_t* atom_starts_in, const int* atom_counts_in);
+
+  /// \brief Copy and move constructors--as with any object containing const members, the move
+  ///        assignment operator is implicitly deleted.
+  /// \{
+  CondensateBorders(const CondensateBorders &original) = default;
+  CondensateBorders(CondensateBorders &&other) = default;
+  /// \}
   
+  const int system_count;     ///< The total number of systems in the object, and the trusted
+                              ///<   length of each of the arrays below
+  const size_t* atom_starts;  ///< Starting indices for the atoms of each system
+  const int* atom_counts;     ///< Atom counts for each system
+};
+
 /// \brief Writeable abstract for the Condensate class, wherein coordinates (only) can be modified
 ///        as a consequence of certain analyses.
 struct CondensateWriter {
@@ -222,7 +244,15 @@ public:
   const CondensateReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CondensateWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}  
-  
+
+  /// \brief Get the read-only summary of the system sizes.  The data is never needed in as a
+  ///        collection of device viewable pointers to host-side data, as this information is
+  ///        constant as of the creation of the object and therefore consistent on both the CPU
+  ///        host and GPU device.
+  ///
+  /// \param tier  The level (host or device) at which to get the set of pointers
+  const CondensateBorders borders(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
 #ifdef STORMM_USE_HPC
   /// \brief Get an abstract to the condensate's host data that is guaranteed to be accessible by
   ///        the GPU device.  

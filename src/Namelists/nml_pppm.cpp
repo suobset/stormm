@@ -46,6 +46,11 @@ PPPMControls::PPPMControls(const TextFile &tf, int *start_line, bool *found_nml,
   t_nml.assignVariable(&dsum_tol, "dsum_tol");
   t_nml.assignVariable(&mesh_ticks, "mesk_ticks");
   setStrategy(t_nml.getStringValue("accuracy"));
+
+  // Immediately apply the new strategy.  A PMIStrategy is only valid when the object is created
+  // with this constructor.  The original &pppm namelist will be referenced to see what was or
+  // was not specified by the user.
+  applyStrategy();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -169,6 +174,217 @@ void PPPMControls::setStrategy(const std::string &strat_in) {
     case ExceptionResponse::SILENT:
       break;
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PPPMControls::applyStrategy() {
+  bool mod_mesh_ticks = (nml_transcript.getKeywordStatus("mesh_ticks") == InputStatus::DEFAULT);
+  bool mod_order      = (nml_transcript.getKeywordStatus("order") == InputStatus::DEFAULT);
+  bool mod_cutoff     = (nml_transcript.getKeywordStatus("cutoff") == InputStatus::DEFAULT);
+  
+  bool cutoff_problem = false;
+  switch (strat) {
+  case PMIStrategy::RECOMMENDED:
+    if (mod_mesh_ticks) {
+      if (mod_order) {
+        mesh_ticks = 4;
+        order = 5;
+      }
+      else {
+        if (order == 4) {
+          mesh_ticks = 5;
+        }
+        else if (order == 5) {
+          mesh_ticks = 4;
+        }
+        else if (order == 6) {
+          mesh_ticks = 3;
+        }
+        else {
+          rtErr("An order of " + std::to_string(order) + " cannot be reconciled with " +
+                getEnumerationName(strat) + ".", "PPPMControls", "applyStrategy");
+        }
+      }
+    }
+    else {
+      if (mod_order) {
+        if (mesh_ticks == 3) {
+          order = 6;
+        }
+        else if (mesh_ticks == 4) {
+          order = 5;
+        }
+        else if (mesh_ticks == 5) {
+          order = 4;
+        }
+        else {
+          rtErr("A spatial cell subdivision into " + std::to_string(mesh_ticks) + " grid "
+                "points cannot be reconciled with " + getEnumerationName(strat) + ".",
+                "PPPMControls", "applyStrategy");
+        }
+      }
+      else {
+        rtErr("Either the number of spatial cell subdivisions or the interpolation order must "
+              "be left unset by the user in order to implement " + getEnumerationName(strat) +
+              ".", "PPPMControls", "applyStrategy");
+      }
+      ewald_coefficient = ewaldCoefficient(cutoff, 1.0e-5);
+    }
+    break;
+  case PMIStrategy::TIGHT:
+    if (mod_mesh_ticks) {
+      if (mod_order) {
+        mesh_ticks = 5;
+        order = 5;
+      }
+      else {
+        if (order == 4) {
+          mesh_ticks = 6;
+        }
+        else if (order == 5) {
+          mesh_ticks = 5;
+        }
+        else if (order == 6) {
+          mesh_ticks = 4;
+        }
+        else {
+          rtErr("An order of " + std::to_string(order) + " cannot be reconciled with " +
+                getEnumerationName(strat) + ".", "PPPMControls", "applyStrategy");
+        }
+      }
+    }
+    else {
+      if (mod_order) {
+        if (mesh_ticks == 4) {
+          order = 6;
+        }
+        else if (mesh_ticks == 5) {
+          order = 5;
+        }
+        else if (mesh_ticks == 6) {
+          order = 4;
+        }
+        else {
+          rtErr("A spatial cell subdivision into " + std::to_string(mesh_ticks) + " grid "
+                "points cannot be reconciled with " + getEnumerationName(strat) + ".",
+                "PPPMControls", "applyStrategy");
+        }
+      }
+      else {
+        rtErr("Either the number of spatial cell subdivisions or the interpolation order must "
+              "be left unset by the user in order to implement " + getEnumerationName(strat) +
+              ".", "PPPMControls", "applyStrategy");
+      }
+    }
+    ewald_coefficient = ewaldCoefficient(cutoff, 1.0e-6);
+    break;
+  case PMIStrategy::VERY_TIGHT:
+    if (mod_mesh_ticks) {
+      if (mod_order) {
+        mesh_ticks = 5;
+        order = 5;
+      }
+      else {
+        if (order == 5) {
+          mesh_ticks = 6;
+        }
+        else if (order == 6) {
+          mesh_ticks = 5;
+        }
+        else {
+          rtErr("An order of " + std::to_string(order) + " cannot be reconciled with " +
+                getEnumerationName(strat) + ".", "PPPMControls", "applyStrategy");
+        }
+      }
+    }
+    else {
+      if (mod_order) {
+        if (mesh_ticks == 5) {
+          order = 6;
+        }
+        else if (mesh_ticks == 6) {
+          order = 5;
+        }
+        else {
+          rtErr("A spatial cell subdivision into " + std::to_string(mesh_ticks) + " grid "
+                "points cannot be reconciled with " + getEnumerationName(strat) + ".",
+                "PPPMControls", "applyStrategy");
+        }
+      }
+      else {
+        rtErr("Either the number of spatial cell subdivisions or the interpolation order must "
+              "be left unset by the user in order to implement " + getEnumerationName(strat) +
+              ".", "PPPMControls", "applyStrategy");
+      }
+      ewald_coefficient = ewaldCoefficient(cutoff, 1.0e-7);
+    }
+    break;
+  case PMIStrategy::RECOMMENDED_PM_HEAVY:
+    if (mod_cutoff) {
+      cutoff = 0.8 * default_pme_cutoff;
+    }
+    else {
+      cutoff_problem = true;
+    }
+    break;
+  case PMIStrategy::RECOMMENDED_PP_HEAVY:
+    if (mod_cutoff) {
+      cutoff = 1.25 * default_pme_cutoff;
+    }
+    else {
+      cutoff_problem = true;
+    }
+    break;
+  case PMIStrategy::TIGHT_PM_HEAVY:
+    if (mod_cutoff) {
+      cutoff = 0.8 * default_pme_cutoff;
+    }
+    else {
+      cutoff_problem = true;
+    }
+    break;
+  case PMIStrategy::TIGHT_PP_HEAVY:
+    if (mod_cutoff) {
+      cutoff = 1.25 * default_pme_cutoff;
+    }
+    else {
+      cutoff_problem = true;
+    }
+    break;
+  case PMIStrategy::NO_AUTOMATION:
+    break;
+  }
+  if (cutoff_problem) {
+    rtErr("The cutoff must be modifiable in order to apply " + getEnumerationName(strat) + ".",
+          "PPPMControls", "applyStrategy");
+  }
+
+  // Apply the recommended, or tight criteria, if appropriate, for a modified cutoff  
+  switch (strat) {
+  case PMIStrategy::RECOMMENDED:
+  case PMIStrategy::TIGHT:
+  case PMIStrategy::VERY_TIGHT:
+  case PMIStrategy::NO_AUTOMATION:
+    break;
+  case PMIStrategy::RECOMMENDED_PM_HEAVY:
+  case PMIStrategy::RECOMMENDED_PP_HEAVY:
+    {
+      const PMIStrategy save_strat = strat;
+      strat = PMIStrategy::RECOMMENDED;
+      applyStrategy();
+      strat = save_strat;
+    }
+    break;
+  case PMIStrategy::TIGHT_PM_HEAVY:
+  case PMIStrategy::TIGHT_PP_HEAVY:
+    {
+      const PMIStrategy save_strat = strat;
+      strat = PMIStrategy::TIGHT;
+      applyStrategy();
+      strat = save_strat;
+    }
+    break;
   }
 }
 

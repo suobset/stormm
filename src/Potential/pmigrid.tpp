@@ -8,12 +8,14 @@ namespace energy {
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 PMIGrid::PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> *cg_in, const NonbondedTheme theme_in,
                  const int b_spline_order_in, const PrecisionModel mode_in,
-                 const int fp_accumulation_bits_in, const int shared_fp_accumulation_bits_in,
-                 const GpuDetails &gpu, const QMapMethod work_unit_configuration_in) :
-    theme{theme_in}, mode{mode_in},
+                 const FFTMode fft_staging_in, const int fp_accumulation_bits_in,
+                 const int shared_fp_accumulation_bits_in, const GpuDetails &gpu,
+                 const QMapMethod work_unit_configuration_in) :
+    theme{theme_in}, mode{mode_in}, fft_staging{fft_staging_in},
     fp_accumulation_bits{fp_accumulation_bits_in},
     shared_fp_accumulation_bits{shared_fp_accumulation_bits_in},
     data_is_real{(fp_accumulation_bits_in > 0)},
+    use_short_format_accumulation{false},
     system_count{0}, b_spline_order{b_spline_order_in},
     shared_acc_buffer_size{findSharedBufferSize(gpu)},
     recommendation{QMapMethod::GENERAL_PURPOSE},
@@ -76,10 +78,12 @@ PMIGrid::PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> *cg_in, const NonbondedTheme
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 PMIGrid::PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> &cg_in, const NonbondedTheme theme_in,
                  const int b_spline_order_in, const PrecisionModel mode_in,
-                 const int fp_accumulation_bits_in, const int shared_fp_accumulation_bits_in,
-                 const GpuDetails &gpu, const QMapMethod work_unit_configuration_in) :
-    PMIGrid(cg_in.getSelfPointer(), theme_in, b_spline_order_in, mode_in, fp_accumulation_bits_in,
-            shared_fp_accumulation_bits_in, gpu, work_unit_configuration_in)
+                 const FFTMode fft_staging_in, const int fp_accumulation_bits_in,
+                 const int shared_fp_accumulation_bits_in, const GpuDetails &gpu,
+                 const QMapMethod work_unit_configuration_in) :
+    PMIGrid(cg_in.getSelfPointer(), theme_in, b_spline_order_in, mode_in, fft_staging_in,
+            fp_accumulation_bits_in, shared_fp_accumulation_bits_in, gpu,
+            work_unit_configuration_in)
 {}
 
 //-------------------------------------------------------------------------------------------------

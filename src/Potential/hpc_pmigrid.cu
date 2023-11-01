@@ -32,14 +32,18 @@ kInitialize(PMIGridAccumulator pm_acc) {
   switch (pm_acc.mode) {
   case PrecisionModel::DOUBLE:
     for (size_t pos = threadIdx.x + (blockDim.x * blockIdx.x); pos < final_index; pos += stride) {
-      pm_acc.lldata[pos] = 0;
-      pm_acc.overflow[pos] = 0;
+      pm_acc.lldata[pos] = 0LL;
+      if (pm_acc.use_overflow) {
+        pm_acc.overflow[pos] = 0;
+      }
     }
     break;
   case PrecisionModel::SINGLE:
     for (size_t pos = threadIdx.x + (blockDim.x * blockIdx.x); pos < final_index; pos += stride) {
       pm_acc.idata[pos] = 0;
-      pm_acc.overflow[pos] = 0;
+      if (pm_acc.use_overflow) {
+        pm_acc.overflow[pos] = 0;
+      }
     }
     break;
   }
@@ -70,16 +74,32 @@ kConvertToReal(PMIGridWriter pm_wrt, const PMIGridAccumulator pm_acc) {
   case PrecisionModel::DOUBLE:
     {
       const double conv_scale = 1.0 / pm_acc.fp_scale;
-      for (size_t pos = first_index; pos < final_index; pos += stride) {
-        pm_wrt.ddata[pos] = int95ToDouble(pm_acc.lldata[pos], pm_acc.overflow[pos]) * conv_scale;
+      if (pm_acc.use_overflow) {
+        for (size_t pos = first_index; pos < final_index; pos += stride) {
+          pm_wrt.ddata[pos] = int95ToDouble(__ldca(&pm_acc.lldata[pos]),
+                                            __ldcv(&pm_acc.overflow[pos])) * conv_scale;
+        }
+      }
+      else {
+        for (size_t pos = first_index; pos < final_index; pos += stride) {
+          pm_wrt.ddata[pos] = (double)(pm_acc.lldata[pos]) * conv_scale;
+        }
       }
     }
     break;
   case PrecisionModel::SINGLE:
     {
       const float conv_scale = (float)(1.0) / pm_acc.fp_scale;
-      for (size_t pos = first_index; pos < final_index; pos += stride) {
-        pm_wrt.fdata[pos] = int63ToFloat(pm_acc.idata[pos], pm_acc.overflow[pos]) * conv_scale;
+      if (pm_acc.use_overflow) {
+        for (size_t pos = first_index; pos < final_index; pos += stride) {
+          pm_wrt.fdata[pos] = int63ToFloat(__ldca(&pm_acc.idata[pos]),
+                                           __ldcv(&pm_acc.overflow[pos])) * conv_scale;
+        }
+      }
+      else {
+        for (size_t pos = first_index; pos < final_index; pos += stride) {
+          pm_wrt.fdata[pos] = (float)(pm_acc.idata[pos]) * conv_scale;
+        }
       }
     }
     break;

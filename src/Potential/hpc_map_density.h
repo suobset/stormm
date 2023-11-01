@@ -19,8 +19,8 @@ using constants::PrecisionModel;
 /// \param calc_prec  Indicate whether to carry out calculations in single- or double-precision
 /// \param acc_prec   Indicate whether to carry out accumulation in 63- or 95-bit precision
 cudaFuncAttributes queryShrAccQMapKernelRequirements(PrecisionModel calc_prec,
-                                                     PrecisionModel acc_prec, size_t cg_tmat,
-                                                     int order);
+                                                     PrecisionModel acc_prec, bool overflow_needed,
+                                                     size_t cg_tmat, int order);
 
 /// \brief Get the kernel attributes for one of the general-purpose density mapping kernels, to
 ///        fill out tables in the core kernel manager.  Descriptions of input parameters follow

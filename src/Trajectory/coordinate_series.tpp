@@ -728,9 +728,9 @@ CoordinateSeriesWriter<void>
 CoordinateSeries<T>::templateFreeData(const HybridTargetLevel tier) {
   return CoordinateSeriesWriter<void>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
                                       globalpos_scale, inverse_globalpos_scale,
-                                      reinterpret_cast<const void*>(x_coordinates.data(tier)),
-                                      reinterpret_cast<const void*>(y_coordinates.data(tier)),
-                                      reinterpret_cast<const void*>(z_coordinates.data(tier)),
+                                      reinterpret_cast<void*>(x_coordinates.data(tier)),
+                                      reinterpret_cast<void*>(y_coordinates.data(tier)),
+                                      reinterpret_cast<void*>(z_coordinates.data(tier)),
                                       box_space_transforms.data(tier),
                                       inverse_transforms.data(tier), box_dimensions.data(tier));
 }

@@ -272,6 +272,8 @@ void unrollMapDensityCall(PMIGrid *pm, size_t cg_tcalc, const AtomGraphSynthesis
 /// \param pm_wrt    Real-valued abstract of the particle-mesh interaction grid
 /// \param pm_acc    Abstract of the particle-mesh interaction grid prepared for fixed-precision
 ///                  accumulation
+/// \param overflow  Indicate whether fixed-precision accumulation can occur without including a
+///                  32-bit overflow accumulator
 /// \param ctrl      Tracking object containing the time step and global counters directing
 ///                  asynchronous work unit progress
 /// \param v_cgr     Read-only, template-free abstract for the cell grid
@@ -286,11 +288,11 @@ void unrollMapDensityCall(PMIGrid *pm, size_t cg_tcalc, const AtomGraphSynthesis
 ///                  the PMIGrid and the CellGrid.  This function is designed to take pre-assembled
 ///                  abstracts for the fastest possible execution.
 /// \{
-void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<double> *ctrl,
+void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, bool overflow, MMControlKit<double> *ctrl,
                                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
                                const SyNonbondedKit<double, double2> &synbk, const int2 lp);
   
-void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, MMControlKit<float> *ctrl,
+void launchShrAccDensityKernel(PMIGridWriter *pm_wrt, bool overflow, MMControlKit<float> *ctrl,
                                const CellGridReader<void, void, void, void> &v_cgr, size_t cg_tmat,
                                const SyNonbondedKit<float, float2> &synbk, const int2 lp);
 

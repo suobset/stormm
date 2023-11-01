@@ -341,8 +341,11 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
   case UnitCellType::ORTHORHOMBIC:
   case UnitCellType::TRICLINIC:
     {
+      // The launch grid for the density mapping kernel will be identical for short- and long-form
+      // fixed precision accumulations.
       const int2 pmewu_lp = launcher.getDensityMappingKernelDims(qspread_approach, prec, acc_prec,
-                                                                 image_coord_type, qspread_order);
+                                                                 true, image_coord_type,
+                                                                 qspread_order);
       for (int i = 0; i < twice_warp_size_int; i++) {
         pmewu_progress.putHost(pmewu_lp.x, i);
       }

@@ -21,7 +21,9 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
 #else
   __shared__ int primary[STORAGE_VOLUME];
 #endif
+#ifndef SHORT_FORMAT_ACCUMULATION
   __shared__ int overflow[STORAGE_VOLUME];
+#endif
   __shared__ volatile int pmwu[density_mapping_wu_size];
   __shared__ volatile int warp_pos[DENSITY_SPREADING_THREADS >> warp_bits];
   __shared__ volatile int pmwu_idx, warp_progress;
@@ -79,21 +81,23 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
 #else
       primary[pos] = 0;
 #endif
+#ifndef SHORT_FORMAT_ACCUMULATION
       overflow[pos] = 0;
+#endif
     }
   }
   __syncthreads();
-
+  
   // Loop over all work units.  The whole block advances one work unit at a time.  
   while (pmwu_idx < pm_wrt.wu_count) {
-    
+
     // Each warp will now take one chain and operate on all atoms in it.  Warps will asynchronously
     // process each chain guided by a counter in __shared__.
-    while (warp_pos[WARP_IDX] < (pmwu[16] << 1)) {
+    while (warp_pos[WARP_IDX] < pmwu[28]) {
       
       // Compute the chain index that the warp should operate upon.
-      const int local_chain_cpos = (warp_pos[WARP_IDX] >> 1) / pmwu[5];
-      const int local_chain_bpos = (warp_pos[WARP_IDX] >> 1) - (local_chain_cpos * pmwu[5]);
+      const int local_chain_cpos = (warp_pos[WARP_IDX] / pmwu[27]) / pmwu[5];
+      const int local_chain_bpos = (warp_pos[WARP_IDX] / pmwu[27]) - (local_chain_cpos * pmwu[5]);
       int sys_chain_bpos = local_chain_bpos + pmwu[2];
       int sys_chain_cpos = local_chain_cpos + pmwu[3];
       sys_chain_bpos -= (sys_chain_bpos >= pmwu[23]) * pmwu[23];
@@ -121,7 +125,7 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
         chain_prefix_sums[prfx_idx] = natom;
       }
       SYNCWARP;
-      int base_atom_pos = warp_size_int * (warp_pos[WARP_IDX] & 0x1);
+      int base_atom_pos = warp_size_int * (warp_pos[WARP_IDX] % pmwu[27]);
       int cell_in_chain = (WARP_IDX * (max_shared_acc_atom_bearing_region_adim + 1));
       while (BALLOT(cell_in_chain < 0) == 0) {
         const int atom_in_chain_pos = base_atom_pos + LANE_IDX;
@@ -373,8 +377,18 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
 #endif
               for (int i = 0; i < ORDER; i++) {
                 if (i + ida >= 0 && i + ida < gmap_a_limit && prod_kj) {
+#ifdef SHORT_FORMAT_ACCUMULATION
+#  ifdef ACC_MODE_DOUBLE
+                  const llint contrib = bspln_a_knots[i] * prod_kj;
+                  atomicAdd((ullint*)&primary[base_kj_idx + i + ida], (ullint)(contrib));
+#  else
+                  const int contrib = bspln_a_knots[i] * prod_kj;
+                  atomicAdd(&primary[base_kj_idx + i + ida], contrib);
+#  endif
+#else
                   atomicSplit(bspln_a_knots[i] * prod_kj, base_kj_idx + i + ida, primary,
                               overflow);
+#endif
                 }
               }
             }
@@ -382,7 +396,7 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
         }
 
         // Advance to the next batch of atoms.
-        base_atom_pos += (warp_size_int << 1);
+        base_atom_pos += pmwu[29];
       }
 
       // Advance to the next chain.
@@ -420,12 +434,20 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
       // should not pollute L1 or L2.  It is not useful to re-initialize the __global__ memory
       // space at this stage, as it is not known how extensive the next work unit will be.
 #ifdef ACC_MODE_DOUBLE
+#  ifndef SHORT_FORMAT_ACCUMULATION
       const int95_t ival = { primary[pos], overflow[pos] };
       const double qval = splitFPToReal(ival) / pm_wrt.shacc_fp_scale;
+#  else
+      const double qval = (double)(primary[pos]) / pm_wrt.shacc_fp_scale;
+#  endif
       __stwt(&pm_wrt.ddata[gbl_pos + pmwu[21]], qval);
 #else
+#  ifndef SHORT_FORMAT_ACCUMULATION
       const int2 ival = { primary[pos], overflow[pos] };
       const float qval = splitFPToReal(ival) / pm_wrt.shacc_fp_scale;
+#  else
+      const float qval = (float)(primary[pos]) / pm_wrt.shacc_fp_scale;
+#  endif
       __stwt(&pm_wrt.fdata[gbl_pos + pmwu[21]], qval);
 #endif
     }
@@ -466,7 +488,9 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
 #else
         primary[pos] = 0;
 #endif
+#ifndef SHORT_FORMAT_ACCUMULATION
         overflow[pos] = 0;
+#endif
       }
     }
     __syncthreads();

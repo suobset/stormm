@@ -117,7 +117,6 @@ size_t copyCoordinateSet(Tdest* dest_crd, const int dest_start_idx, const double
   while (ipos < pos_limit) {
     const int rel_pos = ipos - (iter * stride);
     if (rel_pos < count) {
-
       const size_t drp_idx = dest_start_idx + rel_pos;
       const size_t orp_idx = orig_start_idx + rel_pos;
       if (orig_scale_bits == 0) {
