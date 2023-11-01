@@ -55,6 +55,28 @@ using trajectory::PhaseSpaceWriter;
 using trajectory::Thermostat;
 using trajectory::ThermostatKind;
 using trajectory::TrajectoryKind;
+
+/// \brief A read-only abstract for the system demarcations in the object.  This information is
+///        sometimes critical, and needed on the CPU host even as the general abstract is needed on
+///        the GPU device.
+struct PsSynthesisBorders {
+
+  /// \brief The constructor accepts the total number of systems as well as pointers to the number
+  ///        of atoms and starting indices of each system.
+  PsSynthesisBorders(int system_count_in, const int* atom_starts_in, const int* atom_counts_in);
+
+  /// \brief Copy and move constructors--as with any object containing const members, the move
+  ///        assignment operator is implicitly deleted.
+  /// \{
+  PsSynthesisBorders(const PsSynthesisBorders &original) = default;
+  PsSynthesisBorders(PsSynthesisBorders &&other) = default;
+  /// \}
+  
+  const int system_count;  ///< The total number of systems in the object, and the trusted length
+                           ///<   of each of the arrays below
+  const int* atom_starts;  ///< Starting indices for the atoms of each system
+  const int* atom_counts;  ///< Atom counts for each system
+};
   
 /// \brief The writer for a PhaseSpaceSynthesis object, containing all of the data relevant for
 ///        propagating dynamics in a collection of systems.
@@ -515,7 +537,15 @@ public:
   PsSynthesisWriter data(CoordinateCycle orientation,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-  
+
+  /// \brief Get the read-only summary of the system sizes.  The data is never needed in as a
+  ///        collection of device viewable pointers to host-side data, as this information is
+  ///        constant as of the creation of the object and therefore consistent on both the CPU
+  ///        host and GPU device.
+  ///
+  /// \param tier  The level (host or device) at which to get the set of pointers
+  const PsSynthesisBorders borders(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
 #ifdef STORMM_USE_HPC
   /// \brief Get a special writer which allows the device to read and write to host-mapped data.
   ///        This form of the writer can be used in kernel calls that streamline download and

@@ -495,7 +495,8 @@ void mapDensity(PMIGrid *pm, MolecularMechanicsControls *mm_ctrl,
   PMIGridWriter pm_wrt = pm->data(devc_tier);
   const PrecisionModel calc_prec = (tcalc_is_double) ? PrecisionModel::DOUBLE :
                                                        PrecisionModel::SINGLE;
-  const int2 lp = launcher.getDensityMappingKernelDims(approach, calc_prec, pm_wrt.mode, cg_tmat,
+  const int2 lp = launcher.getDensityMappingKernelDims(approach, calc_prec, pm_wrt.mode,
+                                                       pm->useOverflowAccumulation(), cg_tmat,
                                                        pm_wrt.order);
   switch (approach) {
   case QMapMethod::ACC_SHARED:

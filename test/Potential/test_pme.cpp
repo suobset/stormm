@@ -14,6 +14,7 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/Potential/cellgrid.h"
@@ -229,7 +230,7 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
                                const int pm_order, const NonbondedTheme pm_theme,
                                const TestPriority do_tests, const double chrg_conserv_tol,
                                const double chrg_value_tol, const CoreKlManager &launcher) {
-  PMIGrid pm(cg, pm_theme, pm_order, pmi_grid_prec, pm_acc_bits);
+  PMIGrid pm(cg, pm_theme, pm_order, pmi_grid_prec, FFTMode::OUT_OF_PLACE, pm_acc_bits);
   const AtomGraphSynthesis *poly_ag = cg.getTopologySynthesisPointer();
   const PhaseSpaceSynthesis *poly_ps = cg.getCoordinateSynthesisPointer();
   mapDensity(&pm, poly_ag);
@@ -322,7 +323,8 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
   if (pm_acc_bits > 0) {
     CellGrid cg_copy = cg;
     cg_copy.upload();
-    PMIGrid pm_copy(cg_copy, pm_theme, pm_order, pmi_grid_prec, pm_acc_bits);
+    PMIGrid pm_copy(cg_copy, pm_theme, pm_order, pmi_grid_prec, FFTMode::OUT_OF_PLACE,
+                    pm_acc_bits);
     pm_copy.upload();
     
     // The general-purpose density mapping kernel does not require any work units tailored to
@@ -349,7 +351,8 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
   // In all cases, try the __shared__ accumulation kernel.
   CellGrid cg_copy_ii = cg;
   cg_copy_ii.upload();
-  PMIGrid pm_copy_ii(cg_copy_ii, pm_theme, pm_order, pmi_grid_prec, pm_acc_bits);
+  PMIGrid pm_copy_ii(cg_copy_ii, pm_theme, pm_order, pmi_grid_prec, FFTMode::OUT_OF_PLACE,
+                     pm_acc_bits);
   pm_copy_ii.prepareWorkUnits(QMapMethod::ACC_SHARED, launcher.getGpu());
   pm_copy_ii.setRealDataFormat();
   pm_copy_ii.upload();
@@ -580,16 +583,16 @@ int main(const int argc, const char* argv[]) {
   CellGrid<double, llint, double, double4> cg_test(poly_ps, poly_ag, 4.5, 0.25, 4,
                                                    NonbondedTheme::ELECTROSTATIC);
   CHECK_THROWS_SOFT(PMIGrid pm_bad(cg_test, NonbondedTheme::ELECTROSTATIC, 5,
-                                   PrecisionModel::DOUBLE, 16), "A set of particle-mesh "
-                    "interaction grids was created with an inaccurate fixed-precision "
-                    "representation.", tsm.getTestingStatus());
+                                   PrecisionModel::DOUBLE, FFTMode::OUT_OF_PLACE, 16), "A set of "
+                    "particle-mesh interaction grids was created with an inaccurate "
+                    "fixed-precision representation.", tsm.getTestingStatus());
   CHECK_THROWS_SOFT(PMIGrid pm_bad(cg_test, NonbondedTheme::ELECTROSTATIC, 5,
-                                   PrecisionModel::SINGLE, 58), "A set of " +
-                    getEnumerationName(NonbondedTheme::ELECTROSTATIC) + " particle-mesh "
+                                   PrecisionModel::SINGLE, FFTMode::OUT_OF_PLACE, 58), "A set "
+                    "of " + getEnumerationName(NonbondedTheme::ELECTROSTATIC) + " particle-mesh "
                     "interaction grids was created with a risky fixed-precision representation.",
                     tsm.getTestingStatus());
   CHECK_THROWS_SOFT(PMIGrid pm_bad(cg_test, NonbondedTheme::VAN_DER_WAALS, 5,
-                                   PrecisionModel::SINGLE, 54), "A set of " +
+                                   PrecisionModel::SINGLE, FFTMode::IN_PLACE, 54), "A set of " +
                     getEnumerationName(NonbondedTheme::VAN_DER_WAALS) + " particle-mesh "
                     "interaction grids was created with a risky fixed-precision representation.",
                     tsm.getTestingStatus());

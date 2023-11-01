@@ -198,6 +198,8 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
 
   // PME density mapping (spreading) kernel entries
   const std::vector<PrecisionModel> all_prec = { PrecisionModel::DOUBLE, PrecisionModel::SINGLE };
+  const std::vector<bool> use_short_format = { true, false };
+  const std::vector<std::string> short_formats = { "", "sf" };
   for (int order = 4; order <= 6; order++) {
     for (size_t i = 0; i < all_prec.size(); i++) {
       std::string prec_ordr;
@@ -228,14 +230,17 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
           aprec_ordr += "s";
           break;
         }
-        catalogShrAccQMapKernel(all_prec[i], all_prec[j], int_type_index, order,
-                                "kSAsi" + aprec_ordr + "MapDensity");
-        catalogShrAccQMapKernel(all_prec[i], all_prec[j], llint_type_index, order,
-                                "kSAli" + aprec_ordr + "MapDensity");
-        catalogShrAccQMapKernel(all_prec[i], all_prec[j], float_type_index, order,
-                                "kSAsr" + aprec_ordr + "MapDensity");
-        catalogShrAccQMapKernel(all_prec[i], all_prec[j], double_type_index, order,
-                                "kSAlr" + aprec_ordr + "MapDensity");
+        for (int k = 0; k < 2; k++) {
+          std::string bprec_ordr = aprec_ordr + short_formats[k];
+          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], int_type_index, order,
+                                  "kSAsi" + bprec_ordr + "MapDensity");
+          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], llint_type_index,
+                                  order, "kSAli" + bprec_ordr + "MapDensity");
+          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], float_type_index,
+                                  order, "kSAsr" + bprec_ordr + "MapDensity");
+          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], double_type_index,
+                                  order, "kSAlr" + bprec_ordr + "MapDensity");
+        }
       }
     }
   }
@@ -432,9 +437,10 @@ void CoreKlManager::catalogGeneralQMapKernel(const PrecisionModel prec, const si
 
 //-------------------------------------------------------------------------------------------------
 void CoreKlManager::catalogShrAccQMapKernel(const PrecisionModel calc_prec,
-                                            const PrecisionModel acc_prec, const size_t cg_tmat,
+                                            const PrecisionModel acc_prec,
+                                            const bool overflow, const size_t cg_tmat,
                                             const int order, const std::string &kernel_name) {
-  const std::string k_key = shrAccQMapKernelKey(calc_prec, acc_prec, cg_tmat, order);
+  const std::string k_key = shrAccQMapKernelKey(calc_prec, acc_prec, overflow, cg_tmat, order);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Particle density mapping kernel identifier " + k_key + " already exists in the kernel "
@@ -442,8 +448,8 @@ void CoreKlManager::catalogShrAccQMapKernel(const PrecisionModel calc_prec,
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
-  const cudaFuncAttributes attr = queryShrAccQMapKernelRequirements(calc_prec, acc_prec, cg_tmat,
-                                                                    order);
+  const cudaFuncAttributes attr = queryShrAccQMapKernelRequirements(calc_prec, acc_prec, overflow,
+                                                                    cg_tmat, order);
   int sac_qmap_block_multiplier;
   switch (calc_prec) {
   case PrecisionModel::DOUBLE:
@@ -604,12 +610,12 @@ int2 CoreKlManager::getBornDerivativeKernelDims(const PrecisionModel prec, const
 //-------------------------------------------------------------------------------------------------
 int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
                                                 const PrecisionModel calc_prec,
-                                                const PrecisionModel acc_prec,
+                                                const PrecisionModel acc_prec, const bool overflow,
                                                 const size_t cg_tmat, const int order) const {
   std::string k_key;
   switch (approach) {
   case QMapMethod::ACC_SHARED:
-    k_key = shrAccQMapKernelKey(calc_prec, acc_prec, cg_tmat, order);
+    k_key = shrAccQMapKernelKey(calc_prec, acc_prec, overflow, cg_tmat, order);
     break;
   case QMapMethod::GENERAL_PURPOSE:
     k_key = generalQMapKernelKey(calc_prec, cg_tmat, order);
@@ -632,7 +638,12 @@ int2 CoreKlManager::getDensityMappingKernelDims(const QMapMethod approach,
   switch (approach) {
   case QMapMethod::GENERAL_PURPOSE:
   case QMapMethod::AUTOMATIC:
-    return getDensityMappingKernelDims(approach, prec, prec, cg_tmat, order);
+
+    // The approach must be GENERAL_PURPOSE, or the overloaded form that is called will raise an
+    // exception. Mark the need for overflow bits as TRUE.  This is not a factor in selecting
+    // kernels for the naive mapping approach, although the kernels do make a decision internally
+    // based on the bit count.
+    return getDensityMappingKernelDims(approach, prec, prec, true, cg_tmat, order);
   case QMapMethod::ACC_SHARED:
     rtErr("Both the calculation and accumulation precisions are required inputs for kernels that "
           "carry out " + getEnumerationName(approach) + ".", "CoreKlManager",
@@ -1117,14 +1128,14 @@ std::string generalQMapKernelKey(const PrecisionModel prec, const size_t cg_tmat
 
 //-------------------------------------------------------------------------------------------------
 std::string shrAccQMapKernelKey(const PrecisionModel calc_prec, const PrecisionModel acc_prec,
-                                const size_t cg_tmat, const int order) {
+                                const bool overflow, const size_t cg_tmat, const int order) {
   std::string base_key("qmap_sacc_");
   switch (acc_prec) {
   case PrecisionModel::DOUBLE:
-    base_key += "d_";
+    base_key += (overflow) ? "d_xf_" : "d_sf_";
     break;
   case PrecisionModel::SINGLE:
-    base_key += "s_";
+    base_key += (overflow) ? "s_xf_" : "s_sf_";
     break;
   }
   return base_key + appendQMapKernelKey(calc_prec, cg_tmat, order);

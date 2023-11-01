@@ -660,7 +660,7 @@ void coordCopy(CoordinateSeriesWriter<Tdest> *destination, const size_t frame_de
 #endif
   }
 
-  // Any copy operations involving data on the GPU device will fal through the above switch and
+  // Any copy operations involving data on the GPU device will fall through the above switch and
   // execute the following code.
 #ifdef STORMM_USE_HPC
   launchPreparation(sync, destination_tier, origin_tier);

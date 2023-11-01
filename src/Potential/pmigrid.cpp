@@ -52,11 +52,12 @@ PMIGridReader::PMIGridReader(const PMIGridWriter *w) :
 
 //-------------------------------------------------------------------------------------------------
 PMIGridAccumulator::PMIGridAccumulator(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                                       const int fp_bits_in, const int nsys_in, const int order_in,
+                                       const bool use_overflow_in, const int fp_bits_in,
+                                       const int nsys_in, const int order_in,
                                        const int wu_count_in, const uint4* dims_in,
                                        double* ddata_in, float* fdata_in, int* overflow_in,
                                        const uint* work_units_in) :
-    theme{theme_in}, mode{mode_in}, fp_bits{fp_bits_in},
+    theme{theme_in}, mode{mode_in}, use_overflow{use_overflow_in}, fp_bits{fp_bits_in},
     fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
     nsys{nsys_in}, order{order_in},
     order_squared{order_in * order_in},
@@ -71,10 +72,11 @@ PMIGridAccumulator::PMIGridAccumulator(const NonbondedTheme theme_in, const Prec
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                                 const int fp_bits_in, const int nsys_in, const int order_in,
-                                 const uint4* dims_in, const double* ddata_in,
-                                 const float* fdata_in, const int* overflow_in) :
-    theme{theme_in}, mode{mode_in}, fp_bits{fp_bits_in},
+                                 const bool use_overflow_in, const int fp_bits_in,
+                                 const int nsys_in, const int order_in, const uint4* dims_in,
+                                 const double* ddata_in, const float* fdata_in,
+                                 const int* overflow_in) :
+    theme{theme_in}, mode{mode_in}, use_overflow{use_overflow_in}, fp_bits{fp_bits_in},
     fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
     nsys{nsys_in}, order{order_in}, dims{dims_in},
     lldata{reinterpret_cast<const llint*>(ddata_in)},
@@ -84,14 +86,16 @@ PMIGridFPReader::PMIGridFPReader(const NonbondedTheme theme_in, const PrecisionM
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const PMIGridAccumulator &w) :
-    theme{w.theme}, mode{w.mode}, fp_bits{w.fp_bits}, fp_scale{w.fp_scale}, nsys{w.nsys},
-    order{w.order}, dims{w.dims}, lldata{w.lldata}, idata{w.idata}, overflow{w.overflow}
+    theme{w.theme}, mode{w.mode}, use_overflow{w.use_overflow}, fp_bits{w.fp_bits},
+    fp_scale{w.fp_scale}, nsys{w.nsys}, order{w.order}, dims{w.dims}, lldata{w.lldata},
+    idata{w.idata}, overflow{w.overflow}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const PMIGridAccumulator *w) :
-    theme{w->theme}, mode{w->mode}, fp_bits{w->fp_bits}, fp_scale{w->fp_scale}, nsys{w->nsys},
-    order{w->order}, dims{w->dims}, lldata{w->lldata}, idata{w->idata}, overflow{w->overflow}
+    theme{w->theme}, mode{w->mode}, use_overflow{w->use_overflow}, fp_bits{w->fp_bits},
+    fp_scale{w->fp_scale}, nsys{w->nsys}, order{w->order}, dims{w->dims}, lldata{w->lldata},
+    idata{w->idata}, overflow{w->overflow}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -102,6 +106,11 @@ NonbondedTheme PMIGrid::getTheme() const {
 //-------------------------------------------------------------------------------------------------
 PrecisionModel PMIGrid::getMode() const {
   return mode;
+}
+
+//-------------------------------------------------------------------------------------------------
+FFTMode PMIGrid::getFFTStaging() const {
+  return fft_staging;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -188,6 +197,21 @@ int PMIGrid::getWorkUnitCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int PMIGrid::getLargestWorkUnitGridPoints() const {
+  return largest_work_unit_grid_points;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool PMIGrid::shortFormatAccumulation() const {
+  return use_short_format_accumulation;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool PMIGrid::useOverflowAccumulation() const {
+  return (! use_short_format_accumulation);
+}
+
+//-------------------------------------------------------------------------------------------------
 PMIGridWriter PMIGrid::data(const HybridTargetLevel tier) {
   return PMIGridWriter(theme, mode, shared_fp_accumulation_bits, system_count, b_spline_order,
                        work_unit_count, largest_work_unit_grid_points, grid_dimensions.data(tier),
@@ -218,8 +242,9 @@ PMIGridAccumulator PMIGrid::fpData(const HybridTargetLevel tier) {
     rtErr("Overflow accumulators must be allocated in order to accumulate density in "
           "fixed-precision.", "PMIGrid", "fpData");
   }
-  return PMIGridAccumulator(theme, mode, fp_accumulation_bits, system_count, b_spline_order,
-                            work_unit_count, grid_dimensions.data(tier), dgrid_stack.data(tier),
+  return PMIGridAccumulator(theme, mode, (use_short_format_accumulation == false),
+                            fp_accumulation_bits, system_count, b_spline_order, work_unit_count,
+                            grid_dimensions.data(tier), dgrid_stack.data(tier),
                             fgrid_stack.data(tier), overflow_stack.data(tier),
                             work_units.data(tier));
 }
@@ -234,7 +259,8 @@ const PMIGridFPReader PMIGrid::fpData(const HybridTargetLevel tier) const {
           "such a format.  Current fixed-precision detail bit count: " +
           std::to_string(fp_accumulation_bits) + ".", "PMIGrid", "fpData");
   }
-  return PMIGridFPReader(theme, mode, fp_accumulation_bits, system_count, b_spline_order,
+  return PMIGridFPReader(theme, mode, (use_short_format_accumulation == false),
+                         fp_accumulation_bits, system_count, b_spline_order,
                          grid_dimensions.data(tier), dgrid_stack.data(tier),
                          fgrid_stack.data(tier), overflow_stack.data(tier));
 }
@@ -493,6 +519,10 @@ void PMIGrid::prepareFixedPrecisionModel(const int fp_accumulation_bits_in,
       }
     }
   }
+
+  // Determine whether the fixed-precision format will be compatible with an abridged accumulation
+  // method.
+  checkShortFormatViability();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -505,19 +535,25 @@ void PMIGrid::setRecommendedMappingMethod(const GpuDetails &gpu) {
     const int cell_gp = cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks;
     switch (mode) {
     case PrecisionModel::DOUBLE:
-      if (shared_acc_buffer_size / (cell_gp * (sizeof(int) + sizeof(llint))) >= 4) {
-        recommendation = QMapMethod::ACC_SHARED;
-      }
-      else {
-        recommendation = QMapMethod::GENERAL_PURPOSE;
+      {
+        const int sizeof_ovrf = (use_short_format_accumulation == false) * sizeof(int);
+        if (shared_acc_buffer_size / (cell_gp * (sizeof_ovrf + sizeof(llint))) >= 4) {
+          recommendation = QMapMethod::ACC_SHARED;
+        }
+        else {
+          recommendation = QMapMethod::GENERAL_PURPOSE;
+        }
       }
       break;
     case PrecisionModel::SINGLE:
-      if (shared_acc_buffer_size / (cell_gp * (2 * sizeof(int))) >= 4) {
-        recommendation = QMapMethod::ACC_SHARED;
-      }
-      else {
-        recommendation = QMapMethod::GENERAL_PURPOSE;
+      {
+        const int sizeof_ovrf = (use_short_format_accumulation == false) * sizeof(int);
+        if (shared_acc_buffer_size / (cell_gp * (sizeof_ovrf + sizeof(int))) >= 4) {
+          recommendation = QMapMethod::ACC_SHARED;
+        }
+        else {
+          recommendation = QMapMethod::GENERAL_PURPOSE;
+        }
       }
       break;
     }
@@ -561,16 +597,17 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
       // updated with the necessary density mapping halo. 
       const int cell_gp = cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks;
       int max_buffered_cells;
+      const int sizeof_ovrf = (use_short_format_accumulation == false) * sizeof(int);
       switch (mode) {
       case PrecisionModel::DOUBLE:
-        max_buffered_cells = shared_acc_buffer_size / (cell_gp * (sizeof(llint) + sizeof(int)));
+        max_buffered_cells = shared_acc_buffer_size / (cell_gp * (sizeof(llint) + sizeof_ovrf));
         break;
       case PrecisionModel::SINGLE:
-        max_buffered_cells = shared_acc_buffer_size / (cell_gp * (2 * sizeof(int)));
+        max_buffered_cells = shared_acc_buffer_size / (cell_gp * (sizeof(int) + sizeof_ovrf));
         break;
       }
       halo = computeMappingHalo();
-      
+
       // If the volume of a single cell would exceed the allowed limits of the __shared__ memory
       // per block, recursively call the function to use the general-purpose mapping kernel.
       if (max_buffered_cells == 0) {
@@ -578,8 +615,27 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
         prepareWorkUnits(QMapMethod::GENERAL_PURPOSE, gpu);
         return;
       }
-      int max_xsection = std::min((halo + 3) * (halo + 4),
-                                  (max_buffered_cells + halo) * (halo + 1));
+      
+      // Compute the cross-sectional area of all systems.
+      int total_xc_area = 0;
+      for (int i = 0; i < system_count; i++) {
+        total_xc_area += ext_dims[i].y * ext_dims[i].z;
+      }
+      int max_xsection;
+      if (total_xc_area > 24 * gpu.getSMPCount()) {
+        max_xsection = std::min((halo + 4) * (halo + 3),
+                                (halo + max_buffered_cells) * (halo + 1));
+      }
+      else {
+        if (total_xc_area > 4 * gpu.getSMPCount()) {
+          max_xsection = std::min((halo + 2) * (halo + 3),
+                                  (halo + max_buffered_cells) * (halo + 1));
+        }
+        else {
+          max_xsection = std::min((halo + 1) * (halo + 1),
+                                  (halo + max_buffered_cells) * (halo + 1));
+        }
+      }
 
       // If the maximum cross section permits no cells, a new mapping method must be determined.
       if (max_xsection == 0) {
@@ -587,15 +643,15 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
         prepareWorkUnits(recommendation, gpu);
         return;
       }
-      
-      // Compute the brickwork for this set of systems.
+
+      // Compute the layout for this collection of systems.
       bw = Brickwork(ext_dims, max_shared_acc_atom_bearing_region_adim, max_xsection, halo, 0,
-                     max_buffered_cells, gpu.getSMPCount());
+                     max_buffered_cells, 4 * gpu.getSMPCount());
     }
     break;
   }
 
-  // Cases that do not invlove work unit production will have returned before reaching this point.
+  // Cases that do not involve work unit production will have returned before reaching this point.
   work_unit_count = bw.getBrickCount();
   work_units.resize(density_mapping_wu_size * work_unit_count);
   std::vector<uint> tmp_wu;
@@ -617,11 +673,6 @@ void PMIGrid::prepareWorkUnits(const GpuDetails &gpu) {
     setRecommendedMappingMethod(gpu);
   }
   prepareWorkUnits(recommendation, gpu);
-}
-
-//-------------------------------------------------------------------------------------------------
-int PMIGrid::getLargestWorkUnitGridPoints() const {
-  return largest_work_unit_grid_points;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -821,7 +872,7 @@ int PMIGrid::findSharedBufferSize(const GpuDetails &gpu) const {
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
   if (gpu.getArchMajor() >= 7) {
-    return 25000;
+    return 23040;
   }
   else {
     return 15360;
@@ -830,7 +881,7 @@ int PMIGrid::findSharedBufferSize(const GpuDetails &gpu) const {
   return 10800;
 #  endif
 #else
-  return 25000;
+  return 23040;
 #endif
 }
 
@@ -871,7 +922,11 @@ void PMIGrid::addWorkUnit(std::vector<uint> *result, const int sysid, const int 
       result->push_back(system_cell_adim);
       result->push_back(system_cell_bdim);
       result->push_back(system_cell_cdim);
-      result->push_back((gmap_b + halo) * (gmap_c + halo));
+
+      // Determine the cross sectional area, and the number of warp tasks to subdivide it into
+      const int total_xc_area = (gmap_b + halo) * (gmap_c + halo);
+      const int warps_per_chain = std::max(2, 20 / total_xc_area);
+      result->push_back(total_xc_area);
       result->push_back(cgr_vc.mesh_ticks * cgr_vc.mesh_ticks * cgr_vc.mesh_ticks *
                         gmap_a * gmap_b * gmap_c);
       const uint4 pmig_dims = grid_dimensions.readHost(sysid);
@@ -889,9 +944,12 @@ void PMIGrid::addWorkUnit(std::vector<uint> *result, const int sysid, const int 
       result->push_back(cell_nc);
       result->push_back(cell_start_idx);
       result->push_back(cgr_vc.system_chain_bounds[sysid]);
+      result->push_back(warps_per_chain);
+      result->push_back(warps_per_chain * total_xc_area);
+      result->push_back(warps_per_chain * warp_size_int);
 
-      // Indices 27-31 are filled with zeros
-      for (int i = 0; i < 5; i++) {
+      // Indices 30 and 31 are filled with zeros
+      for (int i = 0; i < 2; i++) {
         result->push_back(0);
       }
     }
@@ -902,6 +960,107 @@ void PMIGrid::addWorkUnit(std::vector<uint> *result, const int sysid, const int 
     // These cases will never be reached and imply no work units
     break;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PMIGrid::checkShortFormatViability() {
+
+  // Make a quick check on whether the bit count is acceptable
+  switch (mode) {
+  case PrecisionModel::DOUBLE:
+    switch (theme) {
+    case NonbondedTheme::ELECTROSTATIC:
+    case NonbondedTheme::VAN_DER_WAALS:
+      if (shared_fp_accumulation_bits > mapping_nonoverflow_bits_dp) {
+        use_short_format_accumulation = false;
+        return;
+      }
+      break;
+    case NonbondedTheme::ALL:
+
+      // Trap a bad input case
+      rtErr("Only one non-bonded potential for can be represented on a particle-mesh interaction "
+            "grid.", "PMIGrid", "checkShortFormatViability");
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    switch (theme) {
+    case NonbondedTheme::ELECTROSTATIC:
+    case NonbondedTheme::VAN_DER_WAALS:
+      if (shared_fp_accumulation_bits > mapping_nonoverflow_bits_sp) {
+        use_short_format_accumulation = false;
+        return;
+      }
+      break;
+    case NonbondedTheme::ALL:
+      rtErr("Only one non-bonded potential for can be represented on a particle-mesh interaction "
+            "grid.", "PMIGrid", "checkShortFormatViability");
+    }
+    break;
+  }
+
+  // Check all topologies to ensure that they do not contain charges or dispersion parameters
+  // which might push the limits of the fixed-precision format in an reasonable configuration.
+  // This will NOT protect against systems which cluster a very large number of atoms into a
+  // specific region in a way that might exceed the grid's accumulation capacity, but the overall
+  // density of atoms and density of the grid are considered.
+  double max_q = 0.0;
+  const std::vector<AtomGraph*>& all_top = poly_ps_pointer->getUniqueTopologies();
+  for (size_t i = 0; i < all_top.size(); i++) {
+    const NonbondedKit<double> inbk = all_top[i]->getDoublePrecisionNonbondedKit();
+    switch (theme) {
+    case NonbondedTheme::ELECTROSTATIC:
+      for (int j = 0; j < inbk.n_q_types; j++) {
+
+        // This could be extended to the condensed charge parameters in the entire synthesis, but
+        // dispersion parameters would still have to be searched in individual topologies.
+        max_q = std::max(fabs(inbk.q_parameter[j]), max_q);
+      }
+      break;
+    case NonbondedTheme::VAN_DER_WAALS:
+      for (int j = 0; j < inbk.n_lj_types; j++) {
+        max_q = std::max(sqrt(0.25 * inbk.ljb_coeff[(inbk.n_lj_types + 1) * j]), max_q);
+      }
+      break;
+    case NonbondedTheme::ALL:
+      break;
+    }
+  }
+
+  // Compute the mean density of particles per grid element in each system, and the maximum of
+  // this quantity over all systems.
+  double max_ppgp = 0.0;
+  for (int i = 0; i < poly_ps_pointer->getSystemCount(); i++) {
+    const uint4 gdims = grid_dimensions.readHost(i);
+    const double nabc = gdims.x * gdims.y * gdims.z;
+
+    // The mean density of particles per grid point will be only an average, but particles will
+    // occlude one another in space.  While one particle may contribute its maximum B-spline
+    // density to a point (this is 8/27 for 4th order, slightly less for higher orders), other
+    // particles nearby may contribute partial density.  Furthermore, even if some particles'
+    // contributions cancel in the final sum, as might occur in charge mapping, the series must
+    // stay within bounds of the accumulator's capacity at all times during the summation.
+    // Dispersion densities are all positive.  Allow that the maximum number of particles per grid
+    // point be considered as twice the mean value and make sure to accommodate this number
+    // density of particles with the maximum possible charge or dispersion density.
+    const double atoms_per_gp = static_cast<double>(poly_ps_pointer->getAtomCount(i)) / nabc;
+    max_ppgp = std::max(max_ppgp, 2.0 * std::max(1.0, atoms_per_gp));
+  }
+  
+  // Subtract the base-2 logarithm of the maximum particle density, times the maximum number of
+  // particles per grid element, from the maximum allowed nonoverflow bits.  That is the ceiling
+  // on the fixed-precision bit count for the systems at hand.
+  int max_mapping_bits = std::max(-1, static_cast<int>(round(log2(max_ppgp * max_q))));
+  switch (mode) {
+  case PrecisionModel::DOUBLE:
+    max_mapping_bits += mapping_nonoverflow_bits_dp;
+    break;
+  case PrecisionModel::SINGLE:
+    max_mapping_bits += mapping_nonoverflow_bits_sp;
+    break;
+  }
+  use_short_format_accumulation = (shared_fp_accumulation_bits <= max_mapping_bits &&
+                                   fp_accumulation_bits <= max_mapping_bits);
 }
 
 //-------------------------------------------------------------------------------------------------

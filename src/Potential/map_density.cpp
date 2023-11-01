@@ -42,7 +42,8 @@ void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   switch (approach) {
   case QMapMethod::ACC_SHARED:
-    launchShrAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
+    launchShrAccDensityKernel(pm_wrt, pm->useOverflowAccumulation(), ctrl, v_cgr, cg_tmat, synbk,
+                              lp);
     break;
   case QMapMethod::GENERAL_PURPOSE:
     launchPMIGridInitialization(pm_acc, block_count);
@@ -65,7 +66,8 @@ void mapDensity(PMIGridWriter *pm_wrt, PMIGridAccumulator *pm_acc, MMControlKit<
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   switch (approach) {
   case QMapMethod::ACC_SHARED:
-    launchShrAccDensityKernel(pm_wrt, ctrl, v_cgr, cg_tmat, synbk, lp);
+    launchShrAccDensityKernel(pm_wrt, pm->useOverflowAccumulation(), ctrl, v_cgr, cg_tmat, synbk,
+                              lp);
     break;
   case QMapMethod::GENERAL_PURPOSE:
     launchPMIGridInitialization(pm_acc, block_count);

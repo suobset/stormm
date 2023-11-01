@@ -108,55 +108,28 @@ double computeMigrationRate(const double effective_cutoff, const double sigma) {
 //-------------------------------------------------------------------------------------------------
 int3 optimizeCellConfiguration(const int cell_na, const int cell_nb, const int cell_nc,
                                const int subdivisions) {
-  const std::vector<uint> prime_factors = { 2, 3, 5, 7 };
-  const ullint big_product = ipowl(2, 14) * ipowl(3, 10) * ipowl(5, 6) * ipowl(7, 4);
+  const std::vector<uint> prime_factors = { 2, 3, 5, 7, 11 };
+  
+  // While there is no restriction on the FFT dimension in any particular direction, it is
+  // important to try and avoid combining "bad" radices in the FFT: no more than one factor of 11
+  // or 7, and avoid combinations of 7 and 11.  If the subdivision is alreayd 7 or 11, take that
+  // into account.
+  const ullint big_product = (subdivisions == 7 || subdivisions == 11) ?
+                             ipowl(2, 14) * ipowl(3, 10) * ipowl(5, 6) :
+                             ipowl(2, 14) * ipowl(3, 10) * ipowl(5, 6) * 7LL * 11LL;
   int3 result;
   result.x = nearestFactor(big_product, cell_na, prime_factors, LimitApproach::BELOW);
   result.y = nearestFactor(big_product, cell_nb, prime_factors, LimitApproach::BELOW);
   result.z = nearestFactor(big_product, cell_nc, prime_factors, LimitApproach::BELOW);
-  if (subdivisions & 0x1) {
-    int cell_dim_decrement = 1;
-    while ((result.x & 0x1) && (result.y & 0x1) && (result.z & 0x1)) {
-      bool problem_solved = false;
-      if (result.x >= result.y && result.x >= result.z) {
-        const int orig_cnai = result.x;
-        result.x -= cell_dim_decrement;
-        result.x = nearestFactor(big_product, result.x, prime_factors, LimitApproach::BELOW);
-        if (result.x & 0x1) {
-          result.x = orig_cnai;
-        }
-        else {
-          problem_solved = true;
-        }
-      }
-      if (problem_solved == false && result.y >= result.z) {
-        const int orig_cnbi = result.y;
-        result.y -= cell_dim_decrement;
-        result.y = nearestFactor(big_product, result.y, prime_factors, LimitApproach::BELOW);
-        if (result.y & 0x1) {
-          result.y = orig_cnbi;
-        }
-        else {
-          problem_solved = true;
-        }
-      }
-      if (problem_solved == false) {
-        const int orig_cnci = result.z;
-        result.z -= cell_dim_decrement;
-        result.z = nearestFactor(big_product, result.z, prime_factors, LimitApproach::BELOW);
-        if (result.z & 0x1) {
-          result.z = orig_cnci;
-        }
-        else {
-          problem_solved = true;
-        }
-      }
-      if (problem_solved == false) {
-        cell_dim_decrement++;
-      }
-    }
+  if ((result.x % 77) == 0) {
+    result.x = (result.x / 77) * 75;
   }
-
+  if ((result.y % 77) == 0) {
+    result.y = (result.y / 77) * 75;
+  }
+  if ((result.z % 77) == 0) {
+    result.z = (result.z / 77) * 75;
+  }
   return result;
 }
   

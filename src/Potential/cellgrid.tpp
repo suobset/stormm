@@ -1246,7 +1246,7 @@ template <typename T, typename Tacc, typename Tcalc, typename T4>
 double
 CellGrid<T, Tacc, Tcalc, T4>::validateEffectiveCutoff(const double eff_cut_in,
                                                       const ExceptionResponse policy_in) const {
-  if (eff_cut_in < minimum_cell_width_excl_one) {
+  if (eff_cut_in < minimum_cell_width) {
     switch (policy_in) {
     case ExceptionResponse::DIE:
       rtErr("An effective cutoff of " +
@@ -1256,11 +1256,11 @@ CellGrid<T, Tacc, Tcalc, T4>::validateEffectiveCutoff(const double eff_cut_in,
       rtWarn("An effective cutoff of " +
              realToString(eff_cut_in, 8, 4, NumberFormat::STANDARD_REAL) + " is too short and may "
              "result in missed bonded exclusions.  The minimum value of " +
-             realToString(minimum_cell_width_excl_one, 8, 4, NumberFormat::STANDARD_REAL) +
+             realToString(minimum_cell_width, 8, 4, NumberFormat::STANDARD_REAL) +
              " will be applied instead.", "CellGrid", "validateEffectiveCutoff");
-      return minimum_cell_width_excl_one;
+      return minimum_cell_width;
     case ExceptionResponse::SILENT:
-      return minimum_cell_width_excl_one;
+      return minimum_cell_width;
     }
   }
   else if (eff_cut_in >= maximum_cell_width) {
@@ -1717,8 +1717,10 @@ void CellGrid<T, Tacc, Tcalc, T4>::initializeExclusionMasks(const CoordinateCycl
                        ((cell_base_capacity / 32) + 1);
   const size_t total_exclusion_capacity = static_cast<size_t>(total_cell_count) *
                                           cell_excl_capacity;
+#if 0
   exclusion_maps.resize(total_exclusion_capacity);
   exclusion_maps_alt.resize(total_exclusion_capacity);
+#endif
   
   // Loop over all cells, proceeding from a given cell to obtain the system index, the cell grid
   // dimensions, and finally the bounds of all cells in the neutral-territory work unit.  A similar

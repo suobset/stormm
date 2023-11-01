@@ -24,7 +24,7 @@ using stmath::radialPartialDerivative;
 /// \brief Default settings for PME calculations
 /// \{
 constexpr int default_charge_mapping_order = 5;
-constexpr double default_dsum_tol = 5.0e-6;
+constexpr double default_dsum_tol = 1.0e-5;
 constexpr double max_dsum_tol = 1.0e-4;
 constexpr double default_pme_cutoff = 8.0;
 constexpr double default_pme_grid_spacing_target = 1.0;
@@ -51,6 +51,15 @@ double ewaldCoefficient(double cutoff, double direct_sum_tol);
 ///        parameters follow from ewaldCoefficient() above, and in fact this function merely calls
 ///        that and returns 0.5 over the result.
 double pmeGaussianSpread(double cutoff, double direct_sum_tol);
+
+/// \brief Back out the direct sum tolerance implied by a given Ewald coefficient and
+///        particle-particle interaction cutoff.
+///
+/// \param cutoff             The particle-particle interaction cutoff
+/// \param ewald_coefficient  The multiplier to the range argument in the error function when
+///                           applied to the potential, e.g. "a" in erf(a * r) / r for a Coulomb
+///                           potential
+double recoverDirectSumTolerance(double cutoff, double ewald_coefficient);
 
 /// \brief For a given Ewald coefficient and Coulomb's constant, compute the derivative of the
 ///        particle-particle interaction of two protons.

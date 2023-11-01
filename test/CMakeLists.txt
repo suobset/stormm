@@ -14,6 +14,7 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_amber_prmtop.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_topology_mods.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_amber_coordinates.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_coordinate_swap.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Chemistry/test_chemical_features.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Chemistry/test_atommask.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Structure/test_local_arrangement.cpp

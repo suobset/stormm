@@ -1093,10 +1093,10 @@ int main(const int argc, const char* argv[]) {
       }
     }
   }
-  check(ncoarsened, RelationalOperator::EQUAL, 1953, "The number of cell grid dimensional "
+  check(ncoarsened, RelationalOperator::EQUAL, 658, "The number of cell grid dimensional "
         "combinations resulting in coarser grids (to satisfy FFT dimension requirements) did not "
         "meet expectations.");
-  check(most_coarsened, RelationalOperator::EQUAL, Approx(0.724911646).margin(1.0e-5), "The most "
+  check(most_coarsened, RelationalOperator::EQUAL, Approx(0.786527082).margin(1.0e-5), "The most "
         "significant shift in the cell grid dimensions did not meet expectations.");
   check(computeMigrationRate(5.5, 0.1), RelationalOperator::EQUAL,
         Approx(0.10500884).margin(1.0e-6), "The migratory rate of particles within a 5.5A cell "

@@ -122,6 +122,18 @@ enum class BSplineUnity {
   NONE          ///< The standard recursive procedure is applied to all coefficients, allowing the
                 ///<   sum to diverge from unity as roundoff error seeps in over each iteration.
 };
+
+/// \brief Real-to-complex and complex-to-real FFTs can be staged as in-place or out-of-place
+///        transformations, with advntages in terms of speed, memory conservation, or both
+///        depending on the card and the size of the problem.
+enum class FFTMode {
+  IN_PLACE,     ///< Perform the FFTs "in place." Code that implements such functionality must
+                ///<   allocate the arrays with additional padding along the "x" (or, unit cell
+                ///<   A) axis, as ((nx / 2) + 1).
+  OUT_OF_PLACE  ///< Perform the FFTs "out of place", dumping complex results in an R2C transform
+                ///<   into an array with nx * ny * nz elements for real data of dimensions nx, ny,
+                ///<   and nz.
+};
   
 /// \brief Get a human-readable string describing an enumeration of the provided type.  Various
 ///        overloads of this function serve enumerators across many libraries.
@@ -135,7 +147,12 @@ std::string getEnumerationName(LogSplineForm input);
 std::string getEnumerationName(TableIndexing input);
 std::string getEnumerationName(BasisFunctions input);
 std::string getEnumerationName(BSplineUnity input);
+std::string getEnumerationName(FFTMode input);
 /// \}
+
+/// \brief Translate a human-readable string (likely from user input) into one of the modes for
+///        real-to-complex and complex-to-real FFTs.
+FFTMode translateFFTMode(const std::string &input);
 
 } // namespace stmath
 } // namespace stormm

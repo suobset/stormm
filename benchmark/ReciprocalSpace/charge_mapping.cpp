@@ -361,6 +361,7 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
 //   n_trials:            The number of times to repeat each experiment
 //   n_repeats:           The number of times to repeat each kernel launch within a single test,
 //                        each of which is terminated by a device synchronization call
+//   fp_bit_count:        The number of fixed-precision bits in which density is accumulated
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tcalc, typename T4>
 void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
@@ -369,7 +370,7 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
                                   const std::string &category_label,
                                   const double half_cutoff = 4.5, const double cutoff_pad = 0.15,
                                   const int mesh_subdivisions = 4, const int n_trials = 4,
-                                  const int n_repeats = 100) {
+                                  const int n_repeats = 100, const int fp_bit_count = 32) {
   CoreKlManager launcher(gpu, poly_ag);
   CellGrid<T, llint, Tcalc, T4> cg(poly_ps.getSelfPointer(), poly_ag.getSelfPointer(), half_cutoff,
                                    cutoff_pad, mesh_subdivisions, NonbondedTheme::ELECTROSTATIC);
@@ -379,36 +380,11 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
   const bool tcalc_is_double = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index);
   const PrecisionModel prec = (tcalc_is_double) ? PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
   const size_t cg_tmat = std::type_index(typeid(T)).hash_code();
-  PMIGrid pm_fx(cg, NonbondedTheme::ELECTROSTATIC, order, prec, 32, 32, gpu);
+  PMIGrid pm_fx(cg, NonbondedTheme::ELECTROSTATIC, order, prec, FFTMode::OUT_OF_PLACE,
+                fp_bit_count, fp_bit_count, gpu);
   pm_fx.prepareWorkUnits(QMapMethod::ACC_SHARED, gpu);
   pm_fx.upload();
   timer->assignTime(0);
-
-  // CHECK
-#if 0
-  if (order == 6) {
-    const PMIGridWriter tmp_pm_wrt = pm_fx.data();
-    printf("There are %d work units:\n", tmp_pm_wrt.wu_count);
-    for (int i = 0; i < tmp_pm_wrt.wu_count; i++) {
-      const int iofs = i * density_mapping_wu_size;
-      printf("  Sys %2u  Atom-bearing [ %2u %2u %2u ] + [ %u %u %u ]  Grid-mapping [ %2u %2u %2u "
-             "] + [ %u %u %u ]  Total cells [ %2u %2u %2u ]  Chains in WU [ %3d ]  PMI Grid = %4u "
-             "elements out of [ %2u %2u %2u + %6u ]\n", tmp_pm_wrt.work_units[iofs],
-             tmp_pm_wrt.work_units[iofs +  1], tmp_pm_wrt.work_units[iofs +  2],
-             tmp_pm_wrt.work_units[iofs +  3], tmp_pm_wrt.work_units[iofs +  4],
-             tmp_pm_wrt.work_units[iofs +  5], tmp_pm_wrt.work_units[iofs +  6],
-             tmp_pm_wrt.work_units[iofs +  7], tmp_pm_wrt.work_units[iofs +  8],
-             tmp_pm_wrt.work_units[iofs +  9], tmp_pm_wrt.work_units[iofs + 10],
-             tmp_pm_wrt.work_units[iofs + 11], tmp_pm_wrt.work_units[iofs + 12],
-             tmp_pm_wrt.work_units[iofs + 22], tmp_pm_wrt.work_units[iofs + 23],
-             tmp_pm_wrt.work_units[iofs + 24], tmp_pm_wrt.work_units[iofs + 16],
-             tmp_pm_wrt.work_units[iofs + 17], tmp_pm_wrt.work_units[iofs + 18],
-             tmp_pm_wrt.work_units[iofs + 19], tmp_pm_wrt.work_units[iofs + 20],
-             tmp_pm_wrt.work_units[iofs + 21]);             
-    }
-  }
-#endif
-  // END CHECK
   
   // Create resources needed by some density mapping kernels.
   MolecularMechanicsControls mm_ctrl;
@@ -448,7 +424,9 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
   const int2 lp_genp = launcher.getDensityMappingKernelDims(QMapMethod::GENERAL_PURPOSE, prec,
                                                             cg_tmat, pm_wrt.order);
   const int2 lp_sacc = launcher.getDensityMappingKernelDims(QMapMethod::ACC_SHARED, prec,
-                                                            pm_wrt.mode, cg_tmat, pm_wrt.order);
+                                                            pm_wrt.mode,
+                                                            pm_fx.useOverflowAccumulation(),
+                                                            cg_tmat, pm_wrt.order);
   const SyNonbondedKit<double,
                        double2> synbk_d = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
   const SyNonbondedKit<float,
@@ -544,7 +522,7 @@ void replicateAndMapCharges(TestSystemManager *tsm, const int system_index,
                             const GpuDetails &gpu, const std::string &category_label,
                             const double half_cutoff = 4.5, const double cutoff_pad = 0.15,
                             const int mesh_subdivisions = 4, const int n_trials = 4,
-                            const int n_repeats = 100) {
+                            const int n_repeats = 100, const int fp_bit_count = 32) {
   const std::vector<int> tiles(replicas, system_index);
   PhaseSpaceSynthesis poly_ps = tsm->exportPhaseSpaceSynthesis(tiles);
   AtomGraphSynthesis poly_ag = tsm->exportAtomGraphSynthesis(tiles);
@@ -552,7 +530,7 @@ void replicateAndMapCharges(TestSystemManager *tsm, const int system_index,
   poly_ag.upload();
   benchmarkAccumulationKernels<T, Tcalc, T4>(poly_ps, poly_ag, order, timer, gpu, category_label,
                                              half_cutoff, cutoff_pad, mesh_subdivisions, n_trials,
-                                             n_repeats);
+                                             n_repeats, fp_bit_count);
 }
 #endif
 
@@ -578,6 +556,9 @@ int main(const int argc, const char* argv[]) {
   int n_trials = 4;
   int n_repeats = 100;
   int n_grids = 4;
+  int max_replicas = 200;
+  int min_replicas = 1;
+  int fp_bits = 32;
   double cutoff = 9.0;
   double cutoff_pad = 0.15;
   bool conservation_tests = true;
@@ -609,6 +590,15 @@ int main(const int argc, const char* argv[]) {
           strcmpCased(argv[i + 1], "false", CaseSensitivity::NO)) {
         conservation_tests = false;
       }
+    }
+    else if (strcmpCased(argv[i], "-max_replicas", CaseSensitivity::NO)) {
+      max_replicas = atof(argv[i + 1]);
+    }
+    else if (strcmpCased(argv[i], "-min_replicas", CaseSensitivity::NO)) {
+      min_replicas = atof(argv[i + 1]);
+    }
+    else if (strcmpCased(argv[i], "-fp_bits", CaseSensitivity::NO)) {
+      fp_bits = atof(argv[i + 1]);
     }
   }
   for (int i = 0; i < argc; i++) {
@@ -662,24 +652,28 @@ int main(const int argc, const char* argv[]) {
     }
   }
 #ifdef STORMM_USE_HPC
-  const std::vector nreps = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40 };
+  const std::vector nreps = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100,
+                              150 };
+  for (int ordr = 4; ordr <= 6; ordr++) {
+    for (size_t i = 0; i < nreps.size(); i++) {
+      if (nreps[i] < min_replicas || nreps[i] > max_replicas) {
+        continue;
+      }
+      const std::string cat_lab = "Kinase (" + std::to_string(ordr) + "th order) (" +
+                                  std::to_string(nreps[i]) + ")";
+      replicateAndMapCharges<float, float, float4>(&tsm, 0, nreps[i], ordr, &timer, gpu, cat_lab,
+                                                   0.5 * cutoff, cutoff_pad, n_grids, n_trials,
+                                                   n_repeats, fp_bits);
+    }
+  }
   for (size_t i = 0; i < nreps.size(); i++) {
-    const std::string cat_lab = "Kinase (4th order) (" + std::to_string(nreps[i]) + ")";
+    if (nreps[i] < min_replicas || nreps[i] > max_replicas) {
+      continue;
+    }
+    const std::string cat_lab = "Kinase (Amberized) (" + std::to_string(nreps[i]) + ")";
     replicateAndMapCharges<float, float, float4>(&tsm, 0, nreps[i], 4, &timer, gpu, cat_lab,
-                                                 0.5 * cutoff, cutoff_pad, n_grids, n_trials,
-                                                 n_repeats);
-  }
-  for (size_t i = 0; i < nreps.size(); i++) {
-    const std::string cat_lab = "Kinase (5th order) (" + std::to_string(nreps[i]) + ")";
-    replicateAndMapCharges<float, float, float4>(&tsm, 0, nreps[i], 5, &timer, gpu, cat_lab,
-                                                 0.5 * cutoff, cutoff_pad, n_grids, n_trials,
-                                                 n_repeats);
-  }
-  for (size_t i = 0; i < nreps.size(); i++) {
-    const std::string cat_lab = "Kinase (6th order) (" + std::to_string(nreps[i]) + ")";
-    replicateAndMapCharges<float, float, float4>(&tsm, 0, nreps[i], 6, &timer, gpu, cat_lab,
-                                                 0.5 * cutoff, cutoff_pad, n_grids, n_trials,
-                                                 n_repeats);
+                                                 3.75, cutoff_pad, 4, n_trials, n_repeats,
+                                                 fp_bits);
   }
 #endif
 

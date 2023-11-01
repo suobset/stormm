@@ -48,6 +48,8 @@ void launchPreparation(const HpcKernelSync sync, const HybridTargetLevel memory_
   case HpcKernelSync::MEMORY_AUTO:
     switch (memory_dest) {
     case HybridTargetLevel::HOST:
+      break;
+    case HybridTargetLevel::DEVICE:
       switch (memory_orig) {
       case HybridTargetLevel::HOST:
 #  ifdef STORMM_USE_CUDA
@@ -57,8 +59,6 @@ void launchPreparation(const HpcKernelSync sync, const HybridTargetLevel memory_
       case HybridTargetLevel::DEVICE:
         break;
       }
-      break;
-    case HybridTargetLevel::DEVICE:
       break;
     }
   }

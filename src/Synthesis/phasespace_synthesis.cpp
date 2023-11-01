@@ -47,6 +47,12 @@ using topology::UnitCellType;
 using trajectory::PhaseSpaceWriter;
 using trajectory::PhaseSpaceReader;
 using trajectory::writeFrame;
+
+//-------------------------------------------------------------------------------------------------
+PsSynthesisBorders::PsSynthesisBorders(const int system_count_in, const int* atom_starts_in,
+                                       const int* atom_counts_in) :
+    system_count{system_count_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in}
+{}
   
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const int unique_topology_count_in,
@@ -1289,6 +1295,11 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              y_force_overflow.data(tier), z_force_overflow.data(tier));
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const PsSynthesisBorders PhaseSpaceSynthesis::borders(const HybridTargetLevel tier) const {
+  return PsSynthesisBorders(system_count, atom_starts.data(tier), atom_counts.data(tier));
 }
 
 #ifdef STORMM_USE_HPC

@@ -134,6 +134,10 @@ public:
   void setStrategy(const std::string &strat_in);
   /// \}
 
+  /// \brief Apply the current strategy, to the extent possible, for filling in missing parameters
+  ///        from the &pppm namelist in the interest of obtaining a particular level of accuracy.
+  void applyStrategy();
+
 private:
   ExceptionResponse policy;  ///< Set the behavior when bad inputs are encountered.  DIE = abort
                              ///<   program, WARN = warn the user, and likely reset to the default

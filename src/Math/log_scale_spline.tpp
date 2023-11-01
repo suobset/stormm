@@ -109,44 +109,62 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-int LogScaleSpline<T4>::getBitStride() const {
+template <typename T4> LogSplineForm LogScaleSpline<T4>::getForm() const {
+  return target_form;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> TableIndexing LogScaleSpline<T4>::getIndexingMethod() const {
+  return indexing_method;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> BasisFunctions LogScaleSpline<T4>::getBasisSet() const {
+  return basis_set;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> int LogScaleSpline<T4>::getBitStride() const {
   return mantissa_bits;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-int LogScaleSpline<T4>::getSplineDensity() const {
+template <typename T4> int LogScaleSpline<T4>::getSplineDensity() const {
   return segments_per_stride;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-double LogScaleSpline<T4>::getEwaldCoefficient() const {
+template <typename T4> double LogScaleSpline<T4>::getEwaldCoefficient() const {
   return ewald_coefficient;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-double LogScaleSpline<T4>::getCoulombConstant() const {
+template <typename T4> double LogScaleSpline<T4>::getCoulombConstant() const {
   return coulomb_constant;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-double LogScaleSpline<T4>::getMaximumRange() const {
+template <typename T4> double LogScaleSpline<T4>::getMaximumRange() const {
   return maximum_range;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-float LogScaleSpline<T4>::getIndexingOffset() const {
+template <typename T4> double LogScaleSpline<T4>::getMinimumRange() const {
+  return minimum_absolute_range;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> float LogScaleSpline<T4>::getIndexingOffset() const {
   return indexing_offset;
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-int LogScaleSpline<T4>::getSplineIndex(const double r) const {
+template <typename T4> int LogScaleSpline<T4>::getOptimizationDepth() const {
+  return ulp_optimization_depth;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> int LogScaleSpline<T4>::getSplineIndex(const double r) const {
   int result;
   switch (precision) {
   case PrecisionModel::DOUBLE:
@@ -166,8 +184,7 @@ int LogScaleSpline<T4>::getSplineIndex(const double r) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-int LogScaleSpline<T4>::getSplineIndexByRealArg(const double r) const {
+template <typename T4> int LogScaleSpline<T4>::getSplineIndexByRealArg(const double r) const {
   switch (indexing_method) {
   case TableIndexing::ARG:
     return getSplineIndex(r);
@@ -353,6 +370,11 @@ LogScaleSpline<T4>::templateFreeData(const HybridTargetLevel tier) const {
   }
   return LogSplineTable<T4>(mantissa_bits + expsgn_bits, table.size(), sp_detail_bitmask,
                             dp_detail_bitmask, reinterpret_cast<const void*>(table.data(tier)));
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> const LogScaleSpline<T4>* LogScaleSpline<T4>::getSelfPointer() const {
+  return this;
 }
 
 #ifdef STORMM_USE_HPC

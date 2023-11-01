@@ -1,8 +1,13 @@
 #include "copyright.h"
+#include "Constants/behavior.h"
+#include "Parsing/parse.h"
 #include "math_enumerators.h"
 
 namespace stormm {
 namespace stmath {
+
+using constants::CaseSensitivity;
+using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const FunctionLevel input) {
@@ -123,6 +128,37 @@ std::string getEnumerationName(const BSplineUnity input) {
     return std::string("CENTER_FILL");
   case BSplineUnity::NONE:
     return std::string("NONE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const FFTMode input) {
+  switch (input) {
+  case FFTMode::IN_PLACE:
+    return std::string("IN_PLACE");
+  case FFTMode::OUT_OF_PLACE:
+    return std::string("OUT_OF_PLACE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+FFTMode translateFFTMode(const std::string &input) {
+  if (strcmpCased(input, std::string("in_place"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("in-place"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("inplace"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("ip"), CaseSensitivity::NO)) {
+    return FFTMode::IN_PLACE;
+  }
+  else if (strcmpCased(input, std::string("out_of_place"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("out-of-place"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("outofplace"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("oop"), CaseSensitivity::NO)) {
+    return FFTMode::OUT_OF_PLACE;
+  }
+  else {
+    rtErr("Unrecognized token \"" + input + "\".", "translateFFTMode");
   }
   __builtin_unreachable();
 }

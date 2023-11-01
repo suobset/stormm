@@ -10,6 +10,12 @@ using numerics::max_llint_accumulation;
 using numerics::globalpos_scale_nonoverflow_bits;
 
 //-------------------------------------------------------------------------------------------------
+CondensateBorders::CondensateBorders(const int system_count_in, const size_t* atom_starts_in,
+                                     const int* atom_counts_in) :
+    system_count{system_count_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 CondensateWriter::CondensateWriter(const PrecisionModel mode_in, const StructureSource basis_in,
                                    const int system_count_in, const UnitCellType unit_cell_in,
                                    const size_t* atom_starts_in, const int* atom_counts_in,
@@ -441,6 +447,11 @@ CondensateWriter Condensate::data(const HybridTargetLevel tier) {
                           x_coordinates.data(tier), y_coordinates.data(tier),
                           z_coordinates.data(tier), box_transforms.data(tier),
                           inv_transforms.data(tier), box_dimensions.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+const CondensateBorders Condensate::borders(const HybridTargetLevel tier) const {
+  return CondensateBorders(system_count, atom_starts.data(tier), atom_counts.data(tier));
 }
 
 #ifdef STORMM_USE_HPC

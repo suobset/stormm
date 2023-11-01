@@ -860,11 +860,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                     ((TCALC)(12.0) * lja_il * invrlim6)) * invrlim * invrlim6) /
                                   (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
                                      (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
-              const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
               const TCALC r_plus_one = r + (TCALC)(1.0);
               const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
 #  ifdef COMPUTE_ENERGY
               if (accflag) {
+                const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
                 const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
                                                        rlimit_plus_one * rlimit_plus_one);
                 const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - arlimit_po_four;
@@ -1452,11 +1452,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                 ((TCALC)(12.0) * lja_il * invrlim6)) * invrlim * invrlim6) /
                               (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
                                  (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
-          const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
           const TCALC r_plus_one = r + (TCALC)(1.0);
           const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
 #  ifdef COMPUTE_ENERGY
           if (accflag) {
+            const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
             const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
                                                    rlimit_plus_one * rlimit_plus_one);
             const TCALC bparm = (((lja_il * invrlim6) - ljb_il) * invrlim6) - arlimit_po_four;

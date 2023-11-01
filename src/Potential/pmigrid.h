@@ -7,7 +7,9 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Constants/hpc_bounds.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Math/math_enumerators.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "cellgrid.h"
@@ -22,6 +24,7 @@ using card::HybridTargetLevel;
 using constants::CartesianDimension;
 using constants::PrecisionModel;
 using constants::UnitCellAxis;
+using stmath::FFTMode;
 using synthesis::PhaseSpaceSynthesis;
 
 /// \brief Bounds on some settings for the particle-mesh interaction grid
@@ -36,6 +39,8 @@ constexpr int maximum_ljspread_fp_bits_sp = 50;
 constexpr int maximum_ljspread_fp_bits_dp = 82;
 constexpr int default_ljspread_fp_bits_sp = 24;
 constexpr int default_ljspread_fp_bits_dp = 56;
+constexpr int mapping_nonoverflow_bits_dp = 61;
+constexpr int mapping_nonoverflow_bits_sp = 29;
 constexpr int default_bspline_order = 5;
 constexpr int density_mapping_wu_size = 32;
 /// \}
@@ -49,7 +54,11 @@ constexpr int density_mapping_wu_size = 32;
 ///        48kB __shared__ memory per thread block for register-based accumulation and 24kB
 ///        __shared__ memory per thread block for __shared__-based accumulation.
 /// \{
+#ifdef STORMM_USE_CUDA
+constexpr int max_shared_acc_atom_bearing_region_adim = 28;
+#else
 constexpr int max_shared_acc_atom_bearing_region_adim = 9;
+#endif
 constexpr int max4s_grid_mapping_volume = 48;
 constexpr int max4s_atom_bearing_region_adim = 7;
 constexpr int max4s_atom_bearing_cross_section = 16;
@@ -149,9 +158,10 @@ struct PMIGridAccumulator {
 
   /// \brief The constructor takes inputs from the object's member variables and re-interprets
   ///        some of them as necessary.
-  PMIGridAccumulator(NonbondedTheme theme_in, PrecisionModel mode_in, int fp_bits_in, int nsys_in,
-                     int order_in, int wu_count_in, const uint4* dims_in, double* ddata_in,
-                     float* fdata_in, int* overflow_in, const uint* work_units_in);
+  PMIGridAccumulator(NonbondedTheme theme_in, PrecisionModel mode_in, bool use_overflow_in,
+                     int fp_bits_in, int nsys_in, int order_in, int wu_count_in,
+                     const uint4* dims_in, double* ddata_in, float* fdata_in, int* overflow_in,
+                     const uint* work_units_in);
 
   /// \brief As with other abstracts, the presence of one or more const members forbids definition
   ///        of the copy and move assignment operators, but with no pointers to repair the default
@@ -164,6 +174,7 @@ struct PMIGridAccumulator {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const bool use_overflow;     ///< Flag to indicate that overflow accumulators must be used
   const int fp_bits;           ///< The number of bits used in fixed-precision accumulation of
                                ///<   whatever density the grids describe.
   const float fp_scale;        ///< Scaling factor applied to all contributions for fixed-precision
@@ -199,9 +210,9 @@ struct PMIGridFPReader {
 
   /// \brief The constructor takes inputs from the object's member variables and re-interprets
   ///        some of them as necessary.
-  PMIGridFPReader(NonbondedTheme theme_in, PrecisionModel mode_in, int fp_bits_in, int nsys_in,
-                  int order_in, const uint4* dims_in, const double* ddata_in,
-                  const float* fdata_in, const int* overflow_in);
+  PMIGridFPReader(NonbondedTheme theme_in, PrecisionModel mode_in, bool use_overflow_in,
+                  int fp_bits_in, int nsys_in, int order_in, const uint4* dims_in,
+                  const double* ddata_in, const float* fdata_in, const int* overflow_in);
 
   /// \brief As with some other readers, the writer can be used as a constructor argument.
   ///
@@ -222,6 +233,7 @@ struct PMIGridFPReader {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const bool use_overflow;     ///< Flag to indicate that overflow accumulators are relevant
   const int fp_bits;           ///< The number of bits used in fixed-precision accumulation of
                                ///<   whatever density the grids describe.
   const float fp_scale;        ///< Scaling factor applied to all contributions for fixed-precision
@@ -254,14 +266,16 @@ public:
   template <typename T, typename Tacc, typename Tcalc, typename T4>
   PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> *cg_in, NonbondedTheme theme_in,
           int b_spline_order_in = default_bspline_order,
-          PrecisionModel mode_in = PrecisionModel::SINGLE, int fp_accumulation_bits_in = 0,
+          PrecisionModel mode_in = PrecisionModel::SINGLE,
+          FFTMode fft_staging_in = FFTMode::IN_PLACE, int fp_accumulation_bits_in = 0,
           int shared_fp_accumulation_bits_in = -1, const GpuDetails &gpu = null_gpu,
           const QMapMethod work_unit_configuration_in = QMapMethod::GENERAL_PURPOSE);
 
   template <typename T, typename Tacc, typename Tcalc, typename T4>
   PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> &cg_in, NonbondedTheme theme_in,
           int b_spline_order_in = default_bspline_order,
-          PrecisionModel mode_in = PrecisionModel::SINGLE, int fp_accumulation_bits_in = 0,
+          PrecisionModel mode_in = PrecisionModel::SINGLE,
+          FFTMode fft_staging_in = FFTMode::IN_PLACE, int fp_accumulation_bits_in = 0,
           int shared_fp_accumulation_bits_in = -1, const GpuDetails &gpu = null_gpu,
           const QMapMethod work_unit_configuration_in = QMapMethod::GENERAL_PURPOSE);
   /// \}
@@ -284,6 +298,10 @@ public:
   
   /// \brief Get the mode in which the object is set to operate.
   PrecisionModel getMode() const;
+
+  /// \brief Get the method for performing real-to-complex and complex-to-real FFTs.  This implies
+  ///        how the grid data itself may be padded.
+  FFTMode getFFTStaging() const;
 
   /// \brief Indicate whether fixed-precision accumulation is enabled.  This will test whether
   ///        fp_accumulation_bits is greater than zero.
@@ -333,7 +351,16 @@ public:
 
   /// \brief Get the number of work units used by the optimized kernel.
   int getWorkUnitCount() const;
-  
+
+  /// \brief Report the number of grid points present in the largest work unit.
+  int getLargestWorkUnitGridPoints() const;
+
+  /// \brief Report whether the PMIGrid will use short format accumulation.
+  bool shortFormatAccumulation() const;
+
+  /// \brief Report whether the PMIGrid will need to use overflow accumulators.
+  bool useOverflowAccumulation() const;
+
   /// \brief Get the abstract for this object containing its precision mode, grid dimensions, and
   ///        pointers to relevant data arrays.
   ///
@@ -474,9 +501,6 @@ public:
   void prepareWorkUnits(QMapMethod approach, const GpuDetails &gpu);
   void prepareWorkUnits(const GpuDetails &gpu);
   /// \}
-
-  /// \brief Report the number of grid points present in the largest work unit.
-  int getLargestWorkUnitGridPoints() const;
   
   /// \brief Initialize the particle-mesh interaction grids, respecting the object's precision and
   ///        accumulation modes.  If fixed-precision is enabled, this will set the data content to
@@ -503,9 +527,14 @@ private:
   /// The non-bonded property mapped to the grid
   NonbondedTheme theme;
   
-  /// Indicate whether the object will run FFTs in single- or double-precision arithmetic.
+  /// Indicate whether the object will run Fast Fouriet Transforms (FFTs) in single- or
+  /// double-precision arithmetic.
   PrecisionModel mode; 
 
+  /// Indicate whether the object will perform real-to-complex and complex-to-real FFTs in-place
+  /// or out-of-place.
+  FFTMode fft_staging;
+  
   /// The number of bits used in scaling for fixed-precision accumulation.  If set to zero,
   /// fixed-precision accumulation is disabled in the object, the overflow array is not allocated
   /// (or de-allocated if necessary), and the fp_(d,f)grid_stack pointers will be unset.
@@ -522,6 +551,13 @@ private:
   /// initialize() (for the beginning of accumulation) or convertToReal() (signifying the end of
   /// fixed-precision accumulation).
   bool data_is_real;
+
+  /// Flag to indicate that the topology synthesis and fixed precision bit count used in any
+  /// fixed-precision accumulation (whether in __shared__ memory or in __global__ memory) is
+  /// compatible with methods that send results only to the primary accumulator.  A TRUE value
+  /// in this flag will select kernels and functions that ignore possible overflow as this has
+  /// been declared safe.
+  bool use_short_format_accumulation;
   
   /// The number of systems with grids in the object.  This is taken from the coordinate synthesis
   /// responsible for creating the attached CellGrid.
@@ -577,32 +613,7 @@ private:
   /// based on the cell grids.  Each work unit is a series of 32 numbers (independent of the
   /// architecture, although this is NVIDIA's warp size as of CUDA 12 and has always been).  The
   /// numbers in each work unit must be interpreted based on the work_unit_configuration setting
-  /// (see above).  For ACC_REGISTER, the work unit indices read:
-  ///
-  /// Index   Description
-  ///  0-15   Indices of a cell in the cell grid from which to take atoms occupying the low 28
-  ///         bits (this comports with the cell grid's upper limit of 2^28 cells spanning all
-  ///         systems).  The number of subsequent cells to take in the chain in the high four bits,
-  ///         e.g. "begin reading at cell 0xfb71c3a and take all atoms in the following 0x5 = 5
-  ///         cells." If reading the stated number of cells would run past the end of the cell
-  ///         grid's A axis, subsequent cell indices will wrap.
-  ///   16    Index of the system in question, in either the cell grid or the particle-mesh
-  ///         interaction grid
-  /// 17-19   The lower limit of the atom-bearing region within the system along its unit cell's A,
-  ///         B, and C axes.  The grid-mapping region will begin at each of these indices, + 1.
-  ///         These indices pertain to the cell grid.
-  /// 20-22   The extent of the atom-bearing region along the A, B, and C axes.  The grid-mapping
-  ///         region will extend for each of these values, - 1.  These indices pertain to the cell
-  ///         grid.
-  /// 23-26   The dimensions of the system's particle-mesh interaction grid along the A, B, and C
-  ///         dimensions, and finally its offset in the general storage array (e.g. fdata or
-  ///         ddata).  This information is copied for convenience.
-  ///   27    The total number of tasks that various warps in the block may need to perform to
-  ///         completely cover the grid-mapping region in the low 16 bits, followed by the number
-  ///         of warp tasks spanning the grid points in any spatial decomposition cell in the high
-  ///         16 bits.  This is pre-computed as part of the work unit and stored for convenience.
-  ///
-  /// For ACC_SHARED, the work unit indices read:
+  /// (see above).  For ACC_SHARED, the work unit indices read:
   ///
   /// Index   Description
   ///   0     Index of the system to which the work unit pertains
@@ -628,6 +639,10 @@ private:
   ///  25     The starting index of spatial decomposition cells in the system to which the work
   ///         unit pertains
   ///  26     The starting index of chains in the system to which the work unit pertains
+  ///  27     The total number of warps assigned to each chain.
+  ///  28     The total number of warp tasks.  This is the number of warps that will pile onto
+  ///         each chain, times the total cross sectional area of the work unit.
+  ///  29     The atom stride that each warp will take within a chain.
   Hybrid<uint> work_units;
 
   /// Pointer to the associated CellGrid object.  A PMIGrid cannot exist without a spatial
@@ -695,6 +710,14 @@ private:
   void addWorkUnit(std::vector<uint> *result, int sysid, int pos_a, int pos_b, int pos_c,
                    int gmap_a, int gmap_b, int gmap_c,
                    const CellGridReader<void, void, void, void> &cgr_vc, int halo = 1);
+
+  /// \brief Check whether the topologies describing systems mapped in this object, the
+  ///        fixed-precision bit count, and the non-bonded potential at hand will permit the use
+  ///        of an abdriged accumulation approach which ignores overflow into the secondary 32-bit
+  ///        accumulator.  To forego this check on the accumulation allows atomics to become "fire
+  ///        and forget", as well as avoiding some arithmetic, which can enhance performance by
+  ///        as much as 75%.
+  void checkShortFormatViability();
 
   /// \brief Compute the number of grid points present in the largest work unit.
   void computeLargestWorkUnitGridPoints();
