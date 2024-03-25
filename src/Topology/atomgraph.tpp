@@ -62,8 +62,10 @@ std::vector<T> AtomGraph::getAtomicMass(const int low_index, const int high_inde
     switch (rep) {
     case MassForm::ORDINARY:
       tmpm = sp_atomic_masses.readHost(low_index, high_index - low_index);
+      break;
     case MassForm::INVERSE:
       tmpm = sp_inverse_atomic_masses.readHost(low_index, high_index - low_index);
+      break;
     }
     for (int i = low_index; i < high_index; i++) {
       tmpm[i] *= (znum_ptr[i] > 0);
@@ -75,8 +77,10 @@ std::vector<T> AtomGraph::getAtomicMass(const int low_index, const int high_inde
     switch (rep) {
     case MassForm::ORDINARY:
       tmpm = atomic_masses.readHost(low_index, high_index - low_index);
+      break;
     case MassForm::INVERSE:
       tmpm = inverse_atomic_masses.readHost(low_index, high_index - low_index);
+      break;
     }
     for (int i = low_index; i < high_index; i++) {
       tmpm[i] *= (znum_ptr[i] > 0);

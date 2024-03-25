@@ -42,9 +42,6 @@ using topology::ImplicitSolventModel;
 using trajectory::Thermostat;
 using trajectory::ThermostatWriter;
 
-/// \brief Set the __shared__ memory configuration for various nonbonded interaction kernels
-void nonbondedKernelSetup();
-
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the non-bonded interactions kernel.  Deposit the results in a developing object that
 ///        will later record launch grid dimensions for managing the kernels.

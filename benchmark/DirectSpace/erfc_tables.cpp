@@ -16,6 +16,7 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/report_table.h"
+#include "../../src/Reporting/reporting_enumerators.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
@@ -86,110 +87,181 @@ std::vector<double> placePointPair(Xoshiro256ppGenerator *xrs, const double r_ta
 }
 
 //-------------------------------------------------------------------------------------------------
-// Test a logarithmic spline table in terms of accuracy over a particular range.  Print the result
-// for display and processing in popular matrix algebra packages.
+// Open the output file and add some comments to indicate to any reader the content of the
+// variables that follow.
 //
 // Arguments:
+//   output_file_name:  Name of the output file to open
+//   lgsp:              The logarithmic spline table which will become the source of results,
+//                      containing critical parameters to be conveyed as annotation in the output
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
-                  const double min_analysis_range, const double max_analysis_range,
-                  const int mantissa_bits_in, const TableIndexing indexing_method_in,
-                  const BasisFunctions basis_set_in, const float indexing_offset_in,
-                  const std::string &test_environment, Xoshiro256ppGenerator *xrs,
-                  const std::string &output_file_name, StopWatch *timer) {
+std::ofstream prepOutputFile(const std::string &output_file_name, const LogScaleSpline<T4> &lgsp) {
 
   // Prepare to write the summary
   std::ofstream foutp = openOutputFile(output_file_name, PrintSituation::APPEND, "open the output "
                                        "for additional test recording");
   const char comment_guard = commentSymbol(OutputSyntax::MATRIX_PKG);
-  printProtectedText("Potential form:  " + getEnumerationName(target_form_in) +
-                     "\nIndexing method: " + getEnumerationName(indexing_method_in) +
-                     "\nBasis functions: " + getEnumerationName(basis_set_in) + "\n",
+  printProtectedText("Potential form:  " + getEnumerationName(lgsp.getForm()) +
+                     "\nIndexing method: " + getEnumerationName(lgsp.getIndexingMethod()) +
+                     "\nBasis functions: " + getEnumerationName(lgsp.getBasisSet()) + "\n\n",
                      comment_guard, &foutp, 120);
+  return foutp;
+}
 
-  // Parse the input for the testing environment
-  const bool test_natural = strcmpCased(test_environment, "natural", CaseSensitivity::NO);
-  
-  // Begin building the report file.  The variable name will be useful for reporting timings of
-  // each logarithmic spline table construction.
-  std::string var_name, unit_str, title_str;
+//-------------------------------------------------------------------------------------------------
+// Set a display variable name based on a spline parameters and any custom extensions.  This is
+// abstracted from the function below for accessibility throughout the benchmarking program.
+//
+// Arguments:
+//   target_form_in:      The form of the function being approximated
+//   indexing_method_in:  The means of deriving a spline table index out of the function argument
+//   basis_set_in:        The basis set for spline elements
+//   custom_extension:    Additional details to add to the variable name
+//-------------------------------------------------------------------------------------------------
+std::string setDisplayVariable(const LogSplineForm target_form_in,
+                               const TableIndexing indexing_method_in,
+                               const BasisFunctions basis_set_in,
+                               const std::string &custom_extension = std::string("")) {
+  std::string result;
   switch (target_form_in) {
   case LogSplineForm::ELEC_PME_DIRECT:
-    var_name += "u_";
-    unit_str = "kcal/mol";
-    title_str = "PME Energy";
+    result = "u_";
     break;
   case LogSplineForm::ELEC_PME_DIRECT_EXCL:
-    var_name += "ux_";
-    unit_str = "kcal/mol";
-    title_str = "PME Energy (with Exclusion)";
+    result = "ux_";
     break;
   case LogSplineForm::DELEC_PME_DIRECT:
-    var_name += "du_";
-    unit_str = "kcal/mol-A";
-    title_str = "PME Force";
+    result = "du_";
     break;
   case LogSplineForm::DELEC_PME_DIRECT_EXCL:
-    var_name += "dux_";
-    unit_str = "kcal/mol-A";
-    title_str = "PME Force (with Exclusion)";
+    result = "dux_";
     break;
   case LogSplineForm::CUSTOM:
     break;
   }
   switch (indexing_method_in) {
   case TableIndexing::ARG:
-    var_name += "r_";
-    title_str += ", Arg";
+    result += "r_";
     break;
   case TableIndexing::SQUARED_ARG:
-    var_name += "r2_";
-    title_str += ", Sq. Arg";
+    result += "r2_";
     break;
   case TableIndexing::ARG_OFFSET:
-    var_name += "ro_";
-    title_str += ", Arg Offset";
+    result += "ro_";
     break;
   case TableIndexing::SQ_ARG_OFFSET:
-    var_name += "r2o_";
-    title_str += ", Sq. Arg Offset";
+    result += "r2o_";
     break;
   }
   switch (basis_set_in) {
   case BasisFunctions::MIXED_FRACTIONS:
-    var_name += "frac";
-    title_str += ", Fraction Series";
+    result += "frac";
     break;
   case BasisFunctions::POLYNOMIAL:
-    var_name += "poly";
-    title_str += ", Polynomial";
+    result += "poly";
     break;
   }
+  result += custom_extension;
+  return result;
+}
 
-  // Compute the spline tables.
-  const double kcoul = stormm::symbols::charmm_gromacs_bioq;
-  const int table_construction = timer->addCategory("Log Spline Table, " + var_name);
-  timer->assignTime(0);
-  LogScaleSpline<T4> lgsp(target_form_in, ew_coeff, kcoul, mantissa_bits_in, 4096.0, 0.015625,
-                          indexing_method_in, basis_set_in, indexing_offset_in);
-  timer->assignTime(table_construction);
+//-------------------------------------------------------------------------------------------------
+// Set variable names and display text based on critical spline parameters.
+//
+// Arguments:
+//   lgsp:       The logarithmic spline which will be plotted
+//   var_name:   Name of the variable to store results in the display script (filled and
+//               returned)
+//   unit_str:   The units of relevant spline values and comparisons (filled and returned)
+//   title_str:  The title of any plot to display (filled and returned)
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void setDisplayStrings(const LogScaleSpline<T4> &lgsp, std::string *var_name,
+                       std::string *unit_str, std::string *title_str) {
+  *var_name = setDisplayVariable(lgsp.getForm(), lgsp.getIndexingMethod(), lgsp.getBasisSet());
+  switch (lgsp.getForm()) {
+  case LogSplineForm::ELEC_PME_DIRECT:
+    *unit_str = "kcal/mol";
+    *title_str = "PME Energy";
+    break;
+  case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+    *unit_str = "kcal/mol";
+    *title_str = "PME Energy (with Exclusion)";
+    break;
+  case LogSplineForm::DELEC_PME_DIRECT:
+    *unit_str = "kcal/mol-A";
+    *title_str = "PME Force";
+    break;
+  case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+    *unit_str = "kcal/mol-A";
+    *title_str = "PME Force (with Exclusion)";
+    break;
+  case LogSplineForm::CUSTOM:
+    break;
+  }
+  switch (lgsp.getIndexingMethod()) {
+  case TableIndexing::ARG:
+    title_str->append(", Arg");
+    break;
+  case TableIndexing::SQUARED_ARG:
+    title_str->append(", Sq. Arg");
+    break;
+  case TableIndexing::ARG_OFFSET:
+    title_str->append(", Arg Offset");
+    break;
+  case TableIndexing::SQ_ARG_OFFSET:
+    title_str->append(", Sq. Arg Offset");
+    break;
+  }
+  switch (lgsp.getBasisSet()) {
+  case BasisFunctions::MIXED_FRACTIONS:
+    title_str->append(", Fraction Series");
+    break;
+  case BasisFunctions::POLYNOMIAL:
+    title_str->append(", Polynomial");
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Evaluate a spline table at many points over its relevant range.
+//
+// Arguments:
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void computeSplineErrors(const LogScaleSpline<T4> &lgsp, const double min_analysis_range,
+                         const double max_analysis_range, const bool test_natural,
+                         std::vector<double> *rpts, std::vector<double> *flt_eval_mue,
+                         std::vector<double> *spl_eval_mue, Xoshiro256ppGenerator *xrs) {
   const double dscr = 0.00390625;
   const int npts = (max_analysis_range - min_analysis_range) / dscr;
-  std::vector<double> rpts(npts), dbl_eval(npts);
-  std::vector<double> flt_eval_means(npts), flt_eval_stdev(npts), flt_eval_mue(npts);
-  std::vector<double> spl_eval_means(npts), spl_eval_stdev(npts), spl_eval_mue(npts);
+  std::vector<double> dbl_eval(npts);
+  std::vector<double> flt_eval_means(npts), flt_eval_stdev(npts);
+  std::vector<double> spl_eval_means(npts), spl_eval_stdev(npts);
+  flt_eval_mue->resize(npts);
+  spl_eval_mue->resize(npts);
+  rpts->resize(npts);
+  double* flt_eval_mue_ptr = flt_eval_mue->data();
+  double* spl_eval_mue_ptr = spl_eval_mue->data();
+  for (int i = 0; i < npts; i++) {
+    flt_eval_mue_ptr[i] = 0.0;
+    spl_eval_mue_ptr[i] = 0.0;
+  }
+  double* rpts_ptr = rpts->data();
   const int ntrials = (test_natural) ? 32 : 1;
   std::vector<double> flt_eval(ntrials), spl_eval(ntrials);
-  const double bfac = 2.0 * ew_coeff / sqrt(stormm::symbols::pi);
+  const double bfac = 2.0 * lgsp.getEwaldCoefficient() / sqrt(stormm::symbols::pi);
+  const double kcoul = lgsp.getCoulombConstant();
   const float kcoulf = kcoul;
   const float bfacf = bfac;
+  const double ew_coeff = lgsp.getEwaldCoefficient();
   const float ew_coeff_f = ew_coeff;
   for (int i = 0; i < npts; i++) {
     const double r = min_analysis_range + (static_cast<double>(i) * dscr);
-    rpts[i] = r;
+    rpts_ptr[i] = r;
     const double ewr = ew_coeff * r;
-    switch (target_form_in) {
+    switch (lgsp.getForm()) {
     case LogSplineForm::ELEC_PME_DIRECT:
       dbl_eval[i] = kcoul * erfc(ew_coeff * r) / r;
       break;
@@ -228,7 +300,7 @@ void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
       }
       const float sp_r  = sqrtf(sp_r2);
       const float sp_ewr = ew_coeff_f * sp_r;
-      switch (target_form_in) {
+      switch (lgsp.getForm()) {
       case LogSplineForm::ELEC_PME_DIRECT:
         flt_eval[j] = kcoulf * erfcf(sp_ewr) / sp_r;
         break;
@@ -246,32 +318,19 @@ void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
       case LogSplineForm::CUSTOM:
         break;
       }
-      flt_eval_mue[i] += fabs(flt_eval[j] - dbl_eval[i]);
+      flt_eval_mue_ptr[i] += fabs(flt_eval[j] - dbl_eval[i]);
 
       // Evaluate the spline based on the way it is indexed.
-      switch (indexing_method_in) {
-      case TableIndexing::ARG:
-        spl_eval[j] = lgsp.evaluate(sp_r);
-        break;
-      case TableIndexing::SQUARED_ARG:
-        spl_eval[j] = lgsp.evaluate(sp_r2);
-        break;
-      case TableIndexing::ARG_OFFSET:
-        spl_eval[j] = lgsp.evaluate(sp_r + indexing_offset_in);
-        break;
-      case TableIndexing::SQ_ARG_OFFSET:
-        spl_eval[j] = lgsp.evaluate(sp_r2 + indexing_offset_in);
-        break;
-      }
-      spl_eval_mue[i] += fabs(spl_eval[j] - dbl_eval[i]);
+      spl_eval[j] = lgsp.evaluateByRealArg(sp_r);
+      spl_eval_mue_ptr[i] += fabs(spl_eval[j] - dbl_eval[i]);
     }
     if (test_natural) {
       flt_eval_means[i] = mean(flt_eval);
       flt_eval_stdev[i] = variance(flt_eval, VarianceMethod::STANDARD_DEVIATION);
       spl_eval_means[i] = mean(spl_eval);
       spl_eval_stdev[i] = variance(spl_eval, VarianceMethod::STANDARD_DEVIATION);
-      flt_eval_mue[i] /= static_cast<double>(ntrials);
-      spl_eval_mue[i] /= static_cast<double>(ntrials);
+      flt_eval_mue_ptr[i] /= static_cast<double>(ntrials);
+      spl_eval_mue_ptr[i] /= static_cast<double>(ntrials);
     }
     else {
       flt_eval_means[i] = flt_eval[0];
@@ -280,9 +339,59 @@ void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
       spl_eval_stdev[i] = 0.0;
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test a logarithmic spline table in terms of accuracy over a particular range.  Print the result
+// for display and processing in popular matrix algebra packages.
+//
+// Arguments:
+//   target_form_in:      Form of the function to spline
+//   ew_coeff:            Ewald coefficient defining the splined function
+//   min_analysis_range:  Minimum relevant range of the spline, for statistical error computation
+//   max_analysis_range:  Maximum relevant range of the spline, for statistical error computation
+//   mantissa_bits_in:    Number of bits after the exponent which become part of the table index
+//   indexing_method_in:  The indexing method for pulling out spline coefficients
+//   basis_set_in:        Basis functions for the spline table that will be constructed
+//   indexing_offset_in:  The real-valued offset for the spline argument
+//   test_environment:    Not a TestEnvironment object, but rather an indication of whether the
+//                        function argument is to be computed in float_32t or float_64t precision
+//   print_figure:        Flag to have the figure printed.  Set to FALSE to suppress display of the
+//                        results.
+//   xrs:                 Source of random numbers for range sampling
+//   output_file_name:    Name of the output file to write results into
+//   timer:               Tracks the time required to construct various splines
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
+                  const double min_analysis_range, const double max_analysis_range,
+                  const int mantissa_bits_in, const TableIndexing indexing_method_in,
+                  const BasisFunctions basis_set_in, const float indexing_offset_in,
+                  const std::string &test_environment, const bool print_figure,
+                  Xoshiro256ppGenerator *xrs, const std::string &output_file_name,
+                  StopWatch *timer) {
+  
+  // Compute the spline tables.
+  const int table_construction = timer->addCategory("Log Spline Table Building");
+  timer->assignTime(0);
+  LogScaleSpline<T4> lgsp(target_form_in, ew_coeff, stormm::symbols::charmm_gromacs_bioq,
+                          mantissa_bits_in, 4096.0, 0.015625, indexing_method_in, basis_set_in,
+                          0, indexing_offset_in);
+  timer->assignTime(table_construction);
+
+  // Begin building the report file.  The variable name will be useful for reporting timings of
+  // each logarithmic spline table construction.
+  std::string var_name, unit_str, title_str;
+  setDisplayStrings(lgsp, &var_name, &unit_str, &title_str);
+  std::ofstream foutp = prepOutputFile(output_file_name, lgsp);
+  std::vector<double> rpts, flt_eval_mue, spl_eval_mue;
+  const bool test_natural = strcmpCased(test_environment, "natural", CaseSensitivity::NO);
+  computeSplineErrors(lgsp, min_analysis_range, max_analysis_range, test_natural, &rpts,
+                      &flt_eval_mue, &spl_eval_mue, xrs);
 
   // Smooth the data and contribute to the output.
   const int ave_window = 8;
+  const int npts = flt_eval_mue.size();
   const int plot_pts = npts / ave_window;
   const double ave_wt = 1.0 / static_cast<double>(ave_window);
   std::vector<double> test_data(plot_pts * 3);
@@ -308,21 +417,135 @@ void analyzeTable(const LogSplineForm target_form_in, const double ew_coeff,
     var_name += "_natural";
     title_str += ", Natural Process";
   }
-  ReportTable test_tab(test_data, { "Distance, A", "Mean Unsigned Error, Spline",
-                                    "Mean Unsigned Error, FP32 Analytic" },
+  ReportTable test_tab(test_data, { "Distance, A", "log(10) Mean Unsigned Error, Spline",
+                                    "log(10) Mean Unsigned Error, FP32 Analytic" },
                        std::vector<int>(3, 12), var_name, 120);
   test_tab.printTable(&foutp, OutputSyntax::MATRIX_PKG);
-  std::string plot_command("figure;\nhold on;\n");
-  plot_command += "plot(" + var_name + "(:,1), " + var_name +
-                  "(:,3), 'color', [ 0.9 0.3 0.0 ], 'linewidth', 4);";
-  plot_command += "plot(" + var_name + "(:,1), " + var_name +
-                  "(:,2), 'color', [ 0.1 0.1 0.1 ], 'linewidth', 4);";
-  plot_command += "xlabel('Distance, A');\nylabel('log10 Mean Unsigned Error, " + unit_str +
-                  "');\n";
-  plot_command += "title('" + title_str + "');\n";
-  plot_command += "legend('Analytic FP32', 'Spline');\n";
-  plot_command += "set(gca, 'fontsize', 36);\n";
-  foutp.write(plot_command.data(), plot_command.size());  
+  if (print_figure) {
+    std::string plot_command("figure;\nhold on;\n");
+    plot_command += "plot(" + var_name + "(:,1), " + var_name + "(:,3), " +
+                    encodePsivantColor(PsivantColor::BLUE, OutputSyntax::MATRIX_PKG) +
+                    ", 'linewidth', 8);\n";
+    plot_command += "plot(" + var_name + "(:,1), " + var_name +
+                    "(:,2), 'color', [ 0.1 0.1 0.1 ], 'linewidth', 8);\n";
+    plot_command += "axis([ 0 12 -8 -3 ]);\n";
+    plot_command += "daspect([ 2.4 1 1 ]);\n";
+    plot_command += "xlabel('Distance, A');\nylabel('log10 Mean Unsigned Error, " + unit_str +
+                    "');\n";
+    plot_command += "title('" + title_str + "');\n";
+    plot_command += "legend('Analytic FP32', 'Spline');\n";
+    plot_command += "set(gca, 'fontsize', 36);\n";
+    foutp.write(plot_command.data(), plot_command.size());
+  }
+  foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute the effect of optimizations with different units of least place.  Descriptions of input
+// arguments follow from analyzeTable(), above, in addition to:
+//
+// Arguments:
+//   ulp_opt:   The number of units of least place to let each spline coefficient wander
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+void testUlpOptimization(const LogSplineForm target_form_in, const double ew_coeff,
+                         const double min_analysis_range, const double max_analysis_range,
+                         const int mantissa_bits_in, const TableIndexing indexing_method_in,
+                         const BasisFunctions basis_set_in, const float indexing_offset_in,
+                         const int max_ulp, Xoshiro256ppGenerator *xrs,
+                         const std::string &output_file_name, StopWatch *timer) {
+  const int table_construction = timer->addCategory("Log Spline Table Building");
+  timer->assignTime(0);
+  LogScaleSpline<T4> lgsp(target_form_in, ew_coeff, stormm::symbols::charmm_gromacs_bioq,
+                          mantissa_bits_in, 4096.0, 0.015625, indexing_method_in, basis_set_in,
+                          0, indexing_offset_in);
+  timer->assignTime(table_construction);
+
+  // Prepare to write the summary
+  std::string var_name, unit_str, title_str;
+  setDisplayStrings(lgsp, &var_name, &unit_str, &title_str);
+  std::ofstream foutp;
+  std::vector<double> rpts, flt_eval_mue, spl_eval_mue;
+  std::vector<double> test_data(2 * (max_ulp + 1));
+  var_name += "_idxb";
+  for (int i = 0; i <= max_ulp; i++) {
+    timer->assignTime(0);
+    LogScaleSpline<T4> lgsp(target_form_in, ew_coeff, stormm::symbols::charmm_gromacs_bioq,
+                            mantissa_bits_in, 4096.0, 0.015625, indexing_method_in, basis_set_in,
+                            i, indexing_offset_in);
+    timer->assignTime(table_construction);
+    computeSplineErrors(lgsp, min_analysis_range, max_analysis_range, false, &rpts,
+                        &flt_eval_mue, &spl_eval_mue, xrs);
+    if (i == 0) {
+      foutp = prepOutputFile(output_file_name, lgsp);
+    }
+    const int npts = spl_eval_mue.size();
+    double weighted_error = 0.0;
+    for (int j = 0; j < npts; j++) {
+      weighted_error += spl_eval_mue[j] * rpts[j] * rpts[j];
+    }
+    test_data[i] = i;
+    test_data[i + (max_ulp + 1)] = weighted_error / static_cast<double>(npts);
+  }
+  const std::vector<int> dec_places = { 0, 12 };
+  ReportTable test_tab(test_data, { "ULP Perturbations", "Weighted Mean Unsigned Error" },
+                       dec_places, var_name, 120);
+  test_tab.printTable(&foutp, OutputSyntax::MATRIX_PKG);
+  foutp.close();
+}
+
+//-------------------------------------------------------------------------------------------------
+// Tabulate the mean unsigned error inherent in logarithmic splines for different numbers of bits
+// taken out of the mantissa.
+//
+// Arguments:
+//   ew_coeff:          The Ewald coefficient selected for this round of tests
+//   xrs:               Source of random numbers for spline evaluations
+//   timer:             Tracks the time required to make various splines
+//   output_file_name:  Name of the output file into which to funnel results
+//-------------------------------------------------------------------------------------------------
+void testMantissaBits(const double ew_coeff, Xoshiro256ppGenerator *xrs, StopWatch *timer,
+                      const std::string &output_file_name) {
+  const int table_construction = timer->addCategory("Log Spline Table Building");
+  const std::vector<BasisFunctions> tbasis = { BasisFunctions::POLYNOMIAL,
+                                               BasisFunctions::MIXED_FRACTIONS };
+  const std::vector<TableIndexing> tindex = { TableIndexing::ARG, TableIndexing::SQUARED_ARG };
+  std::vector<double> test_data;
+  for (int i = 4; i <= 7; i++) {
+    test_data.push_back(i);
+  }
+  std::vector<double> rpts, flt_eval_mue, spl_eval_mue;
+  std::vector<std::string> legend;
+  legend.push_back(std::string("Mantissa Bits"));
+  for (size_t bidx = 0; bidx < tbasis.size(); bidx++) {
+    for (size_t tidx = 0; tidx < tindex.size(); tidx++) {
+      legend.push_back(getEnumerationName(tbasis[bidx]) + " / " +
+                       getEnumerationName(tindex[tidx]));
+      for (int i = 4; i <= 7; i++) {
+        timer->assignTime(0);
+        LogScaleSpline<float4> lgsp(LogSplineForm::DELEC_PME_DIRECT, ew_coeff,
+                                    stormm::symbols::charmm_gromacs_bioq, i, 4096.0, 0.015625,
+                                    tindex[tidx], tbasis[bidx], 0, 0.0);
+        timer->assignTime(table_construction);
+        computeSplineErrors(lgsp, 0.5, 12.0, false, &rpts, &flt_eval_mue, &spl_eval_mue, xrs);
+        const int npts = spl_eval_mue.size();
+        double weighted_error = 0.0;
+        for (int j = 0; j < npts; j++) {
+          weighted_error += spl_eval_mue[j] * rpts[j] * rpts[j];
+        }
+        test_data.push_back(weighted_error / static_cast<double>(npts));
+      }
+    }
+  }
+  std::ofstream foutp = openOutputFile(output_file_name, PrintSituation::APPEND, "open the output "
+                                       "for additional test recording");
+  std::string buffer("\n");
+  foutp.write(buffer.data(), buffer.size());
+  const std::vector<int> dec_places = { 0, 12, 12, 12, 12 };
+  const std::string var_name = "mantissa_dependence";
+  
+  ReportTable test_tab(test_data, legend, dec_places, var_name, 120);
+  test_tab.printTable(&foutp, OutputSyntax::MATRIX_PKG);
   foutp.close();
 }
 
@@ -345,10 +568,18 @@ int main(const int argc, const char* argv[]) {
   }
   
   // Take in additional inputs
+  const std::vector<TableIndexing> tidx_methods = { TableIndexing::SQUARED_ARG, TableIndexing::ARG,
+                                                    TableIndexing::SQ_ARG_OFFSET,
+                                                    TableIndexing::ARG_OFFSET };
+  const std::vector<LogSplineForm> lsfrm_methods = { LogSplineForm::DELEC_PME_DIRECT,
+                                                     LogSplineForm::DELEC_PME_DIRECT_EXCL };
+  std::vector<bool> disp_tidx(tidx_methods.size(), false);
+  std::vector<bool> disp_lsfrm(lsfrm_methods.size(), false);
   double cutoff = 10.0;
   double dsum_tol = 1.0e-7;
   int mantissa_bits = 5;
   int igseed = 322029317;
+  int max_ulp = 4;
   std::string output_file_name("erfc_table_results.m");
   for (int i = 0; i < argc; i++) {
     if (i < argc - 1 && strcmpCased(argv[i], "-cut", CaseSensitivity::NO)) {
@@ -396,6 +627,38 @@ int main(const int argc, const char* argv[]) {
     else if (i < argc - 1 && strcmpCased(argv[i], "-o", CaseSensitivity::YES)) {
       output_file_name = std::string(argv[i + 1]);
     }
+    else if (i < argc - 1 && strcmpCased(argv[i], "-ulp", CaseSensitivity::NO)) {
+      if (verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER)) {
+        max_ulp = stoi(std::string(argv[i + 1]));
+      }
+      else {
+        rtErr("The -ulp optional keyword must be followed by an integer.", "erfc_tables");
+      }
+    }
+    else if (i < argc - 1 && strcmpCased(argv[i], "-display")) {
+      try {
+        const LogSplineForm test_lsfrm = translateLogSplineForm(argv[i + 1]);
+        for (size_t j = 0; j < lsfrm_methods.size(); j++) {
+          if (test_lsfrm == lsfrm_methods[j]) {
+            disp_lsfrm[j] = true;
+          }
+        }
+      }
+      catch (std::runtime_error) {
+        try {
+          const TableIndexing test_tidx = translateTableIndexing(argv[i + 1]);
+          for (size_t j = 0; j < tidx_methods.size(); j++) {
+            if (test_tidx == tidx_methods[j]) {
+              disp_tidx[j] = true;
+            }
+          }
+        }
+        catch (std::runtime_error) {
+          rtWarn(std::string(argv[i + 1]) + " was not recognized as any of the LogScaleSpline "
+                 "functions or indexing methods covered by these benchmarks.", "main");
+        }
+      }
+    }
   }
 
   // Initialize the random number generator.
@@ -410,12 +673,6 @@ int main(const int argc, const char* argv[]) {
   
   // Compute the Ewald coefficient.
   const double ew_coeff = ewaldCoefficient(cutoff, dsum_tol);
-  const std::vector<TableIndexing> tidx_methods = { TableIndexing::SQUARED_ARG,
-                                                    TableIndexing::ARG,
-                                                    TableIndexing::SQ_ARG_OFFSET,
-                                                    TableIndexing::ARG_OFFSET };
-  const std::vector<LogSplineForm> lsfrm_methods = { LogSplineForm::DELEC_PME_DIRECT,
-                                                     LogSplineForm::DELEC_PME_DIRECT_EXCL };
   for (size_t i = 0; i < tidx_methods.size(); i++) {
     float idx_offset;
     switch (tidx_methods[i]) {
@@ -429,20 +686,109 @@ int main(const int argc, const char* argv[]) {
       break;
     }
     for (size_t j = 0; j < lsfrm_methods.size(); j++) {
-      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
-                           tidx_methods[i], BasisFunctions::POLYNOMIAL, idx_offset, "natural",
-                           &xrs, output_file_name, &timer);
-      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
-                           tidx_methods[i], BasisFunctions::POLYNOMIAL, idx_offset, "lab",
-                           &xrs, output_file_name, &timer);
-      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
-                           tidx_methods[i], BasisFunctions::MIXED_FRACTIONS, idx_offset, "natural",
-                           &xrs, output_file_name, &timer);
-      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
-                           tidx_methods[i], BasisFunctions::MIXED_FRACTIONS, idx_offset, "lab",
-                           &xrs, output_file_name, &timer);
+      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits, tidx_methods[i],
+                           BasisFunctions::POLYNOMIAL, idx_offset, "natural",
+                           disp_tidx[i] && disp_lsfrm[j], &xrs, output_file_name, &timer);
+      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits, tidx_methods[i],
+                           BasisFunctions::POLYNOMIAL, idx_offset, "lab",
+                           disp_tidx[i] && disp_lsfrm[j], &xrs, output_file_name, &timer);
+      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits, tidx_methods[i],
+                           BasisFunctions::MIXED_FRACTIONS, idx_offset, "natural",
+                           disp_tidx[i] && disp_lsfrm[j], &xrs, output_file_name, &timer);
+      analyzeTable<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits, tidx_methods[i],
+                           BasisFunctions::MIXED_FRACTIONS, idx_offset, "lab",
+                           disp_tidx[i] && disp_lsfrm[j], &xrs, output_file_name, &timer);
+
+      // Only perform ULP optimization for the non-excluded force, ARG or SQUARED_ARG indexing
+      switch (lsfrm_methods[j]) {
+      case LogSplineForm::ELEC_PME_DIRECT:
+      case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+      case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+      case LogSplineForm::CUSTOM:
+        continue;
+      case LogSplineForm::DELEC_PME_DIRECT:
+        break;
+      }
+      switch (tidx_methods[i]) {
+      case TableIndexing::ARG_OFFSET:
+      case TableIndexing::SQ_ARG_OFFSET:
+        continue;
+      case TableIndexing::ARG:
+      case TableIndexing::SQUARED_ARG:
+        break;
+      }
+      testUlpOptimization<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
+                                  tidx_methods[i], BasisFunctions::POLYNOMIAL, idx_offset, max_ulp,
+                                  &xrs, output_file_name, &timer);
+      testUlpOptimization<float4>(lsfrm_methods[j], ew_coeff, 0.5, 12.0, mantissa_bits,
+                                  tidx_methods[i], BasisFunctions::MIXED_FRACTIONS, idx_offset,
+                                  max_ulp, &xrs, output_file_name, &timer);
     }
   }
+
+  // Aggregate the results of ULP optimization tests
+  foutp = openOutputFile(output_file_name, PrintSituation::APPEND, "prime the output file for "
+                         "printing");
+  std::string buffer;
+  const std::vector<BasisFunctions> spline_basis = { BasisFunctions::POLYNOMIAL,
+                                                     BasisFunctions::MIXED_FRACTIONS };
+  const std::vector<PsivantColor> spline_colors = { PsivantColor::BLACK, PsivantColor::RED,
+                                                    PsivantColor::YELLOW, PsivantColor::PURPLE };
+  for (size_t i = 0; i < lsfrm_methods.size(); i++) {
+    switch (lsfrm_methods[i]) {
+    case LogSplineForm::ELEC_PME_DIRECT:
+    case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+    case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+    case LogSplineForm::CUSTOM:
+      continue;
+    case LogSplineForm::DELEC_PME_DIRECT:
+      break;
+    }
+    buffer = "\nfigure;\nhold on;\n";
+    foutp.write(buffer.data(), buffer.size());
+    std::string legend("legend(");
+    int nlegend_entry = 0;
+    for (size_t bss_con = 0; bss_con < spline_basis.size(); bss_con++) {
+      for (size_t j = 0; j < tidx_methods.size(); j++) {
+        switch (tidx_methods[j]) {
+        case TableIndexing::ARG:
+        case TableIndexing::SQUARED_ARG:
+          break;
+        case TableIndexing::ARG_OFFSET:
+        case TableIndexing::SQ_ARG_OFFSET:
+          continue;
+        }
+        const std::string var_name = setDisplayVariable(lsfrm_methods[i], tidx_methods[j],
+                                                        spline_basis[bss_con], "_idxb");
+        buffer = "plot(" + var_name + "(:,1), " + var_name + "(:,2), " +
+                 encodePsivantColor(spline_colors[nlegend_entry], OutputSyntax::MATRIX_PKG) +
+                 ", 'linewidth', 8);\n"; 
+        buffer += "plot(" + var_name + "(:,1), " + var_name + "(:,2), '.', 'markersize', 48, " +
+                  encodePsivantColor(spline_colors[nlegend_entry], OutputSyntax::MATRIX_PKG) +
+                  ", 3);\n"; 
+        buffer += "plot(" + var_name + "(:,1), " + var_name + "(:,2), 'w.', 'markersize', 32);\n"; 
+        foutp.write(buffer.data(), buffer.size());
+        if (nlegend_entry == 0) {
+          legend += "'" + getEnumerationName(tidx_methods[j]) + ", " +
+                    getEnumerationName(spline_basis[bss_con]) + "'";
+        }
+        else {
+          legend += ", '" + getEnumerationName(tidx_methods[j]) + ", " +
+                    getEnumerationName(spline_basis[bss_con]) + "'";
+        }
+        nlegend_entry += 1;
+      }
+    }
+    buffer = "xlabel('ULP Optimization Range');\nylabel('Error, kcal/mol-A');\n";
+    buffer += "axis([ 0 " + std::to_string(max_ulp) + " 1.0e-6 4.0e-6 ]);\n";
+    buffer += "daspect([ 2.0 1.0e-6 1.0 ]);\n";
+    legend += ");\n";
+    foutp.write(legend.data(), legend.size());
+    buffer += "set(gca, 'fontsize', 36);\nlegend('Location', 'southeastoutside');\n";
+    foutp.write(buffer.data(), buffer.size());
+  }
+  foutp.close();
+  testMantissaBits(ew_coeff, &xrs, &timer, output_file_name);
   
   // Create some cell grids out of periodic systems and compute direct-space interactions.  Test
   // the spline tables in "real-world" applications.
@@ -460,7 +806,6 @@ int main(const int argc, const char* argv[]) {
     const int na_cell = cell_a / half_cutoff;
     const int nb_cell = cell_b / half_cutoff;
     const int nc_cell = cell_c / half_cutoff;
-    
   }
   
   // Print results

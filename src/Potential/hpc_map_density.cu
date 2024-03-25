@@ -11,12 +11,6 @@
 namespace stormm {
 namespace energy {
 
-using numerics::max_int_accumulation;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
-
 #include "Accelerator/syncwarp.cui"
 #include "Math/bspline.cui"
 #include "Numerics/accumulation.cui"
@@ -34,11 +28,9 @@ using numerics::max_llint_accumulation_f;
 // loop and to take all accumulation buffers into __shared__.  Begin with the double-precision
 // kernels.
 #define ACC_MODE_DOUBLE
-#define STORAGE_VOLUME 1920
+#define CALC_MODE_DOUBLE
 #define TCALC double
 #define TCALC2 double2
-#  define MAPPING_BLOCKS 4
-#  define DENSITY_SPREADING_THREADS 256
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
@@ -121,18 +113,14 @@ using numerics::max_llint_accumulation_f;
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#  undef DENSITY_SPREADING_THREADS
-#  undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
+#undef CALC_MODE_DOUBLE
 #undef ACC_MODE_DOUBLE
   
-#define STORAGE_VOLUME 2880
+#define CALC_MODE_DOUBLE
 #define TCALC double
 #define TCALC2 double2
-#  define MAPPING_BLOCKS 4
-#  define DENSITY_SPREADING_THREADS 256
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
@@ -216,40 +204,30 @@ using numerics::max_llint_accumulation_f;
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#  undef DENSITY_SPREADING_THREADS
-#  undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
-
+#undef CALC_MODE_DOUBLE
+  
 // Define the single-precision __shared__ memory density accumulation kernels.
 #define ACC_MODE_DOUBLE
-#define STORAGE_VOLUME 1920
 #define TCALC float
 #define TCALC2 float2
-#  define MAPPING_BLOCKS 4
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif4dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif5dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif6dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -257,25 +235,19 @@ using numerics::max_llint_accumulation_f;
 #  define T4 llint4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif4dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif5dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif6dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
@@ -284,25 +256,19 @@ using numerics::max_llint_accumulation_f;
 #  define TMAT float
 #  define T4 float4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf4dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf5dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf6dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -310,62 +276,46 @@ using numerics::max_llint_accumulation_f;
 #  define T4 double4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf4dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf5dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf6dMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
 #undef ACC_MODE_DOUBLE
   
-#define STORAGE_VOLUME 2880
 #define TCALC float
 #define TCALC2 float2
-#  define MAPPING_BLOCKS 4
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif4sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif5sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif6sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -373,25 +323,19 @@ using numerics::max_llint_accumulation_f;
 #  define T4 llint4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif4sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif5sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif6sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
@@ -400,25 +344,19 @@ using numerics::max_llint_accumulation_f;
 #  define TMAT float
 #  define T4 float4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf4sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf5sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf6sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -426,44 +364,34 @@ using numerics::max_llint_accumulation_f;
 #  define T4 double4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf4sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf5sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf6sMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
 
 // Define additional __shared__ accumulation kernels for use when the accumulation can be
 // expected to stay within one 32- or 64-bit accumulator, not requiring the overflow bits.
 #define SHORT_FORMAT_ACCUMULATION
 #define ACC_MODE_DOUBLE
-#define STORAGE_VOLUME 2880
+#define CALC_MODE_DOUBLE
 #define TCALC double
 #define TCALC2 double2
-#  define MAPPING_BLOCKS 4
-#  define DENSITY_SPREADING_THREADS 256
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
@@ -546,18 +474,14 @@ using numerics::max_llint_accumulation_f;
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#  undef DENSITY_SPREADING_THREADS
-#  undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
+#undef CALC_MODE_DOUBLE
 #undef ACC_MODE_DOUBLE
   
-#define STORAGE_VOLUME 5760
+#define CALC_MODE_DOUBLE
 #define TCALC double
 #define TCALC2 double2
-#  define MAPPING_BLOCKS 4
-#  define DENSITY_SPREADING_THREADS 256
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
@@ -640,48 +564,30 @@ using numerics::max_llint_accumulation_f;
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#  undef DENSITY_SPREADING_THREADS
-#  undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
-
+#undef CALC_MODE_DOUBLE
+  
 // Define the single-precision __shared__ memory density accumulation kernels.
 #define ACC_MODE_DOUBLE
-#define STORAGE_VOLUME 2880
 #define TCALC float
 #define TCALC2 float2
-#  ifdef STORMM_USE_CUDA
-#    if (__CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800)
-#      define MAPPING_BLOCKS 3
-#    else
-#      define MAPPING_BLOCKS 4
-#    endif
-#  else
-#    define MAPPING_BLOCKS 4
-#  endif
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif4dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif5dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif6dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -689,25 +595,19 @@ using numerics::max_llint_accumulation_f;
 #  define T4 llint4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif4dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif5dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif6dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
@@ -716,25 +616,19 @@ using numerics::max_llint_accumulation_f;
 #  define TMAT float
 #  define T4 float4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf4dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf5dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf6dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -742,70 +636,46 @@ using numerics::max_llint_accumulation_f;
 #  define T4 double4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf4dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf5dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf6dsfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
 #undef ACC_MODE_DOUBLE
   
-#define STORAGE_VOLUME 5760
 #define TCALC float
 #define TCALC2 float2
-#  ifdef STORMM_USE_CUDA
-#    if (__CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800)
-#      define MAPPING_BLOCKS 3
-#    else
-#      define MAPPING_BLOCKS 4
-#    endif
-#  else
-#    define MAPPING_BLOCKS 4
-#  endif
 #  define TMAT int
 #  define T4 int4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif4ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif5ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsif6ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -813,25 +683,19 @@ using numerics::max_llint_accumulation_f;
 #  define T4 llint4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif4ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif5ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlif6ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
@@ -840,25 +704,19 @@ using numerics::max_llint_accumulation_f;
 #  define TMAT float
 #  define T4 float4
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf4ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf5ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAsrf6ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef T4
 #  undef TMAT
@@ -866,34 +724,26 @@ using numerics::max_llint_accumulation_f;
 #  define T4 double4
 #  define TMAT_IS_LONG
 #    define ORDER 4
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf4ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 5
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf5ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #    define ORDER 6
-#      define DENSITY_SPREADING_THREADS 320
 #      define KERNEL_NAME kSAlrf6ssfMapDensity
 #        include "map_density_shracc.cui"
 #      undef KERNEL_NAME
-#      undef DENSITY_SPREADING_THREADS
 #    undef ORDER
 #  undef TMAT_IS_LONG
 #  undef T4
 #  undef TMAT
 #  undef TMAT_IS_REAL
-#undef MAPPING_BLOCKS
 #undef TCALC2
 #undef TCALC
-#undef STORAGE_VOLUME
 #undef SHORT_FORMAT_ACCUMULATION
 
 //-------------------------------------------------------------------------------------------------
@@ -1464,98 +1314,82 @@ extern cudaFuncAttributes queryShrAccQMapKernelRequirements(const PrecisionModel
 #define TCALC_IS_DOUBLE
 #  define TMAT int
 #  define T4 int4
-#    define MAPPING_BLOCKS 5
-#      define ORDER 4
-#        define KERNEL_NAME ksid4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 4
-#      define ORDER 5
-#        define KERNEL_NAME ksid5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#      define ORDER 6
-#        define KERNEL_NAME ksid6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME ksid4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME ksid5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME ksid6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT
 #  define TMAT llint
 #  define TMAT_IS_LONG
 #  define T4 llint4
-#    define MAPPING_BLOCKS 5
-#      define ORDER 4
-#        define KERNEL_NAME klid4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 4
-#      define ORDER 5
-#        define KERNEL_NAME klid5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#      define ORDER 6
-#        define KERNEL_NAME klid6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME klid4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME klid5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME klid6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT_IS_LONG
 #  undef TMAT
 #  define TMAT_IS_REAL
 #  define TMAT float
 #  define T4 float4
-#    define MAPPING_BLOCKS 5
-#      define ORDER 4
-#        define KERNEL_NAME ksrd4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 4
-#      define ORDER 5
-#        define KERNEL_NAME ksrd5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#      define ORDER 6
-#        define KERNEL_NAME ksrd6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME ksrd4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME ksrd5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME ksrd6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT
 #  define TMAT double
 #  define TMAT_IS_LONG
 #  define T4 double4
-#    define MAPPING_BLOCKS 5
-#      define ORDER 4
-#        define KERNEL_NAME klrd4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 4
-#      define ORDER 5
-#        define KERNEL_NAME klrd5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#      define ORDER 6
-#        define KERNEL_NAME klrd6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME klrd4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME klrd5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME klrd6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT_IS_LONG
 #  undef TMAT
@@ -1569,106 +1403,82 @@ extern cudaFuncAttributes queryShrAccQMapKernelRequirements(const PrecisionModel
 #define TCALC2 float2
 #  define TMAT int
 #  define T4 int4
-#    define MAPPING_BLOCKS 6
-#      define ORDER 4
-#        define KERNEL_NAME ksif4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 5
-#        define KERNEL_NAME ksif5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 6
-#        define KERNEL_NAME ksif6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME ksif4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME ksif5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME ksif6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT
 #  define TMAT llint
 #  define TMAT_IS_LONG
 #  define T4 llint4
-#    define MAPPING_BLOCKS 6
-#      define ORDER 4
-#        define KERNEL_NAME klif4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 5
-#        define KERNEL_NAME klif5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 6
-#        define KERNEL_NAME klif6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME klif4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME klif5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME klif6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT_IS_LONG
 #  undef TMAT
 #  define TMAT_IS_REAL
 #  define TMAT float
 #  define T4 float4
-#    define MAPPING_BLOCKS 6
-#      define ORDER 4
-#        define KERNEL_NAME ksrf4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 5
-#        define KERNEL_NAME ksrf5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 6
-#        define KERNEL_NAME ksrf6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME ksrf4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME ksrf5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME ksrf6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT
 #  define TMAT double
 #  define TMAT_IS_LONG
 #  define T4 double4
-#    define MAPPING_BLOCKS 6
-#      define ORDER 4
-#        define KERNEL_NAME klrf4MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 5
-#        define KERNEL_NAME klrf5MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
-#    define MAPPING_BLOCKS 5
-#      define ORDER 6
-#        define KERNEL_NAME klrf6MapDensity
-#        include "map_density.cui"
-#        undef KERNEL_NAME
-#      undef ORDER
-#    undef MAPPING_BLOCKS
+#    define ORDER 4
+#      define KERNEL_NAME klrf4MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 5
+#      define KERNEL_NAME klrf5MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
+#    define ORDER 6
+#      define KERNEL_NAME klrf6MapDensity
+#      include "map_density.cui"
+#      undef KERNEL_NAME
+#    undef ORDER
 #  undef T4
 #  undef TMAT_IS_LONG
 #  undef TMAT

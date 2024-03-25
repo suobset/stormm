@@ -727,7 +727,7 @@ private:
   /// The number of atoms in each cell is limited by the cell base capacity and, beyond that, the
   /// number of cells along the simulation box A axis which can collectively buffer a transient
   /// high particle count.  These arrays are each total_cell_count in length and detail, for the
-  /// PRIMARY and ALTERNATE images, the starting point of atoms in the image (the "x" member)
+  /// WHITE and BLACK images, the starting point of atoms in the image (the "x" member)
   /// followed by the total number of atoms in the cell (the high 16 bits of the "y" member) and
   /// the system index (the low 16 bits of the "y" member).
   /// \{
@@ -787,8 +787,8 @@ private:
   /// and going.  The key is to manage this flow, and conserve work done on neighbor lists between
   /// cells from step to step.  The following two arrays manage atoms entering and leaving each
   /// cell.  Each migrating atom will be catalogged in both arrays.  The process will be to list
-  /// the indices of atoms in the other image, i.e. the PRIMARY image entering and leaving
-  /// vestibules reference atom indices in the ALTERNATE image, and vice-versa.  The "x" member
+  /// the indices of atoms in the other image, i.e. the WHITE image entering and leaving
+  /// vestibules reference atom indices in the BLACK image, and vice-versa.  The "x" member
   /// of each tuple holds the index in question while the "y" member holds the index of the cell
   /// that is being entered or left.  Each entering and leaving array will be sized based on the
   /// expected movement of atoms and the density of atoms in each cell.

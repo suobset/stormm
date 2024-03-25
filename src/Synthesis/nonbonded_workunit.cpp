@@ -620,7 +620,7 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
   const int n_atom_blocks = (natom + small_block_size - 1) / small_block_size;
   const bool compute_rng = ((init_code >> 8) > 0);
   if (compute_rng && gpu.getGpuSupported()) {
-
+    
     // A non-null GPU was detected and will affect the profile of the workload.  If there are
     // enough blocks in the launch grid relative to the number of work units, expand the list of
     // non-bonded work units with a complement devoted to computing random numbers.
@@ -635,16 +635,16 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
       for (int i = 0; i < n_atom_blocks; i++) {
         res_ptr[i] = blank_nbwu;
       }
+      nnbwu += n_atom_blocks;
     }
-    nnbwu += n_atom_blocks;
   }
   n_task += compute_rng;
   if (n_task * n_atom_blocks < nnbwu) {
-
+    
     // If there are enough non-bonded work units to distribute just one set of initializations to
     // each, do each task individually, starting with the random number computations (placing these
     // at the front of the kernel gives more time for whatever queues the write instructions go
-    // into to drain by the end of the kernel.
+    // into to drain by the end of the kernel).
     int atom_idx = 0;
     int nbwu_idx = 0;
     int work_code = (init_code & 0xff00);
@@ -657,7 +657,7 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
         nbwu_idx++;
       }
     }
-
+    
     // Now distribute the initialization / refresh operations.
     work_code = 1;
     for (int i = 0; i < 8; i++) {
@@ -675,7 +675,7 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
     }
   }
   else {
-
+    
     // Otherwise, do not consider the middle-ground cases where the work might be more evenly
     // distributed by assigning some combinations of tasks to various work units.  Every work
     // unit gets an assignment to initialize a stretch of atoms according to the same work code.
@@ -683,7 +683,8 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
     // initialization work thin, not taking this path.
     int work_code = (init_code & 0xffff);
     if (work_code > 0) {
-      const int atom_blocks_per_wu = std::max((natom / small_block_size) / nnbwu, 1);
+      const int atom_blocks_per_wu = std::max((((natom + small_block_size - 1) /
+                                                small_block_size) + nnbwu - 1) / nnbwu, 1);
       const int atoms_per_wu = atom_blocks_per_wu * small_block_size;
       int atom_idx = 0;
       int nbwu_idx = 0;
@@ -745,7 +746,7 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
     result = enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts,
                                          atom_offsets);
   }
-
+  
   // Add initialization instructions and return the result
   const int init_code = nonbondedWorkUnitInitCode(init_request, random_cache_depth);
   distributeInitializationRanges(&result, padded_natom, init_code, gpu);

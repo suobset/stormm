@@ -56,6 +56,25 @@ enum class OutputSyntax {
                ///<   with no syntax or other commands associated with plotting programs
 };
 
+/// \brief List the critical points in the molecular dynamics time step.
+enum class IntegrationStage {
+  BEGIN,              ///< Point reached prior to non-bonded force calculations (this is the
+                      ///<   beginning of the step, but for practical purposes in a repeating MD
+                      ///<   cycle this will conincide with the SHAKE or COORDINATE_UPDATE time
+                      ///<   points depending on the use of constraints)
+  NONBONDED_FORCE,    ///< Point reached after the non-bonded interactions have been computed
+  ADDED_FORCE,        ///< Point reached after additional forces have been computed (the forces
+                      ///<   on all atoms are expected to be accumulated in the order
+                      ///<   non-bonded >> added >> bonded)
+  BONDED_FORCE,       ///< Point reached after the bonded interactions have been computed
+  VELOCITY_UPDATE,    ///< Point reached after adjusting velocities by half of the accumulated
+                      ///<   forces with a Verlet integrator
+  RATTLE,             ///< Point reached after applying Velocity constraints
+  COORDINATE_UPDATE,  ///< Point reached after the coordinate and second-half velocity update
+  SHAKE               ///< Point reached after geometric constraints are applied to all atoms
+                      ///<   of the system
+};
+
 /// \brief Possible formats for grid file output.  Descriptions of some enumerations follow from
 ///        the OutputSyntax enumerator above.
 enum class GridFileSyntax {
@@ -110,6 +129,21 @@ enum class SurfaceRender {
   SCAFFOLD  ///< The surface has both opaque or (semi-transparent) faces and colored edges
 };
 
+/// \brief List a series of colors.
+enum class PsivantColor {
+  BLACK,         ///< Black,  RGB weights [ 0.120, 0.120, 0.120 ], hexcode #111c24
+  RED,           ///< Red,    RGB weights [ 0.878, 0.000, 0.204 ], hexcode #e00034
+  YELLOW,        ///< Blue,   RGB weights [ 0.000, 0.478, 0.788 ], hexcode #fdc82f
+  BLUE,          ///< Yellow, RGB weights [ 0.992, 0.784, 0.184 ], hexcode #007ac9
+  PURPLE,        ///< Purple, RGB weights [ 0.557, 0.145, 0.553 ], hexcode #8e258d
+  GREY,          ///< Grey,   RGB weights [ 0.651, 0.651, 0.651 ], hexcode #a6a6a6
+  LIGHT_RED,     ///< Light red,    RGB weights [ 1.000, 0.553, 0.655 ], hexcode #ff8da7
+  LIGHT_YELLOW,  ///< Light yellow, RGB weights [ 0.996, 0.914, 0.675 ], hexcode #fee9ac
+  LIGHT_BLUE,    ///< Light blue,   RGB weights [ 0.514, 0.808, 1.000 ], hexcode #83ceff
+  LIGHT_PURPLE,  ///< Light purple, RGB weights [ 0.894, 0.588, 0.890 ], hexcode #e496e3
+  WHITE          ///< White,        RGB weights [ 1.000, 1.000, 1.000 ], hexcode #ffffff
+};
+
 /// \brief Styles of plotting lines, valid in a range of visualization software.
 enum class LinePlotStyle {
   SOLID,  ///< The line is solid with whatever weight
@@ -132,6 +166,7 @@ constexpr int maximum_roman_numeral = 25;
 /// \{
 std::string getEnumerationName(OutputScope input);
 std::string getEnumerationName(OutputSyntax input);
+std::string getEnumerationName(IntegrationStage input);
 std::string getEnumerationName(GridFileSyntax input);
 std::string getEnumerationName(SectionComponent input);
 std::string getEnumerationName(ListEnumeration input);
@@ -139,8 +174,15 @@ std::string getEnumerationName(TextEnds input);
 std::string getEnumerationName(TableContentKind input);
 std::string getEnumerationName(SurfaceRender input);
 std::string getEnumerationName(LinePlotStyle input);
+std::string getEnumerationName(PsivantColor input);
 /// \}
 
+/// \brief Translate a human-readable string indicating the output scope into the appropriate
+///        enumeration.
+///
+/// \param input  The output scope to translate
+OutputScope translateOutputScope(const std::string &input);
+  
 /// \brief Translate various directives for a surface rendering method into their corresponding
 ///        enumerations.
 ///
@@ -162,6 +204,12 @@ LinePlotStyle translateLinePlotStyle(const std::string &input);
 /// \param x       The integer to validate
 /// \param policy  The degree of fault tolerance
 const std::string& toRoman(int x, ExceptionResponse policy = ExceptionResponse::DIE);
+
+/// \brief Write a Psivant color for plotting in one of the supported output formats.
+///
+/// \param color   The color to display
+/// \param syntax  The plotting format to display the color in
+std::string encodePsivantColor(PsivantColor color, OutputSyntax syntax);
   
 } // namespace review
 } // namespace stormm

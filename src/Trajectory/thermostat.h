@@ -8,7 +8,18 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Constants/scaling.h"
+#include "Constants/symbol_values.h"
+#include "DataTypes/common_types.h"
+#include "Math/vector_ops.h"
 #include "Namelists/nml_dynamics.h"
+#include "Reporting/error_format.h"
+#include "Structure/structure_enumerators.h"
+#include "Synthesis/atomgraph_synthesis.h"
+#include "Synthesis/synthesis_cache_map.h"
+#include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "trajectory_enumerators.h"
 
 namespace stormm {
 namespace trajectory {
@@ -17,90 +28,29 @@ using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
+using data_types::isSignedIntegralScalarType;
+using namelist::default_andersen_frequency;
+using namelist::default_langevin_frequency;
+using namelist::default_rattle_tolerance;
+using namelist::default_simulation_temperature;
+using namelist::default_thermostat_cache_depth;
+using namelist::default_thermostat_random_seed;
+using namelist::default_tstat_evo_window_start;
+using namelist::default_tstat_evo_window_end;
+using namelist::DynamicsControls;
+using namelist::maximum_thermostat_cache_depth;
+using stmath::findBin;
+using structure::ApplyConstraints;
+using symbols::boltzmann_constant_gafs;
+using symbols::boltzmann_constant_gafs_f;
+using synthesis::AtomGraphSynthesis;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisWriter;
+using synthesis::SyAtomUpdateKit;
+using synthesis::SynthesisCacheMap;
+using synthesis::SystemCache;
+using topology::ChemicalDetailsKit;
   
-/// \brief Enumerate the various thermostats available for simulations
-enum class ThermostatKind {
-  NONE, ANDERSEN, LANGEVIN, BERENDSEN
-};
-
-/// \brief The maximum depth that the random number cache can take, to guard against excessive
-///        memory use.
-constexpr int maximum_random_cache_depth = 15;
-
-/// \brief The default cache depth for a thermostat will give high efficiency in the number of
-///        write transactions issued for the 256-bit read required: eight bytes written for every
-///        byte read.
-constexpr int default_thermostat_cache_depth = 2;
-
-/// \brief The default Langevin thermostat collision frequency, in events per femtosecond.
-constexpr double default_langevin_frequency = 0.0;
-  
-/// \brief The default simulation temperature, chemistry's standard temperature and pressure (in
-///        units of Kelvin).
-constexpr double default_simulation_temperature = 298.15;
-
-/// \brief The default random seed for thermostats.  This need not be the same random seed used
-///        for any other application--in fact, having it be distinct guards against generators in
-///        other parts of the program re-using the same sequence.
-constexpr int default_thermostat_random_seed = 1329440765;
-
-/// \brief Read-only abstract for the Thermostat object.
-template <typename T> struct ThermostatReader {
-
-  /// \brief The constructor takes the usual list of parent object attributes with pointers
-  ///        applicable on either the CPU host or GPU device.
-  ThermostatReader(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
-                   int depth_in, int init_evolution_in, int end_evolution_in,
-                   bool common_temperature_in, T init_temperature_in, T final_temperature_in,
-                   T dt_factor_in, T gamma_ln_in, T ln_implicit_in, T ln_explicit_in,
-                   const T* init_temperatures_in, const T* final_temperatures_in,
-                   const ullint2* state_xy_in, const ullint2* state_zw_in, const T* cache_in);
-
-  /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
-  ///        of const member variables.
-  /// \{
-  ThermostatReader(const ThermostatReader &original) = default;
-  ThermostatReader(ThermostatReader &&original) = default;
-  /// \}
-  
-  const ThermostatKind kind;      ///< The type of this thermostat, i.e. Andersen
-  const int natom;                ///< Number of atoms controlled by this thermostat
-  const int padded_natom;         ///< The number of atoms padded by the warp size
-  const int step;                 ///< Current step number of the simulation
-  const int depth;                ///< Depth of the cache (the true depth will be three times
-                                  ///<   higher, to serve each atom with Cartesian X, Y, and Z
-                                  ///<   influences)
-  const int init_evolution;       ///< The final step at which the thermostat target temperatures
-                                  ///<   come from init_temperature or the eponymous array, and
-                                  ///<   the first step at which temperature targets begin to
-                                  ///<   shift linearly towards final_temperature(s)
-  const int end_evolution;        ///< The first step at which the thermostat begins to target
-                                  ///<   final_temperature(s)
-  const bool common_temperature;  ///< Indicates whether the initial and final temperatures
-                                  ///<   targeted by this thermostat are similar across all atoms
-  const T init_temperature;       ///< Initial target temperature, common to all atoms (if it is
-                                  ///<   applicable)
-  const T final_temperature;      ///< Final target temperature, common to all atoms
-  const T dt_factor;              ///< The time step, scaled to translate forces in in kcal/mol-A
-                                  ///<   into movements in Angstroms per fs or Angstroms
-  const T gamma_ln;               ///< The "Gamma" factor for the Langevin thermostat, giving the
-                                  ///<   number of collisions per femtosecond scaled by the
-                                  ///<   conversion factor for taking forces in kcal/mol-A into
-                                  ///<   Angstroms per femtosecond.
-  const T ln_implicit;            ///< Implicit Langevin factor, applied in the first velocity
-                                  ///<   Verlet update after new forces have been computed
-  const T ln_explicit;            ///< Explicit Langevin factor, applied in the second velocity
-                                  ///<   Verlet update as new coordinates are determined
-  const T* init_temperatures;     ///< Array of initial target temperatures for each atom (this,
-                                  ///<   and final_temperatures, will not be accessed if the
-                                  ///<   common_temperature member variable is set to TRUE)
-  const T* final_temperatures;    ///< Array of final target gemperatures for each atom
-  const ullint2* state_xy;        ///< First 128 bits of each 256-bit state vector
-  const ullint2* state_zw;        ///< Second 128 bits of each 256-bit state vector
-  const T* cache;                 ///< Cache of pre-computed random values (depth gives the number
-                                  ///<   of such values for each atom)
-};
-
 /// \brief Partially writeable abstract for the Thermostat object.  As with the MMControlKit struct
 ///        (see the library header mm_controls.h), the step member variable is modifiable so that
 ///        it can be updated without setting it in the parent object and regenerating the entire
@@ -109,12 +59,15 @@ template <typename T> struct ThermostatWriter {
 
   /// \brief The constructor takes the usual list of parent object attributes with pointers
   ///        applicable on either the CPU host or GPU device.
-  ThermostatWriter(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
-                   int depth_in, int init_evolution_in, int end_evolution_in,
-                   bool common_temperature_in, T init_temperature_in, T final_temperature_in,
-                   T dt_factor_in, T gamma_ln_in, T ln_implicit_in, T ln_explicit_in,
+  ThermostatWriter(ThermostatKind kind_in, ThermostatPartition layout_in, int natom_in,
+                   size_t padded_natom_in, int npart_in, int step_in, int depth_in,
+                   int init_evolution_in, int end_evolution_in, T init_temperature_in,
+                   T final_temperature_in, T dt_in, bool csnt_geom_in, T rattle_tol_in,
+                   int rattle_iter_in, int andr_cyc_in, T gamma_ln_in, T ln_implicit_in,
+                   T ln_explicit_in, const int4* partition_bounds_in,
                    const T* init_temperatures_in, const T* final_temperatures_in,
-                   ullint2* state_xy_in, ullint2* state_zw_in, T* cache_in);
+                   ullint2* state_xy_in, ullint2* state_zw_in, PrecisionModel rng_mode_in,
+                   double* cache_in, float* sp_cache_in);
 
   /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
   ///        of const member variables.
@@ -123,42 +76,136 @@ template <typename T> struct ThermostatWriter {
   ThermostatWriter(ThermostatWriter &&original) = default;
   /// \}
   
-  const ThermostatKind kind;      ///< The type of this thermostat, i.e. Andersen
-  const int natom;                ///< Number of atoms controlled by this thermostat
-  const int padded_natom;         ///< The number of atoms padded by the warp size
-  int step;                       ///< Current step number of the simulation
-  const int depth;                ///< Depth of the cache (the true depth will be three times
-                                  ///<   higher, to serve each atom with Cartesian X, Y, and Z
-                                  ///<   influences)
-  const int init_evolution;       ///< The final step at which the thermostat target temperatures
-                                  ///<   come from init_temperature or the eponymous array, and
-                                  ///<   the first step at which temperature targets begin to
-                                  ///<   shift linearly towards final_temperature(s)
-  const int end_evolution;        ///< The first step at which the thermostat begins to target
-                                  ///<   final_temperature(s)
-  const bool common_temperature;  ///< Indicates whether the initial and final temperatures
-                                  ///<   targeted by this thermostat are similar across all atoms
-  const T init_temperature;       ///< Initial target temperature, common to all atoms (if it is
-                                  ///<   applicable)
-  const T final_temperature;      ///< Final target temperature, common to all atoms
-  const T dt_factor;              ///< The time step, scaled to translate forces in in kcal/mol-A
-                                  ///<   into movements in Angstroms per fs or Angstroms
-  const T gamma_ln;               ///< The "Gamma" factor for the Langevin thermostat, giving the
-                                  ///<   number of collisions per femtosecond scaled by the
-                                  ///<   conversion factor for taking forces in kcal/mol-A into
-                                  ///<   Angstroms per femtosecond.
-  const T ln_implicit;            ///< Implicit Langevin factor, applied in the first velocity
-                                  ///<   Verlet update after new forces have been computed
-  const T ln_explicit;            ///< Explicit Langevin factor, applied in the second velocity
-                                  ///<   Verlet update as new coordinates are determined
-  const T* init_temperatures;     ///< Array of initial target temperatures for each atom (this,
-                                  ///<   and final_temperatures, will not be accessed if the
-                                  ///<   common_temperature member variable is set to TRUE)
-  const T* final_temperatures;    ///< Array of final target gemperatures for each atom
-  ullint2* state_xy;              ///< First 128 bits of each 256-bit state vector
-  ullint2* state_zw;              ///< Second 128 bits of each 256-bit state vector
-  T* cache;                       ///< Cache of pre-computed random values (depth gives the number
-                                  ///<   of such values for each atom)
+  const ThermostatKind kind;         ///< The type of this thermostat, i.e. Andersen
+  const ThermostatPartition layout;  ///< The manner in which different atoms or systems are held
+                                     ///<   to one or more heat baths
+  const int natom;                   ///< Number of atoms controlled by this thermostat
+  const size_t padded_natom;         ///< The number of atoms padded by the warp size
+  const int npart;                   ///< Number of unique partitions in the thermostat, each
+                                     ///<   being the atom index bounds on a distinct heat bath
+                                     ///<   at a particular temperature
+  int step;                          ///< Current step number of the simulation
+  const int depth;                   ///< Depth of the cache (the true depth will be three times
+                                     ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                     ///<   influences)
+  const int init_evolution;          ///< Final step at which the thermostat target temperatures
+                                     ///<   come from init_temperature or the eponymous array, and
+                                     ///<   the first step at which temperature targets begin to
+                                     ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;           ///< The first step at which the thermostat begins to target
+                                     ///<   final_temperature(s)
+  const T init_temperature;          ///< Initial target temperature, common to all atoms (if it is
+                                     ///<   applicable)
+  const T final_temperature;         ///< Final target temperature, common to all atoms
+  const T dt;                        ///< The time step, in units of femtoseconds
+  const bool cnst_geom;              ///< Indicate whether to apply geometry constraints
+  const T rattle_tol;                ///< Convergence criterion for RATTLE bond length constraints
+  const int rattle_iter;             ///< Number of iterations to allow when attempting to converge
+                                     ///<   RATTLE
+  const int andr_cyc;                ///< The frequency of Andersen velocity resets, in terms of
+                                     ///<   simulation steps.  Multiply by the time step dt to get
+                                     ///<   the inverse strength of the Andersen thermostat.
+  const T gamma_ln;                  ///< The "Gamma" factor for the Langevin thermostat, giving
+                                     ///<   the number of collisions per femtosecond scaled by the
+                                     ///<   conversion factor for taking forces in kcal/mol-A into
+                                     ///<   Angstroms per femtosecond.
+  const T ln_implicit;               ///< Implicit Langevin factor, applied in the first velocity
+                                     ///<   Verlet update after new forces have been computed
+  const T ln_explicit;               ///< Explicit Langevin factor, applied in the second velocity
+                                     ///<   Verlet update as new coordinates are determined
+  const int4* partition_bounds;      ///< Bounds array on the atoms that this thermostat regulates.
+                                     ///<   Also includes the number of degrees of freedom in each
+                                     ///<   partition.
+  const T* init_temperatures;        ///< Array of initial target temperatures for each atom
+  const T* final_temperatures;       ///< Array of final target gemperatures for each atom
+  ullint2* state_xy;                 ///< First 128 bits of each 256-bit state vector
+  ullint2* state_zw;                 ///< Second 128 bits of each 256-bit state vector
+  const PrecisionModel rng_mode;     ///< The mode in which random numbers are available for this
+                                     ///<   thermostat.  One of cache or sp_cache, below, will be
+                                     ///<   valid as indicated by this member variable.
+  double* cache;                     ///< Cache of double-precision pre-computed random values
+                                     ///<   (depth gives the number of such values for each atom)
+  float* sp_cache;                   ///< Cache of single-precision pre-computed random values
+                                     ///<   (depth gives the number of such values for each atom)
+};
+
+/// \brief Read-only abstract for the Thermostat object.
+template <typename T> struct ThermostatReader {
+
+  /// \brief The constructor takes the usual list of parent object attributes with pointers
+  ///        applicable on either the CPU host or GPU device.  As with some other readers, there
+  ///        is a means to construct this one by "const-ifying" the writer.
+  /// \{
+  ThermostatReader(ThermostatKind kind_in, ThermostatPartition layout_in, int natom_in,
+                   size_t padded_natom_in, int npart_in, int step_in, int depth_in,
+                   int init_evolution_in, int end_evolution_in, T init_temperature_in,
+                   T final_temperature_in, T dt_in, bool csnt_geom_in, T rattle_tol_in,
+                   int rattle_iter_in, int andr_cyc_in, T gamma_ln_in, T ln_implicit_in,
+                   T ln_explicit_in, const int4* partition_bounds_in,
+                   const T* init_temperatures_in, const T* final_temperatures_in,
+                   const ullint2* state_xy_in, const ullint2* state_zw_in,
+                   PrecisionModel rng_mode_in, const double* cache_in, const float* sp_cache_in);
+
+  ThermostatReader(const ThermostatWriter<T> &w);
+  /// \}
+  
+  /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
+  ///        of const member variables.
+  /// \{
+  ThermostatReader(const ThermostatReader &original) = default;
+  ThermostatReader(ThermostatReader &&original) = default;
+  /// \}
+  
+  const ThermostatKind kind;         ///< The type of this thermostat, i.e. Andersen
+  const ThermostatPartition layout;  ///< The manner in which different atoms or systems are held
+                                     ///<   to one or more heat baths
+  const int natom;                   ///< Number of atoms controlled by this thermostat
+  const size_t padded_natom;         ///< The number of atoms padded by the warp size
+  const int npart;                   ///< Number of unique partitions in the thermostat, each
+                                     ///<   being the atom index bounds on a distinct heat bath
+                                     ///<   at a particular temperature
+  const int step;                    ///< Current step number of the simulation
+  const int depth;                   ///< Depth of the cache (the true depth will be three times
+                                     ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                     ///<   influences)
+  const int init_evolution;          ///< Final step at which the thermostat target temperatures
+                                     ///<   come from init_temperature or the eponymous array, and
+                                     ///<   the first step at which temperature targets begin to
+                                     ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;           ///< The first step at which the thermostat begins to target
+                                     ///<   final_temperature(s)
+  const T init_temperature;          ///< Initial target temperature, common to all atoms (if it is
+                                     ///<   applicable)
+  const T final_temperature;         ///< Final target temperature, common to all atoms (if it is
+                                     ///<   applicable)
+  const T dt;                        ///< The time step, in units of femtoseconds
+  const bool cnst_geom;              ///< Indicate whether to apply geometry constraints
+  const T rattle_tol;                ///< Convergence criterion for RATTLE bond length constraints
+  const int rattle_iter;             ///< Number of iterations to allow when attempting to converge
+                                     ///<   RATTLE
+  const int andr_cyc;                ///< The frequency of Andersen velocity resets, in terms of
+                                     ///<   simulation steps.  Multiply by the time step dt to get
+                                     ///<   the inverse strength of the Andersen thermostat.
+  const T gamma_ln;                  ///< The "Gamma" factor for the Langevin thermostat, giving
+                                     ///<   the number of collisions per femtosecond
+  const T ln_implicit;               ///< Implicit Langevin factor, applied in the first velocity
+                                     ///<   Verlet update after new forces have been computed
+  const T ln_explicit;               ///< Explicit Langevin factor, applied in the second velocity
+                                     ///<   Verlet update as new coordinates are determined
+  const int4* partition_bounds;      ///< Bounds array on the atoms that this thermostat regulates.
+                                     ///<   Also includes the number of degrees of freedom in each
+                                     ///<   partition.
+  const T* init_temperatures;        ///< Array of initial target temperatures for each atom
+  const T* final_temperatures;       ///< Array of final target gemperatures for each atom
+  const ullint2* state_xy;           ///< First 128 bits of each 256-bit state vector
+  const ullint2* state_zw;           ///< Second 128 bits of each 256-bit state vector
+  const PrecisionModel rng_mode;     ///< The mode in which random numbers are available for this
+                                     ///<   thermostat.  One of cache or sp_cache, below, will be
+                                     ///<   valid as indicated by this member variable.
+  const double* cache;               ///< Cache of double-precision pre-computed random values
+                                     ///<   (depth gives the number of such values for each atom)
+  const float* sp_cache;             ///< Cache of single-precision pre-computed random values
+                                     ///<   (depth gives the number of such values for each atom)
 };
 
 /// \brief Store the parameters for a simulation thermostat.  Includes Berendsen, Andersen, and
@@ -177,20 +224,134 @@ public:
   ///   - Accept a temperature evolution profile
   ///   - Accept a total number of atoms and a compartmentalization plan
   ///
-  /// \param kind_in           The type of thermostat to implement
   /// \param temperature_in    A flat temperature to apply at all times
-  /// \param temperature_in
   /// \{
-  Thermostat();
-  Thermostat(ThermostatKind kind_in);
-  Thermostat(ThermostatKind kind_in, double temperature_in);
-  Thermostat(ThermostatKind kind_in, double init_temperature_in, double final_temperature_in,
-             int initial_evolution_step_in, int final_evolution_step_in);
-  Thermostat(ThermostatKind kind_in, int atom_count_in,
-             const std::vector<int> &compartment_limits_in,
+  Thermostat(ThermostatKind kind_in = ThermostatKind::NONE,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+  
+  Thermostat(int atom_count_in, ThermostatKind kind_in, double temperature_in,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(int atom_count_in, ThermostatKind kind_in, double init_temperature_in,
+             double final_temperature_in, int initial_evolution_step_in,
+             int final_evolution_step_in, PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(int atom_count_in, ThermostatKind kind_in,
              const std::vector<double> &initial_temperatures_in,
-             const std::vector<double> &final_temperatures_in, int initial_evolution_step_in,
-             int final_evolution_step_in);
+             const std::vector<double> &final_temperatures_in,
+             const std::vector<int2> &paritions_in,
+             int initial_evolution_step_in = default_tstat_evo_window_start,
+             int final_evolution_step_in = default_tstat_evo_window_end,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraph *ag, ThermostatKind kind_in,
+             double initial_temperature_in, double final_temperature_in,
+             int initial_evolution_step_in, int final_evolution_step_in,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraph &ag, ThermostatKind kind_in,
+             double initial_temperature_in,
+             double final_temperature_in,
+             int initial_evolution_step_in, int final_evolution_step_in,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraph *ag, ThermostatKind kind_in,
+             double temperature_in = default_simulation_temperature,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+  
+  Thermostat(const AtomGraph &ag, ThermostatKind kind_in,
+             double temperature_in = default_simulation_temperature,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+  
+  Thermostat(const AtomGraph *ag, ThermostatKind kind_in,
+             const std::vector<double> &initial_temperatures_in,
+             const std::vector<double> &final_temperatures_in,
+             const std::vector<int2> &paritions_in,
+             int initial_evolution_step_in = default_tstat_evo_window_start,
+             int final_evolution_step_in = default_tstat_evo_window_end,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraph &ag, ThermostatKind kind_in,
+             const std::vector<double> &initial_temperatures_in,
+             const std::vector<double> &final_temperatures_in,
+             const std::vector<int2> &paritions_in,
+             int initial_evolution_step_in = default_tstat_evo_window_start,
+             int final_evolution_step_in = default_tstat_evo_window_end,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis *poly_ag, ThermostatKind kind_in,
+             double initial_temperature_in, double final_temperature_in,
+             int initial_evolution_step_in, int final_evolution_step_in,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis &poly_ag, ThermostatKind kind_in,
+             double initial_temperature_in, double final_temperature_in,
+             int initial_evolution_step_in, int final_evolution_step_in,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis *poly_ag, ThermostatKind kind_in,
+             double temperature_in = default_simulation_temperature,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+  
+  Thermostat(const AtomGraphSynthesis &poly_ag, ThermostatKind kind_in,
+             double temperature_in = default_simulation_temperature,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+  
+  Thermostat(const AtomGraphSynthesis *poly_ag, ThermostatKind kind_in,
+             const std::vector<double> &initial_temperatures_in,
+             const std::vector<double> &final_temperatures_in,
+             const std::vector<int2> &paritions_in,
+             int initial_evolution_step_in = default_tstat_evo_window_start,
+             int final_evolution_step_in = default_tstat_evo_window_end, 
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis &poly_ag, ThermostatKind kind_in,
+             const std::vector<double> &initial_temperatures_in,
+             const std::vector<double> &final_temperatures_in,
+             const std::vector<int2> &paritions_in,
+             int initial_evolution_step_in = default_tstat_evo_window_start,
+             int final_evolution_step_in = default_tstat_evo_window_end,
+             PrecisionModel cache_config_in = PrecisionModel::SINGLE,
+             int random_seed_in = default_thermostat_random_seed,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis *poly_ag, const DynamicsControls &dyncon,
+             const SystemCache &sc, const std::vector<int> &sc_origins,
+             const GpuDetails &gpu = null_gpu);
+
+  Thermostat(const AtomGraphSynthesis &poly_ag, const DynamicsControls &dyncon,
+             const SystemCache &sc, const std::vector<int> &sc_origins,
+             const GpuDetails &gpu = null_gpu);
   /// \}
 
   /// \brief The default copy and move constructors and assignment operators are best for this
@@ -208,6 +369,13 @@ public:
   /// \brief Get the kind of thermostat
   ThermostatKind getKind() const;
 
+  /// \brief Indicate whether this thermostat applies a common target temperature to all atoms, to
+  ///        individual systems, or to some finer compartmentalization based on individual atoms.
+  ThermostatPartition getBathPartitions() const;
+
+  /// \brief Get the random number caching precision
+  PrecisionModel getCacheConfiguration() const;
+  
   /// \brief Get the total number of atoms that this thermostat can serve.
   int getAtomCount() const;
 
@@ -243,21 +411,13 @@ public:
   ///        converted to double and can then be put back in a float without changing its value.
   ///        For retrieving large numbers of results, one should used the abstract.
   ///
-  /// \param prec        Precision level of the result to retrieve--indicates whether to extract
-  ///                    the number from sp_random_cache or random_cache
   /// \param atom_index  Index of the atom for which to get a result
   /// \param cache_row   Row of the cache to query (the 0th row offers a result for Cartesian X
   ///                    influence on the atom, the 4th row offers a result for the Carteisan Y
   ///                    influence on the atom one cycle in the future)
   /// \param tier        Indicate whether to take information from the CPU host or GPU device
-  double getCachedRandomResult(PrecisionModel prec, int atom_index,
-                               int cache_row,
+  double getCachedRandomResult(int atom_index, int cache_row,
                                HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  
-  /// \brief Indicate whether this thermostat applies a common target temperature to all atoms, or
-  ///        (if otherwise) there is a list of target initial and final temperatures with shared
-  ///        values among various subdivisions (compartments) of the atom set.
-  bool commonTemperature() const;
   
   /// \brief Get the initial target temperature for this thermostat, in units of Kelvin.
   ///
@@ -270,11 +430,46 @@ public:
   /// \param atom_index  Index of the atom of interest
   double getFinalTemperature(int atom_index = 0) const;
 
-  /// \brief Get the current target temperature for this thermostat, in units of Kelvin.
+  /// \brief Get the spread of temperature targets for all segments of the thermostat at a specific
+  ///        time step.
+  ///
+  /// \param step_number  The step at which to assess the temperature targets
+  template <typename T> std::vector<T> getTemperatureSpread(int step_number = 0) const;
+
+  /// \brief Get the partition boundaries between different segments of the thermostat as a vector
+  ///        of integer tuples, with the partition lower and upper boundaries in the "x" and "y"
+  ///        members, the number of constrained degrees of freedom in the "z" member, and the
+  ///        number of unconstrained degrees of freedom in the "w" member of each tuple.
+  std::vector<int4> getPartitionMap() const;
+  
+  /// \brief Get the current target temperature for this thermostat, in units of Kelvin, for a
+  ///        specific atom.
   ///
   /// \param atom_index  Index of the atom of interest
-  double getCurrentTemperatureTarget(int atom_index = 0) const;
+  template <typename Tcalc> Tcalc getAtomTarget(int atom_index = 0) const;
 
+  /// \brief Get the current target temperature for a specific partition within this thermostat,
+  ///        in units of Kelvin.
+  ///
+  /// \param index  Index of the partition of interest
+  template <typename Tcalc>
+  Tcalc getPartitionTarget(int index = 0) const;
+
+  /// \brief Get the number of constrained degrees of freedom for a particular partition of this
+  ///        thermostat.
+  ///
+  /// \param index  Index of the partition of interest
+  int getPartitionConstrainedDoF(int index = 0) const;
+
+  /// \brief Get the number of degrees of freedom for a particular partition of this thermostat,
+  ///        in absence of any constraints.
+  ///
+  /// \param index  Index of the partition of interest
+  int getPartitionFreeDoF(int index = 0) const;
+
+  /// \brief Get the Andersen reset frequency.
+  int getAndersenResetFrequency() const;
+  
   /// \brief Get the collision frequency for the Langevin thermostat (in units of femtoseconds).
   double getLangevinCollisionFrequency() const;
 
@@ -289,6 +484,19 @@ public:
   /// \brief Get the time step, in units of femtoseconds.
   double getTimeStep() const;
 
+  /// \brief Get the order whether to apply geometric constraints.
+  ApplyConstraints constrainGeometry() const;
+
+  /// \brief Get the convergence criterion for RATTLE bond length constraints.
+  double getRattleTolerance() const;
+
+  /// \brief Get the number of RATTLE iterations to attempt.
+  int getRattleIterations() const;
+
+  /// \brief Get a pointer to the object itself, useful if it has been passed to a function by
+  //         const reference.
+  const Thermostat* getSelfPointer() const;
+  
   /// \brief Get the abstract.
   ///
   /// Overloaded:
@@ -303,85 +511,84 @@ public:
   ThermostatWriter<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   
-  /// \brief Set the type of thermostat.
-  ///   
-  /// \param kind_in  The type of thermostat to use
-  void setKind(ThermostatKind kind_in);
-
   /// \brief Set the number of atoms for which the thermostat is responsible.
   ///
   /// \param atom_count_in  The total number of atoms to assign to this thermostat, whether all
   ///                       part of one system or a padded number collected within a synthesis
-  void setAtomCount(int atom_count_in);
+  /// \param new_seed       New random number generator seed for initializing the random cache (if
+  ///                       applicable).  If set to -1, the object's original seed will be taken.
+  ///                       Otherwise, the object will later record having been initialized with
+  ///                       new_seed.
+  /// \param gpu            Details of any available GPU.  If a real GPU is available, the random
+  ///                       state vectors and cache will be initialized on the CPU host as well as
+  ///                       the GPU device.
+  void setAtomCount(int atom_count_in, int new_seed = -1, const GpuDetails &gpu = null_gpu);
 
-  /// \brief Compartmentalize the thermostated atoms to maintain different temperatures across
-  ///        distinct, or formally separate, groups.
-  ///
-  /// \param compartment_limits_in    The compartment boundaries, required to be monotonically
-  ///                                 increasing and positive.  Starting with any number other than
-  ///                                 zero will lead to the interpretation that there is an
-  ///                                 implicit compartment from zero up to the first numbered
-  ///                                 index.  Ending with any number less than the atom count
-  ///                                 likewise implies a final compartment between the last stated
-  ///                                 index and the end of the atom list.  No index in this list
-  ///                                 may exceed the atom count.
-  /// \param initial_temperatures_in  The initial temperatures for each compartment, i.e. system.
-  ///                                 The length of this list must equal the number of compartments
-  ///                                 determined from compartment_limits_in and the atom count.
-  /// \param initial_temperatures_in  The final temperatures for each compartment.  The length of
-  ///                                 this list must equal the number of compartments declined from
-  ///                                 compartment_limits_in and the atom count.
-  void setCompartments(const std::vector<int> &compartment_limits_in,
-                       const std::vector<double> &initial_temperatures_in,
-                       const std::vector<double> &final_temperatures_in);
-  
   /// \brief Set the initial target temperature.
   ///
   /// Overloaded:
   ///   - Set the temperature to a single value (if the final temperatures are also consistent,
   ///     this will set common_temperature to TRUE and de-allocate any existing Hybrid data
   ///     related to unique temperature compartments).
-  ///   - Set the temperatures of unique subsets of the atoms to a series of values based on an
-  ///     existing compartmentalization
-  ///   - Set the temperatures of unique subsets of the atoms to a series of values based on a new
+  ///   - Set the temperatures of unique subsets of the atoms to a series of values based on a
   ///     compartmentalization
   ///
-  /// \param init_temp_in     Temperature or temperatures that the thermostat shall start with, and
-  ///                         continue to apply until the initial step in its evolution
-  /// \param compartments_in  A new compartmentalization scheme (the same interpretation described
-  ///                         in setCompartments() above applies)
+  /// \param init_temp_in   Temperature or temperatures that the thermostat shall start with, and
+  ///                       continue to apply until the initial step in its evolution
+  /// \param partitions_in  A new compartmentalization scheme (the same interpretation described
+  ///                       in setCompartments() above applies)
   /// \{
-  void setTemperature(double temp_init_in, double temp_final_in = -1.0);
-  void setTemperature(const std::vector<double> &temp_init_in,
-                      const std::vector<double> &temp_final_in);
-  void setTemperature(const std::vector<double> &temp_init_in,
-                      const std::vector<double> &temp_final_in,
-                      const std::vector<int> &compartment_limits_in);
+  void setTemperature(double initial_temperature_in, double final_temperature_in = -1.0);
+  void setTemperature(const std::vector<double> &initial_temperatures_in,
+                      const std::vector<double> &final_temperatures_in,
+                      const std::vector<int2> &partitions_in);
   /// \}
+
+  /// \brief Check the compartmentalization if the thermostat regulates a synthesis of systems.
+  ///
+  /// \param poly_ag  The topology synthesis describing systems to regulate
+  void checkCompartments(const AtomGraphSynthesis *poly_ag);
 
   /// \brief Set the step at which temperature evolution, away from T(init), shall begin.
   ///
-  /// \param step_in  The step setting
-  void setInitialEvolutionStep(int step_in);
+  /// \param init_step_in  Step number at which temperature evolution begins.  Prior to this step,
+  ///                      each bath's target temperature is its initial temperature.  Following
+  ///                      this step, the target temperature of each bath becomes a linear mixture
+  ///                      of the initial and final temperatures.
+  /// \param init_step_in  Step number at which temperature evolution ends.  After this point, the
+  ///                      final temperature of each bath is the target. 
+  void setEvolutionWindow(int init_step_in, int final_step_in);
   
-  /// \brief Set the step at which temperature evolution, away from T(final), shall begin.
+  /// \brief Set the random number cache configuration.
   ///
-  /// \param step_in  The step setting
-  void setFinalEvolutionStep(int step_in);
+  /// \param cache_config_in  The manner in which the cache is to be configured, storing random
+  ///                         numbers in single- or double-precision
+  /// \param gpu              Details of the GPU that will handle future calculations with this
+  ///                         thermostat.  This is critical for getting random state vectors
+  ///                         initialized on the GPU.
+  void setCacheConfiguration(PrecisionModel cache_config_in, const GpuDetails &gpu = null_gpu);
   
   /// \brief Set the random number cache depth.  This value is kept on a tight leash, as it can
   ///        easily lead to allocating too much memory.  A hundred-thousand atom system with cache
   ///        depth 8 leads to over 13.7MB of memory allocation.
   ///
   /// \param depth_in  The depth to take
-  void setRandomCacheDepth(int depth_in);
+  /// \param gpu       Details of the GPU that will handle future calculations with this
+  ///                  thermostat.  This is critical for getting random state vectors initialized
+  ///                  on the GPU.
+  void setRandomCacheDepth(int depth_in, const GpuDetails &gpu = null_gpu);
 
   /// \brief Set the collision frequency for the Langevin thermostat.  This will also set the
   ///        scaled form of the value.
   ///
-  /// \param frequency_in  The collision frequency to take, in events per femtosecond
-  void setLangevinCollisionFrequency(double frequency_in);
+  /// \param langevin_frequency_in  The collision frequency to take, in events per femtosecond
+  void setLangevinCollisionFrequency(double langevin_frequency_in);
 
+  /// \brief Set the Andersen velocity reassignment frequency.  This will be taken from user input.
+  ///
+  /// \param andersen_frequency_in  The number of time steps between Andersen velocity resets
+  void setAndersenResetFrequency(int andersen_frequency_in);
+  
   /// \brief Set the time step.  This will also set the scaled form of the value.
   ///
   /// \param time_step_in  The time step to take, in units of femtoseconds
@@ -395,6 +602,22 @@ public:
   ///        counter to backtrack.
   void decrementStep();
 
+  /// \brief Set the instruction for carrying out geometric constraints during dynamics.
+  ///
+  /// \param cnst_geometry_in  The order for constraints to be applied
+  void setGeometryConstraints(ApplyConstraints cnst_geometry_in);
+
+  /// \brief Set the convergence criterion for RATTLE.
+  ///
+  /// \param rattle_tolerance_in  The convergence criterion to set
+  void setRattleTolerance(double rattle_tolerance_in);
+
+  /// \brief Set the maximum number of iterations to take when attempting to converge RATTLE bond
+  ///        length constraints.
+  ///
+  /// \param rattle_iterations_in  The number of iterations to permit
+  void setRattleIterations(int rattle_iterations_in);
+  
   /// \brief Validate the initial or final target temperature.
   void validateTemperature(double temperature_in);
 
@@ -412,24 +635,29 @@ public:
   ///        thermostating.  This passes a call on to a general-purpose function for seeding the
   ///        generators and will recruit the GPU if available to expedite the process.
   ///
-  /// \param prec          Precision with which to compute random real number results
   /// \param new_seed      A new random number seed to apply, if different from the one used
   ///                      during construction of this Thermostat object
   /// \param scrub_cycles  Number of cycles of Xoshiro256++ generation to run in order to ensure
   ///                      that the newly seeded generators produce high-quality results
+  /// \param tier          Indicate whether to seed random states and cached numbers on the CPU
+  ///                      host alone, or on the GPU device.  Random number state vectors will be
+  ///                      mirrored at both levels of memory if the GPU device layer is
+  ///                      initialized, but the generators will not be advanced on the host.
   /// \param gpu           Specifications of the GPU in use (if applicable)
-  void initializeRandomStates(PrecisionModel prec, int new_seed = default_thermostat_random_seed,
-                              int scrub_cycles = 25, const GpuDetails &gpu = null_gpu);
+  void initializeRandomStates(int new_seed = default_thermostat_random_seed,
+                              int scrub_cycles = 25,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST,
+                              const GpuDetails &gpu = null_gpu);
   
   /// \brief Fill or refill the random number cache for a subset of the atoms, advancing the
   ///        thermostat's random number generators in the process.  This CPU-based function is
   ///        intended to mimic GPU functionality, but the GPU operations are expected to be fused
   ///        with other kernels.
   ///
-  /// \param index_start  Starting index in the list of all atoms
-  /// \param index_end    Upper bound of atoms for which to cache random numbers
-  /// \param mode         Fill either the single-precision or double-precision cache arrays
-  void refresh(size_t index_start, size_t index_end, PrecisionModel mode);
+  /// \param index_start    Starting index in the list of all atoms
+  /// \param index_end      Upper bound of atoms for which to cache random numbers
+  /// \param refresh_depth  The depth to which the cache is to be refreshed
+  void refresh(size_t index_start, size_t index_end, int refresh_depth = 0);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the thermostat's data from the host to the HPC device.  Because the GPU is
@@ -442,38 +670,63 @@ public:
   ///        synchronize progress made on the GPU if any processes are to be carried out by the
   ///        CPU host.
   void download();
+
+  /// \brief Upload the temperature arrays and paritions only.
+  void uploadPartitions();
+
+  /// \brief Download the temperature arrays and partitions only.
+  void downloadPartitions();
 #endif
   
 private:
-  ThermostatKind kind;             ///< The type of thermostat
-  int atom_count;                  ///< The total number of atoms, and thus the number of random
-                                   ///<   state vectors, for which this thermostat is responsible
-                                   ///<   (this times random_cache_depth gives the length of
-                                   ///<   random_sv_bank)
-  int padded_atom_count;           ///< The total number of atoms padded by the warp size
-  int step_number;                 ///< Number of the dynamics step, which should be consistent
-                                   ///<   with any other record of the current simulation step.
-                                   ///<   The thermostat, which will be included in any simulation
-                                   ///<   even if set to NONE kind, is a good place to keep the
-                                   ///<   official step number.
-  int random_seed;                 ///< Seed for the first random state vector (position 0 in the
-                                   ///<   random_sv_bank array)
-  int random_cache_depth;          ///< Depth of the random cache
-  int initial_evolution_step;      ///< The first step at which to initiate temperature evolution
-  int final_evolution_step;        ///< Final step at which to temperature evolution is complete
-  bool common_temperature;         ///< Flag to indicate that all particles use identical initial
-                                   ///<   and final temperatures.
-  double initial_temperature;      ///< Initial temperature to apply to all particles
-  double final_temperature;        ///< Final temperature to apply to all particles
-  double langevin_frequency;       ///< Frequency of collisions between all particles managed by
-                                   ///<   this thermostat and a Langevin bath
-  double scaled_langevin_freq;     ///< Langevin frequency scaled by the conversion factor taking
-                                   ///<   forces in kcal/mol-A into motions in units of A and fs
-  double time_step;                ///< Simulation time step (the thermostat is also the official
-                                   ///<   reference of this information in various C++ functions
-                                   ///<   and GPU kernels)
-  double scaled_time_step;         ///< Time step scaled by the conversion factor taking forces in
-                                   ///<   kcal/mol-A into motions in units of A and fs
+  ThermostatKind kind;              ///< The type of thermostat
+  ThermostatPartition bath_layout;  ///< Indicate whether the thermostat holds a single pair of
+                                    ///<   initial and final temperatures for all atoms, a series
+                                    ///<   of initial and final temperature pairs for all systems,
+                                    ///<   or a series of initial and final temperature pairs for
+                                    ///<   all atoms.
+  PrecisionModel cache_config;      ///< Configuration for random numbers in the cache.  Because it
+                                    ///<   would take a great deal of memory to allocate double- as
+                                    ///<   well as single-precision arrays for any given quantity
+                                    ///<   of cached random numbers, and a potential source of
+                                    ///<   error for new pseudo-random numbers to be deposited in
+                                    ///<   one array but mined from another, this mode setting
+                                    ///<   locks the object into a particular configuration.
+                                    ///<   Either precision model is compatible with arithmetic in
+                                    ///<   single- or double-precision.  To store random numbers in
+                                    ///<   single-precision and feed them into double-precision
+                                    ///<   calculations is hardly a loss of information.
+  int atom_count;                   ///< The total number of atoms, and thus the number of random
+                                    ///<   state vectors, for which this thermostat is responsible
+                                    ///<   (this times random_cache_depth gives the length of
+                                    ///<   random_sv_bank)
+  size_t padded_atom_count;         ///< The total number of atoms padded by the warp size
+  int partition_count;              ///< The number of partitions, essentially the number of unique
+                                    ///<   temperature baths that this thermostat comprises
+  int step_number;                  ///< Number of the dynamics step, which should be consistent
+                                    ///<   with any other record of the current simulation step.
+                                    ///<   The thermostat, which will be included in any simulation
+                                    ///<   even if set to NONE kind, is a good place to keep the
+                                    ///<   official step number.
+  int random_seed;                  ///< Seed for the first random state vector (position 0 in the
+                                    ///<   random_sv_bank array)
+  int random_cache_depth;           ///< Depth of the random cache
+  int initial_evolution_step;       ///< The first step at which to initiate temperature evolution
+  int final_evolution_step;         ///< Final step at which to temperature evolution is complete
+  double initial_temperature;       ///< Initial temperature to apply to all particles
+  double final_temperature;         ///< Final temperature to apply to all particles
+  int andersen_frequency;           ///< The rate of Andersen velocity reassignments (valid only if
+                                    ///<   an Andersen thermostat is in effect)
+  double langevin_frequency;        ///< Frequency of collisions between all particles managed by
+                                    ///<   this thermostat and a Langevin bath, in femtoseconds
+  double time_step;                 ///< Simulation time step (the thermostat is also the official
+                                    ///<   reference of this information in various C++ functions
+                                    ///<   and GPU kernels), in femtoseconds
+  ApplyConstraints cnst_geometry;   ///< Flag to indicate whether geometric constraints are in
+                                    ///<   effect
+  double rattle_tolerance;          ///< Convergence criterion for RATTLE bond length constraints
+  int rattle_iterations;            ///< The maximum number of iterations to use when attempting to
+                                    ///<   converge RATTLE constraint groups
 
   /// Temperatures to apply from step 0 to the initiation of any requested evolution, across
   ///   various compartments of the simulation.  Different compartments, i.e. systems, or
@@ -493,32 +746,46 @@ private:
   /// Bounds array for various compartments of the particles affected by this thermostat.  The name
   /// is more general than "atom_starts" or "system_bounds" because this object is designed to
   /// serve one or many systems, and could, in theory, be used to thermostat different parts of one
-  /// or all systems at different values.  This array is not carried through to the GPU: it defines
-  /// the values of the initial and final temperatures array, which are communicated to the GPU.
-  std::vector<int> compartment_limits;  
-
+  /// or all systems at different values.  Its "x" and "y" members hold the lower and upper bounds
+  /// of atoms in the compartment, respectively, while its "z" and "w" members hold the constrained
+  /// and unconstrained degrees of freedom for atoms in the compartment, respectively.
+  Hybrid<int4> partitions;
+  
   /// Xoshiro256++ state vectors for creating random numbers, one per atom of the simulation.
   /// These are stored in two ullint2 vectors to match the mechanics of templated random number
   /// generator arrays, all based on the fact that most GPUs' largest loads and stores are 128-bit.
+  /// \{
   Hybrid<ullint2> random_state_vector_xy;
   Hybrid<ullint2> random_state_vector_zw;
-
-  /// \brief Allocate space for the random state vector and random number cache
+  /// \}
+  
+  /// Space for the random state vector and random number cache
+  /// \{
   Hybrid<double> random_cache;
   Hybrid<float> sp_random_cache;
+  /// \}
 
+  /// Pointers to the underlying topology or topology synthesis.  At most one of these pointers,
+  /// perhaps neither, will be valid.
+  /// \{
+  AtomGraph *ag_pointer;
+  AtomGraphSynthesis *poly_ag_pointer;
+  /// \}
+  
   /// \brief Allocate storage space for random number generator state vectors and cached random
   ///        numbers.  This will occur when the thermostat is set to Langevin or Andersen, or when
   ///        the atom count changes and the thermostat type is already Langevin or Andersen.
-  void allocateRandomStorage();
-
-  /// \brief Set the flag to indicate that a pair of common temperatures is in use for initial
-  ///        and final targets of the thermostat across all atoms.  Setting the flag to FALSE will
-  ///        trigger allocation of the member variables initial_temperatures and final_temperatures
-  ///        to the proper sizes, and setting the flag to TRUE will de-allocate these arrays.
   ///
-  /// \param setting_in  The state of temperature commonality
-  void setCommonTemperature(bool setting_in);
+  /// \param new_seed  The random number cache, if it has any significance, will be initialized
+  ///                  as it is reallocated.  This input provides the option of supplying a new
+  ///                  random seed.  If set to -1, the object's original random seed will be
+  ///                  taken.
+  /// \param gpu       Details of the GPU to be used in the calculations.  If an actual GPU is
+  ///                  available, initialization will be mirrored on the CPU host and GPU device.
+  void allocateRandomStorage(int new_seed = -1, const GpuDetails &gpu = null_gpu);
+
+  /// \brief Resize the temperature arrays as appropriate to support the stated partitioning.
+  void resizeTemperatureArrays();
 };
 
 /// \brief Return the name of the thermostat choice (an enumerator string conversion function)
@@ -526,6 +793,160 @@ private:
 /// \param kind  The type of thermostat
 std::string getThermostatName(ThermostatKind kind);
 
+/// \brief Get the instantaneous target temperature from a thermostat for a particular atom in the
+///        system or collection of systems regulated by the thermostat.
+///
+/// Overloaded:
+///   - Provide the original object
+///   - Provide the read-only or writeable thermostat abstract
+///
+/// \param tstw        The writeable thermostat abstract
+/// \param tstr        The read-only thermostat abstract
+/// \param tst         The original thermostat object
+/// \param atom_index  Index of the atom of interest.  The partition in which the atom resides
+///                    will be determined inside the function.
+/// \{
+template <typename Tcalc>
+Tcalc getAtomTemperatureTarget(const ThermostatReader<Tcalc> &tstr, int atom_index = 0);
+
+template <typename Tcalc>
+Tcalc getAtomTemperatureTarget(const ThermostatWriter<Tcalc> &tstw, int atom_index = 0);
+
+double getAtomTemperatureTarget(const Thermostat &tst, int atom_index = 0);
+/// \}
+
+/// \brief Get the instantaneous target temperature from a thermostat for a specific partition of
+///        the atoms within the system or collection of systems regulated by the thermostat.
+///
+/// Overloaded:
+///   - Provide the original object
+///   - Provide the read-only or writeable thermostat abstract
+///
+/// \param tstw   The writeable thermostat abstract
+/// \param tstr   The read-only thermostat abstract
+/// \param tst    The original thermostat object
+/// \param index  Index of the partition of interest.  This could be a specific system within a
+///               synthesis, if the thermostat is regulating systems by specific temperatures.
+/// \{
+template <typename Tcalc>
+Tcalc getPartitionTemperatureTarget(const ThermostatReader<Tcalc> &tstr, int index = 0);
+
+template <typename Tcalc>
+Tcalc getPartitionTemperatureTarget(const ThermostatWriter<Tcalc> &tstw, int index = 0);
+
+double getPartitionTemperatureTarget(const Thermostat &tst, int index = 0);
+/// \}
+
+/// \brief Apply Andersen thermostating to reset (or initialize) all velocities in a system.
+///
+/// Overloaded:
+///   - Set velocities in one system or many systems
+///   - Provide abstracts or the original coordinate objects
+///
+/// \param xvel              Particle velocities along the Cartesian X axis
+/// \param yvel              Particle velocities along the Cartesian Y axis
+/// \param zvel              Particle velocities along the Cartesian Z axis
+/// \param xvel_ovrf         Overflow bits for int95_t representations of Cartesian X velocities
+/// \param yvel_ovrf         Overflow bits for int95_t representations of Cartesian Y velocities
+/// \param zvel_ovrf         Overflow bits for int95_t representations of Cartesian Z velocities
+/// \param psw               Abstract for a single system's coordinate object
+/// \param ps                Coordinates (positions, velocities, and forces) for all particles in a
+///                          single system
+/// \param poly_psw          Abstract for a synthesis of coordinates (velocities will be assigned
+///                          to the WHITE xvel, yvel, and zvel arrays of this abstract).
+/// \param poly_ps           The synthesis of coordinates for many systems
+/// \param inv_masses        Inverse masses of all particles, in units of Daltons or g/mol
+/// \param cdk               Chemical details of a single system, including inverse masses
+/// \param poly_auk          Atom update abstract for a coordinate synthesis, holding inverse
+///                          masses
+/// \param ag                Topology for a single system, containing atomic masses
+/// \param poly_ag           Collated topologies for a synthesis of systems, holding inverse masses
+/// \param tstr              Abstract of the thermostat, holding temperatures and a cache of random
+///                          numbers.  The RNG cache will not be updated herein.  It is expected to
+///                          be refilled on its own schedule, also held by settings in the
+///                          thermostat.
+/// \param tst               The thermostat controlling the velocity reassignment (see description
+///                          above)
+/// \param prec              Precision of calculations used in determining particle velocities.
+///                          This will affect the representation of particle inverse masses and
+///                          parameters (including the temperature) obtained from the thermostat,
+///                          but the representation of random numbers in the thermostat is
+///                          indicated by the thermostat itself.
+/// \param vel_scale_factor  Velocity scaling factor for fixed-precision representations, obtained
+///                          from the underlying coordinate synthesis
+/// \{
+template <typename Tcoord, typename Tcalc>
+void andersenVelocityReset(Tcoord* xvel, Tcoord* yvel, Tcoord* zvel, int* xvel_ovrf,
+                           int* yvel_ovrf, int* zvel_ovrf, const Tcalc* inv_masses,
+                           const ThermostatReader<Tcalc> &tstr, Tcalc vel_scale_factor = 1.0);
+
+template <typename Tcoord, typename Tcalc>
+void andersenVelocityReset(Tcoord* xvel, Tcoord* yvel, Tcoord* zvel, const Tcalc* masses,
+                           const ThermostatReader<Tcalc> &tstr, Tcalc vel_scale_factor = 1.0);
+
+void andersenVelocityReset(PhaseSpaceWriter *psw, const ChemicalDetailsKit &cdk,
+                           const ThermostatReader<double> &tstr);
+
+void andersenVelocityReset(PhaseSpace *ps, const AtomGraph &ag, const Thermostat &tst);
+
+template <typename Tcalc, typename Tcalc2, typename Tcalc4>
+void andersenVelocityReset(PsSynthesisWriter *poly_psw,
+                           const SyAtomUpdateKit<Tcalc, Tcalc2, Tcalc4> &poly_auk,
+                           const ThermostatReader<Tcalc> &tstr);
+
+#ifdef STORMM_USE_HPC
+void andersenVelocityReset(PsSynthesisWriter *poly_psw,
+                           const SyAtomUpdateKit<void, void, void> &poly_auk,
+                           const ThermostatReader<void> &tstr,
+                           PrecisionModel prec = PrecisionModel::SINGLE,
+                           const GpuDetails &gpu = null_gpu);
+#endif
+
+void andersenVelocityReset(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
+                           const Thermostat *tst, PrecisionModel prec = PrecisionModel::SINGLE);
+
+void andersenVelocityReset(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
+                           const Thermostat &tst, PrecisionModel prec = PrecisionModel::SINGLE);
+/// \}
+
+/// \brief Initialize velocities based on a particular thermostat configuration and temperature or
+///        set of temperatures.  If the thermostat provided is configured for Andersen or Langevin
+///        regulation, the random numbers expended for this initialization will be replaced by new
+///        issues from their respective generators.  If the thermostat does not involve its own
+///        random number streams, a new thermostat of similar heat bath configuration will be
+///        produced internally, then destroyed after velocities are initialized.
+///
+/// Overloaded:
+///   - Accept a single system.
+///   - Accept a synthesis of multiple systems.
+///
+/// Descriptions of parameters follow from andersenVelocityReset(), above, in addition to:
+///
+/// \param new_seed  New random number seed guiding the generators that will provide the initial
+///                  velocities, if the provided thermostat does not contain its own random number
+///                  cache
+/// \{
+void velocityKickStart(PhaseSpace *ps, const AtomGraph *ag, Thermostat *tst,
+                       const DynamicsControls &dyncon,
+                       EnforceExactTemperature scale_temp = EnforceExactTemperature::YES);
+
+void velocityKickStart(PhaseSpace *ps, const AtomGraph &ag, Thermostat *tst,
+                       const DynamicsControls &dyncon,
+                       EnforceExactTemperature scale_temp = EnforceExactTemperature::YES);
+
+void velocityKickStart(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
+                       Thermostat *tst, const DynamicsControls &dyncon,
+                       PrecisionModel prec = PrecisionModel::SINGLE,
+                       EnforceExactTemperature scale_temp = EnforceExactTemperature::YES,
+                       const GpuDetails &gpu = null_gpu);
+
+void velocityKickStart(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
+                       Thermostat *tst, const DynamicsControls &dyncon,
+                       PrecisionModel prec = PrecisionModel::SINGLE,
+                       EnforceExactTemperature scale_temp = EnforceExactTemperature::YES,
+                       const GpuDetails &gpu = null_gpu);
+/// \}
+  
 } // namespace trajectory
 } // namespace stormm
 

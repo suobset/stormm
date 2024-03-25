@@ -458,6 +458,8 @@ void ReportTable::findColumnWidths(const std::vector<size_t> &data_widths,
     column_widths[i] = std::max(data_widths[i], max_header_width);
     for (int j = 0; j < header_row_count; j++) {
       addTailingWhiteSpace(&column_headings[(i * header_row_count) + j], column_widths[i]);
+    }
+    for (int j = 0; j < data_row_count; j++) {
       addTailingWhiteSpace(&rendered_data[(i * data_row_count) + j], column_widths[i]);
     }
     justifyStrings(&column_headings, i * header_row_count, (i + 1) * header_row_count,

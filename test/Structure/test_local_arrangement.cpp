@@ -1,37 +1,64 @@
 #include "copyright.h"
+#include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/series_ops.h"
+#include "../../src/Math/vector_ops.h"
+#include "../../src/Namelists/nml_dynamics.h"
 #include "../../src/Parsing/parse.h"
+#include "../../src/Parsing/parsing_enumerators.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/nonbonded_potential.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Structure/local_arrangement.h"
+#include "../../src/Structure/rattle.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Synthesis/condensate.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/synthesis_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_analysis.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_copy.h"
 #include "../../src/Trajectory/coordinate_series.h"
+#include "../../src/Trajectory/thermostat.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
+#ifdef STORMM_USE_HPC
+#include "../../src/Accelerator/hpc_config.h"
+#include "../../src/Trajectory/hpc_integration.h"
+#endif
 
+#ifdef STORMM_USE_HPC
+using stormm::card::HpcConfig;
+#endif
+using stormm::card::GpuDetails;
 using stormm::constants::small;
 using stormm::constants::tiny;
+using stormm::data_types::double_type_index;
 #ifndef STORMM_USE_HPC
 using stormm::data_types::double2;
 using stormm::data_types::double3;
+using stormm::data_types::double4;
+using stormm::data_types::float2;
+using stormm::data_types::float3;
+using stormm::data_types::float4;
+using stormm::data_types::int2;
+using stormm::data_types::uint2;
 #endif
 using stormm::data_types::llint;
 using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::energy::EvaluateForce;
@@ -39,39 +66,26 @@ using stormm::energy::evaluateNonbondedEnergy;
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
-using stormm::stmath::computeBoxTransform;
+using stormm::namelist::DynamicsControls;
+using stormm::parse::char4ToString;
+using stormm::parse::NumberFormat;
+using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Xoshiro256ppGenerator;
-using stormm::stmath::angleBetweenVectors;
-using stormm::stmath::crossProduct;
-using stormm::stmath::dot;
-using stormm::stmath::magnitude;
-using stormm::stmath::maxAbsValue;
-using stormm::stmath::maxValue;
-using stormm::stmath::matrixVectorMultiply;
-using stormm::stmath::minValue;
-using stormm::stmath::normalize;
-using stormm::stmath::perpendicularComponent;
-using stormm::stmath::pointPlaneDistance;
-using stormm::stmath::sum;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
+using stormm::stmath::computeBoxTransform;
 using stormm::symbols::pi;
-using stormm::synthesis::Condensate;
-using stormm::synthesis::CondensateWriter;
-using stormm::synthesis::PhaseSpaceSynthesis;
-using stormm::synthesis::PsSynthesisWriter;
 using stormm::topology::AtomGraph;
+using stormm::topology::ConstraintKit;
 using stormm::topology::listVirtualSiteFrameTypes;
 using stormm::topology::UnitCellType;
+using stormm::topology::ValenceKit;
 using stormm::topology::VirtualSiteKind;
-using stormm::trajectory::CoordinateFileKind;
-using stormm::trajectory::CoordinateFrame;
-using stormm::trajectory::CoordinateFrameWriter;
-using stormm::trajectory::CoordinateSeries;
-using stormm::trajectory::CoordinateSeriesWriter;
-using stormm::trajectory::TrajectoryKind;
+using namespace stormm::stmath;
+using namespace stormm::synthesis;
 using namespace stormm::structure;
 using namespace stormm::testing;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Scramble the positions of virtual sites in a system.  Scatter frame atoms between box images
@@ -511,6 +525,788 @@ void checkGeometrics(const TestSystemManager &tsm, const std::vector<UnitCellTyp
 }
 
 //-------------------------------------------------------------------------------------------------
+// Extract the bond lengths of various atom pairs and fill a new array to use in later analyses.
+//
+// Arguments:
+//   vk:        The valence interactions of the topology of interest
+//   pairs:     The list of atom pairs
+//   do_tests:  Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<double> listBondLengths(const ValenceKit<T> &vk, const std::vector<int2> &pairs,
+                                    const TestPriority do_tests) {
+  std::vector<double> result;
+  const int nb = pairs.size();
+  result.reserve(nb);
+  bool all_found = true;
+  for (int pos = 0; pos < nb; pos++) {
+    const int atom_i = pairs[pos].x;
+    const int atom_j = pairs[pos].y;
+    bool found = false;
+    for (int k = vk.bond_asgn_bounds[atom_i]; k < vk.bond_asgn_bounds[atom_i + 1]; k++) {
+      if (vk.bond_asgn_atoms[k] == atom_j) {
+        result.push_back(vk.bond_leq[vk.bond_asgn_index[k]]);
+        found = true;
+      }
+    }
+    all_found = (all_found && found);
+  }
+  check(all_found, "Not all bonds stipulated in the constraints were found in the topology.",
+        do_tests);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the lengths of constraints bonds against the stated values.  This routine will also check
+// that the constraints are properly arranged in a singular topology.
+//
+// Arguments:
+//   ps:        Coordinates of the system of interest.  The RATTLE'd coordinates are expected to be
+//              in the BLACK cycle position.
+//   ag:        Topology of the system of interest
+//   prec:      The precision model in which RATTLE was performed, used to select the bond
+//              equilibria
+//   style:     The manner in which RATTLE groups were evaluated (for error reporting purposes)
+//   tol:       The criterion for a successful test of the applied constraints, not necessarily the
+//              RATTLE tolerance but close it to at the least
+//   do_tests:  Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+void testBondLengths(const PhaseSpace &ps, const AtomGraph &ag, const PrecisionModel prec,
+                     const RattleMethod style, const double tol, const TestPriority do_tests) {
+
+  // Get the target bond lengths
+  std::vector<double> constrained_bond_lengths;
+  std::vector<int2> constrained_atom_pairs;
+  ConstraintKit<double> cnk = ag.getDoublePrecisionConstraintKit();
+  int nb = cnk.group_bounds[cnk.ngroup] - cnk.ngroup;
+  constrained_bond_lengths.reserve(nb);
+  constrained_atom_pairs.reserve(nb);
+  for (int i = 0; i < cnk.ngroup; i++) {
+    const int atom_i = cnk.group_list[cnk.group_bounds[i]];
+    for (int j = cnk.group_bounds[i] + 1; j < cnk.group_bounds[i + 1]; j++) {
+      constrained_atom_pairs.push_back({ atom_i, cnk.group_list[j] });
+    }
+  }
+  check(nb, RelationalOperator::EQUAL, constrained_atom_pairs.size(), "The actual number of "
+        "constrained bonds is not what would be expected based on the number of groups and the "
+        "group sizes.");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    constrained_bond_lengths = listBondLengths<double>(ag.getDoublePrecisionValenceKit(),
+                                                       constrained_atom_pairs, do_tests);
+    break;
+  case PrecisionModel::SINGLE:
+    constrained_bond_lengths = listBondLengths<float>(ag.getSinglePrecisionValenceKit(),
+                                                      constrained_atom_pairs, do_tests);
+    break;
+  }
+
+  // Compute the actual distances between the atoms
+  const PhaseSpaceReader psr = ps.data(CoordinateCycle::BLACK);
+  std::vector<double> rattled_distances(nb);
+  for (int pos = 0; pos < nb; pos++) {
+    const size_t atom_i = constrained_atom_pairs[pos].x;
+    const size_t atom_j = constrained_atom_pairs[pos].y;
+    const double dx = psr.xcrd[atom_j] - psr.xcrd[atom_i];
+    const double dy = psr.ycrd[atom_j] - psr.ycrd[atom_i];
+    const double dz = psr.zcrd[atom_j] - psr.zcrd[atom_i];
+    rattled_distances[pos] = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+  }
+  check(rattled_distances, RelationalOperator::EQUAL, Approx(constrained_bond_lengths).margin(tol),
+        "Bond length constraints did not achieve the stipulated tolerance.  Precision model: " +
+        getEnumerationName(prec) + ".  Rattle method: " + getEnumerationName(style) + ".",
+        do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the momentum of constrained groups before and after application of RATTLE velocity
+// constraints.  Descriptions of input arguments follow from testBondLengths(), above, with a
+// significant modification:
+//
+// Arguments:
+//   ps:       Coordinates and velocities of the system of interest.  The RATTLE'd coordinates and
+//             velocities expected to be in the BLACK cycle position while the un-RATTLE'd
+//             coordinates and velocities are expected to be in the WHITE cycle position.
+//-------------------------------------------------------------------------------------------------
+void testGroupMomenta(const PhaseSpace &ps, const AtomGraph &ag, const PrecisionModel prec,
+                      const RattleMethod style, const double tol, const TestPriority do_tests) {
+
+  ConstraintKit<double> cnk = ag.getDoublePrecisionConstraintKit();
+  const PhaseSpaceReader psr = ps.data();
+  std::vector<double> masses(psr.natom);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    for (int i = 0; i < psr.natom; i++) {
+      masses[i] = ag.getAtomicMass<double>(i);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    for (int i = 0; i < psr.natom; i++) {
+      masses[i] = ag.getAtomicMass<float>(i);
+    }
+    break;
+  }
+
+  // Get the original and the RATTLE-adjusted momenta.
+  std::vector<double> orig_xmnt(cnk.ngroup, 0.0), rattled_xmnt(cnk.ngroup, 0.0);
+  std::vector<double> orig_ymnt(cnk.ngroup, 0.0), rattled_ymnt(cnk.ngroup, 0.0);
+  std::vector<double> orig_zmnt(cnk.ngroup, 0.0), rattled_zmnt(cnk.ngroup, 0.0);
+  std::vector<double> orig_vel, rattled_vel;
+  orig_vel.reserve(3 * cnk.group_bounds[cnk.ngroup]);
+  rattled_vel.reserve(3 * cnk.group_bounds[cnk.ngroup]);
+  for (int i = 0; i < cnk.ngroup; i++) {
+    for (int j = cnk.group_bounds[i]; j < cnk.group_bounds[i + 1]; j++) {
+      const size_t atom_ij = cnk.group_list[j];
+      const double mass_ij = masses[atom_ij];
+      orig_xmnt[i] += psr.xvel[atom_ij] * mass_ij;
+      orig_ymnt[i] += psr.yvel[atom_ij] * mass_ij;
+      orig_zmnt[i] += psr.zvel[atom_ij] * mass_ij;
+      rattled_xmnt[i] += psr.vxalt[atom_ij] * mass_ij;
+      rattled_ymnt[i] += psr.vyalt[atom_ij] * mass_ij;
+      rattled_zmnt[i] += psr.vzalt[atom_ij] * mass_ij;
+      orig_vel.push_back(psr.xvel[atom_ij]);
+      orig_vel.push_back(psr.yvel[atom_ij]);
+      orig_vel.push_back(psr.zvel[atom_ij]);
+      rattled_vel.push_back(psr.vxalt[atom_ij]);
+      rattled_vel.push_back(psr.vyalt[atom_ij]);
+      rattled_vel.push_back(psr.vzalt[atom_ij]);
+    }
+  }
+  check(orig_xmnt, RelationalOperator::EQUAL, rattled_xmnt, "Application of RATTLE velocity "
+        "constraints (" + getEnumerationName(prec) + " precision, " + getEnumerationName(style) +
+        " method) did not conserve momentum of the connected groups along the X axis.", do_tests);
+  check(orig_ymnt, RelationalOperator::EQUAL, rattled_ymnt, "Application of RATTLE velocity "
+        "constraints (" + getEnumerationName(prec) + " precision, " + getEnumerationName(style) +
+        " method) did not conserve momentum of the connected groups along the Y axis.", do_tests);
+  check(orig_zmnt, RelationalOperator::EQUAL, rattled_zmnt, "Application of RATTLE velocity "
+        "constraints (" + getEnumerationName(prec) + " precision, " + getEnumerationName(style) +
+        " method) did not conserve momentum of the connected groups along the Z axis.", do_tests);
+
+  // Check the test's validity: the RATTLE'd velocities should differ from the original velocities.
+  check(rmsError(orig_vel, rattled_vel), RelationalOperator::GREATER_THAN, 0.01, "The original "
+        "and final (rattled) velocities did not register enough difference to constitute a valid "
+        "test of the method.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the operations of RATTLE constraints.
+//
+// Arguments:
+//   tsm:     The collection of test systems
+//   prec:    The precision model in which RATTLE was performed, used to select the bond
+//            equilibria
+//   style:   The manner in which RATTLE groups were evaluated (for error reporting purposes)
+//   xsr:     Source of random numbers for adding noise to coordinates and velocities  
+//-------------------------------------------------------------------------------------------------
+void checkRattleFunctionality(const TestSystemManager &tsm, const PrecisionModel prec,
+                              const RattleMethod style, Xoshiro256ppGenerator *xsr) {
+
+  // Count the number of systems with RATTLE hub-and-spoke groups
+  const int nsys = tsm.getSystemCount();
+  int ntop_with_cnst = 0;
+  int ntop_with_sett = 0;
+  std::vector<bool> has_cnst(nsys, false);
+  std::vector<bool> has_sett(nsys, false);
+  for (int i = 0; i < nsys; i++) {
+    const AtomGraph& ag = tsm.getTopologyReference(i);
+    if (ag.getConstraintGroupCount() > 0) {
+      has_cnst[i] = true;
+      ntop_with_cnst++;
+    }
+    if (ag.getSettleGroupCount() > 0) {
+      has_sett[i] = true;
+      ntop_with_sett++;
+    }
+  }
+
+  // Extract systems one by one, perturb the relevant atoms, and apply RATTLE.
+  for (int i = 0; i < nsys; i++) {
+    if (has_cnst[i] == false) {
+      continue;
+    }
+
+    // Create the coordinates and add random velocities
+    PhaseSpace ps = tsm.exportPhaseSpace(i);
+    PhaseSpaceWriter psw = ps.data(CoordinateCycle::WHITE);
+    PhaseSpaceWriter psw_alt = ps.data(CoordinateCycle::BLACK);
+    addRandomNoise(xsr, psw.xvel, psw.yvel, psw.zvel, psw.natom, 1.0);
+    CoordinateFrame cf(psw.natom);
+
+    // There is currently no way to copy one coordinate cycle point's contents to the other in
+    // a PhaseSpace object.  Use an intermediary object.
+    coordCopy(&cf, ps, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE);
+    coordCopy(&ps, TrajectoryKind::POSITIONS, CoordinateCycle::BLACK, cf);
+
+    // Perturb the positions of atoms.
+    const AtomGraph &ag = tsm.getTopologyReference(i);
+    const ConstraintKit cnk = ag.getDoublePrecisionConstraintKit();
+    for (int i = 0; i < cnk.ngroup; i++) {
+      const int llim = cnk.group_bounds[i];
+      const int hlim = cnk.group_bounds[i + 1];
+      for (int j = llim; j < hlim; j++) {
+        const int jatom = cnk.group_list[j];
+        psw_alt.xcrd[jatom] += xsr->gaussianRandomNumber() * 0.05;
+        psw_alt.ycrd[jatom] += xsr->gaussianRandomNumber() * 0.05;
+        psw_alt.zcrd[jatom] += xsr->gaussianRandomNumber() * 0.05;
+      }
+    }
+
+    // Restore the correct bond lengths with RATTLE.
+    rattlePositions(&ps, ag, prec, 1.0, 1.0e-6, 100, style);
+    testBondLengths(ps, ag, prec, style, 2.0e-6, tsm.getTestingStatus(i));
+    
+    // Further perturb the random velocities, as if performing a force calculation.
+    addRandomNoise(xsr, psw_alt.xvel, psw_alt.yvel, psw_alt.zvel, psw.natom, 1.0);
+    coordCopy(&cf, ps, TrajectoryKind::VELOCITIES, CoordinateCycle::BLACK);
+    coordCopy(&ps, TrajectoryKind::VELOCITIES, CoordinateCycle::WHITE, cf);
+
+    // Restore the correct velocities
+    rattleVelocities(&ps, ag, PrecisionModel::DOUBLE, 1.0, 1.0e-6, 100, style);
+    testGroupMomenta(ps, ag, prec, style, 2.0e-6, tsm.getTestingStatus(i));
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Encapsulate the constraint instruction tests for a particular precision model.
+//
+// Arguments:
+//   poly_ag:   The synthesis of topologies (included here so that its underlying individual
+//              topologies may be queried)
+//   syvk:      Valence parameters and valence work units from the topology synthesis
+//   poly_auk:  Atom update information from the topology synthesis
+//   do_tests:  Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T2, typename T4>
+void synthesisConstraintInsrScan(const AtomGraphSynthesis &poly_ag, const SyValenceKit<T> syvk,
+                                 const SyAtomUpdateKit<T, T2, T4> &poly_auk,
+                                 const TestPriority do_tests) {
+
+  // Begin by laying out the arrays of all constrained bonds.
+  std::vector<int> central_atom_id, peripheral_atom_id;
+  std::vector<double> cnst_sum_atom_invmass, cnst_length;
+  for (int sysid = 0; sysid < poly_ag.getSystemCount(); sysid++) {
+    const AtomGraph* ag_ptr = poly_ag.getSystemTopologyPointer(sysid);
+    const ConstraintKit<double> cnk = ag_ptr->getDoublePrecisionConstraintKit();
+    const int system_offset = poly_ag.getAtomOffset(sysid);
+    for (int i = 0; i < cnk.ngroup; i++) {
+      const int atom_llim = cnk.group_bounds[i];
+      const int atom_hlim = cnk.group_bounds[i + 1];
+      const int param_idx = cnk.group_param_idx[i];
+      const int param_llim = cnk.group_param_bounds[param_idx];
+      for (int j = atom_llim + 1; j < atom_hlim; j++) { 
+        central_atom_id.push_back(cnk.group_list[atom_llim] + system_offset);
+        peripheral_atom_id.push_back(cnk.group_list[j] + system_offset);
+        const double sq_len = cnk.group_sq_lengths[param_llim + j - atom_llim];
+        const double inv_ms = cnk.group_inv_masses[param_llim + j - atom_llim];
+        cnst_sum_atom_invmass.push_back(cnk.group_inv_masses[param_llim] + inv_ms);
+        cnst_length.push_back(sq_len);
+      }
+    }
+  }
+  const int constraint_count = central_atom_id.size();
+  std::vector<int> instruction_covered(constraint_count, 0);
+  std::vector<int> atom_is_central(constraint_count);
+  std::vector<int> atom_is_central_bounds(poly_ag.getPaddedAtomCount() + 1);
+  std::vector<int> atom_is_peripheral(constraint_count);
+  std::vector<int> atom_is_peripheral_bounds(poly_ag.getPaddedAtomCount() + 1);
+  indexingArray(central_atom_id, &atom_is_central, &atom_is_central_bounds);
+  indexingArray(peripheral_atom_id, &atom_is_peripheral, &atom_is_peripheral_bounds);
+
+  // Scan all constraint instructions
+  std::string param_mistakes;
+  int n_param_errors = 0;
+  for (int vwuidx = 0; vwuidx < syvk.nvwu; vwuidx++) {
+
+    // Create a cache of the atom imports, much as would be done on the GPU.
+    const int2 atom_import_limits = syvk.vwu_abstracts[(vwu_abstract_length * vwuidx) +
+                                                       static_cast<int>(VwuAbstractMap::IMPORT)];
+    std::vector<int> atom_import_ids(atom_import_limits.y - atom_import_limits.x);
+    for (int i = atom_import_limits.x; i < atom_import_limits.y; i++) {
+      atom_import_ids[i - atom_import_limits.x] = syvk.vwu_imports[i];
+    }
+
+    // Loop over all constraint group instructions, again as would be done on the GPU.
+    const int2 cnst_insr_limits = syvk.vwu_abstracts[(vwu_abstract_length * vwuidx) +
+                                                     static_cast<int>(VwuAbstractMap::CGROUP)];
+    for (int i = cnst_insr_limits.x; i < cnst_insr_limits.y; i++) {
+
+      // Determine which atoms this constraint applies to.
+      const uint2 tinsr = poly_auk.cnst_insr[i];
+      const int central_atom = atom_import_ids[tinsr.x & 0x3ff];
+      const int peripheral_atom = atom_import_ids[(tinsr.x >> 10) & 0x3ff];
+      const int param_idx = tinsr.y;
+
+      // Search for the bond constraint among the lists compiled for individual topologies
+      const int jlim = atom_is_central_bounds[central_atom + 1];
+      for (int j = atom_is_central_bounds[central_atom]; j < jlim; j++) {
+        const int jcnst = atom_is_central[j];
+        if (central_atom_id[jcnst] != central_atom) {
+          rtErr("Atom index " + std::to_string(central_atom) + " is expected to be the central "
+                "atom of constraint index " + std::to_string(jcnst) + ", but the central atom "
+                "is " + std::to_string(central_atom_id[jcnst]) + " instead.",
+                "checkSynthesisConstraintInstructions");
+        }
+        if (peripheral_atom_id[jcnst] == peripheral_atom) {
+          instruction_covered[jcnst] += 1;
+          if (fabs(poly_auk.cnst_grp_params[param_idx].x - cnst_length[jcnst]) > 1.0e-6 ||
+              fabs(poly_auk.cnst_grp_params[param_idx].y -
+                   cnst_sum_atom_invmass[jcnst]) > 1.0e-6) {
+            if (n_param_errors < 8) {
+              const int sysid = syvk.vwu_abstracts[(vwu_abstract_length * vwuidx) +
+                                                   static_cast<int>(VwuAbstractMap::SYSTEM_ID)].x;
+              const int top_ca_idx = central_atom - poly_ag.getAtomOffset(sysid);
+              const int top_pl_idx = peripheral_atom - poly_ag.getAtomOffset(sysid);
+              const AtomGraph* ag_ptr = poly_ag.getSystemTopologyPointer(sysid);
+              if (n_param_errors > 0) {
+                param_mistakes += ", ";
+              }
+              param_mistakes += char4ToString(ag_ptr->getAtomName(top_ca_idx)) + " - " +
+                                char4ToString(ag_ptr->getAtomName(top_pl_idx)) +
+                                "(synthesis indices " + std::to_string(central_atom) + ", " +
+                std::to_string(peripheral_atom) + " : expected " +
+                realToString(cnst_length[jcnst], 9, 6, NumberFormat::STANDARD_REAL) + " A and " +
+                realToString(cnst_sum_atom_invmass[jcnst], 9, 6, NumberFormat::STANDARD_REAL) +
+                " mol/g, found " +
+                realToString(poly_auk.cnst_grp_params[param_idx].x, 9, 6,
+                             NumberFormat::STANDARD_REAL) + " A and " +
+                realToString(poly_auk.cnst_grp_params[param_idx].y, 9, 6,
+                             NumberFormat::STANDARD_REAL) + " mol/g)";
+              n_param_errors++;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Check the coverage.
+  check(instruction_covered, RelationalOperator::GREATER_THAN,
+        std::vector<int>(constraint_count, 0), "Constraint instructions of the synthesis did not "
+        "cover all constraints found in the individual topologies.", do_tests);
+
+  // Check the parameters.
+  check(n_param_errors, RelationalOperator::EQUAL, 0, "Parameters for the constrained bonds were "
+        "not rendered as expected.  Examples of erroneous parameter pairs include " +
+        param_mistakes + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check that the AtomGraphSynthesis constructs constraint instructions that fulfill all of the
+// constraints in the underlying topologies.
+//
+// Arguments:
+//   tsm:        The collection of test systems, whcih will be parsed for periodic as well as
+//               non-periodic systems to make topology syntheses
+//   uc_choice:  The type(s) of boundary conditions to seek in choosing systems for the synthesis
+//   prec:       The precision model in which to test constraint instructions
+//-------------------------------------------------------------------------------------------------
+void checkSynthesisConstraintInstructions(const TestSystemManager &tsm,
+                                          const std::vector<UnitCellType> &uc_choice,
+                                          const PrecisionModel prec) {
+
+  // Create a synthesis of non-periodic systems
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(uc_choice);
+  
+  // Run through instructions and check off constraints as they are found.  Each thread will get
+  // an instruction and then constrain a bond with it.
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    synthesisConstraintInsrScan(poly_ag, poly_ag.getDoublePrecisionValenceKit(),
+                                poly_ag.getDoublePrecisionAtomUpdateKit(), tsm.getTestingStatus());
+      
+    break;
+  case PrecisionModel::SINGLE:
+    synthesisConstraintInsrScan(poly_ag, poly_ag.getSinglePrecisionValenceKit(),
+                                poly_ag.getSinglePrecisionAtomUpdateKit(), tsm.getTestingStatus());
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check that positional constraints have been correctly applied to a structure within a coordinate
+// synthesis.  In question is whether the protocol for fixed-precision coordinates (which, on the
+// CPU, is also written to emulate actions that the GPU will take) is able to reproduce the results
+// of the CPU double-precision methods.
+//
+// Arguments:
+//   
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void checkSystemPositionConstraints(const PhaseSpaceWriter &ref_psw,
+                                    const PhaseSpaceReader &test_psw, const ConstraintKit<T> &cnk,
+                                    const T tol, const std::string &topology_name,
+                                    const TestPriority do_tests) {
+  std::vector<double> lengths_found;
+  std::vector<double> target_lengths;
+  for (int i = 0; i < cnk.ngroup; i++) {
+    const int llim = cnk.group_bounds[i];
+    const int hlim = cnk.group_bounds[i + 1];
+    const int cen_atom = cnk.group_list[llim];
+    const int param_idx = cnk.group_param_idx[i];
+    const int parm_llim = cnk.group_param_bounds[param_idx];
+    for (int j = llim + 1; j < hlim; j++) {
+      const int dst_atom = cnk.group_list[j];
+      const double dx = ref_psw.xcrd[dst_atom] - ref_psw.xcrd[cen_atom];
+      const double dy = ref_psw.ycrd[dst_atom] - ref_psw.ycrd[cen_atom];
+      const double dz = ref_psw.zcrd[dst_atom] - ref_psw.zcrd[cen_atom];
+      const double r  = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+      const double r_target = sqrt(cnk.group_sq_lengths[parm_llim + j - llim]);
+      lengths_found.push_back(r);
+      target_lengths.push_back(r_target);
+    }
+  }
+  check(lengths_found, RelationalOperator::EQUAL, Approx(target_lengths).margin(tol),
+        "Bond lengths in a system taken from " + topology_name + " were not constrained to the "
+        "expected lengths after positional constraints were applied to the PhaseSpace "
+        "representation.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check that the results of iterative RATTLE velocity constraints achieved the proper result.
+//
+// Arguments:
+//   poly_ps:   The synthesis of coordinates
+//   poly_ag:   The synthesis of topologies
+//   prec:      Precision model for the calculations
+//   tol:       The tolerance by which RATTLE was applied
+//   chk_tol:   The consistency demanded between fixed-precision and floating point constrained
+//              coordinate results
+//   do_tests:  Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T2, typename T4>
+void checkSynthesisRattleV(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceSynthesis &raw,
+                           const SyValenceKit<T> &syvk, const SyAtomUpdateKit<T, T2, T4> &poly_auk,
+                           const T dt, const T tol, const T chk_tol, const HybridTargetLevel tier,
+                           const TestPriority do_tests) {
+
+  // Recover the precision model.  This is the price of being able to template code surrounding the
+  // topology synthesis.
+  const PrecisionModel prec = (std::type_index(typeid(T)).hash_code() == double_type_index) ?
+                              PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
+  
+  // Extract systems from the "raw" coordinates, before constraints were applied.  Use the
+  // constraint procedures for single systems as an independent check on the protocols encoded in
+  // the topology synthesis and operating on the fixed-precision coordinates.
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    PhaseSpace ref_ps = raw.exportSystem(i, tier);
+    const AtomGraph *ag_ptr = raw.getSystemTopologyPointer(i);
+    rattleVelocities(&ref_ps, ag_ptr, prec, dt, tol, 30, RattleMethod::CENTER_SUM);
+    
+    // Compare the alternate approach to processing the raw coordinates to that obtained with the
+    // synthesis-based method.  
+    PhaseSpaceWriter ref_psw = ref_ps.data();
+    const PhaseSpace test_ps = poly_ps.exportSystem(i, tier);
+
+    // Compare the constrained velocities from the double-precision reference calculation to those
+    // obtained from the synthesis method, mixing single- or double-precision arithmetic with a
+    // fixed-precision coordinate (position and velocity) representation.
+    const std::vector<double> ref_xyz =
+      ref_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::VELOCITIES);
+    const std::vector<double> test_xyz =
+      test_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::VELOCITIES);
+    check(ref_xyz, RelationalOperator::EQUAL, Approx(test_xyz).margin(chk_tol), "Constrained "
+          "velocities from " + getEnumerationName(prec) + "-precision arithmetic operating on "
+          "coordinates with " + std::to_string(poly_ps.getGlobalPositionBits()) + " bits of "
+          "positional precision and " + std::to_string(poly_ps.getVelocityBits()) + " bits of "
+          "velocity precision do not agree with a double-precision standard.  The system topology "
+          "is " + getBaseName(ag_ptr->getFileName()) + ".", do_tests);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check that the results of iterative RATTLE position constraints achieved the proper result.
+// Descriptions of input parameters follow from checkSynthesisRattleV() above.
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T2, typename T4>
+void checkSynthesisRattleC(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceSynthesis &raw,
+                           const SyValenceKit<T> &syvk, const SyAtomUpdateKit<T, T2, T4> &poly_auk,
+                           const T dt, const T tol, const T chk_tol, const HybridTargetLevel tier,
+                           const TestPriority do_tests) {
+
+  // Repeat the process above to extract systems from each coordinate synthesis, apply positional
+  // RATTLE constraints to the "raw" (unconstrained) coordinates, and check that the results match.
+  const PrecisionModel prec = (std::type_index(typeid(T)).hash_code() == double_type_index) ?
+                              PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    PhaseSpace ref_ps = raw.exportSystem(i, tier);
+    const AtomGraph *ag_ptr = raw.getSystemTopologyPointer(i);
+    rattlePositions(&ref_ps, ag_ptr, prec, dt, tol, 30, RattleMethod::CENTER_SUM);
+    PhaseSpaceWriter ref_psw = ref_ps.data();
+    const PhaseSpace test_ps = poly_ps.exportSystem(i, tier);
+    
+    // Check positions against the CPU results.
+    const std::vector<double> ref_xyz =
+      ref_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::POSITIONS);
+    const std::vector<double> test_xyz =
+      test_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::POSITIONS);
+    check(ref_xyz, RelationalOperator::EQUAL, Approx(test_xyz).margin(chk_tol), "Constrained "
+          "positions from " + getEnumerationName(prec) + "-precision arithmetic operating on "
+          "coordinates with " + std::to_string(poly_ps.getGlobalPositionBits()) + " bits of "
+          "positional precision and " + std::to_string(poly_ps.getVelocityBits()) + " bits of "
+          "velocity precision do not agree with a double-precision standard.  The system topology "
+          "is " + getBaseName(ag_ptr->getFileName()) + ".", do_tests);
+
+    // Test velocities to ensure that the correction to account for positional adjustments was
+    // successful.
+    const std::vector<double> ref_vxyz =
+      ref_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::VELOCITIES);
+    const std::vector<double> test_vxyz =
+      test_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::VELOCITIES);
+    check(ref_vxyz, RelationalOperator::EQUAL, Approx(test_vxyz).margin(chk_tol),
+          "Constraint-corrected velocities from " + getEnumerationName(prec) + "-precision "
+          "arithmetic operating on coordinates with " +
+          std::to_string(poly_ps.getGlobalPositionBits()) + " bits of positional precision and " +
+          std::to_string(poly_ps.getVelocityBits()) + " bits of velocity precision do not agree "
+          "with a double-precision standard.  The system topology is " +
+          getBaseName(ag_ptr->getFileName()) + ".", do_tests);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Implement RATTLE velocity and position constraints for a coordinate synthesis.  
+//
+// Arguments:
+//   tsm:        The collection of test systems, whcih will be parsed for periodic as well as
+//               non-periodic systems to make topology syntheses
+//   xsr:        Sourcce of random numbers
+//   uc_choice:  The type(s) of boundary conditions to seek in choosing systems for the synthesis
+//   prec:       The precision model in which to test constraint instructions
+//-------------------------------------------------------------------------------------------------
+void checkRattle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
+                 const std::vector<UnitCellType> &uc_choice, const PrecisionModel prec,
+                 const GpuDetails &gpu = null_gpu) {
+
+  // Create the synthesis
+  const size_t nuc = uc_choice.size();
+  std::vector<int> index_key;
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    const AtomGraph* iag_ptr = tsm.getTopologyPointer(i);
+    for (size_t j = 0; j < nuc; j++) {
+      if (iag_ptr->getUnitCellType() == uc_choice[j]) {
+        index_key.push_back(i);
+      }
+    }
+  }
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(index_key);
+#ifdef STORMM_USE_HPC
+  const std::vector<AtomGraph*>& unique_tops = poly_ag.getUniqueTopologies();
+  std::vector<StaticExclusionMask> unique_se_masks;
+  unique_se_masks.reserve(unique_tops.size());
+  for (size_t i = 0; i < unique_tops.size(); i++) {
+    unique_se_masks.push_back(StaticExclusionMask(unique_tops[i]));
+  }
+  StaticExclusionMaskSynthesis poly_se(unique_se_masks, poly_ag.getTopologyIndices());
+  poly_ag.loadNonbondedWorkUnits(poly_se, InitializationTask::GENERAL_DYNAMICS);
+  const CoreKlManager launcher(gpu, poly_ag);
+  poly_ag.upload();
+  poly_se.upload();
+#endif
+  int gbits, vbits;
+  double rtol, chk_tol;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    gbits = 60;
+    vbits = 66;
+    rtol = 1.0e-8;
+    chk_tol= 1.2e-6;
+    break;
+  case PrecisionModel::SINGLE:
+    gbits = 28;
+    vbits = 40;
+    rtol = 1.0e-6;
+    chk_tol= 1.5e-6;
+    break;
+  }
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(index_key, 0.0, 5748424, gbits,
+                                                              vbits);
+  DynamicsControls dyncon;
+  dyncon.setThermostatGroup(273.15, 273.15);
+  dyncon.setGeometricConstraints();
+  std::vector<CoordinateFrame> force_bumps;
+  const int nsys = poly_ps.getSystemCount();
+  force_bumps.reserve(nsys);
+  for (int sysid = 0; sysid < nsys; sysid++) {
+
+    // Copy the system's coordinates.  Set the bond lengths exactly for reference.  Copy those
+    // positions back.  Then, scramble the positions and set those as the "developing" positions.
+    CoordinateFrame cf = poly_ps.exportCoordinates(sysid);
+    CoordinateFrameWriter cfw = cf.data();
+    const AtomGraph *ag_ptr = poly_ps.getSystemTopologyPointer(sysid);
+    const ConstraintKit<double> cnk = ag_ptr->getDoublePrecisionConstraintKit();
+    for (int i = 0; i < cnk.ngroup; i++) {
+      const int llim = cnk.group_bounds[i];
+      const int hlim = cnk.group_bounds[i + 1];
+      const int cen_atom = cnk.group_list[llim];
+      const int param_idx = cnk.group_param_idx[i];
+      const int parm_llim = cnk.group_param_bounds[param_idx];
+      for (int j = llim + 1; j < hlim; j++) {
+        const int dst_atom = cnk.group_list[j];
+        const double dx = cfw.xcrd[dst_atom] - cfw.xcrd[cen_atom];
+        const double dy = cfw.ycrd[dst_atom] - cfw.ycrd[cen_atom];
+        const double dz = cfw.zcrd[dst_atom] - cfw.zcrd[cen_atom];
+        const double r  = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        const double r_target = sqrt(cnk.group_sq_lengths[parm_llim + j - llim]);
+        const double normfac = r_target / r;
+        const double norm_dx = dx * normfac;
+        const double norm_dy = dy * normfac;
+        const double norm_dz = dz * normfac;
+        cfw.xcrd[dst_atom] = cfw.xcrd[cen_atom] + norm_dx;
+        cfw.ycrd[dst_atom] = cfw.ycrd[cen_atom] + norm_dy;
+        cfw.zcrd[dst_atom] = cfw.zcrd[cen_atom] + norm_dz;
+      }
+    }
+    coordCopy(&poly_ps, sysid, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE, cf);
+
+    // Posit a set of velocities for the system.  Use the CoordinateFrame object as a convenient
+    // shuttle for the information and necessary type conversions.
+    PhaseSpace ps = poly_ps.exportSystem(sysid);
+    Thermostat tst(ag_ptr, ThermostatKind::ANDERSEN, 273.15);
+    const ThermostatReader<double> tstr = tst.dpData();
+    velocityKickStart(&ps, ag_ptr, &tst, dyncon, EnforceExactTemperature::YES);
+
+    // The initialized velocities are in a PhaseSpace object.  Transfer the velocities to the
+    // coordinate synthesis.
+    coordCopy(&cf, ps, TrajectoryKind::VELOCITIES, CoordinateCycle::WHITE);
+    coordCopy(&poly_ps, sysid, TrajectoryKind::VELOCITIES, CoordinateCycle::WHITE, cf);
+
+    // Perturb the velocities, as if by applying a force for half a time step.  Remember the
+    // 'forces' (deltas in the velocity of each particle) so that they can applied again later.
+    // Store the perturbed velocities in the "developing" BLACK time cycle stage of the
+    // coordinate synthesis.
+    force_bumps.push_back(cf);
+    addRandomNoise(xsr, cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom, 0.05);
+    CoordinateFrameWriter fb_cfw = force_bumps[sysid].data();
+    for (int i = 0; i < cfw.natom; i++) {
+      fb_cfw.xcrd[i] = cfw.xcrd[i] - fb_cfw.xcrd[i];
+      fb_cfw.ycrd[i] = cfw.ycrd[i] - fb_cfw.ycrd[i];
+      fb_cfw.zcrd[i] = cfw.zcrd[i] - fb_cfw.zcrd[i];
+    }
+    coordCopy(&poly_ps, sysid, TrajectoryKind::VELOCITIES, CoordinateCycle::BLACK, cf);
+
+    // Perturb the coordinates to produce an effect as if they have a history.  This is not a
+    // function of the velocities or the velocity perturbation, which will be applied to the
+    // coordinates later in the analysis.  Store the perturbed coordinates in the BLACK
+    // time cycle of the coordinate synthesis.  Until the actual move, this stage is the history.
+    coordCopy(&cf, ps, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE);
+    addRandomNoise(xsr, cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom, 0.05);
+    coordCopy(&poly_ps, sysid, TrajectoryKind::POSITIONS, CoordinateCycle::BLACK, cf);
+  }
+
+  // Upload coordinates in the synthesis to the GPU.  This is, in effect, making a copy while the
+  // CPU processes coordinates on the host memory.  However, the GPU coordinates will be processed
+  // with specific kernels to check for agreement with CPU results.
+#ifdef STORMM_USE_HPC
+  poly_ps.upload();
+  const int2 intg_lp = launcher.getIntegrationKernelDims(prec, AccumulationMethod::SPLIT,
+                                                         IntegrationStage::VELOCITY_CONSTRAINT);
+  Thermostat velcns_tst(poly_ag, ThermostatKind::NONE, 298.15, PrecisionModel::SINGLE, 41939158,
+                        gpu);
+  CacheResource intg_cache(intg_lp.x, poly_ag.getValenceWorkUnitSize());
+  MolecularMechanicsControls mmctrl_ie(dyncon);
+  mmctrl_ie.primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES,
+                                  VwuGoal::MOVE_PARTICLES, prec, poly_ag);
+  launchIntegrationProcess(&poly_ps, &intg_cache, &velcns_tst, &mmctrl_ie, poly_ag, launcher, prec,
+                           AccumulationMethod::SPLIT, IntegrationStage::VELOCITY_CONSTRAINT);
+  const std::vector<HybridTargetLevel> tiers = { HybridTargetLevel::HOST,
+                                                 HybridTargetLevel::DEVICE };
+#else
+  const std::vector<HybridTargetLevel> tiers = { HybridTargetLevel::HOST };
+#endif
+  
+  // Make a copy of the coordinate synthesis as it has been constructed: reference positions (in
+  // the WHITE stage of the time cycle, which it holds as current) set such that the bond lengths
+  // are all correct, random reference velocities are based on some state at 273 Kelvin, and there
+  // are some sort of evolving velocities.  If running in CPU mode, check the work of the CPU
+  // emulator only.  If running in GPU mode, check both the CPU emulator and the real GPU kernel.
+  PhaseSpaceSynthesis raw = poly_ps;
+  rattleVelocities(&poly_ps, poly_ag, prec, 1.0, rtol);
+  for (size_t i = 0; i < tiers.size(); i++) {
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      checkSynthesisRattleV<double,
+                            double2, double4>(poly_ps, raw, poly_ag.getDoublePrecisionValenceKit(),
+                                              poly_ag.getDoublePrecisionAtomUpdateKit(), 1.0, rtol,
+                                              chk_tol, tiers[i], tsm.getTestingStatus(index_key));
+      break;
+    case PrecisionModel::SINGLE:
+      checkSynthesisRattleV<float,
+                            float2, float4>(poly_ps, raw, poly_ag.getSinglePrecisionValenceKit(),
+                                            poly_ag.getSinglePrecisionAtomUpdateKit(), 1.0, rtol,
+                                            chk_tol, tiers[i], tsm.getTestingStatus(index_key));
+      break;
+    }
+  }
+  
+  // Check that the coordinate cycle for the synthesis remains "WHITE."
+  check(getEnumerationName(poly_ps.getCyclePosition()), RelationalOperator::EQUAL,
+        getEnumerationName(CoordinateCycle::WHITE), "The coordinate cycle of a synthesis was "
+        "not as expected after the velocity constraints protocol.  This may indicate a change "
+        "earlier in the workflow.");
+  
+  // Further advance the velocities according to the prior-computed force bumps, then advance
+  // positions.  This will replace the positions in the BLACK time point such that they are
+  // now "under construction."
+  for (int sysid = 0; sysid < nsys; sysid++) {
+    CoordinateFrame vel = poly_ps.exportCoordinates(sysid, CoordinateCycle::BLACK,
+                                                    TrajectoryKind::VELOCITIES);
+    CoordinateFrameWriter velw = vel.data();
+    CoordinateFrameWriter fbw = force_bumps[sysid].data();
+    for (int i = 0; i < velw.natom; i++) {
+      velw.xcrd[i] += fbw.xcrd[i];
+      velw.ycrd[i] += fbw.ycrd[i];
+      velw.zcrd[i] += fbw.zcrd[i];
+    }
+    coordCopy(&poly_ps, sysid, TrajectoryKind::VELOCITIES, CoordinateCycle::BLACK, vel);
+    CoordinateFrame pos = poly_ps.exportCoordinates(sysid, CoordinateCycle::WHITE,
+                                                    TrajectoryKind::POSITIONS);
+    CoordinateFrameWriter posw = pos.data();
+
+    // Advance assuming a 1fs time step.
+    for (int i = 0; i < posw.natom; i++) {
+      posw.xcrd[i] += velw.xcrd[i];
+      posw.ycrd[i] += velw.ycrd[i];
+      posw.zcrd[i] += velw.zcrd[i];
+    }
+    coordCopy(&poly_ps, sysid, TrajectoryKind::POSITIONS, CoordinateCycle::BLACK, pos);
+  }
+#ifdef STORMM_USE_HPC
+  poly_ps.upload();
+#endif
+
+  // Update the copy (unconstrained reference) of the coordinate synthesis.
+  Hybrid<int2> pairs(nsys);
+  for (int i = 0; i < nsys; i++) {
+    pairs.putHost({ i, i }, i);
+  }
+  coordCopy(&raw, poly_ps, pairs);
+#ifdef STORMM_USE_HPC
+  coordCopy(&raw, poly_ps, pairs, HybridTargetLevel::DEVICE, HybridTargetLevel::DEVICE);
+#endif
+  // Constrain the positions and adjust the velocities as appropriate.
+  rattlePositions(&poly_ps, poly_ag, prec, 1.0, rtol);
+#ifdef STORMM_USE_HPC
+  launchIntegrationProcess(&poly_ps, &intg_cache, &velcns_tst, &mmctrl_ie, poly_ag, launcher, prec,
+                           AccumulationMethod::SPLIT, IntegrationStage::GEOMETRY_CONSTRAINT);
+#endif
+  for (size_t i = 0; i < tiers.size(); i++) {
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      checkSynthesisRattleC<double,
+                            double2, double4>(poly_ps, raw, poly_ag.getDoublePrecisionValenceKit(),
+                                              poly_ag.getDoublePrecisionAtomUpdateKit(), 1.0, rtol,
+                                              chk_tol, tiers[i], tsm.getTestingStatus(index_key));
+      break;
+    case PrecisionModel::SINGLE:
+      checkSynthesisRattleC<float,
+                            float2, float4>(poly_ps, raw, poly_ag.getSinglePrecisionValenceKit(),
+                                            poly_ag.getSinglePrecisionAtomUpdateKit(), 1.0, rtol,
+                                            chk_tol, tiers[i], tsm.getTestingStatus(index_key));
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -521,6 +1317,16 @@ int main(const int argc, const char* argv[]) {
     stormmSplash();
   }
 
+  // Prep the GPU
+#ifdef STORMM_USE_HPC
+  const HpcConfig gpu_config(ExceptionResponse::WARN);
+  const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
+  const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+  const Hybrid<int> array_to_trigger_gpu_mapping(1);
+#else
+  const GpuDetails gpu = null_gpu;
+#endif
+
   // Section 1
   section("Basic checks on re-imaging calculations");
 
@@ -530,9 +1336,12 @@ int main(const int argc, const char* argv[]) {
   // Section 3
   section("Virtual site placement");
 
-  // Section 3
+  // Section 4
   section("Virtual site force transmission");
 
+  // Section 5
+  section("Constraint application");
+  
   // Get a realistic system
   const char osc = osSeparator();
   const std::string base_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -798,7 +1607,7 @@ int main(const int argc, const char* argv[]) {
   check(dihedralAngle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
         Approx(-1.6233704738).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
-  const std::vector<std::string> collection = { "med_1",  "med_3", "symmetry_C1", "tip3p",
+  const std::vector<std::string> collection = { "med_1", "med_3", "symmetry_C1", "tip3p",
                                                 "drug_example_dry", "ubiquitin", "stereo_L1_vs" };
   TestSystemManager tsm(base_top_path, "top", collection, base_crd_path, "inpcrd", collection);
   std::vector<CoordinateFrame> tsm_cf;
@@ -929,7 +1738,23 @@ int main(const int argc, const char* argv[]) {
   checkVirtualSiteForceXfer(&stro_ps, &stro_ag, do_vs_tests);
   checkVirtualSiteForceXfer(&symm_ps, &symm_ag, do_vs_tests);
   checkVirtualSiteForceXfer(&dgvs_ps, &dgvs_ag, do_vs_tests);
-  
+
+  // Check restraint applications through RATTLE and SETTLE
+  section(5);
+  checkRattleFunctionality(tsm, PrecisionModel::DOUBLE, RattleMethod::SEQUENTIAL, &xsr);
+  checkRattleFunctionality(tsm, PrecisionModel::DOUBLE, RattleMethod::CENTER_SUM, &xsr);
+  checkRattleFunctionality(tsm, PrecisionModel::SINGLE, RattleMethod::SEQUENTIAL, &xsr);
+  checkRattleFunctionality(tsm, PrecisionModel::SINGLE, RattleMethod::CENTER_SUM, &xsr);
+  checkSynthesisConstraintInstructions(tsm, { UnitCellType::NONE }, PrecisionModel::DOUBLE);
+  checkSynthesisConstraintInstructions(tsm, { UnitCellType::NONE }, PrecisionModel::SINGLE);
+  const std::vector<UnitCellType> pbct = { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC };
+  checkSynthesisConstraintInstructions(tsm, pbct, PrecisionModel::DOUBLE);
+  checkSynthesisConstraintInstructions(tsm, pbct, PrecisionModel::SINGLE);
+  checkRattle(tsm, &xsr, std::vector<UnitCellType>(1, UnitCellType::NONE),
+              PrecisionModel::DOUBLE, gpu);
+  checkRattle(tsm, &xsr, std::vector<UnitCellType>(1, UnitCellType::NONE),
+              PrecisionModel::SINGLE, gpu);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

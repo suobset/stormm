@@ -33,7 +33,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     gb_offset{default_gb_radii_offset}, gb_neckscale{default_gb_neck_scale},
     gb_neckcut{default_gb_neck_cut}, coulomb_constant{amber_ancient_bioq},
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
-    water_residue_name{' ', ' ', ' ', ' '},
+    largest_constraint_group{0}, water_residue_name{' ', ' ', ' ', ' '},
     pb_radii_sets{std::vector<AtomicRadiusSet>(system_count, AtomicRadiusSet::NONE)},
 
     // Individual topologies and restraint networks (RestraintApparatus objects), each of them
@@ -68,6 +68,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rigid_water_counts{HybridKind::POINTER, "tpsyn_rwat_counts"},
     bond_constraint_counts{HybridKind::POINTER, "tpsyn_bcnst_counts"},
     degrees_of_freedom{HybridKind::POINTER, "tpsyn_deg_freedom"},
+    cnst_degrees_of_freedom{HybridKind::POINTER, "tpsyn_cdeg_freedom"},
     nonrigid_particle_counts{HybridKind::POINTER, "tpsyn_n_nonrigid"},
 
     // Offsets for each system's term lists
@@ -358,6 +359,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
     // Valence work unit instruction sets and energy accumulation masks
     total_valence_work_units{0}, valence_work_unit_size{maximum_valence_work_unit_atoms},
+    valence_thread_block_size{ValenceKernelSize::XL},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
     vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
@@ -437,8 +439,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
-  const int bpsm = large_block_size / small_block_size;
-  valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts, gpu.getSMPCount() * bpsm);
+  valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts, gpu.getSMPCount(),
+                                                        &valence_thread_block_size);
   loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 
@@ -524,6 +526,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const AtomGraphSynthesis &original) :
     coulomb_constant{original.coulomb_constant},
     use_bond_constraints{original.use_bond_constraints},
     use_settle{original.use_settle},
+    largest_constraint_group{original.largest_constraint_group},
     water_residue_name{original.water_residue_name},
     pb_radii_sets{original.pb_radii_sets},
 
@@ -559,6 +562,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const AtomGraphSynthesis &original) :
     rigid_water_counts{original.rigid_water_counts},
     bond_constraint_counts{original.bond_constraint_counts},
     degrees_of_freedom{original.degrees_of_freedom},
+    cnst_degrees_of_freedom{original.cnst_degrees_of_freedom},
     nonrigid_particle_counts{original.nonrigid_particle_counts},
 
     // Offsets for each system's term lists
@@ -846,6 +850,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const AtomGraphSynthesis &original) :
     // Valence work unit instruction sets and energy accumulation masks
     total_valence_work_units{original.total_valence_work_units},
     valence_work_unit_size{original.valence_work_unit_size},
+    valence_thread_block_size{original.valence_thread_block_size},
     vwu_instruction_sets{original.vwu_instruction_sets},
     vwu_import_lists{original.vwu_import_lists},
     vwu_manipulation_masks{original.vwu_manipulation_masks},
@@ -935,6 +940,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(AtomGraphSynthesis &&original) :
     coulomb_constant{original.coulomb_constant},
     use_bond_constraints{original.use_bond_constraints},
     use_settle{original.use_settle},
+    largest_constraint_group{original.largest_constraint_group},
     water_residue_name{original.water_residue_name},
     pb_radii_sets{std::move(original.pb_radii_sets)},
 
@@ -970,6 +976,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(AtomGraphSynthesis &&original) :
     rigid_water_counts{std::move(original.rigid_water_counts)},
     bond_constraint_counts{std::move(original.bond_constraint_counts)},
     degrees_of_freedom{std::move(original.degrees_of_freedom)},
+    cnst_degrees_of_freedom{std::move(original.cnst_degrees_of_freedom)},
     nonrigid_particle_counts{std::move(original.nonrigid_particle_counts)},
 
     // Offsets for each system's term lists
@@ -1257,6 +1264,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(AtomGraphSynthesis &&original) :
     // Valence work unit instruction sets and energy accumulation masks
     total_valence_work_units{original.total_valence_work_units},
     valence_work_unit_size{original.valence_work_unit_size},
+    valence_thread_block_size{original.valence_thread_block_size},
     vwu_instruction_sets{std::move(original.vwu_instruction_sets)},
     vwu_import_lists{std::move(original.vwu_import_lists)},
     vwu_manipulation_masks{std::move(original.vwu_manipulation_masks)},
@@ -1349,6 +1357,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(const AtomGraphSynthesis &othe
   coulomb_constant = other.coulomb_constant;
   use_bond_constraints = other.use_bond_constraints;
   use_settle = other.use_settle;
+  largest_constraint_group = other.largest_constraint_group;
   water_residue_name = other.water_residue_name;
   pb_radii_sets = other.pb_radii_sets;
 
@@ -1384,6 +1393,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(const AtomGraphSynthesis &othe
   rigid_water_counts = other.rigid_water_counts;
   bond_constraint_counts = other.bond_constraint_counts;
   degrees_of_freedom = other.degrees_of_freedom;
+  cnst_degrees_of_freedom = other.cnst_degrees_of_freedom;
   nonrigid_particle_counts = other.nonrigid_particle_counts;
 
   // Offsets for each system's term lists
@@ -1673,6 +1683,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(const AtomGraphSynthesis &othe
   // Valence work unit instruction sets and energy accumulation masks
   total_valence_work_units = other.total_valence_work_units;
   valence_work_unit_size = other.valence_work_unit_size;
+  valence_thread_block_size = other.valence_thread_block_size;
   vwu_instruction_sets = other.vwu_instruction_sets;
   vwu_import_lists = other.vwu_import_lists;
   vwu_manipulation_masks = other.vwu_manipulation_masks;
@@ -1769,6 +1780,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(AtomGraphSynthesis &&other) {
   coulomb_constant = other.coulomb_constant;
   use_bond_constraints = other.use_bond_constraints;
   use_settle = other.use_settle;
+  largest_constraint_group = other.largest_constraint_group;
   water_residue_name = other.water_residue_name;
   pb_radii_sets = std::move(other.pb_radii_sets);
 
@@ -1804,6 +1816,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(AtomGraphSynthesis &&other) {
   rigid_water_counts = std::move(other.rigid_water_counts);
   bond_constraint_counts = std::move(other.bond_constraint_counts);
   degrees_of_freedom = std::move(other.degrees_of_freedom);
+  cnst_degrees_of_freedom = std::move(other.cnst_degrees_of_freedom);
   nonrigid_particle_counts = std::move(other.nonrigid_particle_counts);
 
   // Offsets for each system's term lists
@@ -2091,6 +2104,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(AtomGraphSynthesis &&other) {
   // Valence work unit instruction sets and energy accumulation masks
   total_valence_work_units = other.total_valence_work_units;
   valence_work_unit_size = other.valence_work_unit_size;
+  valence_thread_block_size = other.valence_thread_block_size;
   vwu_instruction_sets = std::move(other.vwu_instruction_sets);
   vwu_import_lists = std::move(other.vwu_import_lists);
   vwu_manipulation_masks = std::move(other.vwu_manipulation_masks);
@@ -2167,6 +2181,7 @@ void AtomGraphSynthesis::rebasePointers() {
   rigid_water_counts.swapTarget(&int_system_data);
   bond_constraint_counts.swapTarget(&int_system_data);
   degrees_of_freedom.swapTarget(&int_system_data);
+  cnst_degrees_of_freedom.swapTarget(&int_system_data);
   nonrigid_particle_counts.swapTarget(&int_system_data);
 
   // Offsets for each system's term lists

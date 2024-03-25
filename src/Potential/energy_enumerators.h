@@ -46,7 +46,7 @@ enum class StateVariable {
   VDW_ONE_FOUR,           ///< van-der Waals (typically, Lennard Jones) energy from 1-4 attenuated
                           ///<   interactions
   ELECTROSTATIC,          ///< Electrostatic energy from non-bonded interactions
-  ELECTROSTATIC_ONE_FOUR, ///< Electrostatic energy from 1-4 attenuated interactions
+  ELEC_ONE_FOUR, ///< Electrostatic energy from 1-4 attenuated interactions
   GENERALIZED_BORN,       ///< Generalized Born (implicit solvent) energy
   RESTRAINT,              ///< Energy due to flat-bottom bimodal harmonic potential restraints
   KINETIC,                ///< Energy due to particle motion
@@ -60,11 +60,11 @@ enum class StateVariable {
   VOLUME,                 ///< Unit cell volume (only relevant to periodic simulations)
   TEMPERATURE_ALL,        ///< Overall system temperature
   TEMPERATURE_PROTEIN,    ///< Temperature of atoms in the "protein" component of the system (this,
-                          ///<   like the other temperature subcategories that collow, is an
+                          ///<   like the other temperature subcategories that follow, is an
                           ///<   arbitrary subset of the atoms defined by a special mask in the
                           ///<   control input)
-  TEMPERATURE_LIGAND,     ///< Overall system temperature
-  TEMPERATURE_SOLVENT,    ///< Overall system temperature
+  TEMPERATURE_LIGAND,     ///< Temperature of atoms in the "ligand" component of the system
+  TEMPERATURE_SOLVENT,    ///< Temperature of atoms in the "solvent" component of the system
   DU_DLAMBDA,             ///< Derivative of the mixed potential energy function with respect to
                           ///<   the mixing parameter Lambda (relevant to thermodynamic
                           ///<   integration applications only)
@@ -195,6 +195,15 @@ enum class PMIStrategy {
                          ///<   shifting more work into the particle-mesh interactions.
   NO_AUTOMATION          ///< Do not use any automated settings.
 };
+
+/// \brief Enumerate the available sizes of the valence work unit kernel.
+enum class ValenceKernelSize {
+  XL = 0,  ///< Launch the kernel with the largest possible block size, up to 512 threads per
+           ///<   block.
+  LG,      ///< Launch the kernel with a large block size, up to 256 threads per block.
+  MD,      ///< Launch the kernel with a medium block size, up to 128 threads per block.
+  SM       ///< Launch the kernel with the smallest possible block size of 64 threads per block.
+};
   
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///
@@ -215,6 +224,7 @@ std::string getEnumerationName(SplineScaffold input);
 std::string getEnumerationName(CellGridAction input);
 std::string getEnumerationName(QMapMethod input);
 std::string getEnumerationName(PMIStrategy input);
+std::string getEnumerationName(ValenceKernelSize input);
 /// \}
 
 /// \brief Produce a potential enumeration based on a selection of recognized input strings.
@@ -227,6 +237,11 @@ NonbondedPotential translateNonbondedPotential(const std::string &input);
 /// \param input  The string describing the potential
 NonbondedTheme translateNonbondedTheme(const std::string &input);
 
+/// \brief Produce an energy sampling enumeration based on a selection of recognized input strings.
+///
+/// \param input  The string describing the sampling
+EnergySample translateEnergySample(const std::string &input);
+  
 /// \brief Produce an enumerated accuracy target for the particle-mesh interaction grid based on a
 ///        selection of recognized input strings.
 ///

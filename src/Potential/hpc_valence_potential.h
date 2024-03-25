@@ -3,7 +3,7 @@
 #define STORMM_VALENCE_POTENTIAL_CUH
 
 #ifdef STORMM_USE_CUDA
-#include <cuda_runtime.h>
+#  include <cuda_runtime.h>
 #endif
 #include "copyright.h"
 #include "Accelerator/core_kernel_manager.h"
@@ -40,9 +40,6 @@ using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
 using trajectory::Thermostat;
 using trajectory::ThermostatWriter;
-  
-/// \brief Set the __shared__ memory configuration for various valence interaction kernels.
-void valenceKernelSetup();
 
 /// \brief Test various subdivisions of a thread block to see whether the workload can be better
 ///        distributed.  This is perilous if the kernel allocates significant static __shared__
@@ -70,10 +67,12 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
 /// \param purpose             Indicate whether the kernel shall deposit its accumulated forces
 ///                            back into global arrays or use them immediately to move particles
 /// \param collision_handling  Indication of whether to forgive clashes
+/// \param kwidth              Indication of the desired thread block size in the kernel
 cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
                                                   EvaluateEnergy eval_nrg,
                                                   AccumulationMethod acc_meth, VwuGoal purpose,
-                                                  ClashResponse collision_handling);
+                                                  ClashResponse collision_handling,
+                                                  ValenceKernelSize kwidth);
 
 /// \brief Evaluate valence work units and move atoms.
 ///

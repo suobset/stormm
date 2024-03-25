@@ -197,6 +197,10 @@ public:
   const NeckGeneralizedBornKit<float>
   spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a const pointer to the object itself, useful if a pointer is needed after passing
+  ///        he object by const reference.
+  const NeckGeneralizedBornTable* getSelfPointer() const;
+  
 private:
   int table_size;                        ///< Size of the neck GB lookup tables (if applicable)
   double neck_cut;                       ///< Neck GB cutoff (if applicable)

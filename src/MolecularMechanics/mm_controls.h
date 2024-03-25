@@ -36,6 +36,7 @@ using namelist::default_rattle_tolerance;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
+using synthesis::VwuGoal;
 using topology::ImplicitSolventModel;
 
 /// \brief The C-style, always writeable abstract for the MolecularMechanicsControls object.  To
@@ -46,9 +47,11 @@ template <typename T> struct MMControlKit {
   /// \brief The constructor takes a straight list of values and pointers.  The step number is
   ///        left modifiable so that the object can be re-used over successive time steps.
   MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T dt_in, T rattle_tol_in,
-               T initial_step_in, int* vwu_progress_in, int* nbwu_progress_in,
-               int* pmewu_progress_in, int* gbrwu_progress_in, int* gbdwu_progress_in,
-               int* gtwu_progress_in, int* scwu_progress_in, int* rdwu_progress_in);
+               T initial_step_in, int* vwu_progress_in, int* vupt_progress_in,
+               int* vcns_progress_in, int* pupt_progress_in, int* gcns_progress_in,
+               int* nbwu_progress_in, int* pmewu_progress_in, int* gbrwu_progress_in,
+               int* gbdwu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
+               int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -63,6 +66,10 @@ template <typename T> struct MMControlKit {
   const T rattle_tol;    ///< Convergence tolerance for bond constraints
   const T initial_step;  ///< Initial step size to be taken in energy minimization
   int* vwu_progress;     ///< Progress counters for valence work units
+  int* vupt_progress;    ///< Progress counters for standalone velocity update work units
+  int* vcns_progress;    ///< Progress counters for standalone velocity constraint work units
+  int* pupt_progress;    ///< Progress counters for standalone coordinate update work units
+  int* gcns_progress;    ///< Progress counters for standalone positional constraint work units
   int* nbwu_progress;    ///< Progress counters for non-bonded work units
   int* pmewu_progress;   ///< Progress counters for PME long-ranged work units
   int* gbrwu_progress;   ///< Progress counters for Generalized Born radii computations
@@ -195,7 +202,9 @@ public:
   ///                          required.
   /// \param softcore          Indicate whether the control counters should take clash handling
   ///                          kernel variants into account
-  /// \param prec              Precision model for calculations
+  /// \param valence_prec      Precision model for valence calculations
+  /// \param nonbond_prec      Precision model for non-bonded calculations
+  /// \param general_prec      Precision model for all calculations
   /// \param qspread_approach  The approach taken by GPU kernels to spread charge density onto the
   ///                          particle-mesh interaction grids
   /// \param acc_prec          Precision model for accumulations (needed in case the density
@@ -207,17 +216,23 @@ public:
   ///                          general descriptors such as the non-bonded work unit type)
   /// \{
   void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
-                             EvaluateEnergy eval_nrg, ClashResponse softcore, PrecisionModel prec,
+                             EvaluateEnergy eval_nrg, ClashResponse softcore, VwuGoal purpose,
+                             PrecisionModel valence_prec, PrecisionModel nonbond_prec,
                              QMapMethod qspread_approach, PrecisionModel acc_prec,
                              size_t image_coord_type, int qspread_order,
                              const AtomGraphSynthesis &poly_ag);
 
   void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, const ClashResponse softcore,
-                             PrecisionModel prec, const AtomGraphSynthesis &poly_ag); 
+                             VwuGoal purpose, PrecisionModel valence_prec,
+                             PrecisionModel nonbond_prec, const AtomGraphSynthesis &poly_ag); 
 
   void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
-                             EvaluateEnergy eval_nrg, PrecisionModel prec,
+                             EvaluateEnergy eval_nrg, VwuGoal purpose, PrecisionModel valence_prec,
+                             PrecisionModel nonbond_prec, const AtomGraphSynthesis &poly_ag); 
+
+  void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
+                             EvaluateEnergy eval_nrg, VwuGoal purpose, PrecisionModel general_prec,
                              const AtomGraphSynthesis &poly_ag); 
   /// \}
   
@@ -253,6 +268,27 @@ private:
   /// twice the warp size, one of the warps in this kernel will reset the counters in array indices
   /// [ warp size, 2 * warp size ).
   Hybrid<int> vwu_progress;
+
+  /// Progress counters for stand-alone velocity update work units.  These will track the valence
+  /// work units in terms of their overall number, and even reference valence work unit data, but
+  /// the kernels that launch them may be of different sizes and therefore the progress counters
+  /// be set and reset differently by the standalone kernels.  In typical simulations, the valence
+  /// work units will drive all processes in trajectory integration, bypassing these counters, but
+  /// for specific applications requiring intervention amidst a modular and decoupled process,
+  /// these progress counters will be made available.
+  Hybrid<int> velocity_update_progress;
+
+  /// Stand-alone velocity constraint work unit progress counters.  See the array member variable
+  /// velocity_update_progress for motivation.
+  Hybrid<int> velocity_constraint_progress;
+
+  /// Stand-alone particle position update work unit progress counters.  See the array member
+  /// variable velocity_update_progress for motivation.
+  Hybrid<int> position_update_progress;
+
+  /// Stand-alone geometry constraint work unit progress counters.  See the array member variable
+  /// velocity_update_progress for motivation.
+  Hybrid<int> geometry_constraint_progress;
   
   /// Progress counters for non-bonded work units, arrayed in a manner like the valence work units
   Hybrid<int> nbwu_progress;
@@ -279,6 +315,10 @@ private:
 
   /// ARRAY-kind Hybrid object targeted by the above POINTER-kind Hybrid objects
   Hybrid<int> int_data;
+
+  /// \brief Re-assign pointers to reference the object's private integer array data.  This is
+  ///        invoked after a copy construction or copy assignment.
+  void rebasePointers();
 };
 
 } // namespace mm

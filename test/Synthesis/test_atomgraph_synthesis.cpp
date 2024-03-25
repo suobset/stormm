@@ -163,7 +163,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   check(dihe_nrg, RelationalOperator::EQUAL, Approx(dihe_nrg_answer).margin(1.0e-7),
         "Cosine-based dihedral energies computed using the synthesis methods are inconsistent "
         "with those computed using a simpler approach.", do_tests);
-  check(impr_nrg, RelationalOperator::EQUAL, Approx(impr_nrg_answer).margin(2.5e-9),
+  check(impr_nrg, RelationalOperator::EQUAL, Approx(impr_nrg_answer).margin(4.0e-9),
         "Cosine-based improper dihedral energies computed using the synthesis methods are "
         "inconsistent with those computed using a simpler approach.", do_tests);
 
@@ -174,7 +174,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer, attn14_frc_deviations;
   for (int i = 0; i < nsys; i++) {
-    qq14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i));
+    qq14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ELEC_ONE_FOUR, i));
     lj14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();

@@ -14,12 +14,14 @@
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Numerics/split_fixed_precision.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/cacheresource.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Reporting/error_format.h"
 #include "../../src/Synthesis/implicit_solvent_workspace.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
@@ -91,42 +93,65 @@ SystemCache directorySweep(const std::vector<std::string> &topol_path,
 // timings.
 //
 // Arguments:
-//   ag_vec:   The topologies to replicate
-//   ps_vec:   The coordinates to replicate
-//   nrep:     The number of replicas to make
-//   mmctrl:   Step counter and progress counters for all work units
-//   gpu:      Details of the GPU to use in calculations
-//   timer:    Object to record the timings
-//   desc:     Description of the system to run (this will factor into the timings section names)
+//   ag_vec:      The topologies to replicate
+//   ps_vec:      The coordinates to replicate
+//   nrep:        The number of replicas to make
+//   mmctrl:      Step counter and progress counters for all work units
+//   gpu:         Details of the GPU to use in calculations
+//   timer:       Object to record the timings
+//   prec:        The precision model in which to perform calculations
+//   eval_frc:    Flag to indicate that forces should be evaluated
+//   eval_nrg:    Flag to indicate that energies should be evaluated
+//   acc_meth:    The accumulation method to use in each kernel
+//   purpose:     Indicate whether to accumulate forces or (instead) to move atoms
+//   batch_name:  Name of the batch, for reporting purposes
 //-------------------------------------------------------------------------------------------------
 void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
                        const std::vector<PhaseSpace> &ps_vec, const int nrep,
                        MolecularMechanicsControls *mmctrl, const GpuDetails &gpu,
                        StopWatch *timer, const PrecisionModel prec, const EvaluateForce eval_frc,
                        const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
-                       const VwuGoal purpose, const std::string &batch_name) {
+                       const VwuGoal purpose, const std::string &batch_name,
+                       const int iter = 100) {
   std::vector<int> ag_idx = tileVector(incrementingSeries<int>(0, ag_vec.size()), nrep);
   AtomGraphSynthesis poly_ag(ag_vec, ag_idx, ExceptionResponse::SILENT, gpu);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_vec, ag_idx);
-  StaticExclusionMaskSynthesis poly_se(ag_vec, ag_idx);
+  StaticExclusionMaskSynthesis poly_se;
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    poly_se = StaticExclusionMaskSynthesis(ag_vec, ag_idx);
+    poly_ag.loadNonbondedWorkUnits(poly_se);
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    break;
+  }
   SeMaskSynthesisReader poly_ser = poly_se.data();
-  poly_ag.loadNonbondedWorkUnits(poly_se);
   CoreKlManager launcher(gpu, poly_ag);
   ScoreCard sc(poly_ag.getSystemCount(), 1, 32);
   const int2 valence_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg, acc_meth,
                                                         purpose, ClashResponse::NONE);
-  const int2 nonbond_lp = launcher.getNonbondedKernelDims(prec, NbwuKind::TILE_GROUPS, eval_frc,
-                                                          eval_nrg, acc_meth,
-                                                          ImplicitSolventModel::NONE,
-                                                          ClashResponse::NONE);
-  const int2 gbr_lp = launcher.getBornRadiiKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
-                                                      ImplicitSolventModel::NONE);
-  const int2 gbd_lp = launcher.getBornDerivativeKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
-                                                           ImplicitSolventModel::NONE);
+  int2 nonbond_lp, gbr_lp, gbd_lp;
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    nonbond_lp = launcher.getNonbondedKernelDims(prec, NbwuKind::TILE_GROUPS, eval_frc, eval_nrg,
+                                                 acc_meth, ImplicitSolventModel::NONE,
+                                                 ClashResponse::NONE);
+    gbr_lp = launcher.getBornRadiiKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
+                                             ImplicitSolventModel::NONE);
+    gbd_lp = launcher.getBornDerivativeKernelDims(prec, NbwuKind::TILE_GROUPS, acc_meth,
+                                                  ImplicitSolventModel::NONE);
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    nonbond_lp = { 1, 1 };
+    break;
+  }
   CacheResource valence_tb_space(valence_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_space(nonbond_lp.x, small_block_max_atoms);
-  mmctrl->primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, prec, poly_ag);
-  Thermostat tstat;
+  mmctrl->primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE,
+                                VwuGoal::ACCUMULATE, prec, prec, poly_ag);
+  Thermostat tstat(poly_ag, ThermostatKind::NONE);
   ImplicitSolventWorkspace isw(poly_ag.getSystemAtomOffsets(), poly_ag.getSystemAtomCounts(),
                                prec);
 
@@ -136,11 +161,19 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
   poly_ps.upload();
 
   // Some common variables for either branch
+  const ValenceKernelSize kwidth = poly_ag.getValenceThreadBlockSize();
   const std::string valk_name = valenceKernelKey(prec, eval_frc, eval_nrg, acc_meth, purpose,
-                                                 ClashResponse::NONE);
-  const std::string nnbk_name = nonbondedKernelKey(prec, NbwuKind::TILE_GROUPS, eval_frc,
-                                                   eval_nrg, acc_meth, ImplicitSolventModel::NONE,
-                                                   ClashResponse::NONE);
+                                                 ClashResponse::NONE, kwidth);
+  std::string nnbk_name;
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    nnbk_name = nonbondedKernelKey(prec, NbwuKind::TILE_GROUPS, eval_frc, eval_nrg, acc_meth,
+                                   ImplicitSolventModel::NONE, ClashResponse::NONE);
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    break;
+  }
   const int sys_val_time = timer->addCategory(batch_name + " on " + valk_name + " (" +
                                               std::to_string(nrep) + ")");
   const int sys_nb_time = timer->addCategory(batch_name + " on " + nnbk_name + " (" +
@@ -173,7 +206,7 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
       timer->assignTime(0);
 
       // Test the valence kernel
-      for (int i = 0; i < 1000; i++) {
+      for (int i = 0; i < iter; i++) {
         ctrl.step += 1;
         launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_rval,
                       eval_frc, eval_nrg, purpose, valence_lp);
@@ -181,16 +214,23 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
       cudaDeviceSynchronize();
       timer->assignTime(sys_val_time);
 
-      // Test the non-bonded kernel
-      poly_ps.initializeForces(gpu, devc_tier);
-      timer->assignTime(0);
-      for (int i = 0; i < 1000; i++) {
-        ctrl.step += 1;
-        launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
-                        &gmem_rnnb, &iswk, eval_frc, eval_nrg, nonbond_lp, gbr_lp, gbd_lp);
+      // Test the non-bonded kernels
+      switch (poly_ag.getUnitCellType()) {
+      case UnitCellType::NONE:
+        poly_ps.initializeForces(gpu, devc_tier);
+        timer->assignTime(0);
+        for (int i = 0; i < iter; i++) {
+          ctrl.step += 1;
+          launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
+                          &gmem_rnnb, &iswk, eval_frc, eval_nrg, nonbond_lp, gbr_lp, gbd_lp);
+        }
+        cudaDeviceSynchronize();
+        timer->assignTime(sys_nb_time);
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        break;
       }
-      cudaDeviceSynchronize();
-      timer->assignTime(sys_nb_time);
     }
     break;
   case PrecisionModel::SINGLE:
@@ -215,7 +255,7 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
       timer->assignTime(0);
 
       // Test the valence kernel
-      for (int i = 0; i < 1000; i++) {
+      for (int i = 0; i < iter; i++) {
         ctrl.step += 1;
         launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_rval,
                       eval_frc, eval_nrg, purpose, acc_meth, valence_lp);
@@ -223,17 +263,24 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
       cudaDeviceSynchronize();
       timer->assignTime(sys_val_time);
       
-      // Test the non-bonded kernel
-      poly_ps.initializeForces(gpu, devc_tier);      
-      timer->assignTime(0);
-      for (int i = 0; i < 1000; i++) {
-        ctrl.step += 1;
-        launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
-                        &gmem_rnnb, &iswk, eval_frc, eval_nrg, acc_meth, nonbond_lp, gbr_lp,
-                        gbd_lp);
+      // Test the non-bonded kernels
+      switch (poly_ag.getUnitCellType()) {
+      case UnitCellType::NONE:
+        poly_ps.initializeForces(gpu, devc_tier);      
+        timer->assignTime(0);
+        for (int i = 0; i < iter; i++) {
+          ctrl.step += 1;
+          launchNonbonded(NbwuKind::TILE_GROUPS, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw,
+                          &gmem_rnnb, &iswk, eval_frc, eval_nrg, acc_meth, nonbond_lp, gbr_lp,
+                          gbd_lp);
+        }
+        cudaDeviceSynchronize();
+        timer->assignTime(sys_nb_time);
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        break;
       }
-      cudaDeviceSynchronize();
-      timer->assignTime(sys_nb_time);
     }
     break;
   }
@@ -248,9 +295,10 @@ void replicaProcessing(const std::vector<AtomGraph*> &ag_vec,
 //   gpu:         Details of the GPU
 //   oe:          Contains the name of the STORMM source directory, and other environment variables
 //   timer:       Object to track the timings
+//   iter:        The number of iterations for which to run each kernel
 //-------------------------------------------------------------------------------------------------
 void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEnvironment &oe,
-              StopWatch *timer) {
+              StopWatch *timer, const int iter = 100) {
   
   // Read the molecules in this batch
   const std::vector<std::string> topols = { "Topologies", batch_name, ".*_ff1.*SB.top" };
@@ -261,10 +309,13 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
   // Loop over the dipeptides one at a time, make syntheses of each of them individually, and
   // test kernels.
   const int mol_count = sc.getSystemCount();
-  const std::vector<int> batch_multiplier = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 75, 100, 125,
-                                              150, 2000 };
-  //175, 200, 225, 250, 300, 350, 400, 450, 500,
-  //                                            600, 700, 800, 900, 1000, 1250, 1500, 1750, 2000 };
+  const std::vector<int> batch_multiplier = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
+                                              55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 125,
+                                              150, 175, 200, 225, 250, 275, 300, 325, 350, 375,
+                                              400, 425, 450, 475, 500, 625, 750, 875, 1000, 1125,
+                                              1250, 1375, 1500, 1625, 1750, 1875, 2000, 2250, 2500,
+                                              2750, 3000, 3250, 3500, 3750, 4000, 4250, 4500, 4750,
+                                              5000 };
   std::vector<AtomGraph*> ag_vec(mol_count);
   std::vector<PhaseSpace> ps_vec;
   ps_vec.reserve(mol_count);
@@ -276,27 +327,48 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
     const int ncopy = batch_multiplier[i];
     replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
                       EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
-                      VwuGoal::ACCUMULATE, batch_name);
+                      VwuGoal::ACCUMULATE, batch_name, iter);
     replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
                       EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                      VwuGoal::ACCUMULATE, batch_name);
+                      VwuGoal::ACCUMULATE, batch_name, iter);
     replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
                       EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::WHOLE,
-                      VwuGoal::ACCUMULATE, batch_name);
+                      VwuGoal::ACCUMULATE, batch_name, iter);
     replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
                       EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::WHOLE,
-                      VwuGoal::ACCUMULATE, batch_name);
+                      VwuGoal::ACCUMULATE, batch_name, iter);
 
     // Only do double-precision calculations for low replica numbers--this can be strenuous on
     // many architectures, particularly in the non-bonded kernel.
     if (batch_multiplier[i] < 3) {
       replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
                         EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
-                        VwuGoal::ACCUMULATE, batch_name);
+                        VwuGoal::ACCUMULATE, batch_name, iter);
       replicaProcessing(ag_vec, ps_vec, ncopy, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
                         EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                        VwuGoal::ACCUMULATE, batch_name);
+                        VwuGoal::ACCUMULATE, batch_name, iter);
     }
+  }
+
+  // Test many replicas of each small molecule system
+  const int nimg = gpu.getSMPCount() * 64;
+  for (size_t i = 0; i < mol_count; i++) {
+    std::vector<AtomGraph*> ss_agv(1, sc.getSystemTopologyPointer(i));
+    std::vector<PhaseSpace> ss_psv(1, sc.getCoordinates(i));
+    const std::string ss_name = getBaseName(ss_agv[0]->getFileName()) + " " +
+                                std::to_string(ss_agv[0]->getAtomCount());
+    replicaProcessing(ss_agv, ss_psv, nimg, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
+                      VwuGoal::ACCUMULATE, ss_name, iter);
+    replicaProcessing(ss_agv, ss_psv, nimg, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      VwuGoal::ACCUMULATE, ss_name, iter);
+    replicaProcessing(ss_agv, ss_psv, nimg, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::WHOLE,
+                      VwuGoal::ACCUMULATE, ss_name, iter);
+    replicaProcessing(ss_agv, ss_psv, nimg, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::WHOLE,
+                      VwuGoal::ACCUMULATE, ss_name, iter);
   }
 }
 
@@ -428,40 +500,168 @@ void testGmemKernel(const int block_size, const int block_count_per_smp, const G
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test kernel timings on a command-line specified topology and coordinate set.
+//
+// Arguments:
+//   top_name:  Name of the topology (if this is actually a coordinate file, it will be taken as
+//              such)
+//   crd_name:  Name of the coordinate file (if this is actually a topology, it will be taken as
+//              such)
+//   iter:      The number of iterations for which to run various kernels
+//   replicas:  The number of times to repliate the system within a synthesis used in computations
+//-------------------------------------------------------------------------------------------------
+void runPeriodicTest(const std::string &top_name, const std::string &crd_name,
+                     const GpuDetails &gpu, StopWatch *timer, const int iter = 100,
+                     const int replicas = 100) {
+
+  // Take in the one system and check its properties
+  AtomGraph ag;
+  std::vector<PhaseSpace> psv;
+  try {
+    ag = AtomGraph(top_name);
+    psv.emplace_back(crd_name);
+  }
+  catch (std::runtime_error) {
+    try {
+      ag = AtomGraph(crd_name);
+      psv.emplace_back(top_name);
+    }
+    catch (std::runtime_error) {
+      rtErr("The files " + top_name + " and " + crd_name + " do not correspond to a valid pair of "
+            "topology and coordinate files.", "runPeriodicTest");
+    }
+  }
+  if (ag.getAtomCount() != psv[0].getAtomCount()) {
+    rtErr("The topology and coordinate set have different numbers of atoms (" +
+          std::to_string(ag.getAtomCount()) + " in the topology, " +
+          std::to_string(psv[0].getAtomCount()) + " in the coordinate set).", "runPeriodicTest");
+  }
+  switch (ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    rtErr("Periodic tests require a periodic system.", "runPeriodicTest");
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    break;
+  }
+  std::vector<AtomGraph*> agv(1, &ag);
+  MolecularMechanicsControls mmctrl;
+  const std::string test_name = getBaseName(ag.getFileName());
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                    EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                    EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                    EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::WHOLE,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::SINGLE,
+                    EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::WHOLE,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
+                    EvaluateForce::YES, EvaluateEnergy::NO, AccumulationMethod::SPLIT,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+  replicaProcessing(agv, psv, replicas, &mmctrl, gpu, timer, PrecisionModel::DOUBLE,
+                    EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                    VwuGoal::ACCUMULATE, test_name, iter);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
-  TestEnvironment oe(argc, argv);
+  TestEnvironment oe(argc, argv, ExceptionResponse::SILENT);
   StopWatch timer;
   HpcConfig gpu_config(ExceptionResponse::WARN);
   std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+  Hybrid<int> engage_gpu(1);
 
-  // Test some basic kernels to examine the launch latency effects of different characteristics.
-  testNullKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
-  testNullKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
-  testNullKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
-  testNullKernel(large_block_size, 1, gpu, &timer);
-  testArgumentLoadedKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
-  testArgumentLoadedKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
-  testArgumentLoadedKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
-  testArgumentLoadedKernel(large_block_size, 1, gpu, &timer);
-  testGmemKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
-  testGmemKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
-  testGmemKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
-  testGmemKernel(large_block_size, 1, gpu, &timer);
+  // Get additional command line inputs
+  int iter = 100;
+  int replicas = 1;
+  bool test_kernel_launch = false;
+  bool extra_periodic_test = false;
+  std::string periodic_top, periodic_crd;
+  for (int i = 0; i < argc; i++) {
+    if (i < argc - 1 && strcmpCased(argv[i], "-iter", CaseSensitivity::NO)) {
+      bool problem = false;
+      if (verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER)) {
+        iter = atoi(argv[i + 1]);
+        if (iter <= 0 || iter >= 100000) {
+          problem = true;
+        }
+      }
+      else {
+        problem = true;
+      }
+      if (problem) {
+        rtErr("The number of kernel iterations must be a positive integer between 1 and 100000.",
+              "main");
+      }
+    }
+    if (strcmpCased(argv[i], "-klaunch", CaseSensitivity::NO)) {
+      test_kernel_launch = true;
+    }
+    if (i < argc - 2 && strcmpCased(argv[i], "-periodic", CaseSensitivity::NO)) {
+      if (getDrivePathType(argv[i + 1]) != DrivePathType::FILE ||
+          getDrivePathType(argv[i + 2]) != DrivePathType::FILE) {
+        rtErr("The -periodic command line argument must be followed by a topology and then a "
+              "coordinate set.", "main");
+      }
+      else {
+        extra_periodic_test = true;
+        periodic_top = std::string(argv[i + 1]);
+        periodic_crd = std::string(argv[i + 2]);
+      }
+    }
+    if (i < argc - 1 && strcmpCased(argv[i], "-rep", CaseSensitivity::NO)) {
+      bool problem = false;
+      if (verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER)) {
+        replicas = atoi(argv[i + 1]);
+        if (iter <= 0 || iter >= 128) {
+          problem = true;
+        }
+      }
+      else {
+        problem = true;
+      }
+      if (problem) {
+        rtErr("The number of replicas for a user-defined system must be a positive integer "
+              "between 1 and 128.", "main");
+      }
+    }
+  }
   
-  // Configure the relevant kernels for this executable.
-  valenceKernelSetup();
+  // Test some basic kernels to examine the launch latency effects of different characteristics.
+  if (test_kernel_launch) {
+    testNullKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+    testNullKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+    testNullKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+    testNullKernel(large_block_size, 1, gpu, &timer);
+    testArgumentLoadedKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+    testArgumentLoadedKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+    testArgumentLoadedKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+    testArgumentLoadedKernel(large_block_size, 1, gpu, &timer);
+    testGmemKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+    testGmemKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+    testGmemKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+    testGmemKernel(large_block_size, 1, gpu, &timer);
+  }
+  if (extra_periodic_test) {
+    runPeriodicTest(periodic_top, periodic_crd, gpu, &timer, iter, replicas);
+  }
+  else {
 
-  // Run different classes of molecules.  This will stress-test the code as well as provide
-  // performance curves with different sizes of molecules.
-  runBatch("Dipeptides", gpu, oe, &timer);
-  runBatch("Tripeptides", gpu, oe, &timer);
-  runBatch("Tetrapeptides", gpu, oe, &timer);
-
+    // Run different classes of molecules.  This will stress-test the code as well as provide
+    // performance curves with different sizes of molecules.
+    runBatch("Dipeptides", gpu, oe, &timer, iter);
+    runBatch("Tripeptides", gpu, oe, &timer, iter);
+    runBatch("Tetrapeptides", gpu, oe, &timer, iter);
+  }
+  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

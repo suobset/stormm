@@ -282,7 +282,7 @@ void NamelistEmulator::assignVariable(std::string *var, const std::string &keywo
 //-------------------------------------------------------------------------------------------------
 void NamelistEmulator::assignVariable(std::string *var, const std::string &keyword_query,
                                       const std::string &sub_key, const int index) const {
-  if (getKeywordStatus(keyword_query, sub_key) != InputStatus::MISSING) {
+  if (getKeywordStatus(keyword_query, sub_key, index) != InputStatus::MISSING) {
     *var = getStringValue(keyword_query, sub_key, index);
   }
 }

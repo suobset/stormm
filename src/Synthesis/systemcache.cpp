@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "systemcache.h"
 #include "FileManagement/file_listing.h"
+#include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
@@ -17,6 +18,7 @@ using diskutil::splitPath;
 using energy::evaluateBondTerms;
 using energy::evaluateAngleTerms;
 using energy::ScoreCard;
+using stmath::incrementingSeries;
 using stmath::prefixSumInPlace;
 using stmath::PrefixSumType;
 using stmath::sum;
@@ -930,6 +932,15 @@ int SystemCache::getSystemTopologyIndex(const int coord_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getSystemTopologyIndex() const {
+  std::vector<int> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = topology_indices[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 int SystemCache::getSystemExampleIndex(const int topology_index) const {
   return example_indices[topology_index];
 }
@@ -1233,6 +1244,14 @@ const AtomGraph& SystemCache::getSystemTopology(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+AtomGraphSynthesis SystemCache::exportTopologySynthesis(const GpuDetails &gpu,
+                                                        const ExceptionResponse policy) const {
+  return AtomGraphSynthesis(this->getTopologyPointer(), this->getRestraintPointer(),
+                            topology_indices, incrementingSeries<int>(0, system_count), policy,
+                            gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
 const PhaseSpace* SystemCache::getCoordinatePointer(const int index) const {
   checkSystemBounds(index, "getCoordinatePointer");
   const PhaseSpace* crd_cache_ptr = coordinates_cache.data();
@@ -1277,6 +1296,14 @@ const PhaseSpace& SystemCache::getCoordinates(const int index) const {
 //-------------------------------------------------------------------------------------------------
 const std::vector<PhaseSpace>& SystemCache::getCoordinates() const {
   return coordinates_cache;
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis SystemCache::exportCoordinateSynthesis(const int globalpos_scale_bits,
+                                                           const int velocity_scale_bits,
+                                                           const int force_scale_bits) const {
+  return PhaseSpaceSynthesis(coordinates_cache, this->getSystemTopologyPointer(),
+                             globalpos_scale_bits, 26, velocity_scale_bits, force_scale_bits);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1370,9 +1397,45 @@ RestraintApparatus* SystemCache::getRestraintPointer(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<RestraintApparatus*> SystemCache::getRestraintPointer() const {
+  std::vector<RestraintApparatus*> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = const_cast<RestraintApparatus*>(&restraints_cache[restraint_indices[i]]);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<RestraintApparatus*> SystemCache::getRestraintPointer() {
+  std::vector<RestraintApparatus*> result(system_count);
+  for (int i = 0; i < system_count; i++) {
+    result[i] = &restraints_cache[restraint_indices[i]];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 const RestraintApparatus& SystemCache::getRestraints(const int index) const {
   checkSystemBounds(index, "getRestraints");
   return restraints_cache[restraint_indices[index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<StaticExclusionMask*> SystemCache::getUniqueStaticMaskPointers() const {
+  std::vector<StaticExclusionMask*> result(topology_count);
+  for (int i = 0; i < topology_count; i++) {
+    result[i] = const_cast<StaticExclusionMask*>(&static_masks_cache[i]);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<StaticExclusionMask*> SystemCache::getUniqueStaticMaskPointers() {
+  std::vector<StaticExclusionMask*> result(topology_count);
+  for (int i = 0; i < topology_count; i++) {
+    result[i] = &static_masks_cache[i];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1800,6 +1863,50 @@ std::string SystemCache::nondegenerateName(const std::string &fname_in,
     result = fname_in;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc) {
+
+  // Loop over all unique topologies in the cache.  Check for isolated boundary conditions.
+  const int ntop = sc.getTopologyCount();
+  bool has_isolated_bc = false;
+  bool has_periodic_bc = false;
+  for (int i = 0; i < ntop; i++) {
+    switch (sc.getTopologyPointer(i)->getUnitCellType()) {
+    case UnitCellType::NONE:
+      has_isolated_bc = true;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      has_periodic_bc = true;
+      break;
+    }
+  }
+  if (has_isolated_bc && has_periodic_bc == false) {
+    const int nsys = sc.getSystemCount();
+    std::vector<StaticExclusionMask*> sev(ntop);
+    std::vector<int> tp_idx(nsys);
+    for (int i = 0; i < sc.getTopologyCount(); i++) {
+      const StaticExclusionMask* sei = sc.getSystemStaticMaskPointer(sc.getSystemExampleIndex(i));
+      sev[i] = const_cast<StaticExclusionMask*>(sei);
+    }
+    for (int i = 0; i < nsys; i++) {
+      tp_idx[i] = sc.getSystemTopologyIndex(i);
+    }
+    StaticExclusionMaskSynthesis result(sev, tp_idx);
+    return result;
+  }
+  else if (has_isolated_bc && has_periodic_bc) {
+    rtErr("The systems provided contain a mixture of periodic and non-periodic boundary "
+          "conditions.  These systems cannot all be compiled together into a synthesis for "
+          "simulations.", "createMaskSynthesis");
+  }
+  else {
+    StaticExclusionMaskSynthesis result;
+    return result;
+  }
+  __builtin_unreachable();
 }
 
 } // namespace synthesis

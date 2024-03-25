@@ -355,12 +355,13 @@ public:
   /// \param index   Index of the device data to read
   /// \param offset  Index of the device data at which to begin reading
   /// \param count   The number of elements to read
+  /// \param v       An array into which the results will be placed (this must be allocated with
+  ///                enough space to hold the results)
   /// \{
   T readDevice(size_t index) const;
   std::vector<T> readDevice(size_t offset, size_t count) const;
   std::vector<T> readDevice() const;
   void readDevice(T* v, size_t offset, size_t count) const;
-  void readDevice(T* v) const;
   /// \}
 
   /// \brief Put data into the devc_data array.  This allows direct host-to-device transfer of

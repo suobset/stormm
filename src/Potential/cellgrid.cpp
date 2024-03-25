@@ -132,6 +132,6 @@ int3 optimizeCellConfiguration(const int cell_na, const int cell_nb, const int c
   }
   return result;
 }
-  
+
 } // namespace energy
 } // namespace stormm

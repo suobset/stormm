@@ -156,7 +156,7 @@ NamelistElement::NamelistElement(const std::string keyword_in,
   default_int_values{},
   default_real_values{},
   default_string_values{},
-  establishment{InputStatus::MISSING},
+  establishment{InputStatus::DEFAULT},
   imperative{KeyRequirement::REQUIRED},
   template_establishment{setEstablishment(default_list)},
   template_requirements{template_requirements_in},
@@ -193,11 +193,6 @@ NamelistElement::NamelistElement(const std::string keyword_in,
     sub_help_messages.push_back("No description provided");
   }
 
-  // Fill out the remainder of the template establishment as missing a default value.
-  for (size_t i = default_list.size(); i < sub_keys.size(); i++) {
-    template_establishment.push_back(InputStatus::MISSING);
-  }
-
   // Resize vector storage and set default values.
   sub_int_values.resize(2 * template_size);
   sub_real_values.resize(2 * template_size);
@@ -223,7 +218,7 @@ NamelistElement::NamelistElement(const std::string keyword_in,
   // Correct the establishment based on whether the entire template has defaults.  If this is
   // not true, then the establishment of the entire STRUCT will be set to MISSING.
   for (int i = 0; i < template_size; i++) {
-    if (template_establishment[i] != InputStatus::DEFAULT) {
+    if (template_establishment[i] == InputStatus::MISSING) {
       establishment = InputStatus::MISSING;
     }
   }
@@ -462,7 +457,7 @@ std::vector<std::string> NamelistElement::getStringValue(const std::string &sub_
 InputStatus NamelistElement::getEstablishment(const std::string &sub_key_query,
                                               const int repeat_no) const {
   if (sub_key_query.size() > 0) {
-
+    
     // Need to use the sub-key names for the search, as the sub-key type is not known
     const size_t member_index = findStringInVector(sub_keys, sub_key_query);
     if (member_index < sub_keys.size()) {

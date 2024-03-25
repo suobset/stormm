@@ -13,7 +13,9 @@
 #include "Potential/hpc_valence_potential.h"
 #include "Structure/hpc_rmsd.h"
 #include "Structure/hpc_virtual_site_handling.h"
+#include "Trajectory/hpc_integration.h"
 #endif
+#include "Synthesis/valence_workunit.h"
 #include "core_kernel_manager.h"
 
 namespace stormm {
@@ -31,17 +33,20 @@ using stmath::queryReductionKernelRequirements;
 using stmath::optReductionKernelSubdivision;
 using structure::queryRMSDKernelRequirements;
 using structure::queryVirtualSiteKernelRequirements;
-using synthesis::optValenceKernelSubdivision;
-using synthesis::optVirtualSiteKernelSubdivision;
+using trajectory::queryIntegrationKernelRequirements;
 #endif
 using stmath::findBin;
+using synthesis::maximum_valence_work_unit_atoms;
+using synthesis::half_valence_work_unit_atoms;
+using synthesis::quarter_valence_work_unit_atoms;
+using synthesis::minimum_valence_work_unit_atoms;
 using parse::CaseSensitivity;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
     KernelManager(gpu_in),
-    valence_block_multiplier{valenceBlockMultiplier()},
+    valence_kernel_width{poly_ag.getValenceThreadBlockSize()},
     nonbond_block_multiplier_dp{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType(),
                                                          PrecisionModel::DOUBLE,
                                                          poly_ag.getImplicitSolventModel())},
@@ -61,71 +66,61 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     sac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
                                                                QMapMethod::ACC_SHARED)},
     reduction_block_multiplier{reductionBlockMultiplier()},
-    virtual_site_block_multiplier_dp{virtualSiteBlockMultiplier(PrecisionModel::DOUBLE)},
-    virtual_site_block_multiplier_sp{virtualSiteBlockMultiplier(PrecisionModel::SINGLE)},
+    virtual_site_kernel_width{poly_ag.getValenceThreadBlockSize()},
     rmsd_block_multiplier_dp{rmsdBlockMultiplier(PrecisionModel::DOUBLE)},
     rmsd_block_multiplier_sp{rmsdBlockMultiplier(PrecisionModel::SINGLE)}
 {
 #ifdef STORMM_USE_HPC
-  // Valence kernel entries
-  const int valence_d_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
-                                                        PrecisionModel::DOUBLE,
-                                                        EvaluateForce::YES, gpu_in);
-  const int valence_fxe_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
-                                                          PrecisionModel::SINGLE,
-                                                          EvaluateForce::NO, gpu_in);
-  const int valence_ffx_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
-                                                          PrecisionModel::SINGLE,
-                                                          EvaluateForce::YES, gpu_in);
-  const int valence_ffe_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
-                                                          PrecisionModel::SINGLE,
-                                                          EvaluateForce::YES, gpu_in);
   const std::vector<ClashResponse> clash_policy = { ClashResponse::NONE, ClashResponse::FORGIVE };
   const std::vector<std::string> clash_ext = { "", "NonClash" };
-  for (int i = 0; i < 2; i++) {
+  const std::string valence_kwidth_ext = getEnumerationName(valence_kernel_width);
+  for (int i = 0; i < clash_policy.size(); i++) {
+    const std::string i_ext = clash_ext[i] + valence_kwidth_ext;
+
+    // Valence kernel entries
     catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_d_div, "kdsValenceEnergyAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kdsValenceEnergyAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_d_div, "kdsValenceAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kdsValenceAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_d_div, "kdsValenceForceAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kdsValenceForceAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_d_div, "kdsValenceEnergyAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kdsValenceEnergyAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_d_div, "kdsValenceForceEnergyAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kdsValenceForceEnergyAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_fxe_div, "kfsValenceEnergyAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kfsValenceEnergyAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_ffx_div, "kfsValenceAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kfsValenceAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_ffx_div, "kfValenceAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kfValenceAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_ffx_div, "kfsValenceForceAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kfsValenceForceAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                          AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_ffx_div, "kfValenceForceAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kfValenceForceAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_ffe_div, "kfValenceEnergyAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kfValenceEnergyAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES, clash_policy[i],
-                         valence_ffe_div, "kfsValenceEnergyAtomUpdate" + clash_ext[i]);
+                         valence_kernel_width, "kfsValenceEnergyAtomUpdate" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_ffe_div, "kfValenceForceEnergyAccumulation" + clash_ext[i]);
+                         valence_kernel_width, "kfValenceForceEnergyAccumulation" + i_ext);
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
-                         valence_ffe_div, "kfsValenceForceEnergyAccumulation" + clash_ext[i]);
-  
+                         valence_kernel_width, "kfsValenceForceEnergyAccumulation" + i_ext);
+    
     // Non-bonded kernel entries
     const std::vector<ImplicitSolventModel> is_models = { ImplicitSolventModel::NONE,
                                                           ImplicitSolventModel::HCT_GB,
@@ -196,6 +191,28 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     }
   }
 
+  // Stand-alone integration kernel entries
+#if 0
+  const std::vector<IntegrationStage> time_step_parts = { IntegrationStage::VELOCITY_ADVANCE,
+                                                          IntegrationStage::VELOCITY_CONSTRAINT,
+                                                          IntegrationStage::POSITION_ADVANCE,
+                                                          IntegrationStage::GEOMETRY_CONSTRAINT };
+#endif
+  const std::vector<IntegrationStage> time_step_parts = { IntegrationStage::VELOCITY_CONSTRAINT,
+                                                          IntegrationStage::GEOMETRY_CONSTRAINT };
+  const std::vector<std::string> time_step_abbrevs = { "VelAdv", "VelCnst", "PosAdv", "GeomCnst" };
+  for (size_t i = 0; i < time_step_parts.size(); i++) {
+    catalogIntegrationKernel(PrecisionModel::DOUBLE, AccumulationMethod::SPLIT,
+                             valence_kernel_width, time_step_parts[i],
+                             "kdsIntegration" + time_step_abbrevs[i] + valence_kwidth_ext);
+    catalogIntegrationKernel(PrecisionModel::SINGLE, AccumulationMethod::SPLIT,
+                             valence_kernel_width, time_step_parts[i],
+                             "kfsIntegration" + time_step_abbrevs[i] + valence_kwidth_ext);
+    catalogIntegrationKernel(PrecisionModel::SINGLE, AccumulationMethod::WHOLE,
+                             valence_kernel_width, time_step_parts[i],
+                             "kfIntegration" + time_step_abbrevs[i] + valence_kwidth_ext);
+  }
+  
   // PME density mapping (spreading) kernel entries
   const std::vector<PrecisionModel> all_prec = { PrecisionModel::DOUBLE, PrecisionModel::SINGLE };
   const std::vector<bool> use_short_format = { true, false };
@@ -232,8 +249,8 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
         }
         for (int k = 0; k < 2; k++) {
           std::string bprec_ordr = aprec_ordr + short_formats[k];
-          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], int_type_index, order,
-                                  "kSAsi" + bprec_ordr + "MapDensity");
+          catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], int_type_index,
+                                  order, "kSAsi" + bprec_ordr + "MapDensity");
           catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], llint_type_index,
                                   order, "kSAli" + bprec_ordr + "MapDensity");
           catalogShrAccQMapKernel(all_prec[i], all_prec[j], use_short_format[k], float_type_index,
@@ -265,16 +282,15 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                          ReductionStage::ALL_REDUCE, reduction_div, "kfrdConjGrad");
 
   // Virtual site kernel entries
-  const int vsite_div = optVirtualSiteKernelSubdivision(poly_ag.getValenceWorkUnitAbstracts(),
-                                                        poly_ag.getValenceWorkUnitCount());
-  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::PLACEMENT, vsite_div,
-                           "kdPlaceVirtualSites");
-  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::PLACEMENT, vsite_div,
-                           "kfPlaceVirtualSites");
-  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::TRANSMIT_FORCES, vsite_div,
-                           "kdTransmitVSiteForces");
-  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::TRANSMIT_FORCES, vsite_div,
-                           "kfTransmitVSiteForces");
+  const std::string vs_kwidth_ext = getEnumerationName(virtual_site_kernel_width);
+  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::PLACEMENT,
+                           virtual_site_kernel_width, "kdPlaceVirtualSites" + vs_kwidth_ext);
+  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::PLACEMENT,
+                           virtual_site_kernel_width, "kfPlaceVirtualSites" + vs_kwidth_ext);
+  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::TRANSMIT_FORCES,
+                           virtual_site_kernel_width, "kdTransmitVSiteForces" + vs_kwidth_ext);
+  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::TRANSMIT_FORCES,
+                           virtual_site_kernel_width, "kfTransmitVSiteForces" + vs_kwidth_ext);
 
   // RMSD kernel entries
   catalogRMSDKernel(PrecisionModel::DOUBLE, RMSDTask::REFERENCE, "kdComputeRMSDToReference");
@@ -290,9 +306,10 @@ void CoreKlManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
                                          const AccumulationMethod acc_meth,
                                          const VwuGoal purpose,
                                          const ClashResponse collision_handling,
-                                         const int subdivision, const std::string &kernel_name) {
+                                         const ValenceKernelSize kwidth,
+                                         const std::string &kernel_name) {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose,
-                                             collision_handling);
+                                             collision_handling, kwidth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
@@ -302,9 +319,66 @@ void CoreKlManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 #  ifdef STORMM_USE_CUDA
   const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
                                                                  acc_meth, purpose,
-                                                                 collision_handling);
-  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, subdivision, gpu,
-                                     kernel_name);
+                                                                 collision_handling, kwidth);
+
+  // Infer the maximum number of blocks per streaming multiprocessor based on the kernel width and
+  // the thread count of the largest possible kernel.
+  int block_mult;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    block_mult = 1;
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const cudaFuncAttributes attr_xl = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
+                                                                        acc_meth, purpose,
+                                                                        collision_handling,
+                                                                        ValenceKernelSize::XL);
+      block_mult = attr_xl.maxThreadsPerBlock / attr.maxThreadsPerBlock;
+    }
+    break;
+  }
+  k_dictionary[k_key] = KernelFormat(attr, 2 * block_mult, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogIntegrationKernel(const PrecisionModel prec,
+                                             const AccumulationMethod acc_meth,
+                                             const ValenceKernelSize kwidth,
+                                             const IntegrationStage process,
+                                             const std::string &kernel_name) {
+  const std::string k_key = integrationKernelKey(prec, acc_meth, kwidth, process);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Integration kernel identifier " + k_key + " already exists in the kernel map.",
+          "CoreKlManager", "catalogIntegrationKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryIntegrationKernelRequirements(prec, acc_meth, kwidth,
+                                                                     process);
+
+  // As above with the valence kernels, infer the block count based on the thread count of the
+  // largest possible kernel.
+  int block_mult;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    block_mult = 1;
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const cudaFuncAttributes attr_xl = queryIntegrationKernelRequirements(prec, acc_meth,
+                                                                            ValenceKernelSize::XL,
+                                                                            process);
+      block_mult = attr_xl.maxThreadsPerBlock / attr.maxThreadsPerBlock;
+    }
+    break;
+  }
+  k_dictionary[k_key] = KernelFormat(attr, 2 * block_mult, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -490,9 +564,9 @@ void CoreKlManager::catalogReductionKernel(const PrecisionModel prec, const Redu
 //-------------------------------------------------------------------------------------------------
 void CoreKlManager::catalogVirtualSiteKernel(const PrecisionModel prec,
                                              const VirtualSiteActivity purpose,
-                                             const int subdivision,
+                                             const ValenceKernelSize kwidth,
                                              const std::string &kernel_name) {
-  const std::string k_key = virtualSiteKernelKey(prec, purpose);
+  const std::string k_key = virtualSiteKernelKey(prec, purpose, kwidth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Virtual site handling kernel identifier " + k_key + " already exists in the kernel "
@@ -500,18 +574,21 @@ void CoreKlManager::catalogVirtualSiteKernel(const PrecisionModel prec,
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
-  const cudaFuncAttributes attr = queryVirtualSiteKernelRequirements(prec, purpose);
+  const cudaFuncAttributes attr = queryVirtualSiteKernelRequirements(prec, purpose, kwidth);
   int virtual_site_block_multiplier;
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    virtual_site_block_multiplier = virtual_site_block_multiplier_dp;
+    virtual_site_block_multiplier = 1;
     break;
   case PrecisionModel::SINGLE:
-    virtual_site_block_multiplier = virtual_site_block_multiplier_sp;
+    {
+      const cudaFuncAttributes attr_xl = queryVirtualSiteKernelRequirements(prec, purpose,
+                                                                            ValenceKernelSize::XL);
+      virtual_site_block_multiplier = attr_xl.maxThreadsPerBlock / attr.maxThreadsPerBlock;
+    }
     break;
   }
-  k_dictionary[k_key] = KernelFormat(attr, virtual_site_block_multiplier, subdivision, gpu,
-                                     kernel_name);
+  k_dictionary[k_key] = KernelFormat(attr, 2 * virtual_site_block_multiplier, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -553,10 +630,22 @@ int2 CoreKlManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
                                          const VwuGoal purpose,
                                          const ClashResponse collision_handling) const {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose,
-                                             collision_handling);
+                                             collision_handling, valence_kernel_width);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " was not found in the kernel map.",
           "CoreKlManager", "getValenceKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getIntegrationKernelDims(const PrecisionModel prec,
+                                             const AccumulationMethod acc_meth,
+                                             const IntegrationStage process) const {
+  const std::string k_key = integrationKernelKey(prec, acc_meth, valence_kernel_width, process);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Integration kernel identifier " + k_key + " was not found in the kernel map.",
+          "CoreKlManager", "getIntegrationKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
@@ -666,7 +755,7 @@ int2 CoreKlManager::getReductionKernelDims(const PrecisionModel prec, const Redu
 //-------------------------------------------------------------------------------------------------
 int2 CoreKlManager::getVirtualSiteKernelDims(const PrecisionModel prec,
                                              const VirtualSiteActivity purpose) const {
-  const std::string k_key = virtualSiteKernelKey(prec, purpose);
+  const std::string k_key = virtualSiteKernelKey(prec, purpose, virtual_site_kernel_width);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Virtual site handling kernel identifier " + k_key + " was not found in the kernel map.",
           "CoreKlManager", "getVirtualSiteKernelDims");
@@ -682,15 +771,6 @@ int2 CoreKlManager::getRMSDKernelDims(const PrecisionModel prec, const RMSDTask 
           "CoreKlManager", "getRMSDKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
-}
-
-//-------------------------------------------------------------------------------------------------
-int valenceBlockMultiplier() {
-#ifdef STORMM_USE_HPC
-  return 2;
-#else
-  return 1;
-#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -808,13 +888,13 @@ std::vector<int> densityMappingBlockMultiplier(const GpuDetails &gpu, const Prec
   case QMapMethod::ACC_SHARED:
     switch (prec) {
     case PrecisionModel::DOUBLE:
-      return std::vector<int>(8, 4);
+      return std::vector<int>(9, 4);
     case PrecisionModel::SINGLE:
       if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
-        return std::vector<int>(8, 4);
+        return std::vector<int>(9, 4);
       }
       else {
-        return std::vector<int>(8, 4);
+        return std::vector<int>(9, 4);
       }
       break;
     }
@@ -823,18 +903,18 @@ std::vector<int> densityMappingBlockMultiplier(const GpuDetails &gpu, const Prec
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
-        return { 4, 4, 4, 4, 4, 4, 3, 3 };
+        return { 0, 4, 4, 4, 4, 4, 4, 4, 4 };
       }
       else {
-        return { 5, 5, 5, 5, 5, 4, 3, 3 };
+        return { 0, 6, 6, 6, 6, 5, 4, 4, 4 };
       }
       break;
     case PrecisionModel::SINGLE:
       if (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) {
-        return std::vector<int>(8, 4);
+        return std::vector<int>(9, 4);
       }
       else {
-        return { 6, 6, 6, 6, 5, 4, 4, 4 };
+        return { 0, 6, 6, 6, 6, 5, 4, 4, 4 };
       }
       break;
     }
@@ -845,7 +925,7 @@ std::vector<int> densityMappingBlockMultiplier(const GpuDetails &gpu, const Prec
   }
   __builtin_unreachable();
 #else
-  return std::vector<int>(8, 1);
+  return std::vector<int>(9, 1);
 #endif
 }
 
@@ -884,9 +964,36 @@ int rmsdBlockMultiplier(const PrecisionModel prec) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string valenceKernelWidthExtension(const PrecisionModel prec,
+                                        const ValenceKernelSize kwidth) {
+
+  // Only append a size modifier if the kernel operates in single-precision.  All kernels that
+  // carry out instructions found in valence work units with double-precision arithmetic are
+  // sized to accommodate the largest possible work unit atom capacity, "one size fits all."
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    return std::string("");
+  case PrecisionModel::SINGLE:
+    switch (kwidth) {
+    case ValenceKernelSize::XL:
+      return std::string("_xl");
+    case ValenceKernelSize::LG:
+      return std::string("_lg");
+    case ValenceKernelSize::MD:
+      return std::string("_md");
+    case ValenceKernelSize::SM:
+      return std::string("_sm");
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval_force,
                              const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
-                             const VwuGoal purpose, const ClashResponse collision_handling) {
+                             const VwuGoal purpose, const ClashResponse collision_handling,
+                             const ValenceKernelSize kwidth) {
   std::string k_key("vale_");
   switch (prec) {
   case PrecisionModel::DOUBLE:
@@ -940,6 +1047,47 @@ std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval
     k_key += "_nc";
     break;
   }
+  k_key += valenceKernelWidthExtension(prec, kwidth);
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string integrationKernelKey(PrecisionModel prec, AccumulationMethod acc_meth, 
+                                 ValenceKernelSize kwidth, IntegrationStage process) {
+  std::string k_key("intg_");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (acc_meth) {
+  case AccumulationMethod::SPLIT:
+    k_key += "s";
+    break;
+  case AccumulationMethod::WHOLE:
+    k_key += "w";
+    break;
+  case AccumulationMethod::AUTOMATIC:
+    break;
+  }
+  k_key += valenceKernelWidthExtension(prec, kwidth);
+  switch (process) {
+  case IntegrationStage::VELOCITY_ADVANCE:
+    k_key += "_va";
+    break;
+  case IntegrationStage::VELOCITY_CONSTRAINT:
+    k_key += "_vc";
+    break;
+  case IntegrationStage::POSITION_ADVANCE:
+    k_key += "_pa";
+    break;
+  case IntegrationStage::GEOMETRY_CONSTRAINT:
+    k_key += "_gc";
+    break;
+  }
   return k_key;
 }
 
@@ -968,6 +1116,10 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
     k_key += "hc";
     break;
   case NbwuKind::UNKNOWN:
+    rtWarn("No kernels are available for an " + getEnumerationName(kind) + " non-bonded work unit "
+           "layout.  This is likely the result of a failure to use the loadNonbondedWorkUnits() "
+           "function in the AtomGraphSynthesis with which this kernel manager is associated.",
+           "nonbondedKernelKey");
     break;
   }
   switch (igb) {
@@ -1179,7 +1331,8 @@ std::string reductionKernelKey(const PrecisionModel prec, const ReductionGoal pu
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string virtualSiteKernelKey(const PrecisionModel prec, const VirtualSiteActivity purpose) {
+std::string virtualSiteKernelKey(const PrecisionModel prec, const VirtualSiteActivity purpose,
+                                 const ValenceKernelSize kwidth) {
   std::string k_key("vste_");
   switch (prec) {
   case PrecisionModel::DOUBLE:
@@ -1197,6 +1350,7 @@ std::string virtualSiteKernelKey(const PrecisionModel prec, const VirtualSiteAct
     k_key += "_xm";
     break;
   }
+  k_key += valenceKernelWidthExtension(prec, kwidth);
   return k_key;
 }
 

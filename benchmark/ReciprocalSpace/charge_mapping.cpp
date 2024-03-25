@@ -259,7 +259,8 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
     const int na = ((gdims >> 28) & 0xfff) * cg_ddr.mesh_ticks;
     const int nb = ((gdims >> 40) & 0xfff) * cg_ddr.mesh_ticks;
     const int nc = (gdims >> 52) * cg_ddr.mesh_ticks;
-    bnch_density[i] = mapDensity(&cf, ag_ptr,  NonbondedTheme::ELECTROSTATIC, na, nb, nc, order);
+    bnch_density[i] = mapDensity(&cf, ag_ptr,  NonbondedTheme::ELECTROSTATIC,
+                                 FFTMode::OUT_OF_PLACE, na, nb, nc, order);
 
     // Create a 32-bit representation of the coordinates and recalculate the density in single-
     // and double-precision with those coordinates.  Which approximation does more damage to the
@@ -275,13 +276,15 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
       cfr_32t.ycrd[i] = fy;
       cfr_32t.zcrd[i] = fz;
     }
-    fcrd_dcalc_density[i] = mapDensity(&cf_32t, ag_ptr, NonbondedTheme::ELECTROSTATIC, na, nb, nc,
-                                       order);
+    fcrd_dcalc_density[i] = mapDensity(&cf_32t, ag_ptr, NonbondedTheme::ELECTROSTATIC,
+                                       FFTMode::OUT_OF_PLACE, na, nb, nc, order);
     const NonbondedKit<float> nbk_f = ag_ptr->getSinglePrecisionNonbondedKit();
     fcrd_fcalc_density[i] = mapDensity<float>(cf_32t.data(), nbk_f, NonbondedTheme::ELECTROSTATIC,
-                                              na, nb, nc, order, unification);
-    dcrd_fcalc_density[i] = mapDensity<float>(cf.data(), nbk_f, NonbondedTheme::ELECTROSTATIC, na,
-                                              nb, nc, order, unification);
+                                              FFTMode::OUT_OF_PLACE, na, nb, nc, order,
+                                              unification);
+    dcrd_fcalc_density[i] = mapDensity<float>(cf.data(), nbk_f, NonbondedTheme::ELECTROSTATIC,
+                                              FFTMode::OUT_OF_PLACE, na, nb, nc, order,
+                                              unification);
     d_fcrd_fcalc_density.emplace_back(fcrd_fcalc_density[i].begin(), fcrd_fcalc_density[i].end());
     d_dcrd_fcalc_density.emplace_back(dcrd_fcalc_density[i].begin(), dcrd_fcalc_density[i].end());
 
@@ -389,12 +392,13 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
   // Create resources needed by some density mapping kernels.
   MolecularMechanicsControls mm_ctrl;
   mm_ctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                                ClashResponse::NONE, prec, pm_fx.getWorkUnitConfiguration(),
-                                pm_fx.getMode(), cg_tmat, order, poly_ag);
+                                ClashResponse::NONE, VwuGoal::ACCUMULATE, prec, prec,
+                                pm_fx.getWorkUnitConfiguration(), pm_fx.getMode(), cg_tmat, order,
+                                poly_ag);
   mm_ctrl.upload();
   MMControlKit<double> ctrl_d = mm_ctrl.dpData(devc_tier);
   MMControlKit<float>  ctrl_f = mm_ctrl.spData(devc_tier);
-  
+    
   // Add categories to the timer, if they are not already present
   const int init_timings = timer->addCategory(category_label + ", Init");
   const int conv_timings = timer->addCategory(category_label + ", Convert");
@@ -458,8 +462,9 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
     const CoordinateFrame cf = poly_ps.exportCoordinates(i);
     cpu_grids[i] = mapDensity(&cf, poly_ps.getSystemTopologyPointer(i),
-                              NonbondedTheme::ELECTROSTATIC, pm_wrt_host.dims[i].x,
-                              pm_wrt_host.dims[i].y, pm_wrt_host.dims[i].z, order);
+                              NonbondedTheme::ELECTROSTATIC, FFTMode::OUT_OF_PLACE,
+                              pm_wrt_host.dims[i].x, pm_wrt_host.dims[i].y, pm_wrt_host.dims[i].z,
+                              order);
     const std::vector<double> gpu_grid = pm_fx.getGrid(i);
     const double mue_i = meanUnsignedError(cpu_grids[i], gpu_grid);
     if (mue_i > 1.0e-4) {
@@ -471,8 +476,8 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
 
   // Run the __shared__ density accumulation kernel.
   for (int trial = 0; trial < n_trials; trial++) {
+    timer->assignTime(0);
     if (tcalc_is_double) {
-      timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
         mapDensity(&pm_wrt, &pm_acc, &ctrl_d, v_cgr, cg_tmat, synbk_d, gpu.getSMPCount(), lp_sacc,
                    QMapMethod::ACC_SHARED, &pm_fx);
@@ -480,7 +485,6 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
       }
     }
     else {
-      timer->assignTime(0);
       for (int i = 0; i < n_repeats; i++) {
         mapDensity(&pm_wrt, &pm_acc, &ctrl_f, v_cgr, cg_tmat, synbk_f, gpu.getSMPCount(), lp_sacc,
                    QMapMethod::ACC_SHARED, &pm_fx);
@@ -500,7 +504,7 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
     const double mue_i = meanUnsignedError(cpu_grids[i], gpu_grid);
     if (mue_i > 1.0e-4) {
       printf("Mean unsigned error in replica %2d is %9.6lf after implementing the %s kernel in "
-             "%s precision.\n", i, mue_i, getEnumerationName(QMapMethod::GENERAL_PURPOSE).c_str(),
+             "%s precision.\n", i, mue_i, getEnumerationName(QMapMethod::ACC_SHARED).c_str(),
              getEnumerationName(prec).c_str());
     }
   }
@@ -555,7 +559,6 @@ int main(const int argc, const char* argv[]) {
   // Take in additional command line inputs
   int n_trials = 4;
   int n_repeats = 100;
-  int n_grids = 4;
   int max_replicas = 200;
   int min_replicas = 1;
   int fp_bits = 32;
@@ -570,10 +573,6 @@ int main(const int argc, const char* argv[]) {
     else if (strcmpCased(argv[i], "-iter", CaseSensitivity::NO) &&
              verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER)) {
       n_repeats = atoi(argv[i + 1]);
-    }
-    else if (strcmpCased(argv[i], "-grids", CaseSensitivity::NO) &&
-             verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER)) {
-      n_grids = atoi(argv[i + 1]);
     }
     else if (strcmpCased(argv[i], "-cutoff", CaseSensitivity::NO) &&
              (verifyNumberFormat(argv[i + 1], NumberFormat::STANDARD_REAL) ||
@@ -633,7 +632,7 @@ int main(const int argc, const char* argv[]) {
   if (tsm.getTestingStatus() != TestPriority::CRITICAL) {
     rtErr("Some systems were not located.", "charge_mapping");
   }
-
+  
   // Obtain a benchmark density map for each system at each B-spline order.
   const int nsys = tsm.getSystemCount();
   const std::vector<UnitCellType> uc_pbc = { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC };
@@ -655,6 +654,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector nreps = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100,
                               150 };
   for (int ordr = 4; ordr <= 6; ordr++) {
+    const int n_grids = 9 - ordr;
     for (size_t i = 0; i < nreps.size(); i++) {
       if (nreps[i] < min_replicas || nreps[i] > max_replicas) {
         continue;

@@ -439,16 +439,16 @@ public:
   void import(const CoordinateFrame *cf, int frame_index = -1);
   void import(const PhaseSpace &ps, int atom_start, int atom_end, int frame_index = -1,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+              CoordinateCycle orientation = CoordinateCycle::WHITE);
   void import(const PhaseSpace &ps, int frame_index = -1,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+              CoordinateCycle orientation = CoordinateCycle::WHITE);
   void import(const PhaseSpace *ps, int atom_start, int atom_end, int frame_index = -1,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+              CoordinateCycle orientation = CoordinateCycle::WHITE);
   void import(const PhaseSpace *ps, int frame_index = -1,
               TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+              CoordinateCycle orientation = CoordinateCycle::WHITE);
   /// \}
 
   /// \brief Import coordinates from a file.  This function accepts directives to read a subset of

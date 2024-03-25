@@ -22,7 +22,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     conv_factor = inverse_scaling_factor * globalpos_scale;
     needs_overflow = (globalpos_scale_bits > globalpos_scale_nonoverflow_bits);
     switch (orientation) {
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       x_recv            = x_coordinates.data(tier);
       y_recv            = y_coordinates.data(tier);
       z_recv            = z_coordinates.data(tier);
@@ -33,7 +33,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
       inverse_xform_ptr = inverse_transforms.data(tier);
       box_dim_ptr       = box_dimensions.data(tier);
       break;
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       x_recv            = x_alt_coordinates.data(tier);
       y_recv            = y_alt_coordinates.data(tier);
       z_recv            = z_alt_coordinates.data(tier);
@@ -50,7 +50,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     conv_factor = inverse_scaling_factor * velocity_scale;
     needs_overflow = (velocity_scale_bits > velocity_scale_nonoverflow_bits);
     switch (orientation) {
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       x_recv      = x_velocities.data(tier);
       y_recv      = y_velocities.data(tier);
       z_recv      = z_velocities.data(tier);
@@ -58,7 +58,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
       y_recv_ovrf = y_velocity_overflow.data(tier);
       z_recv_ovrf = z_velocity_overflow.data(tier);
       break;
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       x_recv      = x_alt_velocities.data(tier);
       y_recv      = y_alt_velocities.data(tier);
       z_recv      = z_alt_velocities.data(tier);
@@ -72,7 +72,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
     conv_factor = inverse_scaling_factor * force_scale;
     needs_overflow = (force_scale_bits > force_scale_nonoverflow_bits);
     switch (orientation) {
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       x_recv      = x_forces.data(tier);
       y_recv      = y_forces.data(tier);
       z_recv      = z_forces.data(tier);
@@ -80,7 +80,7 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
       y_recv_ovrf = y_force_overflow.data(tier);
       z_recv_ovrf = z_force_overflow.data(tier);
       break;
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       x_recv      = x_alt_forces.data(tier);
       y_recv      = y_alt_forces.data(tier);
       z_recv      = z_alt_forces.data(tier);

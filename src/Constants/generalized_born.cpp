@@ -223,5 +223,10 @@ NeckGeneralizedBornTable::spData(const HybridTargetLevel tier) const {
                                        sp_neck_max_value.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+const NeckGeneralizedBornTable* NeckGeneralizedBornTable::getSelfPointer() const {
+  return this;
+}
+
 } // namespace generalized_born_defaults
 } // namespace stormm

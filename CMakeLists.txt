@@ -49,11 +49,13 @@ if (STORMM_ENABLE_CUDA)
 
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --compiler-options=-O0 -g")
 
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --ptxas-options=\"-v\" -gencode arch=compute_60,code=sm_80 -gencode arch=compute_60,code=sm_86")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA --ptxas-options=\"-v\"")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
 
-    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "60;61;70;75;80;86")
+    if (NOT DEFINED CUSTOM_GPU_ARCH)
+        set(CMAKE_CUDA_ARCHITECTURES "52;60;61;70;75;80;86;89")
+    else()
+        set(CMAKE_CUDA_ARCHITECTURES "${CUSTOM_GPU_ARCH}")
     endif()
 
     find_package(CUDAToolkit REQUIRED)

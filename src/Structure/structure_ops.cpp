@@ -15,8 +15,8 @@ double3 centerOfMass(const AtomGraph &ag, const PhaseSpace &ps, const int mol_in
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
   moleculeValidityCheck(mol_index, cdk.nmol, "centerOfMass");
   const PhaseSpaceReader psr = ps.data();
-  return centerOfMass(psr.xcrd, psr.ycrd, psr.zcrd, cdk.masses, cdk.mol_contents,
-                      cdk.mol_limits[mol_index], cdk.mol_limits[mol_index + 1]);
+  return centerOfMass(psr.xcrd, psr.ycrd, psr.zcrd, cdk.masses, cdk.mol_limits[mol_index],
+                      cdk.mol_limits[mol_index + 1], cdk.mol_contents);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -24,8 +24,8 @@ double3 centerOfMass(const AtomGraph *ag, const PhaseSpace *ps, const int mol_in
   const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
   moleculeValidityCheck(mol_index, cdk.nmol, "centerOfMass");
   const PhaseSpaceReader psr = ps->data();
-  return centerOfMass(psr.xcrd, psr.ycrd, psr.zcrd, cdk.masses, cdk.mol_contents,
-                      cdk.mol_limits[mol_index], cdk.mol_limits[mol_index + 1]);
+  return centerOfMass(psr.xcrd, psr.ycrd, psr.zcrd, cdk.masses, cdk.mol_limits[mol_index],
+                      cdk.mol_limits[mol_index + 1], cdk.mol_contents);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -33,8 +33,8 @@ double3 centerOfMass(const AtomGraph &ag, const CoordinateFrame &cf, const int m
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
   moleculeValidityCheck(mol_index, cdk.nmol, "centerOfMass");
   const CoordinateFrameReader cfr = cf.data();
-  return centerOfMass(cfr.xcrd, cfr.ycrd, cfr.zcrd, cdk.masses, cdk.mol_contents,
-                      cdk.mol_limits[mol_index], cdk.mol_limits[mol_index + 1]);
+  return centerOfMass(cfr.xcrd, cfr.ycrd, cfr.zcrd, cdk.masses, cdk.mol_limits[mol_index],
+                      cdk.mol_limits[mol_index + 1],  cdk.mol_contents);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -42,18 +42,18 @@ double3 centerOfMass(const AtomGraph *ag, const CoordinateFrame *cf, const int m
   const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
   moleculeValidityCheck(mol_index, cdk.nmol, "centerOfMass");
   const CoordinateFrameReader cfr = cf->data();
-  return centerOfMass(cfr.xcrd, cfr.ycrd, cfr.zcrd, cdk.masses, cdk.mol_contents,
-                      cdk.mol_limits[mol_index], cdk.mol_limits[mol_index + 1]);
+  return centerOfMass(cfr.xcrd, cfr.ycrd, cfr.zcrd, cdk.masses, cdk.mol_limits[mol_index],
+                      cdk.mol_limits[mol_index + 1], cdk.mol_contents);
 }
 
 //-------------------------------------------------------------------------------------------------
 double3 centerOfMass(const double* xcrd, const double* ycrd, const double* zcrd,
-                     const double* masses, const int* mol_contents, const int mol_start,
-                     const int mol_end) {
+                     const double* masses, const int mol_start, const int mol_end,
+                     const int* mol_contents) {
   double3 result = { 0.0, 0.0, 0.0 };
   double total_mass = 0.0;
   for (int i = mol_start; i < mol_end; i++) {
-    const int atom_idx = mol_contents[i];
+    const int atom_idx = (mol_contents != nullptr) ? mol_contents[i] : i;
     const double atom_mass = masses[atom_idx];
     result.x += atom_mass * xcrd[i];
     result.y += atom_mass * ycrd[i];
@@ -93,7 +93,7 @@ double3 molecularTorque(const double* xcrd, const double* ycrd, const double* zc
                         const double* masses, const int* mol_contents, const int mol_start,
                         const int mol_end) {
   double3 result = { 0.0, 0.0, 0.0 };
-  const double3 c_of_m = centerOfMass(xcrd, ycrd, zcrd, masses, mol_contents, mol_start, mol_end);
+  const double3 c_of_m = centerOfMass(xcrd, ycrd, zcrd, masses, mol_start, mol_end, mol_contents);
   for (int i = mol_start; i < mol_end; i++) {
 
     // Compute the displacement from the center of mass.  This relies on cross-products, but

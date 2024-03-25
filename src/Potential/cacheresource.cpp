@@ -46,12 +46,12 @@ CacheResource::CacheResource(const int block_limit_in, const int atom_limit_in) 
   x_velocities.setPointer(&llint_data,  3 * per_item, per_item);
   y_velocities.setPointer(&llint_data,  4 * per_item, per_item);
   z_velocities.setPointer(&llint_data,  5 * per_item, per_item);
-  x_coordinate_overflow.setPointer(&int_data,                 0, per_item);
-  y_coordinate_overflow.setPointer(&int_data,          per_item, per_item);
-  z_coordinate_overflow.setPointer(&int_data,      2 * per_item, per_item);
-  x_velocity_overflow.setPointer(&int_data,      3 * per_item, per_item);
-  y_velocity_overflow.setPointer(&int_data,      4 * per_item, per_item);
-  z_velocity_overflow.setPointer(&int_data,      5 * per_item, per_item);
+  x_coordinate_overflow.setPointer(&int_data,            0, per_item);
+  y_coordinate_overflow.setPointer(&int_data,     per_item, per_item);
+  z_coordinate_overflow.setPointer(&int_data, 2 * per_item, per_item);
+  x_velocity_overflow.setPointer(&int_data,   3 * per_item, per_item);
+  y_velocity_overflow.setPointer(&int_data,   4 * per_item, per_item);
+  z_velocity_overflow.setPointer(&int_data,   5 * per_item, per_item);
   x_force_overflow.setPointer(&int_data,      6 * per_item, per_item);
   y_force_overflow.setPointer(&int_data,      7 * per_item, per_item);
   z_force_overflow.setPointer(&int_data,      8 * per_item, per_item);

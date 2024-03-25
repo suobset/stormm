@@ -11,11 +11,6 @@ namespace stormm {
 namespace stmath {
 
 using constants::twice_warp_bits_mask_int;
-using numerics::max_int_accumulation;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
 
 #include "Numerics/accumulation.cui"
 

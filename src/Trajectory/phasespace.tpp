@@ -11,7 +11,7 @@ void PhaseSpace::fill(const T* xcrd, const T* ycrd, const T* zcrd, const Traject
                       const double* box_dims) {
   double *xptr, *yptr, *zptr;
   switch (cycle_in) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       xptr = x_alt_coordinates.data();
@@ -30,11 +30,11 @@ void PhaseSpace::fill(const T* xcrd, const T* ycrd, const T* zcrd, const Traject
       break;
     }
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
 
-      // Only in the case of PRIMARY POSITIONS should the box dimensions be filled.
+      // Only in the case of WHITE POSITIONS should the box dimensions be filled.
       if (box_dims != nullptr) {
         double* boxptr = box_dimensions.data();
         for (int i = 0; i < 6; i++) {

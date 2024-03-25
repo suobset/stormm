@@ -18,44 +18,30 @@
 __device__ __forceinline__ void atomicSplit(const double dval, const size_t pos, llint* primary,
                                             int* overflow) {
   llint ival;
-  if (fabs(dval) >= max_llint_accumulation) {
-    const int spillover = dval / max_llint_accumulation;
-    ival = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
-    atomicAdd(&overflow[pos], spillover);
-  }
-  else {
-    ival = __double2ll_rn(dval);
-  }
+  int spillover;
+  spillover = dval / max_llint_accumulation;
+  ival = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
   const llint prim_old = atomicAdd((ullint*)&primary[pos], (ullint)(ival));
   const llint prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
-    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0LL))) * 2);
+  const int prim_flips = ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL);
+  spillover += (2 - (4 * (ival < 0))) * prim_flips;
+  if (spillover) {
+    atomicAdd(&overflow[pos], spillover);
   }
 }
 
 __device__ __forceinline__ void atomicSplit(const float fval, const size_t pos, int* primary,
                                             int* overflow) {
   int ival;
-  if (fabsf(fval) >= max_int_accumulation_f) {
-
-    // While it may seem advantageous to continue accumulating spillover with the result of the
-    // second conditional, or to avoid the conditional that this is a part of by making it
-    // obligatory to compute spillover as the result of fval exceeding the maximum integer
-    // accumulation, this hardly ever happens if the split accumulation is being used in the
-    // proper way.  That yields a slight performance advantage to accumulating the numbers in
-    // this way, with the remote possibility of a third atomicAdd().  Register pressure is
-    // identical with either approach.
-    const int spillover = fval / max_int_accumulation_f;
-    ival = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
-    atomicAdd(&overflow[pos], spillover);
-  }
-  else {
-    ival = __float2int_rn(fval);
-  }
+  int spillover;
+  spillover = fval / max_int_accumulation_f;
+  ival = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
   const int prim_old = atomicAdd(&primary[pos], ival);
   const int prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
+  const int prim_flips = ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0);
+  spillover += (2 - (4 * (ival < 0))) * prim_flips;
+  if (spillover) {
+    atomicAdd(&overflow[pos], spillover);
   }
 }
 /// \}
@@ -79,7 +65,7 @@ __device__ __forceinline__ void atomicSplit(const int95_t ival, const size_t pos
   const llint prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0LL && (prim_old ^ ival.x) >= 0LL) *
-            (1 - (2 * (ival.x < 0LL))) * 2;    
+            (2 - (4 * (ival.x < 0LL)));    
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -91,7 +77,7 @@ __device__ __forceinline__ void atomicSplit(const int2 ival, const size_t pos, i
   const int prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
-            (1 - (2 * (ival.x < 0))) * 2;    
+            (2 - (4 * (ival.x < 0)));    
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -103,7 +89,7 @@ __device__ __forceinline__ void atomicSplit(const llint ival_x, const int ival_y
   const llint prim_old_plus_x = prim_old + ival_x;
   int ival_y = ival_y_in;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0LL && (prim_old ^ ival_x) >= 0LL) *
-            (1 - (2 * (ival_x < 0LL))) * 2;    
+            (2 - (4 * (ival_x < 0LL)));
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -115,7 +101,7 @@ __device__ __forceinline__ void atomicSplit(const int ival_x, const int ival_y_i
   const int prim_old_plus_x = prim_old + ival_x;
   int ival_y = ival_y_in;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival_x) >= 0) *
-            (1 - (2 * (ival_x < 0))) * 2;
+            (2 - (4 * (ival_x < 0)));
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -133,7 +119,7 @@ __device__ __forceinline__ void atomicSplit(const int ival_x, const int ival_y_i
 /// \param fval  Single-precision floating point number, pre-scaled to the fixed-precision range
 /// \{
 __device__ __forceinline__ int95_t doubleToInt95(const double dval) {
-  int95_t result = { 0LL, 0 };
+  int95_t result;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
     result.x = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
@@ -147,7 +133,7 @@ __device__ __forceinline__ int95_t doubleToInt95(const double dval) {
 }
 
 __device__ __forceinline__ int2 floatToInt63(const float fval) {
-  int2 result = { 0, 0 };
+  int2 result;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
     result.x = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
@@ -157,6 +143,19 @@ __device__ __forceinline__ int2 floatToInt63(const float fval) {
     result.x = __float2int_rn(fval);
     result.y = 0;
   }
+  return result;
+}
+
+__device__ __forceinline__ int2 longlongToInt63(const llint val) {
+  int2 result;
+  const int mult = (val < 0) ? -1 : 1;
+  llint tval = val * mult;
+  result.y = (tval >> 31);
+  llint remainder = result.y;
+  remainder <<= 31;
+  remainder = tval - remainder;
+  result.x = remainder * mult;
+  result.y *= mult;
   return result;
 }
 /// \}
@@ -192,6 +191,20 @@ __device__ __forceinline__ float splitFPToReal(const int2 isfp) {
 
 __device__ __forceinline__ float int63ToFloat(const int isfp_x, const int isfp_y) {
   return ((float)(isfp_y) * max_int_accumulation_f) + (float)(isfp_x);
+}
+
+__device__ __forceinline__ llint int63ToLongLong(const int2 isfp) {
+  llint result = isfp.y;
+  result *= max_int_accumulation_ll;
+  result += isfp.x;
+  return result;
+}
+
+__device__ __forceinline__ llint int63ToLongLong(const int isfp_x, const int isfp_y) {
+  llint result = isfp_y;
+  result *= max_int_accumulation_ll;
+  result += isfp_x;
+  return result;
 }
 
 __device__ __forceinline__

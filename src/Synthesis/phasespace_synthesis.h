@@ -15,11 +15,9 @@
 #include "Math/rounding.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Topology/atomgraph.h"
-#include "Trajectory/barostat.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
-#include "Trajectory/thermostat.h"
 #include "Trajectory/trajectory_enumerators.h"
 
 namespace stormm {
@@ -39,8 +37,6 @@ using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::velocity_scale_nonoverflow_bits;
 using topology::AtomGraph;
 using topology::UnitCellType;
-using trajectory::Barostat;
-using trajectory::BarostatKind;
 using trajectory::CoordinateCycle;
 using trajectory::CoordinateFileKind;
 using trajectory::CoordinateFrame;
@@ -52,8 +48,6 @@ using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceReader;
 using trajectory::PhaseSpaceWriter;
-using trajectory::Thermostat;
-using trajectory::ThermostatKind;
 using trajectory::TrajectoryKind;
 
 /// \brief A read-only abstract for the system demarcations in the object.  This information is
@@ -85,8 +79,7 @@ struct PsSynthesisWriter {
   /// \brief Constructor takes a straight list of pointers and constants from the parent object
   ///        (in this case, a PhaseSpaceSynthesis), like other abstracts.
   PsSynthesisWriter(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
-                    ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
-                    double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
+                    const int* atom_starts_in, const int* atom_counts_in,
                     const int* common_ag_list_in, const int* common_ag_bounds_in,
                     const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
                     double lpos_scale_in, double vel_scale_in, double frc_scale_in,
@@ -117,9 +110,6 @@ struct PsSynthesisWriter {
   const int system_count;               ///< The number of independent systems
   const int unique_topology_count;      ///< The number of unique topologies
   const UnitCellType unit_cell;         ///< Type of unit cells (or none) each system resides in
-  const ThermostatKind heat_bath_kind;  ///< The type of thermostat used throughout all systems
-  const BarostatKind piston_kind;       ///< The type of barostat used throughout all systems
-  const double time_step;               ///< Time step used in all simulations
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
   const int* common_ag_list;            ///< Concatenated lists of systems in the synthesis sharing
@@ -215,8 +205,7 @@ struct PsSynthesisReader {
   ///        the relevant pointers const.
   /// \{
   PsSynthesisReader(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
-                    ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
-                    double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
+                    const int* atom_starts_in, const int* atom_counts_in,
                     const int* common_ag_list_in, const int* common_ag_bounds_in,
                     const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
                     double lpos_scale_in, double vel_scale_in, double frc_scale_in,
@@ -252,9 +241,6 @@ struct PsSynthesisReader {
   const int system_count;               ///< The number of independent systems
   const int unique_topology_count;      ///< The number of unique topologies
   const UnitCellType unit_cell;         ///< Type of unit cells (or none) each system resides in
-  const ThermostatKind heat_bath_kind;  ///< The type of thermostat used throughout all systems
-  const BarostatKind piston_kind;       ///< The type of barostat used throughout all systems
-  const double time_step;               ///< Time step used in all simulations
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
   const int* common_ag_list;            ///< Concatenated lists of systems in the synthesis sharing
@@ -368,16 +354,9 @@ public:
   ///                      of systems to be held within the resulting PhaseSpaceSynthesis object.
   /// \param ag_index_key  Indices of the given topology objects to assemble into a larger list of
   ///                      systems to be held within the resulting PhaseSpaceSynthesis object.
-  /// \param time_step_in  The initial time step (will be converted to integer representation as
-  ///                      described above, default 1.0fs which converts to llint(8))
-  /// \param heat_bath_in  A thermostat to govern integration of the equations of motion
-  /// \param piston_in     A barostat to govern box rescaling (if there is a unit cell)
   /// \{
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list,
-                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
-                      const std::vector<Barostat> &pistons_in = { Barostat() },
-                      double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
@@ -386,33 +365,7 @@ public:
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list,
                       const std::vector<int> &index_key,
-                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
-                      const std::vector<Barostat> &pistons_in = { Barostat() },
-                      double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
-                      int localpos_scale_bits_in = default_localpos_scale_bits,
-                      int velocity_scale_bits_in = default_velocity_scale_bits,
-                      int force_scale_bits_in = default_force_scale_bits);
-
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
-                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
-                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
-                      const std::vector<Barostat> &pistons_in = { Barostat() },
-                      double time_step_in = 1.0,
-                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
-                      int localpos_scale_bits_in = default_localpos_scale_bits,
-                      int velocity_scale_bits_in = default_velocity_scale_bits,
-                      int force_scale_bits_in = default_force_scale_bits);
-
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                      const std::vector<AtomGraph*> &ag_list, int globalpos_scale_bits_in,
-                      int localpos_scale_bits_in = default_localpos_scale_bits,
-                      int velocity_scale_bits_in = default_velocity_scale_bits,
-                      int force_scale_bits_in = default_force_scale_bits);
-
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                      const std::vector<AtomGraph*> &ag_list,
-                      const std::vector<int> &index_key, int globalpos_scale_bits_in,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
@@ -491,6 +444,10 @@ public:
   ///
   /// \param system_index  Index of the system of interest
   int getAtomCount(int system_index) const;
+
+  /// \brief Get the total number of atoms across all systems in the synthesis, including padding
+  ///        between systems and after the end of the final system.
+  int getPaddedAtomCount() const;
 
   /// \brief Get the index of the unique topology used by a particular system in the synthesis.
   ///
@@ -611,29 +568,6 @@ public:
   /// \}
 #endif
   
-  /// \brief Move particles according to a given set of forces, based on known masses, to complete
-  ///        the coordinate update phase of Velocity-Verlet integration.  Also updates velocities
-  ///        by half a time step.
-  ///
-  /// \param ag  System topology (for atomic masses)
-  void velocityVerletCoordinateUpdate();
-
-  /// \brief Update velocities by half a time step based on the newly computed forces in the
-  ///        velocity Verlet integration scheme.
-  ///
-  /// \param ag  System topology (for atomic masses)
-  void velocityVerletVelocityUpdate();
-
-  /// \brief Assign velocities by an Andersen thermostat move
-  ///
-  /// \param ag  System topology (for atomic masses)
-  void assignMaxwellVelocities();
-
-  /// \brief Assign velocities by Berendsen coupling
-  ///
-  /// \param ag  System topology (for atomic masses)
-  void berendsenThermocoupling();
-
   /// \brief Extract the phase space (plus forces) of a specific system within the synthesis.
   ///
   /// \param ps           Pointer to an allocated PhaseSpace object (i.e. the original) ready to
@@ -662,7 +596,7 @@ public:
   ///
   /// Overloaded:
   ///   - Provide the stage of the coordinate cycle from which to obtain coordinates
-  ///   - Assume that the PRIMARY stage of the coordinate cycle is desired
+  ///   - Assume that the WHITE stage of the coordinate cycle is desired
   ///
   /// \param index        Index of the system of interest within the synthesis
   /// \param trajkind     Type of coordinates to copy
@@ -684,7 +618,7 @@ public:
   ///
   /// Overloaded:
   ///   - Provide the stage of the coordinate cycle from which to obtain coordinates
-  ///   - Assume that the PRIMARY stage of the coordinate cycle is desired
+  ///   - Assume that the WHITE stage of the coordinate cycle is desired
   ///
   /// \param index        Index of the system of interest within the synthesis
   /// \param trajkind     Type of coordinates to copy
@@ -699,6 +633,20 @@ public:
   std::vector<double>
   getInterlacedCoordinates(int index, TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
+  /// \brief Modify the object's cycle position, as in the course of propagating dynamics.
+  ///
+  /// Overloaded:
+  ///   - Increment the cycle position one step forward (this toggles between the WHITE and
+  ///     BLACK states, and is the same as decrementing the cycle position unless the time
+  ///     cycle takes on a third possible stage)
+  ///   - Set the time cycle to a specific point
+  ///
+  /// \param time_point  The point in the time cycle which the object is to take as "current"
+  /// \{
+  void updateCyclePosition();
+  void updateCyclePosition(CoordinateCycle time_point);
   /// \}
   
   /// \brief Initialize the forces within a PhaseSpaceSynthesis object.  This is the analog of the
@@ -759,7 +707,7 @@ public:
   ///
   /// Overloaded:
   ///   - Provide a PhaseSpace object (all coordinates, velocities, and forces of the input object
-  ///     will be transferred from the PRIMARY stage of the time cycle in the PhaseSpace object,
+  ///     will be transferred from the WHITE stage of the time cycle in the PhaseSpace object,
   ///     into the specified stage of the time cycle in this synthesis, and other stages of the
   ///     time cycle will be transferred accordingly).
   ///   - Provide three arrays of Cartesian X, Y, and Z coordinates, a scaling factor if the
@@ -776,7 +724,7 @@ public:
   ///                           of the systems in the synthesis
   /// \param system_index       Index of the system within this synthesis that the imported
   ///                           coordinates shall replace
-  /// \param orientation        Stage of the time cycle at which the PRIMARY stage of an input
+  /// \param orientation        Stage of the time cycle at which the WHITE stage of an input
   ///                           PhaseSpace object is to enter the synthesis, or at which the data
   ///                           in raw arrays, a CoordinateFrame, or a CoordinateSeries object is
   ///                           to enter the synthesis
@@ -893,13 +841,6 @@ private:
                                   ///<   triclinic unit cell.
   CoordinateCycle cycle_position; ///< The stage of the time cycle (past >> present >> future) that
                                   ///<   holds the relevant, current coordinates
-  ThermostatKind heat_bath_kind;  ///< The type of thermostat that all systems will run.  Other
-                                  ///<   details are variable between systems and stored in their
-                                  ///<   own arrays.
-  BarostatKind piston_kind;       ///< The pressure scaling method for all systems if the unit
-                                  ///<   cells are periodic.  Additional details may vary between
-                                  ///<   systems and are held in their own arrays.
-  double time_step;               ///< The time step for every system, in femtoseconds
 
   // Scaling constants for fixed-precision coordinates (position, velocity) and also forces
   // in this PhaseSpaceSynthesis apply identically to all systems
@@ -1002,11 +943,11 @@ private:
                                           ///<   the box_dimensions triggers an update of the
                                           ///<   transformations)
   Hybrid<double> alt_box_transforms;      ///< Transformation matrices to take coordinates into
-                                          ///<   box (fractional) space for the ALTERNATE
+                                          ///<   box (fractional) space for the BLACK
                                           ///<   coordinate sets
-  Hybrid<double> alt_inverse_transforms;  ///< Inverse transformation matrices for the ALTERNATE
+  Hybrid<double> alt_inverse_transforms;  ///< Inverse transformation matrices for the BLACK
                                           ///<   coordinate sets
-  Hybrid<double> alt_box_dimensions;      ///< Box lengths and the angles for the ALTERNATE
+  Hybrid<double> alt_box_dimensions;      ///< Box lengths and the angles for the BLACK
                                           ///<   coordinate sets
 
   // Data arrays

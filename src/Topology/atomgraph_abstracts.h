@@ -376,11 +376,13 @@ struct ChemicalDetailsKit {
 
   /// \brief Simple constructor based on many detais.  This, like other abstracts, will most likely
   ///        be produced by some AtomGraph member function.
-  ChemicalDetailsKit(int natom_in, int nres_in, int nmol_in, const char4* atom_names_in,
-                     const char4* res_names_in, const char4* atom_types_in,
-                     const int* z_numbers_in, const int* res_limits_in, const int* atom_numbers_in,
-                     const int* res_numbers_in, const int* mol_home_in, const int* mol_contents_in,
-                     const int* mol_limits_in, const double* masses_in, const float* sp_masses_in);
+  ChemicalDetailsKit(int natom_in, int nres_in, int nmol_in, int free_dof_in, int cnst_dof_in,
+                     const char4* atom_names_in, const char4* res_names_in,
+                     const char4* atom_types_in, const int* z_numbers_in, const int* res_limits_in,
+                     const int* atom_numbers_in, const int* res_numbers_in, const int* mol_home_in,
+                     const int* mol_contents_in, const int* mol_limits_in, const double* masses_in,
+                     const float* sp_masses_in, const double* inv_masses_in,
+                     const float* sp_inv_masses_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -391,22 +393,29 @@ struct ChemicalDetailsKit {
 
   // Member variables store the atom count, residue count, and other ways to quantify the system
   // in addition to many useful pointers
-  const int natom;         ///< The number of atoms in the system
-  const int nres;          ///< The number of residues in the system
-  const int nmol;          ///< The number of molecules in the system
-  const char4* atom_names; ///< Names of all atoms in the system
-  const char4* res_names;  ///< Names of all residues in the system
-  const char4* atom_types; ///< Atom type names for all atoms in the system
-  const int* z_numbers;    ///< Atomic numbers for all atoms in the system
-  const int* res_limits;   ///< Residue limits, a capped (exclusive) prefix sum
-  const int* atom_numbers; ///< Structural atom numbers for every atom
-  const int* res_numbers;  ///< Structural residue numbers for every atom (atom, not residue, even
-                           ///<   though the numbers refer to residues)
-  const int* mol_home;     ///< Molecule index to which each atom belongs
-  const int* mol_contents; ///< Contents of every molecule in the system, as lists of atom indices
-  const int* mol_limits;   ///< Molecule limits, the bounds by which to read mol_contents
-  const double* masses;    ///< Masses of atoms in the system
-  const float* sp_masses;  ///< Masses of atoms in the system (single precision)
+  const int natom;             ///< The number of atoms in the system
+  const int nres;              ///< The number of residues in the system
+  const int nmol;              ///< The number of molecules in the system
+  const int free_dof;          ///< Number of degrees of freedom, without consideration to
+                               ///<   geometric constraints
+  const int cnst_dof;          ///< Number of degrees of freedom, when geometric constraints are
+                               ///<   in effect
+  const char4* atom_names;     ///< Names of all atoms in the system
+  const char4* res_names;      ///< Names of all residues in the system
+  const char4* atom_types;     ///< Atom type names for all atoms in the system
+  const int* z_numbers;        ///< Atomic numbers for all atoms in the system
+  const int* res_limits;       ///< Residue limits, a capped (exclusive) prefix sum
+  const int* atom_numbers;     ///< Structural atom numbers for every atom
+  const int* res_numbers;      ///< Structural residue numbers for every atom (atom, not residue,
+                               ///<   even though the numbers refer to residues)
+  const int* mol_home;         ///< Molecule index to which each atom belongs
+  const int* mol_contents;     ///< Contents of every molecule in the system, as lists of atom
+                               ///<   indices
+  const int* mol_limits;       ///< Molecule limits, the bounds by which to read mol_contents
+  const double* masses;        ///< Masses of atoms in the system
+  const float* sp_masses;      ///< Masses of atoms in the system (single precision)
+  const double* inv_masses;    ///< Masses of atoms in the system
+  const float* sp_inv_masses;  ///< Masses of atoms in the system (single precision)
 };
 
 /// \brief Information needed for the placement of virtual sites and transmission of forces on
@@ -459,7 +468,7 @@ template <typename T> struct ConstraintKit {
                          const int* group_param_bounds_in, const T* settle_mormt_in,
                          const T* settle_mhrmt_in, const T* settle_ra_in, const T* settle_rb_in,
                          const T* settle_rc_in, const T* settle_invra_in,
-                         const T* group_lengths_in, const T* group_inv_masses_in);
+                         const T* group_sq_lengths_in, const T* group_inv_masses_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -479,7 +488,7 @@ template <typename T> struct ConstraintKit {
   const int* group_list;          ///< List of all atoms involved in "hub and spoke" constraint
                                   ///<   groups. In each group, the central atom, to which all
                                   ///<   others bind, is listed first.  It is the first atom of
-                                  ///<   any of the constrained bond.  All other atoms are the
+                                  ///<   any of the constrained bonds.  All other atoms are the
                                   ///<   distal termini of those constrained bonds.
   const int* group_bounds;        ///< Bounds array for group_list above.  Every segment of
                                   ///<   group_list will be at least two atoms, and generally two
@@ -497,7 +506,7 @@ template <typename T> struct ConstraintKit {
   const T* settle_rb;             ///< Internal distance measurement of SETTLE groups
   const T* settle_rc;             ///< Internal distance measurement of SETTLE groups
   const T* settle_invra;          ///< Internal distance measurement of SETTLE groups
-  const T* group_lengths;         ///< Bond length targets for the group atoms
+  const T* group_sq_lengths;      ///< Bond length targets for the group atoms
   const T* group_inv_masses;      ///< Inverse masses for the particles in each group
 };
 

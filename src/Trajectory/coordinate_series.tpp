@@ -534,7 +534,7 @@ PhaseSpace CoordinateSeries<T>::exportPhaseSpace(const int frame_index,
   case HybridTargetLevel::HOST:
     result.fill(&x_coordinates.data()[frame_offset], &y_coordinates.data()[frame_offset],
                 &z_coordinates.data()[frame_offset], TrajectoryKind::POSITIONS,
-                CoordinateCycle::PRIMARY, globalpos_scale_bits,
+                CoordinateCycle::WHITE, globalpos_scale_bits,
                 &box_dimensions.data()[bdim_offset]);
     break;
 #ifdef STORMM_USE_HPC
@@ -546,7 +546,7 @@ PhaseSpace CoordinateSeries<T>::exportPhaseSpace(const int frame_index,
       const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
       const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
       result.fill(tmp_xcrd, tmp_ycrd, tmp_zcrd,	TrajectoryKind::POSITIONS,
-                  CoordinateCycle::PRIMARY, globalpos_scale_bits, tmp_bdim);
+                  CoordinateCycle::WHITE, globalpos_scale_bits, tmp_bdim);
     }
     break;
 #endif

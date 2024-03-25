@@ -44,7 +44,7 @@ std::vector<double> uniformRand(Tprng *rng, const size_t rows, const size_t colu
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tprng, typename Tprod>
-void uniformRand(Tprng *rng, std::vector<Tprod> *xv, const double fp_scale, const double scale) {
+void uniformRand(Tprng *rng, std::vector<Tprod> *xv, const double scale, const double fp_scale) {
   const double eff_scale = fp_scale * scale;
   const size_t count = xv->size();
   Tprod* xv_ptr = xv->data();
@@ -93,7 +93,7 @@ std::vector<float> spUniformRand(Tprng *rng, const size_t rows, const size_t col
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tprng, typename Tprod>
-void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, const float fp_scale, const float scale) {
+void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, const float scale, const float fp_scale) {
   const float eff_scale = fp_scale * scale;
   const size_t count = xv->size();
   Tprod* xv_ptr = xv->data();
@@ -502,7 +502,7 @@ void fillRandomCache(ullint2* state_xy, ullint2* state_zw, T* cache, const size_
   Xoshiro256ppGenerator xrs256pp;
   const size_t ct = std::type_index(typeid(T)).hash_code();
   const bool t_is_double = (ct == double_type_index);
-  for (int i = index_start; i < index_end; i++) {
+  for (size_t i = index_start; i < index_end; i++) {
 
     // Set the state of the generator object to the current value in the array of generators.
     // Next, generate a series of random numbers with this seed, then store the resulting state.

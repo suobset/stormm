@@ -31,6 +31,7 @@ AtomGraph::AtomGraph() :
     atom_count{0}, residue_count{0}, molecule_count{0}, largest_residue_size{0},
     last_solute_residue{0}, last_solute_atom{0}, first_solvent_molecule{0},
     last_atom_before_cap{0}, implicit_copy_count{0}, largest_molecule_size{0},
+    unconstrained_dof{0}, constrained_dof{0},
     descriptors{HybridKind::POINTER, "tp_desc"},
     residue_limits{HybridKind::POINTER, "tp_res_limits"},
     atom_struc_numbers{HybridKind::POINTER, "tp_atom_struc_nums"},
@@ -236,7 +237,7 @@ AtomGraph::AtomGraph() :
     use_perturbation_info{PerturbationSetting::OFF}, use_solvent_cap_option{SolventCapSetting::ON},
     use_polarization{PolarizationSetting::ON}, water_residue_name{' ', ' ', ' ', ' '},
     bond_constraint_mask{""}, bond_constraint_omit_mask{""}, bond_constraint_count{0},
-    nonrigid_particle_count{0}, degrees_of_freedom{0}, settle_group_count{0},
+    nonrigid_particle_count{0}, settle_group_count{0},
     settle_parameter_count{0}, constraint_group_count{0}, constraint_parameter_count{0},
     settle_oxygen_atoms{HybridKind::POINTER, "tp_settle_ox"},
     settle_hydro1_atoms{HybridKind::POINTER, "tp_settle_h1"},
@@ -253,7 +254,7 @@ AtomGraph::AtomGraph() :
     settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
     settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
     constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
-    constraint_target_lengths{HybridKind::POINTER, "tp_cnst_targets"},
+    constraint_squared_lengths{HybridKind::POINTER, "tp_cnst_targets"},
     sp_settle_mormt{HybridKind::POINTER, "tp_cnst_sett_mormt"},
     sp_settle_mhrmt{HybridKind::POINTER, "tp_cnst_sett_mhrmt"},
     sp_settle_ra{HybridKind::POINTER, "tp_cnst_sett_ra"},
@@ -261,7 +262,7 @@ AtomGraph::AtomGraph() :
     sp_settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
     sp_settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
     sp_constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
-    sp_constraint_target_lengths{HybridKind::POINTER, "tp_cnst_targets"},
+    sp_constraint_squared_lengths{HybridKind::POINTER, "tp_cnst_targets"},
 
     // Overflow name keys
     atom_overflow_names{HybridKind::POINTER, "atom_name_xtkey"},
@@ -917,7 +918,7 @@ void AtomGraph::rebasePointers() {
   settle_rc.swapTarget(&double_data);
   settle_invra.swapTarget(&double_data);
   constraint_inverse_masses.swapTarget(&double_data);
-  constraint_target_lengths.swapTarget(&double_data);
+  constraint_squared_lengths.swapTarget(&double_data);
   sp_settle_mormt.swapTarget(&float_data);
   sp_settle_mhrmt.swapTarget(&float_data);
   sp_settle_ra.swapTarget(&float_data);
@@ -925,7 +926,7 @@ void AtomGraph::rebasePointers() {
   sp_settle_rc.swapTarget(&float_data);
   sp_settle_invra.swapTarget(&float_data);
   sp_constraint_inverse_masses.swapTarget(&float_data);
-  sp_constraint_target_lengths.swapTarget(&float_data);
+  sp_constraint_squared_lengths.swapTarget(&float_data);
 
   // Repair overflow name pointers
   atom_overflow_names.swapTarget(&char4_data);
@@ -963,6 +964,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     last_atom_before_cap{original.last_atom_before_cap},
     implicit_copy_count{original.implicit_copy_count},
     largest_molecule_size{original.largest_molecule_size},
+    unconstrained_dof{original.unconstrained_dof},
+    constrained_dof{original.constrained_dof},
     descriptors{original.descriptors},
     residue_limits{original.residue_limits},
     atom_struc_numbers{original.atom_struc_numbers},
@@ -1202,7 +1205,6 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     bond_constraint_omit_mask{original.bond_constraint_omit_mask},
     bond_constraint_count{original.bond_constraint_count},
     nonrigid_particle_count{original.nonrigid_particle_count},
-    degrees_of_freedom{original.degrees_of_freedom},
     settle_group_count{original.settle_group_count},
     settle_parameter_count{original.settle_parameter_count},
     constraint_group_count{original.constraint_group_count},
@@ -1222,7 +1224,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     settle_rc{original.settle_rc},
     settle_invra{original.settle_invra},
     constraint_inverse_masses{original.constraint_inverse_masses},
-    constraint_target_lengths{original.constraint_target_lengths},
+    constraint_squared_lengths{original.constraint_squared_lengths},
     sp_settle_mormt{original.sp_settle_mormt},
     sp_settle_mhrmt{original.sp_settle_mhrmt},
     sp_settle_ra{original.sp_settle_ra},
@@ -1230,7 +1232,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_settle_rc{original.sp_settle_rc},
     sp_settle_invra{original.sp_settle_invra},
     sp_constraint_inverse_masses{original.sp_constraint_inverse_masses},
-    sp_constraint_target_lengths{original.sp_constraint_target_lengths},
+    sp_constraint_squared_lengths{original.sp_constraint_squared_lengths},
 
     // Overflow name keys
     atom_overflow_names{original.atom_overflow_names},
@@ -1301,6 +1303,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   last_atom_before_cap = other.last_atom_before_cap;
   implicit_copy_count = other.implicit_copy_count;
   largest_molecule_size = other.largest_molecule_size;
+  unconstrained_dof = other.unconstrained_dof;
+  constrained_dof = other.constrained_dof;
   descriptors = other.descriptors;
   residue_limits = other.residue_limits;
   atom_struc_numbers = other.atom_struc_numbers;
@@ -1540,7 +1544,6 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   bond_constraint_omit_mask = other.bond_constraint_omit_mask;
   bond_constraint_count = other.bond_constraint_count;
   nonrigid_particle_count = other.nonrigid_particle_count;
-  degrees_of_freedom = other.degrees_of_freedom;
   settle_group_count = other.settle_group_count;
   settle_parameter_count = other.settle_parameter_count;
   constraint_group_count = other.constraint_group_count;
@@ -1560,7 +1563,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   settle_rc = other.settle_rc;
   settle_invra = other.settle_invra;
   constraint_inverse_masses = other.constraint_inverse_masses;
-  constraint_target_lengths = other.constraint_target_lengths;
+  constraint_squared_lengths = other.constraint_squared_lengths;
   sp_settle_mormt = other.sp_settle_mormt;
   sp_settle_mhrmt = other.sp_settle_mhrmt;
   sp_settle_ra = other.sp_settle_ra;
@@ -1568,7 +1571,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_settle_rc = other.sp_settle_rc;
   sp_settle_invra = other.sp_settle_invra;
   sp_constraint_inverse_masses = other.sp_constraint_inverse_masses;
-  sp_constraint_target_lengths = other.sp_constraint_target_lengths;
+  sp_constraint_squared_lengths = other.sp_constraint_squared_lengths;
 
   // Copy overflow name keys
   atom_overflow_names = other.atom_overflow_names;
@@ -1623,6 +1626,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     last_atom_before_cap{original.last_atom_before_cap},
     implicit_copy_count{original.implicit_copy_count},
     largest_molecule_size{original.largest_molecule_size},
+    unconstrained_dof{original.unconstrained_dof},
+    constrained_dof{original.constrained_dof},
     descriptors{std::move(original.descriptors)},
     residue_limits{std::move(original.residue_limits)},
     atom_struc_numbers{std::move(original.atom_struc_numbers)},
@@ -1862,7 +1867,6 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     bond_constraint_omit_mask{std::move(original.bond_constraint_omit_mask)},
     bond_constraint_count{original.bond_constraint_count},
     nonrigid_particle_count{original.nonrigid_particle_count},
-    degrees_of_freedom{original.degrees_of_freedom},
     settle_group_count{original.settle_group_count},
     settle_parameter_count{original.settle_parameter_count},
     constraint_group_count{original.constraint_group_count},
@@ -1882,7 +1886,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     settle_rc{std::move(original.settle_rc)},
     settle_invra{std::move(original.settle_invra)},
     constraint_inverse_masses{std::move(original.constraint_inverse_masses)},
-    constraint_target_lengths{std::move(original.constraint_target_lengths)},
+    constraint_squared_lengths{std::move(original.constraint_squared_lengths)},
     sp_settle_mormt{std::move(original.sp_settle_mormt)},
     sp_settle_mhrmt{std::move(original.sp_settle_mhrmt)},
     sp_settle_ra{std::move(original.sp_settle_ra)},
@@ -1890,7 +1894,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_settle_rc{std::move(original.sp_settle_rc)},
     sp_settle_invra{std::move(original.sp_settle_invra)},
     sp_constraint_inverse_masses{std::move(original.sp_constraint_inverse_masses)},
-    sp_constraint_target_lengths{std::move(original.sp_constraint_target_lengths)},
+    sp_constraint_squared_lengths{std::move(original.sp_constraint_squared_lengths)},
 
     // Move overflow name keys
     atom_overflow_names{std::move(original.atom_overflow_names)},
@@ -1955,6 +1959,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   last_atom_before_cap = other.last_atom_before_cap;
   implicit_copy_count = other.implicit_copy_count;
   largest_molecule_size = other.largest_molecule_size;
+  unconstrained_dof = other.unconstrained_dof;
+  constrained_dof = other.constrained_dof;
   descriptors = std::move(other.descriptors);
   residue_limits = std::move(other.residue_limits);
   atom_struc_numbers = std::move(other.atom_struc_numbers);
@@ -2194,7 +2200,6 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   bond_constraint_omit_mask = std::move(other.bond_constraint_omit_mask);
   bond_constraint_count = other.bond_constraint_count;
   nonrigid_particle_count = other.nonrigid_particle_count;
-  degrees_of_freedom = other.degrees_of_freedom;
   settle_group_count = other.settle_group_count;
   settle_parameter_count = other.settle_parameter_count;
   constraint_group_count = other.constraint_group_count;
@@ -2214,7 +2219,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   settle_rc = std::move(other.settle_rc);
   settle_invra = std::move(other.settle_invra);
   constraint_inverse_masses = std::move(other.constraint_inverse_masses);
-  constraint_target_lengths = std::move(other.constraint_target_lengths);
+  constraint_squared_lengths = std::move(other.constraint_squared_lengths);
   sp_settle_mormt = std::move(other.sp_settle_mormt);
   sp_settle_mhrmt = std::move(other.sp_settle_mhrmt);
   sp_settle_ra = std::move(other.sp_settle_ra);
@@ -2222,7 +2227,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_settle_rc = std::move(other.sp_settle_rc);
   sp_settle_invra = std::move(other.sp_settle_invra);
   sp_constraint_inverse_masses = std::move(other.sp_constraint_inverse_masses);
-  sp_constraint_target_lengths = std::move(other.sp_constraint_target_lengths);
+  sp_constraint_squared_lengths = std::move(other.sp_constraint_squared_lengths);
 
   // Move overflow name keys
   atom_overflow_names = std::move(other.atom_overflow_names);

@@ -146,7 +146,7 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
     mesh_subdivisions{mesh_subdivisions_in},
     policy{policy_in},
     theme{theme_in},
-    cycle_position{CoordinateCycle::PRIMARY},
+    cycle_position{CoordinateCycle::WHITE},
     localpos_scale_bits{0}, localpos_scale{1.0}, localpos_inverse_scale{1.0},
     system_cell_grids{HybridKind::ARRAY, "cg_cell_grids"},
     system_cell_umat{HybridKind::ARRAY, "cg_dp_cell_umat"},
@@ -467,8 +467,8 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
   nonimaged_atom_indices_alt.resize(icl_atom_counter);
     
   // Loop back over all structures, reimage atoms, and pack the image arrays.
-  populateImage(CoordinateCycle::PRIMARY);
-  populateImage(CoordinateCycle::ALTERNATE);
+  populateImage(CoordinateCycle::WHITE);
+  populateImage(CoordinateCycle::BLACK);
   
   // Create work units to support the "tower and plate" neutral territory decomposition
   prepareWorkGroups();
@@ -489,8 +489,8 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
   // This covers twelve of the cell:cell interactions.  In the second tranch of exclusion masks,
   // each atom of the lower two of the central cells of the tower (home cell and the -c cell) gets
   // a bit mask and each mask contains one bit for every atom of the home cell.
-  initializeExclusionMasks(CoordinateCycle::PRIMARY);
-  initializeExclusionMasks(CoordinateCycle::ALTERNATE);
+  initializeExclusionMasks(CoordinateCycle::WHITE);
+  initializeExclusionMasks(CoordinateCycle::BLACK);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -597,9 +597,9 @@ uint CellGrid<T, Tacc, Tcalc, T4>::getImageIndex(const int system_index, const i
   validateAtomIndex(system_index, atom_index, "getImageIndex");
   const int synth_idx = poly_ps_ptr->getAtomOffset(system_index) + atom_index;
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return image_array_indices_alt.readHost(synth_idx);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return image_array_indices.readHost(synth_idx);
   }
   __builtin_unreachable();
@@ -625,10 +625,10 @@ int4 CellGrid<T, Tacc, Tcalc, T4>::getCellLocation(const int system_index, const
   const uint cell_nc = (sys_cdims >> 52);
   uint image_idx;
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     image_idx = image_array_indices_alt.readHost(synth_idx);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     image_idx = image_array_indices.readHost(synth_idx);
     break;
   }
@@ -647,10 +647,10 @@ int4 CellGrid<T, Tacc, Tcalc, T4>::getCellLocation(const int system_index, const
   do {
     uint2 mid_lims;
     switch (orientation) {
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       mid_lims = image_cell_limits_alt.readHost(mid_cell_est);
       break;
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       mid_lims = image_cell_limits.readHost(mid_cell_est);
       break;
     }
@@ -693,10 +693,10 @@ int2 CellGrid<T, Tacc, Tcalc, T4>::getChainLocation(const int system_index, cons
   const uint cell_nc = (sys_cdims >> 52);
   uint image_idx;
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     image_idx = image_array_indices_alt.readHost(synth_idx);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     image_idx = image_array_indices.readHost(synth_idx);
     break;
   }
@@ -734,7 +734,7 @@ CellGridWriter<T, Tacc, Tcalc, T4>
 CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                    const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return CellGridWriter<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -762,7 +762,7 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      warp_x_overflow_work.data(tier),
                                      warp_y_overflow_work.data(tier),
                                      warp_z_overflow_work.data(tier));
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return CellGridWriter<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -805,7 +805,7 @@ const CellGridReader<T, Tacc, Tcalc, T4>
 CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                    const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return CellGridReader<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -822,7 +822,7 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      x_force.data(tier), y_force.data(tier), z_force.data(tier),
                                      x_force_overflow.data(tier), y_force_overflow.data(tier),
                                      z_force_overflow.data(tier));
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return CellGridReader<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -855,7 +855,7 @@ CellGridWriter<void, void, void, void>
 CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation,
                                                const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return CellGridWriter<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -890,7 +890,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                       warp_x_overflow_work.data(tier),
                                       warp_y_overflow_work.data(tier),
                                       warp_z_overflow_work.data(tier));
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return CellGridWriter<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -942,7 +942,7 @@ const CellGridReader<void, void, void, void>
 CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation,
                                                const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     {
       const void* cell_umat_ptr = reinterpret_cast<const void*>(system_cell_umat_alt.data(tier));
       const void* cell_invu_ptr = reinterpret_cast<const void*>(system_cell_invu_alt.data(tier));
@@ -967,7 +967,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                         z_force_overflow.data(tier));
     }
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return CellGridReader<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, cell_excl_capacity,
@@ -1419,13 +1419,13 @@ void CellGrid<T, Tacc, Tcalc, T4>::populateImage(const CoordinateCycle cyc) {
   int* nonimg_atom_idx_ptr;
   uint* image_idx_ptr;
   switch (cyc) {
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     cell_limits_ptr = image_cell_limits.data();
     image_ptr = image.data();
     nonimg_atom_idx_ptr = nonimaged_atom_indices.data();
     image_idx_ptr = image_array_indices.data();
     break;
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     cell_limits_ptr = image_cell_limits.data();
     image_ptr = image_alt.data();
     nonimg_atom_idx_ptr = nonimaged_atom_indices_alt.data();
@@ -1454,11 +1454,11 @@ void CellGrid<T, Tacc, Tcalc, T4>::populateImage(const CoordinateCycle cyc) {
                           mean(cfw.ycrd, cfw.natom) < constants::small &&
                           mean(cfw.zcrd, cfw.natom) < constants::small) {
       switch (cyc) {
-      case CoordinateCycle::PRIMARY:
-        coordCopy(&cf, *poly_ps_ptr, pos, TrajectoryKind::POSITIONS, CoordinateCycle::ALTERNATE);
+      case CoordinateCycle::WHITE:
+        coordCopy(&cf, *poly_ps_ptr, pos, TrajectoryKind::POSITIONS, CoordinateCycle::BLACK);
         break;
-      case CoordinateCycle::ALTERNATE:
-        coordCopy(&cf, *poly_ps_ptr, pos, TrajectoryKind::POSITIONS, CoordinateCycle::PRIMARY);
+      case CoordinateCycle::BLACK:
+        coordCopy(&cf, *poly_ps_ptr, pos, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE);
         break;
       }
     }

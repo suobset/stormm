@@ -88,9 +88,10 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
 /// \param sandbox_map  Map linking the coordinate synthesis used in the initial round of energy
 ///                     minimizations to the systems cache created based on the &files namelist
 /// \param prelim_emin  Outputs from preliminary energy minimization runs
+/// \param best_confs   List of the best configurations
 void printReport(const SystemCache &sc, const UserSettings &ui,
                  const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
-                 const ScoreCard &prelim_emin);
+                 const ScoreCard &prelim_emin, const std::vector<int> &best_confs);
   
 } // namespace analysis
 } // namespace conf_app

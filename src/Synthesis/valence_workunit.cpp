@@ -556,7 +556,7 @@ bool ValenceDelegator::setUpdateWorkUnit(const int atom_index, const int vwu_ind
 
   // Update the first unassigned atom, if appropriate
   while (first_unassigned_atom < atom_count &&
-         work_unit_assignment_count[first_unassigned_atom] > 0) {
+         assigned_update_work_units[first_unassigned_atom] >= 0) {
     first_unassigned_atom += 1;
   }
   return true;
@@ -889,11 +889,11 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tv
     ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
-  if (atom_limit < minimum_valence_work_unit_atoms ||
+  if (atom_limit < maximum_valence_work_unit_atoms / 16 ||
       atom_limit > maximum_valence_work_unit_atoms) {
-    const std::string err_msg = (atom_limit < minimum_valence_work_unit_atoms) ?
-                                "is too small to make effective work units." :
-                                "could lead to work units that do not fit in HPC resources.";
+    const std::string err_msg = (atom_limit > maximum_valence_work_unit_atoms) ?
+                                "could lead to work units that do not fit in HPC resources." :
+                                "is too small to make effective work units.";
     rtErr("The maximum allowed number of atoms should be between " +
           std::to_string(minimum_valence_work_unit_atoms) + " and " +
           std::to_string(maximum_valence_work_unit_atoms) + ".  A value of " +
@@ -977,7 +977,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tv
       }
     }
     candidate_additions.resize(0);
-        
+
     // Loop over the growth points and determine new candidate atoms.  During construction,
     // valence work units do not overlap.  Atoms included in some previous work unit do not
     // become new candidates.
@@ -993,7 +993,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tv
     reduceUniqueValues(&candidate_additions);
     ncandidate = candidate_additions.size();
 
-    // If no candidate molecules have yet been found, try jumping to the first unassigned atom.
+    // If no candidate atoms have yet been found, try jumping to the first unassigned atom.
     // In all likelihood, this will be on another molecule within the same topology.  That will
     // be the seed for the next round of additions.
     if (ncandidate == 0) {
@@ -1072,38 +1072,49 @@ std::vector<uint2> ValenceWorkUnit::getAtomManipulationMasks() const {
   const int nbits = static_cast<int>(sizeof(uint)) * 8;
   const int n_segment = roundUp((imported_atom_count + nbits - 1) / nbits, warp_size_int);
   std::vector<uint2> result(n_segment, {0U, 0U});
-  for (int i = 0; i < moved_atom_count; i++) {
+  const int nfull = imported_atom_count / nbits;
+  for (int i = 0; i < nfull; i++) {
+    result[i].x = 0xffffffff;
+  }
+  for (int i = nfull * nbits; i < imported_atom_count; i++) {
     const int seg_idx = (i / nbits);
     const int bit_idx = i - (seg_idx * nbits);
     result[seg_idx].x |= (0x1 << bit_idx);
   }
-  for (int i = 0; i < updated_atom_count; i++) {
-    const int seg_idx = (i / nbits);
-    const int bit_idx = i - (seg_idx * nbits);
-    result[seg_idx].y |= (0x1 << bit_idx);
+  const int mask_length = (imported_atom_count + nbits - 1) / nbits;
+  if (atom_update_mask.size() != static_cast<size_t>(mask_length)) {
+    rtErr("The atom update mask is not of the anticipated length (" +
+          std::to_string(atom_update_mask.size()) + ", " + std::to_string(mask_length) + ").",
+          "ValenceWorkUnit", "getAtomManipulationMasks");
+  }
+  for (int i = 0; i < mask_length; i++) {
+    result[i].y = atom_update_mask[i];
   }
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-int ValenceWorkUnit::getMaxConstraintGroupPaddedSize() const {
-  int max_cgrp_size = 0;
+int ValenceWorkUnit::getPaddedConstraintInstructionCount() const {
+  int result = 0;
   for (int i = 0; i < cnst_group_count; i++) {
 
     // Subtract 1 to get the number of constrained bonds--the central atom adds 1 to the total
-    // atom count in the group
-    max_cgrp_size = std::max(max_cgrp_size, cnst_group_bounds[i + 1] - cnst_group_bounds[i] - 1);
-  }
-  for (int i = 2; i <= max_constraint_group_size; i *= 2) {
-    if (i >= max_cgrp_size) {
-      return i;
+    // atom count in the group.
+    const int total_bonds = cnst_group_bounds[i + 1] - cnst_group_bounds[i] - 1;
+    if (total_bonds >= 16) {
+      rtErr("The largest constraint group size was determined to involve " +
+            std::to_string(total_bonds) + " bonds, which exceeds the maximum allowed size of " +
+            std::to_string(max_constraint_group_size) + ".", "ValenceWorkUnit",
+            "getPaddedConstraintInstructionCount");
     }
+    const int rsiz_limit = roundUp(result + 1, warp_size_int);
+    const int rbnd_limit = roundUp(result + total_bonds, warp_size_int);
+    if (rsiz_limit != rbnd_limit) {
+      result = rsiz_limit;
+    }
+    result += total_bonds;
   }
-  rtErr("The largest constraint group size was determined to involve " +
-        std::to_string(max_cgrp_size) + " atoms, which exceeds the maximum allowed size of " +
-        std::to_string(max_constraint_group_size) + ".", "ValenceWorkUnit",
-        "getMaxConstraintGroupPaddedSize");
-  __builtin_unreachable();
+  return roundUp(result, warp_size_int);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1123,9 +1134,9 @@ std::vector<int> ValenceWorkUnit::getTaskCounts() const {
   result[static_cast<int>(VwuTask::RANGL)]  = rangl_term_count;
   result[static_cast<int>(VwuTask::RDIHE)]  = rdihe_term_count;
 
-  // The constraint group count is a standout--the number of tasks is depends on padding factors
-  // and warp sizes.  Each constraint task is one of the members of a group.
-  result[static_cast<int>(VwuTask::CGROUP)] = cnst_group_count * getMaxConstraintGroupPaddedSize();
+  // The constraint group count is a standout--the number of tasks is depends on padding and warp
+  // sizes.  Each constraint task is one of the members of a group.
+  result[static_cast<int>(VwuTask::CGROUP)] = getPaddedConstraintInstructionCount();
   result[static_cast<int>(VwuTask::SETTLE)] = sett_group_count;
   result[static_cast<int>(VwuTask::VSITE)]  = vste_count;
   return result;
@@ -1141,18 +1152,18 @@ void ValenceWorkUnit::storeCompositeBondInstructions(const std::vector<int> &bon
   if ((vk.nbond > 0 && bond_mapped && vk.nubrd > 0 && ubrd_mapped == false) ||
       (vk.nbond > 0 && bond_mapped == false && vk.nubrd > 0 && ubrd_mapped)) {
     rtErr("Parameter correspondence tables must be supplied for both harmonic bond and "
-          "Urey-bradley terms, or neither.", "ValenceWorkUnit", "getCompositeBondInstructions");
+          "Urey-bradley terms, or neither.", "ValenceWorkUnit", "storeCompositeBondInstructions");
   }
   const bool use_map = (bond_mapped || ubrd_mapped);
   if (use_map && static_cast<int>(bond_param_map.size()) != vk.nbond_param) {
     rtErr("A parameter correspondence table with " + std::to_string(bond_param_map.size()) +
           " entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
-          " bond parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
+          " bond parameter sets.", "ValenceWorkUnit", "storeCompositeBondInstructions");
   }
   if (use_map && static_cast<int>(ubrd_param_map.size()) != vk.nubrd_param) {
     rtErr("A parameter correspondence table with " + std::to_string(ubrd_param_map.size()) +
           " entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
-          " Urey-Bradley parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
+          " Urey-Bradley parameter sets.", "ValenceWorkUnit", "storeCompositeBondInstructions");
   }
   for (int pos = 0; pos < cbnd_term_count; pos++) {
     cbnd_instructions[pos].x = ((cbnd_jk_atoms[pos] << 10) | cbnd_i_atoms[pos]);
@@ -1176,7 +1187,7 @@ void ValenceWorkUnit::storeAngleInstructions(const std::vector<int> &parameter_m
   if (use_map && static_cast<int>(parameter_map.size()) != vk.nangl_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.nangl_param) +
-          " bond angle parameter sets.", "ValenceWorkUnit", "getAngleInstructions");
+          " bond angle parameter sets.", "ValenceWorkUnit", "storeAngleInstructions");
   }
   for (int pos = 0; pos < angl_term_count; pos++) {
     const int at_idx = vk.angl_param_idx[angl_term_list[pos]];
@@ -1197,18 +1208,18 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
   if ((vk.ndihe > 0 && dihe_mapped && vk.ncimp > 0 && cimp_mapped == false) ||
       (vk.ndihe > 0 && dihe_mapped == false && vk.ncimp > 0 && cimp_mapped)) {
     rtErr("Parameter correspondence tables must be supplied for both dihedral and CHARMM improper "
-          "terms, or neither.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
+          "terms, or neither.", "ValenceWorkUnit", "storeCompositeDihedralInstructions");
   }
   const bool use_map = (dihe_mapped || cimp_mapped); 
   if (use_map && static_cast<int>(dihe_param_map.size()) != vk.ndihe_param) {
     rtErr("A parameter correspondence table with " + std::to_string(dihe_param_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.ndihe_param) +
-          " torsion parameter sets.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
+          " torsion parameter sets.", "ValenceWorkUnit", "storeCompositeDihedralInstructions");
   }
   if (use_map && static_cast<int>(cimp_param_map.size()) != vk.ncimp_param) {
     rtErr("A parameter correspondence table with " + std::to_string(cimp_param_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.ncimp_param) +
-          " torsion parameter sets.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
+          " torsion parameter sets.", "ValenceWorkUnit", "storeCompositeDihedralInstructions");
   }
   for (int pos = 0; pos < cdhe_term_count; pos++) {
 
@@ -1235,7 +1246,7 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
               char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]) + " requires a "
               "parameter set with index " + std::to_string(ht_mapped_idx) + ", which exceeds the "
               "allowed number of unique parameter pairs indexed in the first composite dihedral "
-              "position.", "ValenceWorkUnit", "getCompositeDihedralInstructions");        
+              "position.", "ValenceWorkUnit", "storeCompositeDihedralInstructions");        
       }
       cdhe_instructions[pos].y |= (ht_mapped_idx << 16);
       cdhe_instructions[pos].z = 0U;
@@ -1272,7 +1283,7 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
               "1:4 scaling factor pair with index " + std::to_string(dt14_mapped_idx) +
               ", which exceeds the allowed number of unique parameter pairs in the first "
               "composite dihedral 1:4 position.", "ValenceWorkUnit",
-              "getCompositeDihedralInstructions");
+              "storeCompositeDihedralInstructions");
       }
       cdhe_instructions[pos].y |= (dt14_mapped_idx << 10);
       
@@ -1310,7 +1321,7 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
                 "1:4 scaling factor pair with index " + std::to_string(dt2_14_idx) + " and a "
                 "dihedral parameter set with index " + std::to_string(dt2_idx) + ", which exceeds "
                 "the allowed number of unique parameters.", "ValenceWorkUnit",
-                "getCompositeDihedralInstructions");
+                "storeCompositeDihedralInstructions");
         }
         cdhe_instructions[pos].z = dt2_mapped_idx;
         cdhe_instructions[pos].z |= (dt2_14_mapped_idx << 20);
@@ -1330,7 +1341,7 @@ void ValenceWorkUnit::storeCmapInstructions(const std::vector<int> &parameter_ma
   if (use_map && static_cast<int>(parameter_map.size()) != vk.ncmap_surf) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.ncmap_surf) +
-          " CMAP surfaces.", "ValenceWorkUnit", "getCmapInstructions");
+          " CMAP surfaces.", "ValenceWorkUnit", "storeCmapInstructions");
   }
   for (int pos = 0; pos < cmap_term_count; pos++) {
     const int mt_idx = vk.cmap_surf_idx[cmap_term_list[pos]];
@@ -1349,7 +1360,7 @@ void ValenceWorkUnit::storeInferred14Instructions(const std::vector<int> &parame
   if (use_map && static_cast<int>(parameter_map.size()) != vk.nattn14_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.nattn14_param) +
-          " pairs of 1:4 scaling factors.", "ValenceWorkUnit", "getInferred14Instructions");
+          " pairs of 1:4 scaling factors.", "ValenceWorkUnit", "storeInferred14Instructions");
   }
   for (int pos = 0; pos < infr14_term_count; pos++) {
     const int ft_idx = vk.infr14_param_idx[infr14_term_list[pos]];
@@ -1367,12 +1378,12 @@ void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int
   if (kr_param_map.size() != xyz_param_map.size()) {
     rtErr("Parameter correspondence tables must be supplied for both the k(1,2) / r(1,2,3,4) "
           "parameter set and the x / y / z target positions, or neither.", "ValenceWorkUnit",
-          "getPositionalRestraintInstructions");
+          "storePositionalRestraintInstructions");
   }
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nposn) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
           "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nposn) +
-          "terms.", "ValenceWorkUnit", "getPositionalRestraintInstructions");
+          "terms.", "ValenceWorkUnit", "storePositionalRestraintInstructions");
   }
   for (int pos = 0; pos < rposn_term_count; pos++) {
 
@@ -1404,7 +1415,7 @@ void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> 
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nbond) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
           "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nbond) +
-          "terms.", "ValenceWorkUnit", "getDistanceRestraintInstructions");
+          "terms.", "ValenceWorkUnit", "storeDistanceRestraintInstructions");
   }
   for (int pos = 0; pos < rbond_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rbond_term_list[pos]] : rbond_term_list[pos];
@@ -1424,7 +1435,7 @@ void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nangl) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
           "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nangl) +
-          "terms.", "ValenceWorkUnit", "getAngleRestraintInstructions");
+          "terms.", "ValenceWorkUnit", "storeAngleRestraintInstructions");
   }
   for (int pos = 0; pos < rangl_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rangl_term_list[pos]] : rangl_term_list[pos];
@@ -1445,7 +1456,7 @@ void ValenceWorkUnit::storeDihedralRestraintInstructions(const std::vector<int> 
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.ndihe) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
           "entries cannot serve a RestraintApparatus with " + std::to_string(rar.ndihe) +
-          "terms.", "ValenceWorkUnit", "getDihedralRestraintInstructions");
+          "terms.", "ValenceWorkUnit", "storeDihedralRestraintInstructions");
   }
   for (int pos = 0; pos < rdihe_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rdihe_term_list[pos]] : rdihe_term_list[pos];
@@ -1466,7 +1477,7 @@ void ValenceWorkUnit::storeVirtualSiteInstructions(const std::vector<int> &param
   if (use_map && static_cast<int>(parameter_map.size()) != vsk.nframe_set) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vsk.nframe_set) +
-          " virtual sites.", "ValenceWorkUnit", "getVirtualSiteInstructions");
+          " virtual sites.", "ValenceWorkUnit", "storeVirtualSiteInstructions");
   }
   for (int pos = 0; pos < vste_count; pos++) {
     const int vp_idx = vsk.vs_param_idx[virtual_site_list[pos]];
@@ -1503,7 +1514,7 @@ void ValenceWorkUnit::storeSettleGroupInstructions(const std::vector<int> &param
   if (use_map && static_cast<int>(parameter_map.size()) != cnk.nsett_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(cnk.nsett_param) +
-          " SETTLE configurations.", "ValenceWorkUnit", "getVirtualSiteInstructions");
+          " SETTLE configurations.", "ValenceWorkUnit", "storeVirtualSiteInstructions");
   }
   for (int pos = 0; pos < sett_group_count; pos++) {
     const int st_idx = cnk.settle_param_idx[sett_group_list[pos]];
@@ -1518,14 +1529,13 @@ void
 ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parameter_map,
                                                   const std::vector<int> &group_param_bounds) {
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  const int padded_group_size = getMaxConstraintGroupPaddedSize();
-  const int result_size = padded_group_size * cnst_group_count;
+  const int result_size = getPaddedConstraintInstructionCount();
   cnst_instructions.resize(result_size);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != cnk.ncnst_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
           "entries cannot serve a topology with " + std::to_string(cnk.ncnst_param) +
-          " constraint configurations.", "ValenceWorkUnit", "getConstraintGroupInstructions");
+          " constraint configurations.", "ValenceWorkUnit", "storeConstraintGroupInstructions");
   }
   if (use_map && maxValue(parameter_map) >= static_cast<int>(group_param_bounds.size())) {
     rtErr("If a parameter correspondence table is provided, a bounds array that accommodates each "
@@ -1533,7 +1543,7 @@ ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parame
           "lists parameters up to " + std::to_string(maxValue(parameter_map)) + ", whereas the "
           "constraint group parameter bounds array only accommodates " +
           std::to_string(group_param_bounds.size() - 1LLU) + " unique parameter sets.",
-          "ValenceWorkUnit", "getConstraintGroupInstructions");
+          "ValenceWorkUnit", "storeConstraintGroupInstructions");
   }
   int ridx = 0;
   for (int pos = 0; pos < cnst_group_count; pos++) {
@@ -1542,27 +1552,32 @@ ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parame
     const int param_llim = (use_map) ? group_param_bounds[actual_param_idx] :
                                        cnk.group_param_bounds[actual_param_idx];
     const int total_bonds = cnst_group_bounds[pos + 1] - cnst_group_bounds[pos] - 1;
+
+    // Check that the constraint group will fit within the warp.  If not, pad the rest of the warp
+    // with blank interactions.
+    const int ridx_limit = roundUp(ridx + 1, warp_size_int);
+    const int rbnd_limit = roundUp(ridx + total_bonds, warp_size_int);
+    if (ridx_limit != rbnd_limit) {
+      while (ridx < ridx_limit) {
+        
+        // Record atom indices as zero, and show the total number of bonds and participating
+        // threads in this group.  Threads that do not have a valid bond to constrain will detect
+        // that by comparing their position in the warp with these two numbers.
+        cnst_instructions[ridx].x = ((ridx & warp_bits_mask_int) << 20);
+        cnst_instructions[ridx].y = 0U;
+        ridx++;
+      }
+    }
+    const int ridx_base = ridx;
     for (int i = cnst_group_bounds[pos] + 1; i < cnst_group_bounds[pos + 1]; i++) {
       cnst_instructions[ridx].x = ((cnst_group_atoms[i] << 10) |
                                    cnst_group_atoms[cnst_group_bounds[pos]]);
-      cnst_instructions[ridx].x |= ((total_bonds << 24) | (padded_group_size << 20));
+      cnst_instructions[ridx].x |= ((total_bonds << 28) |
+                                    ((ridx_base & warp_bits_mask_int) << 20));
 
       // Use the loop control variable as the offset here, but do not subtract 1 as the
-      // length parameter array will have a blank for the central atom.  
+      // length parameter array will have a blank for the central atom.
       cnst_instructions[ridx].y = param_llim + i - cnst_group_bounds[pos];
-      ridx++;
-    }
-
-    // Pad the rest of the threads in the group with blank interactions.
-    for (int i = total_bonds; i < padded_group_size; i++) {
-
-      // Record atom indices as zero, and show the total number of bonds and participating
-      // threads in this group.  Threads that do not have a valid bond to constrain will detect
-      // that by comparing their position in the warp with these two numbers.  The padded group
-      // size is the same across all threads, but it is only four bits of otherwise unused
-      // information to keep it in every instruction.
-      cnst_instructions[ridx].x = ((total_bonds << 24) | (padded_group_size << 20));
-      cnst_instructions[ridx].y = 0U;
       ridx++;
     }
   }
@@ -2062,7 +2077,7 @@ void ValenceWorkUnit::logActivities() {
     }
   }
 
-  // Detail the restraint tersm for this work unit to manage
+  // Detail the restraint terms for this work unit to manage
   const std::vector<int> relevant_rposns =
     vdel_pointer->getPositionalRestraintAffectors(atom_move_list);
   const size_t nrposn = relevant_rposns.size();
@@ -2409,95 +2424,22 @@ void ValenceWorkUnit::logActivities() {
 }
 
 //-------------------------------------------------------------------------------------------------
-int optValenceKernelSubdivision(const int* atom_counts, const int n_systems,
-                                const PrecisionModel prec, const EvaluateForce eval_frc,
-                                const GpuDetails &gpu) {
-  const int nsmp = gpu.getSMPCount();
-  const int total_atoms = sum<int>(atom_counts, n_systems);
-  if (n_systems > 16 * nsmp) {
-
-    // A very large number of systems, each of which will hae their own valence work unit, will
-    // probably be best served by a subdivision of some sort.  Check the average atom count to
-    // ensure that it is not too great.
-    const int ave_atom_count = total_atoms / n_systems;
-    if (ave_atom_count >= maximum_valence_work_unit_atoms / 2) {
-      return 2;
-    }
-    switch (prec) {
-    case PrecisionModel::DOUBLE:
-      return 2;
-    case PrecisionModel::SINGLE:
-      switch (eval_frc) {
-      case EvaluateForce::YES:
-        return 2;
-      case EvaluateForce::NO:
-        return 4;
-      }
-    }
-  }
-  else {
-
-    // A very large number of atoms may still encourage further subdivision of the work units.
-    if (total_atoms > nsmp * 3 * maximum_valence_work_unit_atoms) {
-      return 2;
-    }
-    else {
-      return 1;
-    }
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-int optValenceKernelSubdivision(const std::vector<int> &atom_counts, const PrecisionModel prec,
-                                const EvaluateForce eval_frc, const GpuDetails &gpu) {
-  return optValenceKernelSubdivision(atom_counts.data(), atom_counts.size(), prec, eval_frc, gpu);
-}
-
-//-------------------------------------------------------------------------------------------------
-int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, const PrecisionModel prec,
-                                const EvaluateForce eval_frc, const GpuDetails &gpu) {
-  return optValenceKernelSubdivision(atom_counts.data(), atom_counts.size(), prec, eval_frc, gpu);
-}
-
-//-------------------------------------------------------------------------------------------------
-int optVirtualSiteKernelSubdivision(const int2* vwu_abstracts, const int vwu_count) {
-  int nbig = 0;
-  int nsmall = 0;
-  for (int i = 0; i < vwu_count; i++) {
-    const int vsite_insr_idx = (i * vwu_abstract_length) + static_cast<int>(VwuAbstractMap::VSITE);
-    const int nvs_insr = vwu_abstracts[vsite_insr_idx].y - vwu_abstracts[vsite_insr_idx].x;
-    if (nvs_insr > (small_block_size / 2)) {
-      nbig++;
-    }
-    else {
-      nsmall++;
-    }
-  }
-  return (nbig > nsmall) ? 1 : 2;
-}
-
-//-------------------------------------------------------------------------------------------------
-int optVirtualSiteKernelSubdivision(const std::vector<int2> &vwu_abstracts, const int vwu_count) {
-  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
-}
-
-//-------------------------------------------------------------------------------------------------
-int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, const int vwu_count) {
-  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
-}
-
-//-------------------------------------------------------------------------------------------------
 int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count) {
+
+  // The maximum topology size is relevant--valence work units pertain to one and only one
+  // topology due to considerations for importing atoms and accumulating energy.
   int min_inefficiency, best_size;
-  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms; vs *= 2) {
+  for (int vs = minimum_valence_work_unit_atoms; vs <= maximum_valence_work_unit_atoms; vs *= 2) {
     const int unique_atom_coverage = vs - 12;
-    int nvwu_est = 0;
     int inefficiency = 0;
     for (int i = 0; i < system_count; i++) {
-      const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
-      nvwu_est += tnvwu;
-      inefficiency += (tnvwu * vs) - atom_counts[i];
+      if (atom_counts[i] < vs) {
+        inefficiency = vs - atom_counts[i];
+      }
+      else {
+        const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
+        inefficiency += (tnvwu * vs) - atom_counts[i];
+      }
     }
     if (vs == minimum_valence_work_unit_atoms || inefficiency < min_inefficiency) {
       min_inefficiency = inefficiency;
@@ -2519,46 +2461,104 @@ int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
 
 //-------------------------------------------------------------------------------------------------
 int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
-                                 const int grid_dimension) {
+                                 const int sm_count, ValenceKernelSize *kwidth) {
   int best_size;
+  ValenceKernelSize best_layout;
   double best_efficiency = 0.0;
-  const int lb_block_dimension = small_block_size;
-  const double dlb_block_dimension = static_cast<double>(small_block_size);
-  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms;
-       vs += minimum_valence_work_unit_atoms) {
-    const int unique_atom_coverage = vs - 12;
+  const int vwu_size_incr = maximum_valence_work_unit_atoms / 32;
+  const double total_atoms = sum<int>(atom_counts, system_count);
+  for (int vs = 2 * vwu_size_incr; vs <= maximum_valence_work_unit_atoms; vs += vwu_size_incr) {
+    
+    // Estimate the number of valence work units that would be needed to cover the workload with
+    // this size of work unit.  The overlap is conservative, implying slightly more work units than
+    // may be necessary, to ensure that the algorithm is unlikely to overrun break points at which
+    // a given card might end up with one extra block to run, e.g. slots for 320 blocks and 321 in
+    // the workload.
     int nvwu_est = 0;
-    double occupancy = 0.0;
+    const double dvs = vs;
+    double average_vwu_atoms = 0.0;
+    const int unique_atom_coverage = vs - 12;
     for (int i = 0; i < system_count; i++) {
-      const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
-      nvwu_est += tnvwu;
-      const int work_est = 5 * unique_atom_coverage;
-      const int vwu_work_batches = (work_est + lb_block_dimension - 1) / lb_block_dimension;
-      occupancy += static_cast<double>(tnvwu) * (static_cast<double>(work_est) /
-                                                 static_cast<double>(vwu_work_batches *
-                                                                     lb_block_dimension));
+      if (atom_counts[i] < vs) {
+        nvwu_est++;
+        average_vwu_atoms += static_cast<double>(atom_counts[i]);
+      }
+      else {
+        const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
+        nvwu_est += tnvwu;
+
+        // The intrinsic efficiency incorporates the new number of work units, less one, at the
+        // estimated unique atom coverage per work unit and one work unit with the remaining number
+        // of atoms.
+        const int last_vwu_atoms_est = atom_counts[i] - ((tnvwu - 1) * unique_atom_coverage);
+        average_vwu_atoms += static_cast<double>(((tnvwu - 1) * vs) + last_vwu_atoms_est + 12);
+      }
     }
-    const double dnvwu_est = static_cast<double>(nvwu_est);
-    occupancy /= dnvwu_est;
-    const int batches = (nvwu_est + grid_dimension - 1) / grid_dimension;
-    const double dslots = static_cast<double>(batches * grid_dimension);
-    const double efficiency = dnvwu_est * occupancy / dslots;
-    if (efficiency > best_efficiency) {
-      best_efficiency = efficiency;
-      best_size = vs;
+    const double intrinsic_eff = total_atoms / average_vwu_atoms;
+    average_vwu_atoms /= static_cast<double>(nvwu_est);
+    
+    // Loop over the possible kernel block sizes that could accommodate work units of this size.
+    // Find the optimal efficiency.
+    const int vks_max = static_cast<int>(ValenceKernelSize::SM);
+    ValenceKernelSize best_kwidth = ValenceKernelSize::XL;
+    for (int i = 0; i <= vks_max; i++) {
+
+      // Pair each enumeration to a specific kernel size, to future-proof against changes in the
+      // order of the list of ValenceKernelSize values.
+      int test_katoms, block_multiplier;
+      const ValenceKernelSize iwidth  = static_cast<ValenceKernelSize>(i);
+      switch (iwidth) {
+      case ValenceKernelSize::XL:
+        test_katoms = maximum_valence_work_unit_atoms;
+        block_multiplier = 2;
+        break;
+      case ValenceKernelSize::LG:
+        test_katoms = half_valence_work_unit_atoms;
+        block_multiplier = 4;
+        break;
+      case ValenceKernelSize::MD:
+        test_katoms = quarter_valence_work_unit_atoms;
+        block_multiplier = 8;
+        break;
+      case ValenceKernelSize::SM:
+        test_katoms = eighth_valence_work_unit_atoms;
+        block_multiplier = 16;
+        break;
+      }
+      if (vs <= test_katoms) {
+        const int nblocks = sm_count * block_multiplier;
+        const int ncyc = (nvwu_est + nblocks - 1) / nblocks;
+
+        // Use the sqrt function to represent the fact that most atoms will have more than one
+        // associated dihedral angle, and other terms.  Underfull work units will still obtain
+        // thread utilization closer to the optimum than the overall percentage of the atom
+        // capacity might suggest.
+        const double block_eff = sqrt(average_vwu_atoms / test_katoms) *
+                                 (static_cast<double>(nvwu_est) /
+                                  static_cast<double>(ncyc * nblocks));
+        const double overall_eff = block_eff * intrinsic_eff;
+        if (overall_eff > best_efficiency) {
+          best_efficiency = overall_eff;
+          best_size = vs;
+          best_layout = iwidth;
+        }
+      }
     }
   }
+  *kwidth = best_layout;
   return best_size;
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int grid_dimension) {
-  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), grid_dimension);
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int sm_count,
+                                 ValenceKernelSize *kwidth) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), sm_count, kwidth);
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int grid_dimension) {
-  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), grid_dimension);
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int sm_count,
+                                 ValenceKernelSize *kwidth) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), sm_count, kwidth);
 }
 
 //-------------------------------------------------------------------------------------------------

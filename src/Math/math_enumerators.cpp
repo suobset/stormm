@@ -163,5 +163,64 @@ FFTMode translateFFTMode(const std::string &input) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+LogSplineForm translateLogSplineForm(const std::string &input) {
+  if (strcmpCased(input, std::string("elec_pme"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("elecpme"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("elec_pme_direct"), CaseSensitivity::NO)) {
+    return LogSplineForm::ELEC_PME_DIRECT;
+  }
+  else if (strcmpCased(input, std::string("delec_pme"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("delecpme"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("delec_pme_direct"), CaseSensitivity::NO)) {
+    return LogSplineForm::DELEC_PME_DIRECT;
+  }
+  else if (strcmpCased(input, std::string("elec_pme_excl"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("elecpme_excl"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("elec_pme_direct_excl"), CaseSensitivity::NO)) {
+    return LogSplineForm::ELEC_PME_DIRECT_EXCL;
+  }
+  else if (strcmpCased(input, std::string("delec_pme_excl"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("delecpme_excl"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("delec_pme_direct_excl"), CaseSensitivity::NO)) {
+    return LogSplineForm::DELEC_PME_DIRECT_EXCL;
+  }
+  else if (strcmpCased(input, std::string("custom"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("customized"), CaseSensitivity::NO)) {
+    return LogSplineForm::CUSTOM;
+  }
+  else {
+    rtErr("Unrecognized token \"" + input + "\".", "translateLogSplineForm");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+TableIndexing translateTableIndexing(const std::string &input) {
+  if (strcmpCased(input, std::string("arg"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("argument"), CaseSensitivity::NO)) {
+    return TableIndexing::ARG;
+  }
+  else if (strcmpCased(input, std::string("squared_arg"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("sqarg"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("arg_squared"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("argsq"), CaseSensitivity::NO)) {
+    return TableIndexing::SQUARED_ARG;
+  }
+  else if (strcmpCased(input, std::string("arg_offset"), CaseSensitivity::NO)) {
+    return TableIndexing::ARG_OFFSET;
+  }
+  else if (strcmpCased(input, std::string("squared_arg_offset"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("sqarg_offset"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("sq_arg_offset"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("arg_squared_offset"), CaseSensitivity::NO)) {
+    return TableIndexing::SQ_ARG_OFFSET;
+  }
+  else {
+    rtErr("Unrecognized token \"" + input + "\".", "translateTableIndexing");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace stormm
 } // namespace stmath

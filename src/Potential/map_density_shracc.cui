@@ -4,7 +4,122 @@
 #define WARP_IDX (threadIdx.x >> warp_bits)
 #define LANE_IDX (threadIdx.x & warp_bits_mask_int)
 
-__global__ void __launch_bounds__(DENSITY_SPREADING_THREADS, MAPPING_BLOCKS)
+// Revise the thread count and set the storage volume in accord with the architecture
+#ifdef STORMM_USE_CUDA
+#  ifdef CALC_MODE_DOUBLE
+#    if ORDER == 4
+#      define DENSITY_SPREADING_THREADS  256
+#    elif ORDER == 5
+#      define DENSITY_SPREADING_THREADS  224
+#    else
+#      define DENSITY_SPREADING_THREADS  192
+#    endif
+#  else
+#    ifdef ACC_MODE_DOUBLE
+#      if ORDER < 6
+#        if __CUDA_ARCH__ < 750
+#          define DENSITY_SPREADING_THREADS  320
+#        elif __CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800
+#          define DENSITY_SPREADING_THREADS  256
+#        else
+#          define DENSITY_SPREADING_THREADS  320
+#        endif
+#      else
+#        if __CUDA_ARCH__ < 750
+#          define DENSITY_SPREADING_THREADS  256
+#        elif __CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800
+#          define DENSITY_SPREADING_THREADS  256
+#        else
+#          define DENSITY_SPREADING_THREADS  256
+#        endif
+#      endif
+#    else
+#      if __CUDA_ARCH__ < 750
+#        if ORDER == 4
+#          define DENSITY_SPREADING_THREADS  288
+#        else
+#          define DENSITY_SPREADING_THREADS  320
+#        endif
+#      elif __CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800
+#        define DENSITY_SPREADING_THREADS  256
+#      else
+#        define DENSITY_SPREADING_THREADS  320
+#      endif
+#    endif
+#  endif
+#  if __CUDA_ARCH__ < 700
+#    ifdef SHORT_FORMAT_ACCUMULATION
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1728
+#      else
+#        define STORAGE_VOLUME 3456
+#      endif
+#    else
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1152
+#      else
+#        define STORAGE_VOLUME 1728
+#      endif
+#    endif
+#  elif __CUDA_ARCH__ >= 700 && __CUDA_ARCH__ < 750
+#    ifdef SHORT_FORMAT_ACCUMULATION
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 2688
+#      else
+#        define STORAGE_VOLUME 5376
+#      endif
+#    else
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1792
+#      else
+#        define STORAGE_VOLUME 2688
+#      endif
+#    endif
+#  elif __CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800
+#    ifdef SHORT_FORMAT_ACCUMULATION
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1728
+#      else
+#        define STORAGE_VOLUME 3456
+#      endif
+#    else
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1152
+#      else
+#        define STORAGE_VOLUME 1728
+#      endif
+#    endif
+#  elif __CUDA_ARCH__ == 800
+#    ifdef SHORT_FORMAT_ACCUMULATION
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 4896
+#      else
+#        define STORAGE_VOLUME 9792
+#      endif
+#    else
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 3264
+#      else
+#        define STORAGE_VOLUME 4896
+#      endif
+#    endif
+#  else
+#    ifdef SHORT_FORMAT_ACCUMULATION
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 2880
+#      else
+#        define STORAGE_VOLUME 5760
+#      endif
+#    else
+#      ifdef ACC_MODE_DOUBLE
+#        define STORAGE_VOLUME 1920
+#      else
+#        define STORAGE_VOLUME 2880
+#      endif
+#    endif
+#  endif
+#endif
+__global__ void __launch_bounds__(DENSITY_SPREADING_THREADS, 4)
 KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
             const CellGridReader<TMAT, void, TCALC, T4> cgr,
             const SyNonbondedKit<TCALC, TCALC2> synbk) {
@@ -14,7 +129,6 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
   // The storage space is tailored to meet a thread block count of 4-5, with 256 threads per block
   // and a maximum cross section of 16 cells.  Each warp will handle its own chain of cells until
   // all cell chains have been processed.
-
   __shared__ volatile TCALC cell_umat[9];
 #ifdef ACC_MODE_DOUBLE
   __shared__ llint primary[STORAGE_VOLUME];
@@ -410,7 +524,7 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
     
     // Convert the results to real-valued numbers and write them to the density grid in global
     // memory.  While this will involve a global read of a lot of data that has likely left L1, the
-    // data may still be preserved in L2
+    // data may still be preserved in L2.
     for (int pos = threadIdx.x; pos < pmwu[17]; pos += blockDim.x) {
       
       // Compute the position in the work unit's grid-mapping region.
@@ -427,7 +541,18 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
       gbl_aidx -= (gbl_aidx >= pmwu[18]) * pmwu[18];
       gbl_bidx -= (gbl_bidx >= pmwu[19]) * pmwu[19];
       gbl_cidx -= (gbl_cidx >= pmwu[20]) * pmwu[20];
-      const uint gbl_pos = (((gbl_cidx * pmwu[19]) + gbl_bidx) * pmwu[18]) + gbl_aidx;
+      uint gbl_pos;
+      switch (pm_wrt.fftm) {
+      case FFTMode::IN_PLACE:
+        {
+          const uint padded_xdim = 2 * ((pmwu[18] / 2) + 1);
+          gbl_pos = (((gbl_cidx * pmwu[19]) + gbl_bidx) * padded_xdim) + gbl_aidx;
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        gbl_pos = (((gbl_cidx * pmwu[19]) + gbl_bidx) * pmwu[18]) + gbl_aidx;
+        break;
+      }
 
       // Read the primary accumulator in __shared__ and the overflow which received additional
       // atomic contributions in L2.  Use write-through stores, as these values are final and
@@ -508,5 +633,10 @@ KERNEL_NAME(PMIGridWriter pm_wrt, MMControlKit<TCALC> ctrl,
   }
 }
 
+// Release various macro definitions
 #undef WARP_IDX
 #undef LANE_IDX
+#ifdef STORMM_USE_CUDA
+#  undef DENSITY_SPREADING_THREADS
+#  undef STORAGE_VOLUME
+#endif

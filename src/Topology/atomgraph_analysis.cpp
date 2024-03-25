@@ -640,7 +640,8 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit 
   
 //-------------------------------------------------------------------------------------------------
 std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
-                                  const int atom_i, const int atom_j) {
+                                  const int atom_i, const int atom_j,
+                                  const std::string &filename) {
   std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int, false);
   bool ring_completed;
   int nrot = colorConnectivity(nbk, cdk, atom_i, atom_j, &marked, &ring_completed);
@@ -655,7 +656,8 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
            char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring system.  This "
            "should not have happened if the bond was selected from a ChemicalFeatures object, but "
            "may have occurred if there is a very complex fused ring system that could not be "
-           "fully mapped.  No atoms will rotate about this bond.", "selectRotatingAtoms");
+           "fully mapped.  No atoms will rotate about this bond.  Original topology: " +
+           filename + ".", "selectRotatingAtoms");
     std::vector<int> tmp_result;
     return tmp_result;
   }
@@ -668,8 +670,8 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
            char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
            std::to_string(cdk.res_numbers[atom_j]) + " :: " +
            char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be worth rotating.  This "
-           "should not have happened if the bond was selected from a ChemicalFeatures object.",
-           "selectRotatingAtoms");
+           "should not have happened if the bond was selected from a ChemicalFeatures object.  "
+           "Original topology: " + filename + ".", "selectRotatingAtoms");
   }
   std::vector<int> result(nrot);
   int counter = 0;
@@ -688,14 +690,14 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
 std::vector<int> selectRotatingAtoms(const AtomGraph &ag, const int atom_i, const int atom_j) {
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
-  return mapRotatingGroup(nbk, cdk, atom_i, atom_j);
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag.getFileName());
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, const int atom_j) {
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
   const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
-  return mapRotatingGroup(nbk, cdk, atom_i, atom_j);
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag->getFileName());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -725,6 +727,55 @@ VdwCombiningRule inferCombiningRule(const AtomGraph &ag, const ExceptionResponse
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
   return inferCombiningRule<double>(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types, policy,
                                     seek_prevalent);
+}
+
+//-------------------------------------------------------------------------------------------------
+int getConstrainedDegreesOfFreedom(const AtomGraph *ag, const int low_atom_index,
+                                   const int high_atom_index) {
+  const int actual_high_atom_index = (high_atom_index <= 0) ? ag->getAtomCount() : high_atom_index;
+  if (low_atom_index >= actual_high_atom_index) {
+    rtErr("The atom range " + std::to_string(low_atom_index) + " to " +
+          std::to_string(actual_high_atom_index) + " is invalid.",
+          "getConstrainedDegreesOfFreedom");
+  }
+  if (low_atom_index < 0 || actual_high_atom_index > ag->getAtomCount()) {
+    rtErr("The atom range " + std::to_string(low_atom_index) + " to " +
+          std::to_string(actual_high_atom_index) + " is invalid for a topology of " +
+          std::to_string(ag->getAtomCount()) + " atoms.", "getConstrainedDegreesOfFreedom");
+  }
+  int result = (3 * (actual_high_atom_index - low_atom_index) - 6);
+  const ConstraintKit<double> cnk = ag->getDoublePrecisionConstraintKit();
+
+  // Subtract one degree of freedom for every constrained bond between two atoms that are both part
+  // of the subset in question.
+  for (int i = 0; i < cnk.ngroup; i++) {
+    const size_t llim = cnk.group_bounds[i];
+    const size_t hlim = cnk.group_bounds[i + 1];
+    if (cnk.group_list[llim] >= low_atom_index && cnk.group_list[llim] < high_atom_index) {
+      for (size_t j = llim + 1; j < hlim; j++) {
+        if (cnk.group_list[j] >= low_atom_index && cnk.group_list[j] < high_atom_index) {
+          result--;
+        }
+      }
+    }
+  }
+
+  // Subtract three degrees of freedom for every three-point rigid water molecule completely
+  // comprised by the subset.
+  for (int i = 0; i < cnk.nsettle; i++) {
+    if (cnk.settle_ox_atoms[i] >= low_atom_index && cnk.settle_ox_atoms[i] < high_atom_index &&
+        cnk.settle_h1_atoms[i] >= low_atom_index && cnk.settle_h1_atoms[i] < high_atom_index &&
+        cnk.settle_h2_atoms[i] >= low_atom_index && cnk.settle_h2_atoms[i] < high_atom_index) {
+      result -= 3;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int getConstrainedDegreesOfFreedom(const AtomGraph &ag, const int low_atom_index,
+                                   const int high_atom_index) {
+  return getConstrainedDegreesOfFreedom(ag.getSelfPointer(), low_atom_index, high_atom_index);
 }
 
 } // namespace topology

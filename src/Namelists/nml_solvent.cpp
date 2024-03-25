@@ -37,7 +37,33 @@ SolventControls::SolventControls(const TextFile &tf, int *start_line, bool *foun
   internal_dielectric = t_nml.getRealValue("intdiel");
   external_dielectric = t_nml.getRealValue("extdiel");
   salt_concentration  = t_nml.getRealValue("saltcon");
-  pb_radii            = translateAtomicRadiusSet(t_nml.getStringValue("pbradii"));
+
+  // If the radius set is unspecified, there are Generalized Born solvent models that demand a
+  // particular set of radii, and others that will do best with a default set.  Make the choice for
+  // the user if there is no specification.
+  if (t_nml.getKeywordStatus("pbradii") == InputStatus::MISSING) {
+    switch (gb_style) {
+    case ImplicitSolventModel::NONE:
+      pb_radii = AtomicRadiusSet::NONE;
+      break;
+    case ImplicitSolventModel::HCT_GB:
+      pb_radii = AtomicRadiusSet::MBONDI;
+      break;
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+      pb_radii = AtomicRadiusSet::MBONDI2;
+      break;
+    case ImplicitSolventModel::NECK_GB:
+      pb_radii = AtomicRadiusSet::BONDI;
+      break;
+    case ImplicitSolventModel::NECK_GB_II:
+      pb_radii = AtomicRadiusSet::MBONDI3;
+      break;
+    }
+  }
+  else {
+    pb_radii = translateAtomicRadiusSet(t_nml.getStringValue("pbradii"));
+  }
 
   // Checks on the input
   validateBornRadiiCutoff();

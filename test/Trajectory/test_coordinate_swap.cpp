@@ -882,7 +882,35 @@ void cdnsSwapTests(const TestSystemManager &tsm, const int na, const int nb, con
 //   system_idx:  Index of the system to work with
 //-------------------------------------------------------------------------------------------------
 void testBadCoordinateSeriesInputs(const TestSystemManager &tsm) {
-
+  const std::vector<int> indices = incrementingSeries(0, tsm.getSystemCount());
+  PhaseSpaceSynthesis poly_psa = tsm.exportPhaseSpaceSynthesis(indices);
+  PhaseSpaceSynthesis poly_psb = tsm.exportPhaseSpaceSynthesis(indices);
+  Hybrid<int2> swaps(4, "bad_swaps");
+  int scon = 0;
+  for (int i = 0; i < poly_psa.getSystemCount(); i++) {
+    for (int j = 0; j < poly_psb.getSystemCount(); j++) {
+      if (poly_psa.getAtomCount(i) != poly_psb.getAtomCount(j) && scon == 0) {
+        swaps.putHost({ i, j }, scon);
+      }
+    }
+  }
+  swaps.putHost({ 0, 1 }, 1);
+  swaps.putHost({ 1, 2 }, 2);
+  swaps.putHost({ 2, 0 }, 3);
+  CHECK_THROWS_SOFT(coordSwap(&poly_psa, &poly_psb, swaps), "An impossible swap between systems "
+                    "of different atom counts was attempted.", tsm.getTestingStatus());
+  PhaseSpaceSynthesis poly_psc = tsm.exportPhaseSpaceSynthesis(indices, 0.0, 67267483, 39);
+  swaps.putHost({ 1, 1 }, 1);
+  swaps.putHost({ 2, 2 }, 2);
+  swaps.putHost({ 3, 3 }, 3);
+  CHECK_THROWS_SOFT(coordSwap(&poly_psa, &poly_psc, swaps), "A swap between two "
+                    "PhaseSpaceSyntheses of different bit counts was carried out.",
+                    tsm.getTestingStatus());
+  CoordinateSeries<float> csa(tsm.exportCoordinateFrame(4), 12);
+  CoordinateSeries<float> csb(tsm.exportCoordinateFrame(4), 12);
+  swaps.putHost({ 2, 3 }, 2);
+  CHECK_THROWS_SOFT(coordSwap(&csa, &csb, swaps), "An impossible swap involving the same system "
+                    "in multiple positions was attempted.", tsm.getTestingStatus());
 }
 
 //-------------------------------------------------------------------------------------------------

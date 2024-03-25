@@ -1291,7 +1291,7 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
   }
 
   // Contribute results
-  ecard->contribute(StateVariable::ELECTROSTATIC_ONE_FOUR, ele_acc, system_index);
+  ecard->contribute(StateVariable::ELEC_ONE_FOUR, ele_acc, system_index);
   ecard->contribute(StateVariable::VDW_ONE_FOUR, vdw_acc, system_index);
 
   // Return the double-precision energy sums, if of interest

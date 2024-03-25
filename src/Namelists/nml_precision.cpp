@@ -31,11 +31,9 @@ PrecisionControls::PrecisionControls(const ExceptionResponse policy_in,
     energy_scale_bits{default_energy_scale_bits},
     charge_mesh_scale_bits{default_charge_mesh_scale_bits},
     bond_constraint_tol{default_precision_constraint_tol},
-    valence_method{translatePrecisionModel(std::string(default_precision_valence_method),
-                                           policy)},
-    nonbonded_method{translatePrecisionModel(std::string(default_precision_nonbonded_method),
-                                             policy)},
-    pme_method{translatePrecisionModel(std::string(default_precision_pme_method), policy)},
+    valence_method{translatePrecisionModel(std::string(default_precision_valence_method))},
+    nonbonded_method{translatePrecisionModel(std::string(default_precision_nonbonded_method))},
+    pme_method{translatePrecisionModel(std::string(default_precision_pme_method))},
     nml_transcript{"precision"}
 {}
 
@@ -57,9 +55,9 @@ PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line, bool *
   const std::string valence_method_str   = t_nml.getStringValue("valence");
   const std::string nonbonded_method_str = t_nml.getStringValue("nonbonded");
   const std::string pme_method_str = t_nml.getStringValue("pmegrid");
-  valence_method = translatePrecisionModel(valence_method_str, policy);
-  nonbonded_method = translatePrecisionModel(nonbonded_method_str, policy);
-  pme_method = translatePrecisionModel(pme_method_str, policy);
+  valence_method = translatePrecisionModel(valence_method_str);
+  nonbonded_method = translatePrecisionModel(nonbonded_method_str);
+  pme_method = translatePrecisionModel(pme_method_str);
 
   // Validate input
   checkGlobalPositionBits(globalpos_scale_bits);

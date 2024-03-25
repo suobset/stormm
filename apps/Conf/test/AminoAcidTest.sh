@@ -55,7 +55,7 @@ cat >> cgen.in << EOF
 EOF
 
 if [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda ] ; then
-  ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda -O -i cgen.in -warn
+  valgrind ${STORMM_BUILD}/apps/Conf/conformer.stormm.cuda -O -i cgen.in -warn
 elif [ -e ${STORMM_BUILD}/apps/Conf/conformer.stormm ] ; then
   ${STORMM_BUILD}/apps/Conf/conformer.stormm -O -i cgen.in -t cgen.out -warn
 fi

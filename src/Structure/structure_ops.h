@@ -36,7 +36,8 @@ using trajectory::PhaseSpace;
 /// \param zcrd          Cartesian Z coordinates of the molecule
 /// \param masses        Pointer to the atomic masses
 /// \param mol_contents  Pointer to the array of atoms (topological indices) contained in the
-///                      molecule of interest
+///                      molecule of interest.  If a nullptr is provided, the order will assumed to
+///                      proceed from mol_start to mol_end.
 /// \{
 double3 centerOfMass(const AtomGraph &ag, const PhaseSpace &ps, int mol_index);
 
@@ -47,7 +48,8 @@ double3 centerOfMass(const AtomGraph &ag, const CoordinateFrame &cf, int mol_ind
 double3 centerOfMass(const AtomGraph *ag, const CoordinateFrame *cf, int mol_index);
 
 double3 centerOfMass(const double* xcrd, const double* ycrd, const double* zcrd,
-                     const double* masses, const int* mol_contents, int mol_start, int mol_end);
+                     const double* masses, int mol_start = 0, int mol_end = 0,
+                     const int* mol_contents = nullptr);
 /// \}
 
 /// \brief Posit that a molecular structure is a rigid body free to rotate in space, and compute

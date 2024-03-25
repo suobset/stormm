@@ -692,6 +692,11 @@ std::vector<BoundedRestraint> RestraintApparatus::getRestraintList() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const RestraintApparatus* RestraintApparatus::getSelfPointer() const {
+  return this;
+}
+
+//-------------------------------------------------------------------------------------------------
 void RestraintApparatus::addRestraints(const std::vector<BoundedRestraint> &new_rest) {
   std::vector<BoundedRestraint> rbasis = getRestraintList();
   rbasis.insert(rbasis.end(), new_rest.begin(), new_rest.end());

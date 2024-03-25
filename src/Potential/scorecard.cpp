@@ -129,7 +129,7 @@ llint ScoreCard::sumPotentialEnergyAsLlint(const llint* nrg_data) const {
   lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELEC_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
   return lacc;
@@ -152,7 +152,7 @@ llint ScoreCard::sumTotalEnergyAsLlint(const llint* nrg_data) const {
   lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELEC_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
@@ -198,6 +198,7 @@ int ScoreCard::getTimeStep(const int time_index) const {
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void ScoreCard::upload() {
+  time_steps.upload();
   instantaneous_accumulators.upload();
   running_accumulators.upload();
   squared_accumulators.upload();
@@ -206,6 +207,7 @@ void ScoreCard::upload() {
 
 //-------------------------------------------------------------------------------------------------
 void ScoreCard::download() {
+  time_steps.download();
   instantaneous_accumulators.download();
   running_accumulators.download();
   squared_accumulators.download();
@@ -253,6 +255,14 @@ void ScoreCard::contribute(const StateVariable var, const llint amount, const in
                                slot);
   const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
                                  static_cast<size_t>(sampled_step_count));
+  if (sampled_step_count >= sample_capacity) {
+    if (sample_capacity < 100) {
+      reserve(2LLU * static_cast<size_t>(sampled_step_count));
+    }
+    else {
+      reserve(5LLU * static_cast<size_t>(sampled_step_count) / 4LLU);
+    }
+  }
   time_series_accumulators.putHost(amount, ts_slot);
 }
 
@@ -1070,15 +1080,14 @@ double ScoreCard::reportVarianceOfStates(const StateVariable aspect, const int s
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportEnergyHistory(const int system_index,
-                                                   const HybridTargetLevel tier) const {
-  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, system_index, tier);
+std::vector<double> ScoreCard::reportHistory(const int system_index,
+                                             const HybridTargetLevel tier) const {
+  return reportHistory(StateVariable::TOTAL_ENERGY, system_index, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
-                                                   const int system_index,
-                                                   const HybridTargetLevel tier) const {
+std::vector<double> ScoreCard::reportHistory(const StateVariable aspect, const int system_index,
+                                             const HybridTargetLevel tier) const {
   std::vector<double> result(sampled_step_count);
   const llint* ts_ptr = time_series_accumulators.data();
   const size_t data_stride_zu = static_cast<size_t>(data_stride);
@@ -1092,13 +1101,13 @@ std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double2> ScoreCard::reportEnergyHistory(const HybridTargetLevel tier) const {
-  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, tier);
+std::vector<double2> ScoreCard::reportHistory(const HybridTargetLevel tier) const {
+  return reportHistory(StateVariable::TOTAL_ENERGY, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double2> ScoreCard::reportEnergyHistory(const StateVariable aspect,
-                                                    const HybridTargetLevel tier) const {
+std::vector<double2> ScoreCard::reportHistory(const StateVariable aspect,
+                                              const HybridTargetLevel tier) const {
   std::vector<double2> result(sampled_step_count);
   const llint* ts_ptr = time_series_accumulators.data();
   const size_t data_stride_zu = static_cast<size_t>(data_stride);
@@ -1129,12 +1138,21 @@ const ScoreCard* ScoreCard::getSelfPointer() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::setLastTimeStep(const int time_index) {
+void ScoreCard::setLastTimeStep(const int time_index, const HybridTargetLevel tier) {
   if (sampled_step_count <= 0) {
     rtErr("No energy values have yet been committed to the sampled history.", "ScoreCard",
           "setLastTimeStep");
   }
-  time_steps.putHost(time_index, sampled_step_count - 1);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    time_steps.putHost(time_index, sampled_step_count - 1);
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    time_steps.putDevice(time_index, sampled_step_count - 1);
+    break;
+#endif
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -23,6 +23,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ TCALC sh_tile_tpts[small_block_max_imports];
   __shared__ TCALC sh_pbradii[small_block_max_atoms];
   __shared__ TCALC sh_screen[small_block_max_atoms];
+  __shared__ llint sh_xcrd[small_block_max_atoms];
+  __shared__ llint sh_ycrd[small_block_max_atoms];
+  __shared__ llint sh_zcrd[small_block_max_atoms];
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_psi[small_block_max_atoms];
@@ -31,6 +34,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ llint sh_psi[small_block_max_atoms];
 #  endif
 #else
+  __shared__ int sh_xcrd_overflow[small_block_max_atoms];
+  __shared__ int sh_ycrd_overflow[small_block_max_atoms];
+  __shared__ int sh_zcrd_overflow[small_block_max_atoms];
   __shared__ llint sh_psi[small_block_max_atoms];
   __shared__ int sh_psi_overflow[small_block_max_atoms];
 #endif
@@ -63,22 +69,19 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
-    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
-                              sh_tile_xcog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
-                              sh_tile_ycog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
-                              sh_tile_zcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, sh_tile_xcog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, sh_ycrd, sh_tile_ycog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, sh_zcrd, sh_tile_zcog,
+                              poly_psw.gpos_scale_f);
 #else
-    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
-                              poly_psw.xcrd_ovrf, &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET],
-                              sh_tile_xcog, poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
-                              poly_psw.ycrd_ovrf, &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET],
-                              sh_tile_ycog, poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
-                              poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
-                              sh_tile_zcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, poly_psw.xcrd_ovrf,
+                              sh_xcrd_overflow, sh_tile_xcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, sh_ycrd, poly_psw.ycrd_ovrf,
+                              sh_ycrd_overflow, sh_tile_ycog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, sh_zcrd, poly_psw.zcrd_ovrf,
+                              sh_zcrd_overflow, sh_tile_zcog, poly_psw.gpos_scale);
 #endif
     pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.pb_radii, -poly_nbk.gb_offset, sh_pbradii);
     pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
@@ -152,36 +155,32 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
                            inv_tile_pts;
       int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
-                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
-                      EXCL_GMEM_OFFSET;
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
 #ifdef TCALC_IS_SINGLE
       const llint x_center = LLCONV_FUNC(tx_cog);
       const llint y_center = LLCONV_FUNC(ty_cog);
       const llint z_center = LLCONV_FUNC(tz_cog);
-      const TCALC t_xcrd   = (TCALC)(__ldca(&gmem_r.xcrd[read_idx]) - x_center) *
-                             poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd   = (TCALC)(__ldca(&gmem_r.ycrd[read_idx]) - y_center) *
-                             poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd   = (TCALC)(__ldca(&gmem_r.zcrd[read_idx]) - z_center) *
-                             poly_psw.inv_gpos_scale;
+      const TCALC t_xcrd   = (TCALC)(sh_xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(sh_ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(sh_zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
 #else
       // Convert the negative values of the center-of-geometry coordinates so that the result
       // can feed into splitFPSum() (which adds A + B).
       const int95_t x_center = doubleToInt95(-tx_cog);
       const int95_t y_center = doubleToInt95(-ty_cog);
       const int95_t z_center = doubleToInt95(-tz_cog);
-      const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
-      const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
-      const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
+      const int95_t x_atom   = { sh_xcrd[read_idx], sh_xcrd_overflow[read_idx] };
+      const int95_t y_atom   = { sh_ycrd[read_idx], sh_ycrd_overflow[read_idx] };
+      const int95_t z_atom   = { sh_zcrd[read_idx], sh_zcrd_overflow[read_idx] };
       const TCALC t_xcrd = int95SumToDouble(x_atom, x_center) * poly_psw.inv_gpos_scale;
       const TCALC t_ycrd = int95SumToDouble(y_atom, y_center) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd = int95SumToDouble(z_atom, z_center) * poly_psw.inv_gpos_scale;
 #endif
-      const TCALC t_radius = sh_pbradii[read_idx - EXCL_GMEM_OFFSET];
+      const TCALC t_radius = sh_pbradii[read_idx];
       const TCALC t_inv_radius = (TCALC)(1.0) / t_radius;
-      const TCALC t_screen = sh_screen[read_idx - EXCL_GMEM_OFFSET];
+      const TCALC t_screen = sh_screen[read_idx];
 #ifdef DO_NECK_CORRECTION
-      const int t_neck_idx = sh_neck_idx[read_idx - EXCL_GMEM_OFFSET];
+      const int t_neck_idx = sh_neck_idx[read_idx];
 #endif
       TCALC psi_acc = (TCALC)(0.0);
       for (int i = 0; i < half_tile_length; i++) {
@@ -418,9 +417,38 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
           const ullint2 zws = __ldcv(&tstw.state_zw[pos]);
           ullint4 xor_state = { xys.x, xys.y, zws.x, zws.y };
           const size_t nrand_zu = 3 * nrand;
+          TCALC2 rng_val;
           for (size_t i = 0; i < nrand_zu; i++) {
-            const TCALC rng_val = xoshiro256pp_normal(&xor_state);
-            __stwt(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val);
+            if ((i & 0x1) == 0) {
+#ifdef TCALC_IS_SINGLE
+              rng_val = xoshiro256pp_normalpairf(&xor_state);
+#else
+              rng_val = xoshiro256pp_normalpair(&xor_state);
+#endif
+              switch (tstw.rng_mode) {
+              case PrecisionModel::DOUBLE:
+                __stwt(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val.x);
+                break;
+              case PrecisionModel::SINGLE:
+                __stwt(&tstw.sp_cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)],
+                       rng_val.x);
+                break;
+              }
+            }
+            else {
+
+              // The pair of independent, normally distributed variables will have been calculated
+              // on the previous loop iteration.
+              switch (tstw.rng_mode) {
+              case PrecisionModel::DOUBLE:
+                __stwt(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val.y);
+                break;
+              case PrecisionModel::SINGLE:
+                __stwt(&tstw.sp_cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)],
+                       rng_val.y);
+                break;
+              }
+            }
           }
           __stwt(&tstw.state_xy[pos], { xor_state.x, xor_state.y });
           __stwt(&tstw.state_zw[pos], { xor_state.z, xor_state.w });

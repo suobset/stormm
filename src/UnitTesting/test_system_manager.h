@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
@@ -29,6 +30,8 @@ using constants::ExceptionResponse;
 using stmath::roundUp;
 using numerics::hostDoubleToInt95;
 using numerics::hostSplitFPSum;
+using numerics::default_velocity_scale_bits;
+using numerics::default_force_scale_bits;
 using random::Xoshiro256ppGenerator;
 using synthesis::Condensate;
 using synthesis::AtomGraphSynthesis;
@@ -226,10 +229,14 @@ public:
   ///                   to compose the synthesis.  Topologies and coordinates will be drawn upon.
   /// \param uc_choice  The choice or choices of unit cell to select (one instance of each matching
   ///                   system will be included in the result)
+  /// \param vel_bits   The number of bits in the fraction for the velocity representation
+  /// \param frc_bits   The number of bits in the fraction for the force representation
   /// \{
   PhaseSpaceSynthesis exportPhaseSpaceSynthesis(const std::vector<int> &index_key,
                                                 double perturbation_sigma = 0.0,
-                                                int xrs_seed = 7108262, int scale_bits = 40) const;
+                                                int xrs_seed = 7108262, int scale_bits = 40,
+                                                int vel_bits = default_velocity_scale_bits,
+                                                int frc_bits = default_force_scale_bits) const;
   PhaseSpaceSynthesis exportPhaseSpaceSynthesis(UnitCellType uc_choice) const;
   PhaseSpaceSynthesis exportPhaseSpaceSynthesis(const std::vector<UnitCellType> &uc_choice) const;
   /// \}
@@ -250,15 +257,15 @@ public:
   /// \{
   AtomGraphSynthesis
   exportAtomGraphSynthesis(const std::vector<int> &index_key,
-                           ExceptionResponse policy = ExceptionResponse::SILENT);
+                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
 
   AtomGraphSynthesis
   exportAtomGraphSynthesis(UnitCellType uc_choice,
-                           ExceptionResponse policy = ExceptionResponse::SILENT);
+                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
 
   AtomGraphSynthesis
   exportAtomGraphSynthesis(const std::vector<UnitCellType> &uc_choice,
-                           ExceptionResponse policy = ExceptionResponse::SILENT);
+                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
   /// \}
 
   /// \brief Produce a SystemCache based on a compilation of the systems read into the manager.

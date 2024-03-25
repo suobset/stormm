@@ -148,7 +148,33 @@ enum class MeshPosition {
              ///<   molecule it is tailored to represent.
   ARBITRARY  ///< The mesh's origin is an arbitrary point in space.
 };
-  
+
+/// \brief Enumerate different approaches to implementing RATTLE distance constraints.
+enum class RattleMethod {
+  SEQUENTIAL,   ///< Loop over all bonds in the RATTLE group sequentially, perturbing the central
+                ///<   atom with each bond and using that perturbed position as the starting point
+                ///<   for the next bond.  This approach depends on the order in which bonds
+                ///<   appear.
+  CENTER_SUM,   ///< The central atom position is kept fixed as the total movement induced by each
+                ///<   bond is accrued.  The distal atoms (hydrogens) move with each constraint
+                ///<   computation.
+#if 0
+  SEQ_UNITARY,  ///< The SEQUENTIAL iteration protocol is applied, but constrained groups with only
+                ///<   one bound hydrogen will be solved analytically, always entering the
+                ///<   adjustment to set the geometry or particle velocities to their target values
+                ///<   within the limits of machine precision.
+  CNS_UNITARY   ///< The CENTER_SUM iteration protocol is applied, and constrained groups with only
+                ///<   one hydrogen will always enter the adjustment to set the constraint to its
+                ///<   target values insofar as the machine precision permits.
+#endif
+};
+
+/// \brief List the choices for constraint application.
+enum class ApplyConstraints {
+  YES,  ///< Yes, apply geometric constraints
+  NO    ///< No, do not apply geometric constraints
+};
+
 /// \brief Return a human-readable string describing each enumerated value.  The enumerator in the
 ///        argument determines the overload to be used.
 ///
@@ -166,6 +192,8 @@ std::string getEnumerationName(OffMeshProtocol input);
 std::string getEnumerationName(SamplingIntensity input);
 std::string getEnumerationName(BoundaryCondition input);
 std::string getEnumerationName(MeshPosition input);
+std::string getEnumerationName(RattleMethod input);
+std::string getEnumerationName(ApplyConstraints input);
 /// \}
 
 /// \brief Interpret string input to recognize an RMSD calculation method (which could include
@@ -196,6 +224,16 @@ BoundaryCondition translateBoundaryCondition(const std::string &input);
 ///
 /// \param input  The human-readable sampling keyword input
 MeshPosition translateMeshPosition(const std::string &input);
+
+/// \brief Interpret string input to recognize a specific approach to implementing RATTLE.
+///
+/// \param input  The human-readable sampling keyword input
+RattleMethod translateRattleMethod(const std::string &input);
+
+/// \brief Interpret a string input to recognize a constraint application directive.
+///
+/// \param input  The constraint application instruction
+ApplyConstraints translateApplyConstraints(const std::string &input);
 
 } // namespace structure
 } // namespace stormm

@@ -836,7 +836,7 @@ void ChemicalFeatures::analyzeTopology(const MapRotatableGroups map_groups_in) {
   ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, ic, warp_size_zu);
   ic = chiral_inversion_methods.putHost(&int_data, tmp_chiral_inversion_methods, ic, warp_size_zu);
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
-
+  
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
   switch (map_groups_in) {
@@ -942,13 +942,13 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       links[j].wipeRingCompletion();
     }
   }
-
+  
   // Fused rings will imply additional cyclic structures than have already been detected.
   // Further analyze any rings with overlapping sets of atoms.
   std::vector<int> ring_participation_bounds(atom_count + 1, 0);
   int* ring_atoms_ptr  = tmp_ring_atoms->data();
   int* ring_bounds_ptr = tmp_ring_atom_bounds->data();
-  const int nring = tmp_ring_atom_bounds->size() - 1LLU;
+  const int nring = tmp_ring_atom_bounds->size() - 1;
   const int nring_atoms = ring_bounds_ptr[nring];
   for (int i = 0; i < nring; i++) {
     for (int j = ring_bounds_ptr[i]; j < ring_bounds_ptr[i + 1]; j++) {
@@ -969,7 +969,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
     ring_participation_bounds[i] = ring_participation_bounds[i - 1];    
   }
   ring_participation_bounds[0] = 0;
-  
+
   // Search all bonds coming out of atoms in fused rings: do they imply other rings that have
   // not yet been detected?
   std::vector<int> fused_rings(16);
@@ -996,7 +996,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       fusion_coverage[i] = true;
       continue;
     }
-
+    
     // This atom participates in two or more rings and has not yet been analyzed, implying an
     // unattended multi-ring system.  Map the extent of that system.
     fused_rings.resize(0);
@@ -1026,7 +1026,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       prev_ring_count = curr_ring_count;
       curr_ring_count = fused_rings.size();
     }
-
+    
     // Mark all atoms in the complete fused ring system to avoid investigating them again.  Take
     // this opportunity to make a list of rings already present in the fused system, to accumulate
     // secondary ring findings.  Store the indices of unique fused rings in this subsystem for
@@ -1068,7 +1068,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       fused_ring_atom_connections[pos] = 0;
       const int atom_idx = fused_ring_atoms[pos];
       for (int j = nbk.nb12_bounds[atom_idx]; j < nbk.nb12_bounds[atom_idx + 1]; j++) {
-        if (valid_atom_mask[nbk.nb12x[j]]) {
+        if (valid_atom_mask[nbk.nb12x[j]] && cdk.z_numbers[nbk.nb12x[j]] > 0) {
           fused_ring_atom_connections[pos] += 1;
         }
       }
@@ -1077,7 +1077,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
     std::sort(ranked_connections.begin(), ranked_connections.end(),
               [](int a, int b) { return a > b; });
     addScalarToVector(&ranked_connections, -1);
-
+    
     // Calculate the maximum size of a tree for this fused ring system.  Keep the search bounded
     // by searching only for secondary rings of up to a certain size starting at each atom j.
     const int max_splits = ranked_connections[0];
@@ -1114,12 +1114,12 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
 
       // Increment the count of nodes that might branch into new rings.  If only one has thus
       // far been encountered, keep going, as it requires two such nodes to complete a ring.
-      n_multi_split++;
+      n_multi_split += fused_ring_atom_connections[j] - 2;
       if (n_multi_split == 1) {
         continue;
       }
       const int jatom = fused_ring_atoms[j];
-
+      
       // Make a tree, starting at jatom and extending through all available combinations to
       // arrive back at jatom.
       links[0].addToTree(-1, jatom, 0, -1, nbk, valid_atom_mask);
@@ -1145,7 +1145,9 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
             while ((! found) && prev_node != -1) {
               const int prev_atom = links[prev_node].getAtom();
               prev_node = links[prev_node].getPreviousNode();
-              found = (found || (prev_atom == pos2_atom));
+              found = (found || (prev_atom == pos2_atom &&
+                                 (fused_ring_atom_connections[j] < 4 ||
+                                  prev_node != -1)));
             }
             if (! found) {
               links[node_count].addToTree(pos_atom, pos2_atom, layer_count, pos, nbk,
@@ -1159,7 +1161,8 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
         layer_bounds.push_back(node_count);
         layer_count++;
       }
-      for (int k = 0; k < j; k++) {
+      const int klim = j + (fused_ring_atom_connections[j] > 3);
+      for (int k = 0; k < klim; k++) {
         if (fused_ring_atom_connections[k] == 2) {
           continue;
         }
@@ -1169,60 +1172,102 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
 
         // Find the shortest and second-shortest paths between atoms jatom and katom, staying
         // within the fused ring atom system.  This occurs when a tree starting at jatom includes
-        // katom twice.  If, in the same layer that katom was include twice, katom is included
-        // additional times, this implies additional rings of equal size.  Log them all.
-        int nk_found = 0;
-        int lcon = 0;
+        // katom twice.  If katom is included more than twice in any layer, this implies additional
+        // rings of equal size.  Log them all.
+        int njk_paths = 0;
         jk_path_bounds.resize(1);
         jk_path_bounds[0] = 0;
         jk_paths.resize(0);
-        for (int m = 0; m < nfused_atoms; m++) {
-          treaded_atoms[fused_ring_atoms[m]] = 0;
-        }
-        int independent_paths = 0;
-        while (lcon < layer_count && independent_paths < fused_ring_atom_connections[k]) {
+        std::vector<int> current_path;
+        current_path.reserve(32);
+        for (int lcon = 1; lcon < layer_count; lcon++) {
           for (int node_idx = layer_bounds[lcon]; node_idx < layer_bounds[lcon + 1]; node_idx++) {
             if (links[node_idx].getAtom() == katom) {
+              current_path.resize(0);
+              current_path.push_back(links[node_idx].getAtom());
               int prev_node = links[node_idx].getPreviousNode();
-              jk_paths.push_back(links[node_idx].getAtom());
-              bool path_independent = true; 
+
+              // Record the new path, all the way back to jatom
               while (prev_node >= 0) {
                 const int atom_on_path = links[prev_node].getAtom();
-                path_independent = (path_independent &&
-                                    (prev_node == 0 || treaded_atoms[atom_on_path] == 0));
-                jk_paths.push_back(atom_on_path);
+                current_path.push_back(atom_on_path);
                 prev_node = links[prev_node].getPreviousNode();
               }
-              independent_paths += path_independent;
-              jk_path_bounds.push_back(jk_paths.size());
-              nk_found++;
+
+              // Check that the path is unique, by testing previously found paths in both
+              // directions.  If so, add it to the growing list of new paths.
+              bool path_independent = true;
+              const int current_path_length = current_path.size();
+              for (int m = 0; m < njk_paths; m++) {
+                if (jk_path_bounds[m + 1] - jk_path_bounds[m] == current_path_length) {
+                  int forward_tracking = 0;
+                  size_t cpos = 0;
+                  const size_t nlim = jk_path_bounds[m + 1];
+                  for (size_t n = jk_path_bounds[m]; n < nlim; n++) {
+                    forward_tracking += (jk_paths[n] == current_path[cpos]);
+                    cpos++;
+                  }
+                  int backward_tracking = 0;
+                  cpos = current_path_length - 1;
+                  for (size_t n = jk_path_bounds[m]; n < nlim; n++) {
+                    backward_tracking += (jk_paths[n] == current_path[cpos]);
+                    cpos--;
+                  }
+                  if (forward_tracking == current_path_length ||
+                      backward_tracking == current_path_length) {
+                    path_independent = false;
+                  }
+                }
+              }
+              if (path_independent) {
+                jk_paths.insert(jk_paths.end(), current_path.begin(), current_path.end());
+                jk_path_bounds.push_back(jk_paths.size());
+                njk_paths++;
+              }
             }
           }
-          lcon++;
         }
 
         // With the possible paths computed, list out the rings for this subsystem.
-        for (int m = 1; m < nk_found; m++) {
-          for (int n = 0; n < m; n++) {
+        if (jatom == katom) {
+          for (int m = 0; m < njk_paths; m++) {
 
-            // Incorporate the first path, in its entirety to include both jatom and katom
-            for (int npos = jk_path_bounds[n]; npos < jk_path_bounds[n + 1]; npos++) {
-              subsystem_ring_atoms.push_back(jk_paths[npos]);
-            }
-            
-            // Incorporate the second path, in reverse, omitting the endpoints, to complete the
-            // ring in a sensible order (all paths proceed from katom to jatom, and include both
-            // katom and jatom).
-            for (int mpos = jk_path_bounds[m + 1] - 2; mpos > jk_path_bounds[m]; mpos--) {
+            // Incorporate the first path, minus the final atom to avoid duplication
+            const int mpos_lim = jk_path_bounds[m + 1] - 1;
+            for (int mpos = jk_path_bounds[m]; mpos < mpos_lim; mpos++) {
               subsystem_ring_atoms.push_back(jk_paths[mpos]);
             }
 
             // Update the bounds
-            const int2 tmp_rank = { jk_path_bounds[n + 1] - jk_path_bounds[n] +
-                                    jk_path_bounds[m + 1] - 2 - jk_path_bounds[m],
+            const int2 tmp_rank = { mpos_lim - jk_path_bounds[m],
                                     static_cast<int>(subsystem_ring_atom_bounds.size()) - 1 };
             subsystem_ring_atom_bounds.push_back(subsystem_ring_atoms.size());
             subsystem_ring_ranks.push_back(tmp_rank);
+          }
+        }
+        else {
+          for (int m = 1; m < njk_paths; m++) {
+            for (int n = 0; n < m; n++) {
+
+              // Incorporate the first path, in its entirety to include both jatom and katom
+              for (int npos = jk_path_bounds[n]; npos < jk_path_bounds[n + 1]; npos++) {
+                subsystem_ring_atoms.push_back(jk_paths[npos]);
+              }
+            
+              // Incorporate the second path, in reverse, omitting the endpoints, to complete the
+              // ring in a sensible order (all paths proceed from katom to jatom, and include both
+              // katom and jatom).
+              for (int mpos = jk_path_bounds[m + 1] - 2; mpos > jk_path_bounds[m]; mpos--) {
+                subsystem_ring_atoms.push_back(jk_paths[mpos]);
+              }
+
+              // Update the bounds
+              const int2 tmp_rank = { jk_path_bounds[n + 1] - jk_path_bounds[n] +
+                                      jk_path_bounds[m + 1] - 2 - jk_path_bounds[m],
+                                      static_cast<int>(subsystem_ring_atom_bounds.size()) - 1 };
+              subsystem_ring_atom_bounds.push_back(subsystem_ring_atoms.size());
+              subsystem_ring_ranks.push_back(tmp_rank);
+            }
           }
         }
       }
@@ -2072,7 +2117,7 @@ std::vector<int> ChemicalFeatures::detailChiralCenters(const NonbondedKit<double
   // Post the chiral arm information now, in its own ARRAY-kind Hybrid object.
   chiral_arm_atoms.resize(tmp_chiral_arms.size());
   chiral_arm_atoms.putHost(tmp_chiral_arms);
-
+  
   // Return the list of chiral atom indices.  The atom indices have all been inflated by one, as
   // if they are all L-orientation.  The orientations will be corrected in the next call to
   // findChiralOrientations().
@@ -2268,7 +2313,7 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
   std::vector<int> prev_atoms(16), new_atoms(16), tmp_igroup(16);
   int all_grp_size = 0;
   for (int i = 0; i < chiral_center_count; i++) {
-
+    
     // The chiral orientation is encoded in the index of the chiral center by making D-chiral
     // centers the negative of the original index, but this leaves an ambiguity if the atom with
     // topological index 0 is chiral.  Therefore, 1 is added to the index and D-chiral centers
@@ -2303,10 +2348,10 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
           bool ring_completed;
           branch_counts[brpos].x = colorConnectivity(nbk, cdk, chatom, nbk.nb12x[j],
                                                      &marked[brpos], &ring_completed);
-
+          
           // Search for one of the remaining branch roots in the marked atoms if there was a ring
           // completion.  This will accomplish one of the following searches.  Mark the fact that
-          // this branch (and its partner, form the other end of the ring) are part of the same
+          // this branch (and its partner, from the other end of the ring) are part of the same
           // ring.  If one of these two branches ends up as one of the ones that rotates, the
           // other must rotate along with it.
           if (ring_completed) {
@@ -2335,7 +2380,7 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
           }
           brpos++;
         }
-
+        
         // Unset the chiral atom itself in the masks just created.  It will not rotate during the
         // inversion.  The number of atoms in each branch is one more than the number of "rotators"
         // counted by the colorConnectivity function, which was originally written for mapping the
@@ -3104,7 +3149,7 @@ void ChemicalFeatures::findChiralOrientations(const CoordinateFrameReader &cfr) 
   }
   const int4* arm_ptr = chiral_arm_atoms.data();
   for (int i = 0; i < chiral_center_count; i++) {
-    const int chatom = abs(chiral_centers.readHost(i) - 1);
+    const int chatom = abs(chiral_centers.readHost(i)) - 1;
     const int chiral_direction = getChiralOrientation(cfr, chatom, arm_ptr[i].x, arm_ptr[i].y,
                                                       arm_ptr[i].z, arm_ptr[i].w);
 
@@ -3121,7 +3166,7 @@ void ChemicalFeatures::findRotatableBondGroups(StopWatch *timer) {
   std::vector<int> tmp_cis_trans_groups, tmp_cis_trans_group_bounds;
   std::vector<int> tmp_invertible_groups, tmp_invertible_group_bounds;
   std::vector<int> tmp_anchor_a_branches, tmp_anchor_b_branches;
-
+  
   // Obtain abstracts from the topology
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();

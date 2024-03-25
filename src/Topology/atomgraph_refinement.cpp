@@ -685,7 +685,8 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
       if (atomic_numbers[other_atom] == 1) {
         for (int k = 1; k < group_size; k++) {
           if (other_atom == tmp_cnst_list[k]) {
-            tmp_cnst_parm[k].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+            const double l_eq = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+            tmp_cnst_parm[k].y = l_eq * l_eq;
             tmp_cnst_made[k] = true;
           }
         }
@@ -698,7 +699,8 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
       const int jatom = tmp_cnst_list[j];
       for (int k = bvt.bond_assigned_bounds[jatom]; k < bvt.bond_assigned_bounds[jatom + 1]; k++) {
         if (bvt.bond_assigned_atoms[k] == catom) {
-          tmp_cnst_parm[j].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[k]]];
+          const double l_eq = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[k]]];
+          tmp_cnst_parm[j].y = l_eq * l_eq;
           tmp_cnst_made[j] = true;
         }
       }
@@ -723,7 +725,7 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
       }
     }
     if (parmset_found == false) {
-      cnst_group_param_idx[ngrp] = cnst_parameter_count;
+      cnst_group_param_idx.push_back(cnst_parameter_count);
       cnst_parameter_bounds.push_back(cnst_parameter_bounds[cnst_parameter_count] + group_size);
       for (int j = 0; j < group_size; j++) {
         cnst_parameter_list.push_back(tmp_cnst_parm[j]);

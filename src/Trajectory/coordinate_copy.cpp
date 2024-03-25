@@ -1168,7 +1168,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
   int *xptr_ovrf, *yptr_ovrf, *zptr_ovrf, *iboxv_ovrf_ptr;
   double *umat_ptr, *invu_ptr, *bdim_ptr;
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       xptr = destr.xalt;
@@ -1201,7 +1201,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
       break;
     }
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       xptr = destr.xcrd;

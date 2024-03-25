@@ -353,7 +353,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
 //-------------------------------------------------------------------------------------------------
 void printReport(const SystemCache &sc, const UserSettings &ui,
                  const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
-                 const ScoreCard &prelim_emin) {
+                 const ScoreCard &prelim_emin, const std::vector<int> &best_confs) {
 
   // Start with a header to explain the purpose of the program.
   const FilesControls& ficon = ui.getFilesNamelistInfo(); 
@@ -525,7 +525,7 @@ void printReport(const SystemCache &sc, const UserSettings &ui,
                                                                   EnergySample::TIME_SERIES,
                                                                   "free", &shortcut_key,
                                                                   &post_script, sandbox_map, {},
-                                                                  repcon);
+                                                                  repcon, best_confs);
       parts.back().addNarration(shortcut_key);
       for (size_t i = 0; i < etables.size(); i++) {
         parts.back().addTable(etables[i]);

@@ -355,15 +355,15 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
                                    const std::vector<int> &partner_atoms_in,
                                    const std::vector<int> &atom_scores,
                                    const std::vector<int> &bond_scores) :
-  table_index{table_index_in},
-  z_number{z_number_in},
-  bond_count{bond_count_in},
-  valence_electrons{valence_electrons_in},
-  possible_states{0},
-  relevant_bonds{relevant_bonds_in},
-  partner_atoms{partner_atoms_in},
-  states{},
-  scores{}
+    table_index{table_index_in},
+    z_number{z_number_in},
+    bond_count{bond_count_in},
+    valence_electrons{valence_electrons_in},
+    possible_states{0},
+    relevant_bonds{relevant_bonds_in},
+    partner_atoms{partner_atoms_in},
+    states{},
+    scores{}
 {
   // Check that the number of bonds will not break the 32-bit unsigned int format
   if ((2 * bond_count) + 8 > sizeof(uint) * 8) {
@@ -409,7 +409,7 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
     default:
       {
         const char2 esymb = elemental_symbols[z_number];
-        rtErr("Element " + std::to_string(esymb.x) + std::to_string(esymb.y) + " is not coevered "
+        rtErr("Element " + std::to_string(esymb.x) + std::to_string(esymb.y) + " is not covered "
               "by the Indigo scoring function.", "IndigoAtomCenter");
       }
     }
@@ -1502,15 +1502,15 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   int frags_participating = 0;
   if (fragment_count > 0) {
     do {
-
+      
       // The net charge of the fragments determines viability at this point--the running sum
       // must stay within the guardrails.
       int acc_charge = 0;      
       for (size_t i = 0; i < frags_participating; i++) {
         acc_charge += q_options[options_bounds[i] + frag_settings[i]];
       }
-      if (acc_charge >= q_guardrail[frags_participating].x &&
-          acc_charge <= q_guardrail[frags_participating].y) {
+      if (frags_participating == 0 || (acc_charge >= q_guardrail[frags_participating].x &&
+                                       acc_charge <= q_guardrail[frags_participating].y)) {
         if (frags_participating < fragment_count) {
           frag_settings[frags_participating] = 0;
           frags_participating++;

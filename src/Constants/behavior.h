@@ -60,7 +60,7 @@ std::string getEnumerationName(ExceptionResponse policy);
 /// \brief Translate a string into a known precision level enumeration.
 ///
 /// \param choice  The named precision model (will be checked for validity)
-PrecisionModel translatePrecisionModel(const std::string &choice, ExceptionResponse policy);
+PrecisionModel translatePrecisionModel(const std::string &choice);
 
 /// \brief Get a descriptive string corresponding to each enumerated compute precision model.
 ///

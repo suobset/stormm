@@ -4,9 +4,11 @@
 
 #include <vector>
 #include "copyright.h"
+#include "Accelerator/gpu_details.h"
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
+#include "Constants/fixed_precision.h"
 #include "FileManagement/file_enumerators.h"
 #include "MoleculeFormat/mdlmol.h"
 #include "Namelists/nml_files.h"
@@ -19,10 +21,14 @@
 #include "Trajectory/phasespace.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "UnitTesting/stopwatch.h"
+#include "atomgraph_synthesis.h"
+#include "phasespace_synthesis.h"
+#include "static_mask_synthesis.h"
 
 namespace stormm {
 namespace synthesis {
 
+using card::GpuDetails;
 using chemistry::ChemicalFeatures;
 using chemistry::MapRotatableGroups;
 using constants::ExceptionResponse;
@@ -31,6 +37,9 @@ using energy::ForwardExclusionMask;
 using energy::StaticExclusionMask;
 using namelist::FilesControls;
 using namelist::RestraintControls;
+using numerics::default_globalpos_scale_bits;
+using numerics::default_velocity_scale_bits;
+using numerics::default_force_scale_bits;
 using restraints::RestraintApparatus;
 using structure::MdlMol;
 using testing::StopWatch;
@@ -118,8 +127,15 @@ public:
   ///        operation of getting the appropriate topology list index, as would be found by this
   ///        function, and thus returns a reference or pointer to the appropriate topology.
   ///
+  /// Overloaded:
+  ///   - Get the unique topology index of a particular system in the cache
+  ///   - Get the unique topology indices of all systems in the order they are stored in the cache
+  ///     
   /// \param coord_index  Index of the PhaseSpace entry object of interest
+  /// \{
   int getSystemTopologyIndex(int coord_index) const;
+  std::vector<int> getSystemTopologyIndex() const;
+  /// \}
 
   /// \brief Get the index of a coordinate set which provides an example of the system that one of
   ///        the topologies in the cache describes.
@@ -258,7 +274,19 @@ public:
   ///
   /// \param index  Index of the coordinate system of interest
   const AtomGraph& getSystemTopology(int index) const;
-  
+
+  /// \brief Return a synthesis of the topologies in the cache, laid out as appropriate for all
+  ///        systems including replicas.
+  ///
+  /// \param gpu     Specifications of the GPU that will manage calculations involving the
+  ///                synthesis
+  /// \param policy  The course of action if errors are encountered while building the synthesis.
+  ///                Defaults to DIE as errors in the underlying topologies are assumed to have
+  ///                been reported when first building the SystemCache object itself.
+  AtomGraphSynthesis
+  exportTopologySynthesis(const GpuDetails &gpu = null_gpu,
+                          const ExceptionResponse policy = ExceptionResponse::DIE) const;
+
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
   ///
   /// Overloaded:
@@ -287,6 +315,12 @@ public:
   const std::vector<PhaseSpace>& getCoordinates() const;
   /// \}
 
+  /// \brief Create and return a coordinate synthesis based on entries in the cache.
+  PhaseSpaceSynthesis
+  exportCoordinateSynthesis(int globalpos_scale_bits = default_globalpos_scale_bits,
+                            int velocity_scale_bits = default_velocity_scale_bits,
+                            int force_scale_bits = default_force_scale_bits) const;
+  
   /// \brief Get a pointer to one of the MDL MOL objects in the cache.
   ///
   /// Overloaded:
@@ -339,11 +373,19 @@ public:
   /// Overloaded:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///   - Return a const vector of pointers to restraints for all systems in a const SystemCache.
+  ///     If requested n this format, a vector of restraint apparatuses for each system in the
+  ///     cache will be returned--the indexing against a smaller list of unique restraint objects
+  ///     held within the SystemCache is implicit.
+  ///   - Return a non-const vector of pointers to restraints for all systems in a mutable
+  ///     SystemCache.  See the const case above for a description of the content of this vector.
   ///
   /// \param index  Index of the system of interest
   /// \{
   const RestraintApparatus* getRestraintPointer(int index) const;
   RestraintApparatus* getRestraintPointer(int index);
+  const std::vector<RestraintApparatus*> getRestraintPointer() const;
+  std::vector<RestraintApparatus*> getRestraintPointer();
   /// \}
 
   /// \brief Get a reference to the restraint apparatus for a particular system.
@@ -351,12 +393,26 @@ public:
   /// \param index  Index of the system of interest
   const RestraintApparatus& getRestraints(int index) const;
 
+  /// \brief Get a vector of all unique static exclusion masks in the system cache, ordered as
+  ///        they appear in the cache itself and therefore indexed by the output of
+  ///        getSystemTopologyIndex().
+  ///
+  /// Overloaded:
+  ///   - Return a const vector of non-const pointers to the masks held in a const SystemCache
+  ///   - Return a non-const vector of non-const pointers to masks held in a mutable SystemCache
+  ///
+  /// \{
+  const std::vector<StaticExclusionMask*> getUniqueStaticMaskPointers() const;
+  std::vector<StaticExclusionMask*> getUniqueStaticMaskPointers();
+  /// \}
+
   /// \brief Get a pointer to the static exclusion mask for a particular system.  These masks
   ///        will only have been calculated for systems with isolated boundary conditions.
   ///
   /// Overloaded:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///   - Return a vector of static masks to all systems in the object
   ///
   /// \param index  Index of the system of interest
   /// \{
@@ -749,6 +805,13 @@ private:
                                 int system_index) const;
 };
 
+/// \brief Obtain a synthesis of static exclusion masks appropriate to all systems in the provided
+///        cache.  This will also check the cache for consistent boundary conditions on all
+///        systems.
+///
+/// \param sc  The cache of systems built from user input
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc);
+  
 } // namespace synthesis
 } // namespace stormm
 

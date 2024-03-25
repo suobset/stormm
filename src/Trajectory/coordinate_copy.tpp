@@ -1158,7 +1158,7 @@ void coordCopy(PsSynthesisWriter *destination, const int index_dest,
                const CoordinateSeriesReader<T> &origin, const int frame_orig,
                const HybridTargetLevel destination_tier, const HybridTargetLevel origin_tier,
                const GpuDetails &gpu, const HpcKernelSync sync) {
-  coordCopy(destination, index_dest, TrajectoryKind::POSITIONS, CoordinateCycle::PRIMARY, origin,
+  coordCopy(destination, index_dest, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE, origin,
             frame_orig, destination_tier, origin_tier, gpu, sync);
 }
 

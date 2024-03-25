@@ -1259,7 +1259,7 @@ int main(const int argc, const char* argv[]) {
                                                 -10036.4655324,  -1009.1558078 };
   const std::vector<double> alad_nbe_answer = {     46.8072425,      3.1589264,
                                                    -78.8463310,     -1.2452480 };
-  const int qq14_idx = static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR);
+  const int qq14_idx = static_cast<size_t>(StateVariable::ELEC_ONE_FOUR);
   const int lj14_idx = static_cast<size_t>(StateVariable::VDW_ONE_FOUR);
   const int qqnb_idx = static_cast<size_t>(StateVariable::ELECTROSTATIC);
   const int ljnb_idx = static_cast<size_t>(StateVariable::VDW);
@@ -1485,7 +1485,7 @@ int main(const int argc, const char* argv[]) {
         trial_sc.contribute(StateVariable::UREY_BRADLEY, ll_ubrd_e, i);
         trial_sc.contribute(StateVariable::CHARMM_IMPROPER, ll_cimp_e, i);
         trial_sc.contribute(StateVariable::CMAP, ll_cmap_e, i);
-        trial_sc.contribute(StateVariable::ELECTROSTATIC_ONE_FOUR, ll_qq14_e, i);
+        trial_sc.contribute(StateVariable::ELEC_ONE_FOUR, ll_qq14_e, i);
         trial_sc.contribute(StateVariable::VDW_ONE_FOUR, ll_lj14_e, i);
         trial_sc.contribute(StateVariable::ELECTROSTATIC, ll_qqnb_e, i);
         trial_sc.contribute(StateVariable::VDW, ll_ljnb_e, i);
@@ -1543,7 +1543,7 @@ int main(const int argc, const char* argv[]) {
           tsc_ave_dev_ans[tsc_idx] = mean(fake_ljnb_e[j]);
           tsc_std_dev_ans[tsc_idx] = variance(fake_ljnb_e[j], VarianceMethod::STANDARD_DEVIATION);
           break;
-        case StateVariable::ELECTROSTATIC_ONE_FOUR:
+        case StateVariable::ELEC_ONE_FOUR:
           tsc_ave_dev_ans[tsc_idx] = mean(fake_qq14_e[j]);
           tsc_std_dev_ans[tsc_idx] = variance(fake_qq14_e[j], VarianceMethod::STANDARD_DEVIATION);
           break;
@@ -1588,7 +1588,7 @@ int main(const int argc, const char* argv[]) {
       // Take lateral measurements over all "systems" at each time point, recording the mean and
       // standard deviations.
       if (i < 14) {
-        const std::vector<double2> ehist = trial_sc.reportEnergyHistory(istate);
+        const std::vector<double2> ehist = trial_sc.reportHistory(istate);
         std::vector<double2> ehist_chk(npts);
         for (int j = 0; j < npts; j++) {
           std::vector<double> survey(nsys);
@@ -1621,7 +1621,7 @@ int main(const int argc, const char* argv[]) {
             case StateVariable::VDW:
               survey[k] = fake_ljnb_e[k][j];
               break;
-            case StateVariable::ELECTROSTATIC_ONE_FOUR:
+            case StateVariable::ELEC_ONE_FOUR:
               survey[k] = fake_qq14_e[k][j];
               break;
             case StateVariable::VDW_ONE_FOUR:

@@ -84,21 +84,15 @@ float Ran2Generator::spUniformRandomNumber() {
   
 //-------------------------------------------------------------------------------------------------
 double Ran2Generator::gaussianRandomNumber() {
-
-  using symbols::twopi;
-
-  const double x1 = sqrt(-2.0 * std::log(uniformRandomNumber()));
-  const double x2 = sin(twopi * uniformRandomNumber());
+  const double x1 = sqrt(-2.0 * log(1.0 - uniformRandomNumber()));
+  const double x2 = sin(symbols::twopi * uniformRandomNumber());
   return x1 * x2;
 }
 
 //-------------------------------------------------------------------------------------------------
 float Ran2Generator::spGaussianRandomNumber() {
-
-  using symbols::twopi_f;
-
-  const float x1 = sqrtf(-2.0 * logf(uniformRandomNumber()));
-  const float x2 = sinf(twopi_f * uniformRandomNumber());
+  const float x1 = sqrtf(-2.0f * static_cast<float>(log(1.0 - uniformRandomNumber())));
+  const float x2 = sinf(symbols::twopi_f * uniformRandomNumber());
   return x1 * x2;
 }
 
@@ -136,29 +130,25 @@ Xoroshiro128pGenerator::Xoroshiro128pGenerator(const ullint2 state_in) :
 //-------------------------------------------------------------------------------------------------
 double Xoroshiro128pGenerator::uniformRandomNumber() {
   const ullint rndbits = next();
-  PolyNumeric work;
-  work.ulli = (((rndbits >> 12) & 0xfffffffffffffLLU) | 0x3ff0000000000000LLU);
-  return work.d - 1.0;
+  return static_cast<double>(rndbits >> 11) * rng_unit_bin_offset;
 }
 
 //-------------------------------------------------------------------------------------------------
 float Xoroshiro128pGenerator::spUniformRandomNumber() {
   const ullint rndbits = next();
-  PolyNumeric work;
-  work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
-  return work.f2.x - 1.0f;
+  return static_cast<float>(rndbits >> 40) * rng_unit_bin_offset_f;
 }
 
 //-------------------------------------------------------------------------------------------------
 double Xoroshiro128pGenerator::gaussianRandomNumber() {
-  const double x1 = sqrt(-2.0 * log(uniformRandomNumber()));
+  const double x1 = sqrt(-2.0 * log(1.0 - uniformRandomNumber()));
   const double x2 = sin(symbols::twopi * uniformRandomNumber());
   return x1 * x2;
 }
 
 //-------------------------------------------------------------------------------------------------
 float Xoroshiro128pGenerator::spGaussianRandomNumber() {
-  const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
+  const float x1 = sqrtf(-2.0f * static_cast<float>(log(1.0 - uniformRandomNumber())));
   const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }
@@ -279,29 +269,25 @@ Xoshiro256ppGenerator::Xoshiro256ppGenerator(const ullint4 state_in) :
 //-------------------------------------------------------------------------------------------------
 double Xoshiro256ppGenerator::uniformRandomNumber() {
   const ullint rndbits = next();
-  PolyNumeric work;
-  work.ulli = (((rndbits >> 12) & 0xfffffffffffffLLU) | 0x3ff0000000000000LLU);
-  return work.d - 1.0;
+  return static_cast<double>(rndbits >> 11) * rng_unit_bin_offset;
 }
 
 //-------------------------------------------------------------------------------------------------
 float Xoshiro256ppGenerator::spUniformRandomNumber() {
   const ullint rndbits = next();
-  PolyNumeric work;
-  work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
-  return work.f2.x - 1.0f;
+  return static_cast<float>(rndbits >> 40) * rng_unit_bin_offset_f;
 }
 
 //-------------------------------------------------------------------------------------------------
 double Xoshiro256ppGenerator::gaussianRandomNumber() {
-  const double x1 = sqrt(-2.0 * log(uniformRandomNumber()));
+  const double x1 = sqrt(-2.0 * log(1.0 - uniformRandomNumber()));
   const double x2 = sin(symbols::twopi * uniformRandomNumber());
   return x1 * x2;
 }
 
 //-------------------------------------------------------------------------------------------------
 float Xoshiro256ppGenerator::spGaussianRandomNumber() {
-  const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
+  const float x1 = sqrtf(-2.0f * static_cast<float>(log(1.0 - spUniformRandomNumber())));
   const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }

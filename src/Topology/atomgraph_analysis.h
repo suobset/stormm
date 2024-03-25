@@ -62,13 +62,14 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit 
 /// \brief The essential work of the selectRotatingAtoms() function below, abstracted to allow
 ///        more flexibility in the way the function is called.
 ///
-/// \param nbk     Non-bonded details (needed for exclusion lists) of the original topology
-/// \param cdk     Chemical details (here, atom names) of the original topology
-/// \param atom_i  The root atom of the rotatable bond
-/// \param atom_j  The second atom of the rotatable bond.  This can be taken as the center of
-///                coordinates for rotating the local system, if convenient.
+/// \param nbk       Non-bonded details (needed for exclusion lists) of the original topology
+/// \param cdk       Chemical details (here, atom names) of the original topology
+/// \param atom_i    The root atom of the rotatable bond
+/// \param atom_j    The second atom of the rotatable bond.  This can be taken as the center of
+///                  coordinates for rotating the local system, if convenient.
+/// \param filename  The name of the original topology file (for error tracing purposes)
 std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
-                                  const int atom_i, const int atom_j);
+                                  const int atom_i, const int atom_j, const std::string &filename);
   
 /// \brief Select atoms for rotation, given a rotatable bond found in a molecule's chemical
 ///        features.
@@ -138,6 +139,27 @@ VdwCombiningRule inferCombiningRule(const AtomGraph *ag,
 VdwCombiningRule inferCombiningRule(const AtomGraph &ag,
                                     ExceptionResponse policy = ExceptionResponse::WARN,
                                     bool seek_prevalent = false);
+/// \}
+
+/// \brief Compute the number of degrees of freedom in some partition of a topology, delineated
+///        by atom indices.  The subdivision could be protein and water, ligand, or specific parts
+///        of a single biomolecule (although a warning will be raised if the constraints do not fit
+///        precisely within the partitions as defined).
+///
+/// Overloaded:
+///   - Provide the topology by const pointer
+///   - Provide the topology by const reference
+///
+/// \param ag               Topology of the system, containing the atom count and constraint
+///                         information
+/// \param low_atom_index   The lower limit of atoms in the subset of interest
+/// \param high_atom_index  The upper limit of atoms in the subset of interest
+/// \{
+int getConstrainedDegreesOfFreedom(const AtomGraph *ag, int low_atom_index = 0,
+                                   int high_atom_index = 0);
+
+int getConstrainedDegreesOfFreedom(const AtomGraph &ag, int low_atom_index = 0,
+                                   int high_atom_index = 0);
 /// \}
 
 } // namespace topology

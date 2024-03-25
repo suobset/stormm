@@ -442,16 +442,17 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
-  Thermostat heat_bath(ThermostatKind::NONE);
+  Thermostat heat_bath(poly_ag, ThermostatKind::NONE);
     
   // Upload the synthesis and prime the pumps
   poly_ag.upload();
   poly_ps.upload();
   poly_se.upload();
-  mmctrl_fe.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES, prec,
-                                  poly_ag);
-  mmctrl_xe.primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec, poly_ag);
-  
+  mmctrl_fe.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                                  VwuGoal::ACCUMULATE, prec, prec, poly_ag);
+  mmctrl_xe.primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES,
+                                  VwuGoal::ACCUMULATE, prec, prec, poly_ag);
+
   // Obtain the appropriate abstracts.  Both precision modes are covered, even though in this test
   // only one is used.
   const HybridTargetLevel devc = HybridTargetLevel::DEVICE;
@@ -473,7 +474,9 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   MMControlKit<double> d_ctrl_xe = mmctrl_xe.dpData(devc);
   MMControlKit<float>  f_ctrl_fe = mmctrl_fe.spData(devc);
   MMControlKit<float>  f_ctrl_xe = mmctrl_xe.spData(devc);
+  const CoordinateCycle alt_orientation = getNextCyclePosition(poly_ps.getCyclePosition());
   PsSynthesisWriter poly_psw = poly_ps.data(devc);
+  PsSynthesisWriter poly_psw_alt = poly_ps.data(alt_orientation, devc);
   ScoreCardWriter scw = sc.data(devc);
   CacheResourceKit<double> d_vale_fe_tbk = valence_fe_tb_reserve.dpData(devc);
   CacheResourceKit<double> d_vale_xe_tbk = valence_xe_tb_reserve.dpData(devc);
@@ -507,12 +510,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
-    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
+    ism_space.initialize(devc, CoordinateCycle::WHITE, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &d_vale_xe_tbk, d_poly_vk, d_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_fe, &poly_psw, &d_tstw, &scw,
                       &d_nonb_tbk, &d_iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp,
@@ -527,7 +531,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &f_vale_xe_tbk, f_poly_vk, f_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &f_tstw, &scw,
                       &f_nonb_tbk, &f_iswk, EvaluateForce::YES, EvaluateEnergy::YES,
@@ -576,7 +581,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
     // Download and check the forces for each system to verify consistency.  If the forces are
     // consistent enough, set them to be exactly consistent, and do the same with the coordinates,
-    // to avoid miniscule roundoff errors that could otherwis creep in over hundreds of steps.
+    // to avoid miniscule roundoff errors that could otherwise creep in over hundreds of steps.
     if (enforce_same_track) {
       poly_ps.download();
       if (checkConsistency(poly_ps, poly_ag, "Force computation", 5.0e-7, 5.0e-7, i)) {
@@ -616,12 +621,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
     // Second stage of the cycle: advance once along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 0, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
+    ism_space.initialize(devc, CoordinateCycle::WHITE, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &d_vale_xe_tbk, d_poly_vk, d_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &d_tstw, &scw,
                       &d_nonb_tbk, &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp,
@@ -636,7 +642,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &f_vale_xe_tbk, f_poly_vk, f_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &f_tstw, &scw,
                       &f_nonb_tbk, &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES,
@@ -665,12 +672,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
     // Third stage of the cycle: advance once more along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 1, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
+    ism_space.initialize(devc, CoordinateCycle::WHITE, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &d_vale_xe_tbk, d_poly_vk, d_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &d_tstw, &scw,
                       &d_nonb_tbk, &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp,
@@ -685,7 +693,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &f_vale_xe_tbk, f_poly_vk, f_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &f_tstw, &scw,
                       &f_nonb_tbk, &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES,
@@ -714,12 +723,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Final stage of the cycle: advance a final time along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 2, redu_lp);
-    ism_space.initialize(devc, CoordinateCycle::PRIMARY, gpu);
+    ism_space.initialize(devc, CoordinateCycle::WHITE, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &d_vale_xe_tbk, d_poly_vk, d_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &d_tstw, &scw,
                       &d_nonb_tbk, &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp,
@@ -734,7 +744,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &f_vale_xe_tbk, f_poly_vk, f_poly_auk,
+                                   vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &f_tstw, &scw,
                       &f_nonb_tbk, &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES,
@@ -766,12 +777,14 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     switch (prec) {
     case PrecisionModel::DOUBLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &d_vale_xe_tbk, d_poly_vk, d_poly_auk,
+                                   vste_mv_lp);
       }
       break;
     case PrecisionModel::SINGLE:
       if (virtual_sites_present) {
-        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+        launchVirtualSitePlacement(&poly_psw_alt, &f_vale_xe_tbk, f_poly_vk, f_poly_auk,
+                                   vste_mv_lp);
       }
       break;
     }
@@ -906,7 +919,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   e_refine.computeTotalEnergy();
   std::vector<std::vector<double>> e_hist_a(poly_ps.getSystemCount());
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
-    e_hist_a[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+    e_hist_a[i] = e_refine.reportHistory(i, HybridTargetLevel::HOST);
   }
   e_refine = launchMinimization(poly_ag, poly_se, &poly_ps_cpy, mincon, gpu, prec, 32, timer,
                                 test_name + " (III)");
@@ -918,7 +931,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   std::vector<int> mismatch(poly_ps_cpy.getSystemCount(), 0);
   const int npts = e_refine.getSampleSize();
   for (int i = 0; i < poly_ps_cpy.getSystemCount(); i++) {
-    e_hist_b[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+    e_hist_b[i] = e_refine.reportHistory(i, HybridTargetLevel::HOST);
     for (int j = 0; j < npts; j++) {
       if (fabs(e_hist_b[i][j] - e_hist_a[i][j]) > stormm::constants::small) {
         mismatch[i] += 1;

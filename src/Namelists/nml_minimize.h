@@ -116,6 +116,17 @@ public:
   /// \param cycles_in  The requested number of clash damping cycles
   void setClashDampingCycles(int cycles_in);
 
+  /// \brief Set the minimum inter-particle separation defining an electrostatic clash.
+  ///
+  /// \param clash_minimum_distance_in
+  void setAbsoluteClashDistance(double clash_minimum_distance_in);
+
+  /// \brief Set the minimum ratio of inter-particle separation to Lennard-Jones sigma defining
+  ///        a van-der Waals clash.
+  ///
+  /// \param clash_vdw_ratio_in  The ratio to apply
+  void setVdwClashRatio(double clash_vdw_ratio_in);
+  
   /// \brief Set the diagnostic printing frequency.
   ///
   /// \param frequency_in  The chosen printing interval

@@ -19,6 +19,7 @@
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "gpu_details.h"
 #include "kernel_format.h"
 
@@ -29,7 +30,9 @@ using constants::PrecisionModel;
 using energy::ClashResponse;
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
+using energy::getEnumerationName;
 using energy::QMapMethod;
+using energy::ValenceKernelSize;
 using numerics::AccumulationMethod;
 using structure::GridDetail;
 using structure::RMSDTask;
@@ -42,7 +45,8 @@ using stmath::ReductionStage;
 using synthesis::VwuGoal;
 using topology::ImplicitSolventModel;
 using topology::UnitCellType;
-
+using trajectory::IntegrationStage;
+  
 /// \brief A class to guide the implementation of GPU kernels, with selected thread counts per
 ///        block and block counts per launch grid for a specific GPU based on the workload.  This
 ///        object is constructed in a stepwise manner, with each kind of work unit contributing
@@ -74,6 +78,17 @@ public:
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
                             AccumulationMethod acc_meth, VwuGoal purpose,
                             ClashResponse collision_handling) const;
+
+  /// \brief Get the block and thread counts for a stand-alone velocity constraint kernel.
+  ///
+  /// \param prec      The precision model for arithmetic to be used in applying constraints
+  /// \param acc_meth  The method in which the velocities will be stored in __shared__ memory
+  ///                  arrays.  The distinction comes about due to the multi-functional nature of
+  ///                  the core code in this kernel: stand-alone or included in a valence
+  ///                  interaction kernel.
+  /// \param process   The part of the integration workflow to perform
+  int2 getIntegrationKernelDims(PrecisionModel prec, AccumulationMethod acc_meth,
+                                IntegrationStage process) const;
 
   /// \brief Get the block and thread counts for a non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
@@ -157,13 +172,12 @@ public:
   
 private:
 
-  /// The workload-specific block multiplier for valence kernels.  No provision is needed for
-  /// NVIDIA GTX 1080-Ti, as the blocks will have at least multiplicity 2 on each streaming
-  /// multiprocessor, but the workload may lead to a choice of smaller blocks for higher
-  /// throughput.  The maximum number of threads per streaming multiprocessor caps at 1024 and
-  /// the block multiplicity caps at 4, so no provisions are needed for Turing architectures,
-  /// either. 
-  int valence_block_multiplier;
+  /// This parameter controls the valence kernel block multiplier.  There will always be at least
+  /// two blocks of the valence work unit kernel resident on each SM, and it can have at most 1024
+  /// threads which gives it no architecture dependence.  However, for different valence
+  /// interaction kernels there can be different thread counts per block and different block
+  /// multipliers associated with each kernel's size.
+  ValenceKernelSize valence_kernel_width;
 
   /// The architecture-specific block multiplier for non-bonded kernels, essentially a provision
   /// for NVIDIA Turing cards.  The non-bonded kernels are not subject to the same constraints and
@@ -205,11 +219,10 @@ private:
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
   int reduction_block_multiplier;
   
-  /// The architecture-specific block multipliers for virtual site handling kernels.
-  /// \{
-  int virtual_site_block_multiplier_dp;
-  int virtual_site_block_multiplier_sp;
-  /// \}
+  /// The architecture-specific block multipliers for virtual site handling kernels are implied by
+  /// the sizes of valence work units and their recommended launch parameters, which contain the
+  /// instructions for placing virtual sites.
+  ValenceKernelSize virtual_site_kernel_width;
 
   /// The architecture-specific block multipliers for RMSD computation kernels.  The thread count
   /// for each kernel is set to 128 (tiny).  Each kernel operates strictly as a collection of
@@ -231,13 +244,23 @@ private:
   /// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
   ///                            produce an error in this context)
   /// \param collision_handling  Indication of whether collisions are to be forgiven
-  /// \param subdivision         Number of times that the basic valence kernel should be subdivided
+  /// \param kwidth              The size selection of the valence kernel, an explicit control over
+  ///                            the kernel subdivision
   /// \param kernel_name         [Optional] Name of the kernel in the actual code
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
                             AccumulationMethod acc_meth, VwuGoal purpose,
-                            ClashResponse collision_handling, int subdivision,
+                            ClashResponse collision_handling, ValenceKernelSize kwidth,
                             const std::string &kernel_name = std::string(""));
 
+  /// \brief Set the maximum block size and thread counts for one of the stand-alone trajectory
+  ///        integration kernels.  Descriptions of input parameters follow from
+  ///        catalogValenceKernel(), above, in addition to:
+  ///
+  /// \param process  The integration process to query, e.g. position advancement
+  void catalogIntegrationKernel(PrecisionModel prec, AccumulationMethod acc_meth,
+                                ValenceKernelSize kwidth, IntegrationStage process,
+                                const std::string &kernel_name = std::string(""));
+  
   /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
   ///        catalogValenceKernel() above, with the addition of:
@@ -309,9 +332,12 @@ private:
   ///
   /// \param prec         The type of floating point numbers in which the kernel shall work
   /// \param purpose      The process to perform with standalone virtual site kernels
-  /// \param subdivision  Number of times that the basic virtual site kernel should be subdivided
+  /// \param kwidth       Width of the kernel required by the valence work units it will process.
+  ///                     This has some bearing on the efficiency of virtual site manipulation in
+  ///                     the standalone kernels.
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
-  void catalogVirtualSiteKernel(PrecisionModel prec, VirtualSiteActivity purpose, int subdivision,
+  void catalogVirtualSiteKernel(PrecisionModel prec, VirtualSiteActivity purpose,
+                                ValenceKernelSize kwidth,
                                 const std::string &kernel_name = std::string(""));
 
   /// \brief Set the maximum block size and thread counts for one of the RMSD calculation kernels.
@@ -322,9 +348,6 @@ private:
   void catalogRMSDKernel(PrecisionModel prec, RMSDTask order,
                          const std::string &kernel_name = std::string(""));
 };
-
-/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.
-int valenceBlockMultiplier();
 
 /// \brief Obtain the architecture-specific block multiplier for non-bonded interaction kernels.
 ///
@@ -372,15 +395,24 @@ int virtualSiteBlockMultiplier(PrecisionModel prec);
 /// \param prec  The type of floating point numbers in which the kernel shall work
 int rmsdBlockMultiplier(PrecisionModel prec);
 
+/// \brief Codify the kernel extension for various valence-related kernels.
+///
+/// \param prec    The precision in which the kernel operates.  Double-precision kernels are
+///                generally not subject to modifications of the size of the thread blocks.
+/// \param kwidth  The recommended width of kernels that will process valence work units
+std::string valenceKernelWidthExtension(PrecisionModel prec, ValenceKernelSize kwidth);
+  
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
-///        - { d, f }      Perform calculations in double (d) or float (f) arithmetic
-///        - { e, f, fe }  Compute energies (e), forces (f), or both (ef)
-///        - { s, w }      Accumulate forces in split integers (s) or whole integers (w)
-///        - { m, a }      Move atoms (m) or accumulate forces or energies (a
-///        - { cl, nc }    Take no action (cl) in the event of a collision, or implement an
-///                        increase in the perceived distance between particles (nc) 
+///        - { d, f }            Perform calculations in double (d) or float (f) arithmetic
+///        - { e, f, fe }        Compute energies (e), forces (f), or both (ef)
+///        - { s, w }            Accumulate forces in split integers (s) or whole integers (w)
+///        - { m, a }            Move atoms (m) or accumulate forces or energies (a
+///        - { cl, nc }          Take no action (cl) in the event of a collision, or implement an
+///                              increase in the perceived distance between particles (nc) 
+///        - { xl, lg, md, sm }  Use an extra large (xl), large (lg), medium (md), or small (sm)
+///                              kernel thread block
 ///
 /// \param prec                Type of floating point numbers in which the kernel shall work
 /// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
@@ -390,10 +422,27 @@ int rmsdBlockMultiplier(PrecisionModel prec);
 ///                            produce an error in this context)
 /// \param purpose             The intended action to take with computed forces
 /// \param collision_handling  Indication of whether to dampen collision effects between particles
+/// \param kwidth              The desired kernel width, from "extra large" to "small"
 std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
-                             VwuGoal purpose, ClashResponse collision_handling);
+                             VwuGoal purpose, ClashResponse collision_handling,
+                             ValenceKernelSize kwidth);
 
+/// \brief Obtain a unique string identifier for one of the integration kernels.  Each identifier
+///        begins with "intg_" and is then appended with letter codes for different attributes
+///        according to the following system:
+///        - { d, f }            Perform calculations in double (d) or float (f) arithmetic
+///        - { s, w }            Accumulate forces in split integers (s) or whole integers (w)
+///        - { xl, lg, md, sm }  Use an extra large (xl), large (lg), medium (md), or small (sm)
+///                              kernel thread block
+///        - { va, vc, pa, gc }  Four possible stages of the integration time step, between force
+///                              calculations: velocity advancement, velocity constraints, position
+///                              advancement, and geometric constraints
+///                               
+/// Descriptions of input parameters follow from valenceKernelKey(), above.
+std::string integrationKernelKey(PrecisionModel prec, AccumulationMethod acc_meth,
+                                 ValenceKernelSize kwidth, IntegrationStage process);
+  
 /// \brief Obtain a unique string identifier for one of the non-bonded kernels.  Each identifier
 ///        begins with "nonb_" and is then appended with letter codes for different aspects
 ///        according to the following system:
@@ -492,12 +541,16 @@ std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, Reduc
 /// \brief Obtain a unique string identifier for one of the virtual site handling kernels.  Each
 ///        identifier begins with "vste_" and is then appended with letter codes for different
 ///        activities according to the following system:
-///        - { d, f }    Perform calculations in double (d) or float (f) arithmetic
-///        - { pl, xm }  Place particles or transmit forces to atoms with mass
+///        - { d, f }            Perform calculations in double (d) or float (f) arithmetic
+///        - { pl, xm }          Place particles or transmit forces to atoms with mass
+///        - { xl, lg, md, sm }  Use an extra large (xl), large (lg), medium (md), or small (sm)
+///                              kernel thread block
 ///
 /// \param prec     The type of floating point numbers in which the kernel shall work
 /// \param purpose  The process to perform with standalone virtual site kernels
-std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity process);
+/// \param kwidth   The recommended thread block size for valence-related kernels
+std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity process,
+                                 ValenceKernelSize kwidth);
 
 /// \brief Obtain a unique string identifier for one of the RMSD calculation kernels.  Each
 ///        identifier begins with "rmsd_" and is then appended with letter codes for different

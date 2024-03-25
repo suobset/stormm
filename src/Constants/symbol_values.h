@@ -34,12 +34,22 @@ constexpr double amber_ancient_bioq  = 332.0522172900000;
 constexpr double charmm_gromacs_bioq = 332.0636974382250;
 /// \}
 
+/// \brief Convert energy quantities computed with internal units of A, fs, and g/mol into
+///        kcal/mol.
+constexpr double gafs_to_kcal  = 1.0 / 0.0004184;
+constexpr float gafs_to_kcal_f = gafs_to_kcal;
+constexpr double kcal_to_gafs = 0.0004184;
+constexpr float kcal_to_gafs_f = kcal_to_gafs;
+  
 /// \brief Avogadro's number
 constexpr double avogadro_number = 6.02214076e+23;
   
 /// \brief Boltzmann's constant in kcal/mol-K
 constexpr double boltzmann_constant = (1.38064852e-23) / 4184.0 * avogadro_number;
-
+constexpr double boltzmann_constant_gafs = boltzmann_constant * kcal_to_gafs;
+constexpr float boltzmann_constant_f = boltzmann_constant;
+constexpr float boltzmann_constant_gafs_f = boltzmann_constant_gafs;
+  
 /// \brief Hartree to kcal/mol conversion
 constexpr double hartree_to_kcal = 627.509474;
 
@@ -48,7 +58,7 @@ constexpr double bohr_to_angstrom = 0.529177210903;
 
 /// \brief Angstrom to Bohr conversion factor
 constexpr double angstrom_to_bohr = 1.889726124626;
-  
+
 /// \brief Values which approach one from below.  They are used in dihedral and similar
 ///        computations to detect when a value is nearing 1.0 and might generate a singularity
 ///        in some denominator, or otherwise become numerically ill-conditioned.  The first is

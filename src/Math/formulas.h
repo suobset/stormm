@@ -68,6 +68,18 @@ double sigmoid(double r, double crossover, double intensity, int order);
 float4 sigmoidf(float r, float crossover, float intensity);
 float sigmoidf(float r, float crossover, float intensity, int order);
 /// \}
+
+/// \brief Compute the value of an angle between the ray connecting the origin to a point in a
+///        two-dimensional plane with the ray along the first principal axis of that plane's
+///        coordinate system.  The angle is returned in radians.
+///
+/// \param x  The coordinate along the first dimension
+/// \param y  The coordinate along the second dimension
+double angleOnAxes(double x, double y);
+
+/// \brief Single-precision variant of angleOnAxes, above.  Overloading and descriptions of
+///        parameters follows from the double-precision variant.
+float angleOnAxesf(float x, float y);
   
 } // namespace stmath
 } // namespace stormm

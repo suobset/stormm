@@ -103,19 +103,32 @@ public:
   ///        are stored.
   int getFixedPrecisionBits() const;
 
+  /// \brief Get the object's current coordinate cycle position.
+  CoordinateCycle getCyclePosition() const;
+  
   /// \brief Get the double-precision abstract, containing pointers to data on the host or device.
   ///
-  /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
-  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
-  ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                                CoordinateCycle orientation = CoordinateCycle::PRIMARY);
-
-  /// \brief Get the single-precision abstract, containing pointers to data on the host or device.
+  /// Overloaded:
+  ///   - Provide the stage of the coordinate cycle towards which pointers will orient
+  ///   - Orient pointers towards the object's current coordinate cycle stage
   ///
   /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
   /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
-  ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                               CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+  /// \{
+  ISWorkspaceKit<double> dpData(CoordinateCycle orientation,
+                                HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
+  /// \brief Get the single-precision abstract, containing pointers to data on the host or device.
+  ///        Overloading and descriptions of input parameters follow from dpData(), above.
+  /// \{
+  ISWorkspaceKit<float> spData(CoordinateCycle orientation,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents from the host to the GPU device.  This may be useful in
@@ -126,6 +139,9 @@ public:
   ///        in debugging scenarios.
   void download();
 #endif
+
+  /// \brief Increment the object's cycle counter.
+  void updateCyclePosition();
   
   /// \brief Set the Generalized Born radii and radii derivative accumulators to zero.
   ///
@@ -133,7 +149,7 @@ public:
   /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   /// \param gpu          Details of the GPU in use
   void initialize(HybridTargetLevel tier = HybridTargetLevel::HOST,
-                  CoordinateCycle orientation = CoordinateCycle::PRIMARY,
+                  CoordinateCycle orientation = CoordinateCycle::WHITE,
                   const GpuDetails &gpu = null_gpu);
 
 #ifdef STORMM_USE_HPC
@@ -141,16 +157,19 @@ public:
   ///
   /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
   void launchInitialization(const GpuDetails &gpu,
-                            CoordinateCycle orientation = CoordinateCycle::PRIMARY);
+                            CoordinateCycle orientation = CoordinateCycle::WHITE);
 #endif
 
 private:
   int fp_bits;                          ///< Fixed-precision bits after the decimal
   int padded_atom_count;                ///< The number of atoms in the system, including padding
-                                        ///<  between separate systems (the starting and ending
-                                        ///<  points of each system are not stored in this object,
-                                        ///<  as it can only function in the context of various
-                                        ///<  synthesis objects which will have this information)
+                                        ///<   between separate systems (the starting and ending
+                                        ///<   points of each system are not stored in this object,
+                                        ///<   as it can only function in the context of various
+                                        ///<   synthesis objects which will have this information)
+  CoordinateCycle cycle_position;       ///< The current position in the coordinate cycle.  This
+                                        ///<   can be used to guide the production of abstracts to
+                                        ///<   the relevant data arrays.
   Hybrid<llint> psi;                    ///< The accumulates psi values for ecah atom, which are
                                         ///<   then transformed, in place, to become the effective
                                         ///<   GB radii
