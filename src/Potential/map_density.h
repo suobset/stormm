@@ -127,7 +127,8 @@ Tcalc sourceMagnitude(NonbondedTheme pmig_density, NonbondedTheme cg_content, Ts
 template <typename Tcalc, typename Tgrid>
 void spreadDensity(const Tcalc* a_cof, const Tcalc* b_cof, const Tcalc* c_cof, int bspline_order,
                    int grid_root_a, int grid_root_b, int grid_root_c, const uint4 grid_dims,
-                   Tgrid* grid_data, int* overflow = nullptr, Tcalc mesh_scaling_factor = 1.0);
+                   FFTMode fft_staging, Tgrid* grid_data, int* overflow = nullptr,
+                   Tcalc mesh_scaling_factor = 1.0);
 
 /// \brief Accumulate the density for particles of a specific system in one of its spatial
 ///        decomposition cells.  This highly templated function serves a number of precision
@@ -219,17 +220,19 @@ void mapDensity(PMIGrid *pm, const AtomGraphSynthesis &poly_ag);
 
 template <typename Tcalc>
 std::vector<Tcalc> mapDensity(const CoordinateFrameReader &cfr, const NonbondedKit<Tcalc> &nbk,
-                              NonbondedTheme theme, int grid_dim_a = -1, int grid_dim_b = -1,
-                              int grid_dim_c = -1, int order = default_bspline_order,
+                              NonbondedTheme theme, FFTMode fft_staging, int grid_dim_a,
+                              int grid_dim_b, int grid_dim_c, int order = default_bspline_order,
                               BSplineUnity unification = BSplineUnity::CENTER_FILL);
 
 std::vector<double> mapDensity(const CoordinateFrame *cf, const AtomGraph *ag,
-                               NonbondedTheme theme, int grid_dim_a = -1, int grid_dim_b = -1,
-                               int grid_dim_c = -1, int order = default_bspline_order);
+                               NonbondedTheme theme, FFTMode fft_staging, int grid_dim_a = -1,
+                               int grid_dim_b = -1, int grid_dim_c = -1,
+                               int order = default_bspline_order);
 
 std::vector<double> mapDensity(const CoordinateFrame &cf, const AtomGraph &ag,
-                               NonbondedTheme theme, int grid_dim_a = -1, int grid_dim_b = -1,
-                               int grid_dim_c = -1, int order = default_bspline_order);
+                               NonbondedTheme theme, FFTMode fft_staging, int grid_dim_a = -1,
+                               int grid_dim_b = -1, int grid_dim_c = -1,
+                               int order = default_bspline_order);
 /// \}
 
 /// \brief Unroll the call to an appropriately templated mapDensity function at the level of the
@@ -244,7 +247,7 @@ std::vector<double> mapDensity(const CoordinateFrame &cf, const AtomGraph &ag,
 ///
 /// \param pm        The particle-mesh interaction grids
 /// \param cg_tacc   Detected data type ID for accumulation of forces in the cell grid
-/// \param cg_Tcalc  Detected data type ID for calculations on atoms in the cell grid
+/// \param cg_tcalc  Detected data type ID for calculations on atoms in the cell grid
 /// \param poly_ag   The topology synthesis containing charge or dispersion parameters
 /// \{
 template <typename T, typename T4>

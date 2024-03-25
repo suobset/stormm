@@ -376,7 +376,7 @@ std::vector<std::string> extractCommonPaths(std::vector<std::string> *input_path
     // With the number of matching characters to all other paths now known, sort the list of
     // matches to determine the most effective shortcut that could be generated based on a
     // substring of the ith path.  Weight shortcuts that reduce the length by greater amounts
-    // more heavily and have paths that 
+    // more heavily and have paths that condense into common roots. 
     std::sort(matches.begin(), matches.end(), [](int a, int b) { return a < b; });
     llint best_score = 0;
     int best_length;

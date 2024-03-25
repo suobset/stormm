@@ -38,11 +38,13 @@ std::string getEnumerationName(const ExceptionResponse policy) {
 }
   
 //-------------------------------------------------------------------------------------------------
-PrecisionModel translatePrecisionModel(const std::string &choice, const ExceptionResponse policy) {
-  if (strcmpCased(choice, std::string("single"))) {
+PrecisionModel translatePrecisionModel(const std::string &choice) {
+  if (strcmpCased(choice, std::string("single"), CaseSensitivity::NO) ||
+      strcmpCased(choice, std::string("float32_t"), CaseSensitivity::NO)) {
     return PrecisionModel::SINGLE;
   }
-  else if (strcmpCased(choice, std::string("double"))) {
+  else if (strcmpCased(choice, std::string("double"), CaseSensitivity::NO) ||
+           strcmpCased(choice, std::string("float64_t"), CaseSensitivity::NO)) {
     return PrecisionModel::DOUBLE;
   }
   else {

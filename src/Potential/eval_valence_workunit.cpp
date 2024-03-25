@@ -36,7 +36,7 @@ void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid
     ecard->initialize(StateVariable::CMAP, sysid);
     break;
   case VwuTask::INFR14:
-    ecard->initialize(StateVariable::ELECTROSTATIC_ONE_FOUR, sysid);
+    ecard->initialize(StateVariable::ELEC_ONE_FOUR, sysid);
     ecard->initialize(StateVariable::VDW_ONE_FOUR, sysid);
     break;
   case VwuTask::RPOSN:
@@ -86,7 +86,7 @@ void commitVwuEnergies(const llint bond_acc, const llint angl_acc, const llint d
     ecard->add(StateVariable::CMAP, cmap_acc, sysid);
     break;
   case VwuTask::INFR14:
-    ecard->add(StateVariable::ELECTROSTATIC_ONE_FOUR, qq14_acc, sysid);
+    ecard->add(StateVariable::ELEC_ONE_FOUR, qq14_acc, sysid);
     ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
     break;
   case VwuTask::RPOSN:

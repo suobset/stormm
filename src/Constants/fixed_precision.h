@@ -27,14 +27,14 @@ using constants::PrecisionModel;
 ///        large unit cells (up to +/- 4096 Angstroms) can be handled while making the most out of
 ///        the 64-bit integer format.
 /// \{
-constexpr double default_globalpos_scale_lf = 268435456.0;
+constexpr double default_globalpos_scale_lf = 4294967296.0;
 constexpr float  default_globalpos_scale_f  = (float)default_globalpos_scale_lf;
-constexpr int    default_globalpos_scale_bits = 28;
+constexpr int    default_globalpos_scale_bits = 32;
 constexpr double default_inverse_globalpos_scale_lf = 1.0 / default_globalpos_scale_lf;
 constexpr float  default_inverse_globalpos_scale_f  = (float)1.0 / default_globalpos_scale_f;
 constexpr int    min_globalpos_scale_bits = 24;
 constexpr int    max_globalpos_scale_bits = 72;
-constexpr int    globalpos_scale_nonoverflow_bits = 32;
+constexpr int    globalpos_scale_nonoverflow_bits = 38;
 constexpr double default_localpos_scale_lf = 16777216.0;
 constexpr float  default_localpos_scale_f  = (float)default_localpos_scale_lf;
 constexpr int    default_localpos_scale_bits = 24;
@@ -56,16 +56,16 @@ constexpr int    max_trajpos_scale_bits = 48;
 ///        quantities.  The "nonoverflow" bit count indicates a threshold beneath which the
 ///        overflow counters will be assumed never to be touched.
 /// \{
-constexpr double default_velocity_scale_lf = 17179869184.0;
+constexpr double default_velocity_scale_lf = 4398046511104.0;
 constexpr float  default_velocity_scale_f  = (float)default_velocity_scale_lf;
-constexpr int    default_velocity_scale_bits = 34;
+constexpr int    default_velocity_scale_bits = 42;
 constexpr double default_inverse_velocity_scale_lf = 1.0 / default_velocity_scale_lf;
 constexpr float  default_inverse_velocity_scale_f = (float)1.0 / default_velocity_scale_f;
-constexpr int    min_velocity_scale_bits = 28;
-constexpr int    max_velocity_scale_bits = 72;
-constexpr int    velocity_scale_nonoverflow_bits = 44;
+constexpr int    min_velocity_scale_bits = 36;
+constexpr int    max_velocity_scale_bits = 80;
+constexpr int    velocity_scale_nonoverflow_bits = 54;
 /// \}
-  
+
 /// \brief Time is expressed in units of femtoseconds, and forces are discretized into increments
 ///        one part in 8,388,608 of one kcal/mol-A.  For 32-bit integer accumulation, this gives a
 ///        range of [ -256.0, +256.0 ) for each of three force components, which will suffice for
@@ -83,6 +83,33 @@ constexpr float  default_inverse_force_scale_f  = (float)default_inverse_force_s
 constexpr int    min_force_scale_bits = 18;
 constexpr int    max_force_scale_bits = 72;
 constexpr int    force_scale_nonoverflow_bits = 40;
+/// \}
+
+/// \brief In order to purge net translational and rotational momentum, the total momentum and
+///        components of the inertial tensor must be accumulated in fixed-precision.  In theory,
+///        these numbers can get very large, as they are extensive properties of each system.
+///        The maximum number of atoms for any one system is targeted at two billion (although
+///        some aspects of various calculations may set the practical limit somewhat lower, on the
+///        order of two hundred million).  The limits on the fixed-precision accumulation for
+///        net momentum and inertial moments will be set with the assumption that a system might
+///        have up to two billion atoms making substantial contributions within an int95_t
+///        accumulator framework.
+/// \{
+constexpr double default_momentum_scale_lf = 68719476736.0;
+constexpr float default_momentum_scale_f = (float)default_momentum_scale_lf;
+constexpr int default_momentum_scale_bits = 36;
+constexpr int min_momentum_scale_bits = 24;
+constexpr int max_momentum_scale_bits = 48;
+constexpr double default_com_scale_lf = 68719476736.0;
+constexpr float default_com_scale_f = (float)default_com_scale_lf;
+constexpr int default_com_scale_bits = 36;
+constexpr int min_com_scale_bits = 20;
+constexpr int max_com_scale_bits = 52;
+constexpr double default_inertia_scale_lf = 268435456.0;
+constexpr float default_inertia_scale_f = (float)default_inertia_scale_lf;
+constexpr int default_inertia_scale_bits = 28;
+constexpr int min_inertia_scale_bits = 20;
+constexpr int max_inertia_scale_bits = 36;
 /// \}
 
 /// \brief Energies are accumulated in units of kcal/mol, discretized into one part in 33554432

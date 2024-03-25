@@ -249,6 +249,83 @@ void hostFloatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
 }
 
 //-------------------------------------------------------------------------------------------------
+int2 hostLongLongToInt63(const llint val) {
+  int2 result;
+  const int mult = (val < 0) ? -1 : 1;
+  llint tval = val * mult;
+  result.y = (tval >> 31);
+  llint remainder = result.y;
+  remainder <<= 31;
+  remainder = tval - remainder;
+  result.x = remainder * mult;
+  result.y *= mult;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const llint val, int *primary, int *overflow) {
+  const int2 conv = hostLongLongToInt63(val);
+  *primary  = conv.x;
+  *overflow = conv.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const llint* val, int* primary, int* overflow, const size_t n_values) {
+  for (size_t i = 0; i < n_values; i++) {
+    const int2 conv = hostLongLongToInt63(val[i]);
+    primary[i]  = conv.x;
+    overflow[i] = conv.y;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const llint* val_x, const llint* val_y, const llint* val_z,
+                         int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                         int* primary_z, int* overflow_z, const size_t n_values) {
+  hostLongLongToInt63(val_x, primary_x, overflow_x, n_values);
+  hostLongLongToInt63(val_y, primary_y, overflow_y, n_values);
+  hostLongLongToInt63(val_z, primary_z, overflow_z, n_values);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const std::vector<llint> &val, std::vector<int> *primary,
+                         std::vector<int> *overflow) {
+  checkFPVectorLength(primary->size(), overflow->size(), "hostLongLongToInt63");
+  checkFPVectorLength(primary->size(), val.size(), "hostLongLongInt63", "The original data must "
+                      "have the same length as the integral result vectors.");
+  hostLongLongToInt63(val.data(), primary->data(), overflow->data(), val.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const std::vector<llint> &val_x, const std::vector<llint> &val_y,
+                         const std::vector<llint> &val_z, std::vector<int> *primary_x,
+                         std::vector<int> *overflow_x, std::vector<int> *primary_y,
+                         std::vector<int> *overflow_y, std::vector<int> *primary_z,
+                         std::vector<int> *overflow_z) {
+  hostLongLongToInt63(val_x, primary_x, overflow_x);
+  hostLongLongToInt63(val_y, primary_y, overflow_y);
+  hostLongLongToInt63(val_z, primary_z, overflow_z);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const Hybrid<llint> &val, Hybrid<int> *primary, Hybrid<int> *overflow) {
+  checkFPVectorLength(primary->size(), overflow->size(), "hostLongLongToInt63");
+  checkFPVectorLength(primary->size(), val.size(), "hostLongLongInt63", "The original data must "
+                      "have the same length as the integral result vectors.");
+  hostLongLongToInt63(val.data(), primary->data(), overflow->data(), val.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostLongLongToInt63(const Hybrid<llint> &val_x, const Hybrid<llint> &val_y,
+                         const Hybrid<llint> &val_z, Hybrid<int> *primary_x,
+                         Hybrid<int> *overflow_x, Hybrid<int> *primary_y, Hybrid<int> *overflow_y,
+                         Hybrid<int> *primary_z, Hybrid<int> *overflow_z) {
+  hostLongLongToInt63(val_x, primary_x, overflow_x);
+  hostLongLongToInt63(val_y, primary_y, overflow_y);
+  hostLongLongToInt63(val_z, primary_z, overflow_z);
+}
+
+//-------------------------------------------------------------------------------------------------
 int2 hostDoubleToInt63(const double dval) {
   int2 result;
   if (fabs(dval) >= max_int_accumulation) {
@@ -349,6 +426,70 @@ void hostDoubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_
   hostDoubleToInt95(dval_x, primary_x, overflow_x, scale);
   hostDoubleToInt95(dval_y, primary_y, overflow_y, scale);
   hostDoubleToInt95(dval_z, primary_z, overflow_z, scale);
+}
+
+//-------------------------------------------------------------------------------------------------
+llint hostInt63ToLongLong(const int primary, const int overflow) {
+  llint result = overflow;
+  result *= max_int_accumulation_ll;
+  result += primary;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(llint* result, const int* primary, const int* overflow,
+                         const size_t n_values) {
+  for (size_t i = 0; i < n_values; i++) {
+    result[i] = hostInt63ToLongLong(primary[i], overflow[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(std::vector<llint> *result, const std::vector<int> &primary,
+                         const std::vector<int> &overflow) {
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToLongLong");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToLongLong", "The result must "
+                      "have the same length as the original, integral data.");
+  hostInt63ToLongLong(result->data(), primary.data(), overflow.data(), result->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(Hybrid<llint> *result, const Hybrid<int> &primary,
+                         const Hybrid<int> &overflow) {
+  checkFPVectorLength(primary.size(), overflow.size(), "hostInt63ToLongLong");
+  checkFPVectorLength(primary.size(), result->size(), "hostInt63ToLongLong", "The result must "
+                      "have the same length as the original, integral data.");
+  hostInt63ToLongLong(result->data(), primary.data(), overflow.data(), result->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(llint* result_x, llint* result_y, llint* result_z, const int* primary_x,
+                         const int* overflow_x, const int* primary_y, const int* overflow_y,
+                         const int* primary_z, const int* overflow_z, const size_t n_values) {
+  hostInt63ToLongLong(result_x, primary_x, overflow_x, n_values);
+  hostInt63ToLongLong(result_y, primary_y, overflow_y, n_values);
+  hostInt63ToLongLong(result_z, primary_z, overflow_z, n_values);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(std::vector<llint> *result_x, std::vector<llint> *result_y,
+                         std::vector<llint> *result_z, const std::vector<int> &primary_x,
+                         const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                         const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                         const std::vector<int> &overflow_z) {
+  hostInt63ToLongLong(result_x, primary_x, overflow_x);
+  hostInt63ToLongLong(result_y, primary_y, overflow_y);
+  hostInt63ToLongLong(result_z, primary_z, overflow_z);
+}
+
+//-------------------------------------------------------------------------------------------------
+void hostInt63ToLongLong(Hybrid<llint> *result_x, Hybrid<llint> *result_y, Hybrid<llint> *result_z,
+                         const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                         const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                         const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z) {
+  hostInt63ToLongLong(result_x, primary_x, overflow_x);
+  hostInt63ToLongLong(result_y, primary_y, overflow_y);
+  hostInt63ToLongLong(result_z, primary_z, overflow_z);
 }
 
 //-------------------------------------------------------------------------------------------------

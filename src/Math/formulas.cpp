@@ -1,10 +1,14 @@
 #include <cmath>
 #include "copyright.h"
+#include "Constants/symbol_values.h"
 #include "formulas.h"
 
 namespace stormm {
 namespace stmath {
 
+using symbols::near_to_one_f;
+using symbols::near_to_one_lf;
+  
 //-------------------------------------------------------------------------------------------------
 int factorial(const int x) {
   if (x > 12) {
@@ -146,6 +150,74 @@ float sigmoidf(const float r, const float crossover, const float intensity, cons
           "derivative.");
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double angleOnAxes(const double x, const double y) {
+  const double r = sqrt((x * x) + (y * y));
+  const double x_over_r = x / r;
+  double offset, trig_func, trig_mult;
+  if (fabs(x_over_r) < near_to_one_lf) {
+
+    // The arccosine function will be well-behaved.  Taking this in all but a sliver of cases
+    // achieves a high degree of warp coalescence.
+    offset = 0.0;
+    trig_func = acos(x_over_r);
+    if (y < 0.0) {
+      trig_func = -trig_func;
+    }
+  }
+  else {
+
+    // The arcsine function will be well-behaved, but different quadrants will call for different
+    // treatments of the arcsine result.
+    trig_func = asin(y / r);
+    if (x >= 0.0) {
+      offset = 0.0;
+    }
+    else if (x < 0.0 && y >= 0.0) {
+      offset = pi;
+      trig_func = -trig_func;
+    }
+    else if (x < 0.0 && y < 0.0) {
+      offset = -pi;
+    }
+  }
+  return trig_func + offset;
+}
+
+//-------------------------------------------------------------------------------------------------
+float angleOnAxesf(const float x, const float y) {
+  const float r = sqrtf((x * x) + (y * y));
+  const float x_over_r = x / r;
+  float offset, trig_func, trig_mult;
+  if (fabsf(x_over_r) < near_to_one_f) {
+
+    // The arccosine function will be well-behaved.  Taking this in all but a sliver of cases
+    // achieves a high degree of warp coalescence.
+    offset = 0.0f;
+    trig_func = acosf(x_over_r);
+    if (y < 0.0f) {
+      trig_func = -trig_func;
+    }
+  }
+  else {
+
+    // The arcsine function will be well-behaved, but different quadrants will call for different
+    // treatments of the arcsine result.
+    trig_func = asinf(y / r);
+    if (x >= 0.0f) {
+      offset = 0.0f;
+    }
+    else if (x < 0.0f && y >= 0.0f) {
+      offset = pi_f;
+      trig_func = -trig_func;
+    }
+    else if (x < 0.0f && y < 0.0f) {
+      offset = -pi_f;
+    }
+  }
+  return trig_func + offset;
 }
 
 } // namespace stmath

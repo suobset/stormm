@@ -4,6 +4,8 @@
 namespace stormm {
 namespace energy {
 
+using stmath::sanctionedDensityGridDimension;
+
 //-------------------------------------------------------------------------------------------------
 void matchThemes(const NonbondedTheme pm_theme, const NonbondedTheme cg_theme) {
   bool problem = false;
@@ -114,18 +116,52 @@ void mapDensity(PMIGrid *pm, const AtomGraphSynthesis &poly_ag) {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> mapDensity(const CoordinateFrame *cf, const AtomGraph *ag,
-                               const NonbondedTheme theme, const int grid_dim_a,
-                               const int grid_dim_b, const int grid_dim_c, const int order) {
-  return mapDensity<double>(cf->data(), ag->getDoublePrecisionNonbondedKit(), theme, grid_dim_a,
-                            grid_dim_b, grid_dim_c, order);
+                               const NonbondedTheme theme, const FFTMode fft_staging,
+                               const int grid_dim_a, const int grid_dim_b, const int grid_dim_c,
+                               const int order) {
+  int actual_grid_dim_a = grid_dim_a;
+  int actual_grid_dim_b = grid_dim_b;
+  int actual_grid_dim_c = grid_dim_c;
+  const CoordinateFrameReader cfr = cf->data();
+  if (grid_dim_a < 0 || grid_dim_b < 0 || grid_dim_c < 0) {
+    const ullint big_product = ipowl(2, 14) * ipowl(3, 10) * ipowl(5, 6) * 7LL * 11LL;
+    const std::vector<uint> primes = { 2, 3, 5, 7, 11 };
+    double max_spacing = 1.00;
+    switch (order) {
+    case 5:
+      max_spacing = 1.25;
+      break;
+    case 6:
+      max_spacing = 1.50;
+      break;
+    case 4:
+    default:
+      break;
+    }
+    if (grid_dim_a < 0) {
+      actual_grid_dim_a = sanctionedDensityGridDimension(big_product, cfr.invu, UnitCellAxis::A,
+                                                         primes, max_spacing);
+    }
+    if (grid_dim_b < 0) {
+      actual_grid_dim_b = sanctionedDensityGridDimension(big_product, cfr.invu, UnitCellAxis::B,
+                                                         primes, max_spacing);
+    }
+    if (grid_dim_c < 0) {
+      actual_grid_dim_c = sanctionedDensityGridDimension(big_product, cfr.invu, UnitCellAxis::C,
+                                                         primes, max_spacing);
+    }
+  }
+  return mapDensity<double>(cfr, ag->getDoublePrecisionNonbondedKit(), theme, fft_staging,
+                            actual_grid_dim_a, actual_grid_dim_b, actual_grid_dim_c, order);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> mapDensity(const CoordinateFrame &cf, const AtomGraph &ag,
-                               const NonbondedTheme theme, const int grid_dim_a,
-                               const int grid_dim_b, const int grid_dim_c, const int order) {
-  return mapDensity<double>(cf.data(), ag.getDoublePrecisionNonbondedKit(), theme, grid_dim_a,
-                            grid_dim_b, grid_dim_c, order);
+                               const NonbondedTheme theme, const FFTMode fft_staging,
+                               const int grid_dim_a, const int grid_dim_b, const int grid_dim_c,
+                               const int order) {
+  return mapDensity<double>(cf.data(), ag.getDoublePrecisionNonbondedKit(), theme, fft_staging,
+                            grid_dim_a, grid_dim_b, grid_dim_c, order);
 }
 
 } // namespace energy

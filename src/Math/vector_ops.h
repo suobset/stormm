@@ -673,6 +673,22 @@ int readBitFromMask(const ushort* va, const size_t pos);
 int readBitFromMask(const std::vector<ushort> &va, const size_t pos);
 /// \}
 
+/// \brief Color a vector of boolean data according to the elements of a mask.
+///
+/// Overloaded:
+///   - Have a new vector produced as output, with all elements not named in mask set to false
+///   - Supply the pre-allocated result vector (any bits currently marked TRUE will not be wiped)
+///
+/// \param mask    The indices of the bool vector to mark as TRUE.
+/// \param result  The pre-allocated result vector
+/// \{
+template <typename T> std::vector<bool> colorVectorMask(const std::vector<T> &mask);
+
+template <typename T> std::vector<bool> colorVectorMask(const std::vector<T> &mask, size_t length);
+
+template <typename T> void colorVectorMask(std::vector<bool> *result, const std::vector<T> &mask);
+/// \}
+
 /// \brief Construct a vector based on an existing vector of any object type and an ordered list
 ///        of indices.  The original vector is limited to INT_MAX unique entries.
 ///

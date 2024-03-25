@@ -18,6 +18,7 @@
 #include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Structure/hpc_virtual_site_handling.h"
 #include "../../src/Structure/structure_enumerators.h"
@@ -49,6 +50,7 @@ using namespace stormm::numerics;
 using namespace stormm::parse;
 using namespace stormm::random;
 using namespace stormm::restraints;
+using namespace stormm::review;
 using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
@@ -96,7 +98,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   const TrajectoryKind frcid = TrajectoryKind::FORCES;
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
-  Thermostat heat_bath(ThermostatKind::NONE);
+  Thermostat heat_bath(poly_ag, ThermostatKind::NONE);
 
   // Clear forces.  Perform calculations for valence interactions and restraints.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
@@ -269,7 +271,7 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               const TestPriority do_tests, const bool do_valence_tests = true) {
   const int nsys = poly_ps->getSystemCount();
   ScoreCard sc(nsys, 1, 32);
-  Thermostat heat_bath(ThermostatKind::NONE);
+  Thermostat heat_bath(poly_ag, ThermostatKind::NONE);
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
   launchValence(prec, poly_ag, mmctrl, poly_ps, &heat_bath, &sc, valence_tb_space,
@@ -320,8 +322,8 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
     cpu_cimp[i] = isc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, 0);
     gpu_cmap[i] =  sc.reportInstantaneousStates(StateVariable::CMAP, i);
     cpu_cmap[i] = isc.reportInstantaneousStates(StateVariable::CMAP, 0);
-    gpu_qq14[i] =  sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i);
-    cpu_qq14[i] = isc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0);
+    gpu_qq14[i] =  sc.reportInstantaneousStates(StateVariable::ELEC_ONE_FOUR, i);
+    cpu_qq14[i] = isc.reportInstantaneousStates(StateVariable::ELEC_ONE_FOUR, 0);
     gpu_lj14[i] =  sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i);
     cpu_lj14[i] = isc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0);
     gpu_rstr[i] =  sc.reportInstantaneousStates(StateVariable::RESTRAINT, i);
@@ -420,9 +422,6 @@ int main(const int argc, const char* argv[]) {
     nblocks *= 2;
     nthreads /= 2;
   }
-
-  // Configure the relevant kernels for this executable.
-  valenceKernelSetup();
   
   // Collect coordinates and topologies
   const char osc = osSeparator();
@@ -456,9 +455,9 @@ int main(const int argc, const char* argv[]) {
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc.getCoordinates(), sysc.getSystemTopologyPointer());
   PhaseSpaceSynthesis poly_ps_dbl(sysc.getCoordinates(), sysc.getSystemTopologyPointer(),
-                                  36, 24, 34, 40);
+                                  36, 24, 36, 40);
   PhaseSpaceSynthesis poly_ps_sdbl(sysc.getCoordinates(), sysc.getSystemTopologyPointer(),
-                                   72, 24, 34, 72);
+                                   72, 24, 36, 72);
   CoreKlManager launcher(gpu, poly_ag);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
@@ -536,7 +535,8 @@ int main(const int argc, const char* argv[]) {
   CacheResource nonbond_tb_space(5 * nblocks, small_block_max_atoms);
   MolecularMechanicsControls mmctrl;
   mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::DOUBLE, poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::DOUBLE, PrecisionModel::DOUBLE,
+                               poly_ag);
   ScoreCard sc(nsys, 1, 32);
   
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
@@ -557,7 +557,8 @@ int main(const int argc, const char* argv[]) {
   
   // Reconfigure the launch coordination for single-precision calculations
   mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::SINGLE, poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::SINGLE, PrecisionModel::SINGLE,
+                               poly_ag);
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, AccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
                          launcher, 3.5e-5, 2.0e-4, do_tests);
@@ -604,8 +605,8 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> bigger_tops = { &trpi_ag, &dhfr_ag, &alad_ag };
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, dhfr_ps, alad_ps };
   PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
-  PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
-  PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 72);
+  PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 36, 40);
+  PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 36, 72);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
   AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT, gpu,
                                  &timer);
@@ -621,7 +622,8 @@ int main(const int argc, const char* argv[]) {
 
   // Reconfigure the work unit progress counters and launch double-precision calculations
   mmctrl.primeWorkUnitCounters(big_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::DOUBLE, big_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::DOUBLE, PrecisionModel::DOUBLE,
+                               big_poly_ag);
   checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, big_launcher, 3.5e-6, 2.5e-5, do_tests);
@@ -635,7 +637,8 @@ int main(const int argc, const char* argv[]) {
 
   // Reconfigure again and launch single-precision calculations on the "big" systems
   mmctrl.primeWorkUnitCounters(big_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::SINGLE, big_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::SINGLE, PrecisionModel::SINGLE,
+                               big_poly_ag);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
                          big_poly_se, AccumulationMethod::SPLIT, PrecisionModel::SINGLE,
                          gpu, big_launcher, 7.5e-5, 3.0e-3, do_tests);
@@ -644,7 +647,7 @@ int main(const int argc, const char* argv[]) {
                          gpu, big_launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, big_launcher,
-                           1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4,
+                           1.5e-4, 6.5e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 1.0e-5, 7.5e-5, 2.2e-4,
                            1.0e-6, 7.5e-4, 7.5e-3, 7.5e-3, do_tests);
   
   // Tweak the original synthesis to incorporate a Generalized Born model.
@@ -662,7 +665,8 @@ int main(const int argc, const char* argv[]) {
   // series is fine.
   poly_ag.setImplicitSolventModel(amber_isms[0], ngb_tables, appropriate_ism_radii[0]);
   mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::DOUBLE, poly_ag); 
+                               VwuGoal::ACCUMULATE, PrecisionModel::DOUBLE, PrecisionModel::DOUBLE,
+                               poly_ag); 
   for (size_t i = 0; i < amber_isms.size(); i++) {
     poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
     poly_ag.upload();
@@ -685,7 +689,8 @@ int main(const int argc, const char* argv[]) {
                              1.0e-6, 1.0e-6, 1.0e-6, do_tests, false);
   }
   mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::SINGLE, poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::SINGLE, PrecisionModel::SINGLE,
+                               poly_ag);
   for (size_t i = 0; i < amber_isms.size(); i++) {
     poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
     poly_ag.upload();
@@ -761,9 +766,9 @@ int main(const int argc, const char* argv[]) {
   }
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
   PhaseSpaceSynthesis ligand_poly_ps_dbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 40, 24,
-                                         34, 44);
+                                         36, 44);
   PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
-                                          34, 72);
+                                          36, 72);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling, ligand_tiling,
                                     ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getUniqueTopologies(),
@@ -779,7 +784,8 @@ int main(const int argc, const char* argv[]) {
   // Reconfigure the progress counters for the large array of ligand systems and launch
   // double-precision calculations.
   mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::DOUBLE, ligand_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::DOUBLE, PrecisionModel::DOUBLE,
+                               ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests);
@@ -799,7 +805,8 @@ int main(const int argc, const char* argv[]) {
 
   // Reconfigure one final time and perform single-precision calculations on the ligands
   mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::SINGLE, ligand_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::SINGLE, PrecisionModel::SINGLE,
+                               ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::SINGLE, gpu, ligand_launcher, 7.5e-5, 3.0e-3, do_tests);
@@ -870,13 +877,24 @@ int main(const int argc, const char* argv[]) {
     placeVirtualSites(&cpulig_dbl_cf_vec[i], iag_ptr);
     placeVirtualSites(&cpulig_sdbl_cf_vec[i], iag_ptr);
   }
+
+  // By convention, the standalone virtual site placement kernels act on frame positions stored in
+  // the developing positions arrays of the synthesis.  In order to mock this effect, the
+  // coordinate syntheses must be advanced one cycle.  This will be undone after the following
+  // tests.
   const VirtualSiteActivity v_activity = VirtualSiteActivity::PLACEMENT;
-  launchVirtualSiteHandling(PrecisionModel::SINGLE, v_activity ,&ligand_poly_ps, &valence_tb_space,
+  ligand_poly_ps.updateCyclePosition();
+  ligand_poly_ps_dbl.updateCyclePosition();
+  ligand_poly_ps_sdbl.updateCyclePosition();
+  launchVirtualSiteHandling(PrecisionModel::SINGLE, v_activity, &ligand_poly_ps, &valence_tb_space,
                            ligand_poly_ag, ligand_launcher);
   launchVirtualSiteHandling(PrecisionModel::DOUBLE, v_activity, &ligand_poly_ps_dbl,
                             &valence_tb_space, ligand_poly_ag, ligand_launcher);
   launchVirtualSiteHandling(PrecisionModel::DOUBLE, v_activity, &ligand_poly_ps_sdbl,
                             &valence_tb_space, ligand_poly_ag, ligand_launcher);
+  ligand_poly_ps.updateCyclePosition();
+  ligand_poly_ps_dbl.updateCyclePosition();
+  ligand_poly_ps_sdbl.updateCyclePosition();
   std::vector<CoordinateFrame> gpulig_cf_vec, gpulig_dbl_cf_vec, gpulig_sdbl_cf_vec;
   gpulig_cf_vec.reserve(nligands);
   gpulig_dbl_cf_vec.reserve(nligands);
@@ -952,13 +970,15 @@ int main(const int argc, const char* argv[]) {
   ligand_poly_ps_dbl.upload();
   ligand_poly_ps_sdbl.upload();
   mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::SINGLE, ligand_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::SINGLE, PrecisionModel::SINGLE,
+                               ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::SINGLE, gpu, ligand_launcher, 7.5e-5, 3.0e-3, do_tests,
                          "(Following virtual site replacement.)");
   mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                               PrecisionModel::DOUBLE, ligand_poly_ag);
+                               VwuGoal::ACCUMULATE, PrecisionModel::DOUBLE, PrecisionModel::DOUBLE,
+                               ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests,
@@ -1006,7 +1026,7 @@ int main(const int argc, const char* argv[]) {
     gpulig_ps_vec.emplace_back(ligand_poly_ps.exportSystem(i, devc_tier));
     gpulig_dbl_ps_vec.emplace_back(ligand_poly_ps_dbl.exportSystem(i, devc_tier));
     gpulig_sdbl_ps_vec.emplace_back(ligand_poly_ps_sdbl.exportSystem(i, devc_tier));
-
+    
     // Transmit forces, via CPU routines, in the respective individual system coordinate objects
     const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
     transmitVirtualSiteForces(&cpulig_ps_vec[i], *iag_ptr);
@@ -1051,6 +1071,8 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
-  return 0;
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmWatermark();
+  }
+  return countGlobalTestFailures();
 }

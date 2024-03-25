@@ -5,6 +5,8 @@
 namespace stormm {
 namespace trajectory {
 
+using topology::getEnumerationName;
+  
 //-------------------------------------------------------------------------------------------------
 void swapValidatePrecisionModels(const int first_bits, const int second_bits, const char* desc) {
   if (first_bits != second_bits) {
@@ -68,6 +70,39 @@ void swapValidateFrameIndices(const int2* frm_pairs, const int pair_count, const
 }
 
 //-------------------------------------------------------------------------------------------------
+void swapValidateUnitCells(const UnitCellType uca, const UnitCellType ucb) {
+  bool problem = false;
+  switch (uca) {
+  case UnitCellType::NONE:
+    switch (ucb) {
+    case UnitCellType::NONE:
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      problem = true;
+      break;
+    }
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    switch (ucb) {
+    case UnitCellType::NONE:
+      problem = true;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      break;
+    }
+    break;
+  }
+  if (problem) {
+    rtErr("Unable to swap coordinates between systems with different unit cell types (" +
+          getEnumerationName(uca) + " vs " + getEnumerationName(ucb) + ").",
+          "swapValidateUnitCells");
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 void swapCheckSameObject(const bool is_same, const int2* frm_pairs, const int pair_count,
                          const HybridTargetLevel tier_first, const HybridTargetLevel tier_second) {
 
@@ -122,6 +157,7 @@ void coordSwap(CoordinateSeriesWriter<void> *v_first, const size_t frm_first,
   swapValidatePrecisionModels(v_first->gpos_bits, v_second->gpos_bits, "particle positions");
   swapValidateFrameIndices(frm_first, v_first->nframe, frm_second, v_second->nframe);
   swapValidateAtomCounts(v_first->natom, v_second->natom);
+  swapValidateUnitCells(v_first->unit_cell, v_second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {
@@ -172,6 +208,7 @@ void coordSwap(CoordinateSeriesWriter<void> *v_first, CoordinateSeriesWriter<voi
                const GpuDetails &gpu, const HpcKernelSync sync) {
   swapValidatePrecisionModels(v_first->gpos_bits, v_second->gpos_bits, "particle positions");
   swapValidateAtomCounts(v_first->natom, v_second->natom);
+  swapValidateUnitCells(v_first->unit_cell, v_second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {
@@ -231,6 +268,7 @@ void coordSwap(PsSynthesisWriter *first, const int frm_first, PsSynthesisWriter 
   swapValidateFrameIndices(frm_first, first_bdrs.system_count, frm_second,
                            second_bdrs.system_count);
   swapValidateAtomCounts(first_bdrs.atom_counts[frm_first], second_bdrs.atom_counts[frm_second]);
+  swapValidateUnitCells(first->unit_cell, second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {
@@ -342,6 +380,7 @@ void coordSwap(PsSynthesisWriter *first, PsSynthesisWriter *second,
   swapValidatePrecisionModels(first->gpos_bits, second->gpos_bits, "particle positions");
   swapValidatePrecisionModels(first->vel_bits,  second->vel_bits, "velocities");
   swapValidatePrecisionModels(first->frc_bits,  second->frc_bits, "forces");
+  swapValidateUnitCells(first->unit_cell, second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {
@@ -469,6 +508,7 @@ void coordSwap(CondensateWriter *first, const size_t frm_first, CondensateWriter
   swapValidateFrameIndices(frm_first, first_bdrs.system_count, frm_second,
                            second_bdrs.system_count);
   swapValidateAtomCounts(first_bdrs.atom_counts[frm_first], second_bdrs.atom_counts[frm_second]);
+  swapValidateUnitCells(first->unit_cell, second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {
@@ -568,6 +608,7 @@ void coordSwap(CondensateWriter *first, CondensateWriter *second,
           getEnumerationName(first->mode) + ", " + getEnumerationName(second->mode) + ").",
           "coordSwap");
   }
+  swapValidateUnitCells(first->unit_cell, second->unit_cell);
   switch (tier_first) {
   case HybridTargetLevel::HOST:
     switch (tier_second) {

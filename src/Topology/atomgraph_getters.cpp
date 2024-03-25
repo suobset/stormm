@@ -87,7 +87,17 @@ double AtomGraph::getTotalMass() const {
   }
   return tmass;
 }
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getDegreesOfFreedom() const {
+  return unconstrained_dof;
+}
   
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getConstrainedDegreesOfFreedom() const {
+  return constrained_dof;
+}
+
 //-------------------------------------------------------------------------------------------------
 int AtomGraph::getDescriptor(const TopologyDescriptor choice) const {
   return descriptors.readHost(static_cast<ulint>(choice));
@@ -639,11 +649,6 @@ int AtomGraph::getConstraintGroupTotalSize() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int AtomGraph::getDegreesOfFreedom() const {
-  return degrees_of_freedom;
-}
-
-//-------------------------------------------------------------------------------------------------
 int AtomGraph::getNonrigidParticleCount() const {
   return nonrigid_particle_count;
 }
@@ -907,13 +912,14 @@ AtomGraph::getSinglePrecisionImplicitSolventKit(const HybridTargetLevel tier) co
 
 //-------------------------------------------------------------------------------------------------
 ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(const HybridTargetLevel tier) const {
-  return ChemicalDetailsKit(atom_count, residue_count, molecule_count, atom_names.data(tier),
-                            residue_names.data(tier), atom_types.data(tier),
-                            atomic_numbers.data(tier), residue_limits.data(tier),
-                            atom_struc_numbers.data(tier), residue_numbers.data(tier),
-                            molecule_membership.data(tier), molecule_contents.data(tier),
-                            molecule_limits.data(tier), atomic_masses.data(tier),
-                            sp_atomic_masses.data(tier));
+  return ChemicalDetailsKit(atom_count, residue_count, molecule_count, unconstrained_dof,
+                            constrained_dof, atom_names.data(tier), residue_names.data(tier),
+                            atom_types.data(tier), atomic_numbers.data(tier),
+                            residue_limits.data(tier), atom_struc_numbers.data(tier),
+                            residue_numbers.data(tier), molecule_membership.data(tier),
+                            molecule_contents.data(tier), molecule_limits.data(tier),
+                            atomic_masses.data(tier), sp_atomic_masses.data(tier),
+                            inverse_atomic_masses.data(tier), sp_inverse_atomic_masses.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -961,8 +967,8 @@ AtomGraph::getDoublePrecisionConstraintKit(const HybridTargetLevel tier) const {
                                constraint_parameter_bounds.data(tier),
                                settle_mormt.data(tier), settle_mhrmt.data(tier),
                                settle_ra.data(tier), settle_rb.data(tier), settle_rc.data(tier),
-                               settle_invra.data(tier), constraint_inverse_masses.data(tier),
-                               constraint_target_lengths.data(tier));
+                               settle_invra.data(tier), constraint_squared_lengths.data(tier),
+                               constraint_inverse_masses.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -979,8 +985,8 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
                               sp_settle_mormt.data(tier), sp_settle_mhrmt.data(tier),
                               sp_settle_ra.data(tier), sp_settle_rb.data(tier),
                               sp_settle_rc.data(tier), sp_settle_invra.data(tier),
-                              sp_constraint_inverse_masses.data(tier),
-                              sp_constraint_target_lengths.data(tier));
+                              sp_constraint_squared_lengths.data(tier),
+                              sp_constraint_inverse_masses.data(tier));
 }
 
 #ifdef STORMM_USE_HPC
@@ -1237,8 +1243,9 @@ AtomGraph::getDeviceViewToHostSPImplicitSolventKit() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-  ChemicalDetailsKit AtomGraph::getDeviceViewToHostChemicalDetailsKit() const {
+ChemicalDetailsKit AtomGraph::getDeviceViewToHostChemicalDetailsKit() const {
   return ChemicalDetailsKit(atom_count, residue_count, molecule_count,
+                            unconstrained_dof, constrained_dof,
                             atom_names.getDeviceValidHostPointer(),
                             residue_names.getDeviceValidHostPointer(),
                             atom_types.getDeviceValidHostPointer(),
@@ -1250,7 +1257,9 @@ AtomGraph::getDeviceViewToHostSPImplicitSolventKit() const {
                             molecule_contents.getDeviceValidHostPointer(),
                             molecule_limits.getDeviceValidHostPointer(),
                             atomic_masses.getDeviceValidHostPointer(),
-                            sp_atomic_masses.getDeviceValidHostPointer());
+                            sp_atomic_masses.getDeviceValidHostPointer(),
+                            inverse_atomic_masses.getDeviceValidHostPointer(),
+                            sp_inverse_atomic_masses.getDeviceValidHostPointer());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1304,8 +1313,8 @@ AtomGraph::getDeviceViewToHostDPConstraintKit() const {
                                settle_rb.getDeviceValidHostPointer(),
                                settle_rc.getDeviceValidHostPointer(),
                                settle_invra.getDeviceValidHostPointer(),
-                               constraint_inverse_masses.getDeviceValidHostPointer(),
-                               constraint_target_lengths.getDeviceValidHostPointer());
+                               constraint_squared_lengths.getDeviceValidHostPointer(),
+                               constraint_inverse_masses.getDeviceValidHostPointer());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1327,8 +1336,8 @@ AtomGraph::getDeviceViewToHostSPConstraintKit() const {
                               sp_settle_rb.getDeviceValidHostPointer(),
                               sp_settle_rc.getDeviceValidHostPointer(),
                               sp_settle_invra.getDeviceValidHostPointer(),
-                              sp_constraint_inverse_masses.getDeviceValidHostPointer(),
-                              sp_constraint_target_lengths.getDeviceValidHostPointer());
+                              sp_constraint_squared_lengths.getDeviceValidHostPointer(),
+                              sp_constraint_inverse_masses.getDeviceValidHostPointer());
 }
 #  endif
 #endif

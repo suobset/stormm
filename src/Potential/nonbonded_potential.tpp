@@ -779,7 +779,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       break;
     }
   }
-
+  
   // Compute inherent Generalized Born energies and initialize an array for solvent forces
   for (int i = 0; i < nbk.natom; i++) {
     const Tcalc atomi_q = nbk.charge[i];
@@ -804,7 +804,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       }
     }
   }
-
+  
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
   // the tiling continues to add a degree of complexity.

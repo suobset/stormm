@@ -12,12 +12,14 @@ namespace stormm {
 namespace structure {
 
 using card::HybridTargetLevel;
-using numerics::max_llint_accumulation;
-using numerics::max_int_accumulation_f;
+using synthesis::eighth_valence_work_unit_atoms;
+using synthesis::half_valence_work_unit_atoms;
 using synthesis::maximum_valence_work_unit_atoms;
+using synthesis::quarter_valence_work_unit_atoms;
 using synthesis::vwu_abstract_length;
 using synthesis::VwuAbstractMap;
 using topology::VirtualSiteKind;
+using trajectory::CoordinateCycle;
   
 #include "Math/rounding.cui"
 #include "Math/vector_formulas.cui"
@@ -25,7 +27,6 @@ using topology::VirtualSiteKind;
   
 #define VSITE_STANDALONE
 #define TCALC  float
-#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 4
 #  define TCALC2 float2
 #  define TCALC3 float3
 #  define TCALC4 float4
@@ -34,12 +35,46 @@ using topology::VirtualSiteKind;
 #  define SIN_FUNC sinf
 #  define SQRT_FUNC sqrtf
 #  define LLCONV_FUNC __float2ll_rn
-#    define KERNEL_NAME kfPlaceVirtualSites
-#      include "virtual_site_placement.cui"
-#    undef KERNEL_NAME
-#    define KERNEL_NAME kfTransmitVSiteForces
-#      include "virtual_site_transmission.cui"
-#    undef KERNEL_NAME
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 2
+#    define VSITE_STANDALONE_THREAD_COUNT 512
+#      define KERNEL_NAME kfPlaceVirtualSitesXL
+#        include "virtual_site_placement.cui"
+#      undef KERNEL_NAME
+#      define KERNEL_NAME kfTransmitVSiteForcesXL
+#        include "virtual_site_transmission.cui"
+#      undef KERNEL_NAME
+#    undef VSITE_STANDALONE_THREAD_COUNT
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 4
+#    define VSITE_STANDALONE_THREAD_COUNT 256
+#      define KERNEL_NAME kfPlaceVirtualSitesLG
+#        include "virtual_site_placement.cui"
+#      undef KERNEL_NAME
+#      define KERNEL_NAME kfTransmitVSiteForcesLG
+#        include "virtual_site_transmission.cui"
+#      undef KERNEL_NAME
+#    undef VSITE_STANDALONE_THREAD_COUNT
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 8
+#    define VSITE_STANDALONE_THREAD_COUNT 128
+#      define KERNEL_NAME kfPlaceVirtualSitesMD
+#        include "virtual_site_placement.cui"
+#      undef KERNEL_NAME
+#      define KERNEL_NAME kfTransmitVSiteForcesMD
+#        include "virtual_site_transmission.cui"
+#      undef KERNEL_NAME
+#    undef VSITE_STANDALONE_THREAD_COUNT
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 16
+#    define VSITE_STANDALONE_THREAD_COUNT 128
+#      define KERNEL_NAME kfPlaceVirtualSitesSM
+#        include "virtual_site_placement.cui"
+#      undef KERNEL_NAME
+#      define KERNEL_NAME kfTransmitVSiteForcesSM
+#        include "virtual_site_transmission.cui"
+#      undef KERNEL_NAME
+#    undef VSITE_STANDALONE_THREAD_COUNT
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
@@ -48,70 +83,117 @@ using topology::VirtualSiteKind;
 #  undef SIN_FUNC
 #  undef SQRT_FUNC
 #  undef LLCONV_FUNC
-#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
 #undef TCALC
 
 #define TCALC  double
-#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 3
 #  define TCALC2 double2
 #  define TCALC3 double3
 #  define TCALC4 double4
 #  define COS_FUNC cos
 #  define SIN_FUNC sin
 #  define SQRT_FUNC sqrt
+#  define SPLIT_FORCE_ACCUMULATION
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 2
+#  define VSITE_STANDALONE_THREAD_COUNT 256
 #    define KERNEL_NAME kdPlaceVirtualSites
 #      include "virtual_site_placement.cui"
 #    undef KERNEL_NAME
 #    define KERNEL_NAME kdTransmitVSiteForces
 #      include "virtual_site_transmission.cui"
 #    undef KERNEL_NAME
+#  undef VSITE_STANDALONE_THREAD_COUNT
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
+#  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
 #  undef COS_FUNC
 #  undef SIN_FUNC
 #  undef SQRT_FUNC
-#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
 #undef TCALC
 #undef VSITE_STANDALONE
 
 //-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryVirtualSiteKernelRequirements(const PrecisionModel prec,
-                                                             const VirtualSiteActivity purpose) {
+                                                             const VirtualSiteActivity purpose,
+                                                             const ValenceKernelSize kwidth) {
   cudaFuncAttributes result;
+  cudaError_t cfa;
   switch (prec) {
   case PrecisionModel::DOUBLE:
     switch (purpose) {
     case VirtualSiteActivity::PLACEMENT:
-      if (cudaFuncGetAttributes(&result, kdPlaceVirtualSites) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kdVirtualSitePlacement.",
-              "queryVirtualSiteKernelRequirements");
-      }
+      cfa = cudaFuncGetAttributes(&result, kdPlaceVirtualSites);
       break;
     case VirtualSiteActivity::TRANSMIT_FORCES:
-      if (cudaFuncGetAttributes(&result, kdTransmitVSiteForces) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kdTransmitVSiteForces.",
-              "queryVirtualSiteKernelRequirements");
-      }
+      cfa = cudaFuncGetAttributes(&result, kdTransmitVSiteForces);
       break;
     }
     break;
   case PrecisionModel::SINGLE:
     switch (purpose) {
     case VirtualSiteActivity::PLACEMENT:
-      if (cudaFuncGetAttributes(&result, kfPlaceVirtualSites) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kfVirtualSitePlacement.",
-              "queryVirtualSiteKernelRequirements");
+      switch (kwidth) {
+      case ValenceKernelSize::XL:
+        cfa = cudaFuncGetAttributes(&result, kfPlaceVirtualSitesXL);
+        break;
+      case ValenceKernelSize::LG:
+        cfa = cudaFuncGetAttributes(&result, kfPlaceVirtualSitesLG);
+        break;
+      case ValenceKernelSize::MD:
+        cfa = cudaFuncGetAttributes(&result, kfPlaceVirtualSitesMD);
+        break;
+      case ValenceKernelSize::SM:
+        cfa = cudaFuncGetAttributes(&result, kfPlaceVirtualSitesSM);
+        break;
       }
       break;
     case VirtualSiteActivity::TRANSMIT_FORCES:
-      if (cudaFuncGetAttributes(&result, kfTransmitVSiteForces) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel kfTransmitVSiteForces.",
-              "queryVirtualSiteKernelRequirements");
+      switch (kwidth) {
+      case ValenceKernelSize::XL:
+        cfa = cudaFuncGetAttributes(&result, kfTransmitVSiteForcesXL);
+        break;
+      case ValenceKernelSize::LG:
+        cfa = cudaFuncGetAttributes(&result, kfTransmitVSiteForcesLG);
+        break;
+      case ValenceKernelSize::MD:
+        cfa = cudaFuncGetAttributes(&result, kfTransmitVSiteForcesMD);
+        break;
+      case ValenceKernelSize::SM:
+        cfa = cudaFuncGetAttributes(&result, kfTransmitVSiteForcesSM);
+        break;
       }
       break;
     }
     break;
+  }
+  if (cfa != cudaSuccess) {
+    std::string error_message("Error obtaining attributes for kernel k");
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      error_message += "d";
+      break;
+    case PrecisionModel::SINGLE:
+      error_message += "f";
+      break;
+    }
+    switch (purpose) {
+    case VirtualSiteActivity::PLACEMENT:
+      error_message += "PlaceVirtualSite";
+      break;
+    case VirtualSiteActivity::TRANSMIT_FORCES:
+      error_message += "TransmitVSiteForces";
+      break;
+    }
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      break;
+    case PrecisionModel::SINGLE:
+      error_message += getEnumerationName(kwidth);
+      break;
+    }
+    error_message += ".";
+    rtErr(error_message, "queryVirtualSiteKernelRequirements");
   }
   return result;
 }
@@ -129,7 +211,21 @@ void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<fl
                                 const SyValenceKit<float> &poly_vk,
                                 const SyAtomUpdateKit<float, float2, float4> &poly_auk,
                                 const int2 bt) {
-  kfPlaceVirtualSites<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+
+  // Like the valence kernels themselves, the launch grid can be used to determine the appropriate
+  // kernel to call.
+  if (bt.y > 256) {
+    kfPlaceVirtualSitesXL<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else if (bt.y > 128) {
+    kfPlaceVirtualSitesLG<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else if (bt.y > 64) {
+    kfPlaceVirtualSitesMD<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else {
+    kfPlaceVirtualSitesSM<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -145,7 +241,18 @@ void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<flo
                                const SyValenceKit<float> &poly_vk,
                                const SyAtomUpdateKit<float, float2, float4> &poly_auk,
                                const int2 bt) {
-  kfTransmitVSiteForces<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  if (bt.y > 256) {
+    kfTransmitVSiteForcesXL<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else if (bt.y > 128) {
+    kfTransmitVSiteForcesLG<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else if (bt.y > 64) {
+    kfTransmitVSiteForcesMD<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
+  else {
+    kfTransmitVSiteForcesSM<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

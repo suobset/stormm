@@ -24,10 +24,6 @@ using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
 using numerics::chooseAccumulationMethod;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
 using synthesis::NbwuKind;
 using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;
@@ -93,11 +89,11 @@ __device__ int loadTileCoordinates(const int pos, const int iter, const int* nbw
       if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
         const llint ival = __ldcs(&read_crd[read_idx]);
         fval = (float)(ival);
-        __stwb(&write_crd[write_idx], ival);
+        write_crd[write_idx] = ival;
       }
       else {
         fval = (float)(0.0);
-        __stwb(&write_crd[write_idx], (128 * (rel_pos + 8) * tile_lane_idx) * gpos_scale);
+        write_crd[write_idx] = (128 * (rel_pos + 8) * tile_lane_idx) * gpos_scale;
       }
     }
     else {
@@ -132,16 +128,16 @@ __device__ int loadTileCoordinates(const int pos, const int iter, const int* nbw
       if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
         const llint ival = __ldcs(&read_crd[read_idx]);
         fval = (double)(ival);
-        __stwb(&write_crd[write_idx], ival);
+        write_crd[write_idx] = ival;
         const int ival_ovrf = __ldcs(&read_crd_ovrf[read_idx]);
         fval += (double)(ival_ovrf) * max_llint_accumulation;
-        __stwb(&write_crd_ovrf[write_idx], ival_ovrf);
+        write_crd_ovrf[write_idx] = ival_ovrf;
       }
       else {
         fval = 0.0;
         const int95_t fake_val = doubleToInt95((128 * (rel_pos + 8) * tile_lane_idx) * gpos_scale);
-        __stwb(&write_crd[write_idx], fake_val.x);
-        __stwb(&write_crd_ovrf[write_idx], fake_val.y);
+        write_crd[write_idx] = fake_val.x;
+        write_crd_ovrf[write_idx] = fake_val.y;
       }
     }
     else {
@@ -706,159 +702,6 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2
 #undef TCALC
-
-//-------------------------------------------------------------------------------------------------
-extern void nonbondedKernelSetup() {
-  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
-
-  // Standard kernels
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsVacuumForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdVacuumEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdVacuumEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsVacuumForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdGBEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdGBEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForce, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBNeckForce __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdGBNeckEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdGBNeckEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForceEnergy, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBNeckForceEnergy __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-
-  // Clash-damping kernels
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfVacuumForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfVacuumForceEnergyNonClash __shared__ memory bank size to eight "
-          "bytes.", "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsVacuumForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdVacuumEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdVacuumEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsVacuumForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsVacuumForceEnergyNonClash __shared__ memory bank size to eight "
-          "bytes.", "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBForceEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdGBEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdGBEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBForceEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgfGBNeckForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgfGBNeckForceEnergyNonClash __shared__ memory bank size to eight "
-          "bytes.", "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForceNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBNeckForceNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdGBNeckEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdGBNeckEnergyNonClash __shared__ memory bank size to eight bytes.",
-          "nonbondedKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(ktgdsGBNeckForceEnergyNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting ktgdsGBNeckForceEnergyNonClash __shared__ memory bank size to eight "
-          "bytes.", "nonbondedKernelSetup");
-  }
-}
 
 //-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes
@@ -2158,7 +2001,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
       MMControlKit<double> ctrl = mmctrl->dpData(tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
       ThermostatWriter<double> tstw = heat_bath->dpData(tier);
-      ISWorkspaceKit<double> iswk = ism_space->dpData(tier);
+      ISWorkspaceKit<double> iswk = ism_space->dpData(poly_ps->getCyclePosition(), tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw, &gmem_r,
                       &iswk, eval_force, eval_energy, bt, gbr_bt, gbd_bt, clash_minimum_distance,
                       clash_ratio);
@@ -2171,7 +2014,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
       MMControlKit<float> ctrl = mmctrl->spData(tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(tier);
       ThermostatWriter<float> tstw = heat_bath->spData(tier);
-      ISWorkspaceKit<float> iswk = ism_space->spData(tier);
+      ISWorkspaceKit<float> iswk = ism_space->spData(poly_ps->getCyclePosition(), tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &tstw, &scw, &gmem_r,
                       &iswk, eval_force, eval_energy, force_sum, bt, gbr_bt, gbd_bt,
                       clash_minimum_distance, clash_ratio);

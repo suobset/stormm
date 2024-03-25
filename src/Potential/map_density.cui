@@ -1,6 +1,23 @@
 // -*-c++-*-
 #include "copyright.h"
 
+// Revise the block count in accord with the architecture
+#ifdef STORMM_USE_CUDA
+#  if __CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800
+#    define MAPPING_BLOCKS 4
+#  else
+#    ifdef TCALC_IS_DOUBLE
+#      define MAPPING_BLOCKS 4
+#    else
+#      if ORDER == 4
+#        define MAPPING_BLOCKS 6
+#      else
+#        define MAPPING_BLOCKS 5
+#      endif
+#    endif
+#  endif
+#endif
+
 /// \brief A naive approach to mapping density: loop over all atoms and barrage the memory space
 ///        with atomicAdd() operations.  This will take 
 __global__ void __launch_bounds__(small_block_size, MAPPING_BLOCKS)
@@ -21,13 +38,8 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
   __shared__ volatile int sh_chain_cpos[small_block_size >> warp_bits];
   __shared__ volatile int sh_chain_cell_init[small_block_size >> warp_bits];
   __shared__ volatile uint sh_final_cell_atom_limits[small_block_size >> warp_bits];
-  __shared__ volatile int sh_warp_intake, sh_total_warps, sh_warps_per_chain;
-#if 0
-  // When stepping through the cell lists in a single loop, it is necessary to recover the exact
-  // stencil point at each iteration.  This can be labrious when done in the innermost loop.  It is
-  // more efficient to pre-compute these values during setup and store them in a block-wide array.
-  __shared__ volatile stencil_indices[warp_size_int * ((ORDER * ORDER * ORDER + 3) / 4)];
-#endif
+  __shared__ volatile int sh_total_warps, sh_warps_per_chain;
+
   // The atoms are in a list with significant gaps, the CellGrid's image array.  In order to
   // traverse that list with reasonably dense thread occupancy, work chain by chain, assigning
   // a certain number of warps out of the launch grid to each chain.  The number of warps that will
@@ -37,7 +49,6 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
   // length by about the cube root of the size difference.  The map stride is stored in registers
   // on all threads to avoid bank conflicts if threads diverge further down in the inner loop.
   const int total_warps = ((blockDim.x * gridDim.x) >> warp_bits);
-  const int map_stride = 4;
   
   // Warps will now proceed along each chain of the cell grid, taking in warp_intake atoms at a
   // time, broadcasting them to all threads using shuffles, and then proceed over all chains to
@@ -49,7 +60,6 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
   }
   if (threadIdx.x == 0) {
     sh_total_warps = total_warps;
-    sh_warp_intake = (warp_size_int / map_stride);
     const int warp_division = total_warps / cgr.total_chain_count;
     sh_warps_per_chain = (warp_division > 4) ? warp_division : 4;
   }
@@ -107,19 +117,21 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
 
     // Once situated on a chain of spatial decomposition cells, each warp proceeds to the end of
     // the chain, seeking an indication that all atoms have been processed.
-    uint atom_pos_in_chain = ((warp_pos[warp_idx] -
+    uint slab_pos_in_chain = ((warp_pos[warp_idx] -
                                (sh_current_chain[warp_idx] * sh_warps_per_chain)) *
-                              sh_warp_intake) + lane_idx;
+                              warp_size_int) + lane_idx;
     
     // Step along the atoms of the cell chain until all have been processed.
     int chain_apos;
     do {
       
       // Get the next image index and immediately increment the atom position in the chain
+      const uint atom_pos_in_chain = slab_pos_in_chain / ORDER;
+      const int bspl_index = slab_pos_in_chain % ORDER;
       uint img_idx = __ldca(&cgr.chain_limits[sh_current_chain[warp_idx]]) + atom_pos_in_chain;
-      atom_pos_in_chain += sh_warp_intake * sh_warps_per_chain;
+      slab_pos_in_chain += warp_size_int * sh_warps_per_chain;
       T4 crdq;
-      if (lane_idx < sh_warp_intake && img_idx < sh_final_cell_atom_limits[warp_idx]) {
+      if (img_idx < sh_final_cell_atom_limits[warp_idx]) {
 #ifdef TMAT_IS_LONG
         crdq = cgr.image[img_idx];
 #else
@@ -156,25 +168,12 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
         // the particle was invalid.
         chain_apos = -1;
       }
-      if (map_stride > 1) {
-
-        // Copy each atom to other threads in the warp in the order [ 0, 1, ..., N, 0, 1, ...,
-        // N, ... 0, 1, ..., N ] with map_stride repeats of the sequence over warp_intake atoms.
-        const int lane_source = (lane_idx & (sh_warp_intake - 1));
-        crdq.x = SHFL(crdq.x, lane_source);
-        crdq.y = SHFL(crdq.y, lane_source);
-        crdq.z = SHFL(crdq.z, lane_source);
-        crdq.w = SHFL(crdq.w, lane_source);
-        chain_apos = SHFL(chain_apos, lane_source);
-      }
-      else {
-
-        // Synchronization is needed before the spatial decomposition cell's transformation matrix
-        // is repopulated, to prevent some threads from barreling through and changing the contents
-        // before others have finished using it once.  This synchronization is handled implicitly
-        // by shuffle instructions if the mapping stride is greater than one.
-        SYNCWARP;
-      }
+      
+      // Synchronization is needed before the spatial decomposition cell's transformation matrix
+      // is repopulated, to prevent some threads from barreling through and changing the contents
+      // before others have finished using it once.  This synchronization is handled implicitly
+      // by shuffle instructions if the mapping stride is greater than one.
+      SYNCWARP;
     
       // The following are only performed for valid atoms.
       if (chain_apos < 0) {
@@ -360,94 +359,72 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
       devcBSpline6(db, bspln_b_knots);
       devcBSpline6(dc, bspln_c_knots);
 #endif
-      for (int i = 0; i < pm_acc.order; i++) {
-        bspln_a_knots[i] *= q;
-      }
+      // Each atom has as many threads focused on it as there are orders in the B-spline
+      // interpolation.  Each thread can take one of the B-spline coefficients along the A axis
+      // and just drop the rest now.  Some degree of coalescence will exist for writes along the
+      // A axis for each of ORDER * ORDER iterations of a double-nested loop.
+      const TCALC bspl_a_knot = bspln_a_knots[bspl_index] * q * pm_acc.fp_scale;
+      const uint4 sys_pm_dims = pm_acc.dims[sh_system_idx[warp_idx]];
+      const uint gpos_a = (ida + bspl_index) -
+                          ((ida + bspl_index >= sys_pm_dims.x) * sys_pm_dims.x);
 
       // Loop over all grid points, issuing atomic additions to the particle-mesh interaction grid.
-      int itp = lane_idx / sh_warp_intake;
-      const uint4 sys_pm_dims = pm_acc.dims[sh_system_idx[warp_idx]];
-      switch (pm_acc.mode) {
-      case PrecisionModel::DOUBLE:
-        if (pm_acc.use_overflow) {
-          while (itp < ORDER * ORDER * ORDER) {
-            const int itp_c = itp / (ORDER * ORDER);
-            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
-            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
-            uint gpos_a = ida + itp_a;
-            uint gpos_b = idb + itp_b;
-            uint gpos_c = idc + itp_c;
-            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
-            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
-            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
-            const uint gpos = sys_pm_dims.w +
-                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
-            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
-                             pm_acc.fp_scale;
-            atomicSplit(dq, gpos, pm_acc.lldata, pm_acc.overflow);
-            itp += map_stride;
-          }
-        }
-        else {
-          while (itp < ORDER * ORDER * ORDER) {
-            const int itp_c = itp / (ORDER * ORDER);
-            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
-            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
-            uint gpos_a = ida + itp_a;
-            uint gpos_b = idb + itp_b;
-            uint gpos_c = idc + itp_c;
-            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
-            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
-            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
-            const uint gpos = sys_pm_dims.w +
-                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
-            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
-                             pm_acc.fp_scale;
-            atomicAdd((ullint*)&pm_acc.lldata[gpos], (ullint)(__double2ll_rn(dq)));
-            itp += map_stride;
-          }
-        }
+      uint padded_gdim_x;
+      switch (pm_acc.fftm) {
+      case FFTMode::IN_PLACE:
+        padded_gdim_x = 2 * ((sys_pm_dims.x / 2) + 1);
         break;
-      case PrecisionModel::SINGLE:
-        if (pm_acc.use_overflow) {
-          while (itp < ORDER * ORDER * ORDER) {
-            const int itp_c = itp / (ORDER * ORDER);
-            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
-            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
-            uint gpos_a = ida + itp_a;
-            uint gpos_b = idb + itp_b;
-            uint gpos_c = idc + itp_c;
-            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
-            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
-            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
-            const uint gpos = sys_pm_dims.w +
-                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
-            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
-                             pm_acc.fp_scale;
-            atomicSplit(dq, gpos, pm_acc.idata, pm_acc.overflow);
-            itp += map_stride;
-          }
-        }
-        else {
-          while (itp < ORDER * ORDER * ORDER) {
-            const int itp_c = itp / (ORDER * ORDER);
-            const int itp_b = (itp - (itp_c * ORDER * ORDER)) / ORDER;
-            const int itp_a = itp - (((itp_c * ORDER) + itp_b) * ORDER);
-            uint gpos_a = ida + itp_a;
-            uint gpos_b = idb + itp_b;
-            uint gpos_c = idc + itp_c;
-            gpos_a -= (gpos_a >= sys_pm_dims.x) * sys_pm_dims.x;
-            gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
-            gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
-            const uint gpos = sys_pm_dims.w +
-                              (((gpos_c * sys_pm_dims.y) + gpos_b) * sys_pm_dims.x) + gpos_a;
-            const TCALC dq = bspln_a_knots[itp_a] * bspln_b_knots[itp_b] * bspln_c_knots[itp_c] *
-                             pm_acc.fp_scale;
-            atomicAdd(&pm_acc.idata[gpos], (int)(__float2int_rn(dq)));
-            itp += map_stride;
-          }
-        }
+      case FFTMode::OUT_OF_PLACE:
+        padded_gdim_x = sys_pm_dims.x;
         break;
+      }
+      for (int k = 0; k < ORDER; k++) {
+        uint gpos_c = idc + k;
+        gpos_c -= (gpos_c >= sys_pm_dims.z) * sys_pm_dims.z;
+        const TCALC ik_dq = bspl_a_knot * bspln_c_knots[k];
+        const uint gpos_ik = sys_pm_dims.w + (gpos_c * sys_pm_dims.y * padded_gdim_x) + gpos_a;
+        switch (pm_acc.mode) {
+        case PrecisionModel::DOUBLE:
+          if (pm_acc.use_overflow) {
+            for (int j = 0; j < ORDER; j++) {
+              uint gpos_b = idb + j;
+              gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+              const uint gpos = gpos_ik + (gpos_b * padded_gdim_x);
+              const TCALC dq = ik_dq * bspln_b_knots[j];
+              atomicSplit(dq, gpos, pm_acc.lldata, pm_acc.overflow);
+            }
+          }
+          else {
+            for (int j = 0; j < ORDER; j++) {
+              uint gpos_b = idb + j;
+              gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+              const uint gpos = gpos_ik + (gpos_b * padded_gdim_x);
+              const TCALC dq = ik_dq * bspln_b_knots[j];
+              atomicAdd((ullint*)&pm_acc.lldata[gpos], (ullint)(__double2ll_rn(dq)));
+            }
+          }
+          break;
+        case PrecisionModel::SINGLE:
+          if (pm_acc.use_overflow) {
+            for (int j = 0; j < ORDER; j++) {
+              uint gpos_b = idb + j;
+              gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+              const uint gpos = gpos_ik + (gpos_b * padded_gdim_x);
+              const TCALC dq = ik_dq * bspln_b_knots[j];
+              atomicSplit(dq, gpos, pm_acc.idata, pm_acc.overflow);
+            }
+          }
+          else {
+            for (int j = 0; j < ORDER; j++) {
+              uint gpos_b = idb + j;
+              gpos_b -= (gpos_b >= sys_pm_dims.y) * sys_pm_dims.y;
+              const uint gpos = gpos_ik + (gpos_b * padded_gdim_x);
+              const TCALC dq = ik_dq * bspln_b_knots[j];
+              atomicAdd(&pm_acc.idata[gpos], __float2int_rn(dq));
+            }
+          }
+          break;
+        }
       }
     } while (BALLOT(chain_apos >= 0));
 
@@ -460,3 +437,8 @@ KERNEL_NAME(PMIGridAccumulator pm_acc, const CellGridReader<TMAT, void, TCALC, T
     SYNCWARP;
   }
 }
+
+// Release the MAPPING_BLOCKS macro
+#ifdef STORMM_USE_CUDA
+#  undef MAPPING_BLOCKS
+#endif

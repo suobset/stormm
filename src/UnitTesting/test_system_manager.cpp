@@ -420,12 +420,15 @@ const std::vector<AtomGraph*> TestSystemManager::getTopologyPointer() const {
 PhaseSpaceSynthesis TestSystemManager::exportPhaseSpaceSynthesis(const std::vector<int> &index_key,
                                                                  const double perturbation_sigma,
                                                                  const int xrs_seed,
-                                                                 const int scale_bits) const {
+                                                                 const int scale_bits,
+                                                                 const int vel_bits,
+                                                                 const int frc_bits) const {
   std::vector<AtomGraph*> ag_pointers(system_count);
   for (size_t i = 0; i < system_count; i++) {
     ag_pointers[i] = const_cast<AtomGraph*>(&all_topologies[i]);
   }
-  PhaseSpaceSynthesis result(all_coordinates, ag_pointers, index_key, scale_bits);
+  PhaseSpaceSynthesis result(all_coordinates, ag_pointers, index_key, scale_bits, 24, vel_bits,
+                             frc_bits);
   PsSynthesisWriter resr = result.data();
   Xoshiro256ppGenerator xrs(xrs_seed);
   if (fabs(perturbation_sigma) > constants::tiny) {
@@ -470,26 +473,28 @@ TestSystemManager::exportPhaseSpaceSynthesis(const std::vector<UnitCellType> &uc
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraphSynthesis TestSystemManager::exportAtomGraphSynthesis(const std::vector<int> &index_key,
-                                                               const ExceptionResponse policy) {
+AtomGraphSynthesis
+TestSystemManager::exportAtomGraphSynthesis(const std::vector<int> &index_key,
+                                            const ExceptionResponse policy) const {
   std::vector<AtomGraph*> ag_pointers(system_count);
   for (size_t i = 0; i < system_count; i++) {
-    ag_pointers[i] = &all_topologies[i];
+    ag_pointers[i] = const_cast<AtomGraph*>(&all_topologies[i]);
   }
   AtomGraphSynthesis result(ag_pointers, index_key, policy);
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraphSynthesis TestSystemManager::exportAtomGraphSynthesis(const UnitCellType uc_choice,
-                                                               const ExceptionResponse policy) {
+AtomGraphSynthesis
+TestSystemManager::exportAtomGraphSynthesis(const UnitCellType uc_choice,
+                                            const ExceptionResponse policy) const {
   return exportAtomGraphSynthesis(getQualifyingSystems(uc_choice));
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis
 TestSystemManager::exportAtomGraphSynthesis(const std::vector<UnitCellType> &uc_choice,
-                                            const ExceptionResponse policy) {
+                                            const ExceptionResponse policy) const {
   std::vector<int> all_quals;
   for (size_t i = 0; i < uc_choice.size(); i++) {
     const std::vector<int> matches = getQualifyingSystems(uc_choice[i]);

@@ -8,11 +8,13 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
+#include "Numerics/numeric_enumerators.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "hpc_valence_potential.h"
 
 namespace stormm {
@@ -29,36 +31,40 @@ using constants::twice_warp_size_int;
 using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
-using stmath::roundUp;
 using numerics::chooseAccumulationMethod;
 using numerics::AccumulationMethod;
-using numerics::max_int_accumulation;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
+using numerics::getEnumerationName;
+using stmath::roundUp;
 using symbols::asymptotic_to_one_f;
 using symbols::asymptotic_to_one_lf;
-using symbols::boltzmann_constant;
+using symbols::boltzmann_constant_f;
+using symbols::gafs_to_kcal_f;
 using symbols::inverse_one_minus_asymptote_f;
 using symbols::inverse_one_minus_asymptote_lf;
+using symbols::inverse_twopi_f;
+using symbols::kcal_to_gafs_f;
 using symbols::near_to_one_f;
 using symbols::near_to_one_lf;
 using symbols::pi;
 using symbols::pi_f;
 using symbols::twopi;
 using symbols::twopi_f;
-using symbols::inverse_twopi_f;
 using synthesis::maximum_valence_work_unit_atoms;
+using synthesis::half_valence_work_unit_atoms;
+using synthesis::quarter_valence_work_unit_atoms;
+using synthesis::eighth_valence_work_unit_atoms;
 using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
 using synthesis::vwu_abstract_length;
 using trajectory::ThermostatKind;
+using trajectory::ThermostatPartition;
 using topology::TorsionKind;
-  
-#include "Numerics/accumulation.cui"
+using topology::VirtualSiteKind;
+
+#include "Accelerator/syncwarp.cui"
 #include "Math/rounding.cui"
 #include "Math/vector_formulas.cui"
+#include "Numerics/accumulation.cui"
 #include "Trajectory/thermostat_utilities.cui"
 
 //-------------------------------------------------------------------------------------------------
@@ -311,7 +317,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Single-precision floating point definitions
 #define TCALC float
-#  define VALENCE_BLOCK_MULTIPLICITY 2
 #  define TCALC2 float2
 #  define TCALC3 float3
 #  define TCALC4 float4
@@ -330,63 +335,275 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Compile the standard kernels with all combinations of energy, and force accumulation methods.
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#      define KERNEL_NAME kfsValenceForceAccumulation
-#        include "valence_potential.cui"
-#      undef KERNEL_NAME  
-#      define UPDATE_ATOMS
-#        define KERNEL_NAME kfsValenceAtomUpdate
+#      define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_BLOCK_MULTIPLICITY 2
+#        define KERNEL_NAME kfsValenceForceAccumulationXL
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 256
+#        define VALENCE_BLOCK_MULTIPLICITY 4
+#        define KERNEL_NAME kfsValenceForceAccumulationLG
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 128
+#        define VALENCE_BLOCK_MULTIPLICITY 8
+#        define KERNEL_NAME kfsValenceForceAccumulationMD
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 64
+#        define VALENCE_BLOCK_MULTIPLICITY 16
+#        define KERNEL_NAME kfsValenceForceAccumulationSM
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define UPDATE_ATOMS
+#        define VALENCE_KERNEL_THREAD_COUNT 512
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfsValenceAtomUpdateXL
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 256
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfsValenceAtomUpdateLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 128
+#          define VALENCE_BLOCK_MULTIPLICITY 8
+#          define KERNEL_NAME kfsValenceAtomUpdateMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 16
+#          define KERNEL_NAME kfsValenceAtomUpdateSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef UPDATE_ATOMS
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
 #        define VALENCE_KERNEL_THREAD_COUNT 448
-#        define KERNEL_NAME kfsValenceForceEnergyAccumulation
-#          include "valence_potential.cui"
-#        undef KERNEL_NAME
-#        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 384
-#        define UPDATE_ATOMS
-#          define KERNEL_NAME kfsValenceEnergyAtomUpdate
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfsValenceForceEnergyAccumulationXL
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
-#        undef UPDATE_ATOMS
+#          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 224
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfsValenceForceEnergyAccumulationLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 128
+#          define VALENCE_BLOCK_MULTIPLICITY 7
+#          define KERNEL_NAME kfsValenceForceEnergyAccumulationMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 14
+#          define KERNEL_NAME kfsValenceForceEnergyAccumulationSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define UPDATE_ATOMS
+#          define VALENCE_KERNEL_THREAD_COUNT 384
+#            define VALENCE_BLOCK_MULTIPLICITY 2
+#            define KERNEL_NAME kfsValenceEnergyAtomUpdateXL
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define VALENCE_BLOCK_MULTIPLICITY 4
+#            define KERNEL_NAME kfsValenceEnergyAtomUpdateLG
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 96
+#            define VALENCE_BLOCK_MULTIPLICITY 8
+#            define KERNEL_NAME kfsValenceEnergyAtomUpdateMD
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 64
+#            define VALENCE_BLOCK_MULTIPLICITY 12
+#            define KERNEL_NAME kfsValenceEnergyAtomUpdateSM
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#        undef UPDATE_ATOMS
 #      undef COMPUTE_ENERGY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef SPLIT_FORCE_ACCUMULATION
-#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    define KERNEL_NAME kfValenceForceAccumulation
-#      include "valence_potential.cui"
-#    undef KERNEL_NAME  
-#    define UPDATE_ATOMS
-#      define KERNEL_NAME kfValenceAtomUpdate
+#    define VALENCE_KERNEL_THREAD_COUNT 512
+#      define VALENCE_BLOCK_MULTIPLICITY 2
+#      define KERNEL_NAME kfValenceForceAccumulationXL
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
-#    undef UPDATE_ATOMS
+#      undef VALENCE_BLOCK_MULTIPLICITY
 #    undef VALENCE_KERNEL_THREAD_COUNT
-#    define COMPUTE_ENERGY
-#      define VALENCE_KERNEL_THREAD_COUNT 448
-#      define KERNEL_NAME kfValenceForceEnergyAccumulation
+#    define VALENCE_KERNEL_THREAD_COUNT 256
+#      define VALENCE_BLOCK_MULTIPLICITY 4
+#      define KERNEL_NAME kfValenceForceAccumulationLG
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
-#      undef VALENCE_KERNEL_THREAD_COUNT
-#      define VALENCE_KERNEL_THREAD_COUNT 384
-#      define UPDATE_ATOMS
-#        define KERNEL_NAME kfValenceEnergyAtomUpdate
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 128
+#      define VALENCE_BLOCK_MULTIPLICITY 8
+#      define KERNEL_NAME kfValenceForceAccumulationMD
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 64
+#      define VALENCE_BLOCK_MULTIPLICITY 16
+#      define KERNEL_NAME kfValenceForceAccumulationSM
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define UPDATE_ATOMS
+#      define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_BLOCK_MULTIPLICITY 2
+#        define KERNEL_NAME kfValenceAtomUpdateXL
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
-#      undef UPDATE_ATOMS
+#        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 224
+#        define VALENCE_BLOCK_MULTIPLICITY 4
+#        define KERNEL_NAME kfValenceAtomUpdateLG
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 128
+#        define VALENCE_BLOCK_MULTIPLICITY 7
+#        define KERNEL_NAME kfValenceAtomUpdateMD
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 64
+#        define VALENCE_BLOCK_MULTIPLICITY 14
+#        define KERNEL_NAME kfValenceAtomUpdateSM
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef UPDATE_ATOMS
+#    define COMPUTE_ENERGY
+#      define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_BLOCK_MULTIPLICITY 2
+#        define KERNEL_NAME kfValenceForceEnergyAccumulationXL
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 224
+#        define VALENCE_BLOCK_MULTIPLICITY 4
+#        define KERNEL_NAME kfValenceForceEnergyAccumulationLG
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 128
+#        define VALENCE_BLOCK_MULTIPLICITY 7
+#        define KERNEL_NAME kfValenceForceEnergyAccumulationMD
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 64
+#        define VALENCE_BLOCK_MULTIPLICITY 14
+#        define KERNEL_NAME kfValenceForceEnergyAccumulationSM
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define UPDATE_ATOMS
+#        define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfValenceEnergyAtomUpdateXL
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfValenceEnergyAtomUpdateLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 96
+#          define VALENCE_BLOCK_MULTIPLICITY 8
+#          define KERNEL_NAME kfValenceEnergyAtomUpdateMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 12
+#          define KERNEL_NAME kfValenceEnergyAtomUpdateSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef UPDATE_ATOMS
 #    undef COMPUTE_ENERGY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
-#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    define KERNEL_NAME kfValenceEnergyAccumulation
-#      include "valence_potential.cui"
-#    undef KERNEL_NAME
+#    define VALENCE_KERNEL_THREAD_COUNT 512
+#      define VALENCE_BLOCK_MULTIPLICITY 2
+#      define KERNEL_NAME kfValenceEnergyAccumulationXL
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 256
+#      define VALENCE_BLOCK_MULTIPLICITY 4
+#      define KERNEL_NAME kfValenceEnergyAccumulationLG
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 128
+#      define VALENCE_BLOCK_MULTIPLICITY 8
+#      define KERNEL_NAME kfValenceEnergyAccumulationMD
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 64
+#      define VALENCE_BLOCK_MULTIPLICITY 16
+#      define KERNEL_NAME kfValenceEnergyAccumulationSM
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#      undef VALENCE_BLOCK_MULTIPLICITY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #  undef COMPUTE_ENERGY
 
@@ -394,73 +611,279 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define CLASH_FORGIVENESS
 #    define COMPUTE_FORCE
 #      define SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#        define KERNEL_NAME kfsValenceForceAccumulationNonClash
-#          include "valence_potential.cui"
-#        undef KERNEL_NAME  
+#        define VALENCE_KERNEL_THREAD_COUNT 512
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfsValenceForceAccumulationNonClashXL
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 256
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfsValenceForceAccumulationNonClashLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 128
+#          define VALENCE_BLOCK_MULTIPLICITY 8
+#          define KERNEL_NAME kfsValenceForceAccumulationNonClashMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 16
+#          define KERNEL_NAME kfsValenceForceAccumulationNonClashSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define UPDATE_ATOMS
 #          define VALENCE_KERNEL_THREAD_COUNT 448
-#          define KERNEL_NAME kfsValenceAtomUpdateNonClash
-#            include "valence_potential.cui"
-#          undef KERNEL_NAME
+#            define VALENCE_BLOCK_MULTIPLICITY 2
+#            define KERNEL_NAME kfsValenceAtomUpdateNonClashXL
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 224
+#            define VALENCE_BLOCK_MULTIPLICITY 4
+#            define KERNEL_NAME kfsValenceAtomUpdateNonClashLG
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 128
+#            define VALENCE_BLOCK_MULTIPLICITY 7
+#            define KERNEL_NAME kfsValenceAtomUpdateNonClashMD
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 64
+#            define VALENCE_BLOCK_MULTIPLICITY 14
+#            define KERNEL_NAME kfsValenceAtomUpdateNonClashSM
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef UPDATE_ATOMS
 #        define COMPUTE_ENERGY
 #          define VALENCE_KERNEL_THREAD_COUNT 384
-#          define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClash
-#            include "valence_potential.cui"
-#          undef KERNEL_NAME
-#          undef VALENCE_KERNEL_THREAD_COUNT
-#          define VALENCE_KERNEL_THREAD_COUNT 320
-#          define UPDATE_ATOMS
-#            define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClash
+#            define VALENCE_BLOCK_MULTIPLICITY 2
+#            define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClashXL
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
-#          undef UPDATE_ATOMS
+#            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define VALENCE_BLOCK_MULTIPLICITY 4
+#            define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClashLG
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 96
+#            define VALENCE_BLOCK_MULTIPLICITY 8
+#            define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClashMD
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 64
+#            define VALENCE_BLOCK_MULTIPLICITY 12
+#            define KERNEL_NAME kfsValenceForceEnergyAccumulationNonClashSM
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define UPDATE_ATOMS
+#            define VALENCE_KERNEL_THREAD_COUNT 320
+#              define VALENCE_BLOCK_MULTIPLICITY 2
+#              define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClashXL
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#              undef VALENCE_BLOCK_MULTIPLICITY
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#            define VALENCE_KERNEL_THREAD_COUNT 160
+#              define VALENCE_BLOCK_MULTIPLICITY 4
+#              define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClashLG
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#              undef VALENCE_BLOCK_MULTIPLICITY
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#            define VALENCE_KERNEL_THREAD_COUNT 128
+#              define VALENCE_BLOCK_MULTIPLICITY 5
+#              define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClashMD
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#              undef VALENCE_BLOCK_MULTIPLICITY
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#            define VALENCE_KERNEL_THREAD_COUNT 64
+#              define VALENCE_BLOCK_MULTIPLICITY 10
+#              define KERNEL_NAME kfsValenceEnergyAtomUpdateNonClashSM
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#              undef VALENCE_BLOCK_MULTIPLICITY
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#          undef UPDATE_ATOMS
 #        undef COMPUTE_ENERGY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#      define KERNEL_NAME kfValenceForceAccumulationNonClash
-#        include "valence_potential.cui"
-#      undef KERNEL_NAME  
+#      define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_BLOCK_MULTIPLICITY 2
+#        define KERNEL_NAME kfValenceForceAccumulationNonClashXL
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME  
+#        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 256
+#        define VALENCE_BLOCK_MULTIPLICITY 4
+#        define KERNEL_NAME kfValenceForceAccumulationNonClashLG
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME  
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 128
+#        define VALENCE_BLOCK_MULTIPLICITY 8
+#        define KERNEL_NAME kfValenceForceAccumulationNonClashMD
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME  
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 64
+#        define VALENCE_BLOCK_MULTIPLICITY 16
+#        define KERNEL_NAME kfValenceForceAccumulationNonClashSM
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME  
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #      define UPDATE_ATOMS
-#        define KERNEL_NAME kfValenceAtomUpdateNonClash
-#          include "valence_potential.cui"
-#        undef KERNEL_NAME
-#      undef UPDATE_ATOMS
-#      undef VALENCE_KERNEL_THREAD_COUNT
-#      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 384
-#        define KERNEL_NAME kfValenceForceEnergyAccumulationNonClash
-#          include "valence_potential.cui"
-#        undef KERNEL_NAME
-#        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 320
-#        define UPDATE_ATOMS
-#          define KERNEL_NAME kfValenceEnergyAtomUpdateNonClash
+#        define VALENCE_KERNEL_THREAD_COUNT 448
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfValenceAtomUpdateNonClashXL
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
-#        undef UPDATE_ATOMS
+#          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 224
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfValenceAtomUpdateNonClashLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 128
+#          define VALENCE_BLOCK_MULTIPLICITY 7
+#          define KERNEL_NAME kfValenceAtomUpdateNonClashMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 14
+#          define KERNEL_NAME kfValenceAtomUpdateNonClashSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef UPDATE_ATOMS
+#      define COMPUTE_ENERGY
+#        define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_BLOCK_MULTIPLICITY 2
+#          define KERNEL_NAME kfValenceForceEnergyAccumulationNonClashXL
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define VALENCE_BLOCK_MULTIPLICITY 4
+#          define KERNEL_NAME kfValenceForceEnergyAccumulationNonClashLG
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 96
+#          define VALENCE_BLOCK_MULTIPLICITY 8
+#          define KERNEL_NAME kfValenceForceEnergyAccumulationNonClashMD
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 64
+#          define VALENCE_BLOCK_MULTIPLICITY 12
+#          define KERNEL_NAME kfValenceForceEnergyAccumulationNonClashSM
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#          undef VALENCE_BLOCK_MULTIPLICITY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define UPDATE_ATOMS
+#          define VALENCE_KERNEL_THREAD_COUNT 320
+#            define VALENCE_BLOCK_MULTIPLICITY 2
+#            define KERNEL_NAME kfValenceEnergyAtomUpdateNonClashXL
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 160
+#            define VALENCE_BLOCK_MULTIPLICITY 4
+#            define KERNEL_NAME kfValenceEnergyAtomUpdateNonClashLG
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 128
+#            define VALENCE_BLOCK_MULTIPLICITY 5
+#            define KERNEL_NAME kfValenceEnergyAtomUpdateNonClashMD
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define VALENCE_KERNEL_THREAD_COUNT 64
+#            define VALENCE_BLOCK_MULTIPLICITY 10
+#            define KERNEL_NAME kfValenceEnergyAtomUpdateNonClashSM
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#            undef VALENCE_BLOCK_MULTIPLICITY
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#        undef UPDATE_ATOMS
 #      undef COMPUTE_ENERGY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef COMPUTE_FORCE
 #    define COMPUTE_ENERGY
-#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#      define KERNEL_NAME kfValenceEnergyAccumulationNonClash
-#        include "valence_potential.cui"
-#      undef KERNEL_NAME
+#      define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_BLOCK_MULTIPLICITY 2
+#        define KERNEL_NAME kfValenceEnergyAccumulationNonClashXL
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 256
+#        define VALENCE_BLOCK_MULTIPLICITY 4
+#        define KERNEL_NAME kfValenceEnergyAccumulationNonClashLG
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 128
+#        define VALENCE_BLOCK_MULTIPLICITY 8
+#        define KERNEL_NAME kfValenceEnergyAccumulationNonClashMD
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 64
+#        define VALENCE_BLOCK_MULTIPLICITY 16
+#        define KERNEL_NAME kfValenceEnergyAccumulationNonClashSM
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef COMPUTE_ENERGY
 #  undef CLASH_FORGIVENESS
 
 // Clear single-precision floating point definitions
-#  undef VALENCE_BLOCK_MULTIPLICITY
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
@@ -480,7 +903,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Double-precision floating point definitions
 #define TCALC double
 #  define VALENCE_BLOCK_MULTIPLICITY  2
-#  define VALENCE_KERNEL_THREAD_COUNT small_block_size
 #  define TCALC2 double2
 #  define TCALC3 double3
 #  define TCALC4 double4
@@ -497,6 +919,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SPLIT_FORCE_ACCUMULATION
 
 // Compile the standard kernels with all combinations of energy, and force accumulation methods.
+#  define VALENCE_KERNEL_THREAD_COUNT 256
 #  define COMPUTE_FORCE
 #    define KERNEL_NAME kdsValenceForceAccumulation
 #      include "valence_potential.cui"
@@ -527,7 +950,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Make new kernels with a clash forgiveness check.
 #  define CLASH_FORGIVENESS
 #    define COMPUTE_FORCE
-#      define VALENCE_KERNEL_THREAD_COUNT small_block_size
+#      define VALENCE_KERNEL_THREAD_COUNT 256
 #      define KERNEL_NAME kdsValenceForceAccumulationNonClash
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
@@ -580,107 +1003,19 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
-extern void valenceKernelSetup() {
-  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
-
-  // Standard routines
-  if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdate, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceAtomUpdate __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdate, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceEnergyAtomUpdate __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceForceAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceForceAccumulation __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceEnergyAccumulation __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceForceEnergyAccumulation __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceAtomUpdate, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceAtomUpdate __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdate, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceEnergyAtomUpdate __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceForceAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceForceAccumulation __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceEnergyAccumulation __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulation, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceForceEnergyAccumulation __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-
-  // Clash-damping routines
-  if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdateNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceAtomUpdateNonClash __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdateNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceEnergyAtomUpdateNonClash __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceForceAccumulationNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceForceAccumulationNonClash __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulationNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfValenceEnergyAccumulationNonClash __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulationNonClash, sms_eight) !=
-      cudaSuccess) {
-    rtErr("Error setting kfValenceForceEnergyAccumulationNonClash __shared__ memory bank size to "
-          "eight bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceAtomUpdateNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceAtomUpdateNonClash __shared__ memory bank size to eight bytes.",
-          "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdateNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceEnergyAtomUpdateNonClash __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceForceAccumulationNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceForceAccumulationNonClash __shared__ memory bank size to eight "
-          "bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulationNonClash, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdsValenceEnergyAccumulationNonClash __shared__ memory bank size to "
-          "eight bytes.", "valenceKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulationNonClash, sms_eight) !=
-      cudaSuccess) {
-    rtErr("Error setting kdsValenceForceEnergyAccumulationNonClash __shared__ memory bank size to "
-          "eight bytes.", "valenceKernelSetup");
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
+#ifdef STORMM_USE_CUDA
 extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel prec,
                                                          const EvaluateForce eval_frc,
                                                          const EvaluateEnergy eval_nrg,
                                                          const AccumulationMethod acc_meth,
                                                          const VwuGoal purpose,
-                                                         const ClashResponse collision_handling) {
+                                                         const ClashResponse collision_handling,
+                                                         const ValenceKernelSize kwidth) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes result;
+  cudaError_t cfa;
   switch (collision_handling) {
   case ClashResponse::NONE:
     switch (prec) {
@@ -691,41 +1026,26 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case EvaluateEnergy::YES:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulation);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdate);
             break;
           }
           break;
         case EvaluateEnergy::NO:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulation) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceForceAccumulation);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdate) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceAtomUpdate);
             break;
           }
           break;
         }
       case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
-                "queryValenceKernelRequirements");
-        }
+        cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation);
         break;
       }
       break;
@@ -738,16 +1058,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::SPLIT:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulation) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateSM);
+                break;
               }
               break;
             }
@@ -755,16 +1094,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::WHOLE:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulation) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdate) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateSM);
+                break;
               }
               break;
             }
@@ -776,15 +1134,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::SPLIT:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulation) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdate) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateSM);
+                break;
               }
               break;
             }
@@ -792,15 +1170,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::WHOLE:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfValenceForceAccumulation) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfValenceAtomUpdate) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateSM);
+                break;
               }
               break;
             }
@@ -810,9 +1208,19 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         }
         break;
       case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulation) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
-                "queryValenceKernelRequirements");
+        switch (kwidth) {
+        case ValenceKernelSize::XL:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationXL);
+          break;
+        case ValenceKernelSize::LG:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationLG);
+          break;
+        case ValenceKernelSize::MD:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationMD);
+          break;
+        case ValenceKernelSize::SM:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationSM);
+          break;
         }
         break;
       }
@@ -828,45 +1236,26 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case EvaluateEnergy::YES:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulationNonClash) !=
-                cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel "
-                    "kdsValenceForceEnergyAccumulationNonClash.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulationNonClash);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdateNonClash) !=
-                cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdateNonClash.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdateNonClash);
             break;
           }
           break;
         case EvaluateEnergy::NO:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulationNonClash) !=
-                cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulationNonClash.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceForceAccumulationNonClash);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdateNonClash) != cudaSuccess) {
-              rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdateNonClash.",
-                    "queryValenceKernelRequirements");
-            }
+            cfa = cudaFuncGetAttributes(&result, kdsValenceAtomUpdateNonClash);
             break;
           }
           break;
         }
       case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulationNonClash) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulationNonClash.",
-                "queryValenceKernelRequirements");
-        }
+        cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulationNonClash);
         break;
       }
       break;
@@ -879,18 +1268,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::SPLIT:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel "
-                      "kfsValenceForceEnergyAccumulationNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulationNonClashSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdateNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdateNonClashSM);
+                break;
               }
               break;
             }
@@ -898,18 +1304,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::WHOLE:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel "
-                      "kfValenceForceEnergyAccumulationNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulationNonClashSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdateNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdateNonClashSM);
+                break;
               }
               break;
             }
@@ -921,16 +1344,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::SPLIT:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulationNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceForceAccumulationNonClashSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClash) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdateNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfsValenceAtomUpdateNonClashSM);
+                break;
               }
               break;
             }
@@ -938,16 +1380,35 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           case AccumulationMethod::WHOLE:
             switch (purpose) {
             case VwuGoal::ACCUMULATE:
-              if (cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClash) !=
-                  cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceForceAccumulationNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceForceAccumulationNonClashSM);
+                break;
               }
               break;
             case VwuGoal::MOVE_PARTICLES:
-              if (cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClash) != cudaSuccess) {
-                rtErr("Error obtaining attributes for kernel kfValenceAtomUpdateNonClash.",
-                      "queryValenceKernelRequirements");
+              switch (kwidth) {
+              case ValenceKernelSize::XL:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClashXL);
+                break;
+              case ValenceKernelSize::LG:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClashLG);
+                break;
+              case ValenceKernelSize::MD:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClashMD);
+                break;
+              case ValenceKernelSize::SM:
+                cfa = cudaFuncGetAttributes(&result, kfValenceAtomUpdateNonClashSM);
+                break;
               }
               break;
             }
@@ -957,9 +1418,19 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         }
         break;
       case EvaluateForce::NO:
-        if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClash) != cudaSuccess) {
-          rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulationNonClash.",
-                "queryValenceKernelRequirements");
+        switch (kwidth) {
+        case ValenceKernelSize::XL:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClashXL);
+          break;
+        case ValenceKernelSize::LG:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClashLG);
+          break;
+        case ValenceKernelSize::MD:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClashMD);
+          break;
+        case ValenceKernelSize::SM:
+          cfa = cudaFuncGetAttributes(&result, kfValenceEnergyAccumulationNonClashSM);
+          break;
         }
         break;
       }
@@ -967,8 +1438,83 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
     }
     break;
   }
+
+  // Check for errors
+  if (cfa != cudaSuccess) {
+
+    // Construct the appropriate error message
+    std::string error_message("Error obtaining attributes for kernel k");
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      error_message += "ds";
+      break;
+    case PrecisionModel::SINGLE:
+      error_message += "f";
+      switch (acc_meth) {
+      case AccumulationMethod::SPLIT:
+        error_message += "s";
+        break;
+      case AccumulationMethod::WHOLE:
+        break;
+      case AccumulationMethod::AUTOMATIC:
+        rtErr("Kernels do not accept " + getEnumerationName(acc_meth) + " accumulation.",
+              "queryValenceKernelRequirements");
+        break;
+      }
+      break;
+    }
+    error_message += "Valence";
+    switch (eval_frc) {
+    case EvaluateForce::YES:
+      switch (eval_nrg) {
+      case EvaluateEnergy::YES:
+        switch (purpose) {
+        case VwuGoal::ACCUMULATE:
+          error_message += "ForceEnergyAccumulation";
+          break;
+        case VwuGoal::MOVE_PARTICLES:
+          error_message += "EnergyAtomUpdate";
+          break;
+        }
+        break;
+      case EvaluateEnergy::NO:
+        switch (purpose) {
+        case VwuGoal::ACCUMULATE:
+          error_message += "ForceAccumulation";
+          break;
+        case VwuGoal::MOVE_PARTICLES:
+          error_message += "AtomUpdate";
+          break;
+        }
+        break;
+      }
+      break;
+    case EvaluateForce::NO:
+      error_message += "EnergyAccumulation";
+      break;
+    }
+    switch (kwidth) {
+    case ValenceKernelSize::XL:
+      error_message += "XL";
+      break;
+    case ValenceKernelSize::LG:
+      error_message += "LG";
+      break;
+    case ValenceKernelSize::MD:
+      error_message += "MD";
+      break;
+    case ValenceKernelSize::SM:
+      error_message += "SM";
+      break;
+    }
+    error_message += ".";
+
+    // Report the error
+    rtErr(error_message, "queryValenceKernelRequirements");
+  }
   return result;
 }
+#endif
 
 //-------------------------------------------------------------------------------------------------
 extern void launchValence(const SyValenceKit<double> &poly_vk,
@@ -1090,7 +1636,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     refined_force_sum = chooseAccumulationMethod(poly_psw->frc_bits);
     break;
   }
-
+  
   // Rather than a switch over cases of the ClashResponse enumerator, just use the nonzero values
   // of either parameter to indicate that clash damping has been requested.
   if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
@@ -1105,28 +1651,113 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         case AccumulationMethod::SPLIT:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfsValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
-                                                                      *poly_psw, clash_distance,
-                                                                      clash_ratio, *scw, *gmem_r);
+
+            // Use the launch grid to determine what size the kernel is.  This requires that all
+            // "XL" kernels have > 256 threads per block, "LG" kernels have > 128 threads per
+            // block, and "MD" kernels have > 64 threads per block.  All "SM" kernels launch with
+            // 64 threads per block.
+            if (bt.y > 256) {
+              kfsValenceForceEnergyAccumulationNonClashXL<<<bt.x,
+                                                            bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw, clash_distance,
+                                                                    clash_ratio, *scw, *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfsValenceForceEnergyAccumulationNonClashLG<<<bt.x,
+                                                            bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw, clash_distance,
+                                                                    clash_ratio, *scw, *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfsValenceForceEnergyAccumulationNonClashMD<<<bt.x,
+                                                            bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw, clash_distance,
+                                                                    clash_ratio, *scw, *gmem_r);
+            }
+            else {
+              kfsValenceForceEnergyAccumulationNonClashSM<<<bt.x,
+                                                            bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw, clash_distance,
+                                                                    clash_ratio, *scw, *gmem_r);
+            }
             break;
           case EvaluateEnergy::NO:
-            kfsValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                                clash_distance, clash_ratio,
-                                                                *gmem_r);
+            if (bt.y > 256) {
+              kfsValenceForceAccumulationNonClashXL<<<bt.x,
+                                                      bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              clash_distance, clash_ratio,
+                                                              *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfsValenceForceAccumulationNonClashLG<<<bt.x,
+                                                      bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              clash_distance, clash_ratio,
+                                                              *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfsValenceForceAccumulationNonClashMD<<<bt.x,
+                                                      bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              clash_distance, clash_ratio,
+                                                              *gmem_r);
+            }
+            else {
+              kfsValenceForceAccumulationNonClashSM<<<bt.x,
+                                                      bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              clash_distance, clash_ratio,
+                                                              *gmem_r);
+            }
             break;
           }
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
-                                                                     *poly_psw, clash_distance,
-                                                                     clash_ratio, *scw, *gmem_r);
+            if (bt.y > 256) {
+              kfValenceForceEnergyAccumulationNonClashXL<<<bt.x,
+                                                           bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                   *poly_psw, clash_distance,
+                                                                   clash_ratio, *scw, *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfValenceForceEnergyAccumulationNonClashLG<<<bt.x,
+                                                           bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                   *poly_psw, clash_distance,
+                                                                   clash_ratio, *scw, *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfValenceForceEnergyAccumulationNonClashMD<<<bt.x,
+                                                           bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                   *poly_psw, clash_distance,
+                                                                   clash_ratio, *scw, *gmem_r);
+            }
+            else {
+              kfValenceForceEnergyAccumulationNonClashSM<<<bt.x,
+                                                           bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                   *poly_psw, clash_distance,
+                                                                   clash_ratio, *scw, *gmem_r);
+            }
             break;
           case EvaluateEnergy::NO:
-            kfValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                               clash_distance, clash_ratio,
-                                                               *gmem_r);
+            if (bt.y > 256) {
+              kfValenceForceAccumulationNonClashXL<<<bt.x,
+                                                     bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_distance, clash_ratio, *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfValenceForceAccumulationNonClashLG<<<bt.x,
+                                                     bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_distance, clash_ratio, *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfValenceForceAccumulationNonClashMD<<<bt.x,
+                                                     bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_distance, clash_ratio, *gmem_r);
+            }
+            else {
+              kfValenceForceAccumulationNonClashSM<<<bt.x,
+                                                     bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             clash_distance, clash_ratio, *gmem_r);
+            }
             break;
           }
           break;
@@ -1135,9 +1766,26 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         }
         break;
       case EvaluateForce::NO:
-        kfValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                            clash_distance, clash_ratio,
-                                                            *scw, *gmem_r);
+        if (bt.y > 256) {
+          kfValenceEnergyAccumulationNonClashXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                clash_distance, clash_ratio, *scw,
+                                                                *gmem_r);
+        }
+        else if (bt.y > 128) {
+          kfValenceEnergyAccumulationNonClashLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                clash_distance, clash_ratio, *scw,
+                                                                *gmem_r);
+        }
+        else if (bt.y > 64) {
+          kfValenceEnergyAccumulationNonClashMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                clash_distance, clash_ratio, *scw,
+                                                                *gmem_r);
+        }
+        else {
+          kfValenceEnergyAccumulationNonClashSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                clash_distance, clash_ratio, *scw,
+                                                                *gmem_r);
+        }
         break;
       }
       break;
@@ -1151,28 +1799,104 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
       case AccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                             clash_distance, clash_ratio,
-                                                             poly_auk, *tstw, *scw, *gmem_r);
+          if (bt.y > 256) {
+            kfsValenceEnergyAtomUpdateNonClashXL<<<bt.x,
+                                                   bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfsValenceEnergyAtomUpdateNonClashLG<<<bt.x,
+                                                   bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfsValenceEnergyAtomUpdateNonClashMD<<<bt.x,
+                                                   bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *scw, *gmem_r);
+          }
+          else {
+            kfsValenceEnergyAtomUpdateNonClashSM<<<bt.x,
+                                                   bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *scw, *gmem_r);
+          }
           break;
         case EvaluateEnergy::NO:
-          kfsValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                       clash_distance, clash_ratio, poly_auk,
-                                                       *tstw, *gmem_r);
+          if (bt.y > 256) {
+            kfsValenceAtomUpdateNonClashXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfsValenceAtomUpdateNonClashLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfsValenceAtomUpdateNonClashMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *gmem_r);
+          }
+          else {
+            kfsValenceAtomUpdateNonClashSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           clash_distance, clash_ratio, poly_auk,
+                                                           *tstw, *gmem_r);
+          }
           break;
         }
         break;
       case AccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                            clash_distance, clash_ratio, poly_auk,
-                                                            *tstw, *scw, *gmem_r);
+          if (bt.y > 256) {
+            kfValenceEnergyAtomUpdateNonClashXL<<<bt.x,
+                                                  bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfValenceEnergyAtomUpdateNonClashLG<<<bt.x,
+                                                  bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfValenceEnergyAtomUpdateNonClashMD<<<bt.x,
+                                                  bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw, *scw, *gmem_r);
+          }
+          else {
+            kfValenceEnergyAtomUpdateNonClashSM<<<bt.x,
+                                                  bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw, *scw, *gmem_r);
+          }
           break;
         case EvaluateEnergy::NO:
-          kfValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                      clash_distance, clash_ratio, poly_auk, *tstw,
-                                                      *gmem_r);
+          if (bt.y > 256) {
+            kfValenceAtomUpdateNonClashXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw,*gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfValenceAtomUpdateNonClashLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw,*gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfValenceAtomUpdateNonClashMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw,*gmem_r);
+          }
+          else {
+            kfValenceAtomUpdateNonClashSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          clash_distance, clash_ratio, poly_auk,
+                                                          *tstw,*gmem_r);
+          }
           break;
         }
         break;
@@ -1193,24 +1917,80 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         case AccumulationMethod::SPLIT:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                              *scw, *gmem_r);
+            if (bt.y > 256) {
+              kfsValenceForceEnergyAccumulationXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, *scw, *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfsValenceForceEnergyAccumulationLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, *scw, *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfsValenceForceEnergyAccumulationMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, *scw, *gmem_r);
+            }
+            else {
+              kfsValenceForceEnergyAccumulationSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, *scw, *gmem_r);
+            }
             break;
           case EvaluateEnergy::NO:
-            kfsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                        *gmem_r);
+            if (bt.y > 256) {
+              kfsValenceForceAccumulationXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfsValenceForceAccumulationLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfsValenceForceAccumulationMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *gmem_r);
+            }
+            else {
+              kfsValenceForceAccumulationSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *gmem_r);
+            }
             break;
           }
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                             *scw, *gmem_r);
+            if (bt.y > 256) {
+              kfValenceForceEnergyAccumulationXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, *scw, *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfValenceForceEnergyAccumulationLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, *scw, *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfValenceForceEnergyAccumulationMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, *scw, *gmem_r);
+            }
+            else {
+              kfValenceForceEnergyAccumulationSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, *scw, *gmem_r);
+            }
             break;
           case EvaluateEnergy::NO:
-            kfValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                       *gmem_r);
+            if (bt.y > 256) {
+              kfValenceForceAccumulationXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *gmem_r);
+            }
+            else if (bt.y > 128) {
+              kfValenceForceAccumulationLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *gmem_r);
+            }
+            else if (bt.y > 64) {
+              kfValenceForceAccumulationMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *gmem_r);
+            }
+            else {
+              kfValenceForceAccumulationSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *gmem_r);
+            }
             break;
           }
           break;
@@ -1219,8 +1999,22 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         }
         break;
       case EvaluateForce::NO:
-        kfValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                    *gmem_r);
+        if (bt.y > 256) {
+          kfValenceEnergyAccumulationXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                        *gmem_r);
+        }
+        else if (bt.y > 128) {
+          kfValenceEnergyAccumulationLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                        *gmem_r);
+        }
+        else if (bt.y > 64) {
+          kfValenceEnergyAccumulationMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                        *gmem_r);
+        }
+        else {
+          kfValenceEnergyAccumulationSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                        *gmem_r);
+        }
         break;
       }
       break;
@@ -1231,24 +2025,80 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
       case AccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
-                                                     *tstw, *scw, *gmem_r);
+          if (bt.y > 256) {
+            kfsValenceEnergyAtomUpdateXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfsValenceEnergyAtomUpdateLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfsValenceEnergyAtomUpdateMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else {
+            kfsValenceEnergyAtomUpdateSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         poly_auk, *tstw, *scw, *gmem_r);
+          }
           break;
         case EvaluateEnergy::NO:
-          kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
-                                               *gmem_r);
+          if (bt.y > 256) {
+            kfsValenceAtomUpdateXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfsValenceAtomUpdateLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfsValenceAtomUpdateMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *gmem_r);
+          }
+          else {
+            kfsValenceAtomUpdateSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *gmem_r);
+          }
           break;
         }
         break;
       case AccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
-                                                    *tstw, *scw, *gmem_r);
+          if (bt.y > 256) {
+            kfValenceEnergyAtomUpdateXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                        poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfValenceEnergyAtomUpdateLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                        poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfValenceEnergyAtomUpdateMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                        poly_auk, *tstw, *scw, *gmem_r);
+          }
+          else {
+            kfValenceEnergyAtomUpdateSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                        poly_auk, *tstw, *scw, *gmem_r);
+          }
           break;
         case EvaluateEnergy::NO:
-          kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
-                                              *gmem_r);
+          if (bt.y > 256) {
+            kfValenceAtomUpdateXL<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                  *tstw, *gmem_r);
+          }
+          else if (bt.y > 128) {
+            kfValenceAtomUpdateLG<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                  *tstw, *gmem_r);
+          }
+          else if (bt.y > 64) {
+            kfValenceAtomUpdateMD<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                  *tstw, *gmem_r);
+          }
+          else {
+            kfValenceAtomUpdateSM<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                  *tstw, *gmem_r);
+          }
           break;
         }
         break;

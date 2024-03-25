@@ -88,7 +88,7 @@ kScoreCardSumEnergy(const int system_count, const int sample_count, llint* inst_
           i == (int)(StateVariable::IMPROPER_DIHEDRAL) || i == (int)(StateVariable::BOND) || 
           i == (int)(StateVariable::UREY_BRADLEY) || i == (int)(StateVariable::ELECTROSTATIC) ||
           i == (int)(StateVariable::CHARMM_IMPROPER) || i == (int)(StateVariable::CMAP) ||
-          i == (int)(StateVariable::ELECTROSTATIC_ONE_FOUR) || i == (int)(StateVariable::VDW) ||
+          i == (int)(StateVariable::ELEC_ONE_FOUR) || i == (int)(StateVariable::VDW) ||
           i == (int)(StateVariable::VDW_ONE_FOUR) || i == (int)(StateVariable::RESTRAINT) ||
           i == (int)(StateVariable::GENERALIZED_BORN)) {
         tot_nrg += inst_acc[slot];
@@ -125,7 +125,7 @@ kScoreCardSumEnergy(const int system_count, const int sample_count, llint* inst_
             j == (int)(StateVariable::IMPROPER_DIHEDRAL) || j == (int)(StateVariable::BOND) ||
             j == (int)(StateVariable::UREY_BRADLEY) || j == (int)(StateVariable::ELECTROSTATIC) ||
             j == (int)(StateVariable::CHARMM_IMPROPER) || j == (int)(StateVariable::CMAP) ||
-            j == (int)(StateVariable::ELECTROSTATIC_ONE_FOUR) || j == (int)(StateVariable::VDW) ||
+            j == (int)(StateVariable::ELEC_ONE_FOUR) || j == (int)(StateVariable::VDW) ||
             j == (int)(StateVariable::VDW_ONE_FOUR) || j == (int)(StateVariable::RESTRAINT) ||
             j == (int)(StateVariable::GENERALIZED_BORN)) {
           tot_nrg += time_ser_acc[batch_offset + batch_pos];

@@ -200,6 +200,10 @@ public:
   ///        the constructor.
   std::vector<BoundedRestraint> getRestraintList() const;
 
+  /// \brief Get a const pointer to the object itself, in case the object has been passed by const
+  ///        reference.
+  const RestraintApparatus* getSelfPointer() const;
+  
   /// \brief Add restraints to the apparatus.
   ///
   /// Overloaded:

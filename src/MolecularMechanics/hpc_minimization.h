@@ -123,7 +123,7 @@ void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
 /// \param launcher         Holds parameters for all kernels, will be accessed for the correct
 ///                         launch configurations of the kernels relevant to the workload at hand
 /// \{
-void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+void launchMinimization(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                         const StaticExclusionMaskSynthesis &poly_se,
                         PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                         MolecularMechanicsControls *mmctrl_fe,
@@ -134,7 +134,7 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         CacheResource *vale_cdfe_cache, CacheResource *vale_cdxe_cache,
                         CacheResource *nonb_cache, CacheResource *nonb_cd_cache,
                         ImplicitSolventWorkspace *ism_space, ReductionBridge *rbg,
-                        LineMinimization *line_record, const AccumulationMethod acc_meth,
+                        LineMinimization *line_record, AccumulationMethod acc_meth,
                         const GpuDetails &gpu, const CoreKlManager &launcher,
                         StopWatch *timer = nullptr,
                         const std::string &task_name = std::string(""));

@@ -5,12 +5,6 @@
 namespace stormm {
 namespace energy {
 
-using numerics::max_int_accumulation_ll;
-using numerics::max_int_accumulation;
-using numerics::max_int_accumulation_f;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
-
 #include "Numerics/accumulation.cui"
 
 /// \brief Initialize a series of particle-mesh interaction grids by setting all density values to
@@ -27,7 +21,15 @@ using numerics::max_llint_accumulation_f;
 __global__ void __launch_bounds__(large_block_size, 1)
 kInitialize(PMIGridAccumulator pm_acc) {
   const uint4 fdims = pm_acc.dims[pm_acc.nsys - 1];
-  const size_t final_index = fdims.w + (fdims.x * fdims.y * fdims.z);
+  size_t final_index;
+  switch (pm_acc.fftm) {
+  case FFTMode::IN_PLACE:
+    final_index = fdims.w + (2 * ((fdims.x / 2) + 1) * fdims.y * fdims.z);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    final_index = fdims.w + (fdims.x * fdims.y * fdims.z);
+    break;
+  }
   const size_t stride = blockDim.x * gridDim.x;
   switch (pm_acc.mode) {
   case PrecisionModel::DOUBLE:
@@ -67,7 +69,15 @@ extern void launchPMIGridInitialization(PMIGridAccumulator *pm_acc, const int bl
 __global__ void __launch_bounds__(large_block_size, 1)
 kConvertToReal(PMIGridWriter pm_wrt, const PMIGridAccumulator pm_acc) {
   const uint4 fdims = pm_acc.dims[pm_acc.nsys - 1];
-  const size_t final_index = fdims.w + (fdims.x * fdims.y * fdims.z);
+  size_t final_index;
+  switch (pm_acc.fftm) {
+  case FFTMode::IN_PLACE:
+    final_index = fdims.w + (2 * ((fdims.x / 2) + 1) * fdims.y * fdims.z);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    final_index = fdims.w + (fdims.x * fdims.y * fdims.z);
+    break;
+  }
   const size_t stride = blockDim.x * gridDim.x;
   const size_t first_index = threadIdx.x + (blockDim.x * blockIdx.x);
   switch (pm_acc.mode) {

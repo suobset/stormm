@@ -21,6 +21,7 @@
 namespace stormm {
 namespace namelist {
 
+using energy::EnergySample;
 using energy::StateVariable;
 using parse::TextFile;
 using parse::WrapTextSearch;
@@ -35,6 +36,7 @@ constexpr int default_common_path_threshold = 4;
 constexpr int default_energy_decimal_places = 4;
 constexpr double default_energy_outlier_sigmas = 3.0;
 constexpr int default_outlier_limit = 4;
+constexpr char default_report_variable_name[] = "stormm";
 /// \}
 
 /// \brief Collect output directives relating to the diagnostics file.  While the output frequency
@@ -78,9 +80,17 @@ public:
   ///        reduction?
   OutputScope getOutputScope() const;
 
+  /// \brief Get the type of energy or state variable sampling (mean, time series, final value).
+  EnergySample getEnergySamplingMethod() const;
+
+  /// \brief Get the method for grouping systems.
+  
   /// \brief Get the name of the user responsible for generating the results.
   const std::string& getUsername() const;
 
+  /// \brief Get the (base) name of the matrix variable under which to store results.
+  const std::string& getReportVariable() const;
+  
   /// \brief Get the date on which the program began to run, taken as the time that this
   ///        ReportControls object was constructed.
   timeval getStartDate() const;
@@ -163,12 +173,30 @@ public:
   void setOutputScope(const std::string &report_scope_in);
   /// \}
 
+  /// \brief Set the method for reporting samples of system state variables.
+  ///
+  /// Overloaded:
+  ///   - Supply the enumeration directly.
+  ///   - Supply a string that can be translate into the enumeration.
+  ///
+  /// \param state_sampling_in  The sampling method to set
+  /// \{
+  void setStateSampling(EnergySample state_sampling_in);
+  void setStateSampling(const std::string &state_sampling_in);
+  /// \}
+  
   /// \brief Set the username.
   ///
   /// \param username_in  A username reported in the input file, not detected automatically from
   ///                     the environment (as is the default behavior)
   void setUsername(const std::string &username_in);
 
+  /// \brief Set the name of the matrix variable for reporting state quantities (volume,
+  ///        temperature, energy components).
+  ///
+  /// \param report_variable_in  The base name of the matrix variable to use
+  void setReportVariable(const std::string &report_variable_in);
+  
   /// \brief Set the preference for printing wall clock timings.
   ///
   /// Overloaded:
@@ -233,7 +261,12 @@ private:
   OutputSyntax report_layout;   ///< Layout of the diagnostics report file, making it amenable to
                                 ///<   one or more plotting or matrix analysis programs
   OutputScope report_scope;     ///< Detail in which to report each system's results
+  EnergySample state_sampling;  ///< The method for sampling and reporting state variables in the
+                                ///<   system.
   std::string username;         ///< Name of the user (detected automatically)
+  std::string report_variable;  ///< Name of the variable under which to file results for
+                                ///<   simulation diagnostics (this is appended with various state
+                                ///<   variable names, as appropriate)
   timeval start_date;           ///< Date and time on which this object was constructed, which will
                                 ///<   be taken as a good approximation of the date and time on
                                 ///<   which the calling program was executed.
@@ -268,6 +301,12 @@ private:
   ///
   /// \param inpstr  The user input
   std::vector<StateVariable> translateEnergyComponent(const std::string &inpstr);
+
+  /// \brief Translate a user-supplied string into one or more state variables (pressure,
+  ///        temperature, volume, or subclassefs of each).
+  ///
+  /// \param inpstr  The user input
+  std::vector<StateVariable> translateStateQuantity(const std::string &inpstr);
   
   /// \brief Translate the namelist STRUCT input for an SD file data item into the internal object
   ///        encoding such a request.

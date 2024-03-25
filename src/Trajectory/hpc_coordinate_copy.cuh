@@ -3,6 +3,7 @@
 #define STORMM_HPC_COORDINATE_COPY_CUH
 
 #include "Accelerator/gpu_details.h"
+#include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Numerics/split_fixed_precision.h"
@@ -14,11 +15,7 @@ namespace stormm {
 namespace trajectory {
 
 using card::GpuDetails;
-using numerics::max_int_accumulation;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
-using numerics::max_llint_accumulation_f;
+using constants::PrecisionModel;
 using synthesis::CondensateWriter;
 using synthesis::CondensateReader;
 using synthesis::PsSynthesisWriter;

@@ -1,6 +1,11 @@
 // -*-c++-*-
 #include "copyright.h"
 
+#ifdef STORMM_USE_CUDA
+#  if (__CUDA_ARCH__ == 700 || __CUDA_ARCH__ >= 800)
+#    define LARGE_CHIP_CACHE
+#  endif
+#endif
 #define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 
 /// \brief Compute the Generalized Born radii for all particles in all systems.
@@ -23,6 +28,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ TCALC sh_tile_tpts[small_block_max_imports];
   __shared__ TCALC sh_sum_deijda[small_block_max_atoms];
   __shared__ TCALC sh_screen[small_block_max_atoms];
+#ifdef LARGE_CHIP_CACHE
+  __shared__ llint sh_xcrd[small_block_max_atoms];
+  __shared__ llint sh_ycrd[small_block_max_atoms];
+  __shared__ llint sh_zcrd[small_block_max_atoms];
+#endif
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_xfrc[small_block_max_atoms];
@@ -37,6 +47,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ llint sh_zfrc[small_block_max_atoms];
 #  endif
 #else
+#  ifdef LARGE_CHIP_CACHE
+  __shared__ int sh_xcrd_overflow[small_block_max_atoms];
+  __shared__ int sh_ycrd_overflow[small_block_max_atoms];
+  __shared__ int sh_zcrd_overflow[small_block_max_atoms];
+#  endif
   __shared__ llint sh_xfrc[small_block_max_atoms];
   __shared__ llint sh_yfrc[small_block_max_atoms];
   __shared__ llint sh_zfrc[small_block_max_atoms];
@@ -162,13 +177,30 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     // Load the usual coordinates, plus the screening factors.  This is done after the initial,
     // lengthy reading process to backfill idle threads and keep the memory bus load consistent.
 #ifdef TCALC_IS_SINGLE
+#  ifdef LARGE_CHIP_CACHE
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, sh_xcrd, sh_tile_xcog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.ycrd, sh_ycrd, sh_tile_ycog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, sh_zcrd, sh_tile_zcog,
+                              poly_psw.gpos_scale_f);
+#  else
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
                               sh_tile_xcog, poly_psw.gpos_scale_f);
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
                               sh_tile_ycog, poly_psw.gpos_scale_f);
     pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
                               sh_tile_zcog, poly_psw.gpos_scale_f);
+#  endif
 #else
+#  ifdef LARGE_CHIP_CACHE
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, sh_xcrd, poly_psw.xcrd_ovrf,
+                              sh_xcrd_overflow, sh_tile_xcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.ycrd, sh_ycrd, poly_psw.ycrd_ovrf,
+                              sh_ycrd_overflow, sh_tile_ycog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, sh_zcrd, poly_psw.zcrd_ovrf,
+                              sh_zcrd_overflow, sh_tile_zcog, poly_psw.gpos_scale);
+#  else
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
                               poly_psw.xcrd_ovrf, &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET],
                               sh_tile_xcog, poly_psw.gpos_scale);
@@ -178,6 +210,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
                               poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
                               sh_tile_zcog, poly_psw.gpos_scale);
+#  endif
 #endif
     pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
     while (pos < 6 * padded_import_count) {
@@ -251,25 +284,44 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
                            inv_tile_pts;
       const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
                            inv_tile_pts;
+#ifdef LARGE_CHIP_CACHE
+      int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
+      const size_t sh_read_idx = read_idx;
+      read_idx += EXCL_GMEM_OFFSET;
+#else
       int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
                       ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
                       EXCL_GMEM_OFFSET;
+#endif
 #ifdef TCALC_IS_SINGLE
       const llint x_center = LLCONV_FUNC(tx_cog);
       const llint y_center = LLCONV_FUNC(ty_cog);
       const llint z_center = LLCONV_FUNC(tz_cog);
+#  ifdef LARGE_CHIP_CACHE
+      const TCALC t_xcrd   = (TCALC)(sh_xcrd[sh_read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(sh_ycrd[sh_read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(sh_zcrd[sh_read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#  else
       const TCALC t_xcrd   = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
       const TCALC t_ycrd   = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#  endif
 #else
       // Convert the negative values of the center-of-geometry coordinates so that the result
       // can feed into splitFPSum() (which adds A + B).
       const int95_t x_center = doubleToInt95(-tx_cog);
       const int95_t y_center = doubleToInt95(-ty_cog);
       const int95_t z_center = doubleToInt95(-tz_cog);
+#  ifdef LARGE_CHIP_CACHE
+      const int95_t x_atom   = { sh_xcrd[sh_read_idx], sh_xcrd_overflow[sh_read_idx] };
+      const int95_t y_atom   = { sh_ycrd[sh_read_idx], sh_ycrd_overflow[sh_read_idx] };
+      const int95_t z_atom   = { sh_zcrd[sh_read_idx], sh_zcrd_overflow[sh_read_idx] };
+#  else
       const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
       const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
       const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
+#  endif
       const int95_t x95_tmp  = splitFPSum(x_atom, x_center);
       const int95_t y95_tmp  = splitFPSum(y_atom, y_center);
       const int95_t z95_tmp  = splitFPSum(z_atom, z_center);
@@ -503,4 +555,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   }
 }
 
+// Clear definitions needed for this instance of the kernel
+#ifdef STORMM_USE_CUDA
+#  if (__CUDA_ARCH__ == 700 || __CUDA_ARCH__ >= 800)
+#    undef LARGE_CHIP_CACHE
+#  endif
+#endif
 #undef EXCL_GMEM_OFFSET

@@ -1579,8 +1579,8 @@ int main(const int argc, const char* argv[]) {
         "detected between random number series created starting from the same seed.");
   check(mean(result_a), RelationalOperator::EQUAL, Approx(0.49674889).margin(1.0e-7), "The mean "
 	"of a set of " + std::to_string(n_pts) + " random numbers is incorrect.");
-  check(mean(result_c), RelationalOperator::EQUAL, Approx(-0.01931485).margin(1.0e-7), "The mean "
-        "value of a normal distribution of random numbers is incorrect.");
+  check(mean(result_c), RelationalOperator::EQUAL, Approx(-0.022698028552).margin(1.0e-7),
+        "The mean value of a normal distribution of random numbers is incorrect.");
 
   // Additional checks, using the file reference system
   const std::string randoms_snp = oe.getStormmSourcePath() + osSeparator() + "test" +
@@ -2395,6 +2395,26 @@ int main(const int argc, const char* argv[]) {
   check(c_init, RelationalOperator::EQUAL, zbins, "Initial seedings of particles along the unit "
         "cell C axis were not computed as expected.");
 
+  // Check the methods for backing out angles relative to the abscissa based on two-dimensional
+  // coordinates.
+  std::vector<double> recovered_angles(200), recovered_angles_f(200), angles_ans(200);
+  for (int i = 0; i < 200; i++) {
+    const double angle_i = (static_cast<double>(i - 100) + 0.5) * pi / 100.0;
+    const double range_i = (0.9 * xrs128p.uniformRandomNumber()) + 0.1;
+    const double x_point = range_i * cos(angle_i);
+    const double y_point = range_i * sin(angle_i);
+    recovered_angles[i] = angleOnAxes(x_point, y_point);
+    recovered_angles_f[i] = angleOnAxesf(x_point, y_point);
+    angles_ans[i] = angle_i;
+  }
+  check(recovered_angles, RelationalOperator::EQUAL, angles_ans, "Angles back-calculated from a "
+        "series of points arranged about a set of two-dimensional axes do not obtain the original "
+        "values of the angles that generated them.");
+  check(recovered_angles_f, RelationalOperator::EQUAL, Approx(angles_ans).margin(4.5e-6),
+        "Angles back-calculated from a series of points arranged about a set of two-dimensional "
+        "axes do not obtain the original values of the angles that generated them.  The "
+        "single-precision mode of the function was used in this test.");
+  
   // Check the application of a sorted template
   const int nwild = 10;
   std::vector<int2> wildcards(nwild);
@@ -2427,6 +2447,26 @@ int main(const int argc, const char* argv[]) {
         "expected.");
   check(sorted_association, RelationalOperator::EQUAL, sorted_assoc_ii, "Ordering an array based "
         "on the extracted ordering from an assoicated sort does not produce the expected result.");
+
+  // Check the partitioning of some numbers
+  const std::vector<int> preferred_lengths = { 15, 13, 11, 9, 7, 5 };
+  const std::vector<int> discouraged_lengths = { 12, 10, 8, 6, 4, 3 };
+  std::vector<int> segments = partition(23, 16, preferred_lengths, discouraged_lengths);
+  const std::vector<int> segments_ans_a = { 15, 7, 1 };
+  check(segments, RelationalOperator::EQUAL, segments_ans_a, "The partitioning of 23 did not "
+        "return the expected result.");
+  segments = partition(27, 11, preferred_lengths, discouraged_lengths);
+  const std::vector<int> segments_ans_b = { 9, 9, 9 };
+  check(segments, RelationalOperator::EQUAL, segments_ans_b, "The partitioning of 27 did not "
+        "return the expected result.");
+  segments = partition(23, 23, preferred_lengths, discouraged_lengths);
+  const std::vector<int> segments_ans_c = { 23 };
+  check(segments, RelationalOperator::EQUAL, segments_ans_c, "The partitioning of 23 with a "
+        "maximum value of 23 did not return the expected result.");
+  segments = partition(29, 14, preferred_lengths, discouraged_lengths);
+  const std::vector<int> segments_ans_d = { 13, 13, 3 };
+  check(segments, RelationalOperator::EQUAL, segments_ans_d, "The partitioning of 29 did not "
+        "return the expected result.");
   
   // Print results
   printTestSummary(oe.getVerbosity());

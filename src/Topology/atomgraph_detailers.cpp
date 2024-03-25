@@ -346,14 +346,14 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   }
   const int ncnst_val = cnst_table.cnst_parameter_list.size();
   std::vector<double> tmp_cnst_inv_masses(ncnst_val);
-  std::vector<double> tmp_cnst_target_lengths(ncnst_val);
+  std::vector<double> tmp_cnst_squared_lengths(ncnst_val);
   std::vector<float> sp_tmp_cnst_inv_masses(ncnst_val);
-  std::vector<float> sp_tmp_cnst_target_lengths(ncnst_val);
-  for (int i = 0; i < cnst_table.cnst_parameter_count; i++) {
+  std::vector<float> sp_tmp_cnst_squared_lengths(ncnst_val);
+  for (int i = 0; i < ncnst_val; i++) {
     tmp_cnst_inv_masses[i]        = cnst_table.cnst_parameter_list[i].x;
-    tmp_cnst_target_lengths[i]    = cnst_table.cnst_parameter_list[i].y;
+    tmp_cnst_squared_lengths[i]    = cnst_table.cnst_parameter_list[i].y;
     sp_tmp_cnst_inv_masses[i]     = cnst_table.cnst_parameter_list[i].x;
-    sp_tmp_cnst_target_lengths[i] = cnst_table.cnst_parameter_list[i].y;
+    sp_tmp_cnst_squared_lengths[i] = cnst_table.cnst_parameter_list[i].y;
   }
   dc = settle_mormt.putHost(&double_data, tmp_settle_mormt, dc, warp_size_zu);
   dc = settle_mhrmt.putHost(&double_data, tmp_settle_mhrmt, dc, warp_size_zu);
@@ -362,7 +362,8 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   dc = settle_rc.putHost(&double_data, tmp_settle_rc, dc, warp_size_zu);
   dc = settle_invra.putHost(&double_data, tmp_settle_invra, dc, warp_size_zu);  
   dc = constraint_inverse_masses.putHost(&double_data, tmp_cnst_inv_masses, dc, warp_size_zu);
-  dc = constraint_target_lengths.putHost(&double_data, tmp_cnst_target_lengths, dc, warp_size_zu);
+  dc = constraint_squared_lengths.putHost(&double_data, tmp_cnst_squared_lengths, dc,
+                                          warp_size_zu);
   dc = solty_info.putHost(&double_data, tmp_solty_info, dc, warp_size_zu);
   dc = hbond_a_values.putHost(&double_data, tmp_hbond_a_values, dc, warp_size_zu);
   dc = hbond_b_values.putHost(&double_data, tmp_hbond_b_values, dc, warp_size_zu);
@@ -489,7 +490,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   fc = sp_settle_rc.putHost(&float_data, sp_tmp_settle_rc, fc, warp_size_zu);
   fc = sp_settle_invra.putHost(&float_data, sp_tmp_settle_invra, fc, warp_size_zu);
   fc = sp_constraint_inverse_masses.putHost(&float_data, sp_tmp_cnst_inv_masses, fc, warp_size_zu);
-  fc = sp_constraint_target_lengths.putHost(&float_data, sp_tmp_cnst_target_lengths, fc,
+  fc = sp_constraint_squared_lengths.putHost(&float_data, sp_tmp_cnst_squared_lengths, fc,
                                             warp_size_zu);
   
   // Do the same for char4 Hybrid POINTER-kind objects
@@ -1259,6 +1260,21 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   constraint_group_count = cnst_table.cnst_group_count;
   settle_parameter_count = cnst_table.settle_parameter_count;
   constraint_parameter_count = cnst_table.cnst_parameter_count;
+
+  // Count the degrees of freedom, with and without constraints
+  unconstrained_dof = (3 * (atom_count - vsite_table.vs_count));
+  switch (periodic_box_class) {
+  case UnitCellType::NONE:
+    unconstrained_dof -= 6;
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    unconstrained_dof -= 3;
+    break;
+  }
+  constrained_dof = unconstrained_dof - (3 * cnst_table.settle_group_count) -
+                    (cnst_table.cnst_group_bounds[cnst_table.cnst_group_count] -
+                     cnst_table.cnst_group_count);
   
   // Transfer data from the CPU-bound std::vectors and unguarded structs into HPC-capable Hybrid
   // objects.

@@ -54,9 +54,9 @@ enum class TrajectoryKind {
 ///        present, and what was past becomes the staging ground for the forthcoming future
 ///        configuration.
 enum class CoordinateCycle {
-  ALTERNATE, ///< Set the prior positions arrays (x_prior_coordinates...) as holding the current
-             ///<   coordinates.
-  PRIMARY    ///< Set the typical positions arrays (x_coordinates...) as current
+  BLACK, ///< Set the alternate positions arrays (x_alt_coordinates...) as holding the current
+         ///<   coordinates.
+  WHITE  ///< Set the typical positions arrays (x_coordinates...) as current
 };
 
 /// \brief Differentiate between fixed-column and free-format (but ordered) files.
@@ -83,6 +83,52 @@ enum class TrajectoryFusion {
         ///<   grouped under the same label
 };
 
+/// \brief Enumerate the various thermostats available for simulations
+enum class ThermostatKind {
+  NONE,      ///< No thermostating takes place.  The simulation explores a microcanonical "NVE"
+             ///<   ensemble.
+  ANDERSEN,  ///< Andersen thermostating, with periodic velocity reassignments of all particles,
+             ///<   is in effect.
+  LANGEVIN,  ///< Langevin thermostating, with constant velocity adjustments of all particles,
+             ///<   is in effect.
+  BERENDSEN  ///< Berendsen thermostating, with velocity rescaling and all of the problems it
+             ///<   might confer, is in effect.
+};
+
+/// \brief Enumerate the ways in which different atoms of one or more simulations may have unique
+///        temperature baths.
+enum class ThermostatPartition {
+  COMMON,   ///< All atoms of the one system or multiple systems share a common temperature bath.
+            ///<   Its initial and final temperatures may differ.
+  SYSTEMS,  ///< Different systems of a synthesis will each have their own unique temperature
+            ///<   baths.  Each system may have a unique initial and final temperature.
+  ATOMS     ///< Individual atoms may have their own temperature baths.  In most cases this will be
+            ///<   used to hold the protein and solvent at different temperatures.
+};
+
+/// \brief Due to its random nature, the velocity initialization may not set a system at the exact
+///        temperature requested by the applied Andersen thermostat.  Enumerate the options for
+///        enforcing a particular temperature.
+enum class EnforceExactTemperature {
+  YES,  ///< The exact temperature will be enforced by a Berendesen velocity rescaling with
+        ///<   infinite coupling strength
+  NO    ///< The exact temperature will be enforce
+};
+
+/// \brief List the basic stages of the integration time step, to aid in differentiating them
+///        across various routines.
+enum class IntegrationStage {
+  VELOCITY_ADVANCE,     ///< Adjust the velocities one half time step according to the forces at
+                        ///<   hand.
+  VELOCITY_CONSTRAINT,  ///< Adjust the velocities of particles to ensure that those involved in
+                        ///<   constrained bonds move orthogonally to their bond axes.
+  POSITION_ADVANCE,     ///< Finalize the velocities with one more advancement based on the current
+                        ///<   forces, then advance the particle positions based on the velocities
+                        ///<   at hand.
+  GEOMETRY_CONSTRAINT   ///< Apply geometric constraints to bond lengths, with commensurate
+                        ///<   velocity adjustments if required.
+};
+
 /// \brief Produce a description of the coordinate file kind.
 ///
 /// \param cfkind  The enumerator instance of interest
@@ -99,10 +145,15 @@ std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind);
 /// \{
 std::string getEnumerationName(CoordinateFileKind cfkind);
 std::string getEnumerationName(AncdfVariable key);
-std::string getEnumerationName(CoordinateFileRole cpkind);
-std::string getEnumerationName(TrajectoryFusion protocol);
 std::string getEnumerationName(TrajectoryKind input);
 std::string getEnumerationName(CoordinateCycle orientation);
+std::string getEnumerationName(CoordinateLineFormat input);
+std::string getEnumerationName(CoordinateFileRole cpkind);
+std::string getEnumerationName(TrajectoryFusion protocol);
+std::string getEnumerationName(ThermostatKind input);
+std::string getEnumerationName(ThermostatPartition input);
+std::string getEnumerationName(EnforceExactTemperature input);
+std::string getEnumerationName(IntegrationStage input);
 /// \}
 
 /// \brief Translate a string into one of the CoordinateFileKind enumerations.
@@ -110,6 +161,16 @@ std::string getEnumerationName(CoordinateCycle orientation);
 /// \param name_in  The string to translate
 CoordinateFileKind translateCoordinateFileKind(const std::string &name_in);
 
+/// \brief Translate a string into one of the ThermostatKind enumerations.
+///
+/// \param input  The string to translate
+ThermostatKind translateThermostatKind(const std::string &input);
+  
+/// \brief Obtain the next point in the coordinate cycle.
+///
+/// \param orientation  The current point in the coordinate cycle
+CoordinateCycle getNextCyclePosition(CoordinateCycle orientation);
+  
 /// \brief Translate the AncdfVariable enumeration.  This provides keywords to serve as landmarks
 ///        in an Amber binary trajectory or restart file.
 ///

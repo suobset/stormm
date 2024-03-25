@@ -21,44 +21,47 @@ using stmath::PrefixSumType;
 
 //-------------------------------------------------------------------------------------------------
 PMIGridWriter::PMIGridWriter(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                             const int fp_bits_in, const int nsys_in, const int order_in,
-                             const int wu_count_in, const int max_grid_points_in,
-                             const uint4* dims_in, double* ddata_in, float* fdata_in,
-                             const uint* work_units_in) :
-    theme{theme_in}, mode{mode_in}, shacc_fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
-    nsys{nsys_in}, order{order_in}, wu_count{wu_count_in}, max_grid_points{max_grid_points_in},
-    dims{dims_in}, ddata{ddata_in}, fdata{fdata_in}, work_units{work_units_in}
+                             const FFTMode fftm_in, const int fp_bits_in, const int nsys_in,
+                             const int order_in, const int wu_count_in,
+                             const int max_grid_points_in, const uint4* dims_in, double* ddata_in,
+                             float* fdata_in, const uint* work_units_in) :
+    theme{theme_in}, mode{mode_in}, fftm{fftm_in},
+    shacc_fp_scale{static_cast<float>(pow(2.0, fp_bits_in))}, nsys{nsys_in}, order{order_in},
+    wu_count{wu_count_in}, max_grid_points{max_grid_points_in}, dims{dims_in}, ddata{ddata_in},
+    fdata{fdata_in}, work_units{work_units_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridReader::PMIGridReader(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                             const int fp_bits_in, const int nsys_in, const int order_in,
-                             const uint4* dims_in, const double* ddata_in, const float* fdata_in) :
-    theme{theme_in}, mode{mode_in}, shacc_fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
-    nsys{nsys_in}, order{order_in}, dims{dims_in}, ddata{ddata_in}, fdata{fdata_in}
+                             const FFTMode fftm_in, const int fp_bits_in, const int nsys_in,
+                             const int order_in, const uint4* dims_in, const double* ddata_in,
+                             const float* fdata_in) :
+    theme{theme_in}, mode{mode_in}, fftm{fftm_in},
+    shacc_fp_scale{static_cast<float>(pow(2.0, fp_bits_in))}, nsys{nsys_in}, order{order_in},
+    dims{dims_in}, ddata{ddata_in}, fdata{fdata_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridReader::PMIGridReader(const PMIGridWriter &w) :
-    theme{w.theme}, mode{w.mode}, shacc_fp_scale{w.shacc_fp_scale}, nsys{w.nsys}, order{w.order},
-    dims{w.dims}, ddata{w.ddata}, fdata{w.fdata}
+    theme{w.theme}, mode{w.mode}, fftm{w.fftm}, shacc_fp_scale{w.shacc_fp_scale}, nsys{w.nsys},
+    order{w.order}, dims{w.dims}, ddata{w.ddata}, fdata{w.fdata}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridReader::PMIGridReader(const PMIGridWriter *w) :
-    theme{w->theme}, mode{w->mode}, shacc_fp_scale{w->shacc_fp_scale}, nsys{w->nsys},
-    order{w->order}, dims{w->dims}, ddata{w->ddata}, fdata{w->fdata}
+    theme{w->theme}, mode{w->mode}, fftm{w->fftm}, shacc_fp_scale{w->shacc_fp_scale},
+    nsys{w->nsys}, order{w->order}, dims{w->dims}, ddata{w->ddata}, fdata{w->fdata}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridAccumulator::PMIGridAccumulator(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                                       const bool use_overflow_in, const int fp_bits_in,
-                                       const int nsys_in, const int order_in,
+                                       const FFTMode fftm_in,  const bool use_overflow_in,
+                                       const int fp_bits_in, const int nsys_in, const int order_in,
                                        const int wu_count_in, const uint4* dims_in,
                                        double* ddata_in, float* fdata_in, int* overflow_in,
                                        const uint* work_units_in) :
-    theme{theme_in}, mode{mode_in}, use_overflow{use_overflow_in}, fp_bits{fp_bits_in},
-    fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
+    theme{theme_in}, mode{mode_in}, fftm{fftm_in}, use_overflow{use_overflow_in},
+    fp_bits{fp_bits_in}, fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
     nsys{nsys_in}, order{order_in},
     order_squared{order_in * order_in},
     order_cubed{order_in * order_in * order_in},
@@ -72,11 +75,12 @@ PMIGridAccumulator::PMIGridAccumulator(const NonbondedTheme theme_in, const Prec
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const NonbondedTheme theme_in, const PrecisionModel mode_in,
-                                 const bool use_overflow_in, const int fp_bits_in,
-                                 const int nsys_in, const int order_in, const uint4* dims_in,
-                                 const double* ddata_in, const float* fdata_in,
-                                 const int* overflow_in) :
-    theme{theme_in}, mode{mode_in}, use_overflow{use_overflow_in}, fp_bits{fp_bits_in},
+                                 const FFTMode fftm_in, const bool use_overflow_in,
+                                 const int fp_bits_in, const int nsys_in, const int order_in,
+                                 const uint4* dims_in, const double* ddata_in,
+                                 const float* fdata_in, const int* overflow_in) :
+    theme{theme_in}, mode{mode_in}, fftm{fftm_in}, use_overflow{use_overflow_in},
+    fp_bits{fp_bits_in},
     fp_scale{static_cast<float>(pow(2.0, fp_bits_in))},
     nsys{nsys_in}, order{order_in}, dims{dims_in},
     lldata{reinterpret_cast<const llint*>(ddata_in)},
@@ -86,16 +90,16 @@ PMIGridFPReader::PMIGridFPReader(const NonbondedTheme theme_in, const PrecisionM
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const PMIGridAccumulator &w) :
-    theme{w.theme}, mode{w.mode}, use_overflow{w.use_overflow}, fp_bits{w.fp_bits},
+    theme{w.theme}, mode{w.mode}, fftm{w.fftm}, use_overflow{w.use_overflow}, fp_bits{w.fp_bits},
     fp_scale{w.fp_scale}, nsys{w.nsys}, order{w.order}, dims{w.dims}, lldata{w.lldata},
     idata{w.idata}, overflow{w.overflow}
 {}
 
 //-------------------------------------------------------------------------------------------------
 PMIGridFPReader::PMIGridFPReader(const PMIGridAccumulator *w) :
-    theme{w->theme}, mode{w->mode}, use_overflow{w->use_overflow}, fp_bits{w->fp_bits},
-    fp_scale{w->fp_scale}, nsys{w->nsys}, order{w->order}, dims{w->dims}, lldata{w->lldata},
-    idata{w->idata}, overflow{w->overflow}
+    theme{w->theme}, mode{w->mode}, fftm{w->fftm}, use_overflow{w->use_overflow},
+    fp_bits{w->fp_bits}, fp_scale{w->fp_scale}, nsys{w->nsys}, order{w->order}, dims{w->dims},
+    lldata{w->lldata}, idata{w->idata}, overflow{w->overflow}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -213,9 +217,10 @@ bool PMIGrid::useOverflowAccumulation() const {
 
 //-------------------------------------------------------------------------------------------------
 PMIGridWriter PMIGrid::data(const HybridTargetLevel tier) {
-  return PMIGridWriter(theme, mode, shared_fp_accumulation_bits, system_count, b_spline_order,
-                       work_unit_count, largest_work_unit_grid_points, grid_dimensions.data(tier),
-                       dgrid_stack.data(tier), fgrid_stack.data(tier), work_units.data(tier));
+  return PMIGridWriter(theme, mode, fft_staging, shared_fp_accumulation_bits, system_count,
+                       b_spline_order, work_unit_count, largest_work_unit_grid_points,
+                       grid_dimensions.data(tier), dgrid_stack.data(tier), fgrid_stack.data(tier),
+                       work_units.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -228,9 +233,9 @@ const PMIGridReader PMIGrid::data(const HybridTargetLevel tier) const {
           "real-valued data before trying to read it as floating-point values.", "PMIGrid",
           "data");
   }
-  return PMIGridReader(theme, mode, shared_fp_accumulation_bits, system_count, b_spline_order,
-                       grid_dimensions.data(tier), dgrid_stack.data(tier), fgrid_stack.data(tier));
-
+  return PMIGridReader(theme, mode, fft_staging, shared_fp_accumulation_bits, system_count,
+                       b_spline_order, grid_dimensions.data(tier), dgrid_stack.data(tier),
+                       fgrid_stack.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -242,7 +247,7 @@ PMIGridAccumulator PMIGrid::fpData(const HybridTargetLevel tier) {
     rtErr("Overflow accumulators must be allocated in order to accumulate density in "
           "fixed-precision.", "PMIGrid", "fpData");
   }
-  return PMIGridAccumulator(theme, mode, (use_short_format_accumulation == false),
+  return PMIGridAccumulator(theme, mode, fft_staging, (use_short_format_accumulation == false),
                             fp_accumulation_bits, system_count, b_spline_order, work_unit_count,
                             grid_dimensions.data(tier), dgrid_stack.data(tier),
                             fgrid_stack.data(tier), overflow_stack.data(tier),
@@ -259,7 +264,7 @@ const PMIGridFPReader PMIGrid::fpData(const HybridTargetLevel tier) const {
           "such a format.  Current fixed-precision detail bit count: " +
           std::to_string(fp_accumulation_bits) + ".", "PMIGrid", "fpData");
   }
-  return PMIGridFPReader(theme, mode, (use_short_format_accumulation == false),
+  return PMIGridFPReader(theme, mode, fft_staging, (use_short_format_accumulation == false),
                          fp_accumulation_bits, system_count, b_spline_order,
                          grid_dimensions.data(tier), dgrid_stack.data(tier),
                          fgrid_stack.data(tier), overflow_stack.data(tier));
@@ -313,6 +318,15 @@ double PMIGrid::getTotalOnGrid(const int system_index) const {
   const uint4 gdims = grid_dimensions.readHost(system_index);
   const size_t illim = gdims.w;
   const size_t ihlim = illim + static_cast<size_t>(gdims.x * gdims.y * gdims.z);
+  uint padded_gdim_x;
+  switch (fft_staging) {
+  case FFTMode::IN_PLACE:
+    padded_gdim_x = 2 * ((gdims.x / 2) + 1);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    padded_gdim_x = gdims.x;
+    break;
+  }
   double result = 0.0;
   if (data_is_real) {
     const double* ddata_ptr = dgrid_stack.data();
@@ -322,15 +336,43 @@ double PMIGrid::getTotalOnGrid(const int system_index) const {
     int95_t iresult = { 0LL, 0 };
     switch (mode) {
     case PrecisionModel::DOUBLE:
-      for (size_t i = illim; i < ihlim; i++) {
-        const int95_t i_val = hostDoubleToInt95(ddata_ptr[i] * scale_up);
-        iresult = hostSplitFPSum(i_val, iresult);
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jk_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            for (uint i = 0; i < gdims.x; i++) {
+              const int95_t i_val = hostDoubleToInt95(ddata_ptr[jk_idx + i] * scale_up);
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          const int95_t i_val = hostDoubleToInt95(ddata_ptr[i] * scale_up);
+          iresult = hostSplitFPSum(i_val, iresult);
+        }
+        break;
       }
       break;
     case PrecisionModel::SINGLE:
-      for (size_t i = illim; i < ihlim; i++) {
-        const int95_t i_val = hostDoubleToInt95(static_cast<double>(fdata_ptr[i]) * scale_up);
-        iresult = hostSplitFPSum(i_val, iresult);
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jk_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            for (uint i = 0; i < gdims.x; i++) {
+              const int95_t i_val = hostDoubleToInt95(fdata_ptr[jk_idx + i] * scale_up);
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          const int95_t i_val = hostDoubleToInt95(static_cast<double>(fdata_ptr[i]) * scale_up);
+          iresult = hostSplitFPSum(i_val, iresult);
+        }
+        break;
       }
       break;
     }
@@ -345,8 +387,22 @@ double PMIGrid::getTotalOnGrid(const int system_index) const {
     case PrecisionModel::DOUBLE:
       {
         int95_t iresult = { 0LL, 0 };
-        for (size_t i = illim; i < ihlim; i++) {
-          iresult = hostSplitFPSum(iresult, lldata_ptr[i], ovrf_ptr[i]);
+        switch (fft_staging) {
+        case FFTMode::IN_PLACE:
+          for (uint k = 0; k < gdims.z; k++) {
+            for (uint j = 0; j < gdims.y; j++) {
+              const uint jk_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+              for (uint i = 0; i < gdims.x; i++) {
+                iresult = hostSplitFPSum(iresult, lldata_ptr[jk_idx + i], ovrf_ptr[jk_idx + i]);
+              }
+            }
+          }
+          break;
+        case FFTMode::OUT_OF_PLACE:
+          for (size_t i = illim; i < ihlim; i++) {
+            iresult = hostSplitFPSum(iresult, lldata_ptr[i], ovrf_ptr[i]);
+          }
+          break;
         }
         result = hostInt95ToDouble(iresult) * inv_scl;
       }
@@ -354,8 +410,22 @@ double PMIGrid::getTotalOnGrid(const int system_index) const {
     case PrecisionModel::SINGLE:
       {
         int2 iresult = { 0, 0 };
-        for (size_t i = illim; i < ihlim; i++) {
-          iresult = hostSplitFPSum(iresult, idata_ptr[i], ovrf_ptr[i]);
+        switch (fft_staging) {
+        case FFTMode::IN_PLACE:
+          for (uint k = 0; k < gdims.z; k++) {
+            for (uint j = 0; j < gdims.y; j++) {
+              const uint jk_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+              for (uint i = 0; i < gdims.x; i++) {
+                iresult = hostSplitFPSum(iresult, lldata_ptr[jk_idx + i], ovrf_ptr[jk_idx + i]);
+              }
+            }
+          }
+          break;
+        case FFTMode::OUT_OF_PLACE:
+          for (size_t i = illim; i < ihlim; i++) {
+            iresult = hostSplitFPSum(iresult, idata_ptr[i], ovrf_ptr[i]);
+          }
+          break;
         }
         result = hostInt63ToDouble(iresult) * inv_scl;
       }
@@ -369,37 +439,108 @@ double PMIGrid::getTotalOnGrid(const int system_index) const {
 std::vector<double> PMIGrid::getGrid(const int system_index) const {
   validateSystemIndex(system_index);
   const uint4 gdims = grid_dimensions.readHost(system_index);
-  const size_t llim = gdims.w;
-  const size_t hlim = gdims.w + (gdims.x * gdims.y * gdims.z);
-  std::vector<double> result(hlim - llim);
+  const size_t illim = gdims.w;
+  const size_t ihlim = gdims.w + (gdims.x * gdims.y * gdims.z);
+  uint padded_gdim_x;
+  switch (fft_staging) {
+  case FFTMode::IN_PLACE:
+    padded_gdim_x = 2 * ((gdims.x / 2) + 1);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    padded_gdim_x = gdims.x;
+    break;
+  }
+  std::vector<double> result(ihlim - illim);
   switch (mode) {
   case PrecisionModel::DOUBLE:
     if (data_is_real) {
       const double* ddata_ptr = dgrid_stack.data();
-      for (size_t i = llim; i < hlim; i++) {
-        result[i - llim] = ddata_ptr[i];
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jkp_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            const uint jk_idx = ((k * gdims.y) + j) * gdims.x;
+            for (uint i = 0; i < gdims.x; i++) {
+              result[jk_idx + i] = ddata_ptr[jkp_idx + i];
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          result[i - illim] = ddata_ptr[i];
+        }
+        break;
       }
     }
     else {
       const PMIGridFPReader fpr = fpData();
       const double inv_scale = 1.0 / fpr.fp_scale;
-      for (size_t i = llim; i < hlim; i++) {
-        result[i - llim] = hostInt95ToDouble(fpr.lldata[i], fpr.overflow[i]) * inv_scale;
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jkp_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            const uint jk_idx = ((k * gdims.y) + j) * gdims.x;
+            for (uint i = 0; i < gdims.x; i++) {
+              result[jk_idx] = hostInt95ToDouble(fpr.lldata[jkp_idx + i],
+                                                 fpr.overflow[jkp_idx + i]) * inv_scale;
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          result[i - illim] = hostInt95ToDouble(fpr.lldata[i], fpr.overflow[i]) * inv_scale;
+        }
+        break;
       }
     }
     break;
   case PrecisionModel::SINGLE:
     if (data_is_real) {
       const float* fdata_ptr = fgrid_stack.data();
-      for (size_t i = llim; i < hlim; i++) {
-        result[i - llim] = fdata_ptr[i];
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jkp_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            const uint jk_idx = ((k * gdims.y) + j) * gdims.x;
+            for (uint i = 0; i < gdims.x; i++) {
+              result[jk_idx + i] = fdata_ptr[jkp_idx + i];
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          result[i - illim] = fdata_ptr[i];
+        }
+        break;
       }
     }
     else {
       const PMIGridFPReader fpr = fpData();
       const double inv_scale = 1.0 / fpr.fp_scale;
-      for (size_t i = llim; i < hlim; i++) {
-        result[i - llim] = hostInt63ToDouble(fpr.idata[i], fpr.overflow[i]) * inv_scale;
+      switch (fft_staging) {
+      case FFTMode::IN_PLACE:
+        for (uint k = 0; k < gdims.z; k++) {
+          for (uint j = 0; j < gdims.y; j++) {
+            const uint jkp_idx = gdims.w + (((k * gdims.y) + j) * padded_gdim_x);
+            const uint jk_idx = ((k * gdims.y) + j) * gdims.x;
+            for (uint i = 0; i < gdims.x; i++) {
+              result[jk_idx] = hostInt63ToDouble(fpr.idata[jkp_idx + i],
+                                                 fpr.overflow[jkp_idx + i]) * inv_scale;
+            }
+          }
+        }
+        break;
+      case FFTMode::OUT_OF_PLACE:
+        for (size_t i = illim; i < ihlim; i++) {
+          result[i - illim] = hostInt63ToDouble(fpr.idata[i], fpr.overflow[i]) * inv_scale;
+        }
+        break;
       }
     }
     break;
@@ -643,10 +784,11 @@ void PMIGrid::prepareWorkUnits(const QMapMethod approach, const GpuDetails &gpu)
         prepareWorkUnits(recommendation, gpu);
         return;
       }
-
+      
       // Compute the layout for this collection of systems.
       bw = Brickwork(ext_dims, max_shared_acc_atom_bearing_region_adim, max_xsection, halo, 0,
-                     max_buffered_cells, 4 * gpu.getSMPCount());
+                     max_buffered_cells, 4 * gpu.getSMPCount(), { 15, 13, 11, 9, 7, 5 },
+                     { 8, 4, 2, 6, 10, 12, 14, 1 });
     }
     break;
   }
@@ -695,7 +837,16 @@ void PMIGrid::initialize(const HybridTargetLevel tier, const GpuDetails &gpu) {
       PMIGridAccumulator pm_acc = fpData(tier);
       for (int pos = 0; pos < pm_acc.nsys; pos++) {
         const uint4 pdims = pm_acc.dims[pos];
-        const uint ilim = pdims.w + (pdims.x * pdims.y * pdims.z);
+        uint padded_dim_x;
+        switch (fft_staging) {
+        case FFTMode::IN_PLACE:
+          padded_dim_x = 2 * ((pdims.x / 2) + 1);
+          break;
+        case FFTMode::OUT_OF_PLACE:
+          padded_dim_x = pdims.x;
+          break;
+        }
+        const uint ilim = pdims.w + (padded_dim_x * pdims.y * pdims.z);
         switch (mode) {
         case PrecisionModel::DOUBLE:
           for (uint i = pdims.w; i < ilim; i++) {
@@ -716,7 +867,16 @@ void PMIGrid::initialize(const HybridTargetLevel tier, const GpuDetails &gpu) {
       PMIGridWriter pm_wrt = data(tier);
       for (int pos = 0; pos < pm_wrt.nsys; pos++) {
         const uint4 pdims = pm_wrt.dims[pos];
-        const uint ilim = pdims.w + (pdims.x * pdims.y * pdims.z);
+        uint padded_dim_x;
+        switch (fft_staging) {
+        case FFTMode::IN_PLACE:
+          padded_dim_x = 2 * ((pdims.x / 2) + 1);
+          break;
+        case FFTMode::OUT_OF_PLACE:
+          padded_dim_x = pdims.x;
+          break;
+        }
+        const uint ilim = pdims.w + (padded_dim_x * pdims.y * pdims.z);
         switch (mode) {
         case PrecisionModel::DOUBLE:
           for (uint i = pdims.w; i < ilim; i++) {
@@ -769,7 +929,15 @@ void PMIGrid::convertToReal(const HybridTargetLevel tier, const GpuDetails &gpu)
       const float conv_scalef = conv_scale;
       for (int i = 0; i < system_count; i++) {
         const uint4 gdims = pm_acc.dims[i];
-        const uint jlim = gdims.w + (gdims.x * gdims.y * gdims.z);
+        uint jlim;
+        switch (fft_staging) {
+        case FFTMode::IN_PLACE:
+          jlim = gdims.w + (2 * ((gdims.x / 2) + 1) * gdims.y * gdims.z);
+          break;
+        case FFTMode::OUT_OF_PLACE:
+          jlim = gdims.w + (gdims.x * gdims.y * gdims.z);
+          break;
+        }
         switch (mode) {
         case PrecisionModel::DOUBLE:
           for (uint j = gdims.w; j < jlim; j++) {
@@ -871,16 +1039,33 @@ void PMIGrid::validateSystemIndex(const int system_index) const {
 int PMIGrid::findSharedBufferSize(const GpuDetails &gpu) const {
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
-  if (gpu.getArchMajor() >= 7) {
-    return 23040;
+  if (gpu.getArchMajor() < 7) {
+    return 13824;
+  }
+  else if (gpu.getArchMajor() == 7) {
+    if (gpu.getArchMinor() < 5) {
+      return 21504;
+    }
+    else {
+      return 13824;
+    }
+  }
+  else if (gpu.getArchMajor() >= 8) {
+    if (gpu.getArchMinor() == 0) {
+      return 39168;
+    }
+    else {
+      return 23040;
+    }
   }
   else {
-    return 15360;
+    return 13824;
   }
 #  else
   return 10800;
 #  endif
 #else
+  // For CPU code, create work units as if there were a 25kB allotment available
   return 23040;
 #endif
 }

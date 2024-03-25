@@ -212,13 +212,13 @@ public:
   template <typename T>
   void fill(const T* xcrd, const T* ycrd, const T* zcrd,
             TrajectoryKind kind = TrajectoryKind::POSITIONS,
-            CoordinateCycle cycle_in = CoordinateCycle::PRIMARY, int scale_bits = 0,
+            CoordinateCycle cycle_in = CoordinateCycle::WHITE, int scale_bits = 0,
             const double* box_dims = nullptr);
 
   template <typename T>
   void fill(const std::vector<T> &xcrd, const std::vector<T> &ycrd, const std::vector<T> &zcrd,
             TrajectoryKind kind = TrajectoryKind::POSITIONS,
-            CoordinateCycle cycle_in = CoordinateCycle::PRIMARY, int scale_bits = 0,
+            CoordinateCycle cycle_in = CoordinateCycle::WHITE, int scale_bits = 0,
             const std::vector<double> &box_dims = {});
   /// \}
 
@@ -260,6 +260,7 @@ public:
   /// Overloaded:
   ///   - Get all coordinates
   ///   - Get coordinates for a range of atoms
+  ///   - Choose the point in the time cycle or accept the object's "current" state
   ///
   /// \param low_index   The lower atom index of a range
   /// \param high_index  The upper atom index of a range
@@ -270,8 +271,19 @@ public:
   std::vector<double>
   getInterlacedCoordinates(TrajectoryKind kind = TrajectoryKind::POSITIONS,
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  getInterlacedCoordinates(CoordinateCycle orientation,
+                           TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   std::vector<double>
   getInterlacedCoordinates(int low_index, int high_index,
+                           TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  std::vector<double>
+  getInterlacedCoordinates(int low_index, int high_index, CoordinateCycle orientation,
                            TrajectoryKind kind = TrajectoryKind::POSITIONS,
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
@@ -384,7 +396,7 @@ public:
   ///   - Update forces for an arbitrary point in the time cycle
   ///   - Update forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void initializeForces(CoordinateCycle orientation);
   void initializeForces();
@@ -472,7 +484,7 @@ public:
   ///   - Upload particle positions for a specific point in the time cycle
   ///   - Upload particle positions for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void uploadPositions(CoordinateCycle orientation);
   void uploadPositions();
@@ -487,7 +499,7 @@ public:
   ///   - Upload velocities for a specific point in the time cycle
   ///   - Upload velocities for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void uploadVelocities(CoordinateCycle orientation);
   void uploadVelocities();
@@ -499,7 +511,7 @@ public:
   ///   - Upload forces for a specific point in the time cycle
   ///   - Upload forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void uploadForces(CoordinateCycle orientation);
   void uploadForces();
@@ -514,7 +526,7 @@ public:
   ///   - Download particle positions for a specific point in the time cycle
   ///   - Download particle positions for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void downloadPositions(CoordinateCycle orientation);
   void downloadPositions();
@@ -529,7 +541,7 @@ public:
   ///   - Download velocities for a specific point in the time cycle
   ///   - Download velocities for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void downloadVelocities(CoordinateCycle orientation);
   void downloadVelocities();
@@ -541,12 +553,13 @@ public:
   ///   - Download forces for a specific point in the time cycle
   ///   - Download forces for the object's current position in the cycle
   ///
-  /// \param orentation  A selected point in the time cycle (PRIMARY or ALTERNATE)
+  /// \param orentation  A selected point in the time cycle (WHITE or BLACK)
   /// \{
   void downloadForces(CoordinateCycle orientation);
   void downloadForces();
   /// \}
 #endif
+  
 private:
   std::string file_name;           ///< Name of the file from which these coordinates (and
                                    ///<   perhaps velocities) derived.  Empty string indicates
@@ -589,7 +602,7 @@ private:
                                            ///<   (lengths are given in Angstroms, angles in
                                            ///<   radians)
 
-  // Like coordinates, velocities and forces appear in PRIMARY -> ALTERNATE blocks
+  // Like coordinates, velocities and forces appear in WHITE -> BLACK blocks
   Hybrid<double> x_velocities;      ///< Cartesian X velocities of all particles
   Hybrid<double> y_velocities;      ///< Cartesian Y velocities of all particles
   Hybrid<double> z_velocities;      ///< Cartesian Z velocities of all particles

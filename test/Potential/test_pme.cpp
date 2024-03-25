@@ -312,8 +312,8 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
     const int na = nx * cg.getCellCount(sysid, UnitCellAxis::A);
     const int nb = nx * cg.getCellCount(sysid, UnitCellAxis::B);
     const int nc = nx * cg.getCellCount(sysid, UnitCellAxis::C);
-    simple_q_grids[sysid] = mapDensity(&cf, system_topologies[sysid], pm_theme, na, nb, nc,
-                                       pm_order);
+    simple_q_grids[sysid] = mapDensity(&cf, system_topologies[sysid], pm_theme, pm_rdr.fftm, na,
+                                       nb, nc, pm_order);
     compareSystemDensityField(cg, pm, sysid, simple_q_grids[sysid], "CPU", pm_fp_msg,
                               chrg_value_tol, do_tests);
   }
@@ -362,7 +362,7 @@ void spatialDecompositionInner(const CellGrid<T, Tacc, Tcalc, T4> &cg,
                                     PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
   const size_t cg_tmat = std::type_index(typeid(T)).hash_code();
   mm_ctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                                ClashResponse::NONE, tcalc_prec,
+                                ClashResponse::NONE, VwuGoal::ACCUMULATE, tcalc_prec, tcalc_prec,
                                 pm_copy_ii.getWorkUnitConfiguration(), pm_copy_ii.getMode(),
                                 cg_tmat, pm_order, *poly_ag);
   mapDensity(&pm_copy_ii, &mm_ctrl, &cg_copy_ii, poly_ag, launcher, QMapMethod::ACC_SHARED);

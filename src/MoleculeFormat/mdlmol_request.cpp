@@ -89,7 +89,7 @@ MdlMolDataRequest::MdlMolDataRequest(const std::string &title_in,
   case StateVariable::VDW:
   case StateVariable::VDW_ONE_FOUR:
   case StateVariable::ELECTROSTATIC:
-  case StateVariable::ELECTROSTATIC_ONE_FOUR:
+  case StateVariable::ELEC_ONE_FOUR:
   case StateVariable::GENERALIZED_BORN:
   case StateVariable::RESTRAINT:
   case StateVariable::KINETIC:

@@ -6,11 +6,12 @@ namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-LogSplineTable<T4>::LogSplineTable(const int detail_bits_in, const int index_bound_in,
+LogSplineTable<T4>::LogSplineTable(const BasisFunctions basis_in, const TableIndexing lookup_in,
+                                   const int detail_bits_in, const int index_bound_in,
                                    const uint sp_detail_mask_in, const ullint dp_detail_mask_in,
                                    const T4* table_in) :
-    detail_bits{detail_bits_in}, index_bound{index_bound_in}, sp_detail_mask{sp_detail_mask_in},
-    dp_detail_mask{dp_detail_mask_in}, table{table_in}
+    basis{basis_in}, lookup{lookup_in}, detail_bits{detail_bits_in}, index_bound{index_bound_in},
+    sp_detail_mask{sp_detail_mask_in}, dp_detail_mask{dp_detail_mask_in}, table{table_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -354,8 +355,8 @@ const LogSplineTable<T4> LogScaleSpline<T4>::data(const HybridTargetLevel tier) 
   case PrecisionModel::SINGLE:
     expsgn_bits = 9;
   }
-  return LogSplineTable<T4>(mantissa_bits + expsgn_bits, table.size(), sp_detail_bitmask,
-                            dp_detail_bitmask, table.data(tier));
+  return LogSplineTable<T4>(basis_set, indexing_method, mantissa_bits + expsgn_bits, table.size(),
+                            sp_detail_bitmask, dp_detail_bitmask, table.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -368,8 +369,9 @@ LogScaleSpline<T4>::templateFreeData(const HybridTargetLevel tier) const {
   case PrecisionModel::SINGLE:
     expsgn_bits = 9;
   }
-  return LogSplineTable<T4>(mantissa_bits + expsgn_bits, table.size(), sp_detail_bitmask,
-                            dp_detail_bitmask, reinterpret_cast<const void*>(table.data(tier)));
+  return LogSplineTable<void>(basis_set, indexing_method, mantissa_bits + expsgn_bits,
+                              table.size(), sp_detail_bitmask, dp_detail_bitmask,
+                              reinterpret_cast<const void*>(table.data(tier)));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -509,8 +511,9 @@ float LogScaleSpline<T4>::checkIndexingOffset(float indexing_offset_in) {
   // Check that the number is positive, and greater than zero.
   Ecumenical4 nl = { .f = indexing_offset_in };
   if (((nl.ui >> 31) & 0x1) == 1 || (nl.ui & 0x7fffff) > 0) {
-    rtErr("The indexing offset must be a positive number and some small power (or small "
-          "negative power) of two.", "LogScaleSpline", "checkIndexingOffset");
+    rtErr("The indexing offset (" + minimalRealFormat(indexing_offset_in, 1.0e-5) + ") must be a "
+          "positive number and some small power (or small negative power) of two.",
+          "LogScaleSpline", "checkIndexingOffset");
   }
   return indexing_offset_in;
 }
@@ -1046,15 +1049,17 @@ void LogScaleSpline<T4>::evaluateOverallError() {
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
 LogSplineTable<T4> restoreType(const LogSplineTable<void> *rasa) {
-  return LogSplineTable<T4>(rasa->detail_bits, rasa->index_bound, rasa->sp_detail_mask,
-                            rasa->dp_detail_mask, reinterpret_cast<const T4*>(rasa->table));
+  return LogSplineTable<T4>(rasa->basis, rasa->lookup, rasa->detail_bits, rasa->index_bound,
+                            rasa->sp_detail_mask, rasa->dp_detail_mask,
+                            reinterpret_cast<const T4*>(rasa->table));
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
 LogSplineTable<T4> restoreType(const LogSplineTable<void> &rasa) {
-  return LogSplineTable<T4>(rasa.detail_bits, rasa.index_bound, rasa.sp_detail_mask,
-                            rasa.dp_detail_mask, reinterpret_cast<const T4*>(rasa.table));
+  return LogSplineTable<T4>(rasa.basis, rasa.lookup, rasa.detail_bits, rasa.index_bound,
+                            rasa.sp_detail_mask, rasa.dp_detail_mask,
+                            reinterpret_cast<const T4*>(rasa.table));
 }
 
 } // namespace stmath

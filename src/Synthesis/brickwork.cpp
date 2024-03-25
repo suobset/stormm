@@ -8,7 +8,8 @@ namespace stormm {
 namespace synthesis {
 
 using stmath::roundUp;
-
+using stmath::partition;
+  
 //-------------------------------------------------------------------------------------------------
 VolumePartition::VolumePartition(const int a_dim_in, const int b_dim_in, const int c_dim_in,
                                  const int a_orig_in, const int b_orig_in, const int c_orig_in,
@@ -110,7 +111,8 @@ VolumePartition VolumePartition::split(const int a_dim_update) {
 Brickwork::Brickwork(const std::vector<int3> &system_dimensions_in, const int a_span_max_in,
                      const int bc_cross_section_max_in, const int halo_under_in,
                      const int halo_over_in, const int max_nonhalo_volume_in,
-                     const int target_multiple) :
+                     const int target_multiple, const std::vector<int> &preferred_a_lengths,
+                     const std::vector<int> &discouraged_a_lengths) :
     a_span_max{a_span_max_in}, bc_cross_section_max{bc_cross_section_max_in},
     halo_under{halo_under_in}, halo_over{halo_over_in}, max_nonhalo_volume{max_nonhalo_volume_in},
     system_dimensions{system_dimensions_in}, bricks{}
@@ -129,7 +131,7 @@ Brickwork::Brickwork(const std::vector<int3> &system_dimensions_in, const int a_
           std::to_string(halo_over) + " (over) are too large for a maximum cross sectional area "
           "of " + std::to_string(bc_cross_section_max) + ".", "Brickwork");
   }
-  subdivide(target_multiple);
+  subdivide(target_multiple, preferred_a_lengths, discouraged_a_lengths);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -227,7 +229,9 @@ int3 Brickwork::getSystemDimensions(const int system_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void Brickwork::subdivide(const int target_work_unit_multiple) {
+void Brickwork::subdivide(const int target_work_unit_multiple,
+                          const std::vector<int> &preferred_a_lengths,
+                          const std::vector<int> &discouraged_a_lengths) {
   const int nsys = system_dimensions.size();
 
   // Lay out a search range to find the optimal spread of work units.  Determine the largest cross
@@ -266,6 +270,7 @@ void Brickwork::subdivide(const int target_work_unit_multiple) {
   // Create work units based on the most efficient layout
   bricks.reserve(best_nwu);
   bricks.resize(0);
+  std::vector<int> a_lengths(16);
   for (int i = 0; i < nsys; i++) {
     const int3 idims = system_dimensions[i];
 
@@ -275,20 +280,28 @@ void Brickwork::subdivide(const int target_work_unit_multiple) {
     const int remainder_c = idims.z - (nlrg_c * best_cdim);
 
     // Lay out the largest possible work units for this layer with respect to the A axis
-    const int ta_span = std::min(max_nonhalo_volume / (best_bdim * best_cdim),
-                                 a_span_max - all_halo);
+    int ta_span = std::min(max_nonhalo_volume / (best_bdim * best_cdim),
+                           a_span_max - all_halo);
     if (ta_span == 0) {
       rtErr("A work unit non-halo region with non-halo cross section " +
             std::to_string(best_bdim) + " x " + std::to_string(best_cdim) + " and maximum "
             "non-halo volume " + std::to_string(max_nonhalo_volume) + " results in a unit cell A "
             "axis dimension of zero.", "Brickwork", "subdivide");
     }
+
+    // Adjust the best length downwards to meet the highest possible preferred length.  Determine
+    // a suitable combination of lengths that are all in the "preferred" category, or otherwise
+    // avoid the "discouraged" category.  Obtain a list of lengths for work units of this
+    // cross section.
+    partition(idims.x, ta_span, preferred_a_lengths, discouraged_a_lengths, &a_lengths);
+    const size_t na_lim = a_lengths.size();
     for (int nb = 0; nb < nlrg_b; nb++) {
       for (int nc = 0; nc < nlrg_c; nc++) {
-        for (int na = 0; na < idims.x; na += ta_span) {
-          const int choose_adim = (na + ta_span <= idims.x) ? ta_span : idims.x - na;
-          bricks.emplace_back(choose_adim, best_bdim, best_cdim, na, nb * best_bdim,
+        int aprog = 0;
+        for (int na = 0; na < na_lim; na++) {
+          bricks.emplace_back(a_lengths[na], best_bdim, best_cdim, aprog, nb * best_bdim,
                               nc * best_cdim, halo_under, halo_over, i);
+          aprog += a_lengths[na];
         }
       }
     }
@@ -305,17 +318,20 @@ void Brickwork::subdivide(const int target_work_unit_multiple) {
               "A axis dimension of zero.  This occurred when back-filling the unit cell B axis.",
               "Brickwork", "subdivide");
       }
+      partition(idims.x, va_span, preferred_a_lengths, discouraged_a_lengths, &a_lengths);
+      const size_t na_lim = a_lengths.size();
       for (int nc = 0; nc < idims.z; nc += height) {
         const int choose_cdim = (nc + height <= idims.z) ? height : idims.z - nc;
-        for (int na = 0; na < idims.x; na += va_span) {
-          const int choose_adim = (na + va_span <= idims.x) ? va_span : idims.x - na;
-          bricks.emplace_back(choose_adim, remainder_b, choose_cdim, na, idims.y - remainder_b,
-                              nc, halo_under, halo_over, i);
+        int aprog = 0;
+        for (int na = 0; na < na_lim; na++) {
+          bricks.emplace_back(a_lengths[na], remainder_b, choose_cdim, aprog,
+                              idims.y - remainder_b, nc, halo_under, halo_over, i);
+          aprog += a_lengths[na];
         }
       }
     }
 
-    // Fill out work units to fill out the top, moving along the B axis
+    // Create out work units to fill out the top, moving along the B axis
     if (remainder_c > 0) {
       const int total_b_span = nlrg_b * best_bdim;
       const int width = (bc_cross_section_max / (remainder_c + all_halo)) - all_halo;
@@ -328,12 +344,15 @@ void Brickwork::subdivide(const int target_work_unit_multiple) {
               "A axis dimension of zero.  This occurred when back-filling the unit cell C axis.",
               "Brickwork", "subdivide");
       }
+      partition(idims.x, va_span, preferred_a_lengths, discouraged_a_lengths, &a_lengths);
+      const size_t na_lim = a_lengths.size();
       for (int nb = 0; nb < total_b_span; nb += width) {
         const int choose_bdim = (nb + width <= total_b_span) ? width : total_b_span - nb;
-        for (int na = 0; na < idims.x; na += va_span) {
-          const int choose_adim = (na + va_span <= idims.x) ? va_span : idims.x - na;
-          bricks.emplace_back(choose_adim, choose_bdim, remainder_c, na, nb,
+        int aprog = 0;
+        for (int na = 0; na < na_lim; na++) {
+          bricks.emplace_back(a_lengths[na], choose_bdim, remainder_c, aprog, nb,
                               idims.z - remainder_c, halo_under, halo_over, i);
+          aprog += a_lengths[na];
         }
       }
     }

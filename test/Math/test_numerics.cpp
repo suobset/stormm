@@ -1,3 +1,4 @@
+#include <climits>
 #include "copyright.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Constants/behavior.h"
@@ -6,6 +7,7 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/formulas.h"
 #include "../../src/Math/juffa.h"
 #include "../../src/Math/log_scale_spline.h"
 #include "../../src/Math/matrix_ops.h"
@@ -526,26 +528,32 @@ void testCoulombDerivatives(const double rmax, Xoshiro256ppGenerator *xrs) {
 // Test the logarithmic spline production.
 //
 // Arguments:
-//   style:         The type of spline to produce and test
-//   idx_meth:      Indexing method for the spline table
-//   basis_set:     The basis functions to be used to contruct the spline
-//   ew_coeff:      The Ewald coefficient governing the splitting factor
-//   manissa_bits:  The number of bits of the mantissa with which to build the table index
-//   tol:           Tolerance for errors in the spline tables generated under the specified
-//                  precision model
-//   xrs:           Random number generator for creating inputs to spline evaluation
-//   timer:         Timings object to help track how long these tables take to build on CPU or GPU
+//   style:            The type of spline to produce and test
+//   idx_meth:         Indexing method for the spline table
+//   basis_set:        The basis functions to be used to contruct the spline
+//   ew_coeff:         The Ewald coefficient governing the splitting factor
+//   manissa_bits:     The number of bits of the mantissa with which to build the table index
+//   tol:              Tolerance for errors in the spline tables generated under the specified
+//                     precision model
+//   ulp_opt:          The number of units of least place with which to attempt optimizing the
+//                     spline coefficients
+//   indexing_offset:  Argument offset for the spline index when using ARG_OFFSET or SQ_ARG_OFFSET
+//                     indexing mode
+//   xrs:              Random number generator for creating inputs to spline evaluation
+//   timer:            Timings object to help track how long tables take to build on CPU or GPU
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
 void testLogSplineRendering(const LogSplineForm style, const TableIndexing idx_meth,
                             const BasisFunctions basis_set, const double ew_coeff,
-                            const int mantissa_bits, const double tol, Xoshiro256ppGenerator *xrs,
+                            const int mantissa_bits, const double tol, const int ulp_opt,
+                            const float indexing_offset, Xoshiro256ppGenerator *xrs,
                             StopWatch *timer) {
   const std::string desc = (std::type_index(typeid(T4)).hash_code() == double4_type_index) ?
                            "dp" : "sp";
   const int spl_timings = timer->addCategory("Compute " + desc + " PME energy by " +
                                              getEnumerationName(idx_meth) + " (" +
-                                             std::to_string(mantissa_bits) + " bits)");
+                                             std::to_string(mantissa_bits) + " bits, " +
+                                             std::to_string(ulp_opt) + " ulp)");
   const int npts = 1024;
   std::vector<double> rpts = uniformRand(xrs, npts, 10.0);
   addScalarToVector(&rpts, 0.9);
@@ -554,7 +562,7 @@ void testLogSplineRendering(const LogSplineForm style, const TableIndexing idx_m
   const double kcoul = stormm::symbols::charmm_gromacs_bioq;
   const float kcoulf = stormm::symbols::charmm_gromacs_bioq;
   const LogScaleSpline<T4> lgsp(style, ew_coeff, kcoul, mantissa_bits, 64.0, 0.015625, idx_meth,
-                                basis_set);
+                                basis_set, ulp_opt, indexing_offset);
   timer->assignTime(spl_timings);
   const float ew_coeff_f = ew_coeff;
   const double beta = 2.0 * ew_coeff / sqrt(pi);
@@ -600,15 +608,10 @@ void testLogSplineRendering(const LogSplineForm style, const TableIndexing idx_m
   }
   check(spl_eval, RelationalOperator::EQUAL, Approx(dbl_eval).margin(tol), "The spline table "
         "for " + getEnumerationName(style) + ", indexed by " + getEnumerationName(idx_meth) +
-        " and constructed with " + getEnumerationName(basis_set) + ", does not meet expectations "
-        "for accuracy.");
+        " and constructed with " + getEnumerationName(basis_set) + " (" +
+        std::to_string(mantissa_bits) + " bits of the mantissa for indexing), does not meet "
+        "expectations for accuracy.");
   timer->assignTime(0);
-  const LogScaleSpline<T4> lgsp_frac(style, ew_coeff, kcoul, mantissa_bits, 64.0, 0.015625,
-                                     idx_meth, BasisFunctions::MIXED_FRACTIONS);
-  timer->assignTime(spl_timings);
-  for (int i = 0; i < npts; i++) {
-    spl_eval[i] = lgsp_frac.evaluateByRealArg(rpts[i]);
-  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -829,6 +832,67 @@ int main(const int argc, const char* argv[]) {
   check(hdx.readHost(), RelationalOperator::EQUAL, rec_hdx.readHost(), "Double-precision floating "
         "point numbers are not recovered when passed through the int95_t fixed-precision "
         "representation (X), when using a Hybrid object.");
+  const int nscatter_tests = 2048;
+  const int nincrement_tests = 256;
+  std::vector<llint> large_z_a(nscatter_tests);
+  std::vector<llint> large_z_b(nscatter_tests);
+  std::vector<llint> large_z_c(nscatter_tests);
+  std::vector<llint> large_z_d(nincrement_tests);
+  const llint powertwo_a = ipowl(2, 51);
+  const llint powertwo_b = ipowl(2, 26);
+  const llint powertwo_c = ipowl(2, 20);
+  const llint scatter_llim = -nscatter_tests / 4;
+  const llint scatter_hlim =  nscatter_tests / 4;
+  for (llint i = scatter_llim; i < scatter_hlim; i++) {
+    const llint base_a = i * powertwo_a;
+    const llint base_b = i * powertwo_b;
+    const llint base_c = i * powertwo_c;
+    for (int j = 0; j < 2; j++) {
+      const int jidx = 2 * (i - scatter_llim) + j;
+      large_z_a[jidx] = base_a + static_cast<int>(xrs.uniformRandomNumber() * 1024.0);
+      large_z_b[jidx] = base_b + static_cast<int>(xrs.uniformRandomNumber() * 1024.0);
+      large_z_c[jidx] = base_c + static_cast<int>(xrs.uniformRandomNumber() * 1024.0);
+    }
+  }
+  const llint incr_llim = -nincrement_tests / 4;
+  const llint incr_hlim =  nincrement_tests / 4;
+  for (llint i = incr_llim; i < incr_hlim; i++) {
+    large_z_d[2 * (i + 64)    ] = static_cast<llint>(INT_MAX) + i;
+    large_z_d[2 * (i + 64) + 1] = static_cast<llint>(INT_MIN) + i;
+  }
+  std::vector<int2> split_short_a(nscatter_tests);
+  std::vector<int2> split_short_b(nscatter_tests);
+  std::vector<int2> split_short_c(nscatter_tests);
+  std::vector<int2> split_short_d(nincrement_tests);
+  const std::vector<double> dblref_a(large_z_a.begin(), large_z_a.end());
+  const std::vector<double> dblref_b(large_z_b.begin(), large_z_b.end());
+  const std::vector<double> dblref_c(large_z_c.begin(), large_z_c.end());
+  const std::vector<double> dblref_d(large_z_d.begin(), large_z_d.end());
+  std::vector<double> dblshort_a(nscatter_tests), dblshort_b(nscatter_tests);
+  std::vector<double> dblshort_c(nscatter_tests), dblshort_d(nincrement_tests);
+  for (int i = 0; i < nscatter_tests; i++) {
+    split_short_a[i] = hostLongLongToInt63(large_z_a[i]);
+    split_short_b[i] = hostLongLongToInt63(large_z_b[i]);
+    split_short_c[i] = hostLongLongToInt63(large_z_c[i]);
+    dblshort_a[i] = hostInt63ToDouble(split_short_a[i]);
+    dblshort_b[i] = hostInt63ToDouble(split_short_b[i]);
+    dblshort_c[i] = hostInt63ToDouble(split_short_c[i]);
+  }
+  for (int i = 0; i < nincrement_tests; i++) {
+    split_short_d[i] = hostLongLongToInt63(large_z_d[i]);
+    dblshort_d[i] = hostInt63ToDouble(split_short_d[i]);
+  }
+  check(dblshort_a, RelationalOperator::EQUAL, dblref_a, "Conversion of long long integers to "
+        "int2 did not conerve information in the broadest-spectrum scan.");
+  check(dblshort_b, RelationalOperator::EQUAL, dblref_b, "Conversion of long long integers to "
+        "int2 did not conerve information in a scan that focuses on the seam between the two "
+        "32-bit values.");
+  check(dblshort_c, RelationalOperator::EQUAL, dblref_c, "Conversion of long long integers to "
+        "int2 did not conerve information in a fine-grained scan that never exceeds the primary "
+        "value's range.");
+  check(dblshort_d, RelationalOperator::EQUAL, dblref_d, "Conversion of long long integers to "
+        "int2 did not conerve information in an incremental scan that never exceeds the primary "
+        "value's range.");
 
   // Test functions for changing the precision model
   section(4);
@@ -865,49 +929,91 @@ int main(const int argc, const char* argv[]) {
         "The inverse method of computing the direct sum tolerance for a given Ewald coefficient "
         "does not produce the expected result.");  
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 2.5e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 2.5e-5, 0, 0.0, &xrs,
+                                 &timer);
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.5e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.5e-5, 0, 0.0, &xrs,
+                                 &timer);
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.1e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.1e-5, 0, 0.0, &xrs,
+                                 &timer);
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.5e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.5e-5, 0, 0.0, &xrs,
+                                 &timer);
   testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.5e-8, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.5e-8, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 9.6e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 9.6e-5, 0, 0.0, &xrs,
+                                 &timer);
   testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 3.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 3.0e-9, 0, 0.0, &xrs,
+                                  &timer);
   testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.2e-4, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 1.2e-4, 0, 0.0,
+                                 &xrs, &timer);
   testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0,
+                                  &xrs, &timer);
   testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.0e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.0e-5, 0, 0.0,
+                                 &xrs, &timer);
   testLogSplineRendering<double4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
-                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, &xrs, &timer);
+                                  BasisFunctions::POLYNOMIAL, ew_loose, 8, 1.0e-9, 0, 0.0,
+                                  &xrs, &timer);
   testLogSplineRendering<float4>(LogSplineForm::DELEC_PME_DIRECT_EXCL, TableIndexing::SQUARED_ARG,
-                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.0e-5, &xrs, &timer);
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.0e-5, 0, 0.0,
+                                 &xrs, &timer);
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,
-                                  BasisFunctions::MIXED_FRACTIONS, ew_loose, 8, 1.0e-9, &xrs,
-                                  &timer);
+                                  BasisFunctions::MIXED_FRACTIONS, ew_loose, 8, 1.0e-9, 0, 0.0,
+                                  &xrs, &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG,
-                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 5.0e-5, &xrs,
-                                 &timer);
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 5.0e-5, 0, 0.0,
+                                 &xrs, &timer);
   testLogSplineRendering<double4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                  BasisFunctions::MIXED_FRACTIONS, ew_loose, 8, 1.0e-9, &xrs,
-                                  &timer);
+                                  BasisFunctions::MIXED_FRACTIONS, ew_loose, 8, 1.0e-9, 0, 0.0,
+                                  &xrs, &timer);
   testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQUARED_ARG,
-                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 3.5e-5, &xrs,
-                                 &timer);
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 3.5e-5, 0, 0.0,
+                                 &xrs, &timer);
+
+  // Introduce the offset argument indexing methods
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG_OFFSET,
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 6.0e-5, 0, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG_OFFSET,
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 6.5e-5, 2, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQ_ARG_OFFSET,
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 6.5e-5, 0, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQ_ARG_OFFSET,
+                                 BasisFunctions::MIXED_FRACTIONS, ew_loose, 5, 6.5e-5, 2, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG_OFFSET,
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 4.0e-5, 0, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::ARG_OFFSET,
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 3.8e-5, 3, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQ_ARG_OFFSET,
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 5.0e-5, 0, 0.015625,
+                                 &xrs, &timer);
+  testLogSplineRendering<float4>(LogSplineForm::ELEC_PME_DIRECT, TableIndexing::SQ_ARG_OFFSET,
+                                 BasisFunctions::POLYNOMIAL, ew_loose, 5, 2.8e-5, 3, 0.015625,
+                                 &xrs, &timer);
 
   // Test Norbert Juffa's various 32-bit floating point functions
   section(7);

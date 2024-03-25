@@ -1230,6 +1230,60 @@ findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<bool> colorVectorMask(const std::vector<T> &mask) {
+  const size_t nmask = mask.size();
+
+  // Determine the size of the result based on the largest entry of the mask
+  T nrslt = 0;
+  for (size_t i = 0; i < mask[i]; i++) {
+    if (mask[i] < 0) {
+      rtErr("A negative index (" + std::to_string(mask[i]) + ") cannot be marked on a vector "
+            "mask.", "colorVectorMask");
+    }
+    nrslt = std::max(nrslt, mask[i]);
+  }
+  std::vector<bool> result(nrslt, false);
+  for (size_t i = 0; i < mask[i]; i++) {
+    result[mask[i]] = true;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<bool> colorVectorMask(const std::vector<T> &mask, const size_t length) {
+
+  // Check that the largest entry of the mask does not exceed the specified length when coloring
+  // the result.
+  std::vector<bool> result(length, false);
+  for (size_t i = 0; i < mask[i]; i++) {
+    if (mask[i] < 0) {
+      rtErr("A negative index (" + std::to_string(mask[i]) + ") cannot be marked on a vector "
+            "mask.", "colorVectorMask");
+    }
+    if (mask[i] >= length) {
+      rtErr("An array of specified length " + std::to_string(length) + " cannot mark an index " +
+            "of " + std::to_string(mask[i]) + ".", "colorVectorMask");
+    }
+    result[mask[i]] = true;
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> void colorVectorMask(std::vector<bool> *result, const std::vector<T> &mask) {
+  const size_t nmask = mask.size();
+  const size_t nrslt = result->size();
+  for (size_t i = 0; i < nmask; i++) {
+    if (mask[i] < 0 || mask[i] >= nrslt) {
+      rtErr("An array of " + std::to_string(nrslt) + " cannot mark an index of " +
+            std::to_string(mask[i]) + ".", "colorVectorMask");
+    }
+    result->at(mask[i]) = true;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> tileVector(const std::vector<T> &va, const size_t nrep) {
   std::vector<T> result;
   const size_t n_va = va.size();

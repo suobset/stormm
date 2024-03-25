@@ -171,5 +171,202 @@ size_t getPaddedMemorySize(const size_t length, const size_t growth_increment,
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+void partition(const int n, const int pmax, const std::vector<int> &pref,
+               const std::vector<int> &dscr, std::vector<int> *result) {
+
+  // Return immediately if there is no partitioning needed
+  if (pmax >= n) {
+    result->resize(1);
+    result->at(0) = n;
+    return;
+  }
+
+  // Adjust the maximum length downwards to meet the highest possible preferred length.
+  // Determine a suitable combination of lengths that are all in the "preferred" category, or
+  // otherwise avoid the "discouraged" category.
+  int pbase = pmax;
+  int nearest_match = 0;
+  const int npref = pref.size();
+  for (int i = 0; i < npref; i++) {
+    if (pref[i] < pmax && (pmax - pref[i] < pmax - nearest_match)) {
+      nearest_match = pref[i];
+    }
+  }
+  if (nearest_match > 0) {
+    pbase = nearest_match;
+  }
+
+  // Compute the number of base partitions.
+  int base_count = n / pbase;
+  
+  // Compute the length of the final partition.  
+  int last_partition = n - (base_count * pbase);
+  if (last_partition == 0) {
+
+    // If no further partitioning is needed, fill out the result.
+    result->resize(base_count);
+    int* res_ptr = result->data();
+    for (int i = 0; i < base_count; i++) {
+      res_ptr[i] = pbase;
+    }
+  }
+  else {
+
+    // Determine whether the last partition is already a preferred size.
+    bool last_is_good = false;
+    for (int i = 0; i < npref; i++) {
+      last_is_good = (last_is_good || (pref[i] == last_partition));
+    }
+    if (last_is_good) {
+      result->resize(base_count + 1);
+      int* res_ptr = result->data();
+      for (int i = 0; i < base_count; i++) {
+        res_ptr[i] = pbase;
+      }
+      res_ptr[base_count] = last_partition;
+    }
+    else {
+
+      // Determine whether the final partition can be subdivided into roughly equal portions of
+      // preferred sizes.
+      int2 best_pair = { 0, last_partition };
+      for (int i = 0; i < npref; i++) {
+        for (int j = 0; j < npref; j++) {
+          if (pref[i] + pref[j] == last_partition &&
+              abs(pref[i] - pref[j]) < abs(best_pair.x - best_pair.y)) {
+            best_pair.x = pref[i];
+            best_pair.y = pref[j];
+          }
+        }
+      }
+      if (best_pair.x != 0) {
+        result->resize(base_count + 2);
+        int* res_ptr = result->data();
+        for (int i = 0; i < base_count; i++) {
+          res_ptr[i] = pbase;
+        }
+        res_ptr[base_count    ] = best_pair.x;
+        res_ptr[base_count + 1] = best_pair.y;
+      }
+      else {
+
+        // Determine whether the final partition, which so far is at least smaller than pmax and
+        // therefore permitted, is truly bad.
+        const int ndscr = dscr.size();
+        bool last_is_bad = false;
+        for (int i = 0; i < ndscr; i++) {
+          last_is_bad = (last_is_bad || dscr[i] == last_partition);
+        }
+        if (last_is_bad == false) {
+          result->resize(base_count + 1);
+          int* res_ptr = result->data();
+          for (int i = 0; i < base_count; i++) {
+            res_ptr[i] = pbase;
+          }
+          res_ptr[base_count] = last_partition;
+        }
+        else {
+
+          // Find the largest preferred partition less than the current remainder, take this out
+          // as its own partition, and then fold in the rest as one final partition.
+          nearest_match = 0;
+          for (int i = 0; i < npref; i++) {
+            if (pref[i] < last_partition &&
+                (last_partition - pref[i] < last_partition - nearest_match)) {
+              nearest_match = pref[i];
+            }
+          }
+          if (nearest_match > 0) {
+            result->resize(base_count + 2);
+            int* res_ptr = result->data();
+            for (int i = 0; i < base_count; i++) {
+              res_ptr[i] = pbase;
+            }
+            res_ptr[base_count    ] = nearest_match;
+            res_ptr[base_count + 1] = last_partition - nearest_match;
+          }
+          else {
+
+            // The last partition is discouraged, and nothing preferable was found.  It is probably
+            // still better to have one work unit of a discouraged size than two of any other size.
+            result->resize(base_count + 1);
+            int* res_ptr = result->data();
+            for (int i = 0; i < base_count; i++) {
+              res_ptr[i] = pbase;
+            }
+            res_ptr[base_count] = last_partition;
+          }
+        }
+      }
+    }
+  }
+
+  // Check the result.
+  const int nres = result->size();
+  const int* chk_ptr = result->data();
+  for (size_t i = 0; i < nres; i++) {
+    if (chk_ptr[i] > pmax) {
+      rtErr("Element " + std::to_string(i) + " (" + std::to_string(chk_ptr[i]) + ") exceeds the "
+            "maximum partition of " + std::to_string(pmax) + ".", "partition");
+    }
+  }
+  const int tsum = sum<int>(chk_ptr, nres);
+  if (tsum != n) {
+    rtErr("The sum of elements (" + std::to_string(tsum) + ") did not meet the target of " +
+          std::to_string(n) + ".", "partition");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> partition(const int n, const int pmax, const std::vector<int> &pref,
+                           const std::vector<int> &dscr) {
+  std::vector<int> result;
+  partition(n, pmax, pref, dscr, &result);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int sanctionedDensityGridDimension(const ullint big_product, const double* invu,
+                                   const UnitCellAxis edge, const std::vector<uint> &primes,
+                                   const double max_spacing) {
+  int ne;
+  switch (edge) {
+  case UnitCellAxis::A:
+    ne = ceil(invu[0] / max_spacing);
+    break;
+  case UnitCellAxis::B:
+    ne = ceil(sqrt((invu[3] * invu[3]) + (invu[4] * invu[4])) / max_spacing);
+    break;
+  case UnitCellAxis::C: 
+    ne = ceil(sqrt((invu[6] * invu[6]) + (invu[7] * invu[7]) + (invu[8] * invu[8])) / max_spacing);
+    break;
+  }
+  int result = nearestFactor(big_product, ne, primes, LimitApproach::ABOVE);
+
+  // The combination of radices 7 and 11 is very costly for FFTs, but either radix by itself along
+  // one dimension is fine.  Check both to see which provides the minimal result.
+  if (result % 77 == 0) {
+    const int r_seven  = nearestFactor(big_product / 11LLU, ne, primes, LimitApproach::ABOVE);
+    const int r_eleven = nearestFactor(big_product / 7LLU,  ne, primes, LimitApproach::ABOVE);
+    result = std::min(r_seven, r_eleven);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int sanctionedDensityGridDimension(const ullint big_product, const double* invu,
+                                   const CartesianDimension edge,
+                                   const std::vector<uint> &primes, const double max_spacing) {
+  switch (edge) {
+  case CartesianDimension::X:
+    return sanctionedDensityGridDimension(big_product, invu, UnitCellAxis::A, primes, max_spacing);
+  case CartesianDimension::Y:
+    return sanctionedDensityGridDimension(big_product, invu, UnitCellAxis::B, primes, max_spacing);
+  case CartesianDimension::Z:
+    return sanctionedDensityGridDimension(big_product, invu, UnitCellAxis::C, primes, max_spacing);
+  }
+  __builtin_unreachable();
+}
 } // namespace stmath
 } // namespace stormm

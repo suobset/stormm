@@ -474,10 +474,11 @@ int main(const int argc, const char* argv[]) {
   const TextFile repinpa_tf(rep_nml_a, TextOrigin::RAM);
   start_line = 0;
   ReportControls repcon_a(repinpa_tf, &start_line, nullptr);
-  check(repcon_a.getReportedQuantityCount(), RelationalOperator::EQUAL, 10, "The number of "
+  check(repcon_a.getReportedQuantityCount(), RelationalOperator::EQUAL, 3, "The number of "
         "reported quantities in a &report namelist does not meet expectations.");
-  check(repcon_a.getReportedQuantities()[8] == StateVariable::ANGLE &&
-        repcon_a.getReportedQuantities()[9] == StateVariable::UREY_BRADLEY, "Details of the "
+  check(repcon_a.getReportedQuantityCount() >= 3 &&
+        repcon_a.getReportedQuantities()[1] == StateVariable::ANGLE &&
+        repcon_a.getReportedQuantities()[2] == StateVariable::UREY_BRADLEY, "Details of the "
         "reported quantities in a &report namelist do not meet expectations.");
   check(repcon_a.getSDFileDataRequestCount(), RelationalOperator::EQUAL, 2, "The number of data "
         "requests in a &report namelist is incorrect.");
@@ -492,12 +493,12 @@ int main(const int argc, const char* argv[]) {
   testBadNamelist("report", "sdf_item { -title PrintAngle -parameter HarmonicAngle -typeI CT "
                   "-typeJ CN }", "A data item printing angle force field parameters was "
                   "accepted without the correct number of atom types");
-  testBadNamelist("report", "sdf_item { -title PrintBond -parameter bond -typeI CT "
-                  "-typeJ CN -typeK CB }", "A data item printing bond force field parameters was "
-                  "accepted without the correct number of atom types");
-  testBadNamelist("report", "sdf_item { -title PrintAngle -parameter anglep -typeI CT "
-                  "-typeJ CN -typeK CB }", "A data item with a nonsensical parameter name was "
-                  "accepted for SD file output");
+  testBadNamelist("report", "sdf_item { -title PrintBond -parameter bond -typeI CT -typeJ CN "
+                  "-typeK CB }", "A data item printing bond force field parameters was accepted "
+                  "without the correct number of atom types");
+  testBadNamelist("report", "sdf_item { -title PrintAngle -parameter anglep -typeI CT -typeJ CN "
+                  "-typeK CB }", "A data item with a nonsensical parameter name was accepted for "
+                  "SD file output");
   testBadNamelist("report", "sdf_item { -title PrintDihedral -parameter dihedral -typeI CT "
                   "-typeJ CN -typeK CB -typeL OT }", "A data item printing dihedral force field "
                   "parameters was accepted, but this is a composite of proper, improper, and "
@@ -518,6 +519,21 @@ int main(const int argc, const char* argv[]) {
   check(repcon_b.getSDFileDataRequest(1).getKind() == DataRequestKind::STATE_VARIABLE,
         "The subject of an SD file data item request is not correctly conveyed by a &report "
         "namelist.");
+  const std::string rep_nml_c("&report\n  sdf_item { -title BOND_E -label sulfonamide -energy "
+                              "bond }\n  sdf_item { -title ANGLE_E -label sulfonamide -energy "
+                              "HarmonicAngle }\n  energy bond\n  energy angle\n  scope full  "
+                              "syntax matplotlib\n  state volume, state temp, state pressure\n"
+                              "&end\n");
+  const TextFile repinpc_tf(rep_nml_c, TextOrigin::RAM);
+  start_line = 0;
+  ReportControls repcon_c(repinpc_tf, &start_line, nullptr, ExceptionResponse::SILENT);
+  check(repcon_c.getReportedQuantityCount(), RelationalOperator::EQUAL, 6, "The number of "
+        "reported quantities, including requested states, in a &report namelist does not meet "
+        "expectations.");
+  check(repcon_c.getReportedQuantityCount() >= 6 &&
+        repcon_c.getReportedQuantities()[4] == StateVariable::VOLUME &&
+        repcon_c.getReportedQuantities()[5] == StateVariable::TEMPERATURE_ALL, "Details of the "
+        "reported quantities in a &report namelist do not meet expectations.");
 
   // The receptor namelist must come with a label group for the receptor structures.  Whether that
   // label group actually exists in a separate &files namelist will be tested at runtime.

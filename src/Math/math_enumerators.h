@@ -154,6 +154,14 @@ std::string getEnumerationName(FFTMode input);
 ///        real-to-complex and complex-to-real FFTs.
 FFTMode translateFFTMode(const std::string &input);
 
+/// \brief Translate a human-readable string (likely from user input) into one of the known
+///        functions for logarithmically indexed spline tables.
+LogSplineForm translateLogSplineForm(const std::string &input);
+
+/// \brief Translate a human-readable string (likely from user input) into one of the known
+///        table indexing methods for logarithmically indexed spline tables.
+TableIndexing translateTableIndexing(const std::string &input);
+  
 } // namespace stmath
 } // namespace stormm
 

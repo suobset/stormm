@@ -59,6 +59,19 @@ constexpr int default_xoshiro256pp_scrub  = 50;
 ///        and making this a constant makes it easier to reproduce the sequence at a given point.
 constexpr int max_xo_long_jumps = 1024;
 
+/// \brief When using the XOR-shift random number generators, uniform random numbers are produced
+///        on the range [0.0, 1.0).  The Box-Muller transformation to produce random numbers on a
+///        normal distribution is valid for the range (0.0, 1.0), otherwise it produces nan when
+///        the log() or sqrt() functions encounter a zero, respectively.  In order to solve this,
+///        XOR-shift random number generators will commit to producing uniform random numbers with
+///        less random bits (see the implementation), but make use of the 24th or 53rd bits in the
+///        form of an offset one-half the width of the smallest representable increment on the
+///        range [0.5, 1.0).
+/// \{
+constexpr double rng_unit_bin_offset  = 1.1102230246251565404236316680908203125e-16;
+constexpr float rng_unit_bin_offset_f = 5.960464477539062500e-08f;
+/// \}
+  
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
 ///        to have a member function, these random number generators are intended for convenience
@@ -240,10 +253,10 @@ public:
   ///        generators in templated functions.
   float spGaussianRandomNumber();
 
-  /// \brief Jump forward 2^64 iterations in the sequence.
+  /// \brief Jump forward 2^128 iterations in the sequence.
   void jump();
   
-  /// \brief Jump forward 2^96 iterations in the sequence.
+  /// \brief Jump forward 2^192 iterations in the sequence.
   void longJump();
 
   /// \brief Reveal the current state of the generator.
@@ -392,7 +405,7 @@ std::vector<double> uniformRand(Tprng *rng, size_t rows, size_t columns, double 
                                 RngFillMode mode = RngFillMode::COLUMNS);
 
 template <typename Tprng, typename Tprod>
-void uniformRand(Tprng *rng, std::vector<Tprod> *xv, double fp_scale = 1.0, double scale = 1.0);
+void uniformRand(Tprng *rng, std::vector<Tprod> *xv, double scale = 1.0, double fp_scale = 1.0);
 /// \}
 
 /// \brief Return single-precision random number(s) distributed over a uniform distribution.
@@ -407,7 +420,7 @@ std::vector<float> spUniformRand(Tprng *rng, size_t rows, size_t columns, float 
                                  RngFillMode mode = RngFillMode::COLUMNS);
 
 template <typename Tprng, typename Tprod>
-void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, float fp_scale = 1.0, float scale = 1.0);
+void spUniformRand(Tprng *rng, std::vector<Tprod> *xv, float scale = 1.0, float fp_scale = 1.0);
 /// \}
 
 /// \brief Return double-precision random number(s) distributed over a normal distribution.

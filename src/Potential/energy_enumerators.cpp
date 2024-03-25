@@ -76,8 +76,8 @@ std::string getEnumerationName(const StateVariable input) {
     return std::string("VDW_ONE_FOUR");
   case StateVariable::ELECTROSTATIC:
     return std::string("ELECTROSTATIC");
-  case StateVariable::ELECTROSTATIC_ONE_FOUR:
-    return std::string("ELECTROSTATIC_ONE_FOUR");
+  case StateVariable::ELEC_ONE_FOUR:
+    return std::string("ELEC_ONE_FOUR");
   case StateVariable::GENERALIZED_BORN:
     return std::string("GENERALIZED_BORN");
   case StateVariable::RESTRAINT:
@@ -263,6 +263,21 @@ std::string getEnumerationName(const PMIStrategy input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ValenceKernelSize input) {
+  switch (input) {
+  case ValenceKernelSize::XL:
+    return std::string("XL");
+  case ValenceKernelSize::LG:
+    return std::string("LG");
+  case ValenceKernelSize::MD:
+    return std::string("MD");
+  case ValenceKernelSize::SM:
+    return std::string("SM");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 NonbondedPotential translateNonbondedPotential(const std::string &input) {
   if (strcmpCased(input, std::string("electrostatic"), CaseSensitivity::NO) ||
       strcmpCased(input, std::string("elec"), CaseSensitivity::NO) ||
@@ -306,6 +321,30 @@ NonbondedTheme translateNonbondedTheme(const std::string &input) {
   else {
     rtErr("The input \"" + input + "\" does not have a valid enumeration.",
           "translateNonbondedTheme");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+EnergySample translateEnergySample(const std::string &input) {
+  if (strcmpCased(input, std::string("time_series"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("series"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("all"), CaseSensitivity::NO)) {
+    return EnergySample::TIME_SERIES;
+  }
+  else if (strcmpCased(input, std::string("mean"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("average"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("timeaverage"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("time_average"), CaseSensitivity::NO)) {
+    return EnergySample::TIME_AVERAGE;
+  }
+  else if (strcmpCased(input, std::string("final"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("last"), CaseSensitivity::NO)) {
+    return EnergySample::FINAL;
+  }
+  else {
+    rtErr("The input \"" + input + "\" does not have a valid enumeration.",
+          "translateEnergySample");
   }
   __builtin_unreachable();
 }

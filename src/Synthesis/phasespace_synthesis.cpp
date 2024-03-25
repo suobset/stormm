@@ -56,35 +56,32 @@ PsSynthesisBorders::PsSynthesisBorders(const int system_count_in, const int* ato
   
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const int unique_topology_count_in,
-                                     const UnitCellType unit_cell_in,
-                                     const ThermostatKind heat_bath_kind_in,
-                                     const BarostatKind piston_kind_in, const double time_step_in,
-                                     const int* atom_starts_in, const int* atom_counts_in,
-                                     const int* common_ag_list_in, const int* common_ag_bounds_in,
-                                     const int* unique_ag_idx_in, const int* replica_idx_in,
-                                     const double gpos_scale_in, const double lpos_scale_in,
-                                     const double vel_scale_in, const double frc_scale_in,
-                                     const int gpos_bits_in, const int lpos_bits_in,
-                                     const int vel_bits_in, const int frc_bits_in,
-                                     llint* boxvecs_in, int* boxvec_ovrf_in, double* umat_in,
-                                     double* invu_in, double* boxdims_in, llint* alt_boxvecs_in,
-                                     int* alt_boxvec_ovrf_in, double* umat_alt_in,
-                                     double* invu_alt_in, double* alt_boxdims_in, llint* xcrd_in,
-                                     llint* ycrd_in, llint* zcrd_in, int* xcrd_ovrf_in,
-                                     int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in,
-                                     llint* yvel_in, llint* zvel_in, int* xvel_ovrf_in,
-                                     int* yvel_ovrf_in, int* zvel_ovrf_in, llint* xfrc_in,
-                                     llint* yfrc_in, llint* zfrc_in, int* xfrc_ovrf_in,
-                                     int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xalt_in,
-                                     llint* yalt_in, llint* zalt_in, int* xalt_ovrf_in,
-                                     int* yalt_ovrf_in, int* zalt_ovrf_in, llint* vxalt_in,
-                                     llint* vyalt_in, llint* vzalt_in, int* vxalt_ovrf_in,
-                                     int* vyalt_ovrf_in, int* vzalt_ovrf_in, llint* fxalt_in,
-                                     llint* fyalt_in, llint* fzalt_in, int* fxalt_ovrf_in,
-                                     int* fyalt_ovrf_in, int* fzalt_ovrf_in) :
+                                     const UnitCellType unit_cell_in, const int* atom_starts_in,
+                                     const int* atom_counts_in, const int* common_ag_list_in,
+                                     const int* common_ag_bounds_in, const int* unique_ag_idx_in,
+                                     const int* replica_idx_in, const double gpos_scale_in,
+                                     const double lpos_scale_in, const double vel_scale_in,
+                                     const double frc_scale_in, const int gpos_bits_in,
+                                     const int lpos_bits_in, const int vel_bits_in,
+                                     const int frc_bits_in, llint* boxvecs_in, int* boxvec_ovrf_in,
+                                     double* umat_in, double* invu_in, double* boxdims_in,
+                                     llint* alt_boxvecs_in, int* alt_boxvec_ovrf_in,
+                                     double* umat_alt_in, double* invu_alt_in,
+                                     double* alt_boxdims_in, llint* xcrd_in, llint* ycrd_in,
+                                     llint* zcrd_in, int* xcrd_ovrf_in, int* ycrd_ovrf_in,
+                                     int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
+                                     llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in,
+                                     int* zvel_ovrf_in, llint* xfrc_in, llint* yfrc_in,
+                                     llint* zfrc_in, int* xfrc_ovrf_in, int* yfrc_ovrf_in,
+                                     int* zfrc_ovrf_in, llint* xalt_in, llint* yalt_in,
+                                     llint* zalt_in, int* xalt_ovrf_in, int* yalt_ovrf_in,
+                                     int* zalt_ovrf_in, llint* vxalt_in, llint* vyalt_in,
+                                     llint* vzalt_in, int* vxalt_ovrf_in, int* vyalt_ovrf_in,
+                                     int* vzalt_ovrf_in, llint* fxalt_in, llint* fyalt_in,
+                                     llint* fzalt_in, int* fxalt_ovrf_in, int* fyalt_ovrf_in,
+                                     int* fzalt_ovrf_in) :
     system_count{system_count_in}, unique_topology_count{unique_topology_count_in},
-    unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in}, piston_kind{piston_kind_in},
-    time_step{time_step_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+    unit_cell{unit_cell_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
     common_ag_list{common_ag_list_in}, common_ag_bounds{common_ag_bounds_in},
     unique_ag_idx{unique_ag_idx_in}, replica_idx{replica_idx_in}, gpos_scale{gpos_scale_in},
     lpos_scale{lpos_scale_in}, vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
@@ -117,42 +114,39 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const int unique
 
 //-------------------------------------------------------------------------------------------------
 PsSynthesisReader::PsSynthesisReader(const int system_count_in, const int unique_topology_count_in,
-                                     const UnitCellType unit_cell_in,
-                                     const ThermostatKind heat_bath_kind_in,
-                                     const BarostatKind piston_kind_in, const double time_step_in,
-                                     const int* atom_starts_in, const int* atom_counts_in,
-                                     const int* common_ag_list_in, const int* common_ag_bounds_in,
-                                     const int*	unique_ag_idx_in, const int* replica_idx_in,
-                                     const double gpos_scale_in, const double lpos_scale_in,
-                                     const double vel_scale_in, const double frc_scale_in,
-                                     const int gpos_bits_in, const int lpos_bits_in,
-                                     const int vel_bits_in, const int frc_bits_in,
-                                     const llint* boxvecs_in, const int* boxvec_ovrf_in,
-                                     const double* umat_in, const double* invu_in,
-                                     const double* boxdims_in, const llint* alt_boxvecs_in,
-                                     const int* alt_boxvec_ovrf_in, const double* umat_alt_in,
-                                     const double* invu_alt_in, const double* alt_boxdims_in,
-                                     const llint* xcrd_in, const llint* ycrd_in,
-                                     const llint* zcrd_in, const int* xcrd_ovrf_in,
-                                     const int* ycrd_ovrf_in, const int* zcrd_ovrf_in,
-                                     const llint* xvel_in, const llint* yvel_in,
-                                     const llint* zvel_in, const int* xvel_ovrf_in,
-                                     const int* yvel_ovrf_in, const int* zvel_ovrf_in,
-                                     const llint* xfrc_in, const llint* yfrc_in,
-                                     const llint* zfrc_in, const int* xfrc_ovrf_in,
-                                     const int* yfrc_ovrf_in, const int* zfrc_ovrf_in,
-                                     const llint* xalt_in, const llint* yalt_in,
-                                     const llint* zalt_in, const int* xalt_ovrf_in,
-                                     const int* yalt_ovrf_in, const int* zalt_ovrf_in,
-                                     const llint* vxalt_in, const llint* vyalt_in,
-                                     const llint* vzalt_in, const int* vxalt_ovrf_in,
-                                     const int* vyalt_ovrf_in, const int* vzalt_ovrf_in,
-                                     const llint* fxalt_in, const llint* fyalt_in,
-                                     const llint* fzalt_in, const int* fxalt_ovrf_in,
-                                     const int* fyalt_ovrf_in, const int* fzalt_ovrf_in) :
+                                     const UnitCellType unit_cell_in, const int* atom_starts_in,
+                                     const int* atom_counts_in, const int* common_ag_list_in,
+                                     const int* common_ag_bounds_in, const int* unique_ag_idx_in,
+                                     const int* replica_idx_in, const double gpos_scale_in,
+                                     const double lpos_scale_in, const double vel_scale_in,
+                                     const double frc_scale_in, const int gpos_bits_in,
+                                     const int lpos_bits_in, const int vel_bits_in,
+                                     const int frc_bits_in, const llint* boxvecs_in,
+                                     const int* boxvec_ovrf_in, const double* umat_in,
+                                     const double* invu_in, const double* boxdims_in,
+                                     const llint* alt_boxvecs_in, const int* alt_boxvec_ovrf_in,
+                                     const double* umat_alt_in, const double* invu_alt_in,
+                                     const double* alt_boxdims_in, const llint* xcrd_in,
+                                     const llint* ycrd_in, const llint* zcrd_in,
+                                     const int* xcrd_ovrf_in, const int* ycrd_ovrf_in,
+                                     const int* zcrd_ovrf_in, const llint* xvel_in,
+                                     const llint* yvel_in, const llint* zvel_in,
+                                     const int* xvel_ovrf_in, const int* yvel_ovrf_in,
+                                     const int* zvel_ovrf_in, const llint* xfrc_in,
+                                     const llint* yfrc_in, const llint* zfrc_in,
+                                     const int* xfrc_ovrf_in, const int* yfrc_ovrf_in,
+                                     const int* zfrc_ovrf_in, const llint* xalt_in,
+                                     const llint* yalt_in, const llint* zalt_in,
+                                     const int* xalt_ovrf_in, const int* yalt_ovrf_in,
+                                     const int* zalt_ovrf_in, const llint* vxalt_in,
+                                     const llint* vyalt_in, const llint* vzalt_in,
+                                     const int* vxalt_ovrf_in, const int* vyalt_ovrf_in,
+                                     const int* vzalt_ovrf_in, const llint* fxalt_in,
+                                     const llint* fyalt_in, const llint* fzalt_in,
+                                     const int* fxalt_ovrf_in, const int* fyalt_ovrf_in,
+                                     const int* fzalt_ovrf_in) :
     system_count{system_count_in}, unique_topology_count{unique_topology_count_in},
-    unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in}, piston_kind{piston_kind_in},
-    time_step{time_step_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
+    unit_cell{unit_cell_in}, atom_starts{atom_starts_in}, atom_counts{atom_counts_in},
     common_ag_list{common_ag_list_in}, common_ag_bounds{common_ag_bounds_in},
     unique_ag_idx{unique_ag_idx_in}, replica_idx{replica_idx_in}, gpos_scale{gpos_scale_in},
     lpos_scale{lpos_scale_in}, vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
@@ -188,9 +182,6 @@ PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
     system_count{psyw.system_count},
     unique_topology_count{psyw.unique_topology_count},
     unit_cell{psyw.unit_cell},
-    heat_bath_kind{psyw.heat_bath_kind},
-    piston_kind{psyw.piston_kind},
-    time_step{psyw.time_step},
     atom_starts{psyw.atom_starts},
     atom_counts{psyw.atom_counts},
     common_ag_list{psyw.common_ag_list},
@@ -244,9 +235,6 @@ PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
@@ -254,10 +242,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     system_count{static_cast<int>(ps_list.size())},
     unique_topology_count{0},
     unit_cell{UnitCellType::NONE},
-    cycle_position{CoordinateCycle::PRIMARY},
-    heat_bath_kind{ThermostatKind::NONE},
-    piston_kind{BarostatKind::NONE},
-    time_step{time_step_in},
+    cycle_position{CoordinateCycle::WHITE},
     globalpos_scale{pow(2.0, globalpos_scale_bits_in)},
     localpos_scale{pow(2.0, localpos_scale_bits_in)},
     velocity_scale{pow(2.0, velocity_scale_bits_in)},
@@ -337,8 +322,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
   checkLocalPositionBits(localpos_scale_bits);
   checkVelocityBits(velocity_scale_bits);
   checkForceBits(force_scale_bits);
-  const int nbaths = heat_baths_in.size();
-  const int npumps = pistons_in.size();
   if (system_count == 0) {
     rtErr("At least one PhaseSpace object must be provided.", "PhaseSpaceSynthesis");
   }
@@ -346,40 +329,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     rtErr("One topology pointer must be provided for each coordinate system (currently " +
           std::to_string(ag_list.size()) + " topology pointers and " +
           std::to_string(system_count) + " PhaseSpace objects.", "PhaseSpaceSynthesis");
-  }
-  else if (nbaths != 1 && nbaths != system_count) {
-    rtErr("One thermostat must be provided, or one thermostat for each system (currently " +
-          std::to_string(system_count) + " systems and " + std::to_string(nbaths) +
-          " thermostats).", "PhaseSpaceSynthesis");
-  }
-  else if (npumps != 1 && npumps != system_count) {
-    rtErr("One barostat must be provided, or one barostat for each system (currently " +
-          std::to_string(system_count) + " systems and " + std::to_string(npumps) +
-          " barostats).", "PhaseSpaceSynthesis");
-  }
-
-  // Check validity of thermostats: all thermostats must be of the same type, but temperatures
-  // and details of the coupling strength may vary between systems
-  heat_bath_kind = heat_baths_in[0].getKind();
-  for (int i = 1; i < nbaths; i++) {
-    if (heat_baths_in[i].getKind() != heat_baths_in[0].getKind()) {
-      rtErr("All system thermostats must be of the same class.  System " + std::to_string(i) +
-            " uses a " + getThermostatName(heat_baths_in[i].getKind()) + " thermostat whereas the "
-            "first system locks the method to " + getThermostatName(heat_baths_in[0].getKind()) +
-            ".", "PhaseSpaceSynthesis");
-    }
-  }
-  
-  // Check validity of barostats: all barostats must be of the same type, but pressures and
-  // details of the rescaling may vary between systems
-  piston_kind = pistons_in[0].getKind();
-  for (int i = 1; i < npumps; i++) {
-    if (pistons_in[i].getKind() != pistons_in[0].getKind()) {
-      rtErr("All system barostats must be of the same class.  System " + std::to_string(i) +
-            " uses a " + getBarostatName(pistons_in[i].getKind()) + " barostat whereas the first "
-            "system locks the method to " + getBarostatName(pistons_in[0].getKind()) + ".",
-            "PhaseSpaceSynthesis");
-    }
   }
 
   // Find the unique topologies
@@ -405,7 +354,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     atom_stride += roundUp(ps_list[i].getAtomCount(), warp_size_int);
   }
   allocate(atom_stride);
-
+  
   // Survey all systems and list all examples using each unique topology.
   int* stib_ptr = shared_topology_instance_bounds.data();
   for (int i = 0; i < system_count; i++) {
@@ -418,6 +367,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
   }
   prefixSumInPlace(&shared_topology_instance_bounds, PrefixSumType::EXCLUSIVE,
                    "PhaseSpaceSynthesis");
+  
   std::vector<int> stib_counters = shared_topology_instance_bounds.readHost();
   if (stib_counters.back() != system_count) {
     rtErr("Counts of systems linked to each unique topology are incorrect.",
@@ -580,7 +530,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
       alt_box_dimensions.putHost(psr.boxdim[j], (i * dim_stride) + j);
     }
 
-    // Copy the box transformations into the ALTERNATE space
+    // Copy the box transformations into the BLACK space
     llint* alt_bv_ptr = alt_box_vectors.data();
     int* alt_bv_ovrf_ptr = alt_box_vector_overflow.data();
     double* alt_umat_ptr = alt_box_transforms.data();
@@ -597,62 +547,17 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &index_key,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<int> &ps_index_key,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<int> &ag_index_key,
-                                         const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in,
-                                         const double time_step_in,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(ps_list, ag_list, { Thermostat() }, { Barostat() }, 1.0,
                         globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
                         force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const std::vector<AtomGraph*> &ag_list,
-                                         const std::vector<int> &index_key,
-                                         const int globalpos_scale_bits_in,
-                                         const int localpos_scale_bits_in,
-                                         const int velocity_scale_bits_in,
-                                         const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
-                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
-{}
-
-//-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const std::vector<int> &ps_index_key,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<int> &ag_index_key,
@@ -661,8 +566,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
     PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
-                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
-                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
+                        force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -671,9 +576,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     unique_topology_count{original.unique_topology_count},
     unit_cell{original.unit_cell},
     cycle_position{original.cycle_position},
-    heat_bath_kind{original.heat_bath_kind},
-    piston_kind{original.piston_kind},
-    time_step{original.time_step},
     globalpos_scale{original.globalpos_scale},
     localpos_scale{original.localpos_scale},
     velocity_scale{original.velocity_scale},
@@ -761,9 +663,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     unique_topology_count{original.unique_topology_count},
     unit_cell{original.unit_cell},
     cycle_position{original.cycle_position},
-    heat_bath_kind{original.heat_bath_kind},
-    piston_kind{original.piston_kind},
-    time_step{original.time_step},
     globalpos_scale{original.globalpos_scale},
     localpos_scale{original.localpos_scale},
     velocity_scale{original.velocity_scale},
@@ -848,9 +747,6 @@ PhaseSpaceSynthesis& PhaseSpaceSynthesis::operator=(const PhaseSpaceSynthesis &o
   unique_topology_count = other.unique_topology_count;
   unit_cell = other.unit_cell;
   cycle_position = other.cycle_position;
-  heat_bath_kind = other.heat_bath_kind;
-  piston_kind = other.piston_kind;
-  time_step = other.time_step;
   globalpos_scale = other.globalpos_scale;
   localpos_scale = other.localpos_scale;
   velocity_scale = other.velocity_scale;
@@ -943,9 +839,6 @@ PhaseSpaceSynthesis& PhaseSpaceSynthesis::operator=(PhaseSpaceSynthesis &&other)
   unique_topology_count = other.unique_topology_count;
   unit_cell = other.unit_cell;
   cycle_position = other.cycle_position;
-  heat_bath_kind = other.heat_bath_kind;
-  piston_kind = other.piston_kind;
-  time_step = other.time_step;
   globalpos_scale = other.globalpos_scale;
   localpos_scale = other.localpos_scale;
   velocity_scale = other.velocity_scale;
@@ -1087,6 +980,13 @@ int PhaseSpaceSynthesis::getAtomCount(const int system_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getPaddedAtomCount() const {
+  const size_t last_system = system_count - 1;
+  return atom_starts.readHost(last_system) +
+         roundUp(atom_counts.readHost(last_system), warp_size_int);
+}
+
+//-------------------------------------------------------------------------------------------------
 int PhaseSpaceSynthesis::getUniqueTopologyIndex(const int system_index) const {
   return unique_topology_reference.readHost(system_index);
 }
@@ -1148,10 +1048,10 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const HybridTargetLevel tier) 
 const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                                                   const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::PRIMARY:
-    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, atom_starts.data(tier),
-                             atom_counts.data(tier), shared_topology_instances.data(tier),
+  case CoordinateCycle::WHITE:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell,
+                             atom_starts.data(tier), atom_counts.data(tier),
+                             shared_topology_instances.data(tier),
                              shared_topology_instance_bounds.data(tier),
                              unique_topology_reference.data(tier),
                              shared_topology_instance_index.data(tier), globalpos_scale,
@@ -1182,10 +1082,10 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientat
                              x_alt_force_overflow.data(tier),
                              y_alt_force_overflow.data(tier),
                              z_alt_force_overflow.data(tier));
-  case CoordinateCycle::ALTERNATE:
-    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, atom_starts.data(tier),
-                             atom_counts.data(tier), shared_topology_instances.data(tier),
+  case CoordinateCycle::BLACK:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell,
+                             atom_starts.data(tier), atom_counts.data(tier),
+                             shared_topology_instances.data(tier),
                              shared_topology_instance_bounds.data(tier),
                              unique_topology_reference.data(tier),
                              shared_topology_instance_index.data(tier), globalpos_scale,
@@ -1227,10 +1127,10 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const HybridTargetLevel tier) {
 PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                                             const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::PRIMARY:
-    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, atom_starts.data(tier),
-                             atom_counts.data(tier), shared_topology_instances.data(tier),
+  case CoordinateCycle::WHITE:
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell,
+                             atom_starts.data(tier), atom_counts.data(tier),
+                             shared_topology_instances.data(tier),
                              shared_topology_instance_bounds.data(tier),
                              unique_topology_reference.data(tier),
                              shared_topology_instance_index.data(tier), globalpos_scale,
@@ -1261,10 +1161,10 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              x_alt_force_overflow.data(tier),
                              y_alt_force_overflow.data(tier),
                              z_alt_force_overflow.data(tier));
-  case CoordinateCycle::ALTERNATE:
-    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, atom_starts.data(tier),
-                             atom_counts.data(tier), shared_topology_instances.data(tier),
+  case CoordinateCycle::BLACK:
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell,
+                             atom_starts.data(tier), atom_counts.data(tier),
+                             shared_topology_instances.data(tier),
                              shared_topology_instance_bounds.data(tier),
                              unique_topology_reference.data(tier),
                              shared_topology_instance_index.data(tier), globalpos_scale,
@@ -1383,36 +1283,35 @@ PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycle orientation) con
 
   // Return an abstract based on the requested point in the coordinate cycle
   switch (orientation) {
-  case CoordinateCycle::PRIMARY:
-    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
-                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
-                             devc_unique_topology_reference, devc_shared_topology_instance_index,
-                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
-                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
-                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
-                             devc_invu, devc_boxdims, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
-                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_xcrd, devc_ycrd,
-                             devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel,
-                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
-                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
-                             devc_zfrc_ovrf, devc_xalt, devc_yalt, devc_zalt, devc_xalt_ovrf,
-                             devc_yalt_ovrf, devc_zalt_ovrf, devc_vxalt, devc_vyalt, devc_vzalt,
-                             devc_vxalt_ovrf, devc_vyalt_ovrf, devc_vzalt_ovrf, devc_fxalt,
-                             devc_fyalt, devc_fzalt, devc_fxalt_ovrf, devc_fyalt_ovrf,
-                             devc_fzalt_ovrf);
-  case CoordinateCycle::ALTERNATE:
-    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
-                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
-                             devc_unique_topology_reference, devc_shared_topology_instance_index,
-                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
-                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
-                             force_scale_bits, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
-                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_boxvecs,
-                             devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims, devc_xalt,
+  case CoordinateCycle::WHITE:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, devc_atom_starts,
+                             devc_atom_counts, devc_shared_topology_instances,
+                             devc_shared_topology_instance_bounds, devc_unique_topology_reference,
+                             devc_shared_topology_instance_index, globalpos_scale, localpos_scale,
+                             velocity_scale, force_scale, globalpos_scale_bits,
+                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                             devc_boxvecs, devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims,
+                             devc_alt_boxvecs, devc_alt_boxvec_ovrf, devc_umat_alt, devc_invu_alt,
+                             devc_alt_boxdims, devc_xcrd, devc_ycrd, devc_zcrd, devc_xcrd_ovrf,
+                             devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel, devc_zvel,
+                             devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc, devc_yfrc,
+                             devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_xalt,
                              devc_yalt, devc_zalt, devc_xalt_ovrf, devc_yalt_ovrf, devc_zalt_ovrf,
                              devc_vxalt, devc_vyalt, devc_vzalt, devc_vxalt_ovrf, devc_vyalt_ovrf,
+                             devc_vzalt_ovrf, devc_fxalt, devc_fyalt, devc_fzalt, devc_fxalt_ovrf,
+                             devc_fyalt_ovrf, devc_fzalt_ovrf);
+  case CoordinateCycle::BLACK:
+    return PsSynthesisReader(system_count, unique_topology_count, unit_cell, devc_atom_starts,
+                             devc_atom_counts, devc_shared_topology_instances,
+                             devc_shared_topology_instance_bounds, devc_unique_topology_reference,
+                             devc_shared_topology_instance_index, globalpos_scale, localpos_scale,
+                             velocity_scale, force_scale, globalpos_scale_bits,
+                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                             devc_alt_boxvecs, devc_alt_boxvec_ovrf, devc_umat_alt, devc_invu_alt,
+                             devc_alt_boxdims, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_xalt, devc_yalt, devc_zalt,
+                             devc_xalt_ovrf, devc_yalt_ovrf, devc_zalt_ovrf, devc_vxalt,
+                             devc_vyalt, devc_vzalt, devc_vxalt_ovrf, devc_vyalt_ovrf,
                              devc_vzalt_ovrf, devc_fxalt, devc_fyalt, devc_fzalt, devc_fxalt_ovrf,
                              devc_fyalt_ovrf, devc_fzalt_ovrf, devc_xcrd, devc_ycrd, devc_zcrd,
                              devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel,
@@ -1501,36 +1400,35 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
 
   // Return an abstract based on the requested point in the coordinate cycle
   switch (orientation) {
-  case CoordinateCycle::PRIMARY:
-    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
-                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
-                             devc_unique_topology_reference, devc_shared_topology_instance_index,
-                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
-                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
-                             force_scale_bits, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
-                             devc_invu, devc_boxdims, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
-                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_xcrd, devc_ycrd,
-                             devc_zcrd, devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel,
-                             devc_yvel, devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf,
-                             devc_xfrc, devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf,
-                             devc_zfrc_ovrf, devc_xalt, devc_yalt, devc_zalt, devc_xalt_ovrf,
-                             devc_yalt_ovrf, devc_zalt_ovrf, devc_vxalt, devc_vyalt, devc_vzalt,
-                             devc_vxalt_ovrf, devc_vyalt_ovrf, devc_vzalt_ovrf, devc_fxalt,
-                             devc_fyalt, devc_fzalt, devc_fxalt_ovrf, devc_fyalt_ovrf,
-                             devc_fzalt_ovrf);
-  case CoordinateCycle::ALTERNATE:
-    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, heat_bath_kind,
-                             piston_kind, time_step, devc_atom_starts, devc_atom_counts,
-                             devc_shared_topology_instances, devc_shared_topology_instance_bounds,
-                             devc_unique_topology_reference, devc_shared_topology_instance_index,
-                             globalpos_scale, localpos_scale, velocity_scale, force_scale,
-                             globalpos_scale_bits, localpos_scale_bits, velocity_scale_bits,
-                             force_scale_bits, devc_alt_boxvecs, devc_alt_boxvec_ovrf,
-                             devc_umat_alt, devc_invu_alt, devc_alt_boxdims, devc_boxvecs,
-                             devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims, devc_xalt,
+  case CoordinateCycle::WHITE:
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, devc_atom_starts,
+                             devc_atom_counts, devc_shared_topology_instances,
+                             devc_shared_topology_instance_bounds, devc_unique_topology_reference,
+                             devc_shared_topology_instance_index, globalpos_scale, localpos_scale,
+                             velocity_scale, force_scale, globalpos_scale_bits,
+                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                             devc_boxvecs, devc_boxvec_ovrf, devc_umat, devc_invu, devc_boxdims,
+                             devc_alt_boxvecs, devc_alt_boxvec_ovrf, devc_umat_alt, devc_invu_alt,
+                             devc_alt_boxdims, devc_xcrd, devc_ycrd, devc_zcrd, devc_xcrd_ovrf,
+                             devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel, devc_zvel,
+                             devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc, devc_yfrc,
+                             devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf, devc_xalt,
                              devc_yalt, devc_zalt, devc_xalt_ovrf, devc_yalt_ovrf, devc_zalt_ovrf,
                              devc_vxalt, devc_vyalt, devc_vzalt, devc_vxalt_ovrf, devc_vyalt_ovrf,
+                             devc_vzalt_ovrf, devc_fxalt, devc_fyalt, devc_fzalt, devc_fxalt_ovrf,
+                             devc_fyalt_ovrf, devc_fzalt_ovrf);
+  case CoordinateCycle::BLACK:
+    return PsSynthesisWriter(system_count, unique_topology_count, unit_cell, devc_atom_starts,
+                             devc_atom_counts, devc_shared_topology_instances,
+                             devc_shared_topology_instance_bounds, devc_unique_topology_reference,
+                             devc_shared_topology_instance_index, globalpos_scale, localpos_scale,
+                             velocity_scale, force_scale, globalpos_scale_bits,
+                             localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                             devc_alt_boxvecs, devc_alt_boxvec_ovrf, devc_umat_alt, devc_invu_alt,
+                             devc_alt_boxdims, devc_boxvecs, devc_boxvec_ovrf, devc_umat,
+                             devc_invu, devc_boxdims, devc_xalt, devc_yalt, devc_zalt,
+                             devc_xalt_ovrf, devc_yalt_ovrf, devc_zalt_ovrf, devc_vxalt,
+                             devc_vyalt, devc_vzalt, devc_vxalt_ovrf, devc_vyalt_ovrf,
                              devc_vzalt_ovrf, devc_fxalt, devc_fyalt, devc_fzalt, devc_fxalt_ovrf,
                              devc_fyalt_ovrf, devc_fzalt_ovrf, devc_xcrd, devc_ycrd, devc_zcrd,
                              devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel,
@@ -1650,26 +1548,6 @@ void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_l
 #endif
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::velocityVerletCoordinateUpdate() {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::velocityVerletVelocityUpdate() {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::assignMaxwellVelocities() {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::berendsenThermocoupling() {
-
-}
-
-//-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
                                         const HybridTargetLevel origin,
                                         const HybridTargetLevel destination,
@@ -1779,7 +1657,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_coordinates.readHost(astart, rsw.natom);
         ybuffer = y_alt_coordinates.readHost(astart, rsw.natom);
         zbuffer = z_alt_coordinates.readHost(astart, rsw.natom);
@@ -1787,7 +1665,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         invu_buffer = alt_inverse_transforms.readHost(xfrm_offset, 9);
         bdim_buffer = alt_box_dimensions.readHost(bdim_offset, 6);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_coordinates.readHost(astart, rsw.natom);
         ybuffer = y_coordinates.readHost(astart, rsw.natom);
         zbuffer = z_coordinates.readHost(astart, rsw.natom);
@@ -1799,12 +1677,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       break;
     case TrajectoryKind::VELOCITIES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_velocities.readHost(astart, rsw.natom);
         ybuffer = y_alt_velocities.readHost(astart, rsw.natom);
         zbuffer = z_alt_velocities.readHost(astart, rsw.natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_velocities.readHost(astart, rsw.natom);
         ybuffer = y_velocities.readHost(astart, rsw.natom);
         zbuffer = z_velocities.readHost(astart, rsw.natom);
@@ -1813,12 +1691,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       break;
     case TrajectoryKind::FORCES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_forces.readHost(astart, rsw.natom);
         ybuffer = y_alt_forces.readHost(astart, rsw.natom);
         zbuffer = z_alt_forces.readHost(astart, rsw.natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_forces.readHost(astart, rsw.natom);
         ybuffer = y_forces.readHost(astart, rsw.natom);
         zbuffer = z_forces.readHost(astart, rsw.natom);
@@ -1832,7 +1710,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_coordinates.readDevice(astart, rsw.natom);
         ybuffer = y_alt_coordinates.readDevice(astart, rsw.natom);
         zbuffer = z_alt_coordinates.readDevice(astart, rsw.natom);
@@ -1840,7 +1718,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         invu_buffer = alt_inverse_transforms.readDevice(xfrm_offset, 9);
         bdim_buffer = alt_box_dimensions.readDevice(bdim_offset, 6);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_coordinates.readDevice(astart, rsw.natom);
         ybuffer = y_coordinates.readDevice(astart, rsw.natom);
         zbuffer = z_coordinates.readDevice(astart, rsw.natom);
@@ -1852,12 +1730,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       break;
     case TrajectoryKind::VELOCITIES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_velocities.readDevice(astart, rsw.natom);
         ybuffer = y_alt_velocities.readDevice(astart, rsw.natom);
         zbuffer = z_alt_velocities.readDevice(astart, rsw.natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_velocities.readDevice(astart, rsw.natom);
         ybuffer = y_velocities.readDevice(astart, rsw.natom);
         zbuffer = z_velocities.readDevice(astart, rsw.natom);
@@ -1866,12 +1744,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       break;
     case TrajectoryKind::FORCES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xbuffer = x_alt_forces.readDevice(astart, rsw.natom);
         ybuffer = y_alt_forces.readDevice(astart, rsw.natom);
         zbuffer = z_alt_forces.readDevice(astart, rsw.natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xbuffer = x_forces.readDevice(astart, rsw.natom);
         ybuffer = y_forces.readDevice(astart, rsw.natom);
         zbuffer = z_forces.readDevice(astart, rsw.natom);
@@ -1920,12 +1798,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_coord_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_alt_coord_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_alt_coord_overflow.readHost(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_coordinate_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_coordinate_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_coordinate_overflow.readHost(astart, rsw.natom);
@@ -1937,12 +1815,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_velocity_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_alt_velocity_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_alt_velocity_overflow.readHost(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_velocity_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_velocity_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_velocity_overflow.readHost(astart, rsw.natom);
@@ -1954,12 +1832,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (force_scale_bits > force_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_force_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_alt_force_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_alt_force_overflow.readHost(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_force_overflow.readHost(astart, rsw.natom);
           y_ovrf_buffer = y_force_overflow.readHost(astart, rsw.natom);
           z_ovrf_buffer = z_force_overflow.readHost(astart, rsw.natom);
@@ -1976,12 +1854,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_coord_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_alt_coord_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_alt_coord_overflow.readDevice(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_coordinate_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_coordinate_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_coordinate_overflow.readDevice(astart, rsw.natom);
@@ -1993,12 +1871,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_velocity_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_alt_velocity_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_alt_velocity_overflow.readDevice(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_velocity_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_velocity_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_velocity_overflow.readDevice(astart, rsw.natom);
@@ -2010,12 +1888,12 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       if (force_scale_bits > force_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           x_ovrf_buffer = x_alt_force_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_alt_force_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_alt_force_overflow.readDevice(astart, rsw.natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           x_ovrf_buffer = x_force_overflow.readDevice(astart, rsw.natom);
           y_ovrf_buffer = y_force_overflow.readDevice(astart, rsw.natom);
           z_ovrf_buffer = z_force_overflow.readDevice(astart, rsw.natom);
@@ -2062,12 +1940,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_coordinates.readHost(atom_offset, natom);
         ydata = y_alt_coordinates.readHost(atom_offset, natom);
         zdata = z_alt_coordinates.readHost(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_coordinates.readHost(atom_offset, natom);
         ydata = y_coordinates.readHost(atom_offset, natom);
         zdata = z_coordinates.readHost(atom_offset, natom);
@@ -2076,12 +1954,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_coord_overflow.readHost(atom_offset, natom);
           yovrf = y_alt_coord_overflow.readHost(atom_offset, natom);
           zovrf = z_alt_coord_overflow.readHost(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_coordinate_overflow.readHost(atom_offset, natom);
           yovrf = y_coordinate_overflow.readHost(atom_offset, natom);
           zovrf = z_coordinate_overflow.readHost(atom_offset, natom);
@@ -2091,12 +1969,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       break;
     case TrajectoryKind::VELOCITIES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_velocities.readHost(atom_offset, natom);
         ydata = y_alt_velocities.readHost(atom_offset, natom);
         zdata = z_alt_velocities.readHost(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_velocities.readHost(atom_offset, natom);
         ydata = y_velocities.readHost(atom_offset, natom);
         zdata = z_velocities.readHost(atom_offset, natom);
@@ -2105,12 +1983,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_velocity_overflow.readHost(atom_offset, natom);
           yovrf = y_alt_velocity_overflow.readHost(atom_offset, natom);
           zovrf = z_alt_velocity_overflow.readHost(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_velocity_overflow.readHost(atom_offset, natom);
           yovrf = y_velocity_overflow.readHost(atom_offset, natom);
           zovrf = z_velocity_overflow.readHost(atom_offset, natom);
@@ -2120,12 +1998,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       break;
     case TrajectoryKind::FORCES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_forces.readHost(atom_offset, natom);
         ydata = y_alt_forces.readHost(atom_offset, natom);
         zdata = z_alt_forces.readHost(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_forces.readHost(atom_offset, natom);
         ydata = y_forces.readHost(atom_offset, natom);
         zdata = z_forces.readHost(atom_offset, natom);
@@ -2134,12 +2012,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (force_scale_bits <= force_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_force_overflow.readHost(atom_offset, natom);
           yovrf = y_alt_force_overflow.readHost(atom_offset, natom);
           zovrf = z_alt_force_overflow.readHost(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_force_overflow.readHost(atom_offset, natom);
           yovrf = y_force_overflow.readHost(atom_offset, natom);
           zovrf = z_force_overflow.readHost(atom_offset, natom);
@@ -2154,12 +2032,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_coordinates.readDevice(atom_offset, natom);
         ydata = y_alt_coordinates.readDevice(atom_offset, natom);
         zdata = z_alt_coordinates.readDevice(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_coordinates.readDevice(atom_offset, natom);
         ydata = y_coordinates.readDevice(atom_offset, natom);
         zdata = z_coordinates.readDevice(atom_offset, natom);
@@ -2168,12 +2046,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_coord_overflow.readDevice(atom_offset, natom);
           yovrf = y_alt_coord_overflow.readDevice(atom_offset, natom);
           zovrf = z_alt_coord_overflow.readDevice(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_coordinate_overflow.readDevice(atom_offset, natom);
           yovrf = y_coordinate_overflow.readDevice(atom_offset, natom);
           zovrf = z_coordinate_overflow.readDevice(atom_offset, natom);
@@ -2183,12 +2061,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       break;
     case TrajectoryKind::VELOCITIES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_velocities.readDevice(atom_offset, natom);
         ydata = y_alt_velocities.readDevice(atom_offset, natom);
         zdata = z_alt_velocities.readDevice(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_velocities.readDevice(atom_offset, natom);
         ydata = y_velocities.readDevice(atom_offset, natom);
         zdata = z_velocities.readDevice(atom_offset, natom);
@@ -2197,12 +2075,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_velocity_overflow.readDevice(atom_offset, natom);
           yovrf = y_alt_velocity_overflow.readDevice(atom_offset, natom);
           zovrf = z_alt_velocity_overflow.readDevice(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_velocity_overflow.readDevice(atom_offset, natom);
           yovrf = y_velocity_overflow.readDevice(atom_offset, natom);
           zovrf = z_velocity_overflow.readDevice(atom_offset, natom);
@@ -2212,12 +2090,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       break;
     case TrajectoryKind::FORCES:
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xdata = x_alt_forces.readDevice(atom_offset, natom);
         ydata = y_alt_forces.readDevice(atom_offset, natom);
         zdata = z_alt_forces.readDevice(atom_offset, natom);
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xdata = x_forces.readDevice(atom_offset, natom);
         ydata = y_forces.readDevice(atom_offset, natom);
         zdata = z_forces.readDevice(atom_offset, natom);
@@ -2226,12 +2104,12 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const CoordinateC
       if (force_scale_bits <= force_scale_nonoverflow_bits) {
         overflow_found = true;
         switch (orientation) {
-        case CoordinateCycle::ALTERNATE:
+        case CoordinateCycle::BLACK:
           xovrf = x_alt_force_overflow.readDevice(atom_offset, natom);
           yovrf = y_alt_force_overflow.readDevice(atom_offset, natom);
           zovrf = z_alt_force_overflow.readDevice(atom_offset, natom);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xovrf = x_force_overflow.readDevice(atom_offset, natom);
           yovrf = y_force_overflow.readDevice(atom_offset, natom);
           zovrf = z_force_overflow.readDevice(atom_offset, natom);
@@ -2280,6 +2158,23 @@ PhaseSpaceSynthesis::getInterlacedCoordinates(const int index, const TrajectoryK
 }
 
 //-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::updateCyclePosition() {
+  switch (cycle_position) {
+  case CoordinateCycle::WHITE:
+    cycle_position = CoordinateCycle::BLACK;
+    break;
+  case CoordinateCycle::BLACK:
+    cycle_position = CoordinateCycle::WHITE;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::updateCyclePosition(const CoordinateCycle time_point) {
+  cycle_position = time_point;
+}
+
+//-------------------------------------------------------------------------------------------------
 #ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation,
                                            const GpuDetails &gpu,
@@ -2300,7 +2195,7 @@ void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation, co
       int* y_ovrf_ptr;
       int* z_ovrf_ptr;
       switch (orientation) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         xptr = x_alt_forces.data();
         yptr = y_alt_forces.data();
         zptr = z_alt_forces.data();
@@ -2308,7 +2203,7 @@ void PhaseSpaceSynthesis::initializeForces(const CoordinateCycle orientation, co
         y_ovrf_ptr = y_alt_force_overflow.data();
         z_ovrf_ptr = z_alt_force_overflow.data();
         break;
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         xptr = x_forces.data();
         yptr = y_forces.data();
         zptr = z_forces.data();
@@ -2653,11 +2548,11 @@ void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_i
   import(psr.xfrc, psr.yfrc, psr.zfrc, nullptr, nullptr, nullptr, system_index, focus, 1.0,
          TrajectoryKind::FORCES, tier);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
-    focus = CoordinateCycle::PRIMARY;
+  case CoordinateCycle::BLACK:
+    focus = CoordinateCycle::WHITE;
     break;
-  case CoordinateCycle::PRIMARY:
-    focus = CoordinateCycle::ALTERNATE;
+  case CoordinateCycle::WHITE:
+    focus = CoordinateCycle::BLACK;
     break;
   }
   import(psr.xalt, psr.yalt, psr.zalt, psr.umat_alt, psr.invu_alt, psr.boxdim_alt, system_index,
@@ -2803,13 +2698,14 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   // Target the arrays detailing unique system instances to the back of the int_data array, as
   // the alignment of int_data and llint_data then works better for fixed-precision coordinates.
   // This is strictly organizational and has no effect on performance.
+  const size_t topl_stride = roundUp(unique_topology_count + 1, warp_size_int);
   shared_topology_instances.setPointer(&int_data, (18LLU * atom_stride) + twosysdx, system_count);
   shared_topology_instance_bounds.setPointer(&int_data, (18LLU * atom_stride) + twosysdx +
                                              system_stride, unique_topology_count + 1);
   unique_topology_reference.setPointer(&int_data, (18LLU * atom_stride) + twosysdx +
-                                       (2LLU * system_stride), system_count);
+                                       system_stride + topl_stride, system_count);
   shared_topology_instance_index.setPointer(&int_data, (18LLU * atom_stride) + twosysdx +
-                                       (3LLU * system_stride), system_count);
+                                       (2LLU * system_stride) + topl_stride, system_count);
 }
 
 //-------------------------------------------------------------------------------------------------

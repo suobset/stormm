@@ -11,13 +11,20 @@ namespace constants {
 /// \brief The warp size can be given in many number formats to minimize type conversions during
 ///        compute-intensive processes
 /// \{
-#ifdef STORMM_USE_HIP
+#if defined(STORMM_USE_HIP)
 constexpr size_t warp_size_zu = 64;
 constexpr int warp_size_int = 64;
 constexpr unsigned long int warp_size_lu = 64LU;
 constexpr long long int warp_size_lld = 64LL;
 constexpr unsigned long long int warp_size_llu = 64LLU;
 constexpr int warp_bits = 6;
+#elif defined(STORMM_USE_INTEL)
+constexpr size_t warp_size_zu = 16;
+constexpr int warp_size_int = 16;
+constexpr unsigned long int warp_size_lu = 16LU;
+constexpr long long int warp_size_lld = 16LL;
+constexpr unsigned long long int warp_size_llu = 16LLU;
+constexpr int warp_bits = 4;
 #else
 constexpr size_t warp_size_zu = 32;
 constexpr int warp_size_int = 32;
@@ -35,7 +42,7 @@ constexpr size_t warp_bits_mask_zu = warp_size_zu - 1LLU;
 constexpr int warp_bits_mask_int = warp_size_int - 1;
 constexpr unsigned long int warp_bits_mask_lu = warp_size_lu - 1LU;
 constexpr long long int warp_bits_mask_lld = warp_size_lld - 1LL;
-constexpr long long int warp_bits_mask_llu = warp_size_llu - 1LLU;
+constexpr unsigned long long int warp_bits_mask_llu = warp_size_llu - 1LLU;
 constexpr size_t twice_warp_bits_mask_zu = warp_bits_mask_zu + warp_size_zu;
 constexpr int twice_warp_bits_mask_int = warp_bits_mask_int + warp_size_int;
 constexpr unsigned long int twice_warp_bits_mask_lu = warp_bits_mask_lu + warp_size_lu;

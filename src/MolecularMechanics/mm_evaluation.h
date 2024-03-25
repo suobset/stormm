@@ -87,11 +87,12 @@ using namespace generalized_born_defaults;
 ///                         to be clashing
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc>
-void evalValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
-                UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *sc,
-                const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                EvaluateForce eval_force, int system_index = 0, Tcalc inv_gpos_factor = 1.0,
-                Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
+void evalValeMM(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                Tforce* zfrc, ScoreCard *sc, const ValenceKit<Tcalc> &vk,
+                const NonbondedKit<Tcalc> &nbk, EvaluateForce eval_force, int system_index = 0,
+                Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0,
+                Tcalc clash_ratio = 0.0);
 
 void evalValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                 const NonbondedKit<double> &nbk, EvaluateForce eval_force, int system_index = 0,
@@ -122,12 +123,13 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForc
 /// \param step  The step number, which may affect restraint activation
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-void evalValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
-                    UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                    const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
-                    int system_index = 0, int step = 0, Tcalc inv_gpos_factor = 1.0,
-                    Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
+void evalValeRestMM(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                    const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                    Tforce* zfrc, ScoreCard *sc, const ValenceKit<Tcalc> &vk,
+                    const NonbondedKit<Tcalc> &nbk, const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar,
+                    EvaluateForce eval_force, int system_index = 0, int step = 0,
+                    Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                    Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk,
@@ -157,12 +159,12 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 /// Descriptions of input variables follow from evalValeMM() and evalValeRestMM() above.
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc>
-void evalNonbValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
-                    UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
-                    const StaticExclusionMaskReader &ser, EvaluateForce eval_force,
-                    int system_index = 0, Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
-                    Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
+void evalNonbValeMM(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                    const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                    Tforce* zfrc, ScoreCard *sc, const ValenceKit<Tcalc> &vk,
+                    const NonbondedKit<Tcalc> &nbk, const StaticExclusionMaskReader &ser,
+                    EvaluateForce eval_force, int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                    Tcalc force_factor = 1.0, Tcalc clash_distance = 0.0, Tcalc clash_ratio = 0.0);
 
 void evalNonbValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
@@ -195,9 +197,10 @@ void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 /// \param se   Permanent map of non-bonded exclusions for all pairs of atoms in the system
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-void evalNonbValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+void evalNonbValeRestMM(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *sc,
+                        const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                         const StaticExclusionMaskReader &ser,
                         const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
                         int system_index = 0, int step = 0, Tcalc inv_gpos_factor = 1.0,
@@ -241,9 +244,10 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 /// \param neck_gbtab  Table of "neck" Generalized Born parameters, if applicable
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-void evalRestrainedMMGB(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+void evalRestrainedMMGB(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *sc,
+                        const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
                         const StaticExclusionMaskReader &ser, const ImplicitSolventKit<Tcalc> &isk,
                         const NeckGeneralizedBornKit<Tcalc> &neck_gbk,
                         Tforce* effective_gb_radii, Tforce* psi, Tforce* sumdeijda,

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "math_enumerators.h"
@@ -12,6 +13,8 @@
 namespace stormm {
 namespace stmath {
 
+using constants::CartesianDimension;
+using constants::UnitCellAxis;
 using symbols::pi;
 using symbols::pi_f;
 using symbols::near_to_one_f;
@@ -88,6 +91,51 @@ template <typename Tcalc>
 Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
                         const Tcalc* bc, const Tcalc* scr);
 
+/// \brief Subdivide a number into a sum of preferred values, avoiding discouraged values if
+///        possible, starting from an upper bound on the allowed partition size.
+///
+/// Overloaded:
+///   - Return a vector with the computed partitioning
+///   - Store the partitioning in a pre-allocated space
+///
+/// \param n       The amount to subdivide
+/// \param pmax    The maximum value allowed for any one partition
+/// \param pref    The list of preferred partition sizes, first being most prefereable
+/// \param dscr    The list of discouraged partition sizes, first being most discouraged
+/// \param result  The pre-allocated partition space to fill
+/// \{
+void partition(int n, int pmax, const std::vector<int> &pref, const std::vector<int> &dscr,
+               std::vector<int> *result);
+
+std::vector<int> partition(int n, int pmax, const std::vector<int> &pref,
+                           const std::vector<int> &dscr);
+/// \}
+
+/// \brief Determine the optimal particle density grid dimension along one axis of a given unit
+///        cell.  This will admit factors of 7 or 11, if they are supplied in the list of primes
+///        and the aggregate number (big_product), but not both 7 and 11 in the same result.
+///
+/// Overloaded:
+///   - Provide the unit cell axis in crystallographic space group terminology
+///   - Indicate the unit cell axis as a Cartesian Dimension
+///
+/// \param big_product  The product of all prime factors, in sanctioned quantities that might be
+///                     admissible ot the result, e.g. (2^12) * (3^6) * (5^4) * 7 * 11
+/// \param invu         Transformation matrix taking unit cell fractional coordinates into
+///                     Cartesian space
+/// \param edge         The unit cell edge in question
+/// \param primes       A list of prime factors admissible to the result
+/// \param max_spacing  The maximum allowed grid spacing.  The default of 1.0 is sufficient for
+///                     fourth-order interpolation, whereas 1.25 can be used with 5th order
+///                     interpolation and 1.5 with 6th order interpolation.
+/// \{
+int sanctionedDensityGridDimension(ullint big_product, const double* invu, UnitCellAxis edge,
+                                   const std::vector<uint> &primes, double max_spacing = 1.0);
+
+int sanctionedDensityGridDimension(ullint big_product, const double* inv, CartesianDimension edge,
+                                   const std::vector<uint> &primes, double max_spacing = 1.0);
+/// \}
+  
 } // namespace stmath
 } // namespace stormm
 

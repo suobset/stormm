@@ -79,7 +79,7 @@ PhaseSpace::PhaseSpace(const int atom_count_in, const UnitCellType unit_cell_in)
     file_name{std::string("")},
     atom_count{atom_count_in},
     unit_cell{unit_cell_in},
-    cycle_position{CoordinateCycle::PRIMARY},
+    cycle_position{CoordinateCycle::WHITE},
     x_coordinates{HybridKind::POINTER, "x_coordinates"},
     y_coordinates{HybridKind::POINTER, "y_coordinates"},
     z_coordinates{HybridKind::POINTER, "z_coordinates"},
@@ -389,25 +389,25 @@ const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_forces.data(tier);
       }
       break;
@@ -417,25 +417,25 @@ const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_forces.data(tier);
       }
       break;
@@ -445,25 +445,25 @@ const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_forces.data(tier);
       }
       break;
@@ -481,25 +481,25 @@ double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const Tra
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return x_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return x_forces.data(tier);
       }
       break;
@@ -509,25 +509,25 @@ double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const Tra
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return y_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return y_forces.data(tier);
       }
       break;
@@ -537,25 +537,25 @@ double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const Tra
     switch (kind) {
     case TrajectoryKind::POSITIONS:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_coordinates.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_coordinates.data(tier);
       }
       break;
     case TrajectoryKind::VELOCITIES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_velocities.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_velocities.data(tier);
       }
       break;
     case TrajectoryKind::FORCES:
       switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      case CoordinateCycle::BLACK:
         return z_alt_forces.data(tier);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return z_forces.data(tier);
       }
       break;
@@ -568,11 +568,26 @@ double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const Tra
 //-------------------------------------------------------------------------------------------------
 std::vector<double> PhaseSpace::getInterlacedCoordinates(const TrajectoryKind kind,
                                                          const HybridTargetLevel tier) const {
-  return getInterlacedCoordinates(0, atom_count, kind, tier);
+  return getInterlacedCoordinates(0, atom_count, cycle_position, kind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> PhaseSpace::getInterlacedCoordinates(const CoordinateCycle orientation,
+                                                         const TrajectoryKind kind,
+                                                         const HybridTargetLevel tier) const {
+  return getInterlacedCoordinates(0, atom_count, orientation, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, const int high_index,
+                                                         const TrajectoryKind kind,
+                                                         const HybridTargetLevel tier) const {
+  return getInterlacedCoordinates(low_index, high_index, cycle_position, kind, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, const int high_index,
+                                                         const CoordinateCycle orientation,
                                                          const TrajectoryKind kind,
                                                          const HybridTargetLevel tier) const {
 
@@ -586,31 +601,31 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, co
   case HybridTargetLevel::HOST:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      switch (orientation) {
+      case CoordinateCycle::BLACK:
         return interlaceXYZ(x_alt_coordinates.data(), y_alt_coordinates.data(),
                             z_alt_coordinates.data(), low_index, high_index);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return interlaceXYZ(x_coordinates.data(), y_coordinates.data(), z_coordinates.data(),
                             low_index, high_index);
       }
       break;
     case TrajectoryKind::VELOCITIES:
-      switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      switch (orientation) {
+      case CoordinateCycle::BLACK:
         return interlaceXYZ(x_alt_velocities.data(), y_alt_velocities.data(),
                             z_alt_velocities.data(), low_index, high_index);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return interlaceXYZ(x_velocities.data(), y_velocities.data(), z_velocities.data(),
                             low_index, high_index);
       }
       break;
     case TrajectoryKind::FORCES:
-      switch (cycle_position) {
-      case CoordinateCycle::ALTERNATE:
+      switch (orientation) {
+      case CoordinateCycle::BLACK:
         return interlaceXYZ(x_alt_forces.data(), y_alt_forces.data(), z_alt_forces.data(),
                             low_index, high_index);
-      case CoordinateCycle::PRIMARY:
+      case CoordinateCycle::WHITE:
         return interlaceXYZ(x_forces.data(), y_forces.data(), z_forces.data(), low_index,
                             high_index);
       }
@@ -623,13 +638,13 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, co
       std::vector<double> xval, yval, zval;
       switch (kind) {
       case TrajectoryKind::POSITIONS:
-        switch (cycle_position) {
-        case CoordinateCycle::ALTERNATE:
+        switch (orientation) {
+        case CoordinateCycle::BLACK:
           xval = x_alt_coordinates.readDevice(low_index, high_index);
           yval = y_alt_coordinates.readDevice(low_index, high_index);
           zval = z_alt_coordinates.readDevice(low_index, high_index);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xval = x_coordinates.readDevice(low_index, high_index);
           yval = y_coordinates.readDevice(low_index, high_index);
           zval = z_coordinates.readDevice(low_index, high_index);
@@ -637,13 +652,13 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, co
         }
         break;
       case TrajectoryKind::VELOCITIES:
-        switch (cycle_position) {
-        case CoordinateCycle::ALTERNATE:
+        switch (orientation) {
+        case CoordinateCycle::BLACK:
           xval = x_alt_velocities.readDevice(low_index, high_index);
           yval = y_alt_velocities.readDevice(low_index, high_index);
           zval = z_alt_velocities.readDevice(low_index, high_index);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xval = x_velocities.readDevice(low_index, high_index);
           yval = y_velocities.readDevice(low_index, high_index);
           zval = z_velocities.readDevice(low_index, high_index);
@@ -651,13 +666,13 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, co
         }
         break;
       case TrajectoryKind::FORCES:
-        switch (cycle_position) {
-        case CoordinateCycle::ALTERNATE:
+        switch (orientation) {
+        case CoordinateCycle::BLACK:
           xval = x_alt_forces.readDevice(low_index, high_index);
           yval = y_alt_forces.readDevice(low_index, high_index);
           zval = z_alt_forces.readDevice(low_index, high_index);
           break;
-        case CoordinateCycle::PRIMARY:
+        case CoordinateCycle::WHITE:
           xval = x_forces.readDevice(low_index, high_index);
           yval = y_forces.readDevice(low_index, high_index);
           zval = z_forces.readDevice(low_index, high_index);
@@ -677,9 +692,9 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, co
 const double* PhaseSpace::getBoxSpaceTransformPointer(const CoordinateCycle orientation,
                                                       const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_box_space_transform.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return box_space_transform.data(tier);
   }
   __builtin_unreachable();
@@ -689,9 +704,9 @@ const double* PhaseSpace::getBoxSpaceTransformPointer(const CoordinateCycle orie
 double* PhaseSpace::getBoxSpaceTransformPointer(const CoordinateCycle orientation,
                                                 const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_box_space_transform.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return box_space_transform.data(tier);
   }
   __builtin_unreachable();
@@ -711,9 +726,9 @@ double* PhaseSpace::getBoxSpaceTransformPointer(const HybridTargetLevel tier) {
 const double* PhaseSpace::getInverseTransformPointer(const CoordinateCycle orientation,
                                                      const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_inverse_transform.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return inverse_transform.data(tier);
   }
   __builtin_unreachable();
@@ -723,9 +738,9 @@ const double* PhaseSpace::getInverseTransformPointer(const CoordinateCycle orien
 double* PhaseSpace::getInverseTransformPointer(const CoordinateCycle orientation,
                                                const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_inverse_transform.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return inverse_transform.data(tier);
   }
   __builtin_unreachable();
@@ -745,9 +760,9 @@ double* PhaseSpace::getInverseTransformPointer(const HybridTargetLevel tier) {
 const double* PhaseSpace::getBoxSizePointer(const CoordinateCycle orientation,
                                             const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_box_dimensions.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return box_dimensions.data(tier);
   }
   __builtin_unreachable();
@@ -757,9 +772,9 @@ const double* PhaseSpace::getBoxSizePointer(const CoordinateCycle orientation,
 double* PhaseSpace::getBoxSizePointer(const CoordinateCycle orientation,
                                       const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return alt_box_dimensions.data(tier);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return box_dimensions.data(tier);
   }
   __builtin_unreachable();
@@ -781,18 +796,18 @@ std::vector<double> PhaseSpace::getBoxSpaceTransform(const CoordinateCycle orien
   switch (tier) {
   case HybridTargetLevel::HOST:
     switch (orientation) {
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       return alt_box_space_transform.readHost();
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       return box_space_transform.readHost();
     }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (orientation) {
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       return alt_box_space_transform.readDevice();
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       return box_space_transform.readDevice();
     }
     break;
@@ -812,18 +827,18 @@ std::vector<double> PhaseSpace::getInverseTransform(const CoordinateCycle orient
   switch (tier) {
   case HybridTargetLevel::HOST:
     switch (orientation) {
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       return alt_inverse_transform.readHost();
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       return inverse_transform.readHost();
     }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (orientation) {
-    case CoordinateCycle::ALTERNATE:
+    case CoordinateCycle::BLACK:
       return alt_inverse_transform.readDevice();
-    case CoordinateCycle::PRIMARY:
+    case CoordinateCycle::WHITE:
       return inverse_transform.readDevice();
     }
     break;
@@ -853,12 +868,12 @@ void PhaseSpace::initializeForces(const CoordinateCycle orientation) {
   double* y_ptr;
   double* z_ptr;
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     x_ptr = x_alt_forces.data();
     y_ptr = y_alt_forces.data();
     z_ptr = z_alt_forces.data();
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     x_ptr = x_forces.data();
     y_ptr = y_forces.data();
     z_ptr = z_forces.data();
@@ -882,11 +897,11 @@ void PhaseSpace::initializeForces() {
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::updateCyclePosition() {
   switch (cycle_position) {
-  case CoordinateCycle::ALTERNATE:
-    cycle_position = CoordinateCycle::PRIMARY;
+  case CoordinateCycle::BLACK:
+    cycle_position = CoordinateCycle::WHITE;
     break;
-  case CoordinateCycle::PRIMARY:
-    cycle_position = CoordinateCycle::ALTERNATE;
+  case CoordinateCycle::WHITE:
+    cycle_position = CoordinateCycle::BLACK;
     break;
   }
 }
@@ -977,7 +992,7 @@ const PhaseSpaceReader PhaseSpace::data(const HybridTargetLevel tier) const {
 const PhaseSpaceReader PhaseSpace::data(const CoordinateCycle orientation,
                                         const HybridTargetLevel tier) const {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return PhaseSpaceReader(atom_count, unit_cell, x_alt_coordinates.data(tier),
                             y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
                             alt_box_space_transform.data(tier),
@@ -991,7 +1006,7 @@ const PhaseSpaceReader PhaseSpace::data(const CoordinateCycle orientation,
                             x_velocities.data(tier), y_velocities.data(tier),
                             z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
                             z_forces.data(tier));
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return PhaseSpaceReader(atom_count, unit_cell, x_coordinates.data(tier),
                             y_coordinates.data(tier), z_coordinates.data(tier),
                             box_space_transform.data(tier), inverse_transform.data(tier),
@@ -1017,7 +1032,7 @@ PhaseSpaceWriter PhaseSpace::data(const HybridTargetLevel tier) {
 PhaseSpaceWriter PhaseSpace::data(const CoordinateCycle orientation,
                                   const HybridTargetLevel tier) {
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return PhaseSpaceWriter(atom_count, unit_cell, x_alt_coordinates.data(tier),
                             y_alt_coordinates.data(tier), z_alt_coordinates.data(tier),
                             alt_box_space_transform.data(tier),
@@ -1031,7 +1046,7 @@ PhaseSpaceWriter PhaseSpace::data(const CoordinateCycle orientation,
                             x_velocities.data(tier), y_velocities.data(tier),
                             z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
                             z_forces.data(tier));
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return PhaseSpaceWriter(atom_count, unit_cell, x_coordinates.data(tier),
                             y_coordinates.data(tier), z_coordinates.data(tier),
                             box_space_transform.data(tier), inverse_transform.data(tier),
@@ -1076,12 +1091,12 @@ const PhaseSpaceReader PhaseSpace::deviceViewToHostData(CoordinateCycle orientat
   const double* yfrc_alt = y_alt_forces.getDeviceValidHostPointer();
   const double* zfrc_alt = z_alt_forces.getDeviceValidHostPointer();
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return PhaseSpaceReader(atom_count, unit_cell, xcrd_alt, ycrd_alt, zcrd_alt, umat_alt,
                             invu_alt, boxdim_alt, umat, invu, boxdim, xvel_alt, yvel_alt, zvel_alt,
                             xfrc_alt, yfrc_alt, zfrc_alt, xcrd, ycrd, zcrd, xvel, yvel, zvel, xfrc,
                             yfrc, zfrc);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return PhaseSpaceReader(atom_count, unit_cell, xcrd, ycrd, zcrd, umat, invu, boxdim, umat_alt,
                             invu_alt, boxdim_alt, xvel, yvel, zvel, xfrc, yfrc, zfrc, xcrd_alt,
                             ycrd_alt, zcrd_alt, xvel_alt, yvel_alt, zvel_alt, xfrc_alt, yfrc_alt,
@@ -1122,12 +1137,12 @@ PhaseSpaceWriter PhaseSpace::deviceViewToHostData(CoordinateCycle orientation) {
   double* yfrc_alt = y_alt_forces.getDeviceValidHostPointer();
   double* zfrc_alt = z_alt_forces.getDeviceValidHostPointer();
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     return PhaseSpaceWriter(atom_count, unit_cell, xcrd_alt, ycrd_alt, zcrd_alt, umat_alt,
                             invu_alt, boxdim_alt, umat, invu, boxdim, xvel_alt, yvel_alt, zvel_alt,
                             xfrc_alt, yfrc_alt, zfrc_alt, xcrd, ycrd, zcrd, xvel, yvel, zvel, xfrc,
                             yfrc, zfrc);
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     return PhaseSpaceWriter(atom_count, unit_cell, xcrd, ycrd, zcrd, umat, invu, boxdim, umat_alt,
                             invu_alt, boxdim_alt, xvel, yvel, zvel, xfrc, yfrc, zfrc, xcrd_alt,
                             ycrd_alt, zcrd_alt, xvel_alt, yvel_alt, zvel_alt, xfrc_alt, yfrc_alt,
@@ -1150,13 +1165,13 @@ void PhaseSpace::upload() {
 void PhaseSpace::uploadPositions(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
 
     // Upload based on the storage array, as the individual X, Y, or Z velocity arrays will not
     // permit uploading 3x their stated length, even though the extra memory is there.
     storage.upload(3 * stride, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.upload(0         , 3 * stride);
     break;
   }
@@ -1178,10 +1193,10 @@ void PhaseSpace::uploadVelocities(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     storage.upload((9 * stride) + offset, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.upload((6 * stride) + offset, 3 * stride);
     break;
   }
@@ -1197,10 +1212,10 @@ void PhaseSpace::uploadForces(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     storage.upload((15 * stride) + offset, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.upload((12 * stride) + offset, 3 * stride);
     break;
   }
@@ -1220,10 +1235,10 @@ void PhaseSpace::download() {
 void PhaseSpace::downloadPositions(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     storage.download(3 * stride, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.download(0         , 3 * stride);
     break;
   }
@@ -1245,10 +1260,10 @@ void PhaseSpace::downloadVelocities(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     storage.download(( 9 * stride) + offset, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.download(( 6 * stride) + offset, 3 * stride);
     break;
   }
@@ -1264,10 +1279,10 @@ void PhaseSpace::downloadForces(const CoordinateCycle orientation) {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
   switch (orientation) {
-  case CoordinateCycle::ALTERNATE:
+  case CoordinateCycle::BLACK:
     storage.download((15 * stride) + offset, 3 * stride);
     break;
-  case CoordinateCycle::PRIMARY:
+  case CoordinateCycle::WHITE:
     storage.download((12 * stride) + offset, 3 * stride);
     break;
   }

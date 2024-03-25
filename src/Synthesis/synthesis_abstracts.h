@@ -249,13 +249,14 @@ template <typename T, typename T2> struct SyNonbondedKit {
 template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
 
   /// \brief The constructor takes a list of parameter arrays.  Like other AtomGraphSynthesis
-  ///        abstracts, then actual numbers of parameters in each array, which are irrelevant to
+  ///        abstracts, the actual numbers of parameters in each array, which are irrelevant to
   ///        the implementation as long as the work unit instructions do not overrun the bounds,
-  ///        are omitted to save space on the constants imported as arguments to each kernel.
-  SyAtomUpdateKit(const T* inv_masses_in, const T4* vs_params_in, const T4* settle_geom_in,
-                  const T2* settle_mass_in, const T2* cnst_grp_params_in,
-                  const uint2* vste_insr_in, const uint2* sett_insr_in, const uint2* cnst_insr_in,
-                  const uint2* vwu_manip_in);
+  ///        are omitted to save space on the constants imported as arguments to each kernel.  The
+  ///        numbers of each instruction are found in the valence work units.
+  SyAtomUpdateKit(const T* masses_in, const T* inv_masses_in, int largest_group_in,
+                  const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
+                  const T2* cnst_grp_params_in, const uint2* vste_insr_in,
+                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -265,9 +266,12 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   /// \}
 
   // General information relevant to moving particles
+  const T* masses;            ///< Masses of all particles
   const T* inv_masses;        ///< Inverse masses of all particles
 
   // Parameters and instruction sets for virtual sites and constraints
+  const int largest_group;    ///< Number of constrained bonds in the largest hub-and-spoke group
+                              ///<   found in any topology
   const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
                               ///<   dimension parameters in the 
   const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
@@ -276,15 +280,14 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   const T2* settle_mass;      ///< Inverse mass considerations for SETTLE-constrained groups.  The
                               ///<   SETTLE instructions will indicate which parameter set, and
                               ///<   thus which index of this array to take.  
-  const T2* cnst_grp_params;  ///< Bond length (x member) and inverse mass (y member) information
-                              ///<   for hub-and-spoke constraint groups.
+  const T2* cnst_grp_params;  ///< Squared bond length (x member) and the sum of inverse masses for
+                              ///<   both atoms (y member) in one constraint (of perhaps several)
+                              ///<   of a hub-and-spoke constraint group.
   const uint2* vste_insr;     ///< Virtual site placement instructions
   const uint2* sett_insr;     ///< SETLLE group constraints instructions
   const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
   const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
                               ///<   for all valence work units
-
-  // Inverse masses of all atoms
 };
   
 } // namespace synthesis

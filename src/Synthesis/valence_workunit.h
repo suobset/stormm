@@ -22,6 +22,7 @@ using card::Hybrid;
 using constants::PrecisionModel;
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
+using energy::ValenceKernelSize;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
@@ -29,13 +30,16 @@ using topology::ConstraintKit;
 using topology::ValenceKit;
 using topology::VirtualSiteKit;
 
-/// \brief The minimium value for the atom limit in a valence work unit--there should be no need
-///        to force the size below 128, which was the maximum size in pmemd.cuda.
-constexpr int minimum_valence_work_unit_atoms = 64;
-
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
 ///        of __shared__ memory in a block of 256 threads might need to be stretched.
-constexpr int maximum_valence_work_unit_atoms = 320;
+constexpr int maximum_valence_work_unit_atoms = 544;
+constexpr int half_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 2;
+constexpr int quarter_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 4;
+constexpr int eighth_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 8;
+
+/// \brief The minimium value for the atom limit in a valence work unit--there should be no need
+///        to force the size below 72.  The size of woork units in pmemd.cuda was 128.
+constexpr int minimum_valence_work_unit_atoms = eighth_valence_work_unit_atoms;
 
 /// \brief The maximum tolerated number of recursive calls to various atom searching functions.
 ///        The halo region needed to determine the correct movement of any given atom cannot chain
@@ -604,7 +608,7 @@ public:
   /// \brief Get the padded size of the largest constraint group.  The padding extends the size of
   ///        each constraint group in the work unit to the minimum factor of two, with a maximum
   ///        allowed size of 16.
-  int getMaxConstraintGroupPaddedSize() const;
+  int getPaddedConstraintInstructionCount() const;
 
   /// \brief Get a vector describing the number of each type of item this work unit can be tasked
   ///        to perform.
@@ -937,7 +941,7 @@ private:
   /// would be acceptable for that unit to log the updated position and velocity, but only one
   /// work unit will be responsible for doing that.
   std::vector<int> atom_update_list;
-
+  
   /// A mask of local atoms that the work unit is responsible for updating in the global position
   /// arrays.  All local atoms, except virtual sites, will be moved according to the forces acting
   /// upon them (it is faster to move the 1-2% of atoms that do not absolutely need to move than
@@ -1107,53 +1111,6 @@ private:
   const RestraintApparatus *ra_pointer;  ///< Restraint apparatus to which this object pertains
 };
 
-/// \brief Optimize the valence kernel subdivision.  Single-precision kernels involving force
-///        computation, as well as all double-precision kernels, can be subdivided up two times.
-///        Single-precision kernels involving only energy computations can be subdivide up to
-///        four times.
-///
-/// Overloaded:
-///   - Provide the system sizes as a C-style array with a trusted length.
-///   - Provide the system sizes as a Standard Template Library vector.
-///   - Provide the system sizes as a Hybrid object (host data will be valid).
-///
-/// \param atom_counts  The numbers of atoms in each system
-/// \param n_systems    Number of systems (if a C-style array of the atom counts is provided)
-/// \param prec         Precision model for the kernel of interest
-/// \param eval_frc     Indicate whether the kernel of interest will evaluate forces
-/// \param gpu          Details of the GPU to use in calculations
-/// \{
-int optValenceKernelSubdivision(const int* atom_counts, int n_systems, PrecisionModel prec,
-                                EvaluateForce eval_frc, const GpuDetails &gpu);
-
-int optValenceKernelSubdivision(const std::vector<int> &atom_counts, PrecisionModel prec,
-                                EvaluateForce eval_frc, const GpuDetails &gpu);
-
-int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, PrecisionModel prec,
-                                EvaluateForce eval_frc, const GpuDetails &gpu);
-/// \}
-
-/// \brief Optimize the virtual site kernel handling subdivision.  This applies when the virtual
-///        sites are manipulated outside of broader work units computing valence interactions.
-///
-/// Overloaded:
-///   - Provide the system sizes as a C-style array with a trusted length.
-///   - Provide the system sizes as a Standard Template Library vector.
-///   - Provide the system sizes as a Hybrid object (host data will be valid).
-///
-/// \param vwu_abstracts  Abstracts for valence work units, containing the numbers of virtual sites
-///                       in each work unit
-/// \param vwu_count      The number of valence work units (this might be inferred from the length
-///                       of the abstracts array, but its inclusion is forced to make sure that the
-///                       true count in whatever synthesis of topologies is respected)
-/// \{
-int optVirtualSiteKernelSubdivision(const int2* vwu_abstracts, int vwu_count);
-
-int optVirtualSiteKernelSubdivision(const std::vector<int2> &vwu_abstracts, int vwu_count);
-
-int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, int vwu_count);
-/// \}
-
 /// \brief Calculate the optimal sizes of valence work units based on a series of system sizes.
 ///        This will engage some simple heuristics, not examine the actual topologies to optimize
 ///        a particular number.
@@ -1164,10 +1121,14 @@ int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, int vwu_c
 ///   - Accept a Hybrid object with the system sizes
 ///   - Accept launch parameters to inform the choice of work unit size
 ///
-/// \param atom_counts     The sizes of each system
-/// \param system_count    The number of systems (if a C-style array is provided)
-/// \param grid_dimension  The number of blocks that will be launched on the GPU (based on the
-///                        number of streaming multiprocessors)
+/// \param atom_counts   The sizes of each system
+/// \param system_count  The number of systems (if a C-style array is provided)
+/// \param sm_count      The number of blocks that will be launched on the GPU (based on the number
+///                      of streaming multiprocessors)
+/// \param kwidth        The recommended kernel width in which to launch the valence calculations
+///                      (this will be large enough to accommodate the largest work units, but
+///                      could be larger if the card is under-filled).  The recommended thread
+///                      block size is returned through this pointer.
 /// \{
 int calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
 
@@ -1175,11 +1136,14 @@ int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
 
 int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
 
-int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int grid_dimension);
+int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int sm_count,
+                                 ValenceKernelSize *kwidth);
 
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int grid_dimension);
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int sm_count,
+                                 ValenceKernelSize *kwidth);
 
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int grid_dimension);
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int sm_count,
+                                 ValenceKernelSize *kwidth);
 /// \}
 
 /// \brief Build a series of valence work units to cover a topology.
@@ -1188,7 +1152,7 @@ int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int grid_dimens
 ///   - Accept a pre-existing ValenceDelegator, so that information used in creating the work units
 ///     will be available after they are finished
 ///   - Construct the ValenceDelegator internally (some functionality associated with the
-///     ValenceWorkUnits will be unavaialable later)
+///     ValenceWorkUnits will be unavailable later)
 ///
 /// \param ag                 The topology of interest
 /// \param ra                 Restraints linked to the topology

@@ -31,6 +31,7 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Potential/test_pme.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Reporting/test_display.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Restraints/test_restraints.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/MolecularMechanics/test_dynamics.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/MolecularMechanics/test_minimization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/MoleculeFormat/test_molecule_formats.cpp)
 

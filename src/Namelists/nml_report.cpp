@@ -16,17 +16,22 @@ namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
+using energy::translateEnergySample;
 using parse::minimalRealFormat;
 using parse::strcmpCased;
 using parse::stringToChar4;
 using review::default_output_file_width;
+using review::translateOutputScope;
 using structure::DataRequestKind;
   
 //-------------------------------------------------------------------------------------------------
 ReportControls::ReportControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in}, report_layout{OutputSyntax::STANDALONE},
-    report_scope{OutputScope::AVERAGES}, username{std::string("")}, start_date{},
-    print_walltime_data{true}, report_file_width{default_output_file_width},
+    report_scope{OutputScope::AVERAGES}, state_sampling{EnergySample::TIME_SERIES},
+    username{std::string("")},
+    report_variable{std::string(default_report_variable_name)},
+    start_date{}, print_walltime_data{true},
+    report_file_width{default_output_file_width},
     common_path_limit{default_common_path_limit},
     common_path_threshold{default_common_path_threshold},
     energy_decimal_places{default_energy_decimal_places},
@@ -64,8 +69,14 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   if (t_nml.getKeywordStatus("scope") != InputStatus::MISSING) {
     setOutputScope(t_nml.getStringValue("scope"));
   }
+  if (t_nml.getKeywordStatus("nrgsample") != InputStatus::MISSING) {
+    setStateSampling(t_nml.getStringValue("nrgsample"));
+  }
   if (t_nml.getKeywordStatus("username") != InputStatus::MISSING) {
     setUsername(t_nml.getStringValue("username"));
+  }
+  if (t_nml.getKeywordStatus("varname") != InputStatus::MISSING) {
+    setReportVariable(t_nml.getStringValue("varname"));
   }
   if (t_nml.getKeywordStatus("timings") != InputStatus::MISSING) {
     setWallTimeData(t_nml.getStringValue("timings"));
@@ -75,6 +86,12 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
     const int ndetail = t_nml.getKeywordEntries("energy");
     for (int i = 0; i < ndetail; i++) {
       setReportedQuantities(t_nml.getStringValue("energy", i));
+    }
+  }
+  if (t_nml.getKeywordStatus("state") != InputStatus::MISSING) {
+    const int ndetail = t_nml.getKeywordEntries("state");
+    for (int i = 0; i < ndetail; i++) {
+      setReportedQuantities(translateStateQuantity(t_nml.getStringValue("state", i)));
     }
   }
   if (t_nml.getKeywordStatus("sdf_item") != InputStatus::MISSING) {
@@ -95,84 +112,6 @@ ReportControls::ReportControls(const TextFile &tf, int *start_line, bool *found_
   // Validate inputs found thus far
   validateEnergyDecimalPlaces();
   validateOutlierMetrics();
-  
-  // Construct the list of state variables that will be presented in the output file (the actual
-  // reporting will be contingent on whether these quantities are indeed relevant to the
-  // calculation).
-  const int n_reported_sv = reported_quantities.size();
-  bool specific_mm   = false;
-  bool specific_temp = false;
-  bool specific_vir  = false;
-  std::vector<StateVariable> tmp_rq;
-  tmp_rq.reserve(n_reported_sv);
-  for (int i = 0; i < n_reported_sv; i++) {
-    switch (reported_quantities[i]) {
-    case StateVariable::BOND:
-    case StateVariable::ANGLE:
-    case StateVariable::PROPER_DIHEDRAL:
-    case StateVariable::IMPROPER_DIHEDRAL:
-    case StateVariable::UREY_BRADLEY:
-    case StateVariable::CHARMM_IMPROPER:
-    case StateVariable::CMAP:
-    case StateVariable::VDW:
-    case StateVariable::VDW_ONE_FOUR:
-    case StateVariable::ELECTROSTATIC:
-    case StateVariable::ELECTROSTATIC_ONE_FOUR:
-    case StateVariable::GENERALIZED_BORN:
-    case StateVariable::RESTRAINT:
-      specific_mm   = true;
-      tmp_rq.push_back(reported_quantities[i]);
-      break;
-    case StateVariable::TEMPERATURE_PROTEIN:
-    case StateVariable::TEMPERATURE_LIGAND:
-    case StateVariable::TEMPERATURE_SOLVENT:
-      specific_temp = true;
-      tmp_rq.push_back(reported_quantities[i]);
-      break;
-    case StateVariable::VIRIAL_11:
-    case StateVariable::VIRIAL_12:
-    case StateVariable::VIRIAL_22:
-    case StateVariable::VIRIAL_13:
-    case StateVariable::VIRIAL_23:
-    case StateVariable::VIRIAL_33:
-      specific_vir  = true;
-      tmp_rq.push_back(reported_quantities[i]);
-      break;
-    case StateVariable::KINETIC:
-    case StateVariable::PRESSURE:
-    case StateVariable::VOLUME:
-    case StateVariable::TEMPERATURE_ALL:
-    case StateVariable::DU_DLAMBDA:
-    case StateVariable::POTENTIAL_ENERGY:
-    case StateVariable::TOTAL_ENERGY:
-    case StateVariable::ALL_STATES:
-      break;
-    }
-  }
-  reported_quantities.resize(0);
-  reported_quantities.push_back(StateVariable::TOTAL_ENERGY);
-  reported_quantities.push_back(StateVariable::POTENTIAL_ENERGY);
-  reported_quantities.push_back(StateVariable::KINETIC);
-  reported_quantities.push_back(StateVariable::TEMPERATURE_ALL);
-  reported_quantities.push_back(StateVariable::PRESSURE);
-  reported_quantities.push_back(StateVariable::VOLUME);
-  reported_quantities.push_back(StateVariable::DU_DLAMBDA);
-  if (specific_mm == false) {
-    reported_quantities.push_back(StateVariable::BOND);
-    reported_quantities.push_back(StateVariable::ANGLE);
-    reported_quantities.push_back(StateVariable::PROPER_DIHEDRAL);
-    reported_quantities.push_back(StateVariable::IMPROPER_DIHEDRAL);
-    reported_quantities.push_back(StateVariable::UREY_BRADLEY);
-    reported_quantities.push_back(StateVariable::CHARMM_IMPROPER);
-    reported_quantities.push_back(StateVariable::CMAP);
-    reported_quantities.push_back(StateVariable::VDW);
-    reported_quantities.push_back(StateVariable::VDW_ONE_FOUR);
-    reported_quantities.push_back(StateVariable::ELECTROSTATIC);
-    reported_quantities.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
-    reported_quantities.push_back(StateVariable::GENERALIZED_BORN);
-    reported_quantities.push_back(StateVariable::RESTRAINT);
-  }
-  reported_quantities.insert(reported_quantities.end(), tmp_rq.begin(), tmp_rq.end());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -183,6 +122,16 @@ OutputSyntax ReportControls::getOutputSyntax() const {
 //-------------------------------------------------------------------------------------------------
 OutputScope ReportControls::getOutputScope() const {
   return report_scope;
+}
+
+//-------------------------------------------------------------------------------------------------
+EnergySample ReportControls::getEnergySamplingMethod() const {
+  return state_sampling;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::string& ReportControls::getReportVariable() const {
+  return report_variable;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -309,35 +258,10 @@ void ReportControls::setOutputScope(const OutputScope report_scope_in) {
 
 //-------------------------------------------------------------------------------------------------
 void ReportControls::setOutputScope(const std::string &report_scope_in) {
-  if (strcmpCased(report_scope_in, "average", CaseSensitivity::NO) ||
-      strcmpCased(report_scope_in, "averages", CaseSensitivity::NO) ||
-      strcmpCased(report_scope_in, "mean", CaseSensitivity::NO) ||
-      strcmpCased(report_scope_in, "means", CaseSensitivity::NO)) {
-    report_scope = OutputScope::AVERAGES;
+  try {
+    report_scope = translateOutputScope(report_scope_in);
   }
-  else if (strcmpCased(report_scope_in, "outlier", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "outliers", CaseSensitivity::NO)) {
-    report_scope = OutputScope::OUTLIERS;
-  }
-  else if (strcmpCased(report_scope_in, "cluster_average", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "cluster_averages", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "clusteraverage", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "clusteraverages", CaseSensitivity::NO)) {
-    report_scope = OutputScope::CLUSTER_AVERAGES;
-  }
-  else if (strcmpCased(report_scope_in, "cluster_outlier", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "cluster_outliers", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "clusteroutlier", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "clusteroutliers", CaseSensitivity::NO)) {
-    report_scope = OutputScope::CLUSTER_OUTLIERS;
-  }
-  else if (strcmpCased(report_scope_in, "all", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "full", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "entire", CaseSensitivity::NO) ||
-           strcmpCased(report_scope_in, "complete", CaseSensitivity::NO)) {
-    report_scope = OutputScope::FULL;
-  }
-  else {
+  catch (std::runtime_error) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr(report_scope_in + " was not recognized as a valid scope for reporting energies and "
@@ -355,8 +279,40 @@ void ReportControls::setOutputScope(const std::string &report_scope_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ReportControls::setStateSampling(EnergySample state_sampling_in) {
+  state_sampling = state_sampling_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::setStateSampling(const std::string &state_sampling_in) {
+  try {
+    state_sampling = translateEnergySample(state_sampling_in);
+  }
+  catch (std::runtime_error) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr(state_sampling_in + " was not recognized as a valid scope for sampling energies and "
+            "other system diagnostics.", "ReportControls", "setStateSampling");
+    case ExceptionResponse::WARN:
+      rtWarn(state_sampling_in + " was not recognized as a valid output syntax.  The " +
+             getEnumerationName(EnergySample::TIME_SERIES) + " format will be taken instead.",
+             "ReportControls", "setStateSampling");
+      state_sampling = EnergySample::TIME_SERIES;
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ReportControls::setUsername(const std::string &username_in) {
   username = username_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportControls::setReportVariable(const std::string &report_variable_in) {
+  report_variable = report_variable_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -526,7 +482,7 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
   }
   else if (strcmpCased(inpstr, "elec", noc) || strcmpCased(inpstr, "electrostatic", noc)) {
     result.push_back(StateVariable::ELECTROSTATIC);
-    result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
+    result.push_back(StateVariable::ELEC_ONE_FOUR);
   }
   else if (strcmpCased(inpstr, "elec_nonbonded", noc) ||
            strcmpCased(inpstr, "elecnonbonded", noc) ||
@@ -542,7 +498,7 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
            strcmpCased(inpstr, "near_electrostatic", noc) ||
            strcmpCased(inpstr, "electrostaticnear", noc) ||
            strcmpCased(inpstr, "nearelectrostatic", noc)) {
-    result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
+    result.push_back(StateVariable::ELEC_ONE_FOUR);
   }
   else if (strcmpCased(inpstr, "gb", noc) || strcmpCased(inpstr, "generalized_born", noc) ||
            strcmpCased(inpstr, "solvent", noc) || strcmpCased(inpstr, "generalizedborn", noc)) {
@@ -551,24 +507,14 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
   else if (strcmpCased(inpstr, "restraint", noc) || strcmpCased(inpstr, "nmr", noc)) {
     result.push_back(StateVariable::RESTRAINT);
   }
-  else if (strcmpCased(inpstr, "local_temperature", noc)) {
-    result.push_back(StateVariable::TEMPERATURE_PROTEIN);
-    result.push_back(StateVariable::TEMPERATURE_LIGAND);
-    result.push_back(StateVariable::TEMPERATURE_SOLVENT);
-  }
-  else if (strcmpCased(inpstr, "virial_components", noc)) {
-    result.push_back(StateVariable::VIRIAL_11);
-    result.push_back(StateVariable::VIRIAL_12);
-    result.push_back(StateVariable::VIRIAL_22);
-    result.push_back(StateVariable::VIRIAL_13);
-    result.push_back(StateVariable::VIRIAL_23);
-    result.push_back(StateVariable::VIRIAL_33);
-  }
   else if (strcmpCased(inpstr, "total_energy", noc) || strcmpCased(inpstr, "totalenergy", noc) ||
-           strcmpCased(inpstr, "etot", noc)) {
+           strcmpCased(inpstr, "etot", noc) || strcmpCased(inpstr, "total", noc)) {
     result.push_back(StateVariable::TOTAL_ENERGY);
   }
-  else if (strcmpCased(inpstr, "potential_energy", noc) ||
+  else if (strcmpCased(inpstr, "kinetic", noc)) {
+    result.push_back(StateVariable::KINETIC);
+  }
+  else if (strcmpCased(inpstr, "potential_energy", noc) || strcmpCased(inpstr, "potential", noc) ||
            strcmpCased(inpstr, "potentialenergy", noc) || strcmpCased(inpstr, "pe", noc)) {
     result.push_back(StateVariable::POTENTIAL_ENERGY);
   }
@@ -587,6 +533,35 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
     case ExceptionResponse::SILENT:
       break;
     }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<StateVariable> ReportControls::translateStateQuantity(const std::string &inpstr) {
+  std::vector<StateVariable> result;
+  const CaseSensitivity noc = CaseSensitivity::NO;
+  if (strcmpCased(inpstr, "temperature", noc) || strcmpCased(inpstr, "temp", noc)) {
+    result.push_back(StateVariable::TEMPERATURE_ALL);
+  }
+  else if (strcmpCased(inpstr, "local_temperature", noc)) {
+    result.push_back(StateVariable::TEMPERATURE_PROTEIN);
+    result.push_back(StateVariable::TEMPERATURE_LIGAND);
+    result.push_back(StateVariable::TEMPERATURE_SOLVENT);
+  }
+  else if (strcmpCased(inpstr, "pressure", noc)) {
+    result.push_back(StateVariable::PRESSURE);
+  }
+  else if (strcmpCased(inpstr, "virial_components", noc)) {
+    result.push_back(StateVariable::VIRIAL_11);
+    result.push_back(StateVariable::VIRIAL_12);
+    result.push_back(StateVariable::VIRIAL_22);
+    result.push_back(StateVariable::VIRIAL_13);
+    result.push_back(StateVariable::VIRIAL_23);
+    result.push_back(StateVariable::VIRIAL_33);
+  }
+  else if (strcmpCased(inpstr, "volume", noc) || strcmpCased(inpstr, "vol", noc)) {
+    result.push_back(StateVariable::VOLUME);
   }
   return result;
 }
@@ -891,11 +866,15 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
   };
   t_nml.addKeyword(NamelistElement("syntax", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("scope", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("nrgsample", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("username", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("varname", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("timings", NamelistType::STRING, "MISSING"));
   t_nml.addKeyword(NamelistElement("report_width", NamelistType::INTEGER,
                                    std::to_string(default_output_file_width)));
   t_nml.addKeyword(NamelistElement("energy", NamelistType::STRING, "MISSING",
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
+  t_nml.addKeyword(NamelistElement("state", NamelistType::STRING, "MISSING",
                                    DefaultIsObligatory::NO, InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("e_precision", NamelistType::INTEGER,
                                    std::to_string(default_energy_decimal_places)));
@@ -939,6 +918,11 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                 "format).");
   t_nml.addHelp("scope", "The extent of reporting that shall take place for the energies and "
                 "other properties of individual systems.");
+  t_nml.addHelp("nrgsample", "The depth of reporting for energy and state variable diagnostics.  "
+                "Choose TIME_SERIES, SERIES, or ALL for complete reporting of all measurements "
+                "every ntpr steps.  Choose MEAN or AVERAGE to report just the averages and "
+                "standard deviations of such quantities.  Choose FINAL or LAST to report only the "
+                "values for the trajectory's final frame.");
   t_nml.addHelp("username", "Name of the user driving the run (if different from that which would "
                 "be detected automatically).");
   t_nml.addHelp("timings", "By default, the wall time devoted to various aspects of a calculation "
@@ -948,20 +932,18 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                 "sander's mdout has a width of 80 characters.  This width will be respected "
                 "except as required by aspects of line formatting and unbreakable variable or "
                 "file names.");
-  t_nml.addHelp("energy", "In addition to certain obligatory outputs, a user can select that only "
-                "specific molecular mechanics energy components be printed, to help focus the "
-                "output and reduce file sizes.  In all cases, the total, total potential, and "
-                "total kinetic energies will be reported, as will thermodynamic integration "
-                "derivatives (if applicable), pressure (if applicable), overall temperature, and "
-                "volume.  By default, all molecular mechanics energy components are also "
-                "reported, but a user may request specific components and thereby disable the "
-                "printing of unrequested terms.  Acceptable arguments include: BOND, ANGLE, "
-                "TORSION / DIHEDRAL, PROPER_DIHEDRAL, IMPROPER_DIHEDRAL, CMAP, VDW / LJ, ELEC / "
-                "ELECTROSTATIC, GB / SOLVENT, and NMR / RESTRAINT.  Various plurals or omissions "
-                "of underscores may also be recognized, and the arguments are not case "
-                "sensitive.  A user may also opt to print temperatures of specific regions of the "
-                "simulation by supplying the LOCAL_TEMPERATURE argument, and components of the "
-                "virial using the VIRIAL_COMPONENTS argument.");
+  t_nml.addHelp("energy", "If unspecified, STORMM will print all relevant molecular mechanics "
+                "energy components.  This keyword allows a user to select specific components for "
+                "printing, to help focus the output and reduce file sizes.  Acceptable arguments "
+                "include: BOND, ANGLE, TORSION / DIHEDRAL, PROPER_DIHEDRAL, IMPROPER_DIHEDRAL, "
+                "CMAP, VDW / LJ, ELEC / ELECTROSTATIC, GB / SOLVENT, and NMR / RESTRAINT.  "
+                "Various plurals or omissions of underscores may also be recognized, and the "
+                "arguments are not case sensitive.");
+  t_nml.addHelp("state", "If unspecified, the overall temperature will be printed.  If applicable "
+                "and \"state\" is unspecified, volume and overall pressure will be printed.  A "
+                "user may also opt to print temperatures of specific regions of the simulation by "
+                "supplying the LOCAL_TEMPERATURE argument, and components of the virial using the "
+                "VIRIAL_COMPONENTS argument.");
   t_nml.addHelp("e_precision", "The number of decimal places with which to report all energy "
                 "quantities in the output tables.  Energies are reported in units of kcal/mol.  "
                 "The default setting matches Amber output and is appropriate for most molecular "

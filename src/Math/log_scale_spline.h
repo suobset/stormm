@@ -29,6 +29,7 @@ using constants::PrecisionModel;
 using symbols::amber_ancient_bioq;
 using energy::minimum_ewald_coefficient;
 using energy::maximum_ewald_coefficient;
+using parse::minimalRealFormat;
 using parse::NumberFormat;
 using parse::realToString;
 
@@ -46,8 +47,9 @@ template <typename T4> struct LogSplineTable {
 
   /// \brief As with other abstracts, the constructor takes a straight list of inputs for each
   ///        member variable.
-  LogSplineTable(int detail_bits_in, int index_bound_in, uint sp_detail_mask_in,
-                 ullint dp_detail_mask_in, const T4* table_in);
+  LogSplineTable(BasisFunctions basis_in, TableIndexing lookup_in, int detail_bits_in,
+                 int index_bound_in, uint sp_detail_mask_in, ullint dp_detail_mask_in,
+                 const T4* table_in);
 
   /// \brief The const-ness of member variables implicitly deletes the copy and move assignment
   ///        operators, but the default copy and move constructors are valid.
@@ -56,6 +58,16 @@ template <typename T4> struct LogSplineTable {
   LogSplineTable(LogSplineTable &&original) = default;
   /// \}
 
+  /// The type of basis functions f(x), g(x), h(x), and v(x) in the expression evaluated by the
+  /// spline:
+  ///
+  /// U(x) = A f(x) + B g(x) + C h(x) + D v(x)
+  BasisFunctions basis;
+
+  /// The method of transforming the argument of the underlying benchmark function into a table
+  /// index for selecting the correct spline
+  TableIndexing lookup;
+  
   /// The number of bits of the corresponding floating point format of the range argument.  For a
   /// double4 LogSplineTable, the range argument is double and the number of detail bits (on any
   /// architecture STORMM is prepared for use on) should be 52 minus the number of mantissa bits

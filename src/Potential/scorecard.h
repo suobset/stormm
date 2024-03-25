@@ -231,7 +231,7 @@ public:
   ///                      contrbution describes
   void add(StateVariable var, llint amount, int system_index = 0);  
 
-  /// \brief Commit the (assumed complete), accumulated results in one or more state variables to
+  /// \brief Commit the (assumed complete) accumulated results in one or more state variables to
   ///        the running tallies and time series kept for statistical purposes.
   ///
   /// Overloaded:
@@ -401,13 +401,13 @@ public:
   ///                      from all potential and kinetic energy sources)
   /// \param tier          Level from which to extract the data
   /// \{
-  std::vector<double> reportEnergyHistory(int system_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  std::vector<double> reportEnergyHistory(StateVariable aspect, int system_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  std::vector<double2> reportEnergyHistory(StateVariable aspect,
-                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double> reportHistory(int system_index,
+                                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double> reportHistory(StateVariable aspect, int system_index,
+                                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double2> reportHistory(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double2> reportHistory(StateVariable aspect,
+                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Get a const pointer to this object.
@@ -416,7 +416,8 @@ public:
   /// \brief Set the time index for the most recent stored set of energies.
   ///
   /// \param time_index  Set the time index
-  void setLastTimeStep(int time_index);
+  /// \param tier        The memory level at which to set the time step
+  void setLastTimeStep(int time_index, HybridTargetLevel tier = HybridTargetLevel::HOST);
   
   /// \brief Import the results of another ScoreCard into this one, including all components and
   ///        the associated energy history.  If the current object does not have sufficient space
@@ -431,10 +432,10 @@ public:
   ///   - Import multiple systems into multiple indices.
   ///
   /// \param other           The other energy tracking object
-  /// \param fill_index      Index of the current object to import results into
-  /// \param fill_indices    Indices of the current object to import results into
-  /// \param source_index    Index of the original object to import results from
-  /// \param source_indices  Indices of the original object to import results from
+  /// \param fill_index      System index of the current object to import results into
+  /// \param fill_indices    System indices of the current object to import results into
+  /// \param source_index    System index of the original object to import results from
+  /// \param source_indices  System indices of the original object to import results from
   /// \{
   void import(const ScoreCard *other, size_t fill_index, size_t source_index);
   void import(const ScoreCard &other, size_t fill_index, size_t source_index);

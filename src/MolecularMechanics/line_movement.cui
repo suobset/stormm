@@ -32,7 +32,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
                              ((lane_idx ==  7) * (int)(StateVariable::VDW)) +
                              ((lane_idx ==  8) * (int)(StateVariable::VDW_ONE_FOUR)) +
                              ((lane_idx ==  9) * (int)(StateVariable::ELECTROSTATIC)) +
-                             ((lane_idx == 10) * (int)(StateVariable::ELECTROSTATIC_ONE_FOUR)) +
+                             ((lane_idx == 10) * (int)(StateVariable::ELEC_ONE_FOUR)) +
                              ((lane_idx == 11) * (int)(StateVariable::GENERALIZED_BORN)) +
                              ((lane_idx == 12) * (int)(StateVariable::RESTRAINT));
 

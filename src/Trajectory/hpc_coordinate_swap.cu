@@ -1,5 +1,6 @@
 // -*-c++-*-
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "hpc_coordinate_swap.h"
 #include "hpc_coordinate_swap.cuh"
@@ -7,6 +8,7 @@
 namespace stormm {
 namespace trajectory {
 
+using constants::PrecisionModel;
 using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::velocity_scale_nonoverflow_bits;
 using numerics::force_scale_nonoverflow_bits;

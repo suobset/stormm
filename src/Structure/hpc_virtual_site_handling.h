@@ -6,6 +6,7 @@
 #include "Accelerator/core_kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Potential/cacheresource.h"
+#include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
@@ -18,6 +19,7 @@ using card::CoreKlManager;
 using constants::PrecisionModel;
 using energy::CacheResource;
 using energy::CacheResourceKit;
+using energy::ValenceKernelSize;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
@@ -30,8 +32,11 @@ using synthesis::SyValenceKit;
 ///                 the fixed-precision coordinate representation has extensions to 95 bits
 /// \param purpose  Whether to place the virtual sites (after motion of their frame atoms) or to
 ///                 transmit forces from the virtual sites to their frame atoms
+/// \param kwidth   Recommended width of the thread blocks (XL = 512, LG = 256, MD = 128, SM = 64
+///                 threads)
 cudaFuncAttributes queryVirtualSiteKernelRequirements(PrecisionModel prec,
-                                                      VirtualSiteActivity purpose);
+                                                      VirtualSiteActivity purpose,
+                                                      ValenceKernelSize kwidth);
 
 /// \brief Place virtual sites based on new atom positions within the current coordinate set.
 ///

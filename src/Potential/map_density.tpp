@@ -163,17 +163,26 @@ Tcalc sourceMagnitude(const NonbondedTheme pmig_density, const NonbondedTheme cg
 template <typename Tcalc, typename Tgrid>
 void spreadDensity(const Tcalc* a_cof, const Tcalc* b_cof, const Tcalc* c_cof,
                    const int bspline_order, const int grid_root_a, const int grid_root_b,
-                   const int grid_root_c, const uint4 grid_dims, Tgrid* grid_data, int* overflow,
-                   const Tcalc mesh_scaling_factor) {
+                   const int grid_root_c, const uint4 grid_dims, const FFTMode fft_staging,
+                   Tgrid* grid_data, int* overflow, const Tcalc mesh_scaling_factor) {
   const int om = bspline_order - 1;
   const bool tgrid_is_llint = (std::type_index(typeid(Tgrid)).hash_code() == llint_type_index);
+  uint padded_gdim_x;
+  switch (fft_staging) {
+  case FFTMode::IN_PLACE:
+    padded_gdim_x = 2 * ((grid_dims.x / 2) + 1);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    padded_gdim_x = grid_dims.x;
+    break;
+  }
   for (int k = 0; k < bspline_order; k++) {
     int kg_pos = grid_root_c + k;
     kg_pos += ((kg_pos < 0) - (kg_pos >= grid_dims.z)) * grid_dims.z;
     for (int j = 0; j < bspline_order; j++) {
       int jg_pos = grid_root_b + j;
       jg_pos += ((jg_pos < 0) - (jg_pos >= grid_dims.y)) * grid_dims.y;
-      const size_t jk_gidx = grid_dims.w + (((kg_pos * grid_dims.y) + jg_pos) * grid_dims.x);
+      const size_t jk_gidx = grid_dims.w + (((kg_pos * grid_dims.y) + jg_pos) * padded_gdim_x);
       const Tcalc jk_contrib = b_cof[j] * c_cof[k];
       for (int i = 0; i < bspline_order; i++) {
         int ig_pos = grid_root_a + i;
@@ -255,7 +264,7 @@ void accumulateCellDensity(PMIGridWriter *pm_wrt, const int sysid, const int cel
         }
         spreadDensity<double, double>(a_cof.data(), b_cof.data(), c_cof.data(), pm_wrt->order,
                                       grid_root_a, grid_root_b, grid_root_c, pm_wrt->dims[sysid],
-                                      pm_wrt->ddata);
+                                      pm_wrt->fftm, pm_wrt->ddata);
       }
     }
     break;
@@ -276,7 +285,7 @@ void accumulateCellDensity(PMIGridWriter *pm_wrt, const int sysid, const int cel
         }
         spreadDensity<float, float>(a_cof.data(), b_cof.data(), c_cof.data(), pm_wrt->order,
                                     grid_root_a, grid_root_b, grid_root_c, pm_wrt->dims[sysid],
-                                    pm_wrt->fdata);
+                                    pm_wrt->fftm, pm_wrt->fdata);
       }
     }
     break;
@@ -331,7 +340,8 @@ void accumulateCellDensity(PMIGridAccumulator *pm_acc, const int sysid, const in
         }
         spreadDensity<double, llint>(a_cof.data(), b_cof.data(), c_cof.data(), pm_acc->order,
                                      grid_root_a, grid_root_b, grid_root_c, pm_acc->dims[sysid],
-                                     pm_acc->lldata, pm_acc->overflow, pm_acc->fp_scale);
+                                     pm_acc->fftm, pm_acc->lldata, pm_acc->overflow,
+                                     pm_acc->fp_scale);
       }
     }
     break;
@@ -352,7 +362,7 @@ void accumulateCellDensity(PMIGridAccumulator *pm_acc, const int sysid, const in
         }
         spreadDensity<float, int>(a_cof.data(), b_cof.data(), c_cof.data(), pm_acc->order,
                                   grid_root_a, grid_root_b, grid_root_c, pm_acc->dims[sysid],
-                                  pm_acc->idata, pm_acc->overflow, pm_acc->fp_scale);
+                                  pm_acc->fftm, pm_acc->idata, pm_acc->overflow, pm_acc->fp_scale);
       }
     }
     break;
@@ -566,9 +576,9 @@ void unrollMapDensityCall(PMIGrid *pm, const size_t cg_tcalc, const AtomGraphSyn
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
 std::vector<Tcalc> mapDensity(const CoordinateFrameReader &cfr, const NonbondedKit<Tcalc> &nbk,
-                              const NonbondedTheme theme, const int grid_dim_a,
-                              const int grid_dim_b, const int grid_dim_c, const int order,
-                              const BSplineUnity unification) {
+                              const NonbondedTheme theme, const FFTMode fft_staging,
+                              const int grid_dim_a, const int grid_dim_b, const int grid_dim_c,
+                              const int order, const BSplineUnity unification) {
 
   // Trap bad inputs
   if (cfr.natom != nbk.natom) {
@@ -620,7 +630,16 @@ std::vector<Tcalc> mapDensity(const CoordinateFrameReader &cfr, const NonbondedK
   }
 
   // Initialize the resulting grid.
-  std::vector<Tcalc> result(grid_dim_a * grid_dim_b * grid_dim_c, 0.0);
+  int padded_dim_a;
+  switch (fft_staging) {
+  case FFTMode::IN_PLACE:
+    padded_dim_a = 2 * ((grid_dim_a / 2) + 1);
+    break;
+  case FFTMode::OUT_OF_PLACE:
+    padded_dim_a = grid_dim_a;
+    break;
+  }
+  std::vector<Tcalc> result(padded_dim_a * grid_dim_b * grid_dim_c, 0.0);
   
   // Loop over all particles, compute B-spline coefficients, and map the density to the grid.
   std::vector<Tcalc> bspl_a(order), bspl_b(order), bspl_c(order);
@@ -668,7 +687,7 @@ std::vector<Tcalc> mapDensity(const CoordinateFrameReader &cfr, const NonbondedK
         int act_j = base_gb + j;
         act_j += ((act_j < 0) - (act_j >= grid_dim_b)) * grid_dim_b;
         const Tcalc bspl_bc = bspl_b[j] * bspl_c[k];
-        const int jk_idx = ((act_k * grid_dim_b) + act_j) * grid_dim_a;
+        const int jk_idx = ((act_k * grid_dim_b) + act_j) * padded_dim_a;
         for (int i = 0; i < order; i++) {
           int act_i = base_ga + i;
           act_i += ((act_i < 0) - (act_i >= grid_dim_a)) * grid_dim_a;

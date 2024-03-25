@@ -26,6 +26,7 @@
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Reporting/reporting_enumerators.h"
+#include "../../../src/Structure/radius_gyration.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/condensate.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
@@ -147,11 +148,17 @@ int main(int argc, const char* argv[]) {
   }
   AtomGraphSynthesis sandbox_ag(unique_topologies, sandbox_restraints, sandbox_topology_indices, 
                                 incrementingSeries<int>(0, sandbox.getSystemCount(), 1));
+
+  // CHECK
+#if 0
+  const std::vector<double> pre_gr = radiusOfGyration(sandbox, sandbox_ag);
+#endif
+  // END CHECK
+
 #ifdef STORMM_USE_HPC
   StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getUniqueTopologies(),
                                             sandbox_ag.getTopologyIndices());
 #endif
-  
   // Complete the work unit construction.  Upload data to the GPU, if applicable.
 #ifdef STORMM_USE_HPC
   InitializationTask init_task;
@@ -209,11 +216,23 @@ int main(int argc, const char* argv[]) {
 #ifdef STORMM_USE_HPC
   sandbox.download();
   emin.download();
-  Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE, gpu);
-#else
-  Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE);
-#endif
 
+  // CHECK
+#if 0
+  const std::vector<double> post_gr = radiusOfGyration(sandbox, sandbox_ag);
+  std::vector<double> dgr(post_gr.size());
+  for (size_t i = 0; i < pre_gr.size(); i++) {
+    dgr[i] = (post_gr[i] - pre_gr[i]) / pre_gr[i];
+  }
+  printf("Change in G(R) = %12.8lf +/- %12.8lf\n", mean(dgr),
+         variance(dgr, VarianceMethod::STANDARD_DEVIATION));
+#endif
+  // END CHECK
+  
+  //Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE, gpu);
+#else
+  //Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE);
+#endif
   // For each rotatable bond, compute the value obtained in each conformer.  This will produce a
   // map of the viable minima for various conformations.
   
@@ -222,12 +241,12 @@ int main(int argc, const char* argv[]) {
                                                                 sandbox_map, emin,
                                                                 ui.getConformerNamelistInfo());
   master_timer.assignTime(tm_conformer_selection);
-
+  
   // Print the best conformations for each topological system.
   printResults(sandbox, best_confs, emin, sc, sandbox_map, ui.getConformerNamelistInfo(),
                ui.getReportNamelistInfo());
   writeInputTranscript(ui);
-  printReport(sc, ui, sandbox_prm, sandbox_map, emin);
+  printReport(sc, ui, sandbox_prm, sandbox_map, emin, best_confs);
   
   // Print timings results
   master_timer.printResults();

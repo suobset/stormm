@@ -167,9 +167,9 @@ int main(const int argc, const char* argv[]) {
   }
   check(td_copied.size(), RelationalOperator::EQUAL, 16, "Assignment of a Hybrid object does not "
         "make the object the correct size.");
-  check(td_copied.readHost(4), RelationalOperator::EQUAL, Approx(-7.82397027).margin(1.0e-6),
+  check(td_copied.readHost(4), RelationalOperator::EQUAL, Approx(-22.76199814).margin(1.0e-6),
         "The Hybrid assignment operator does not do a deep copy of the values on the host.");
-  check(td_copied.readDevice(7), RelationalOperator::EQUAL, Approx(-11.88356310).margin(1.0e-6),
+  check(td_copied.readDevice(7), RelationalOperator::EQUAL, Approx(-21.48105323).margin(1.0e-6),
         "The Hybrid assignment operator does not do a deep copy of the values on the device.");
   check(std::string(td_copied.getLabel().name), RelationalOperator::EQUAL, "Not dead",
         "The Hybrid assignment operator does not carry over the proper label.");

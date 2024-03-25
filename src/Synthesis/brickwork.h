@@ -109,11 +109,17 @@ public:
   /// \brief The minimum necessary information is a series of tuples indicating the dimensions of
   ///        each system.
   ///
-  /// \param target_multiple     Work to bring the number of bricks as close to a multiple of this
-  ///                            number as possible, without going over
+  /// \param target_multiple        Work to bring the number of bricks as close to a multiple of
+  ///                               this number as possible, without going over
+  /// \param preferred_a_lengths    A list of preferred lengths for volume partitions along the
+  ///                               unit cell A axis.
+  /// \param discouraged_a_lengths  A list of discouraged lengths for volume partitions along the
+  ///                               unit cell A axis
   Brickwork(const std::vector<int3> &system_dimensions_in = {}, int a_span_max_in = 7,
             int bc_cross_section_max_in = 16, int halo_under_in = 1, int halo_over_in = 0,
-            int max_nonhalo_volume_in = 48, int target_multiple = 1);
+            int max_nonhalo_volume_in = 48, int target_multiple = 1,
+            const std::vector<int> &preferred_a_lengths = {},
+            const std::vector<int> &discouraged_a_lengths = {});
 
   /// \brief With no pointers to repair, no const members, and any array data members taken from
   ///        the Standard Template Library, the default copy and move constructors, as well as
@@ -195,7 +201,13 @@ public:
   ///        near to a multiple thereof, is hit.
   ///
   /// \param target_work_unit_multiple  The ideal number of work units to create
-  void subdivide(int target_work_unit_multiple = 1);
+  /// \param preferred_a_lengths        A list of preferred lengths for volume partitions along
+  ///                                   the unit cell A axis
+  /// \param discouraged_a_lengths      A list of discouraged lengths for volume partitions along
+  ///                                   the unit cell A axis
+  void subdivide(int target_work_unit_multiple = 1,
+                 const std::vector<int> &preferred_a_lengths = {},
+                 const std::vector<int> &discouraged_a_lengths = {});
 
 private:
   

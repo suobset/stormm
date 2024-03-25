@@ -85,12 +85,22 @@ CheckResult check(const bool statement, const std::string &error_message,
   }
   else {
     printf("Check FAILED: ");
+    std::string criticality("");
+    switch (urgency) {
+    case TestPriority::CRITICAL:
+      break;
+    case TestPriority::ABORT:
+    case TestPriority::NON_CRITICAL:
+      criticality = "[Non-critical] ";
+      break;
+    }
     if (error_message.size() > 0) {
-      const std::string parsed_msg = terminalFormat(error_message, "", "", 14, 0, 14);
+      const std::string parsed_msg = terminalFormat(criticality + error_message, "", "", 14, 0,
+                                                    14);
       printf("%s\n", parsed_msg.c_str());
     }
     else {
-      printf("No description provided.\n");
+      printf("%sNo description provided.\n", criticality.c_str());
     }
     if (urgency == TestPriority::NON_CRITICAL) {
       gbl_test_results.logResult(CheckResult::IGNORED);
@@ -197,6 +207,8 @@ CheckResult check(const double lhs, const RelationalOperator relationship, const
   int rhs_dec = realDecimalPlaces(rhs.getValue());
   bool both_are_integers = (lhs_dec == 0 && rhs_dec == 0);
   idec = (idec > 9 && both_are_integers) ? 0 : idec;
+
+  // Report the error.  Add an alert if the test is considered non-critical.
   std::string error_edit("  ");
   switch (rhs.getStyle()) {
   case ComparisonType::ABSOLUTE:
@@ -508,7 +520,16 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
         std::string error_edit("  ");
         error_edit += vectorAlignmentReport(ref_content, content, data_format,
                                             comparison_tolerance);
-        const std::string parsed_msg = terminalFormat(error_message + error_edit,
+        std::string criticality;
+        switch (urgency) {
+        case TestPriority::CRITICAL:
+          break;
+        case TestPriority::ABORT:
+        case TestPriority::NON_CRITICAL:
+          criticality = "[Non-critical] ";
+          break;
+        }
+        const std::string parsed_msg = terminalFormat(criticality + error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());
         if (urgency == TestPriority::NON_CRITICAL) {
@@ -653,7 +674,16 @@ CheckResult snapshot(const std::string &filename, const TextFile &content,
           }
           error_edit += " ].";
         }
-        const std::string parsed_msg = terminalFormat(error_message + error_edit,
+        std::string criticality("");
+        switch (urgency) {
+        case TestPriority::CRITICAL:
+          break;
+        case TestPriority::ABORT:
+        case TestPriority::NON_CRITICAL:
+          criticality = "[Non-critical] ";
+          break;
+        }
+        const std::string parsed_msg = terminalFormat(criticality + error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());
         if (urgency == TestPriority::NON_CRITICAL) {

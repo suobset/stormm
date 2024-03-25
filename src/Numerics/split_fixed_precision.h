@@ -8,6 +8,7 @@
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "numeric_enumerators.h"
 
 namespace stormm {
 namespace numerics {
@@ -16,21 +17,6 @@ using card::Hybrid;
 using constants::ExceptionResponse;
 using constants::PrecisionModel;
   
-/// \brief Enumerate the choices for carrying out fixed-precision accumulation
-enum class AccumulationMethod {
-  SPLIT,     ///< Use split accumulation, stashing the low 32 bits in a locally cached int and the
-             ///<   high 32 bits in a secondary accumulator probably located further away in main
-             ///<   memory.  So long as most of the work happens in the low 32 bits, this reduces
-             ///<   local memory demand and overall memory bandwidth by a factor of two, lowers
-             ///<   GPU kernel register pressure on many architectures, and has shown 2.2 - 2.9x
-             ///<   the speed of accumulating in int64.
-  WHOLE,     ///< Sum fixed-precision numbers in int64 accumulators.  This is needed when the
-             ///<   fixed-precision work cannot be mostly confined to the low 32 bits.
-  AUTOMATIC  ///< Determine the accumulation method by looking at the number of fixed-precision
-             ///<   bits after the decimal and making some assumptions about typical molecular
-             ///<   mechanics forces.
-};
-
 /// \brief The maximum contributions for signed integer accumulation.  There is no long long
 ///        integer form of the maximum long long integer accumulation as the number would wrap
 ///        the format to become the negative of its intended value.  The long long integer
@@ -50,8 +36,9 @@ constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 /// \brief Translate a string specifying a force accumulation method into the numerical code.
 ///
 /// \param method  The string to translate
+/// \param policy  Action to take in the event of an error
 AccumulationMethod translateAccumulationMethod(const std::string &choice,
-                                                         ExceptionResponse policy);
+                                               ExceptionResponse policy);
 
 /// \brief Get a string for the name of a force accumulation method.
 ///
@@ -169,6 +156,32 @@ void hostFloatToInt63(const Hybrid<float> &fval_x, const Hybrid<float> &fval_y,
                       Hybrid<int> *primary_y, Hybrid<int> *overflow_y, Hybrid<int> *primary_z,
                       Hybrid<int> *overflow_z, float scale = 1.0f);
 
+int2 hostLongLongToInt63(const llint val);
+
+void hostLongLongToInt63(const llint val, int *primary, int *overflow);
+
+void hostLongLongToInt63(const llint* val, int* primary, int* overflow, size_t n_values);
+
+void hostLongLongToInt63(const llint* val_x, const llint* val_y, const llint* val_z,
+                         int* primary_x, int* overflow_x, int* primary_y, int* overflow_y,
+                         int* primary_z, int* overflow_z, size_t n_values);
+
+void hostLongLongToInt63(const std::vector<llint> &val, std::vector<int> *primary,
+                         std::vector<int> *overflow);
+
+void hostLongLongToInt63(const std::vector<llint> &val_x, const std::vector<llint> &val_y,
+                         const std::vector<llint> &val_z, std::vector<int> *primary_x,
+                         std::vector<int> *overflow_x, std::vector<int> *primary_y,
+                         std::vector<int> *overflow_y, std::vector<int> *primary_z,
+                         std::vector<int> *overflow_z);
+
+void hostLongLongToInt63(const Hybrid<llint> &val, Hybrid<int> *primary, Hybrid<int> *overflow);
+
+void hostLongLongToInt63(const Hybrid<llint> &val_x, const Hybrid<llint> &val_y,
+                         const Hybrid<llint> &val_z, Hybrid<int> *primary_x,
+                         Hybrid<int> *overflow_x, Hybrid<int> *primary_y, Hybrid<int> *overflow_y,
+                         Hybrid<int> *primary_z, Hybrid<int> *overflow_z);
+
 int2 hostDoubleToInt63(const double fval);
 
 void hostDoubleToInt63(const double fval, int *primary, int *overflow);
@@ -222,6 +235,32 @@ void hostDoubleToInt95(const Hybrid<double> &dval_x, const Hybrid<double> &dval_
 /// \param n_values  Trusted length of result, as well as any primary and overflow arrays, when
 ///                  working with C-style arrays in the conversion
 /// \{
+llint hostInt63ToLongLong(int primary, int overflow);
+
+void hostInt63ToLongLong(llint* result, const int* primary, const int* overflow, size_t n_values);
+
+void hostInt63ToLongLong(std::vector<llint> *result, const std::vector<int> &primary,
+                         const std::vector<int> &overflow, size_t n_values);
+
+void hostInt63ToLongLong(Hybrid<llint> *result, const Hybrid<int> &primary,
+                         const Hybrid<int> &overflow, size_t n_values);
+
+void hostInt63ToLongLong(llint* result_x, llint* result_y, llint* result_z, const int* primary_x,
+                         const int* overflow_x, const int* primary_y, const int* overflow_y,
+                         const int* primary_z, const int* overflow_z, size_t n_values);
+
+void hostInt63ToLongLong(std::vector<llint> *result_x, std::vector<llint> *result_y,
+                         std::vector<llint> *result_z, const std::vector<int> &primary_x,
+                         const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                         const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                         const std::vector<int> &overflow_z, size_t n_values);
+
+void hostInt63ToLongLong(Hybrid<llint> *result_x, Hybrid<llint> *result_y, Hybrid<llint> *result_z,
+                         const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                         const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                         const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
+                         size_t n_values);
+
 double hostInt63ToDouble(int primary, int overflow);
 
 void hostInt63ToDouble(double* result, const int* primary, const int* overflow, size_t n_values,
@@ -433,7 +472,7 @@ void fixedPrecisionGrid(Hybrid<llint> *primary, Hybrid<int> *overflow, const int
 void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
                         const int95_t increment, const size_t grid_size);
 /// \}
-
+  
 } // namespace numerics
 } // namespace stormm
 
@@ -448,6 +487,11 @@ namespace stormm {
   using numerics::hostSplitFPSum;
   using numerics::hostInt95Sum;
   using numerics::hostInt63Sum;
+  using numerics::max_int_accumulation;
+  using numerics::max_int_accumulation_f;
+  using numerics::max_int_accumulation_ll;
+  using numerics::max_llint_accumulation;
+  using numerics::max_llint_accumulation_f;
 } // namespace stormm
 
 #endif

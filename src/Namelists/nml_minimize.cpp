@@ -147,6 +147,16 @@ void MinimizeControls::setClashDampingCycles(const int cycles_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void MinimizeControls::setAbsoluteClashDistance(const double clash_minimum_distance_in) {
+  clash_minimum_distance = clash_minimum_distance_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setVdwClashRatio(const double clash_vdw_ratio_in) {
+  clash_vdw_ratio = clash_vdw_ratio_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MinimizeControls::setDiagnosticPrintFrequency(const int frequency_in) {
   print_frequency = frequency_in;
   validatePrintFrequency();

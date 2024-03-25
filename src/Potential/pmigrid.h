@@ -74,9 +74,10 @@ constexpr int max6s_atom_bearing_cross_section = 12;
 struct PMIGridWriter {
 
   /// \brief The constructor take a straight list of inputs for all member variables.
-  PMIGridWriter(NonbondedTheme theme_in, PrecisionModel mode_in, int fp_bits_in, int nsys_in,
-                int order_in, int wu_count_in, int max_grid_points_in, const uint4* dims_in,
-                double* ddata_in, float* fdata_in, const uint* work_units_in);
+  PMIGridWriter(NonbondedTheme theme_in, PrecisionModel mode_in, FFTMode fftm_in, int fp_bits_in,
+                int nsys_in, int order_in, int wu_count_in, int max_grid_points_in,
+                const uint4* dims_in, double* ddata_in, float* fdata_in,
+                const uint* work_units_in);
 
   /// \brief As with other abstracts, the presence of one or more const members forbids definition
   ///        of the copy and move assignment operators, but with no pointers to repair the default
@@ -89,6 +90,8 @@ struct PMIGridWriter {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const FFTMode fftm;          ///< The layout of the FFT grid, implying a mode in which the FFT
+                               ///<   will be carried out
   const float shacc_fp_scale;  ///< Scaling factor used in fixed-precision accumulation when
                                ///<   accumulating density in __shared__ memory.
   const int nsys;              ///< The number of systems in the synthesis served by this object,
@@ -115,8 +118,9 @@ struct PMIGridWriter {
 struct PMIGridReader {
 
   /// \brief The constructor take a straight list of inputs for all member variables.
-  PMIGridReader(NonbondedTheme theme_in, PrecisionModel mode_in, int fp_bits_in, int nsys_in,
-                int order_in, const uint4* dims_in, const double* ddata_in, const float* fdata_in);
+  PMIGridReader(NonbondedTheme theme_in, PrecisionModel mode_in, FFTMode fftm_in, int fp_bits_in,
+                int nsys_in, int order_in, const uint4* dims_in, const double* ddata_in,
+                const float* fdata_in);
 
   /// \brief As with some other readers, the writer can be used as a constructor argument.
   ///
@@ -137,6 +141,8 @@ struct PMIGridReader {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const FFTMode fftm;          ///< The layout of the FFT grid, implying a mode in which the FFT
+                               ///<   will be carried out
   const float shacc_fp_scale;  ///< Scaling factor used in fixed-precision accumulation when
                                ///<   accumulating density in __shared__ memory.
   const int nsys;              ///< The number of systems in the synthesis served by this object,
@@ -158,10 +164,10 @@ struct PMIGridAccumulator {
 
   /// \brief The constructor takes inputs from the object's member variables and re-interprets
   ///        some of them as necessary.
-  PMIGridAccumulator(NonbondedTheme theme_in, PrecisionModel mode_in, bool use_overflow_in,
-                     int fp_bits_in, int nsys_in, int order_in, int wu_count_in,
-                     const uint4* dims_in, double* ddata_in, float* fdata_in, int* overflow_in,
-                     const uint* work_units_in);
+  PMIGridAccumulator(NonbondedTheme theme_in, PrecisionModel mode_in, FFTMode fftm_in,
+                     bool use_overflow_in, int fp_bits_in, int nsys_in, int order_in,
+                     int wu_count_in, const uint4* dims_in, double* ddata_in, float* fdata_in,
+                     int* overflow_in, const uint* work_units_in);
 
   /// \brief As with other abstracts, the presence of one or more const members forbids definition
   ///        of the copy and move assignment operators, but with no pointers to repair the default
@@ -174,6 +180,8 @@ struct PMIGridAccumulator {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const FFTMode fftm;          ///< The layout of the FFT grid, implying a mode in which the FFT
+                               ///<   will be carried out
   const bool use_overflow;     ///< Flag to indicate that overflow accumulators must be used
   const int fp_bits;           ///< The number of bits used in fixed-precision accumulation of
                                ///<   whatever density the grids describe.
@@ -210,9 +218,10 @@ struct PMIGridFPReader {
 
   /// \brief The constructor takes inputs from the object's member variables and re-interprets
   ///        some of them as necessary.
-  PMIGridFPReader(NonbondedTheme theme_in, PrecisionModel mode_in, bool use_overflow_in,
-                  int fp_bits_in, int nsys_in, int order_in, const uint4* dims_in,
-                  const double* ddata_in, const float* fdata_in, const int* overflow_in);
+  PMIGridFPReader(NonbondedTheme theme_in, PrecisionModel mode_in, FFTMode fftm_in,
+                  bool use_overflow_in, int fp_bits_in, int nsys_in, int order_in,
+                  const uint4* dims_in, const double* ddata_in, const float* fdata_in,
+                  const int* overflow_in);
 
   /// \brief As with some other readers, the writer can be used as a constructor argument.
   ///
@@ -233,6 +242,8 @@ struct PMIGridFPReader {
   const NonbondedTheme theme;  ///< The non-bonded property mapped to the particle-mesh interaction
                                ///<   grid
   const PrecisionModel mode;   ///< The mode in which the object is to operate
+  const FFTMode fftm;          ///< The layout of the FFT grid, implying a mode in which the FFT
+                               ///<   will be carried out
   const bool use_overflow;     ///< Flag to indicate that overflow accumulators are relevant
   const int fp_bits;           ///< The number of bits used in fixed-precision accumulation of
                                ///<   whatever density the grids describe.

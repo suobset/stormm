@@ -991,7 +991,7 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
       case StateVariable::VDW:
       case StateVariable::VDW_ONE_FOUR:
       case StateVariable::ELECTROSTATIC:
-      case StateVariable::ELECTROSTATIC_ONE_FOUR:
+      case StateVariable::ELEC_ONE_FOUR:
       case StateVariable::GENERALIZED_BORN:
       case StateVariable::KINETIC:
       case StateVariable::PRESSURE:

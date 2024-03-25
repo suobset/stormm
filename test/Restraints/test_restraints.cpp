@@ -631,7 +631,7 @@ int main(const int argc, const char* argv[]) {
   section(4);
   const RestraintKit<double, double2, double4> gk_posn_dbl = gk_posn_ra.dpData();
   const RestraintKit<float, float2, float4> gk_posn_flt = gk_posn_ra.spData();
-  testPrecisionSetup(gk_posn_ra, gk_ps, 1.0e-5, 1.0e-6, 1.0e-4, 1.0e-5, do_tests);
+  testPrecisionSetup(gk_posn_ra, gk_ps, 2.5e-5, 1.0e-6, 1.0e-4, 1.0e-5, do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

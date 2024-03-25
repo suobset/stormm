@@ -10,6 +10,7 @@
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction_enumerators.h"
 #include "Math/reduction_workunit.h"
+#include "Potential/energy_enumerators.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -26,6 +27,7 @@ using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::ExceptionResponse;
+using energy::ValenceKernelSize;
 using stmath::RdwuPerSystem;
 using stmath::ReductionWorkUnit;
 using restraints::RestraintApparatus;
@@ -222,6 +224,14 @@ public:
   ///        Hybrid array member variable.
   const Hybrid<int>& getSystemAtomOffsets() const;
 
+  /// \brief Get the numbers of unconstrained degrees of freedom for all individual systems in the
+  //         synthesis, as a const reference to the internal Hybrid array member variable.
+  const Hybrid<int>& getDegreesOfFreedom() const;
+  
+  /// \brief Get the numbers of constrained degrees of freedom for all individual systems in the
+  //         synthesis, as a const reference to the internal Hybrid array member variable.
+  const Hybrid<int>& getConstrainedDegreesOfFreedom() const;
+  
   /// \brief Get the unit cell type that will be taken for all systems (TRICLINIC subsumes
   ///        ORTHORHOMBIC in a sort of type promotion).
   UnitCellType getUnitCellType() const;
@@ -301,6 +311,9 @@ public:
   ///        user or tailored by the automated heuristics to produce the best saturation.
   int getValenceWorkUnitSize() const;
 
+  /// \brief Get the necessary thread block size for evaluating the valence work units.
+  ValenceKernelSize getValenceThreadBlockSize() const;
+  
   /// \brief Get the abstracts (condensed lists of import and instruction set limits) for the
   ///        valence work units spanning all systems in this synthesis.
   const Hybrid<int2>& getValenceWorkUnitAbstracts() const;
@@ -526,6 +539,8 @@ private:
                                       ///<   so it can be set here)
   ShakeSetting use_bond_constraints;  ///< Toggles use of bond length constraints
   SettleSetting use_settle;           ///< Toggles analytic constraints on rigid water
+  int largest_constraint_group;       ///< Number of bonds involved in the largest hub-and-spoke
+                                      ///<   constraint group for any system in the synthesis
   char4 water_residue_name;           ///< Name of water residue, compared to residue_names
 
   /// Settings for the Poisson-Boltzmann radii sets for each system, also used in GB.  While it is
@@ -603,7 +618,9 @@ private:
   // Information relevant to the MD propagation algorithm
   Hybrid<int> rigid_water_counts;       ///< Number of rigid water molecules subject to SETTLE
   Hybrid<int> bond_constraint_counts;   ///< Bonds with lengths constrained by SHAKE or RATTLE
-  Hybrid<int> degrees_of_freedom;       ///< Total degrees of freedom, 3N - 6 - constraints in
+  Hybrid<int> degrees_of_freedom;       ///< Total degrees of freedom in the system, in the absence
+                                        ///<   of constraints (3N -6 for N particles)
+  Hybrid<int> cnst_degrees_of_freedom;  ///< Total degrees of freedom, 3N - 6 - constraints in
                                         ///<   each system
   Hybrid<int> nonrigid_particle_counts; ///< A rigid water is one non-rigid particle.  A protein
                                         ///<   with N atoms and no bond length constraints is N
@@ -1148,9 +1165,10 @@ private:
                                               ///<   constraint_param_bounds array
   Hybrid<int> constraint_param_bounds;        ///< Bounds array for constraint_group_params and
                                               ///<   sp_constraint_group_params
-  Hybrid<double2> constraint_group_params;    ///< Constraint parameters: length in the x member
-                                              ///<   and inverse mass in the y member, for each
-                                              ///<   constrained bond in the group
+  Hybrid<double2> constraint_group_params;    ///< Constraint parameters: the squared target bond
+                                              ///<   length in the x member and inverse mass in the
+                                              ///<   y member, for each constrained bond in the
+                                              ///<   group
   Hybrid<float2> sp_constraint_group_params;  ///< Single precision constraint parameters: length
                                               ///<   length and inverse mass in the x and y
                                               ///<   members of the tuple, respectively
@@ -1164,6 +1182,10 @@ private:
   // contributed back to the global arrays.
   int total_valence_work_units;  ///< Total count of valence work units spanning all systems
   int valence_work_unit_size;    ///< Maximum size of the value work units
+
+  /// The thread block size needed to launch valence work units associated with this synthesis.
+  /// Larger thread blocks may be used, but this is the minimum recommended size.
+  ValenceKernelSize valence_thread_block_size;
   
   /// Instruction sets for the bond work units, storing integers for the low (_L nomenclature) and
   /// high (_H nomeclature) limits of all the types of interactions in a given work unit.  Each
@@ -1281,11 +1303,10 @@ private:
   /// constraint group itself is uncertain, but for practical purposes the number of participating
   /// atoms will be limited to sixteen.  Each instruction pertains to one bond of the group,
   /// providing the atom index of the central (heavy) atom in bits 1-10 of the x member and the
-  /// atom index of the light atom (hydrogen) in bits 11-20 of the x member.  The lane number of
-  /// the thread participating in evaluating this group is given in bits 21-24 and the number of
-  /// constrained bonds is given in 25-28.  The parameter index indicating the target equilibrium
-  /// length for this constraint group is given in the y member.  Masses of each atom involved will
-  /// be read from global parameter tables and cached in L1 for this and subsequent atom updates.
+  /// atom index of the light atom (hydrogen) in bits 11-20 of the x member.  The lane index of the
+  /// base thread for the constraint group is given in bits 21-28 and the number of constrained
+  /// bonds is given in 29-32.  The parameter index indicating the target equilibrium length and
+  /// inverse masses for this constraint group is given in the y member.
   Hybrid<uint2> cnst_instructions;
 
   // Instructions for evaluating energy terms--these are stored as extra arrays, as they will only
@@ -1514,7 +1535,16 @@ private:
   void importImplicitSolventAtomParameters(int system_index);
 
   /// \brief Impart the hard-wired "Neck" Generalized Born tables to the synthesis.
+  ///
+  /// Overloaded:
+  ///   - Provide customized tables of neck GB parameters
+  ///   - Use the hard-coded default tables
+  /// 
+  /// \param ngb_tab  Optional, customized table of neck Generalized Born parameters
+  /// \{
+  void setImplicitSolventNeckParameters(const NeckGeneralizedBornTable &ngb_tab);
   void setImplicitSolventNeckParameters();
+  /// \}
 };
 
 } // namespace synthesis

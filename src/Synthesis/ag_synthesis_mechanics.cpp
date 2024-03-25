@@ -3,11 +3,13 @@
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
+#include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
+#include "Parsing/parsing_enumerators.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
 #include "UnitTesting/stopwatch.h"
@@ -22,6 +24,10 @@ namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
+using diskutil::getBaseName;
+using parse::realToString;
+using parse::NumberFormat;
+using restraints::RestraintStage;
 using stmath::buildReductionWorkUnits;
 using stmath::incrementingSeries;
 using stmath::maxAbsoluteDifference;
@@ -33,8 +39,6 @@ using stmath::RdwuAbstractMap;
 using stmath::rdwu_abstract_length;
 using stmath::roundUp;
 using stmath::sum;
-using parse::realToString;
-using restraints::RestraintStage;
 using topology::CmapAccessories;
 using topology::computeCmapDerivatives;
 using topology::ConstraintKit;
@@ -364,7 +368,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
-  int_system_data.resize(45 * padded_system_count);
+  int_system_data.resize(46 * padded_system_count);
   int pivot = 0;
   topology_indices.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -415,6 +419,8 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   bond_constraint_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   degrees_of_freedom.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  cnst_degrees_of_freedom.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   nonrigid_particle_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -519,6 +525,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     rigid_water_counts.putHost(ag_ptr->getRigidWaterCount(), i);
     bond_constraint_counts.putHost(ag_ptr->getBondConstraintCount(), i);
     degrees_of_freedom.putHost(ag_ptr->getDegreesOfFreedom(), i);
+    cnst_degrees_of_freedom.putHost(ag_ptr->getConstrainedDegreesOfFreedom(), i);
     nonrigid_particle_counts.putHost(ag_ptr->getNonrigidParticleCount(), i);
 
     // Record various offsets, and increment the counters
@@ -1431,15 +1438,17 @@ void AtomGraphSynthesis::condenseParameterTables() {
       n_unique_sett++;
     }
 
-    // Seek out unique bond length constraint parameter sets
+    // Seek out unique bond length constraint parameter sets.  Track the largest such constraint
+    // group.
     for (int j = 0; j < i_cnk.ncnst_param; j++) {
       if (cnst_synthesis_index[topology_cnst_table_offsets[i] + j] >= 0) {
         continue;
       }
       const int nelem = i_cnk.group_param_bounds[j + 1] - i_cnk.group_param_bounds[j];
+      largest_constraint_group = std::max(largest_constraint_group, nelem - 1);
       std::vector<Approx> lengths, inv_masses;
       for (int k = i_cnk.group_param_bounds[j]; k < i_cnk.group_param_bounds[j + 1]; k++) {
-        lengths.emplace_back(i_cnk.group_lengths[k], ComparisonType::ABSOLUTE,
+        lengths.emplace_back(i_cnk.group_sq_lengths[k], ComparisonType::ABSOLUTE,
                              constants::verytiny);
         inv_masses.emplace_back(i_cnk.group_inv_masses[k], ComparisonType::ABSOLUTE,
                                 constants::verytiny);
@@ -1454,7 +1463,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
           }
           bool same = true;
           for (int n = 0; n < nelem; n++) {
-            const double km_length = k_cnk.group_lengths[k_cnk.group_param_bounds[m] + n];
+            const double km_length = k_cnk.group_sq_lengths[k_cnk.group_param_bounds[m] + n];
             const double km_inv_mass = k_cnk.group_inv_masses[k_cnk.group_param_bounds[m] + n];
             same = (same && lengths[n].test(km_length) && inv_masses[n].test(km_inv_mass));
           }
@@ -1466,10 +1475,11 @@ void AtomGraphSynthesis::condenseParameterTables() {
 
       // Catalog this unique hub-and-spoke constraint group
       for (int k = 0; k < nelem; k++) {
-        filtered_cnst_group_params.push_back({ lengths[k].getValue(), inv_masses[k].getValue() });
+        filtered_cnst_group_params.push_back({ lengths[k].getValue(), inv_masses[0].getValue() +
+                                                                      inv_masses[k].getValue() });
         float2 tmp_f2;
         tmp_f2.x = lengths[k].getValue();
-        tmp_f2.y = inv_masses[k].getValue();
+        tmp_f2.y = (inv_masses[0].getValue() + inv_masses[k].getValue());
         sp_filtered_cnst_group_params.push_back(tmp_f2);
       }
       filtered_cnst_group_bounds.push_back(static_cast<int>(filtered_cnst_group_params.size()));
@@ -1484,7 +1494,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
 
   // The charge parameters get their own arrays due to the time they are finally condensed and the
   // uncertainty of their size.  Other non-bonded parameter sets have dedicated ARRAY-kind Hybrid
-  // objects as well.  The indexing array (charge_indices) is a POINTER-kiind Hybrid targeting
+  // objects as well.  The indexing array (charge_indices) is a POINTER-kind Hybrid targeting
   // chem_int_data.
   charge_parameters.resize(filtered_chrg.size());
   charge_parameters.putHost(filtered_chrg);
@@ -1611,6 +1621,10 @@ void AtomGraphSynthesis::condenseParameterTables() {
   sp_settle_group_geometry.putHost(sp_filtered_sett_geom);
   constraint_param_bounds.resize(filtered_cnst_group_bounds.size());
   constraint_param_bounds.putHost(filtered_cnst_group_bounds);
+  constraint_group_params.resize(filtered_cnst_group_params.size());
+  constraint_group_params.putHost(filtered_cnst_group_params);
+  sp_constraint_group_params.resize(sp_filtered_cnst_group_params.size());
+  sp_constraint_group_params.putHost(sp_filtered_cnst_group_params);
   
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole.  Fill out the parameter maps.
@@ -2916,6 +2930,16 @@ const Hybrid<int>& AtomGraphSynthesis::getSystemAtomOffsets() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const Hybrid<int>& AtomGraphSynthesis::getDegreesOfFreedom() const {
+  return degrees_of_freedom;
+}
+
+//-------------------------------------------------------------------------------------------------
+const Hybrid<int>& AtomGraphSynthesis::getConstrainedDegreesOfFreedom() const {
+  return cnst_degrees_of_freedom;
+}
+
+//-------------------------------------------------------------------------------------------------
 UnitCellType AtomGraphSynthesis::getUnitCellType() const {
   return periodic_box_class;
 }
@@ -2978,6 +3002,11 @@ int AtomGraphSynthesis::getValenceWorkUnitCount() const {
 //-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getValenceWorkUnitSize() const {
   return valence_work_unit_size;
+}
+
+//-------------------------------------------------------------------------------------------------
+ValenceKernelSize AtomGraphSynthesis::getValenceThreadBlockSize() const {
+  return valence_thread_block_size;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3178,8 +3207,8 @@ SyAtomUpdateKit<double, double2, double4>
 AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
   return SyAtomUpdateKit<double,
                          double2,
-                         double4>(inverse_atomic_masses.data(tier),
-                                  virtual_site_parameters.data(tier),
+                         double4>(atomic_masses.data(tier), inverse_atomic_masses.data(tier),
+                                  largest_constraint_group, virtual_site_parameters.data(tier),
                                   settle_group_geometry.data(tier), settle_group_masses.data(tier),
                                   constraint_group_params.data(tier), vste_instructions.data(tier),
                                   sett_instructions.data(tier), cnst_instructions.data(tier),
@@ -3191,8 +3220,8 @@ SyAtomUpdateKit<float, float2, float4>
 AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
   return SyAtomUpdateKit<float,
                          float2,
-                         float4>(sp_inverse_atomic_masses.data(tier),
-                                 sp_virtual_site_parameters.data(tier),
+                         float4>(sp_atomic_masses.data(tier), sp_inverse_atomic_masses.data(tier),
+                                 largest_constraint_group, sp_virtual_site_parameters.data(tier),
                                  sp_settle_group_geometry.data(tier),
                                  sp_settle_group_masses.data(tier),
                                  sp_constraint_group_params.data(tier),
@@ -3371,8 +3400,8 @@ void AtomGraphSynthesis::importImplicitSolventAtomParameters(const int system_in
 }
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::setImplicitSolventNeckParameters() {
-  const NeckGeneralizedBornTable ngb_tab;
+void
+AtomGraphSynthesis::setImplicitSolventNeckParameters(const NeckGeneralizedBornTable &ngb_tab) {
   const NeckGeneralizedBornKit<double> ngbk = ngb_tab.dpData();
   neck_table_size = ngbk.table_size;
   neck_limit_tables.resize(neck_table_size * neck_table_size);
@@ -3386,9 +3415,127 @@ void AtomGraphSynthesis::setImplicitSolventNeckParameters() {
     sp_neck_limit_ptr[i].y = ngbk.max_value[i];
   }
 }
- 
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventNeckParameters() {
+  const NeckGeneralizedBornTable ngb_tab;
+  setImplicitSolventNeckParameters(ngb_tab);
+}
+
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::setImplicitSolventModel() {
+
+  // Set the global GB parameters based on the first topology with a valid implicit solvent model.
+  // Check subsequent topologies to ensure that there is agreement where required.
+  if (system_count == 0) {
+    return;
+  }
+  const NeckGeneralizedBornTable ngb_tab;
+  const NeckGeneralizedBornKit<double> ngbk = ngb_tab.dpData();
+  int sys_idx = 0;
+  int gb_setting_system;
+  gb_style = ImplicitSolventModel::NONE;
+  while (sys_idx < system_count && gb_style == ImplicitSolventModel::NONE) {
+    const AtomGraph* ag_base = getSystemTopologyPointer(sys_idx);
+    if (ag_base->getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+      gb_style = ag_base->getImplicitSolventModel();
+      dielectric_constant = ag_base->getDielectricConstant();
+      salt_concentration = ag_base->getSaltConcentration();
+      is_kappa = (salt_concentration > constants::tiny) ?
+                 sqrt(default_salt_kappa_dependence * salt_concentration) : 0.0;
+      gb_offset = (gb_style == ImplicitSolventModel::NECK_GB_II) ?
+                  static_cast<double>(default_neck_ii_gb_radii_offset) :
+                  static_cast<double>(default_gb_radii_offset);
+      gb_neckscale = (gb_style == ImplicitSolventModel::NECK_GB_II) ?
+                     static_cast<double>(default_gb_neck_ii_scale) :
+                     static_cast<double>(default_gb_neck_scale);
+      gb_neckcut = ngbk.neck_cut;
+      gb_setting_system = sys_idx;
+    }
+    sys_idx++;
+  }
+
+  // Check that all other topologies contain the same critical implicit solvent parameters
+  while (sys_idx < system_count) {
+    const AtomGraph* ag_base = getSystemTopologyPointer(sys_idx);
+    const ImplicitSolventModel test_ism = ag_base->getImplicitSolventModel();
+    switch (test_ism) {
+    case ImplicitSolventModel::NONE:
+      break;
+    case ImplicitSolventModel::HCT_GB:
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+      switch (gb_style) {
+      case ImplicitSolventModel::NONE:
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+        break;
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        rtErr("A 'Neck' GB model of the form " + getEnumerationName(gb_style) + " set for the "
+              "synthesis by system index " + std::to_string(gb_setting_system) + " (" +
+              getBaseName(getSystemTopologyPointer(gb_setting_system)->getFileName()) + "), is "
+              "not compatible with other GB models (" + getEnumerationName(test_ism) +
+              " in system index " + std::to_string(sys_idx) + ", " +
+              getBaseName(getSystemTopologyPointer(sys_idx)->getFileName()) + ").",
+              "AtomGraphSynthesis", "setImplicitSolventModel");
+        break;
+      }
+      break;
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      switch (gb_style) {
+      case ImplicitSolventModel::NONE:
+      case ImplicitSolventModel::HCT_GB:
+      case ImplicitSolventModel::OBC_GB:
+      case ImplicitSolventModel::OBC_GB_II:
+        rtErr("A GB model of the form " + getEnumerationName(gb_style) + " set for the "
+              "synthesis by system index " + std::to_string(gb_setting_system) + " (" +
+              getBaseName(getSystemTopologyPointer(gb_setting_system)->getFileName()) + "), is "
+              "not compatible with a 'Neck' GB model (" + getEnumerationName(test_ism) +
+              " in system index " + std::to_string(sys_idx) + ", " +
+              getBaseName(getSystemTopologyPointer(sys_idx)->getFileName()) + ").",
+              "AtomGraphSynthesis", "setImplicitSolventModel");
+        break;
+      case ImplicitSolventModel::NECK_GB:
+      case ImplicitSolventModel::NECK_GB_II:
+        if (gb_style != test_ism) {
+          rtErr("Multiple 'Neck' GB models cannot be placed in the same synthesis (system index " +
+                std::to_string(gb_setting_system) + ", of style " + getEnumerationName(gb_style) +
+                " and system index " + std::to_string(sys_idx) + " of style " +
+                getEnumerationName(test_ism) + ", taken from " +
+                getBaseName(getSystemTopologyPointer(gb_setting_system)->getFileName()) + " and " +
+                getBaseName(getSystemTopologyPointer(sys_idx)->getFileName()) + ", respectively).",
+                "AtomGraphSynthesis", "setImplicitSolventModel");
+        }
+        break;
+      }
+    }
+    const double test_dielectric = ag_base->getDielectricConstant();
+    if (fabs(test_dielectric - dielectric_constant) > 1.0e-4) {
+      rtErr("Multiple dielectric constants (" +
+            realToString(test_dielectric, 8, 4, NumberFormat::STANDARD_REAL) + " and " +
+            realToString(dielectric_constant, 8, 4, NumberFormat::STANDARD_REAL) + " from " +
+            getBaseName(getSystemTopologyPointer(sys_idx)->getFileName()) + " and " +
+            getBaseName(getSystemTopologyPointer(gb_setting_system)->getFileName()) + " in system "
+            "indices " + std::to_string(sys_idx) + " and " + std::to_string(gb_setting_system) +
+            ", respectively) cannot be combined in the same synthesis.", "AtomGraphSynthesis",
+            "setImplicitSolventModel");
+    }
+    const double test_salt = ag_base->getSaltConcentration();
+    if (fabs(test_salt - salt_concentration) > constants::small) {
+      rtErr("Multiple salt concentrations (" +
+            realToString(test_salt, 8, 4, NumberFormat::STANDARD_REAL) + " and " +
+            realToString(salt_concentration, 8, 4, NumberFormat::STANDARD_REAL) + " from " +
+            getBaseName(getSystemTopologyPointer(sys_idx)->getFileName()) + " and " +
+            getBaseName(getSystemTopologyPointer(gb_setting_system)->getFileName()) + " in system "
+            "indices " + std::to_string(sys_idx) + " and " + std::to_string(gb_setting_system) +
+            ", respectively) cannot be combined in the same synthesis.", "AtomGraphSynthesis",
+            "setImplicitSolventModel");
+    }
+    sys_idx++;
+  }
   
   // The original GB settings from the input topologies will be imported into the synthesis.
   switch (gb_style) {

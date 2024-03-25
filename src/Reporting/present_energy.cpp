@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "Constants/scaling.h"
 #include "FileManagement/file_listing.h"
+#include "FileManagement/file_util.h"
 #include "Math/summation.h"
 #include "Math/statistical_enumerators.h"
 #include "Math/vector_ops.h"
@@ -9,6 +10,7 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "present_energy.h"
+#include "section_contents.h"
 #include "summary_file.h"
 
 namespace stormm {
@@ -17,9 +19,11 @@ namespace review {
 using constants::verytiny;
 using diskutil::extractCommonPaths;
 using diskutil::listCommonPaths;
+using diskutil::openOutputFile;
 using energy::getEnumerationName;
 using parse::lowercase;
 using stmath::sum;
+using stmath::colorVectorMask;
 using stmath::elementwiseMultiply;
 using stmath::mean;
 using stmath::variance;
@@ -30,6 +34,7 @@ using topology::AtomGraph;
 using topology::ImplicitSolventModel;
 using topology::TorsionKind;
 using topology::NonbondedKit;
+using topology::UnitCellType;
 using topology::ValenceKit;
 
 //-------------------------------------------------------------------------------------------------
@@ -48,6 +53,20 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
     for (int i = 0; i < scmapr.nsynth; i++) {
       cache_system_in_use[scmapr.cache_origins[i]] = true;
       cache_topol_in_use[scmapr.topology_origins[i]] = true;
+    }
+
+    // If the systems exist in isolate dboundary conditions, pressure and volume have no meaning.
+    bool has_prss, has_volm;
+    switch (scmap.getCoordinateSynthesisPointer()->getUnitCellType()) {
+    case UnitCellType::NONE:
+      has_prss = false;
+      has_volm = false;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      has_prss = true;
+      has_volm = true;
+      break;
     }
     
     // If no details of the desired energies are indicated, assume that all relevant energies
@@ -98,7 +117,7 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
       has_ubrd = (has_ubrd || vk.nubrd > 0);
       has_cimp = (has_cimp || vk.ncimp > 0);
       has_cmap = (has_cmap || vk.ncmap > 0);
-
+      
       // Check for non-bonded properties
       const NonbondedKit<double> nbk = topologies[i]->getDoublePrecisionNonbondedKit();
       const bool has_charge = (variance(nbk.charge, nbk.natom,
@@ -131,16 +150,19 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
     if (has_ubrd) result.push_back(StateVariable::UREY_BRADLEY);
     if (has_cimp) result.push_back(StateVariable::CHARMM_IMPROPER);
     if (has_cmap) result.push_back(StateVariable::CMAP);
-    if (has_qq14) result.push_back(StateVariable::ELECTROSTATIC_ONE_FOUR);
+    if (has_qq14) result.push_back(StateVariable::ELEC_ONE_FOUR);
     if (has_lj14) result.push_back(StateVariable::VDW_ONE_FOUR);
     if (has_qqnb) result.push_back(StateVariable::ELECTROSTATIC);
     if (has_ljnb) result.push_back(StateVariable::VDW);
     if (has_gb)   result.push_back(StateVariable::GENERALIZED_BORN);
     if (has_rstr) result.push_back(StateVariable::RESTRAINT);
+    if (has_prss) result.push_back(StateVariable::PRESSURE);
+    if (has_volm) result.push_back(StateVariable::VOLUME);
 
     // Check all systems for the presence of nonzero kientic energy
-    if (sum<double>(nrg.reportAverageStates(StateVariable::KINETIC)) > verytiny) {
+    if (mean(nrg.reportAverageStates(StateVariable::KINETIC)) > verytiny) {
       result.push_back(StateVariable::KINETIC);
+      result.push_back(StateVariable::TEMPERATURE_ALL);
     }
     return result;
   }
@@ -172,7 +194,7 @@ std::vector<ReportTable> tabulateAverageEnergy(const ScoreCard &nrg, const Energ
         }
         size_t adcon = npts;
         for (int j = 0; j < nsys; j++) {
-          const std::vector<double> ehist = nrg.reportEnergyHistory(used_quantities[i], j);
+          const std::vector<double> ehist = nrg.reportHistory(used_quantities[i], j);
           for (int k = 0; k < npts; k++) {
             iresult[k].x += ehist[k];
             iresult[k].y += ehist[k] * ehist[k];
@@ -353,7 +375,8 @@ ReportTable groupSystemDesignations(const SynthesisCacheMap &scmap,
 ReportTable groupEnergyAccumulation(const ScoreCard &nrg, const EnergySample measure,
                                     const int* system_indices, const int* group_bounds,
                                     const int group_count, const StateVariable quantity,
-                                    const std::string &varname, const ReportControls &repcon) {
+                                    const std::string &varname, const ReportControls &repcon,
+                                    const std::vector<bool> &report_mask) {
   size_t total_data = (group_count * 2) + 1;
   size_t npts;
   switch (measure) {
@@ -392,7 +415,7 @@ ReportTable groupEnergyAccumulation(const ScoreCard &nrg, const EnergySample mea
       case EnergySample::TIME_SERIES:
         {
           const int npts = nrg.getSampleSize();
-          const std::vector<double> contrib = nrg.reportEnergyHistory(quantity, i);
+          const std::vector<double> contrib = nrg.reportHistory(quantity, i);
           for (int j = 0; j < npts; j++) {
             iresult[j].x += contrib[j];
             iresult[j].y += contrib[j] * contrib[j];
@@ -448,8 +471,41 @@ std::vector<ReportTable> tabulateGroupedEnergy(const ScoreCard &nrg,
                                                std::string *shortcut_key,
                                                const SynthesisCacheMap &scmap,
                                                const std::vector<StateVariable> &quantities,
-                                               const ReportControls &repcon) {
+                                               const ReportControls &repcon,
+                                               const std::vector<bool> &report_mask) {
   const SynthesisMapReader scmapr = scmap.data();
+
+  // Translate the mask of reported systems from an order corresponding to a straight reading of
+  // the systems in the systems cache into one in which systems for each of the relevant groups
+  // appear in order.
+  std::vector<bool> group_ordered_mask(scmap.getSynthesisSystemCount(), false);
+  int ijcon = 0;
+  switch (organization) {
+  case SystemGrouping::SOURCE:
+    for (int i = 0; i < scmapr.ncache; i++) {
+      for (int j = scmapr.csystem_bounds[i]; j < scmapr.csystem_bounds[i + 1]; j++) {
+        group_ordered_mask[ijcon] = report_mask[scmapr.csystem_proj[j]];
+        ijcon++;
+      }
+    }
+    break;
+  case SystemGrouping::TOPOLOGY:
+    for (int i = 0; i < scmapr.ntopol; i++) {
+      for (int j = scmapr.ctopol_bounds[i]; j < scmapr.ctopol_bounds[i + 1]; j++) {
+        group_ordered_mask[ijcon] = report_mask[scmapr.ctopol_proj[j]];
+        ijcon++;
+      }
+    }
+    break;
+  case SystemGrouping::LABEL:
+    for (int i = 0; i < scmapr.nlabel; i++) {
+      for (int j = scmapr.clabel_bounds[i]; j < scmapr.clabel_bounds[i + 1]; j++) {
+        group_ordered_mask[ijcon] = report_mask[scmapr.clabel_proj[j]];
+        ijcon++;
+      }
+    }
+    break;
+  }
   const std::vector<StateVariable> used_quantities = assessEnergyDetails(nrg, scmap, quantities);
   const int nquant = used_quantities.size();
   std::vector<ReportTable> result;
@@ -460,17 +516,17 @@ std::vector<ReportTable> tabulateGroupedEnergy(const ScoreCard &nrg,
     case SystemGrouping::SOURCE:
       result.push_back(groupEnergyAccumulation(nrg, measure, scmapr.csystem_proj,
                                                scmapr.csystem_bounds, scmapr.ncache,
-                                               used_quantities[i], varname, repcon));
+                                               used_quantities[i], varname, repcon, report_mask));
       break;
     case SystemGrouping::TOPOLOGY:
       result.push_back(groupEnergyAccumulation(nrg, measure, scmapr.ctopol_proj,
                                                scmapr.ctopol_bounds, scmapr.ntopol,
-                                               used_quantities[i], varname, repcon));
+                                               used_quantities[i], varname, repcon, report_mask));
       break;
     case SystemGrouping::LABEL:
       result.push_back(groupEnergyAccumulation(nrg, measure, scmapr.clabel_proj,
                                                scmapr.clabel_bounds, scmapr.nlabel,
-                                               used_quantities[i], varname, repcon));
+                                               used_quantities[i], varname, repcon, report_mask));
       break;
     }
   }
@@ -478,9 +534,39 @@ std::vector<ReportTable> tabulateGroupedEnergy(const ScoreCard &nrg,
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateGroupedEnergy(const ScoreCard &nrg,
+                                               const SystemGrouping organization,
+                                               const EnergySample measure,
+                                               const std::string &varname,
+                                               std::string *shortcut_key,
+                                               const SynthesisCacheMap &scmap,
+                                               const std::vector<StateVariable> &quantities,
+                                               const ReportControls &repcon,
+                                               const std::vector<int> &report_mask) {
+  const std::vector<bool> brep_mask = colorVectorMask(report_mask,
+                                                      scmap.getSynthesisSystemCount());
+  return tabulateGroupedEnergy(nrg, organization, measure, varname, shortcut_key, scmap,
+                               quantities, repcon, brep_mask);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateGroupedEnergy(const ScoreCard &nrg,
+                                               const SystemGrouping organization,
+                                               const EnergySample measure,
+                                               const std::string &varname,
+                                               std::string *shortcut_key,
+                                               const SynthesisCacheMap &scmap,
+                                               const std::vector<StateVariable> &quantities,
+                                               const ReportControls &repcon) {
+  const std::vector<bool> report_mask(scmap.getSynthesisSystemCount(), true);
+  return tabulateGroupedEnergy(nrg, organization, measure, varname, shortcut_key, scmap,
+                               quantities, repcon, report_mask);
+}
+
+//-------------------------------------------------------------------------------------------------
 ReportTable allSystemDesignations(std::string *shortcut_key, const SynthesisCacheMap &scmap,
                                   const ReportControls &repcon) {
-  std::string explain_paths("In the following energetics table, each system is given by a "
+  std::string explain_paths("In the following energetics table(s), each system is given by a "
                             "numerical identifier as follows");
   const SynthesisMapReader scmapr = scmap.data();
   std::vector<std::string> topology_names;
@@ -490,7 +576,7 @@ ReportTable allSystemDesignations(std::string *shortcut_key, const SynthesisCach
     const AtomGraph *iag_ptr = sc->getTopologyPointer(scmapr.topology_origins[i]);
     topology_names.push_back(iag_ptr->getFileName());
   }
-  const std::vector<std::string> tn_shortcuts = extractCommonPaths(&topology_names, 8, 4);
+  const std::vector<std::string> tn_shortcuts = extractCommonPaths(&topology_names, 8, 3);
   if (tn_shortcuts.size() > 0) {
     const std::string pluralize = (tn_shortcuts.size() > 1) ? "path shortcuts" : "a path shortcut";
     explain_paths += ".  This table of keys uses " + pluralize + " to condense its contents:\n";
@@ -506,7 +592,7 @@ ReportTable allSystemDesignations(std::string *shortcut_key, const SynthesisCach
   std::vector<std::string> all_system_names_data;
   all_system_names_data.reserve(scmapr.nsynth * 4);
   for (int i = 0; i < scmapr.nsynth; i++) {
-    all_system_names_data.push_back(std::to_string(i));
+    all_system_names_data.push_back(std::to_string(i + 1));
   }
   for (int i = 0; i < scmapr.nsynth; i++) {
     all_system_names_data.push_back(std::to_string(scmapr.cache_origins[i] + 1));
@@ -528,39 +614,54 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
                                             std::string *post_script,
                                             const SynthesisCacheMap &scmap,
                                             const std::vector<StateVariable> &quantities,
-                                            const ReportControls &repcon) {
+                                            const ReportControls &repcon,
+                                            const std::vector<bool> &report_mask) {
   const std::vector<StateVariable> used_quantities = assessEnergyDetails(nrg, scmap, quantities);
   const int nquant = used_quantities.size();
   std::vector<ReportTable> result;
   result.reserve(1 + nquant);
   result.push_back(allSystemDesignations(shortcut_key, scmap, repcon));
   const int nsys = scmap.getSynthesisSystemCount();
+  if (report_mask.size() < nsys) {
+    rtErr("A mask of " + std::to_string(report_mask.size()) + " is insufficient to cover a "
+          "collection of " + std::to_string(nsys) + " systems.", "tabulateFullEnergy");
+  }
+  int nrep = 0;
+  for (int i = 0; i < nsys; i++) {
+    nrep += static_cast<int>(report_mask[i]);
+  }
   std::vector<double> table_data;
   std::vector<std::string> table_headings;
   const int npts = nrg.getSampleSize();
   post_script->resize(0);
   switch (measure) {
   case EnergySample::TIME_SERIES:
-    table_data.resize(static_cast<size_t>(nsys + 1) * static_cast<size_t>(npts));
-    table_headings.reserve(nsys + 1);
+    table_data.resize(static_cast<size_t>(nrep + 1) * static_cast<size_t>(npts));
+    table_headings.reserve(nrep + 1);
     table_headings.push_back("Step Number");
     for (int i = 0; i < nsys; i++) {
-      table_headings.push_back("System " + std::to_string(i + 1));
+      if (report_mask[i]) {
+        table_headings.push_back("System " + std::to_string(i + 1));
+      }
     }
     break;
   case EnergySample::FINAL:
-    table_data.resize(nsys * nquant);
-    table_headings.reserve(nsys);
+    table_data.resize(nrep * nquant);
+    table_headings.reserve(nrep);
     for (int i = 0; i < nsys; i++) {
-      table_headings.push_back("System " + std::to_string(i + 1));
+      if (report_mask[i]) {
+        table_headings.push_back("System " + std::to_string(i + 1));
+      }
     }
     break;
   case EnergySample::TIME_AVERAGE:
-    table_data.resize(2LLU * static_cast<size_t>(nsys * nquant));
-    table_headings.reserve(2LLU * static_cast<size_t>(nsys));
+    table_data.resize(2LLU * static_cast<size_t>(nrep * nquant));
+    table_headings.reserve(2LLU * static_cast<size_t>(nrep));
     for (int i = 0; i < nsys; i++) {
-      table_headings.push_back("System " + std::to_string(i + 1) + " Mean");
-      table_headings.push_back("System " + std::to_string(i + 1) + " Std. Dev.");
+      if (report_mask[i]) {
+        table_headings.push_back("System " + std::to_string(i + 1) + " Mean");
+        table_headings.push_back("System " + std::to_string(i + 1) + " Std. Dev.");
+      }
     }
     break;
   }
@@ -572,13 +673,15 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
       }
       size_t adcon = npts;
       for (int j = 0; j < nsys; j++) {
-        const std::vector<double> jhist = nrg.reportEnergyHistory(used_quantities[i], j);
-        for (int k = 0; k < npts; k++) {
-          table_data[adcon] = jhist[k];
-          adcon++;
+        if (report_mask[j]) {
+          const std::vector<double> jhist = nrg.reportHistory(used_quantities[i], j);
+          for (int k = 0; k < npts; k++) {
+            table_data[adcon] = jhist[k];
+            adcon++;
+          }
         }
       }
-      std::vector<int> table_decimals(nsys + 1, repcon.getEnergyDecimalPlaces());
+      std::vector<int> table_decimals(nrep + 1, repcon.getEnergyDecimalPlaces());
       table_decimals[0] = 0;
       result.emplace_back(table_data, table_headings, table_decimals,
                           varname + "_" + lowercase(getEnumerationName(used_quantities[i])));
@@ -591,13 +694,15 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
       // posterior analysis.
       size_t adcon = 0;
       for (int i = 0; i < nsys; i++) {
-        for (int j = 0; j < nquant; j++) {
-          table_data[adcon] = nrg.reportInstantaneousStates(used_quantities[j], i);
-          adcon++;
+        if (report_mask[i]) {
+          for (int j = 0; j < nquant; j++) {
+            table_data[adcon] = nrg.reportInstantaneousStates(used_quantities[j], i);
+            adcon++;
+          }
         }
       }
       result.emplace_back(table_data, table_headings,
-                          std::vector<int>(nsys, repcon.getEnergyDecimalPlaces()),
+                          std::vector<int>(nrep, repcon.getEnergyDecimalPlaces()),
                           varname + "_aggregate");
     }
     break;
@@ -606,15 +711,17 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
     // Make a temporary table of all time-averaged energy components and their error bars, then
     // have the script break it into separate variables.
     for (int i = 0; i < nsys; i++) {
-      for (int j = 0; j < nquant; j++) {
-        std::vector<double> ehist = nrg.reportEnergyHistory(used_quantities[j], i);
-        table_data[  (2 * i * nsys)       + j] = mean(ehist);
-        table_data[(((2 * i) + 1) * nsys) + j] = variance(ehist,
-                                                          VarianceMethod::STANDARD_DEVIATION);
+      if (report_mask[i]) {
+        for (int j = 0; j < nquant; j++) {
+          std::vector<double> ehist = nrg.reportHistory(used_quantities[j], i);
+          table_data[  (2 * i * nrep)       + j] = mean(ehist);
+          table_data[(((2 * i) + 1) * nrep) + j] = variance(ehist,
+                                                            VarianceMethod::STANDARD_DEVIATION);
+        }
       }
     }
     result.emplace_back(table_data, table_headings,
-                        std::vector<int>(nsys, repcon.getEnergyDecimalPlaces()),
+                        std::vector<int>(nrep, repcon.getEnergyDecimalPlaces()),
                         varname + "_aggregate");
     break;
   }
@@ -664,15 +771,40 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySample measure,
+                                            const std::string &varname, std::string *shortcut_key,
+                                            std::string *post_script,
+                                            const SynthesisCacheMap &scmap,
+                                            const std::vector<StateVariable> &quantities,
+                                            const ReportControls &repcon,
+                                            const std::vector<int> &report_mask) {
+  const std::vector<bool> brep_mask = colorVectorMask(report_mask,
+                                                      scmap.getSynthesisSystemCount());
+  return tabulateFullEnergy(nrg, measure, varname, shortcut_key, post_script, scmap, quantities,
+                            repcon, brep_mask);
+}
 
-  
+//-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySample measure,
+                                            const std::string &varname, std::string *shortcut_key,
+                                            std::string *post_script,
+                                            const SynthesisCacheMap &scmap,
+                                            const std::vector<StateVariable> &quantities,
+                                            const ReportControls &repcon) {
+  const std::vector<bool> report_mask(scmap.getSynthesisSystemCount(), true);
+  return tabulateFullEnergy(nrg, measure, varname, shortcut_key, post_script, scmap, quantities,
+                            repcon, report_mask);
+}
+
 //-------------------------------------------------------------------------------------------------
 std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const EnergySample measure,
                                                std::string *shortcut_key, std::string *post_script,
                                                const SynthesisCacheMap &scmap,
                                                const SystemGrouping organization,
                                                const std::vector<StateVariable> &quantities,
-                                               const ReportControls &repcon) {
+                                               const ReportControls &repcon,
+                                               const std::vector<bool> &report_mask) {
+  std::vector<ReportTable> result;
   
   // Determine the outliers based on the final energies, whether across the entire synthesis or
   // in terms of specific groups of systems.
@@ -684,6 +816,10 @@ std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const Energ
   case OutputScope::AVERAGES:
   case OutputScope::CLUSTER_AVERAGES:
   case OutputScope::FULL:
+
+    // These cases will have redirected to tabulateFullEnergy() or tabulateAverageEnerg(), above.
+    // The output sccope is evaluated a second time internally to differentiate between cluster
+    // outliers and cache-wide outliers.
     break;
   case OutputScope::OUTLIERS:
     {
@@ -823,7 +959,87 @@ std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const Energ
     }
     break;
   }
+
+  return result;
 }
- 
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const EnergySample measure,
+                                               std::string *shortcut_key, std::string *post_script,
+                                               const SynthesisCacheMap &scmap,
+                                               const SystemGrouping organization,
+                                               const std::vector<StateVariable> &quantities,
+                                               const ReportControls &repcon,
+                                               const std::vector<int> &report_mask) {
+  const std::vector<bool> brep_mask = colorVectorMask(report_mask,
+                                                      scmap.getSynthesisSystemCount());
+  return tabulateOutlierEnergy(nrg, measure, shortcut_key, post_script, scmap, organization,
+                               quantities, repcon, brep_mask);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ReportTable> tabulateOutlierEnergy(const ScoreCard &nrg, const EnergySample measure,
+                                               std::string *shortcut_key, std::string *post_script,
+                                               const SynthesisCacheMap &scmap,
+                                               const SystemGrouping organization,
+                                               const std::vector<StateVariable> &quantities,
+                                               const ReportControls &repcon) {
+  const std::vector<bool> report_mask(scmap.getSynthesisSystemCount(), true);
+  return tabulateOutlierEnergy(nrg, measure, shortcut_key, post_script, scmap, organization,
+                               quantities, repcon, report_mask);
+}
+
+//-------------------------------------------------------------------------------------------------
+void createDiagnosticReport(const ScoreCard &nrg, const SynthesisCacheMap &scmap,
+                            const ReportControls &repcon, std::ofstream *foutp) {
+  
+  const std::string end_line("\n");
+  foutp->write(end_line.data(), end_line.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+void createDiagnosticReport(const ScoreCard &nrg, const SynthesisCacheMap &scmap,
+                            const UserSettings &ui) {
+  const ReportControls repcon = ui.getReportNamelistInfo();
+  const FilesControls ficon = ui.getFilesNamelistInfo();
+  const std::vector<StateVariable> quantities = repcon.getReportedQuantities();
+  std::vector<ReportTable> diag_contents;
+  std::string shortcut_key(""), post_script("");
+  switch (repcon.getOutputScope()) {
+  case OutputScope::AVERAGES:
+  case OutputScope::CLUSTER_AVERAGES:
+  case OutputScope::FULL:
+    diag_contents = tabulateFullEnergy(nrg, repcon.getEnergySamplingMethod(),
+                                       repcon.getReportVariable(), &shortcut_key, &post_script,
+                                       scmap, repcon.getReportedQuantities(), repcon);
+    break;
+  case OutputScope::OUTLIERS:
+  case OutputScope::CLUSTER_OUTLIERS:
+    //tabulateOutlierEnergy();
+    break;
+  }
+
+  // Various sections of the input will be ordered within a Standard Template Library vector.
+  std::vector<SectionContents> all_sect;
+  
+  // Create a summary of the user input
+  if (ui.getInputFileName().size() > 0) {
+    all_sect.emplace_back("User Input", ficon.getReportFile(), repcon.getReportFileWidth(),
+                          repcon.getOutputSyntax(), 1.0e-4);
+    all_sect.back().addNarration("This is the input file:");
+    const TextFile input_tf(ui.getInputFileName());
+    all_sect.back().addNarration(input_tf);
+  }
+  all_sect.emplace_back("Energy and State Variables", ficon.getReportFile(),
+                        repcon.getReportFileWidth(), repcon.getOutputSyntax(),
+                        pow(10.0, -repcon.getEnergyDecimalPlaces()));
+  all_sect.back().addNarration(shortcut_key);
+  for (size_t i = 0; i < diag_contents.size(); i++) {
+    all_sect.back().addTable(diag_contents[i]);
+  }
+  printAllSections(ficon.getReportFile(), ui.getPrintingPolicy(), all_sect,
+                   repcon.getOutputSyntax());
+}
+  
 } // namespace review
 } // namespace stormm

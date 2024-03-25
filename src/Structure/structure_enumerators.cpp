@@ -160,7 +160,29 @@ std::string getEnumerationName(const MeshPosition input) {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const RattleMethod input) {
+  switch (input) {
+  case RattleMethod::SEQUENTIAL:
+    return std::string("SEQUENTIAL");
+  case RattleMethod::CENTER_SUM:
+    return std::string("CENTER_SUM");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const ApplyConstraints input) {
+  switch (input) {
+  case ApplyConstraints::YES:
+    return std::string("YES");
+  case ApplyConstraints::NO:
+    return std::string("NO");
+  }
+  __builtin_unreachable();
+}
+
 //-------------------------------------------------------------------------------------------------
 RMSDMethod translateRMSDMethod(const std::string &input) {
   if (strcmpCased(input, std::string("align_mass"), CaseSensitivity::NO) ||
@@ -272,6 +294,40 @@ MeshPosition translateMeshPosition(const std::string &input) {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+RattleMethod translateRattleMethod(const std::string &input) {
+  if (strcmpCased(input, std::string("sequential"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("traditional"), CaseSensitivity::NO)) {
+    return RattleMethod::SEQUENTIAL;
+  }
+  else if (strcmpCased(input, std::string("center_sum"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("bias_free"), CaseSensitivity::NO)) {
+    return RattleMethod::CENTER_SUM;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid RATTLE approach.", "translateRattleMethod");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+ApplyConstraints translateApplyConstraints(const std::string &input) {
+  if (strcmpCased(input, std::string("off"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("false"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("no"), CaseSensitivity::NO)) {
+    return ApplyConstraints::NO;
+  }
+  else if (strcmpCased(input, std::string("on"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("true"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("yes"), CaseSensitivity::NO)) {
+    return ApplyConstraints::YES;
+  }
+  else {
+    rtErr("\"" + input + "\" is not a valid constraint instruction.", "translateApplyConstraints");
+  }
+  __builtin_unreachable();
+}
+
 } // namespace structure
 } // namespace stormm

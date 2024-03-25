@@ -411,7 +411,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const std::vector<double> cimp_e = sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER);
   const std::vector<double> cmap_e = sc.reportInstantaneousStates(StateVariable::CMAP);
   const std::vector<double> qq14_e =
-    sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
+    sc.reportInstantaneousStates(StateVariable::ELEC_ONE_FOUR);
   const std::vector<double> lj14_e =
     sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
   
@@ -911,6 +911,80 @@ void verifyBrickCoverage(const Brickwork &bw) {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the way valence work units are sized.
+//-------------------------------------------------------------------------------------------------
+void testVwuSizingAlgorithm() {
+
+  // Try mock ligands with small hypothetical GPUs
+  Xoroshiro128pGenerator xrs(88014239);
+  std::vector<int> vwu_cap(18);
+  std::vector<ValenceKernelSize> kwidths(18);
+  std::vector<int> atom_counts(32);
+  uniformRand(&xrs, &atom_counts, 48.0, 1.0);
+  for (int i = 0; i < 32; i++) {
+    atom_counts[i] += 16;
+  }
+  int iplc = 0;
+  for (int i = 32; i > 0; i /= 2) {
+    vwu_cap[iplc] = calculateValenceWorkUnitSize(atom_counts, i, &kwidths[iplc]);
+    iplc++;
+  }
+  atom_counts.resize(768);
+  uniformRand(&xrs, &atom_counts, 48.0, 1.0);
+  for (int i = 0; i < 768; i++) {
+    atom_counts[i] += 16;
+  }
+  for (int i = 32; i > 0; i /= 2) {
+    vwu_cap[iplc] = calculateValenceWorkUnitSize(atom_counts, i, &kwidths[iplc]);
+    iplc++;
+  }
+  atom_counts.resize(9216);
+  uniformRand(&xrs, &atom_counts, 48.0, 1.0);
+  for (int i = 0; i < 9216; i++) {
+    atom_counts[i] += 16;
+  }
+  for (int i = 32; i > 0; i /= 2) {
+    vwu_cap[iplc] = calculateValenceWorkUnitSize(atom_counts, i, &kwidths[iplc]);
+    iplc++;
+  }
+  const std::vector<int> vwu_cap_ans = { 51, 68, 68, 68, 68, 68,
+                                         51, 68, 68, 68, 68, 68,
+                                         68, 68, 68, 68, 68, 68 };
+  check(vwu_cap, RelationalOperator::EQUAL, vwu_cap_ans, "The calcualted valence work unit sizes "
+        "did not meet expectations.");
+  std::vector<int> kwidths_int(iplc);
+  for (int i = 0; i < iplc; i++) {
+    kwidths_int[i] = static_cast<int>(kwidths[i]);
+  }
+  std::vector<int> kwidths_ans(kwidths.size(), static_cast<int>(ValenceKernelSize::SM));
+  kwidths_ans[0] = static_cast<int>(ValenceKernelSize::XL);
+  kwidths_ans[1] = static_cast<int>(ValenceKernelSize::XL);
+  kwidths_ans[2] = static_cast<int>(ValenceKernelSize::LG);
+  kwidths_ans[3] = static_cast<int>(ValenceKernelSize::MD);
+  check(kwidths_int, RelationalOperator::EQUAL, kwidths_ans, "The selected valence thread block "
+        "sizes did not meet expectations.");
+
+  // Try protein-sized systems with an approximation of an Ampere-era NVIDIA GPU
+  const std::vector<int> prot_atom_counts = { 2000, 4000, 6000, 8000, 10000, 20000, 30000, 40000 };
+  const int nprot_trials = prot_atom_counts.size();
+  std::vector<int> prot_vwu_cap(nprot_trials), prot_kwidths_int(nprot_trials);
+  std::vector<ValenceKernelSize> prot_kwidths(nprot_trials);
+  for (int i = 0; i < nprot_trials; i++) {
+    const std::vector<int> tmp_atom_counts(1, prot_atom_counts[i]);
+    prot_vwu_cap[i] = calculateValenceWorkUnitSize(tmp_atom_counts, 68, &prot_kwidths[i]);
+  }
+  const std::vector<int> prot_vwu_cap_ans = { 34, 51, 68, 85, 102, 170, 238, 323 };
+  check(prot_vwu_cap, RelationalOperator::EQUAL, prot_vwu_cap_ans, "The valence work unit sizes "
+        "selected for a series of protein-sized systems do not meet expectations.");
+  for (int i = 0; i < nprot_trials; i++) {
+    prot_kwidths_int[i] = static_cast<int>(prot_kwidths[i]);
+  }
+  const std::vector<int> prot_kwidths_ans(nprot_trials, static_cast<int>(ValenceKernelSize::XL));
+  check(prot_kwidths_int, RelationalOperator::EQUAL, prot_kwidths_ans, "The valence thread block "
+        "sizes selected for a series of protein-sized systems do not meet expectations.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1168,8 +1242,6 @@ int main(const int argc, const char* argv[]) {
   check(scale_bits_result, RelationalOperator::EQUAL, scale_bits_answer, "Fixed-precision bit "
         "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.",
         do_tests);
-  check(psynth_w.time_step, RelationalOperator::EQUAL, 1.0, "The time step was not correctly "
-        "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
 
   // Check that the copy assignment works
   PhaseSpaceSynthesis psynth_copy = psynth;
@@ -1207,7 +1279,7 @@ int main(const int argc, const char* argv[]) {
   check(orig_xyz, RelationalOperator::EQUAL, orig_xyz2, "Atom positions of the original "
         "PhaseSpaceSynthesis were corrupted by modifying the deep copy.", do_tests);
   const double noise_introduced = meanUnsignedError(orig_xyz, copy_xyz2);
-  check(noise_introduced, RelationalOperator::EQUAL, Approx(9.06563).margin(3.0e-5),
+  check(noise_introduced, RelationalOperator::EQUAL, Approx(9.10463).margin(3.0e-5),
         "Modifying the deep copy was ineffective.");
 
   // Create a SystemCache containing all of the systems of the first synthesis, plus meta data.
@@ -1251,8 +1323,7 @@ int main(const int argc, const char* argv[]) {
         "map.", do_tests);
   
   // Make a second coordinate synthesis, this time with different fixed-precision settings
-  PhaseSpaceSynthesis psynth2(psv, agv, std::vector<Thermostat>(1), std::vector<Barostat>(1),
-                              2.5, 24, 25, 40, 28);
+  PhaseSpaceSynthesis psynth2(psv, agv, 24, 25, 40, 28);
   PsSynthesisWriter psynth_w2 = psynth2.data();
   const std::vector<double> scaling_answer2 = { pow(2.0, 24), pow(2.0, 25), pow(2.0, 40),
                                                 pow(2.0, 28), 1.0 / pow(2.0, 24),
@@ -1282,8 +1353,6 @@ int main(const int argc, const char* argv[]) {
         "not meet expectations.", do_tests);
   check(scale_bits_result2, RelationalOperator::EQUAL, scale_bits_answer2, "Fixed-precision bit "
         "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
-  check(psynth_w2.time_step, RelationalOperator::EQUAL, 2.5, "The time step was not correctly "
-        "copied into a PhaseSpaceSynthesis writeable abstract.", do_tests);
   psynth2.extractSystem(&tip3p_ps_copy, 3);
   for (int i = 0; i < tip3p_orig_writer.natom; i++) {
     y_orig[i] = tip3p_orig_writer.ycrd[i];
@@ -1403,6 +1472,9 @@ int main(const int argc, const char* argv[]) {
         "for a series of amino acid dipeptides do not agree with those assembled through an "
         "alternative method.", do_tests);
 
+  // Check the valence work unit sizing for various GPU sizes and workloads.
+  testVwuSizingAlgorithm();
+  
   // Run diagnotics of the valence work units on a simple system, one with only a single work unit
   runValenceWorkUnitTests(sysc.getSystemTopology(0).getFileName(),
                           sysc.getCoordinates(0).getFileName(), oe, &my_prng);

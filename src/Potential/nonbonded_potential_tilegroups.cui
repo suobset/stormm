@@ -1,6 +1,12 @@
 // -*-c++-*-
 #include "copyright.h"
 
+#ifdef STORMM_USE_CUDA
+#  if (__CUDA_ARCH__ == 700 || __CUDA_ARCH__ >= 800)
+#    define LARGE_CHIP_CACHE
+#  endif
+#endif
+
 #define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 
 /// \brief Compute the non-bonded energy and forces due to electrostatic, van-der Waals, and
@@ -73,7 +79,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   __shared__ int sh_zfrc_overflow[small_block_max_atoms];
 #  endif
 #endif
-
+#ifdef LARGE_CHIP_CACHE
+  __shared__ llint sh_xcrd[small_block_max_atoms];
+  __shared__ llint sh_ycrd[small_block_max_atoms];
+  __shared__ llint sh_zcrd[small_block_max_atoms];
+#  ifndef TCALC_IS_SINGLE
+  __shared__ int sh_xcrd_overflow[small_block_max_atoms];
+  __shared__ int sh_ycrd_overflow[small_block_max_atoms];
+  __shared__ int sh_zcrd_overflow[small_block_max_atoms];
+#  endif
+#endif
 #ifdef COMPUTE_ENERGY
   __shared__ int sh_system_indices[small_block_max_imports];
   __shared__ llint sh_elec_acc[small_block_max_imports];
@@ -123,13 +138,30 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     const int tile_side_offset = warp_lane_idx / tile_length;
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
+#  ifdef LARGE_CHIP_CACHE
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, sh_tile_xcog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, sh_ycrd, sh_tile_ycog,
+                              poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, sh_zcrd, sh_tile_zcog,
+                              poly_psw.gpos_scale_f);
+#  else
     pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
                               sh_tile_xcog, poly_psw.gpos_scale_f);
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
                               sh_tile_ycog, poly_psw.gpos_scale_f);
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
                               sh_tile_zcog, poly_psw.gpos_scale_f);
+#  endif
 #else
+#  ifdef LARGE_CHIP_CACHE
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, poly_psw.xcrd_ovrf,
+                              sh_xcrd_overflow, sh_tile_xcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, sh_ycrd, poly_psw.ycrd_ovrf,
+                              sh_ycrd_overflow, sh_tile_ycog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, sh_zcrd, poly_psw.zcrd_ovrf,
+                              sh_zcrd_overflow, sh_tile_zcog, poly_psw.gpos_scale);
+#  else
     pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
                               poly_psw.xcrd_ovrf, &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET],
                               sh_tile_xcog, poly_psw.gpos_scale);
@@ -139,6 +171,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
                               poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
                               sh_tile_zcog, poly_psw.gpos_scale);
+#  endif
 #endif
     const int import_count = nbwu_map[0];
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
@@ -216,7 +249,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           case ImplicitSolventModel::NECK_GB_II:
             {
               const TCALC fipsi = psival * (-gb_radius);
-            
               egbi = (TCALC)(1.0) /
                      (inv_gb_radius -
                       (TANH_FUNC((__ldcs(&poly_nbk.gb_alpha[read_idx]) -
@@ -372,25 +404,44 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                            inv_tile_pts;
       const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
                            inv_tile_pts;
+#ifdef LARGE_CHIP_CACHE
+      int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
+      const size_t sh_read_idx = read_idx;
+      read_idx += EXCL_GMEM_OFFSET;
+#else
       int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
                       ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
                       EXCL_GMEM_OFFSET;
+#endif
 #ifdef TCALC_IS_SINGLE
       const llint x_center = LLCONV_FUNC(tx_cog);
       const llint y_center = LLCONV_FUNC(ty_cog);
       const llint z_center = LLCONV_FUNC(tz_cog);
+#  ifdef LARGE_CHIP_CACHE
+      const TCALC t_xcrd   = (TCALC)(sh_xcrd[sh_read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(sh_ycrd[sh_read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(sh_zcrd[sh_read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#  else
       const TCALC t_xcrd   = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
       const TCALC t_ycrd   = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#  endif
 #else
       // Convert the negative values of the center-of-geometry coordinates so that the result
       // can feed into splitFPSum() (which adds A + B).
       const int95_t x_center = doubleToInt95(-tx_cog);
       const int95_t y_center = doubleToInt95(-ty_cog);
       const int95_t z_center = doubleToInt95(-tz_cog);
+#  ifdef LARGE_CHIP_CACHE
+      const int95_t x_atom   = { sh_xcrd[sh_read_idx], sh_xcrd_overflow[sh_read_idx] };
+      const int95_t y_atom   = { sh_ycrd[sh_read_idx], sh_ycrd_overflow[sh_read_idx] };
+      const int95_t z_atom   = { sh_zcrd[sh_read_idx], sh_zcrd_overflow[sh_read_idx] };
+#  else
       const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
       const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
       const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
+#  endif
       const TCALC t_xcrd  = int95SumToDouble(x_atom, x_center) * poly_psw.inv_gpos_scale;
       const TCALC t_ycrd  = int95SumToDouble(y_atom, y_center) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd  = int95SumToDouble(z_atom, z_center) * poly_psw.inv_gpos_scale;
@@ -421,7 +472,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       for (int i = 0; i < half_tile_length; i++) {
         int crd_src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - i)) +
                            ((warp_lane_idx >= tile_length) *
-                           (warp_lane_idx - three_halves_tile_length + i));
+                            (warp_lane_idx - three_halves_tile_length + i));
         crd_src_lane += tile_length * ((crd_src_lane <  tile_length &&
                                         warp_lane_idx < tile_length) +
                                        (crd_src_lane <             0 &&
@@ -490,10 +541,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           if (r < clash_distance) {
             const TCALC aparm = (TCALC)(-0.5) / (clash_distance * clash_distance *
                                                  (clash_distance + (TCALC)(1.0)));
+#  ifdef COMPUTE_ENERGY
             const TCALC bparm = ((TCALC)(1.0) / clash_distance) -
                                 (aparm * (clash_distance + (TCALC)(1.0)) *
                                  (clash_distance + (TCALC)(1.0)));
-#  ifdef COMPUTE_ENERGY
             elec_nrg += ot_qq * ((aparm * (r + (TCALC)(1.0)) * (r + (TCALC)(1.0))) + bparm);
 #  endif
 #  ifdef COMPUTE_FORCE
@@ -524,13 +575,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                                   ((TCALC)(12.0) * lja * invrlim6)) * invrlim * invrlim6) /
                                 (((((((TCALC)(4.0) * vdw_limit) + (TCALC)(12.0)) * vdw_limit) +
                                    (TCALC)(12.0)) * vdw_limit) + (TCALC)(4.0));
+            const TCALC r_plus_one = r + (TCALC)(1.0);
+            const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
+#  ifdef COMPUTE_ENERGY
             const TCALC rlimit_plus_one = vdw_limit + (TCALC)(1.0);
             const TCALC arlimit_po_four = aparm * (rlimit_plus_one * rlimit_plus_one *
                                                    rlimit_plus_one * rlimit_plus_one);
             const TCALC bparm = (((lja * invrlim6) - ljb) * invrlim6) - (arlimit_po_four);
-            const TCALC r_plus_one = r + (TCALC)(1.0);
-            const TCALC arpo_three = aparm * r_plus_one * r_plus_one * r_plus_one;
-#  ifdef COMPUTE_ENERGY
             vdw_nrg += (arpo_three * r_plus_one) + bparm;
 #  endif
 #  ifdef COMPUTE_FORCE
@@ -629,7 +680,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       pos += warps_per_block;
     }
     __syncthreads();
-
+    
     // Commit the locally accumulated forces back to global arrays.
     pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef COMPUTE_FORCE
@@ -711,21 +762,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       while (pos < atom_limit) {
         if (refresh_code & 0x1) {
           __stcs(&poly_psw.fxalt[pos], 0LL);
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
           __stcs(&poly_psw.fxalt_ovrf[pos], 0);
-#endif
+#  endif
         }
         if ((refresh_code >> 1) & 0x1) {
           __stcs(&poly_psw.fyalt[pos], 0LL);
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
           __stcs(&poly_psw.fyalt_ovrf[pos], 0);
-#endif
+#  endif
         }
         if ((refresh_code >> 2) & 0x1) {
           __stcs(&poly_psw.fzalt[pos], 0LL);
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
           __stcs(&poly_psw.fzalt_ovrf[pos], 0);
-#endif
+#  endif
         }
         pos += blockDim.x;
       }
@@ -747,12 +798,41 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           const ullint2 zws = __ldcs(&tstw.state_zw[pos]);
           ullint4 xor_state = { xys.x, xys.y, zws.x, zws.y };
           const	size_t nrand_zu	= 3 * nrand;
+          TCALC2 rng_val;
           for (size_t i = 0; i < nrand_zu; i++) {
-            const TCALC	rng_val = xoshiro256pp_normal(&xor_state);
-            __stcs(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val);
+            if ((i & 0x1) == 0) {
+#  ifdef TCALC_IS_SINGLE
+              rng_val = xoshiro256pp_normalpairf(&xor_state);
+#  else
+              rng_val = xoshiro256pp_normalpair(&xor_state);
+#  endif
+              switch (tstw.rng_mode) {
+              case PrecisionModel::DOUBLE:
+                __stwt(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val.x);
+                break;
+              case PrecisionModel::SINGLE:
+                __stwt(&tstw.sp_cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)],
+                       rng_val.x);
+                break;
+              }
+            }
+            else {
+
+              // The pair of independent, normally distributed variables will have been calculated
+              // on the previous loop iteration.
+              switch (tstw.rng_mode) {
+              case PrecisionModel::DOUBLE:
+                __stwt(&tstw.cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)], rng_val.y);
+                break;
+              case PrecisionModel::SINGLE:
+                __stwt(&tstw.sp_cache[(i * (size_t)(tstw.padded_natom)) + (size_t)(pos)],
+                       rng_val.y);
+                break;
+              }
+            }
           }
-          __stcs(&tstw.state_xy[pos], { xor_state.x, xor_state.y });
-          __stcs(&tstw.state_zw[pos], { xor_state.z, xor_state.w });
+          __stwt(&tstw.state_xy[pos], { xor_state.x, xor_state.y });
+          __stwt(&tstw.state_zw[pos], { xor_state.z, xor_state.w });
           pos += rng_stride;
         }
       }
@@ -779,4 +859,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   }
 }
 
+// Clear definitions needed for this instance of the kernel
+#ifdef STORMM_USE_CUDA
+#  if (__CUDA_ARCH__ == 700 || __CUDA_ARCH__ >= 800)
+#    undef LARGE_CHIP_CACHE
+#  endif
+#endif
 #undef EXCL_GMEM_OFFSET

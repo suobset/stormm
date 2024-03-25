@@ -776,11 +776,6 @@ void Hybrid<T>::readDevice(T* v, const size_t offset, const size_t count) const 
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void Hybrid<T>::readDevice(T* v) const {
-  return readDevice(v, 0, length);
-}
-
-//-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::putDevice(const T value, const size_t index) {
 
   // Check that there is data on the host

@@ -20,9 +20,6 @@ namespace synthesis {
 using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::velocity_scale_nonoverflow_bits;
 using numerics::force_scale_nonoverflow_bits;
-using numerics::max_int_accumulation_f;
-using numerics::max_int_accumulation_ll;
-using numerics::max_llint_accumulation;
   
 #include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"

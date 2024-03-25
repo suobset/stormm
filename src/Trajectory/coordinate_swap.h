@@ -10,11 +10,13 @@
 #include "Reporting/error_format.h"
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "coordinate_series.h"
 
 namespace stormm {
 namespace trajectory {
 
+using card::GpuDetails;
 using card::HpcKernelSync;
 using card::Hybrid;
 using card::HybridTargetLevel;
@@ -24,6 +26,7 @@ using synthesis::CondensateWriter;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisBorders;
 using synthesis::PsSynthesisWriter;
+using topology::UnitCellType;
 
 /// \brief Check that the fixed-precision scaling of two objects is the same.  This can be called
 ///        for more than one aspect of each object if needed.
@@ -58,6 +61,15 @@ void swapValidateFrameIndices(const int2* frm_pairs, int pair_count, int count_f
                               int count_second);
 /// \}
 
+/// \brief Check that the systems being swapped have similar unit cell types (at least that they
+///        have periodic boundary conditions or not--there could be corner cases in which it is
+///        desirable to swap between a system that is orthorhombic and one which is triclinic, if
+///        for example the box angles are nearly right angles).
+///
+/// \param uca  The unit cell type of the second collection of structures
+/// \param ucb  The unit cell type of the second collection of structures
+void swapValidateUnitCells(UnitCellType uca, UnitCellType ucb);
+  
 /// \brief Apply additional considerations when swapping a batch of systems between the same memory
 ///        tier of the same object, to avoid possible race conditions on the GPU or dependence on
 ///        the order of swaps on the CPU.

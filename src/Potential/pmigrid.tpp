@@ -52,7 +52,15 @@ PMIGrid::PMIGrid(const CellGrid<T, Tacc, Tcalc, T4> *cg_in, const NonbondedTheme
     na_dims[i] = cg_in->getCellCount(i, UnitCellAxis::A) * grid_mult;
     nb_dims[i] = cg_in->getCellCount(i, UnitCellAxis::B) * grid_mult;
     nc_dims[i] = cg_in->getCellCount(i, UnitCellAxis::C) * grid_mult;
-    grid_totals[i] = roundUp<ullint>(na_dims[i] * nb_dims[i] * nc_dims[i], warp_size_int);
+    switch (fft_staging) {
+    case FFTMode::IN_PLACE:
+      grid_totals[i] = roundUp<ullint>(2LLU * static_cast<ullint>((na_dims[i] / 2) + 1) *
+                                       nb_dims[i] * nc_dims[i], warp_size_int);
+      break;
+    case FFTMode::OUT_OF_PLACE:
+      grid_totals[i] = roundUp<ullint>(na_dims[i] * nb_dims[i] * nc_dims[i], warp_size_int);
+      break;
+    }
   }
   prefixSumInPlace(&grid_totals, PrefixSumType::EXCLUSIVE);
   if (grid_totals[system_count] > UINT_MAX) {
