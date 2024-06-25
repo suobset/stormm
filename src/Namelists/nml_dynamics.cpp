@@ -35,6 +35,7 @@ DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const Wrap
     thermostat_cache_config{std::string(default_thermostat_cache_config)},
     andersen_frequency{default_andersen_frequency},
     langevin_frequency{default_langevin_frequency},
+    nt_warp_multiplicity{default_nt_warp_multiplicity},
     initial_temperature_targets{}, final_temperature_targets{}, thermostat_labels{},
     thermostat_label_indices{}, thermostat_masks{},
     nml_transcript{"dynamics"}
@@ -76,6 +77,7 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   t_nml.assignVariable(&thermostat_cache_config, "tcache_config");
   t_nml.assignVariable(&andersen_frequency, "vrand");
   t_nml.assignVariable(&langevin_frequency, "gamma_ln");
+  t_nml.assignVariable(&nt_warp_multiplicity, "nt_mult");
   const int ntstat = t_nml.getKeywordEntries("temperature");
   initial_temperature_targets.resize(ntstat);
   final_temperature_targets.resize(ntstat);
@@ -99,6 +101,8 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   validateRattleTolerance();
   validateRattleIterations();
   validateThermostatKind();
+  validateCacheConfiguration();
+  validateNTWarpMultiplicity();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -227,6 +231,11 @@ const std::vector<std::string>& DynamicsControls::getThermostatMasks() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int DynamicsControls::getNTWarpMultiplicity() const {
+  return nt_warp_multiplicity;
+}
+
+//-------------------------------------------------------------------------------------------------
 const NamelistEmulator& DynamicsControls::getTranscript() const {
   return nml_transcript;
 }
@@ -351,12 +360,6 @@ void DynamicsControls::setThermostatSeed(const int igseed) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void DynamicsControls::setThermostatCacheConfig(const std::string &cache_config_in) {
-  thermostat_cache_config = cache_config_in;
-  validateCacheConfiguration();
-}
-
-//-------------------------------------------------------------------------------------------------
 void DynamicsControls::setAndersenFrequency(const int frequency_in) {
   andersen_frequency = frequency_in;
 }
@@ -364,6 +367,12 @@ void DynamicsControls::setAndersenFrequency(const int frequency_in) {
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setLangevinFrequency(const double frequency_in) {
   langevin_frequency = frequency_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setThermostatCacheConfig(const std::string &cache_config_in) {
+  thermostat_cache_config = cache_config_in;
+  validateCacheConfiguration();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -382,6 +391,12 @@ void DynamicsControls::setThermostatGroup(const double initial_target, const dou
   thermostat_labels.push_back(label);
   thermostat_label_indices.push_back(label_index);
   thermostat_masks.push_back(mask);
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setNTWarpMultiplicity(const int mult_in) {
+  nt_warp_multiplicity = mult_in;
+  validateNTWarpMultiplicity();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -661,6 +676,27 @@ void DynamicsControls::validateCacheConfiguration() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void DynamicsControls::validateNTWarpMultiplicity() {
+  if (nt_warp_multiplicity < 0 || nt_warp_multiplicity > maximum_nt_warp_multiplicity) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The maximum number of warps that can be devoted to any one neutral territory "
+            "decomposition is " + std::to_string(maximum_nt_warp_multiplicity) + ".",
+            "DynamicsControls", "validateNTWarpMultiplicity");
+    case ExceptionResponse::WARN:
+      rtWarn("The maximum number of warps that can be devoted to any one neutral territory "
+             "decomposition is " + std::to_string(maximum_nt_warp_multiplicity) + ".  The "
+             "minimum value (1) will be applied.", "DynamicsControls",
+             "validateNTWarpMultiplicity");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    nt_warp_multiplicity = 1;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
                                const ExceptionResponse policy, const WrapTextSearch wrap) {
   NamelistEmulator t_nml("dynamics", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
@@ -696,6 +732,7 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addKeyword("vrand", NamelistType::INTEGER, std::to_string(default_andersen_frequency));
   t_nml.addKeyword("gamma_ln", NamelistType::REAL, realToString(default_langevin_frequency, 9, 6,
                                                                 NumberFormat::STANDARD_REAL));
+  t_nml.addKeyword("nt_mult", NamelistType::INTEGER, std::to_string(default_nt_warp_multiplicity));
   const std::string tempr_help("Specify the temperature, or the temperature profile, at which "
                                "to maintain a system or group of particles within a system.");
   const std::vector<std::string> tempr_keys_help = {
@@ -719,9 +756,10 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   
   // Help messages for each trajectory keyword
   t_nml.addHelp("nstlim", "Number of dynamics steps to carry out");
-  t_nml.addHelp("ntpr", "The frequency with which to calculate and print energy diagonostics");
+  t_nml.addHelp("ntpr", "The frequency with which to calculate and print energy diagnostics");
   t_nml.addHelp("ntwx", "The frequency with which to print trajectory snapshots");
   t_nml.addHelp("nscm", "The frequency with which to purge motion of the center of mass");
+  t_nml.addHelp("dt", "The time step, in units of femtoseconds");
 
   // Help messages for geometry constraints keywords
   t_nml.addHelp("rigid_geom", "Indicate whether to enforce rigid geometries, namely bond length "
@@ -746,6 +784,25 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addHelp("gamma_ln", "Collision frequency for a Langevin thermostat, in units of inverse "
                 "femtoseconds.  These values should be 1/1000th of those fed to Amber, to comport "
                 "with STORMM's internal time units of femtoseconds, not picoseconds.");
+  t_nml.addHelp("nt_mult", "The number of warps that will cooperate to solve any given neutral "
+                "territory decomposition subdomain.  By default, STORMM will look at the workload "
+                "and the available GPU, then try to guess the best value between 1 and 8.  "
+                "Maximum 8 warps per NT decomposition subdomain."); 
+  t_nml.addHelp("tcache_depth", "Quantity of random numbers to produce for each atom's x, y, and "
+                "z moves each time the random number generators are taken out of global memory "
+                "and used.  Each use of a random generator increments it, and the result must be "
+                "written back to global memory.  Each atom has its own generator state.  Creating "
+                "and storing more sets of random numbers with each state checkout can thereby "
+                "optimize memory traffic.  The default of 1 is good in most situations, but "
+                "perhaps not all.");
+  t_nml.addHelp("thermostat_seed", "Random number seed for the first random number state vector "
+                "in the simulation.  In most situations, this is the state vector for the first "
+                "atom.  Subsequent random number state vectors (guiding other variables, such as "
+                "other atoms) will be initialized based on the long jump function for the "
+                "XOR-shift generator.");
+  t_nml.addHelp("tcache_config", "Configures the random number cache to hold SINGLE or DOUBLE "
+                "precision random number results.  The cache configuration is independent of the "
+                "precision with which the random numbers are formed.");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.  All calls to this function should

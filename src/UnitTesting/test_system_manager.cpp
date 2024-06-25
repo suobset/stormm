@@ -32,9 +32,9 @@ using trajectory::detectCoordinateFileKind;
 TestSystemManager::TestSystemManager() :
     topology_base{std::string("")}, topology_extn{std::string("")},
     coordinate_base{std::string("")}, coordinate_extn{std::string("")}, 
-    fault_response{ExceptionResponse::WARN}, fault_found{false},
-    topology_names{}, coordinate_names{}, topology_exist{}, topology_success{}, coordinate_exist{},
-    coordinate_success{}, compatibility{}, all_topologies{}, all_coordinates{}
+    fault_response{TestPriority::ABORT}, all_go_response{TestPriority::CRITICAL},
+    fault_found{false}, topology_names{}, coordinate_names{}, topology_exist{}, topology_success{},
+    coordinate_exist{}, coordinate_success{}, compatibility{}, all_topologies{}, all_coordinates{}
 {}
   
 //-------------------------------------------------------------------------------------------------

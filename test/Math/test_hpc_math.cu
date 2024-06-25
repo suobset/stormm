@@ -475,7 +475,7 @@ int main(const int argc, const char* argv[]) {
   Hybrid<double> block_set(n_block, "block_vector");
   Hybrid<double> large_set(n_large, "large_vector");
   Hybrid<double> giant_set(n_giant, "giant_vector");
-  Hybrid<double> tb_buffer(gpu.getSMPCount(), "sum_accumulators", HybridFormat::HOST_ONLY);
+  Hybrid<double> tb_buffer(gpu.getSMPCount(), "sum_accumulators", HybridFormat::HOST_MOUNTED);
   Ran2Generator prng(oe.getRandomSeed());
   loadRan2ByCPU(&tiny_set, &prng);
   loadRan2ByCPU(&small_set, &prng);

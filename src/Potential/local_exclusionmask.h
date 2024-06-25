@@ -494,6 +494,24 @@ void setProfile(int pos, ullint tprof, ullint mode,
                 std::vector<ullint> *tmp_profiles, std::vector<uint2> *tmp_secondary_masks);
 /// \}
 
+/// \brief Free function for the CPU host to evaluate the inner workings of the LocalExclusionMask.
+///        This is called by both the object's own member functions as well as another free
+///        function using a LocalExclusionMask abstract with pointers to data on the host.
+///
+/// \param atom_i         Absolute index of the ith atom within the whole synthesis
+/// \param atom_j         Absolute index of the jth atom
+/// \param prof           Profile obtained from the list of common profiles after evaluating the
+///                       atom's profile code
+/// \param secondary_ptr  Pointer to the list of secondary masks kept by the object
+bool evaluateLocalMask(int atom_i, int atom_j, ullint prof, const uint2* secondary_ptr);
+
+/// \brief Free function for testing an exclusion in CPU code using a host-side abstract of the
+///        library's central object.  Descriptions of input parameters follow from
+///        evaluateLocalMask(), above, in addition to:
+///
+/// \param  lemr  The abstract of the LocalExclusionMask, with pointers set to data on the CPU host
+bool testExclusion(const LocalExclusionMaskReader &lemr, int atom_i, int atom_j);
+  
 } // namespace energy
 } // namespace stormm
 
