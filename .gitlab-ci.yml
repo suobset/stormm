@@ -6,24 +6,35 @@ stages:
 test:
   stage: test
 
+  image: nvidia/cuda:12.5.0-devel-ubuntu22.04
+
   script:
+
+    - apt update && apt upgrade -y
+    - apt install wget -y
+    - apt install python3-pip -y
+    - pip install gcovr
+    - nvidia-smi
+
+    - wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    - bash Miniforge3.sh -b -p "${HOME}/conda"
+
+    - source "${HOME}/conda/etc/profile.d/conda.sh"
+    - source "${HOME}/conda/etc/profile.d/mamba.sh"
 
     - rm -rf build deploy .conda
 
-    - if [ "$CUDA" == "YES" ]; then module load cuda/11.4; fi
-
-    - export CONDA=/projects2/common/SOFTWARE/mambaforge/bin/conda
-    - $CONDA create --prefix=${CI_PROJECT_DIR}/.conda cmake
+    - conda create --prefix=${CI_PROJECT_DIR}/.conda cmake
 
     - if [ "$RDKIT" == "YES" ]; then
-         $CONDA install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen boost;
+         conda install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen boost;
       fi
 
     - CUDA_VISIBLE_DEVICES=$CI_RUNNER_ID
 
     - mkdir build && cd build
 
-    - $CONDA run --no-capture-output --prefix ${CI_PROJECT_DIR}/.conda
+    - conda run --no-capture-output --prefix ${CI_PROJECT_DIR}/.conda
       cmake -DCMAKE_BUILD_TYPE=DEBUG 
             -DSTORMM_ENABLE_CUDA=$CUDA 
             -DSTORMM_ENABLE_RDKIT=$RDKIT
@@ -31,7 +42,6 @@ test:
             -DSTORMM_ENABLE_TEST_COVERAGE=YES 
             -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
     - make -j
-
     - make test -j
     - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
 
@@ -66,6 +76,8 @@ test:
   artifacts:
     name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
     expire_in: 2 days
+    paths:
+      - /builds/roivant/psivant/tools/STORMM/build/Testing/Temporary/LastTest.log
     reports:
       coverage_report:
         coverage_format: cobertura
