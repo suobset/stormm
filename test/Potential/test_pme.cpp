@@ -11,6 +11,8 @@
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
+#include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -20,23 +22,29 @@
 #include "../../src/Potential/cellgrid.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/map_density.h"
+#include "../../src/Potential/pme_potential.h"
+#include "../../src/Potential/pme_util.h"
 #include "../../src/Potential/pmigrid.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
+#include "../../src/Topology/atomgraph_analysis.h"
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::card;
+using namespace stormm::constants;
 using namespace stormm::data_types;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
+using namespace stormm::errors;
 using namespace stormm::mm;
 using namespace stormm::review;
 using namespace stormm::stmath;
+using namespace stormm::symbols;
 using namespace stormm::topology;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
@@ -465,6 +473,436 @@ void spatialDecompositionOuter(const AtomGraphSynthesis &poly_ag,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Verify the accuracy of particle-particle interactions computed using a basic neighbor list with
+// the simplest possible function, one which uses no neighbor list.
+//
+// Arguments:
+//   ps_chk:       Pre-allocated copy of the coordinate set in question (forces will be initialized
+//                 and then accumulated)
+//   ps:           The coordinates set in question, containing positions and accumulated forces for
+//                 all particles
+//   ag:           Topology for the system in question
+//   elec_cutoff:  Cutoff for electrostatic interactions
+//   vdw_cutoff:   Cutoff for Lennard-Jones interactions
+//   qqew_coeff:   Splitting coefficient for electrostatic interactions
+//   ljew_coeff:   Splitting coefficient for Lennard-Jones interactions
+//   vdw_sum:      The method for computing the particle-particle Lennard-Jones sum
+//   lema:         Exclusions within the system
+//   nrg:          Non-bonded energy sum associated with ps, with the electrostatic sum in the "x"
+//                 member of the tuple and the Lennard-Jones sum in the "y" member of the tuple
+//   theme:        The type of non-bonded calculations to evaluate
+//   do_tests:     Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+void checkParticlePairInteractions(PhaseSpace *ps_chk, const PhaseSpace &ps, const AtomGraph &ag,
+                                   const double elec_cutoff, const double vdw_cutoff,
+                                   const double qqew_coeff, const double ljew_coeff,
+                                   const VdwSumMethod vdw_sum, const LocalExclusionMask &lema,
+                                   const double2 nrg, const NonbondedTheme theme,
+                                   const TestPriority do_tests) {
+  ps_chk->initializeForces();
+  PhaseSpaceWriter chkw = ps_chk->data();
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  const double elec_cutsq = elec_cutoff * elec_cutoff;
+  const double vdw_cutsq = vdw_cutoff * vdw_cutoff;
+  const double qq_bfac = 2.0 * qqew_coeff / sqrt(pi);
+  double2 chksum = { 0.0, 0.0 };
+  for (int i = 1; i < chkw.natom; i++) {
+    const double atmi_x = chkw.xcrd[i];
+    const double atmi_y = chkw.ycrd[i];
+    const double atmi_z = chkw.zcrd[i];
+    const double atmi_q = nbk.charge[i] * nbk.coulomb_constant;
+    const int atmi_ljidx = nbk.lj_idx[i] * nbk.n_lj_types;
+    for (int j = 0; j < i; j++) {
+      double dx = chkw.xcrd[j] - atmi_x;
+      double dy = chkw.ycrd[j] - atmi_y;
+      double dz = chkw.zcrd[j] - atmi_z;
+      imageCoordinates<double, double>(&dx, &dy, &dz, chkw.umat, chkw.invu, chkw.unit_cell,
+                                       ImagingMethod::MINIMUM_IMAGE, 1.0);
+      const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+      const double invr2 = 1.0 / r2;
+      const double qij = atmi_q * nbk.charge[j];
+      const int ljidx_ij = atmi_ljidx + nbk.lj_idx[j];
+      double fmag = 0.0;
+      if (lema.testExclusion(i, j)) {
+        switch (theme) {
+        case NonbondedTheme::ELECTROSTATIC:
+        case NonbondedTheme::ALL:
+          {
+            const double invr = sqrt(invr2);
+            const double u_quant = erfc(qqew_coeff / invr) * invr;
+            const double exp_quant = qq_bfac * exp(-qqew_coeff * qqew_coeff * r2);
+            fmag += -qij * (((exp_quant + u_quant) * invr) - invr2) * invr;
+            chksum.x += qij * (u_quant - invr);
+          }
+          break;
+        case NonbondedTheme::VAN_DER_WAALS:
+          break;
+        }
+        switch (theme) {
+        case NonbondedTheme::VAN_DER_WAALS:
+        case NonbondedTheme::ALL:
+          switch (vdw_sum) {
+          case VdwSumMethod::CUTOFF:
+          case VdwSumMethod::SMOOTH:
+            break;
+          case VdwSumMethod::PME:
+
+            // If an infinite sum is in effect for PME van-der Waals interactions, then the primary
+            // image of the inverse r^6 interaction must be subtracted.  Otherwise, the exclusion
+            // implies that no interaction will be calculated.
+            chksum.y += nbk.ljb_coeff[ljidx_ij] * invr2 * invr2 * invr2;
+            break;
+          }
+          break;
+        case NonbondedTheme::ELECTROSTATIC:
+          break;
+        }
+      }
+      else {
+        switch (theme) {
+        case NonbondedTheme::ELECTROSTATIC:
+        case NonbondedTheme::ALL:
+          if (r2 < elec_cutsq) {
+            const double invr = sqrt(invr2);
+            const double u_quant = erfc(qqew_coeff / invr) * invr;
+            const double exp_quant = qq_bfac * exp(-qqew_coeff * qqew_coeff * r2);
+            fmag += -qij * (exp_quant + u_quant) * invr2;
+            chksum.x += qij * u_quant;
+          }
+          break;
+        case NonbondedTheme::VAN_DER_WAALS:
+          break;
+        }
+        switch (theme) {
+        case NonbondedTheme::VAN_DER_WAALS:
+        case NonbondedTheme::ALL:
+          if (r2 < vdw_cutsq) {
+            switch (vdw_sum) {
+            case VdwSumMethod::CUTOFF:
+              {
+                const double invr4 = invr2 * invr2;
+                const double invr6 = invr4 * invr2;
+                const double lja = nbk.lja_coeff[ljidx_ij];
+                const double ljb = nbk.ljb_coeff[ljidx_ij];
+                fmag += ((6.0 * ljb) - (12.0 * lja * invr6)) * invr4 * invr4;
+                chksum.y += ((lja * invr6) - ljb) * invr6;
+              }
+              break;
+            case VdwSumMethod::PME:
+            case VdwSumMethod::SMOOTH:
+              break;
+            }
+          }
+          break;
+        case NonbondedTheme::ELECTROSTATIC:
+          break;
+        }
+      }
+      const double fmag_dx = dx * fmag;
+      const double fmag_dy = dy * fmag;
+      const double fmag_dz = dz * fmag;
+      chkw.xfrc[i] += fmag_dx;
+      chkw.yfrc[i] += fmag_dy;
+      chkw.zfrc[i] += fmag_dz;
+      chkw.xfrc[j] -= fmag_dx;
+      chkw.yfrc[j] -= fmag_dy;
+      chkw.zfrc[j] -= fmag_dz;
+    }
+  }
+
+  // Check that the cell-based sum agrees with the simple procedure for these individual systems.
+  bool check_elec = true;
+  bool check_vdw = true;
+  switch (theme) {
+  case NonbondedTheme::ELECTROSTATIC:
+    check_vdw = false;
+    break;
+  case NonbondedTheme::VAN_DER_WAALS:
+    check_elec = false;
+    break;
+  case NonbondedTheme::ALL:
+    break;
+  }
+  std::vector<double> ref_fx(chkw.natom), ref_fy(chkw.natom), ref_fz(chkw.natom);
+  const PhaseSpaceReader psr = ps.data();
+  std::vector<double> tst_fx(psr.natom), tst_fy(psr.natom), tst_fz(psr.natom);
+  for (int i = 0; i < psr.natom; i++) {
+    ref_fx[i] = chkw.xfrc[i];
+    ref_fy[i] = chkw.yfrc[i];
+    ref_fz[i] = chkw.zfrc[i];
+    tst_fx[i] = psr.xfrc[i];
+    tst_fy[i] = psr.yfrc[i];
+    tst_fz[i] = psr.zfrc[i];
+  }
+  if (check_elec) {
+    check(chksum.x, RelationalOperator::EQUAL, nrg.x, "The electrostatic energy sums for a system "
+          "based on topology " + getBaseName(ag.getFileName()) + " do not agree when computed "
+          "with a simple nested loop versus a basic neighbor list and cell decomposition.  Energy "
+          "computation protocol: " + getEnumerationName(theme) + ".", do_tests);
+  }
+  if (check_vdw) {
+    check(chksum.y, RelationalOperator::EQUAL, nrg.y, "The van-der Waals energy sums for a system "
+          "based on topology " + getBaseName(ag.getFileName()) + " do not agree when computed "
+          "with a simple nested loop versus a basic neighbor list and cell decomposition.  Energy "
+          "computation protocol: " + getEnumerationName(theme) + ".", do_tests);
+  }
+  check(tst_fx, RelationalOperator::EQUAL, ref_fx, "Cartesian X forces for a system based on "
+        "topology " + getBaseName(ag.getFileName()) + " do not agree when computed with a simple "
+        "nested loop versus a basic neighbor list and cell decomposition.  Energy computation "
+        "protocol: " + getEnumerationName(theme) + ".", do_tests);
+  check(tst_fy, RelationalOperator::EQUAL, ref_fy, "Cartesian Y forces for a system based on "
+        "topology " + getBaseName(ag.getFileName()) + " do not agree when computed with a simple "
+        "nested loop versus a basic neighbor list and cell decomposition.  Energy computation "
+        "protocol: " + getEnumerationName(theme) + ".", do_tests);
+  check(tst_fz, RelationalOperator::EQUAL, ref_fz, "Cartesian Z forces for a system based on "
+        "topology " + getBaseName(ag.getFileName()) + " do not agree when computed with a simple "
+        "nested loop versus a basic neighbor list and cell decomposition.  Energy computation "
+        "protocol: " + getEnumerationName(theme) + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Examine cell grid contents in order to make an additional checkon the object's performance and
+// presentation of information.
+//
+// Arguments:
+//   cg:        The cell grid in question, containing an indication of its non-bonded information
+//   do_tests:  Indicate whether tests are possible
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
+void checkCellGridContents(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
+                           const TestPriority do_tests) {
+  const PhaseSpaceSynthesis *poly_ps = cg.getCoordinateSynthesisPointer();
+  const AtomGraphSynthesis *poly_ag = cg.getTopologySynthesisPointer();
+  const CellGridReader<Tcoord, Tacc, Tcalc, Tcoord4> cgr = cg.data();
+  const SyNonbondedKit<double, double2> poly_nbk = poly_ag->getDoublePrecisionNonbondedKit();
+  const bool tcoord_is_real = isFloatingPointScalarType<Tcoord>();
+  
+  // Step through each system and determine, based on the type of non-bonded interactions, what
+  // should be in the cell grid.
+  for (int i = 0; i < poly_ps->getSystemCount(); i++) {
+
+    // Trust the cell grid for the spatial decompositon dimensions
+    const ullint cell_layout = cgr.system_cell_grids[i];
+    const int cell_start = (cell_layout & 0xfffffff);
+    const int ncell_a = ((cell_layout >> 28) & 0xfff);
+    const int ncell_b = ((cell_layout >> 40) & 0xfff);
+    const int ncell_c = (cell_layout >> 52);
+    const double dnc_a = ncell_a;
+    const double dnc_b = ncell_b;
+    const double dnc_c = ncell_c;
+    const int total_cells = ncell_a * ncell_b * ncell_c;
+    const PhaseSpace ps = poly_ps->exportSystem(i);
+    const AtomGraph *ag = poly_ps->getSystemTopologyPointer(i);
+    const PhaseSpaceReader psr = ps.data();
+    const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+    std::vector<int> cell_counts(total_cells, 0);
+    std::vector<int3> cell_locations(psr.natom);
+    for (int j = 0; j < psr.natom; j++) {
+      bool incl_atom;
+      switch (cg.getTheme()) {
+      case NonbondedTheme::ELECTROSTATIC:
+        incl_atom = fabs(nbk.charge[j]) > stormm::constants::small;
+        break;
+      case NonbondedTheme::VAN_DER_WAALS:
+        {
+          const VdwCombiningRule lj_rule = inferCombiningRule(ag);
+          incl_atom = hasVdwProperties<double>(nbk, j, lj_rule);
+        }
+        break;
+      case NonbondedTheme::ALL:
+        incl_atom = true;
+        break;
+      }
+      if (incl_atom) {
+        double frac_x = (psr.umat[0] * psr.xcrd[j]) + (psr.umat[3] * psr.ycrd[j]) +
+                        (psr.umat[6] * psr.zcrd[j]);
+        double frac_y = (psr.umat[1] * psr.xcrd[j]) + (psr.umat[4] * psr.ycrd[j]) +
+                        (psr.umat[7] * psr.zcrd[j]);
+        double frac_z = (psr.umat[2] * psr.xcrd[j]) + (psr.umat[5] * psr.ycrd[j]) +
+                        (psr.umat[8] * psr.zcrd[j]);
+        frac_x -= floor(frac_x);
+        frac_y -= floor(frac_y);
+        frac_z -= floor(frac_z);
+        frac_x *= dnc_a;
+        frac_y *= dnc_b;
+        frac_z *= dnc_c;
+        const int jcell_a = frac_x;
+        const int jcell_b = frac_y;
+        const int jcell_c = frac_z;
+        cell_counts[(((jcell_c * ncell_b) + jcell_b) * ncell_a) + jcell_a] += 1;
+        cell_locations[j] = { jcell_a, jcell_b, jcell_c };
+      }
+      else {
+        cell_locations[j] = { -1, -1, -1 };
+      }
+    }
+    std::vector<std::vector<int>> chk_contents(total_cells);
+    std::vector<std::vector<double>> chk_charges(total_cells);
+    std::vector<std::vector<int>> chk_ljtypes(total_cells);
+    for (int j = 0; j < total_cells; j++) {
+      chk_contents[j].reserve(cell_counts[j]);
+      chk_charges[j].reserve(cell_counts[j]);
+      chk_ljtypes[j].reserve(cell_counts[j]);
+    }
+    for (int j = 0; j < psr.natom; j++) {
+      if (cell_locations[j].x >= 0) {
+        const int jcell_loc = (((cell_locations[j].z * ncell_b) + cell_locations[j].y) * ncell_a) +
+                              cell_locations[j].x;
+        chk_contents[jcell_loc].push_back(j);
+        chk_charges[jcell_loc].push_back(nbk.charge[j]);
+        chk_ljtypes[jcell_loc].push_back(nbk.lj_idx[j]);
+      }
+    }
+    
+    // Step through each cell and confirm the identity and location of each atom.  Log any missing
+    // atoms in an array of tuples with the topological atom ID in the "x" member, the cell in
+    // which it should be found in the "y" member, and the cell in which it is found in the "z"
+    // member (or -1 if the atom is not present at all).  Also check that the total number of atoms
+    // in each cell matches what is reported by the cell grid, using another list of tuples with
+    // the cell index in the "x" member, the number of atoms displayed by the cell grid in the "y"
+    // member, and the number of atoms counted from the topology in the "z" member.
+    std::vector<int3> cell_miscounts;
+    std::vector<int3> missing_atoms;
+    std::vector<double4> erroneous_charges;
+    std::vector<int4> erroneous_ljtypes;
+    const int synth_atom_offset = poly_ps->getAtomOffset(i);
+    for (int j = 0; j < total_cells; j++) {
+      const int cg_jcount = (cgr.cell_limits[cell_start + j].y >> 16);
+      const uint cg_llim = cgr.cell_limits[cell_start + j].x;
+      const uint cg_hlim = cg_llim + cg_jcount;
+      if (cg_jcount != cell_counts[j]) {
+        cell_miscounts.push_back({ j, cg_jcount, cell_counts[j] });
+      }
+      for (int k = 0; k < cell_counts[j]; k++) {
+        const int atom_idx = chk_contents[j][k];
+        const uint img_atom_idx = cgr.img_atom_idx[synth_atom_offset + atom_idx];
+        bool found = false;
+        for (uint m = cg_llim; m < cg_hlim; m++) {
+          found = (found || cgr.nonimg_atom_idx[m] - synth_atom_offset == atom_idx);
+        }
+        if (found == false) {
+          const uint min_sys_atom_idx = cgr.cell_limits[cell_start].x;
+          const uint img_idx_delta = img_atom_idx - min_sys_atom_idx;
+          const uint chain_length = ncell_a * cgr.cell_base_capacity;
+          const uint sys_chain_loc = (img_idx_delta / chain_length);
+          const uint pcell_c = sys_chain_loc / ncell_b;
+          const uint pcell_b = sys_chain_loc -  (pcell_c * ncell_b);
+          int actual_cell = -1;
+          for (int m = 0; m < ncell_a; m++) {
+            const int test_cell = cell_start + (((pcell_c * ncell_b) + pcell_b) * ncell_a);
+            const uint2 tclim = cgr.cell_limits[test_cell];
+            if (img_atom_idx >= tclim.x && img_atom_idx < tclim.x + (tclim.y >> 16)) {
+              actual_cell = test_cell - cell_start;
+            }
+          }
+          missing_atoms.push_back({ atom_idx, j, actual_cell });
+        }
+        else {
+
+          // If the atom was found as expected, compare its non-bonded properties.
+          double charge;
+          int lj_type_idx;
+          bool read_charge = true;
+          bool read_ljtype = true;
+          switch (cgr.theme) {
+          case NonbondedTheme::ELECTROSTATIC:
+            read_ljtype = false;
+            break;
+          case NonbondedTheme::VAN_DER_WAALS:
+            read_charge = false;
+            break;
+          case NonbondedTheme::ALL:
+            break;
+          }
+          if (read_charge) {
+            charge = sourceMagnitude(NonbondedTheme::ELECTROSTATIC, cgr.theme,
+                                     cgr.image[img_atom_idx].w, tcoord_is_real, i, poly_nbk);
+            if (fabs(charge - chk_charges[j][k]) > 1.0e-6) {
+              erroneous_charges.push_back({ charge, chk_charges[j][k],
+                                            static_cast<double>(j), static_cast<double>(k) });
+            }
+          }
+          if (read_ljtype) {
+            lj_type_idx = sourceIndex(NonbondedTheme::VAN_DER_WAALS, cgr.theme,
+                                      cgr.image[img_atom_idx].w, tcoord_is_real);
+            if (lj_type_idx != chk_ljtypes[j][k]) {
+              erroneous_ljtypes.push_back({ lj_type_idx, chk_ljtypes[j][k], j, k });
+            }
+          }
+        }
+      }
+    }
+    std::string xmpl_str, chrg_str, lj_str;
+    const int nmisc_rep = std::min(static_cast<int>(cell_miscounts.size()), 8); 
+    for (int j = 0; j < nmisc_rep; j++) {
+      const int xcl_c = cell_miscounts[j].x / (ncell_a * ncell_b);
+      const int xcl_b = (cell_miscounts[j].x - (xcl_c * ncell_a * ncell_b)) / ncell_a;
+      const int xcl_a = cell_miscounts[j].x - (((xcl_c * ncell_b) + xcl_b) * ncell_a);
+      xmpl_str += "[ Cell " + std::to_string(xcl_a) + " " + std::to_string(xcl_b) + " " +
+                  std::to_string(xcl_c) + ", grid has " + std::to_string(cell_miscounts[j].y) +
+                  ", counted " + std::to_string(cell_miscounts[j].z) + " ]";
+      xmpl_str += listSeparator(j, nmisc_rep);
+    }
+    const int nchrg_rep = std::min(static_cast<int>(erroneous_charges.size()), 8);
+    for (int j = 0; j < nchrg_rep; j++) {
+      const int cnum = erroneous_charges[j].z;
+      const int xcl_c = cnum / (ncell_a * ncell_b);
+      const int xcl_b = (cnum - (xcl_c * ncell_a * ncell_b)) / ncell_a;
+      const int xcl_a = cnum - (((xcl_c * ncell_b) + xcl_b) * ncell_a);
+      chrg_str += "[ Cell " + std::to_string(xcl_a) + " " + std::to_string(xcl_b) + " " +
+                  std::to_string(xcl_c) + ", grid " + std::to_string(erroneous_charges[j].x) +
+                  ", topology " + std::to_string(erroneous_charges[j].y) + " ]";
+      chrg_str += listSeparator(j, nchrg_rep);
+    }
+    const int nlj_rep = std::min(static_cast<int>(erroneous_ljtypes.size()), 8);
+    for (int j = 0; j < nlj_rep; j++) {
+      const int cnum = erroneous_ljtypes[j].z;
+      const int xcl_c = cnum / (ncell_a * ncell_b);
+      const int xcl_b = (cnum - (xcl_c * ncell_a * ncell_b)) / ncell_a;
+      const int xcl_a = cnum - (((xcl_c * ncell_b) + xcl_b) * ncell_a);
+      lj_str += "[ Cell " + std::to_string(xcl_a) + " " + std::to_string(xcl_b) + " " +
+                std::to_string(xcl_c) + ", grid " + std::to_string(erroneous_ljtypes[j].x) +
+                ", topology " + std::to_string(erroneous_ljtypes[j].y) + " ]";
+      lj_str += listSeparator(j, nchrg_rep);
+    }
+    check(cell_miscounts.size() == 0, "Some cells of the grid were found to have different "
+          "numbers of atoms than were found by a simple re-analysis.  System: " +
+          getBaseName(ag->getFileName()) + ".  Non-bonded theme: " +
+          getEnumerationName(cg.getTheme()) + ".  Examples of cells include " + xmpl_str + ".",
+          do_tests);
+    check(missing_atoms.size(), RelationalOperator::EQUAL, 0, "Some atoms of the topology were "
+          "not found on the grid as expected.  System: " + getBaseName(ag->getFileName()) +
+          ".  Non-bonded theme: " + getEnumerationName(cg.getTheme()) + ".", do_tests);
+    check(erroneous_charges.size(), RelationalOperator::EQUAL, 0, "Some charges of the topology "
+          "were not properly conveyed by the cell grid, based on a simple re-analysis.  "
+          "Examples of discrepancies include " + chrg_str + ".", do_tests);
+    check(erroneous_ljtypes.size(), RelationalOperator::EQUAL, 0, "Some Lennard-Jones atom types "
+          "of the topology were not properly conveyed by the cell grid, based on a simple "
+          "re-analysis.  Examples of discrepancies include " + lj_str + ".", do_tests);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compare two force arrays.  This encapsulates the error message to elimiate repetitive code.
+//
+// Arguments:
+//   test_frc:  The array of forces to test
+//   ref_frc:   The array of forces to be trusted
+//   dim:       The Cartesian dimension along which forces apply to atoms
+//   nrg_kind:  The type of potential giving rise to the forces
+//   do_tests:  Indicate whether testing is possible
+//-------------------------------------------------------------------------------------------------
+void compareForceArrays(const std::vector<double> &test_frc, const std::vector<double> &ref_frc,
+                        const CartesianDimension dim, const NonbondedTheme nrg_kind,
+                        const TestPriority do_tests) {
+  check(test_frc, RelationalOperator::EQUAL, Approx(ref_frc).margin(7.0e-6), "Cartesian " +
+        getEnumerationName(dim) + " forces emerging from " + getEnumerationName(nrg_kind) +
+        " interactions computed with a CellGrid neighbor list and later transferred to a "
+        "PhaseSpaceSynthesis do not agree with those obtained from a simple nested loop "
+        "calculation.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -490,6 +928,9 @@ int main(const int argc, const char* argv[]) {
   // Section 2
   section("Test charge spreading in various modes");
 
+  // Section 3
+  section("Test simple particle-particle interactions");
+  
   // Create a synthesis of systems and the associated particle-mesh interaction grid
   section(1);
   const std::vector<std::string> pbc_systems = { "bromobenzene", "bromobenzene_vs", "tip3p",
@@ -596,6 +1037,249 @@ int main(const int argc, const char* argv[]) {
                     getEnumerationName(NonbondedTheme::VAN_DER_WAALS) + " particle-mesh "
                     "interaction grids was created with a risky fixed-precision representation.",
                     tsm.getTestingStatus());
+
+  // Test particle-particle interactions using a simplified neighbor list
+  const double ew_coeff = ewaldCoefficient(default_pme_cutoff, default_dsum_tol);
+  std::vector<double2> nrg_results;
+  const int nsys = tsm.getSystemCount();
+  std::vector<std::vector<double>> qqx_ref_frc(nsys), qqy_ref_frc(nsys), qqz_ref_frc(nsys);
+  std::vector<std::vector<double>> qqx_twr_frc(nsys), qqy_twr_frc(nsys), qqz_twr_frc(nsys);
+  std::vector<std::vector<double>> ljx_ref_frc(nsys), ljy_ref_frc(nsys), ljz_ref_frc(nsys);
+  std::vector<std::vector<double>> ljx_twr_frc(nsys), ljy_twr_frc(nsys), ljz_twr_frc(nsys);
+  std::vector<std::vector<double>> nbx_ref_frc(nsys), nby_ref_frc(nsys), nbz_ref_frc(nsys);
+  std::vector<std::vector<double>> nbx_twr_frc(nsys), nby_twr_frc(nsys), nbz_twr_frc(nsys);
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    bool skip = false;
+    switch (tsm.getTopologyReference(i).getUnitCellType()) {
+    case UnitCellType::NONE:
+      skip = true;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      break;
+    }
+    if (skip) {
+      continue;
+    }
+    PhaseSpace ps = tsm.exportPhaseSpace(i);
+    PhaseSpace ps_chk = ps;
+    PhaseSpaceWriter psw = ps.data();
+    const AtomGraph ag = tsm.getTopologyReference(i);
+    const LocalExclusionMask lema_qq(ag, NonbondedTheme::ELECTROSTATIC);
+    const LocalExclusionMask lema_lj(ag, NonbondedTheme::VAN_DER_WAALS);
+    const LocalExclusionMask lema_all(ag, NonbondedTheme::ALL);
+    const double2 pme_qqe  = evaluateParticleParticleEnergy(&ps, ag, lema_qq,
+                                                            PrecisionModel::DOUBLE,
+                                                            default_pme_cutoff, default_pme_cutoff,
+                                                            ew_coeff, ew_coeff,
+                                                            VdwSumMethod::CUTOFF,
+                                                            EvaluateForce::YES,
+                                                            NonbondedTheme::ELECTROSTATIC);
+    checkParticlePairInteractions(&ps_chk, ps, ag, default_pme_cutoff, default_pme_cutoff,
+                                  ew_coeff, ew_coeff, VdwSumMethod::CUTOFF, lema_qq, pme_qqe,
+                                  NonbondedTheme::ELECTROSTATIC, tsm.getTestingStatus());
+    qqx_ref_frc[i].resize(psw.natom);
+    qqy_ref_frc[i].resize(psw.natom);
+    qqz_ref_frc[i].resize(psw.natom);
+    for (int j = 0; j < psw.natom; j++) {
+      qqx_ref_frc[i][j] = psw.xfrc[j];
+      qqy_ref_frc[i][j] = psw.yfrc[j];
+      qqz_ref_frc[i][j] = psw.zfrc[j];
+    }
+    ps.initializeForces();
+    const double2 pme_lje  = evaluateParticleParticleEnergy(&ps, ag, lema_lj,
+                                                            PrecisionModel::DOUBLE,
+                                                            default_pme_cutoff, default_pme_cutoff,
+                                                            ew_coeff, ew_coeff,
+                                                            VdwSumMethod::CUTOFF,
+                                                            EvaluateForce::YES,
+                                                            NonbondedTheme::VAN_DER_WAALS);
+    checkParticlePairInteractions(&ps_chk, ps, ag, default_pme_cutoff, default_pme_cutoff,
+                                  ew_coeff, ew_coeff, VdwSumMethod::CUTOFF, lema_lj, pme_lje,
+                                  NonbondedTheme::VAN_DER_WAALS, tsm.getTestingStatus());
+    ljx_ref_frc[i].resize(psw.natom);
+    ljy_ref_frc[i].resize(psw.natom);
+    ljz_ref_frc[i].resize(psw.natom);
+    for (int j = 0; j < psw.natom; j++) {
+      ljx_ref_frc[i][j] = psw.xfrc[j];
+      ljy_ref_frc[i][j] = psw.yfrc[j];
+      ljz_ref_frc[i][j] = psw.zfrc[j];
+    }
+    ps.initializeForces();
+    const double2 pme_alle = evaluateParticleParticleEnergy(&ps, ag, lema_all,
+                                                            PrecisionModel::DOUBLE,
+                                                            default_pme_cutoff, default_pme_cutoff,
+                                                            ew_coeff, ew_coeff,
+                                                            VdwSumMethod::CUTOFF,
+                                                            EvaluateForce::YES,
+                                                            NonbondedTheme::ALL);
+    checkParticlePairInteractions(&ps_chk, ps, ag, default_pme_cutoff, default_pme_cutoff,
+                                  ew_coeff, ew_coeff, VdwSumMethod::CUTOFF, lema_all, pme_alle,
+                                  NonbondedTheme::ALL, tsm.getTestingStatus());
+    nbx_ref_frc[i].resize(psw.natom);
+    nby_ref_frc[i].resize(psw.natom);
+    nbz_ref_frc[i].resize(psw.natom);
+    for (int j = 0; j < psw.natom; j++) {
+      nbx_ref_frc[i][j] = psw.xfrc[j];
+      nby_ref_frc[i][j] = psw.yfrc[j];
+      nbz_ref_frc[i][j] = psw.zfrc[j];
+    }
+    nrg_results.push_back(pme_alle);
+  }
+  
+  // Run calculations based on the synthesis of all systems, then compare the results to those
+  // obtained with the basic neighbor list method.
+  const std::vector<NonbondedTheme> nbkinds = { NonbondedTheme::ELECTROSTATIC,
+                                                NonbondedTheme::VAN_DER_WAALS,
+                                                NonbondedTheme::ALL };
+  std::vector<double> tower_plate_qq, tower_plate_lj, tower_plate_allqq, tower_plate_alllj;
+  std::vector<std::vector<double>> tower_plate_qq_xfrc, tower_plate_qq_yfrc, tower_plate_qq_zfrc;
+  std::vector<std::vector<double>> tower_plate_lj_xfrc, tower_plate_lj_yfrc, tower_plate_lj_zfrc;
+  std::vector<std::vector<double>> tower_plate_xfrc, tower_plate_yfrc, tower_plate_zfrc;
+  tower_plate_qq_xfrc.resize(nsys);
+  tower_plate_qq_yfrc.resize(nsys);
+  tower_plate_qq_zfrc.resize(nsys);
+  tower_plate_lj_xfrc.resize(nsys);
+  tower_plate_lj_yfrc.resize(nsys);
+  tower_plate_lj_zfrc.resize(nsys);
+  tower_plate_xfrc.resize(nsys);
+  tower_plate_yfrc.resize(nsys);
+  tower_plate_zfrc.resize(nsys);
+  PsSynthesisWriter poly_psw = poly_ps.data();
+  for (size_t i = 0; i < nbkinds.size(); i++) {
+    CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 0.5 * default_pme_cutoff, 0.1,
+                                                4, nbkinds[i]);
+    checkCellGridContents(cg, tsm.getTestingStatus());
+    const LocalExclusionMask poly_lema(poly_ag, nbkinds[i]);
+    ScoreCard sc(poly_ps.getSystemCount());
+    evaluateParticleParticleEnergy<double, llint,
+                                   double, double4>(&cg, &sc, poly_lema, default_pme_cutoff,
+                                                    default_pme_cutoff, ew_coeff, ew_coeff,
+                                                    VdwSumMethod::CUTOFF, EvaluateForce::YES,
+                                                    nbkinds[i]);
+    poly_ps.initializeForces();
+    cg.contributeForces();
+    const std::vector<double> qq_nrg = sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC);
+    const std::vector<double> lj_nrg = sc.reportInstantaneousStates(StateVariable::VDW);
+    for (int j = 0; j < poly_ps.getSystemCount(); j++) {
+
+      // Log the energies and forces
+      const int k_llim = poly_psw.atom_starts[j];
+      const int k_hlim = k_llim + poly_psw.atom_counts[j];
+      switch (nbkinds[i]) {
+      case NonbondedTheme::ELECTROSTATIC:
+        tower_plate_qq.push_back(qq_nrg[j]);
+        tower_plate_qq_xfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_qq_yfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_qq_zfrc[j].resize(poly_psw.atom_counts[j]);
+        for (int k = k_llim; k < k_hlim; k++) {
+          tower_plate_qq_xfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.xfrc[k],
+                                                                 poly_psw.xfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+          tower_plate_qq_yfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.yfrc[k],
+                                                                 poly_psw.yfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+          tower_plate_qq_zfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.zfrc[k],
+                                                                 poly_psw.zfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+        }
+        break;
+      case NonbondedTheme::VAN_DER_WAALS:
+        tower_plate_lj.push_back(lj_nrg[j]);
+        tower_plate_lj_xfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_lj_yfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_lj_zfrc[j].resize(poly_psw.atom_counts[j]);
+        for (int k = k_llim; k < k_hlim; k++) {
+          tower_plate_lj_xfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.xfrc[k],
+                                                                 poly_psw.xfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+          tower_plate_lj_yfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.yfrc[k],
+                                                                 poly_psw.yfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+          tower_plate_lj_zfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.zfrc[k],
+                                                                 poly_psw.zfrc_ovrf[k]) *
+                                               poly_psw.inv_frc_scale;
+        }
+        break;
+      case NonbondedTheme::ALL:
+        tower_plate_allqq.push_back(qq_nrg[j]);
+        tower_plate_alllj.push_back(lj_nrg[j]);
+        tower_plate_xfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_yfrc[j].resize(poly_psw.atom_counts[j]);
+        tower_plate_zfrc[j].resize(poly_psw.atom_counts[j]);
+        for (int k = k_llim; k < k_hlim; k++) {
+          tower_plate_xfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.xfrc[k],
+                                                              poly_psw.xfrc_ovrf[k]) *
+                                            poly_psw.inv_frc_scale;
+          tower_plate_yfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.yfrc[k],
+                                                              poly_psw.yfrc_ovrf[k]) *
+                                            poly_psw.inv_frc_scale;
+          tower_plate_zfrc[j][k - k_llim] = hostInt95ToDouble(poly_psw.zfrc[k],
+                                                              poly_psw.zfrc_ovrf[k]) *
+                                            poly_psw.inv_frc_scale;
+        }
+        break;
+      }
+    }
+  }
+
+  // Check that the synthesis forces agree with the reference calculations
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    compareForceArrays(tower_plate_qq_xfrc[i], qqx_ref_frc[i], CartesianDimension::X,
+                       NonbondedTheme::ELECTROSTATIC, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_qq_yfrc[i], qqy_ref_frc[i], CartesianDimension::Y,
+                       NonbondedTheme::ELECTROSTATIC, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_qq_zfrc[i], qqz_ref_frc[i], CartesianDimension::Z,
+                       NonbondedTheme::ELECTROSTATIC, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_lj_xfrc[i], ljx_ref_frc[i], CartesianDimension::X,
+                       NonbondedTheme::VAN_DER_WAALS, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_lj_yfrc[i], ljy_ref_frc[i], CartesianDimension::Y,
+                       NonbondedTheme::VAN_DER_WAALS, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_lj_zfrc[i], ljz_ref_frc[i], CartesianDimension::Z,
+                       NonbondedTheme::VAN_DER_WAALS, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_xfrc[i], nbx_ref_frc[i], CartesianDimension::X,
+                       NonbondedTheme::ALL, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_yfrc[i], nby_ref_frc[i], CartesianDimension::Y,
+                       NonbondedTheme::ALL, tsm.getTestingStatus());
+    compareForceArrays(tower_plate_zfrc[i], nbz_ref_frc[i], CartesianDimension::Z,
+                       NonbondedTheme::ALL, tsm.getTestingStatus());
+  }
+
+  // Perform finite difference tests
+  for (size_t i = 0; i < nbkinds.size(); i++) {
+    for (int j = 0; j < poly_ps.getSystemCount(); j++) {
+      if (poly_ps.getAtomCount(j) > 768) {
+        continue;
+      }
+
+      // Compute the base energy and force
+#if 0
+      const double2
+      
+      switch (nbkinds[i]) {
+      case NonbondedTheme::ELECTROSTATIC:
+      case NonbondedTheme::VAN_DER_WAALS:
+      case NonbondedTheme::ALL:
+        break;
+      }
+#endif
+    }
+  }
+
+  // CHECK
+  printf("Elec = [\n");
+  for (size_t i = 0; i < nrg_results.size(); i++) {
+    printf("  %12.6lf %12.6lf %12.6lf\n", nrg_results[i].x, tower_plate_qq[i],
+           tower_plate_allqq[i]);
+  }
+  printf("];\n");
+  printf("vdW = [\n");
+  for (size_t i = 0; i < nrg_results.size(); i++) {
+    printf("  %12.6lf %12.6lf %12.6lf\n", nrg_results[i].y, tower_plate_lj[i],
+           tower_plate_alllj[i]);
+  }
+  printf("];\n");
+  // END CHECK
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

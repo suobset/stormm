@@ -3,6 +3,7 @@
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -52,6 +53,8 @@ using stormm::float_type_index;
 using stormm::int_type_index;
 using stormm::llint_type_index;
 using stormm::constants::ExceptionResponse;
+using stormm::constants::warp_size_int;
+using stormm::data_types::int95_t;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
@@ -948,6 +951,128 @@ void testLocalExclusionMask(const AtomGraphSynthesis &poly_ag, StopWatch *timer,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the particle migration features within a CellGrid object.
+//
+// Arguments:
+//   cg:        The cell grid neighbor list ready for testing
+//   poly_ps:   The associated coordinate synthesis (provided as a formal argument to avoid having
+//              to const-cast the pointer if it were harvested from cg itself)
+//   xrs:       Source of random numbers
+//   do_tests:  Indicate whether testing is possible
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
+void testCellMigration(CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg, PhaseSpaceSynthesis *poly_ps,
+                       Xoshiro256ppGenerator *xrs, const TestPriority do_tests) {
+
+  // Perturb particle positions in the associated coordinate synthesis.  Place the perturbed
+  // positions in the next move cycle.
+  PsSynthesisWriter poly_psw = poly_ps->data();
+  std::vector<std::vector<double>> x_moves(poly_psw.system_count);
+  std::vector<std::vector<double>> y_moves(poly_psw.system_count);
+  std::vector<std::vector<double>> z_moves(poly_psw.system_count);  
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    const size_t illim = poly_psw.atom_starts[i];
+    const size_t ihlim = illim + poly_psw.atom_counts[i];
+    x_moves[i].resize(ihlim - illim);
+    y_moves[i].resize(ihlim - illim);
+    z_moves[i].resize(ihlim - illim);
+    for (size_t j = illim; j < ihlim; j++) {
+      const double xpos = hostInt95ToDouble(poly_psw.xcrd[j], poly_psw.xcrd_ovrf[j]);
+      const double ypos = hostInt95ToDouble(poly_psw.ycrd[j], poly_psw.ycrd_ovrf[j]);
+      const double zpos = hostInt95ToDouble(poly_psw.zcrd[j], poly_psw.zcrd_ovrf[j]);
+      x_moves[i][j - illim] = xrs->gaussianRandomNumber();
+      y_moves[i][j - illim] = xrs->gaussianRandomNumber();
+      z_moves[i][j - illim] = xrs->gaussianRandomNumber();
+      const double nxpos = xpos + (x_moves[i][j - illim] * poly_psw.gpos_scale);
+      const double nypos = ypos + (y_moves[i][j - illim] * poly_psw.gpos_scale);
+      const double nzpos = zpos + (z_moves[i][j - illim] * poly_psw.gpos_scale);
+      const int95_t inxpos = hostDoubleToInt95(nxpos);
+      const int95_t inypos = hostDoubleToInt95(nypos);
+      const int95_t inzpos = hostDoubleToInt95(nzpos);
+      poly_psw.xalt[j] = inxpos.x;
+      poly_psw.yalt[j] = inypos.x;
+      poly_psw.zalt[j] = inzpos.x;
+      poly_psw.xalt_ovrf[j] = inxpos.y;
+      poly_psw.yalt_ovrf[j] = inypos.y;
+      poly_psw.zalt_ovrf[j] = inzpos.y;
+    }
+  }
+  cg->updatePositions();
+  poly_ps->updateCyclePosition();
+  CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> cgw = cg->data();
+  
+  std::vector<int> base_misalignments(poly_psw.system_count, 0);
+  bool particles_unplaceable = false;
+  const int xfrm_stride = roundUp(9, warp_size_int);
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    const PhaseSpace ps = poly_ps->exportSystem(i);
+    const PhaseSpaceReader psr = ps.data();
+
+    // Check that the structural evolution is reflected in the PhaseSpace object
+    for (int j = 0; j < psr.natom; j++) {
+      base_misalignments[i] += (fabs(psr.xcrd[j] - x_moves[i][j] - psr.xalt[j]) > 1.0e-6 ||
+                                fabs(psr.ycrd[j] - y_moves[i][j] - psr.yalt[j]) > 1.0e-6 ||
+                                fabs(psr.zcrd[j] - z_moves[i][j] - psr.zalt[j]) > 1.0e-6);
+    }
+    std::vector<double> cg_xpos(psr.natom), cg_ypos(psr.natom), cg_zpos(psr.natom);
+    std::vector<double> ps_xpos(psr.natom), ps_ypos(psr.natom), ps_zpos(psr.natom);
+
+    // Check that the cell grid accounts for each new particle position correctly.
+    const ullint grid_bounds = cgw.system_cell_grids[i];
+    const int cell_start = (grid_bounds & 0xfffffff);
+    const int ncell_a = ((grid_bounds >> 28) & 0xfff);
+    const int ncell_b = ((grid_bounds >> 40) & 0xfff);
+    const int ncell_c = (grid_bounds >> 52);
+    const uint base_img_idx = cgw.cell_limits[cell_start].x;
+    const Tcoord* invu_p = &cgw.system_cell_invu[xfrm_stride * i];
+    for (int j = 0; j < psr.natom; j++) {
+      const int synth_idx = poly_psw.atom_starts[i] + j;
+      const uint img_idx = cgw.img_atom_idx[synth_idx];
+      const uint img_del_idx = img_idx - base_img_idx;
+      const int chain_idx = img_del_idx / static_cast<uint>(cgw.cell_base_capacity * ncell_a);
+      const int cell_cidx = chain_idx / ncell_b;
+      const int cell_bidx = chain_idx - (cell_cidx * ncell_b);
+      int cell_aidx = -1;
+      const int base_chain_cell = cell_start + (((cell_cidx * ncell_b) + cell_bidx) * ncell_a);
+      for (int k = 0; k < ncell_a; k++) {
+        const uint2 kcell_lims = cgw.cell_limits[base_chain_cell + k];
+        const uint kcell_max = kcell_lims.x + (kcell_lims.y >> 16);
+        if (img_idx >= kcell_lims.x && img_idx < kcell_max) {
+          cell_aidx = k;
+        }
+      }
+      particles_unplaceable = ((cell_aidx == -1) || particles_unplaceable);
+      const Tcoord4 xyz_prop = cgw.image[img_idx];
+      cg_xpos[j] = xyz_prop.x * cgw.lpos_scale;
+      cg_ypos[j] = xyz_prop.y * cgw.lpos_scale;
+      cg_zpos[j] = xyz_prop.z * cgw.lpos_scale;
+      const double dcell_aidx = cell_aidx;
+      const double dcell_bidx = cell_bidx;
+      const double dcell_cidx = cell_cidx;
+      cg_xpos[j] += (invu_p[0] * dcell_aidx) + (invu_p[3] * dcell_bidx) + (invu_p[6] * dcell_cidx);
+      cg_ypos[j] +=                            (invu_p[4] * dcell_bidx) + (invu_p[7] * dcell_cidx);
+      cg_zpos[j] +=                                                       (invu_p[8] * dcell_cidx);
+      ps_xpos[j] = psr.xcrd[j];
+      ps_ypos[j] = psr.ycrd[j];
+      ps_zpos[j] = psr.zcrd[j];
+    }
+    imageCoordinates<double, double>(&ps_xpos, &ps_ypos, &ps_zpos, psr.umat, psr.invu,
+                                     psr.unit_cell, ImagingMethod::PRIMARY_UNIT_CELL);
+    const AtomGraph *ag = poly_ps->getSystemTopologyPointer(i);
+    const std::string err_append = " (system " + getBaseName(ag->getFileName()) + ").";
+    check(cg_xpos, RelationalOperator::EQUAL, ps_xpos, "CellGrid X coordinates do not match those "
+          "of the underlying coordinate synthesis after particle migration.", do_tests);
+    check(cg_ypos, RelationalOperator::EQUAL, ps_ypos, "CellGrid Y coordinates do not match those "
+          "of the underlying coordinate synthesis after particle migration.", do_tests);
+    check(cg_zpos, RelationalOperator::EQUAL, ps_zpos, "CellGrid Z coordinates do not match those "
+          "of the underlying coordinate synthesis after particle migration.", do_tests);
+  }
+  check(base_misalignments, RelationalOperator::EQUAL, std::vector<int>(poly_psw.system_count, 0),
+        "Some particles were not properly updated in the coordinate synthesis, as judged by "
+        "comparing the two time cycles of exported PhaseSpace objects.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1126,7 +1251,10 @@ int main(const int argc, const char* argv[]) {
     testLocalExclusionMask(tsm.getTopologyPointer(i), &timer, tsm.getTestingStatus());
   }
   testLocalExclusionMask(poly_ag, &timer, tsm.getTestingStatus());
-
+  
+  // Test the CellGrid object's particle migration
+  testCellMigration(&cg, &poly_ps, &xrs, tsm.getTestingStatus());
+  
   // Print results
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

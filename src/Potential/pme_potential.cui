@@ -1,0 +1,89 @@
+// -*-c++-*-
+#include "copyright.h"
+
+/// \brief Compute the non-bonded energy and froces due to electrostatic and van-der Waals
+///        interactions in a series of spatial decomposition cells defined by a Neutral Territory
+///        layout.  Each warp will act independently for maximum granularity, while the overall
+///        size of thread blocks is set to maximize thread occupancy on any given architecture.
+__global__ void __launch_bounds__(small_block_size, PMENB_KERNEL_BLOCKS_MULTIPLIER)
+KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const LocalExclusionMaskReader lemr,
+#ifdef CLASH_FORGIVENESS
+            const TCALC clash_distance, const TCALC clash_ratio,
+#endif
+#ifdef UPDATE_ATOMS
+            const SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk,
+            const ThermostatWriter<TCALC> tstw,
+#endif
+#ifdef COMPUTE_ENERGY
+            ScoreCardWriter scw,
+#endif
+#ifdef DUAL_GRIDS
+            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw_qq,
+            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw_lj,
+#else
+            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw,
+#endif
+            MMControlKit<TCALC> ctrl) {
+
+  // The coordinates and properties of receiving atoms will be passed among the individual threads,
+  // while coordinates and properties of sending atoms will be held in __shared__ memory to reduce
+  // register pressure.  The local exclusion masks for each of the sending atoms will also be held
+  // in __shared__ memory arrays.  For single-precision coordinates and forces, this amounts to
+  // 12 (local coordinates) + 12 (accumulated forces) + 8 (non-bonded charge and Lennard-Jones
+  // type) + 4 (topological index).
+  // overflow accumulators for forces being stored in __global__ memory accumulators.  If a chip
+  // has a large amount of __shared__ accessible, the overflow force accumulators will get moved
+  // into __shared__ (+12 bytes per thread), as will the
+  __shared__ int warp_cell_counters[small_block_warps];
+  __shared__ int plate_prefix_sum[13 * small_block_warps];
+  __shared__ int tower_prefix_sum[ 6 * small_block_warps];
+#ifdef SMALL_BOX
+  __shared__ int lower_tower_starts[small_block_warps];
+#endif
+  __shared__ TCALC sending_xcrd[small_block_size];
+  __shared__ TCALC sending_ycrd[small_block_size];
+  __shared__ TCALC sending_zcrd[small_block_size];
+  __shared__ int sending_ljidx[small_block_size];
+  __shared__ TCALC sending_q[small_block_size];
+  __shared__ int sending_topl_idx[small_block_size];
+  __shared__ TACC sending_xfrc[small_block_size];
+  __shared__ TACC sending_yfrc[small_block_size];
+  __shared__ TACC sending_zfrc[small_block_size];
+  __shared__ int sending_xfrc_ovrf[small_block_size];
+  __shared__ int sending_yfrc_ovrf[small_block_size];
+  __shared__ int sending_zfrc_ovrf[small_block_size];
+  
+  const int warp_idx = (threadIdx.x >> warp_bits);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+
+  // Initialize forces in the alternate image.
+  
+#ifdef DUAL_GRIDS
+  while (warp_cell_counters[warp_idx] < ctrl.nt_warp_mult * (cgw_qq.total_cell_count +
+                                                             cgw_lj.total_cell_count)) {
+#else
+  while (warp_cell_counters[warp_idx] < ctrl.nt_warp_mult * cgw.total_cell_count) {
+#endif
+    
+    // Read the limits for each cell and assemble the tower and plate prefix sums.
+    
+    
+    // Loop over all tower atoms, taking batches of "sending" atoms, then make a nested loop over
+    // all batches of atoms in the plate.
+
+    // Loop over all atoms in the central cell, first completing a self-interaction tile, then
+    // completing tiles with any other atoms in the central cell, and finally completing tiles
+    // with all atoms in the lower part of the tower.
+
+    // Increment the work unit counter.
+    if (lane_idx == 0) {
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
+    }
+#ifdef DUAL_GRIDS
+  }
+#else
+  }
+#endif
+  
+}

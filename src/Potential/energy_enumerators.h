@@ -116,6 +116,18 @@ enum class VdwCombiningRule {
                       ///<   to either of the other rules
 };
 
+/// \brief The van-der Waals sum can be computed through several distinct methods, all in use by
+///        various established MD programs.
+enum class VdwSumMethod {
+  CUTOFF,  ///< Use a hard cutoff for computing the van-der Waals sum.  This is the cheapest
+           ///<   approach, but most prone to systematic errors.
+  SMOOTH,  ///< Use a cubic spline to taper the potential from its finite value near the cutoff to
+           ///<   zero at the cutoff.  The width of the switching region can be set using the
+           ///<   vdw_switch keyword.
+  PME      ///< Use the particle-mesh Ewald splitting to compute long-ranged dispersion
+           ///<   interactions.
+};
+
 /// \brief Functions and kernels can be configured to dampen the effects of clashes (at a minor
 ///        expense in computation and registers), or not.
 enum class ClashResponse {
@@ -218,6 +230,7 @@ std::string getEnumerationName(NonbondedPotential input);
 std::string getEnumerationName(NonbondedTheme input);
 std::string getEnumerationName(DecomposablePotential input);
 std::string getEnumerationName(VdwCombiningRule input);
+std::string getEnumerationName(VdwSumMethod input);
 std::string getEnumerationName(ClashResponse input);
 std::string getEnumerationName(EnergySample input);
 std::string getEnumerationName(SplineScaffold input);

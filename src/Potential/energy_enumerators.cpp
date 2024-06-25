@@ -173,6 +173,19 @@ std::string getEnumerationName(const VdwCombiningRule input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const VdwSumMethod input) {
+  switch (input) {
+  case VdwSumMethod::CUTOFF:
+    return std::string("CUTOFF");
+  case VdwSumMethod::SMOOTH:
+    return std::string("SMOOTH");
+  case VdwSumMethod::PME:
+    return std::string("PME");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const ClashResponse input) {
   switch (input) {
   case ClashResponse::NONE:

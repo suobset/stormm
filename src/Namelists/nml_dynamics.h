@@ -99,7 +99,19 @@ constexpr int default_thermostat_random_seed = 1329440765;
 constexpr int default_tstat_evo_window_start = 0;
 constexpr int default_tstat_evo_window_end   = 0;
 /// \}
-  
+
+/// \brief The warp multiplicity of non-bonded pairwise calculations can have an effect on the
+///        overall speed of the computation.  While the unit cell subdivision is aggressive, it
+///        is still a lot of work for one warp to do all tiles bewteen perhaps 50+ atoms in the
+///        "tower" and 120+ atoms in the "plate" regions of a single neutral-territory region
+///        controlled by one of the subdivisions.  Multiple warps can cooperate to get all of the
+///        work done.  Allowing the user to control this parameter in certain situations may
+///        permit further optimizations.
+/// \{
+constexpr int maximum_nt_warp_multiplicity = 8;
+constexpr int default_nt_warp_multiplicity = 1;
+/// \}
+
 /// \brief Object to encapsulate molecular dynamics control information.  Like other namelist
 ///        encapsualtors, this object can take input file data as part of its construction, or
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
@@ -176,7 +188,7 @@ public:
   /// \brief Get the final step for temperature evolution from the initial temperature profile
   ///        to the final temperature profile across all atoms and all systems.
   int getThermostatEvolutionEnd() const;
-
+  
   /// \brief Get the depth of the thermostat's random number cache.
   int getThermostatCacheDepth() const;
 
@@ -218,6 +230,9 @@ public:
 
   /// \brief Get the atom mask strings for each thermostated group of atoms.
   const std::vector<std::string>& getThermostatMasks() const;
+
+  /// \brief Get the warp multiplicity for non-bonded pairwise calculations.
+  int getNTWarpMultiplicity() const;
   
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;
@@ -347,6 +362,12 @@ public:
                           const std::string &label = std::string("all"), int label_index = -1,
                           const std::string &mask = std::string("@="));
 
+  /// \brief Get the warp multiplicity for non-bonded pairwise calculations.  This applies only to
+  ///        periodic dynamics.
+  ///
+  /// \param mult_in  The warp multiplicity to set
+  void setNTWarpMultiplicity(int mult_in);
+
 private:
   ExceptionResponse policy;        ///< Set the behavior when bad inputs are encountered.  DIE =
                                    ///<   abort program, WARN = warn the user, and likely reset to
@@ -387,6 +408,9 @@ private:
                                    ///<   reset in the Andersen thermostating scheme
   double langevin_frequency;       ///< The frequency of stochastic Langevin collisions, in units
                                    ///<   of inverse femtoseconds
+  int nt_warp_multiplicity;        ///< The number of warps that will cooperate to complete work in
+                                   ///<   each neutral-territory subdivision of periodic dynamics
+                                   ///<   unit cells
   
   /// Configuration for the thermostat's random number cache (if applicable)
   std::string thermostat_cache_config;    
@@ -409,7 +433,7 @@ private:
   /// A series of strings expressing atom masks for subgroups of atoms within each identified
   /// system that will be subject to each temperature profile
   std::vector<std::string> thermostat_masks;
-  
+
   /// Store a deep copy of the original namelist emulator as read from the input file.
   NamelistEmulator nml_transcript;
   
@@ -449,6 +473,9 @@ private:
   
   /// \brief Validate the precision model for caching random numbers.
   void validateCacheConfiguration();
+
+  /// \brief Validate the warp multiplicity for non-bonded pairwise calculations.
+  void validateNTWarpMultiplicity();
 };
   
 /// \brief Produce a namelist for specifying molecular dynamics directives, similar to those found

@@ -8,6 +8,7 @@
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Potential/energy_enumerators.h"
+#include "Potential/cellgrid.h"
 #include "Math/reduction_enumerators.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
@@ -23,6 +24,7 @@ using card::CoreKlManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
+using energy::CellGrid;
 using energy::ClashResponse;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
@@ -33,6 +35,7 @@ using namelist::default_minimize_dx0;
 using namelist::default_minimize_maxcyc;
 using namelist::default_minimize_ncyc;
 using namelist::default_rattle_tolerance;
+using namelist::default_nt_warp_multiplicity;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
@@ -46,8 +49,8 @@ template <typename T> struct MMControlKit {
 
   /// \brief The constructor takes a straight list of values and pointers.  The step number is
   ///        left modifiable so that the object can be re-used over successive time steps.
-  MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T dt_in, T rattle_tol_in,
-               T initial_step_in, int* vwu_progress_in, int* vupt_progress_in,
+  MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T initial_step_in,
+               int nt_warp_mult_in, int* vwu_progress_in, int* vupt_progress_in,
                int* vcns_progress_in, int* pupt_progress_in, int* gcns_progress_in,
                int* nbwu_progress_in, int* pmewu_progress_in, int* gbrwu_progress_in,
                int* gbdwu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
@@ -59,24 +62,24 @@ template <typename T> struct MMControlKit {
   MMControlKit(MMControlKit &&original) = default;
   /// \}
 
-  int step;              ///< The current simulation step
-  const int sd_cycles;   ///< The number of steepest-descent energy minimization cycles
-  const int max_cycles;  ///< The total number of energy minimization cycles or dynamics steps
-  const T dt;            ///< Simulation time step (only valid for dynamics)
-  const T rattle_tol;    ///< Convergence tolerance for bond constraints
-  const T initial_step;  ///< Initial step size to be taken in energy minimization
-  int* vwu_progress;     ///< Progress counters for valence work units
-  int* vupt_progress;    ///< Progress counters for standalone velocity update work units
-  int* vcns_progress;    ///< Progress counters for standalone velocity constraint work units
-  int* pupt_progress;    ///< Progress counters for standalone coordinate update work units
-  int* gcns_progress;    ///< Progress counters for standalone positional constraint work units
-  int* nbwu_progress;    ///< Progress counters for non-bonded work units
-  int* pmewu_progress;   ///< Progress counters for PME long-ranged work units
-  int* gbrwu_progress;   ///< Progress counters for Generalized Born radii computations
-  int* gbdwu_progress;   ///< Progress counters for Generalized Born derivative computations
-  int* gtwu_progress;    ///< Progress counters for gathering work units
-  int* scwu_progress;    ///< Progress counters for scattering work units
-  int* rdwu_progress;    ///< Progress counters for reduction work units
+  int step;                ///< The current simulation step
+  const int sd_cycles;     ///< The number of steepest-descent energy minimization cycles
+  const int max_cycles;    ///< The total number of energy minimization cycles or dynamics steps
+  const T initial_step;    ///< Initial step size to be taken in energy minimization
+  const int nt_warp_mult;  ///< The number of warps to use, per neighbor list decomposition cell,
+                           ///<   in neutral territory tile processing
+  int* vwu_progress;       ///< Progress counters for valence work units
+  int* vupt_progress;      ///< Progress counters for standalone velocity update work units
+  int* vcns_progress;      ///< Progress counters for standalone velocity constraint work units
+  int* pupt_progress;      ///< Progress counters for standalone coordinate update work units
+  int* gcns_progress;      ///< Progress counters for standalone positional constraint work units
+  int* nbwu_progress;      ///< Progress counters for non-bonded work units
+  int* pmewu_progress;     ///< Progress counters for PME long-ranged work units
+  int* gbrwu_progress;     ///< Progress counters for Generalized Born radii computations
+  int* gbdwu_progress;     ///< Progress counters for Generalized Born derivative computations
+  int* gtwu_progress;      ///< Progress counters for gathering work units
+  int* scwu_progress;      ///< Progress counters for scattering work units
+  int* rdwu_progress;      ///< Progress counters for reduction work units
 };
 
 /// \brief A collection of contol data for molecular mechanics simulations, conveying the current
@@ -93,16 +96,13 @@ public:
   ///        namelist-derived control objects don't just get pushed by value to the GPU is that the
   ///        work unit counters need special arrays, which this object manages.
   ///
-  /// \param time_step_in     The desired time step
-  /// \param rattle_tol_in    The desired RATTLE tolerance (for dynamics)
   /// \param initial_step_in  The desired initial step (for energy minimization)
   /// \param user_input       Namelist-derived molecular dynamics or energy minimization controls
   /// \{
-  MolecularMechanicsControls(double time_step_in = default_dynamics_time_step,
-                             double rattle_tol_in = default_rattle_tolerance,
-                             double initial_step_in = default_minimize_dx0,
+  MolecularMechanicsControls(double initial_step_in = default_minimize_dx0,
                              int sd_cycles_in = default_minimize_ncyc,
-                             int max_cycles_in = default_minimize_maxcyc);
+                             int max_cycles_in = default_minimize_maxcyc,
+                             int nt_warp_multiplicity_in = default_nt_warp_multiplicity);
 
   MolecularMechanicsControls(const DynamicsControls &user_input);
                              
@@ -134,15 +134,12 @@ public:
   /// \brief Get the total number of minimization steps, or total MD cycles.
   int getTotalCycles() const;
 
-  /// \brief Get the time step.
-  double getTimeStep() const;
-
-  /// \brief Get the RATTLE tolerance.
-  double getRattleTolerance() const;
+  /// \brief Get the neutral-territory warp multiplicity.
+  int getNTWarpMultiplicity() const;
 
   /// \brief Get the initial step for energy minimization.
   double getInitialMinimizationStep() const;
-
+  
   /// \brief Get the value of one of the valence work unit progress counters on the host or the
   ///        HPC device.
   ///
@@ -235,6 +232,25 @@ public:
                              EvaluateEnergy eval_nrg, VwuGoal purpose, PrecisionModel general_prec,
                              const AtomGraphSynthesis &poly_ag); 
   /// \}
+
+  /// \brief Set the neutral-territory warp multiplicity based on one or two gell grids, for a
+  ///        given GPU.
+  ///
+  /// Overloaded:
+  ///   - Accept one neighbor list and specifications the GPU that will perform the calculations
+  ///   - Accept two neighbor lists and the specifications of the GPU
+  ///
+  /// \param cg_a  The first cell grid neighbor list
+  /// \param cg_b  The second (optional) cell grid neighbor list
+  /// \param gpu   Details of the GPU that will evaluate pairwise interactions
+  /// \{
+  template <typename T, typename Tacc, typename Tcalc, typename T4>
+  void setNTWarpMultiplicity(const CellGrid<T, Tacc, Tcalc, T4> *cg_a,
+                             const CellGrid<T, Tacc, Tcalc, T4> *cg_b, const GpuDetails &gpu);
+
+  template <typename T, typename Tacc, typename Tcalc, typename T4>
+  void setNTWarpMultiplicity(const CellGrid<T, Tacc, Tcalc, T4> *cg_a, const GpuDetails &gpu);
+  /// \}
   
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();
@@ -249,16 +265,14 @@ public:
 #endif
   
 private:
-  int step_number;      ///< The step counter for the simulation
-  int sd_cycles;        ///< The number of steepest-descent energy minimization cycles
-  int max_cycles;       ///< The total number of energy minimization cycles or dynamics steps
-  double time_step;     ///< Time step of the simulation, units of femtoseconds.  This may be
-                        ///<   truncated with the precision level of the abstract.
-  double rattle_tol;    ///< Rattle tolerance, again truncated with the precision level of the
-                        ///<   abstract
-  double initial_step;  ///< The initial step length (for all systems, if these controls govern a
-                        ///<   synthesis) to take in energy minimization calculations
-  
+  int step_number;          ///< The step counter for the simulation
+  int sd_cycles;            ///< The number of steepest-descent energy minimization cycles
+  int max_cycles;           ///< The total number of energy minimization cycles or dynamics steps
+  int nt_warp_multiplicity; ///< The number of warps that should cooperate to evaluate all pair
+                            ///<   interactions in a cell grid neighbor list
+  double initial_step;      ///< The initial step length (for all systems, if these controls
+                            ///<   govern a synthesis) to take in energy minimization calculations
+
   /// Progress counters through valence work units, an array of two times the number of lanes per
   /// warp so that the valence work units kernel can perform resets of elements in this array with
   /// maximum efficiency.  The kernel will work based on the progress counter with index equal to
