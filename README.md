@@ -172,7 +172,12 @@ actual algorithm in any severe way.
   public member variables.  Such structs should also have no member functions--they are, for all
   practical purposes, structs in the traditional C sense, but this is of course a convention, not
   a compiler-enforced rule.
-- Template structs take template type name T, or T1, T2, T3... as necessary.
+- Template structs take template type name T, or T1, T2, T3... as necessary.  When multiple
+  templated types are present, tuples of the base type should be named with the size of the tuple,
+  e.g. ```<typename T, typename T4>``` when T could be ```int``` or ```float```.  More elaborate
+  names are encouraged when the types serve different purposes and are not expected to comprise
+  similar number formats, e.g. ```<typename Tcoord, typename Tcalc>``` for distinguishing the data
+  types used to express coordinates and the data type used to perform most arithmetic.
 - Use initializer list mechanics where possible, but for structs that require detailed reading of
   a text file or other complex manipulation of data, write an argumentless constructor that builds
   a blank struct, then use that to fulfill the initializer lists of any other constructors which
@@ -329,3 +334,43 @@ and de-referencing (there are cases of that, and STORMM libraries frequently pro
 full of const pointers to expedite access to data, especially in GPU-based arrays).  However, for
 the specific purpose of letting a function modify one of its input arguments, pointers are the
 preferred route.
+
+---------------------------------------------------------------------------------------------------
+  Class Abstracts and the C++ >> C >> HPC Transition Model
+---------------------------------------------------------------------------------------------------
+STORMM is a collection of C++ classes and CUDA (and perhaps in the future HIP or OpenCL) Kernels
+which communicate by stripping the data down to a lowest common denominator of C.  Each class
+built in STORMM should emit one or more "abstracts" which will collect critical constants, sizing
+information for arrays, and raw pointers to the underlying information contained in the class.
+Each abstract is a ```struct``` and as such should contain only a basic constructor taking values
+for each member variable as a formal argument, copy and move constructors, and perhaps a manually
+defined destructor.  This represents a C++ to C transition: it is possible to overrun the limits
+of various arrays when uing an abstract if the stated bounds are not respected, as there are no
+accessor functions with their own internal bounds checks as would be expected in a C++
+```class```.  Abstracts should contain suffixes like ```Reader```, ```Writer```, ```Kit```, or
+```Plan``` depending on what seems most appropriate given the nature of the object and the
+mutability of data mapped by the abstract.  In most cases, even ```Writer``` abstracts will contain
+some ```const``` members such as array sizing constants, and thus will not be able to have copy and
+move assignment operators.  In most cases the abstracts will be obtained from class member
+functions named ```data()``` but more descriptive names may be used to produce specialized
+abstracts tailored to a subset of the underlying class object's contents.
+
+---------------------------------------------------------------------------------------------------
+  Templated CUDA Kernels and Templated Kernel Arguments 
+---------------------------------------------------------------------------------------------------
+A thought experiment can establish that it is not feasible to call a templated CUDA kernel from a
+C++ file (.cpp) unless the HPC compiler is also compiling the .cpp implementations, i.e. is the
+only compiler in town.  This is not the way STORMM is intended to function, given the standalone
+CPU functionality that most of the code base aims to provide for prototyping and basic testing.
+This does not, however, mean that a templated class instantiated by a C++ compiler cannot be
+delivered to a CUDA (or HIP, or OpenCL) implementation without writing separate branches for every
+intended data type of the template, an approach which would be prohibitive in the case of multiple
+independent templated data types.  The preferred approach in STORMM is to create abstracts of the
+templated class with the templated data pointers cast to ```void*```.   This cannot be done with
+scalar constants included in the abstract, but it is seldom a problem.  Abstracts of this sort are
+typically obtained by member functions named ```templateFreeData()```.  The void-casted abstracts
+are then converted back to their original types by templated free functions named
+```restoreType```, overloaded by the different abstracts they take for formal arguments.  Because
+both C++ and HPC compilers will build objects out of the various header files, each will develop
+their own template instantiations for a given object while the ```void*```-casted form is useful
+as the intermediary.
