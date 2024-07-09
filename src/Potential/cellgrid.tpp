@@ -14,6 +14,7 @@ CellGridWriter<T, Tacc, Tcalc, T4>::CellGridWriter(const NonbondedTheme theme_in
                                                    const size_t cell_base_capacity_in,
                                                    const float lpos_scale_in,
                                                    const float lpos_inv_scale_in,
+                                                   const float frc_scale_in,
                                                    const ullint* system_cell_grids_in,
                                                    Tcalc* system_cell_umat_in,
                                                    T* system_cell_invu_in, T* system_pmig_invu_in,
@@ -37,18 +38,18 @@ CellGridWriter<T, Tacc, Tcalc, T4>::CellGridWriter(const NonbondedTheme theme_in
     theme{theme_in}, system_count{system_count_in}, total_cell_count{total_cell_count_in},
     total_chain_count{total_chain_count_in}, mesh_ticks{mesh_ticks_in},
     cell_base_capacity{cell_base_capacity_in}, lpos_scale{lpos_scale_in},
-    lpos_inv_scale{lpos_inv_scale_in}, system_cell_grids{system_cell_grids_in},
-    system_cell_umat{system_cell_umat_in}, system_cell_invu{system_cell_invu_in},
-    system_pmig_invu{system_pmig_invu_in}, cell_limits{cell_limits_in},
-    cell_limits_alt{cell_limits_alt_in}, chain_limits{chain_limits_in},
-    system_chain_bounds{system_chain_bounds_in}, chain_system_owner{chain_system_owner_in},
-    image{image_in}, image_alt{image_alt_in}, migration_keys{migration_keys_in}, flux{flux_in},
-    fill_counters{fill_counters_in}, nonimg_atom_idx{nonimg_atom_idx_in},
-    nonimg_atom_idx_alt{nonimg_atom_idx_alt_in}, img_atom_idx{img_atom_idx_in},
-    img_atom_idx_alt{img_atom_idx_alt_in}, nt_groups{nt_groups_in}, xfrc{xfrc_in}, yfrc{yfrc_in},
-    zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in},
-    xfrc_hw{xfrc_hw_in}, yfrc_hw{yfrc_hw_in}, zfrc_hw{zfrc_hw_in}, xfrc_hw_ovrf{xfrc_hw_ovrf_in},
-    yfrc_hw_ovrf{yfrc_hw_ovrf_in}, zfrc_hw_ovrf{zfrc_hw_ovrf_in}
+    lpos_inv_scale{lpos_inv_scale_in}, frc_scale{frc_scale_in},
+    system_cell_grids{system_cell_grids_in}, system_cell_umat{system_cell_umat_in},
+    system_cell_invu{system_cell_invu_in}, system_pmig_invu{system_pmig_invu_in},
+    cell_limits{cell_limits_in}, cell_limits_alt{cell_limits_alt_in},
+    chain_limits{chain_limits_in}, system_chain_bounds{system_chain_bounds_in},
+    chain_system_owner{chain_system_owner_in}, image{image_in}, image_alt{image_alt_in},
+    migration_keys{migration_keys_in}, flux{flux_in}, fill_counters{fill_counters_in},
+    nonimg_atom_idx{nonimg_atom_idx_in}, nonimg_atom_idx_alt{nonimg_atom_idx_alt_in},
+    img_atom_idx{img_atom_idx_in}, img_atom_idx_alt{img_atom_idx_alt_in}, nt_groups{nt_groups_in},
+    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in},
+    zfrc_ovrf{zfrc_ovrf_in}, xfrc_hw{xfrc_hw_in}, yfrc_hw{yfrc_hw_in}, zfrc_hw{zfrc_hw_in},
+    xfrc_hw_ovrf{xfrc_hw_ovrf_in}, yfrc_hw_ovrf{yfrc_hw_ovrf_in}, zfrc_hw_ovrf{zfrc_hw_ovrf_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -61,6 +62,7 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const NonbondedTheme theme_in
                                                    const size_t cell_base_capacity_in,
                                                    const float lpos_scale_in,
                                                    const float lpos_inv_scale_in,
+                                                   const float inv_frc_scale_in,
                                                    const ullint* system_cell_grids_in,
                                                    const Tcalc* system_cell_umat_in,
                                                    const T* system_cell_invu_in,
@@ -80,14 +82,14 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const NonbondedTheme theme_in
     theme{theme_in}, system_count{system_count_in}, total_cell_count{total_cell_count_in},
     total_chain_count{total_chain_count_in}, mesh_ticks{mesh_ticks_in},
     cell_base_capacity{cell_base_capacity_in}, lpos_scale{lpos_scale_in},
-    lpos_inv_scale{lpos_inv_scale_in}, system_cell_grids{system_cell_grids_in},
-    system_cell_umat{system_cell_umat_in}, system_cell_invu{system_cell_invu_in},
-    system_pmig_invu{system_pmig_invu_in}, cell_limits{cell_limits_in},
-    chain_limits{chain_limits_in}, system_chain_bounds{system_chain_bounds_in},
-    chain_system_owner{chain_system_owner_in}, image{image_in},
-    nonimg_atom_idx{nonimg_atom_idx_in}, img_atom_idx{img_atom_idx_in}, nt_groups{nt_groups_in},
-    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in},
-    zfrc_ovrf{zfrc_ovrf_in}
+    lpos_inv_scale{lpos_inv_scale_in}, inv_frc_scale{inv_frc_scale_in},
+    system_cell_grids{system_cell_grids_in}, system_cell_umat{system_cell_umat_in},
+    system_cell_invu{system_cell_invu_in}, system_pmig_invu{system_pmig_invu_in},
+    cell_limits{cell_limits_in}, chain_limits{chain_limits_in},
+    system_chain_bounds{system_chain_bounds_in}, chain_system_owner{chain_system_owner_in},
+    image{image_in}, nonimg_atom_idx{nonimg_atom_idx_in}, img_atom_idx{img_atom_idx_in},
+    nt_groups{nt_groups_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
+    yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -96,14 +98,14 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const CellGridWriter<T, Tacc,
     theme{cgw.theme}, system_count{cgw.system_count}, total_cell_count{cgw.total_cell_count},
     total_chain_count{cgw.total_chain_count}, mesh_ticks{cgw.mesh_ticks},
     cell_base_capacity{cgw.cell_base_capacity}, lpos_scale{cgw.lpos_scale},
-    lpos_inv_scale{cgw.lpos_inv_scale}, system_cell_grids{cgw.system_cell_grids},
-    system_cell_umat{cgw.system_cell_umat}, system_cell_invu{cgw.system_cell_invu},
-    system_pmig_invu{cgw.system_pmig_invu}, cell_limits{cgw.cell_limits},
-    chain_limits{cgw.chain_limits}, system_chain_bounds{cgw.system_chain_bounds},
-    chain_system_owner{cgw.chain_system_owner}, image{cgw.image},
-    nonimg_atom_idx{cgw.nonimg_atom_idx}, img_atom_idx{cgw.img_atom_idx}, nt_groups{cgw.nt_groups},
-    xfrc{cgw.xfrc}, yfrc{cgw.yfrc}, zfrc{cgw.zfrc}, xfrc_ovrf{cgw.xfrc_ovrf},
-    yfrc_ovrf{cgw.yfrc_ovrf}, zfrc_ovrf{cgw.zfrc_ovrf}
+    lpos_inv_scale{cgw.lpos_inv_scale}, inv_frc_scale{static_cast<float>(1.0 / cgw.frc_scale)},
+    system_cell_grids{cgw.system_cell_grids}, system_cell_umat{cgw.system_cell_umat},
+    system_cell_invu{cgw.system_cell_invu}, system_pmig_invu{cgw.system_pmig_invu},
+    cell_limits{cgw.cell_limits}, chain_limits{cgw.chain_limits},
+    system_chain_bounds{cgw.system_chain_bounds}, chain_system_owner{cgw.chain_system_owner},
+    image{cgw.image}, nonimg_atom_idx{cgw.nonimg_atom_idx}, img_atom_idx{cgw.img_atom_idx},
+    nt_groups{cgw.nt_groups}, xfrc{cgw.xfrc}, yfrc{cgw.yfrc}, zfrc{cgw.zfrc},
+    xfrc_ovrf{cgw.xfrc_ovrf}, yfrc_ovrf{cgw.yfrc_ovrf}, zfrc_ovrf{cgw.zfrc_ovrf}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -112,12 +114,12 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const CellGridWriter<T, Tacc,
     theme{cgw->theme}, system_count{cgw->system_count}, total_cell_count{cgw->total_cell_count},
     total_chain_count{cgw->total_chain_count}, mesh_ticks{cgw->mesh_ticks},
     cell_base_capacity{cgw->cell_base_capacity}, lpos_scale{cgw->lpos_scale},
-    lpos_inv_scale{cgw->lpos_inv_scale}, system_cell_grids{cgw->system_cell_grids},
-    system_cell_umat{cgw->system_cell_umat}, system_cell_invu{cgw->system_cell_invu},
-    system_pmig_invu{cgw->system_pmig_invu}, cell_limits{cgw->cell_limits},
-    chain_limits{cgw->chain_limits}, system_chain_bounds{cgw->system_chain_bounds},
-    chain_system_owner{cgw->chain_system_owner}, image{cgw->image},
-    nonimg_atom_idx{cgw->nonimg_atom_idx}, img_atom_idx{cgw->img_atom_idx},
+    lpos_inv_scale{cgw->lpos_inv_scale}, inv_frc_scale{static_cast<float>(1.0 / cgw->frc_scale)},
+    system_cell_grids{cgw->system_cell_grids}, system_cell_umat{cgw->system_cell_umat},
+    system_cell_invu{cgw->system_cell_invu}, system_pmig_invu{cgw->system_pmig_invu},
+    cell_limits{cgw->cell_limits}, chain_limits{cgw->chain_limits},
+    system_chain_bounds{cgw->system_chain_bounds}, chain_system_owner{cgw->chain_system_owner},
+    image{cgw->image}, nonimg_atom_idx{cgw->nonimg_atom_idx}, img_atom_idx{cgw->img_atom_idx},
     nt_groups{cgw->nt_groups}, xfrc{cgw->xfrc}, yfrc{cgw->yfrc}, zfrc{cgw->zfrc},
     xfrc_ovrf{cgw->xfrc_ovrf}, yfrc_ovrf{cgw->yfrc_ovrf}, zfrc_ovrf{cgw->zfrc_ovrf}
 {}
@@ -710,8 +712,8 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
     return CellGridWriter<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                     localpos_inverse_scale, system_cell_grids.data(tier),
-                                     system_cell_umat_alt.data(tier),
+                                     localpos_inverse_scale, poly_ps_ptr->getForceScalingFactor(),
+                                     system_cell_grids.data(tier), system_cell_umat_alt.data(tier),
                                      system_cell_invu_alt.data(tier),
                                      system_pmig_invu_alt.data(tier),
                                      image_cell_limits_alt.data(tier),
@@ -735,9 +737,10 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
     return CellGridWriter<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                     localpos_inverse_scale, system_cell_grids.data(tier),
-                                     system_cell_umat.data(tier), system_cell_invu.data(tier),
-                                     system_pmig_invu.data(tier), image_cell_limits.data(tier),
+                                     localpos_inverse_scale, poly_ps_ptr->getForceScalingFactor(),
+                                     system_cell_grids.data(tier), system_cell_umat.data(tier),
+                                     system_cell_invu.data(tier), system_pmig_invu.data(tier),
+                                     image_cell_limits.data(tier),
                                      image_cell_limits_alt.data(tier),
                                      image_chain_limits.data(tier), system_chain_bounds.data(tier),
                                      chain_system_membership.data(tier), image.data(tier),
@@ -775,8 +778,9 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
     return CellGridReader<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                     localpos_inverse_scale, system_cell_grids.data(tier),
-                                     system_cell_umat_alt.data(tier),
+                                     localpos_inverse_scale,
+                                     poly_ps_ptr->getInverseForceScalingFactor(),
+                                     system_cell_grids.data(tier), system_cell_umat_alt.data(tier),
                                      system_cell_invu_alt.data(tier),
                                      system_pmig_invu_alt.data(tier),
                                      image_cell_limits_alt.data(tier),
@@ -791,10 +795,12 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
     return CellGridReader<T, Tacc,
                           Tcalc, T4>(theme, system_count, total_cell_count, total_chain_count,
                                      mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                     localpos_inverse_scale, system_cell_grids.data(tier),
-                                     system_cell_umat.data(tier), system_cell_invu.data(tier),
-                                     system_pmig_invu.data(tier), image_cell_limits.data(tier),
-                                     image_chain_limits.data(tier), system_chain_bounds.data(tier),
+                                     localpos_inverse_scale,
+                                     poly_ps_ptr->getInverseForceScalingFactor(),
+                                     system_cell_grids.data(tier), system_cell_umat.data(tier),
+                                     system_cell_invu.data(tier), system_pmig_invu.data(tier),
+                                     image_cell_limits.data(tier), image_chain_limits.data(tier),
+                                     system_chain_bounds.data(tier),
                                      chain_system_membership.data(tier), image.data(tier),
                                      nonimaged_atom_indices.data(tier),
                                      image_array_indices.data(tier), nt_work_groups.data(tier),
@@ -822,7 +828,8 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
     return CellGridWriter<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                      localpos_inverse_scale, system_cell_grids.data(tier),
+                                      localpos_inverse_scale, poly_ps_ptr->getForceScalingFactor(),
+                                      system_cell_grids.data(tier),
                                       reinterpret_cast<void*>(system_cell_umat_alt.data(tier)),
                                       reinterpret_cast<void*>(system_cell_invu_alt.data(tier)),
                                       reinterpret_cast<void*>(system_pmig_invu_alt.data(tier)),
@@ -853,7 +860,8 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
     return CellGridWriter<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                      localpos_inverse_scale, system_cell_grids.data(tier),
+                                      localpos_inverse_scale, poly_ps_ptr->getForceScalingFactor(),
+                                      system_cell_grids.data(tier),
                                       reinterpret_cast<void*>(system_cell_umat.data(tier)),
                                       reinterpret_cast<void*>(system_cell_invu.data(tier)),
                                       reinterpret_cast<void*>(system_pmig_invu.data(tier)),
@@ -907,7 +915,9 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
       return CellGridReader<void, void,
                             void, void>(theme, system_count, total_cell_count, total_chain_count,
                                         mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                        localpos_inverse_scale, system_cell_grids.data(tier),
+                                        localpos_inverse_scale,
+                                        poly_ps_ptr->getInverseForceScalingFactor(),
+                                        system_cell_grids.data(tier),
                                         cell_umat_ptr, cell_invu_ptr, pmig_invu_ptr,
                                         image_cell_limits_alt.data(tier),
                                         image_chain_limits.data(tier),
@@ -928,7 +938,9 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
     return CellGridReader<void, void,
                           void, void>(theme, system_count, total_cell_count, total_chain_count,
                                       mesh_subdivisions, cell_base_capacity, localpos_scale,
-                                      localpos_inverse_scale, system_cell_grids.data(tier),
+                                      localpos_inverse_scale,
+                                      poly_ps_ptr->getInverseForceScalingFactor(),
+                                      system_cell_grids.data(tier),
                                       reinterpret_cast<const void*>(system_cell_umat.data(tier)),
                                       reinterpret_cast<const void*>(system_cell_invu.data(tier)),
                                       reinterpret_cast<const void*>(system_pmig_invu.data(tier)),
@@ -1890,11 +1902,11 @@ void CellGrid<T, Tacc, Tcalc, T4>::populateImage(const CoordinateCycle cyc) {
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 void CellGrid<T, Tacc, Tcalc, T4>::prepareWorkGroups() {
-  std::vector<int> twu(16);
-  std::vector<int> rel_a = {  0,  0,  0,  0,  1,  2, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2 };
-  std::vector<int> rel_b = {  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2 };
-  std::vector<int> rel_c = { -2, -1,  1,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 };
-  nt_work_groups.resize(static_cast<size_t>(total_cell_count) * 16LLU);
+  std::vector<int> twu(32, 0);
+  std::vector<int> rel_a = {  0,  0,  0,  0,  0, -2, -1,  0,  1,  2, -2, -1,  0,  1,  2, -2, -1 };
+  std::vector<int> rel_b = {  0,  0,  0,  0,  0, -2, -2, -2, -2, -2, -1, -1, -1, -1, -1,  0,  0 };
+  std::vector<int> rel_c = { -2, -1,  0,  1,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 };
+  nt_work_groups.resize(static_cast<size_t>(total_cell_count) * 32LLU);
   for (int i = 0; i < total_cell_count; i++) {
     const uint2 icell_lims = image_cell_limits.readHost(i);
     const int system_idx = (icell_lims.y & 0xffff);
@@ -1913,16 +1925,20 @@ void CellGrid<T, Tacc, Tcalc, T4>::prepareWorkGroups() {
     // List the other cells that must be brought into play, by their own indices within the grid
     // as a whole.  Place them in a standard order according to the description of the work_groups
     // array, encoded in rel_a, rel_b, and rel_c above.
-    for (int j = 0; j < 16; j++) {
+    for (int j = 0; j < 17; j++) {
       int ra_idx = a_idx + rel_a[j];
       int rb_idx = b_idx + rel_b[j];
       int rc_idx = c_idx + rel_c[j];
       ra_idx += ((ra_idx < 0) + (ra_idx >= icell_na)) * icell_na;
       rb_idx += ((rb_idx < 0) + (rb_idx >= icell_nb)) * icell_nb;
       rc_idx += ((rc_idx < 0) + (rc_idx >= icell_nc)) * icell_nc;
-      twu[j] = icell_offset + (((rc_idx * icell_nb) + rb_idx) * icell_na) + ra_idx;
+      twu[j + ((j > 5) * 11)] = icell_offset + (((rc_idx * icell_nb) + rb_idx) * icell_na) +
+                                ra_idx;
     }
-    nt_work_groups.putHost(twu, 16LLU * static_cast<ullint>(i), 16);
+    nt_work_groups.putHost(twu, 32LLU * static_cast<ullint>(i), 32);
+    
+    // Indices 6-15 (and 29-31) are available to store additional information on the work unit.
+    twu[29] = system_idx;
   }
 }
 
@@ -2167,7 +2183,7 @@ CellGridWriter<T, Tacc, Tcalc, T4> restoreType(CellGridWriter<void, void, void, 
                         Tcalc, T4>(rasa->theme, rasa->system_count, rasa->total_cell_count,
                                    rasa->total_chain_count, rasa->mesh_ticks,
                                    rasa->cell_base_capacity, rasa->lpos_scale,
-                                   rasa->lpos_inv_scale, rasa->system_cell_grids,
+                                   rasa->lpos_inv_scale, rasa->frc_scale, rasa->system_cell_grids,
                                    reinterpret_cast<Tcalc*>(rasa->system_cell_umat),
                                    reinterpret_cast<T*>(rasa->system_cell_invu),
                                    reinterpret_cast<T*>(rasa->system_pmig_invu),
@@ -2195,7 +2211,7 @@ CellGridWriter<T, Tacc, Tcalc, T4> restoreType(CellGridWriter<void, void, void, 
                         Tcalc, T4>(rasa.theme, rasa.system_count, rasa.total_cell_count,
                                    rasa.total_chain_count, rasa.mesh_ticks,
                                    rasa.cell_base_capacity, rasa.lpos_scale, rasa.lpos_inv_scale,
-                                   rasa.system_cell_grids,
+                                   rasa.frc_scale, rasa.system_cell_grids,
                                    reinterpret_cast<Tcalc*>(rasa.system_cell_umat),
                                    reinterpret_cast<T*>(rasa.system_cell_invu),
                                    reinterpret_cast<T*>(rasa.system_pmig_invu),
@@ -2224,7 +2240,8 @@ restoreType(const CellGridReader<void, void, void, void> *rasa) {
                         Tcalc, T4>(rasa->theme, rasa->system_count, rasa->total_cell_count,
                                    rasa->total_chain_count, rasa->mesh_ticks,
                                    rasa->cell_base_capacity, rasa->lpos_scale,
-                                   rasa->lpos_inv_scale, rasa->system_cell_grids,
+                                   rasa->lpos_inv_scale, rasa->inv_frc_scale,
+                                   rasa->system_cell_grids,
                                    reinterpret_cast<const Tcalc*>(rasa->system_cell_umat),
                                    reinterpret_cast<const T*>(rasa->system_cell_invu),
                                    reinterpret_cast<const T*>(rasa->system_pmig_invu),
@@ -2246,7 +2263,7 @@ restoreType(const CellGridReader<void, void, void, void> &rasa) {
                         Tcalc, T4>(rasa.theme, rasa.system_count, rasa.total_cell_count,
                                    rasa.total_chain_count, rasa.mesh_ticks,
                                    rasa.cell_base_capacity, rasa.lpos_scale, rasa.lpos_inv_scale,
-                                   rasa.system_cell_grids,
+                                   rasa.inv_frc_scale, rasa.system_cell_grids,
                                    reinterpret_cast<const Tcalc*>(rasa.system_cell_umat),
                                    reinterpret_cast<const T*>(rasa.system_cell_invu),
                                    reinterpret_cast<const T*>(rasa.system_pmig_invu),

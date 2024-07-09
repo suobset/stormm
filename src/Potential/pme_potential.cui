@@ -5,59 +5,73 @@
 ///        interactions in a series of spatial decomposition cells defined by a Neutral Territory
 ///        layout.  Each warp will act independently for maximum granularity, while the overall
 ///        size of thread blocks is set to maximize thread occupancy on any given architecture.
-__global__ void __launch_bounds__(small_block_size, PMENB_KERNEL_BLOCKS_MULTIPLIER)
+__global__ void __launch_bounds__(small_block_size, PMENB_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const LocalExclusionMaskReader lemr,
+            const TilePlan tlpn, const PPIKit<TCALC, TCALC4> nrg_tab,
 #ifdef CLASH_FORGIVENESS
             const TCALC clash_distance, const TCALC clash_ratio,
-#endif
-#ifdef UPDATE_ATOMS
-            const SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk,
-            const ThermostatWriter<TCALC> tstw,
 #endif
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,
 #endif
 #ifdef DUAL_GRIDS
-            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw_qq,
-            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw_lj,
+            CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw_qq,
+            CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw_lj,
 #else
-            CellGridWriter<TCOORD, TACC, TCALC, TCALC4> cgw,
+            CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw,
 #endif
             MMControlKit<TCALC> ctrl) {
 
   // The coordinates and properties of receiving atoms will be passed among the individual threads,
   // while coordinates and properties of sending atoms will be held in __shared__ memory to reduce
-  // register pressure.  The local exclusion masks for each of the sending atoms will also be held
-  // in __shared__ memory arrays.  For single-precision coordinates and forces, this amounts to
-  // 12 (local coordinates) + 12 (accumulated forces) + 8 (non-bonded charge and Lennard-Jones
-  // type) + 4 (topological index).
-  // overflow accumulators for forces being stored in __global__ memory accumulators.  If a chip
-  // has a large amount of __shared__ accessible, the overflow force accumulators will get moved
-  // into __shared__ (+12 bytes per thread), as will the
-  __shared__ int warp_cell_counters[small_block_warps];
+  // register pressure.  One legacy cards with 64 kB of allocatable __shared__ memory and 32 kB of
+  // additional L1, 1280 threads per SM will be engaged in five blocks of 256 threads each.  On
+  // newer cards with up to 100 kB of allocatable __shared__ memory and an additional 28 kB of L1,
+  // 1536 threads per SM will be engaged in six blocks.
+#ifdef DUAL_GRIDS
+  __shared__ bool warp_on_qq[small_block_warps];
+#endif
+  __shared__ uint warp_cell_counters[small_block_warps];
   __shared__ int plate_prefix_sum[13 * small_block_warps];
   __shared__ int tower_prefix_sum[ 6 * small_block_warps];
-#ifdef SMALL_BOX
-  __shared__ int lower_tower_starts[small_block_warps];
+  __shared__ uint tower_cg_offsets[5 * small_block_warps];
+  __shared__ uint plate_cg_offsets[12 * small_block_warps];
+  __shared__ int system_idx[small_block_warps];
+  __shared__ int base_tile_depth[small_block_warps];
+  __shared__ int base_plan_idx[small_block_warps];
+#ifdef TINY_BOX
+  //__shared__ int lower_tower_starts[small_block_warps];
 #endif
   __shared__ TCALC sending_xcrd[small_block_size];
   __shared__ TCALC sending_ycrd[small_block_size];
   __shared__ TCALC sending_zcrd[small_block_size];
-  __shared__ int sending_ljidx[small_block_size];
-  __shared__ TCALC sending_q[small_block_size];
   __shared__ int sending_topl_idx[small_block_size];
+  __shared__ int sending_prof_idx[small_block_size];
+  __shared__ uint sending_img_idx[small_block_size];
+  __shared__ uint recving_img_idx[small_block_size];
   __shared__ TACC sending_xfrc[small_block_size];
   __shared__ TACC sending_yfrc[small_block_size];
   __shared__ TACC sending_zfrc[small_block_size];
+#ifdef LARGE_CHIP_CACHE
+  // The large chip cache allows the kernel to do local accumulations of the sending atoms' forces,
+  // added together without atomics.  This is the one of the lowest frequency processes in the tile
+  // and therefore the overflow of such a process, which may not even be accessed, will not get
+  // priority on legacy cards with only 96 kB (64 kB __shared__ plus 32 kB other L1) streaming
+  // multiprocessors.
   __shared__ int sending_xfrc_ovrf[small_block_size];
   __shared__ int sending_yfrc_ovrf[small_block_size];
   __shared__ int sending_zfrc_ovrf[small_block_size];
-  
+#endif
+
+  // Set the warp and lane indices, then initialize the work unit counter
   const int warp_idx = (threadIdx.x >> warp_bits);
   const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+  if (lane_idx == 0) {
+    warp_cell_counters[warp_idx] = (blockIdx.x * small_block_warps) + warp_idx;
+  }
+  SYNCWARP;
 
-  // Initialize forces in the alternate image.
-  
+  // Loop over all work units
 #ifdef DUAL_GRIDS
   while (warp_cell_counters[warp_idx] < ctrl.nt_warp_mult * (cgw_qq.total_cell_count +
                                                              cgw_lj.total_cell_count)) {
@@ -66,24 +80,863 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const LocalExclusionMa
 #endif
     
     // Read the limits for each cell and assemble the tower and plate prefix sums.
+#ifdef DUAL_GRIDS
+    const bool tmp_warp_on_qq = (warp_cell_counters[warp_idx] <
+                                 ctrl.nt_warp_mult * cgw_qq.total_cell_count);
+    if (lane_idx == 0) {
+      warp_on_qq[warp_idx] = tmp_warp_on_qq;
+    }
+    uint nt_idx;
+    int wu_data;
+    if (tmp_warp_on_qq) {
+      nt_idx = warp_cell_counters[warp_idx] / ctrl.nt_warp_mult;
+      wu_data = __ldcv(&cgw_qq.nt_groups[(nt_idx << warp_bits) + lane_idx]);
+    }
+    else {
+      nt_idx = (warp_cell_counters[warp_idx] -
+               (ctrl.nt_warp_mult * cgw_qq.total_cell_count)) / ctrl.nt_warp_mult;
+      wu_data = __ldcv(&cgw_lj.nt_groups[((nt_idx - cgw_qq.total_cell_count) << warp_bits) +
+                                         lane_idx]);
+    }
+    const int tower_base_pos = (warp_cell_counters[warp_idx] -
+                                (ctrl.nt_warp_mult * (cgw_qq.total_cell_count + nt_idx))) *
+                               warp_size_int;
+#else
+    const uint nt_idx = warp_cell_counters[warp_idx] / ctrl.nt_warp_mult;
+    const int tower_base_pos = (warp_cell_counters[warp_idx] - (ctrl.nt_warp_mult * nt_idx)) *
+                               warp_size_int;
+    int wu_data = __ldcv(&cgw.nt_groups[(nt_idx << warp_bits) + lane_idx]);
+#endif
+#ifdef STORMM_USE_CUDA
+    // The local variable wu_data is initially seeded with the cell grid cell index coming from the
+    // work unit.  Later, it is repurposed to hold the current number of atoms in the tower or
+    // plate cell for the purpose of computing the prefix sums.
+    if (lane_idx == 29) {
+      system_idx[warp_idx] = wu_data;
+      wu_data = 0;
+    }
+    uint2 cell_contents;
+    if (lane_idx < 5 || (lane_idx >= 16 && lane_idx < 28)) {
+#  ifdef DUAL_GRIDS
+      cell_contents = (tmp_warp_on_qq) ? cgw_qq.cell_limits[wu_data] : cgw_lj.cell_limits[wu_data];
+#  else
+      cell_contents = cgw.cell_limits[wu_data];
+#  endif
+      if (lane_idx < 5) {
+        tower_cg_offsets[lane_idx] = cell_contents.x;
+      }
+      else {
+        plate_cg_offsets[lane_idx - 16] = cell_contents.x;
+      }
+      wu_data = (cell_contents.y >> 16);
+    }
     
+    // Compute both prefix sums simultaneously using the layout of tower and plate cells presented
+    // in the original work unit.
+    const int tgx = (lane_idx & 0xf);
+    wu_data += ((tgx &  1) ==  1) * __shfl_up_sync(0xffffffff, wu_data, 1, 32);
+    wu_data += ((tgx &  3) ==  3) * __shfl_up_sync(0xffffffff, wu_data, 2, 32);
+    wu_data += ((tgx &  7) ==  7) * __shfl_up_sync(0xffffffff, wu_data, 4, 32);
+    wu_data += (tgx == 15) * __shfl_up_sync(0xffffffff, wu_data, 8, 32);
+    wu_data += ((tgx &  7) == 3 && tgx > 8)  * __shfl_up_sync(0xffffffff, wu_data, 4, 32);
+    wu_data += ((tgx &  3) == 1 && tgx > 4)  * __shfl_up_sync(0xffffffff, wu_data, 2, 32);
+    wu_data += ((tgx &  1) == 0 && tgx >= 2) * __shfl_up_sync(0xffffffff, wu_data, 1, 32);
+    if (lane_idx <= 5) {
+      tower_prefix_sum[lane_idx] = wu_data;
+    }
+    else if (lane_idx >= 16 && lane_idx <= 28) {
+      plate_prefix_sum[lane_idx - 16] = wu_data;
+    }
     
     // Loop over all tower atoms, taking batches of "sending" atoms, then make a nested loop over
     // all batches of atoms in the plate.
+    for (int i = tower_base_pos; i < tower_prefix_sum[5]; i += warp_size_int * ctrl.nt_warp_mult) {
+
+      // Begin by initializing the sending atoms' force accumulators.
+      sending_xfrc[threadIdx.x] = (TACC)(0);
+      sending_yfrc[threadIdx.x] = (TACC)(0);
+      sending_zfrc[threadIdx.x] = (TACC)(0);
+#  ifdef LARGE_CHIP_CACHE
+      sending_xfrc_ovrf[threadIdx.x] = 0;
+      sending_yfrc_ovrf[threadIdx.x] = 0;
+      sending_zfrc_ovrf[threadIdx.x] = 0;
+#  else
+      tlpn.xfrc_ovrf[(blockIdx.x * blockDim.x) + threadIdx.x] = 0;
+      tlpn.yfrc_ovrf[(blockIdx.x * blockDim.x) + threadIdx.x] = 0;
+      tlpn.zfrc_ovrf[(blockIdx.x * blockDim.x) + threadIdx.x] = 0;
+#  endif      
+      // If there are more than 24 atoms in this tower batch, use the full warp.  Otherwise,
+      // seed the warp with groups of 16 or 8 atoms in order to complete the batch.
+      uint iatom_seek;
+      if (tower_prefix_sum[5] - i > three_quarter_warp_size_int) {
+
+        // Take the full warp.
+        iatom_seek = i + lane_idx;
+        if (lane_idx == 0) {
+          base_tile_depth[warp_idx] = warp_size_int;
+          base_plan_idx[warp_idx] = 0;
+        }
+      }
+      else if (tower_prefix_sum[5] - i > quarter_warp_size_int) {
+
+        // Take up to sixteen atoms and duplicate them over the warp.  If there are more than
+        // sixteen atoms left to do, the loop control variable will backtrack by 16 in order to
+        // sweep up the remainder of the tower batch.
+        iatom_seek = i + (lane_idx & 0xf);
+        if (lane_idx == 0) {
+          base_tile_depth[warp_idx] = half_warp_size_int;
+          base_plan_idx[warp_idx] = 3;
+        }
+      }
+      else {
+
+        // Take up to eight atoms and replicate them four times over the warp.
+        iatom_seek = i + (lane_idx & 0x7);
+        if (lane_idx == 0) {
+          base_tile_depth[warp_idx] = quarter_warp_size_int;
+          base_plan_idx[warp_idx] = 6;
+        }
+      }
+
+      // Because the non-bonded parameters of the sending atoms will not be stored in __shared__
+      // memory on cards with less than 64kB __shared__ resources available, these variables must
+      // be allocated on a per-thread basis prior to taking in data from the neighbor list.
+      TCALC sending_q;
+      int sending_ljidx, tmp_snd_topl_idx, tmp_snd_prof_idx;
+      uint tmp_snd_img_idx;
+      TCALC tmp_snd_xcrd, tmp_snd_ycrd, tmp_snd_zcrd;
+      
+      // Each atom can be located to within one of the five cells of the tower with a series of
+      // three conditional tests (four if dual cell grids are in use).  Read critical markers
+      // temporarily into registers to prevent a possible traffic jam that would happen if many
+      // threads try to access the same __shared__ memory bank simultanoeously.
+      const int tprfx_1 = tower_prefix_sum[1];
+      const int tprfx_2 = tower_prefix_sum[2];
+      const int tprfx_3 = tower_prefix_sum[3];
+      const int tprfx_4 = tower_prefix_sum[4];
+      if (iatom_seek >= tower_prefix_sum[5]) {
+#  ifdef DUAL_GRIDS
+        const TCALC fake_pos = (warp_on_qq[warp_idx]) ? (TCALC)(8 + lane_idx) * ctrl.elec_cut :
+                                                        (TCALC)(8 + lane_idx) * ctrl.vdw_cut;
+#  else
+        const TCALC fake_pos = (TCALC)(5 + lane_idx) * ctrl.vdw_cut;
+#  endif
+        tmp_snd_xcrd = fake_pos;
+        tmp_snd_ycrd = fake_pos;
+        tmp_snd_zcrd = fake_pos;
+        tmp_snd_topl_idx = 0;
+        tmp_snd_prof_idx = 0;
+        sending_ljidx = 0;
+        sending_q = (TCALC)(0.0);
+        tmp_snd_img_idx = 0xffffffff;
+      }
+      else {
+        TCOORD zc_moves;
+        if (iatom_seek < tprfx_2) {
+          if (iatom_seek < tprfx_1) {
+            tmp_snd_img_idx = tower_cg_offsets[0] + iatom_seek;
+            zc_moves = (TCOORD)(-2);
+          }
+          else {
+            tmp_snd_img_idx = tower_cg_offsets[1] + iatom_seek - tprfx_1;
+            zc_moves = (TCOORD)(-1);
+          }
+        }
+        else if (iatom_seek >= tprfx_3) {
+          if (iatom_seek < tprfx_4) {
+            tmp_snd_img_idx = tower_cg_offsets[3] + iatom_seek - tprfx_3;
+            zc_moves = (TCOORD)(1);
+          }
+          else {
+            tmp_snd_img_idx = tower_cg_offsets[4] + iatom_seek - tprfx_4;
+            zc_moves = (TCOORD)(2);
+          }
+        }
+        else {
+          tmp_snd_img_idx = tower_cg_offsets[2] + iatom_seek - tprfx_2;
+          zc_moves = (TCOORD)(0);
+        }
+
+        // On CUDA acrchitectures, the transform stride will be one warp's size
+        const size_t cinvu_idx = system_idx[warp_idx] * warp_size_int;
+#  ifdef DUAL_GRIDS
+        if (warp_on_qq[warp_idx]) {
+          tmp_snd_topl_idx = __ldg(&cgw_qq.nonimg_atom_idx[tmp_snd_img_idx]);
+          tmp_snd_prof_idx = __ldg(&lemr.prof_idx[tmp_snd_topl_idx]);
+#    ifdef TCOORD_IS_LONG
+          const TCOORD4 crdq = cgw_qq.image[tmp_snd_img_idx];
+#    else
+          const TCOORD4 crdq = __ldg(&cgw_qq.image[tmp_snd_img_idx]);
+#    endif
+          tmp_snd_xcrd = crdq.x + (zc_moves * cgw_qq.system_cell_invu[cinvu_idx + 6]);
+          tmp_snd_ycrd = crdq.y + (zc_moves * cgw_qq.system_cell_invu[cinvu_idx + 7]);
+          tmp_snd_zcrd = crdq.z + (zc_moves * cgw_qq.system_cell_invu[cinvu_idx + 8]);
+#    ifdef TCOORD_IS_REAL
+          sending_q = crdq.w;
+#    else
+#      ifdef TCOORD_IS_LONG
+          sending_q = __longlong_as_double(crdq.w);
+#      else
+          sending_q = __int_as_float(crdq.w);
+#      endif
+#    endif
+        }
+        else {
+          tmp_snd_topl_idx = __ldg(&cgw_lj.nonimg_atom_idx[tmp_snd_img_idx]);
+          tmp_snd_prof_idx = __ldg(&lemr.prof_idx[tmp_snd_topl_idx]);
+#ifdef TCOORD_IS_LONG
+          const TCOORD4 crdq = cgw_lj.image[tmp_snd_img_idx];
+#else
+          const TCOORD4 crdq = __ldg(&cgw_lj.image[tmp_snd_img_idx]);
+#endif
+          tmp_snd_xcrd = crdq.x + (zc_moves * cgw_lj.system_cell_invu[cinvu_idx + 6]);
+          tmp_snd_ycrd = crdq.y + (zc_moves * cgw_lj.system_cell_invu[cinvu_idx + 7]);
+          tmp_snd_zcrd = crdq.z + (zc_moves * cgw_lj.system_cell_invu[cinvu_idx + 8]);
+#    ifdef TCOORD_IS_REAL
+#      ifdef TCOORD_IS_LONG
+          sending_ljidx = __double_as_longlong(crdq.w);
+#      else
+          sending_ljidx = __float_as_int(crdq.w);
+#      endif
+#    else
+          sending_ljidx = crdq.w;
+#    endif
+        }
+#  else // DUAL_GRIDS
+        tmp_snd_topl_idx = __ldg(&cgw.nonimg_atom_idx[tmp_snd_img_idx]);
+        tmp_snd_prof_idx = __ldg(&lemr.prof_idx[tmp_snd_topl_idx]);
+#    ifdef TCOORD_IS_LONG
+        const TCOORD4 crdq = cgw.image[tmp_snd_img_idx];
+#    else
+        const TCOORD4 crdq = __ldg(&cgw.image[tmp_snd_img_idx]);
+#    endif
+        tmp_snd_xcrd = crdq.x + (zc_moves * cgw.system_cell_invu[cinvu_idx + 6]);
+        tmp_snd_ycrd = crdq.y + (zc_moves * cgw.system_cell_invu[cinvu_idx + 7]);
+        tmp_snd_zcrd = crdq.z + (zc_moves * cgw.system_cell_invu[cinvu_idx + 8]);
+
+        // A single cell grid will be expected to record both electrostatic and van-der Waals
+        // parameters for the atoms.  The choice of one or two cell grids is thereby unrolling the
+        // theme enumeration of the cell grid.
+#    ifdef TCOORD_IS_REAL
+#      ifdef TCOORD_IS_LONG
+        const llint fused_param_idx = __double_as_longlong(crdq.w);
+        sending_q     = __ldca(&poly_nbk.q_params[(fused_param_idx & dp_charge_index_mask)]);
+        sending_ljidx = (fused_param_idx >> dp_charge_index_bits);
+#      else
+        const int fused_param_idx = __float_as_int(crdq.w);
+        sending_q     = __ldca(&poly_nbk.q_params[(fused_param_idx & sp_charge_index_mask)]);
+        sending_ljidx = (fused_param_idx >> sp_charge_index_bits);
+#      endif
+#    else
+#      ifdef TCOORD_IS_LONG
+        sending_q     = __ldca(&poly_nbk.q_params[(crdq.w & dp_charge_index_mask)]);
+        sending_ljidx = (crdq.w >> dp_charge_index_bits);
+#      else
+        sending_q     = __ldca(&poly_nbk.q_params[(crdq.w & sp_charge_index_mask)]);
+        sending_ljidx = (crdq.w >> sp_charge_index_bits);
+#      endif
+#    endif
+        // Modify the Lennard-Jones (van-der Waals) parameter index with the correct offset in
+        // the synthesis compilation of tables.  Modify the charge parameter by folding in
+        // Coulomb's constant at this stage.  These modifications will not need to be applied to
+        // atoms of the plate.
+        const int sys_idx = system_idx[warp_idx];
+        sending_ljidx = (sending_ljidx * __ldca(&poly_nbk.n_lj_types[sys_idx])) +
+                        __ldca(&poly_nbk.ljabc_offsets[sys_idx]);
+        sending_q *= poly_nbk.coulomb;
+#  endif
+#  ifndef TCOORD_IS_REAL
+        // The __shared__ memory arrays will have converted the coordinates to TCALC type, which
+        // will be either float or double.  Rescale the results according to the cell grid's
+        // internal coordinate factor.
+#    ifdef DUAL_GRIDS
+        if (warp_on_qq[warp_idx]) {
+          tmp_snd_xcrd *= cgw_qq.lpos_inv_scale;
+          tmp_snd_ycrd *= cgw_qq.lpos_inv_scale;
+          tmp_snd_zcrd *= cgw_qq.lpos_inv_scale;
+        }
+        else {
+          tmp_snd_xcrd *= cgw_lj.lpos_inv_scale;
+          tmp_snd_ycrd *= cgw_lj.lpos_inv_scale;
+          tmp_snd_zcrd *= cgw_lj.lpos_inv_scale;
+        }
+#    else
+        tmp_snd_xcrd *= cgw.lpos_inv_scale;
+        tmp_snd_ycrd *= cgw.lpos_inv_scale;
+        tmp_snd_zcrd *= cgw.lpos_inv_scale;
+#    endif
+#  endif
+      }
+
+      // Log the coordinates and paritcle indices of sending atoms in a warp-synchronous manner,
+      // as these __shared__memory accesses are well coalesced but branching can be avoided.
+      sending_xcrd[threadIdx.x] = tmp_snd_xcrd;
+      sending_ycrd[threadIdx.x] = tmp_snd_ycrd;
+      sending_zcrd[threadIdx.x] = tmp_snd_zcrd;
+      sending_img_idx[threadIdx.x] = tmp_snd_img_idx;
+      sending_topl_idx[threadIdx.x] = tmp_snd_topl_idx;
+      sending_prof_idx[threadIdx.x] = tmp_snd_prof_idx;
+
+      // Synchronize the warp to ensure that directives on the sending atom layout can guide
+      // further plan specialization.
+      SYNCWARP;
+
+      // Loop over all atoms of the plate.
+      for (int j = 0; j < plate_prefix_sum[12]; j += warp_size_int) {
+
+        // Determine any further subdivision of the tile based on the remaining number of plate
+        // atoms.
+        const int jbatch_size = plate_prefix_sum[12] - j;
+        int tile_depth, plan_idx;
+        if (jbatch_size > three_quarter_warp_size_int) {
+          tile_depth = base_tile_depth[warp_idx];
+          plan_idx = base_plan_idx[warp_idx];
+        }
+        else if (jbatch_size > quarter_warp_size_int) {
+          tile_depth = (base_tile_depth[warp_idx] >> 1);
+          plan_idx = base_plan_idx[warp_idx] + 1;
+        }
+        else {
+          tile_depth = (base_tile_depth[warp_idx] >> 2);
+          plan_idx = base_plan_idx[warp_idx] + 2;
+        }
+
+        // Read atomic coordinates and properties for the receiving atoms.
+        TCALC recv_xcrd, recv_ycrd, recv_zcrd, recv_q;
+        int recv_ljidx, recv_topl_idx;
+        uint jatom_seek = j + __ldca(&tlpn.read_assign[(plan_idx * warp_size_int) + lane_idx]);
+        if (jatom_seek >= plate_prefix_sum[12]) {
+#  ifdef DUAL_GRIDS
+          const TCALC fake_pos = (warp_on_qq[warp_idx]) ? (TCALC)(8 + lane_idx) * ctrl.elec_cut :
+                                                          (TCALC)(8 + lane_idx) * ctrl.vdw_cut;
+#  else
+          const TCALC fake_pos = (TCALC)(5 + lane_idx) * ctrl.vdw_cut;
+#  endif
+          recv_xcrd = fake_pos;
+          recv_ycrd = fake_pos;
+          recv_zcrd = fake_pos;
+          recv_ljidx = 0;
+          recv_q = (TCALC)(0.0);
+          recv_topl_idx = 0;
+          jatom_seek = 0xffffffff;
+        }
+        else {
+          int lguess = 0;
+          int hguess = 12;
+          bool found;
+          int mguess = ((hguess + lguess) >> 1);
+          do {
+            if (jatom_seek < plate_prefix_sum[mguess]) {
+              hguess = mguess;
+              found = false;
+            }
+            else if (jatom_seek < plate_prefix_sum[mguess + 1]) {
+              found = true;
+            }
+            else {
+              lguess = mguess;
+              found = false;
+            }
+            mguess = ((hguess + lguess) >> 1);
+          } while (! found);
+          const uint img_idx = plate_cg_offsets[mguess] + jatom_seek - plate_prefix_sum[mguess];
+          recving_img_idx[threadIdx.x] = img_idx;
+          const int mg_row = mguess / 5;
+          const TCOORD yc_moves = (TCOORD)(mg_row - 2);
+          const TCOORD xc_moves = (TCOORD)(mguess - (mg_row * 5) - 2);
+          const size_t cinvu_idx = system_idx[warp_idx] * warp_size_int;
+#  ifdef DUAL_GRIDS
+          if (warp_on_qq[warp_idx]) {
+#    ifdef TCOORD_IS_LONG
+            const TCOORD4 crdq = cgw_qq.image[img_idx];
+#    else
+            const TCOORD4 crdq = __ldg(&cgw_qq.image[img_idx]);
+#    endif
+            recv_topl_idx = __ldg(&cgw_qq.nonimg_atom_idx[img_idx]);
+            recv_xcrd = crdq.x + (xc_moves * cgw_qq.system_cell_invu[cinvu_idx + 0]) +
+                                 (yc_moves * cgw_qq.system_cell_invu[cinvu_idx + 3]);
+            recv_ycrd = crdq.y + (xc_moves * cgw_qq.system_cell_invu[cinvu_idx + 1]) +
+                                 (yc_moves * cgw_qq.system_cell_invu[cinvu_idx + 4]);
+            recv_zcrd = crdq.z + (xc_moves * cgw_qq.system_cell_invu[cinvu_idx + 2]) +
+                                 (yc_moves * cgw_qq.system_cell_invu[cinvu_idx + 5]);
+#    ifdef TCOORD_IS_REAL
+            recv_q = crdq.w;
+#    else
+#      ifdef TCOORD_IS_LONG
+            recv_q = __longlong_as_double(crdq.w);
+#      else
+            recv_q = __int_as_float(crdq.w);
+#      endif
+#    endif
+          }
+          else {
+#    ifdef TCOORD_IS_LONG
+            const TCOORD4 crdq = cgw_lj.image[img_idx];
+#    else
+            const TCOORD4 crdq = __ldg(&cgw_lj.image[img_idx]);
+#    endif
+            recv_topl_idx = __ldg(&cgw_lj.nonimg_atom_idx[img_idx]);
+            recv_xcrd = crdq.x + (xc_moves * cgw_lj.system_cell_invu[cinvu_idx + 0]) +
+                                 (yc_moves * cgw_lj.system_cell_invu[cinvu_idx + 3]);
+            recv_ycrd = crdq.y + (xc_moves * cgw_lj.system_cell_invu[cinvu_idx + 1]) +
+                                 (yc_moves * cgw_lj.system_cell_invu[cinvu_idx + 4]);
+            recv_zcrd = crdq.z + (xc_moves * cgw_lj.system_cell_invu[cinvu_idx + 2]) +
+                                 (yc_moves * cgw_lj.system_cell_invu[cinvu_idx + 5]);
+#    ifdef TCOORD_IS_REAL
+#      ifdef TCOORD_IS_LONG
+            recv_ljidx = __double_as_longlong(crdq.w);
+#      else
+            recv_ljidx = __float_as_int(crdq.w);
+#      endif
+#    else
+            recv_ljidx = crdq.w;
+#    endif
+          }
+#  else // DUAL_GRIDS
+#    ifdef TCOORD_IS_LONG
+          const TCOORD4 crdq = cgw.image[img_idx];
+#    else
+          const TCOORD4 crdq = __ldg(&cgw.image[img_idx]);
+#    endif
+          recv_topl_idx = __ldg(&cgw.nonimg_atom_idx[img_idx]);
+          recv_xcrd = crdq.x + (xc_moves * cgw.system_cell_invu[cinvu_idx + 0]) +
+                               (yc_moves * cgw.system_cell_invu[cinvu_idx + 3]);
+          recv_ycrd = crdq.y + (xc_moves * cgw.system_cell_invu[cinvu_idx + 1]) +
+                               (yc_moves * cgw.system_cell_invu[cinvu_idx + 4]);
+          recv_zcrd = crdq.z + (xc_moves * cgw.system_cell_invu[cinvu_idx + 2]) +
+                               (yc_moves * cgw.system_cell_invu[cinvu_idx + 5]);
+#    ifdef TCOORD_IS_REAL
+#      ifdef TCOORD_IS_LONG
+          const llint fused_param_idx = __double_as_longlong(crdq.w);
+          recv_q     = __ldca(&poly_nbk.q_params[(fused_param_idx & dp_charge_index_mask)]);
+          recv_ljidx = (fused_param_idx >> dp_charge_index_bits);
+#      else
+          const int fused_param_idx = __float_as_int(crdq.w);
+          recv_q     = __ldca(&poly_nbk.q_params[(fused_param_idx & sp_charge_index_mask)]);
+          recv_ljidx = (fused_param_idx >> sp_charge_index_bits);
+#      endif
+#    else
+#      ifdef TCOORD_IS_LONG
+          recv_q     = __ldca(&poly_nbk.q_params[(crdq.w & dp_charge_index_mask)]);
+          recv_ljidx = (crdq.w >> dp_charge_index_bits);
+#      else
+          recv_q     = __ldca(&poly_nbk.q_params[(crdq.w & sp_charge_index_mask)]);
+          recv_ljidx = (crdq.w >> sp_charge_index_bits);
+#      endif
+#    endif
+#  endif // DUAL_GRIDS
+#  ifndef TCOORD_IS_REAL
+#    ifdef DUAL_GRIDS
+          if (warp_on_qq[warp_idx]) {
+            recv_xcrd *= cgw_qq.lpos_inv_scale;
+            recv_ycrd *= cgw_qq.lpos_inv_scale;
+            recv_zcrd *= cgw_qq.lpos_inv_scale;
+          }
+          else {
+            recv_xcrd *= cgw_lj.lpos_inv_scale;
+            recv_ycrd *= cgw_lj.lpos_inv_scale;
+            recv_zcrd *= cgw_lj.lpos_inv_scale;
+          }
+#    else
+          recv_xcrd *= cgw.lpos_inv_scale;
+          recv_ycrd *= cgw.lpos_inv_scale;
+          recv_zcrd *= cgw.lpos_inv_scale;
+#    endif
+#  endif // TCOORD_IS_REAL
+        }
+        
+        // Proceed to iterate the tile for the proper number of iterations.  Begin by computing
+        // the interaction between the sending and receiving atoms that each thread has at hand.
+        // Then, if the the loop control variable k has not yet reached the target, take the
+        // receiving atom, its parameters and accumulated forces, from the next thread higher
+        // (wrapping according to the warp subdivision determined by the receiving atoms).  The
+        // final shuffle of receiving atoms will be coded to have the receiving atoms end up in a
+        // state suitable for reducing the accumulated forces.
+        TCALC send_fx = (TCALC)(0.0);
+        TCALC send_fy = (TCALC)(0.0);
+        TCALC send_fz = (TCALC)(0.0);
+        TCALC recv_fx = (TCALC)(0.0);
+        TCALC recv_fy = (TCALC)(0.0);
+        TCALC recv_fz = (TCALC)(0.0);
+#  ifdef DUAL_GRIDS
+        if (warp_on_qq[warp_idx]) {
+          for (int k = 0; k < tile_depth; k++) {
+
+            // Determine the exclusion status.  This can produce a momentary spike in register
+            // usage which is best handled prior to computing other derived quantities for the
+            // particle pair.
+            const ullint excl_mask = __ldca(&lemr.profiles[sending_prof_idx[threadIdx.x]]);
+            const uint lkp_advance = devcEvaluateLocalMask(sending_topl_idx[threadIdx.x],
+                                                           recv_topl_idx, excl_mask,
+                                                           lemr.aux_masks) ?
+                                     nrg_tab.excl_offset : 0;
+                
+            // Compute the interaction between the atoms.
+            const TCALC dx = recv_xcrd - sending_xcrd[threadIdx.x];
+            const TCALC dy = recv_ycrd - sending_ycrd[threadIdx.x];
+            const TCALC dz = recv_zcrd - sending_zcrd[threadIdx.x]; 
+            const TCALC r2 = (dx * dx) + (dy * dy) + (dz * dz);
+            if (r2 < ctrl.elec_cut_sq) {
+              const TCALC qq = recv_q * sending_q;
+#    ifdef TCALC_IS_SINGLE
+              const uint spl_idx = (__float_as_uint(r2) >> nrg_tab.index_shift_bits) + lkp_advance;
+#    else
+              const uint spl_idx = (__double_as_longlong(r2) >> nrg_tab.index_shift_bits) +
+                                   lkp_advance;
+#    endif
+              const TCALC4 coef = nrg_tab.force[spl_idx];
+              const TCALC invr2 = (TCALC)(1.0) / r2;
+              const TCALC fmag = qq * ((r2 * coef.x) + coef.y +
+                                       (((invr2 * coef.w) + coef.z) * invr2));
+              send_fx += fmag * dx;
+              send_fy += fmag * dy;
+              send_fz += fmag * dz;
+              recv_fx -= fmag * dx;
+              recv_fy -= fmag * dy;
+              recv_fz -= fmag * dz;
+            }
+
+            // Move the receiving atoms, their properties, and their accumulated forces one thread
+            // to the left.  Depending on the replication of the receiving atoms the index may need
+            // adjustment.
+            const int next_thread = ((lane_idx + 1) & warp_bits_mask_int);
+            recv_xcrd = SHFL(recv_xcrd, next_thread);
+            recv_ycrd = SHFL(recv_ycrd, next_thread);
+            recv_zcrd = SHFL(recv_zcrd, next_thread);
+            recv_fx = SHFL(recv_fx, next_thread);
+            recv_fy = SHFL(recv_fy, next_thread);
+            recv_fz = SHFL(recv_fz, next_thread);
+            recv_q = SHFL(recv_q, next_thread);
+            recv_topl_idx = SHFL(recv_topl_idx, next_thread);
+          }
+        }
+        else {
+          for (int k = 0; k < tile_depth; k++) {
+
+            // Determine the exclusion status.  This can produce a momentary spike in register
+            // usage which is best handled prior to computing other derived quantities for the
+            // particle pair.
+            const ullint excl_mask = __ldca(&lemr.profiles[sending_prof_idx[threadIdx.x]]);
+            const bool is_excl = devcEvaluateLocalMask(sending_topl_idx[threadIdx.x],
+                                                       recv_topl_idx, excl_mask, lemr.aux_masks);
+            const TCALC dx = recv_xcrd - sending_xcrd[threadIdx.x];
+            const TCALC dy = recv_ycrd - sending_ycrd[threadIdx.x];
+            const TCALC dz = recv_zcrd - sending_zcrd[threadIdx.x]; 
+            const TCALC r2 = (dx * dx) + (dy * dy) + (dz * dz);
+            if (r2 < ctrl.vdw_cut_sq && (! is_excl)) {
+              const int klj_idx = sending_ljidx + recv_ljidx;
+              const TCALC lja = __ldca(&poly_nbk.lja_coeff[klj_idx]);
+              const TCALC ljb = __ldca(&poly_nbk.ljb_coeff[klj_idx]);
+              const TCALC invr2 = (TCALC)(1.0) / r2;
+              const TCALC invr4 = invr2 * invr2;
+              const TCALC fmag = (((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) *
+                                 invr4 * invr4;
+              send_fx += fmag * dx;
+              send_fy += fmag * dy;
+              send_fz += fmag * dz;
+              recv_fx -= fmag * dx;
+              recv_fy -= fmag * dy;
+              recv_fz -= fmag * dz;
+            }
+            const int next_thread = ((lane_idx + 1) & warp_bits_mask_int);
+            recv_xcrd = SHFL(recv_xcrd, next_thread);
+            recv_ycrd = SHFL(recv_ycrd, next_thread);
+            recv_zcrd = SHFL(recv_zcrd, next_thread);
+            recv_fx = SHFL(recv_fx, next_thread);
+            recv_fy = SHFL(recv_fy, next_thread);
+            recv_fz = SHFL(recv_fz, next_thread);
+            recv_ljidx = SHFL(recv_ljidx, next_thread);
+            recv_topl_idx = SHFL(recv_topl_idx, next_thread);
+          }
+        }
+#  else // DUAL_GRIDS
+        for (int k = 0; k < tile_depth; k++) {
+
+          // Determine the exclusion status.  This can produce a momentary spike in register
+          // usage which is best handled prior to computing other derived quantities for the
+          // particle pair.
+          const ullint excl_mask = __ldca(&lemr.profiles[sending_prof_idx[threadIdx.x]]);
+          const uint lkp_advance = devcEvaluateLocalMask(sending_topl_idx[threadIdx.x],
+                                                         recv_topl_idx, excl_mask,
+                                                         lemr.aux_masks) ?
+                                   nrg_tab.excl_offset : 0;
+          const TCALC dx = recv_xcrd - sending_xcrd[threadIdx.x];
+          const TCALC dy = recv_ycrd - sending_ycrd[threadIdx.x];
+          const TCALC dz = recv_zcrd - sending_zcrd[threadIdx.x]; 
+          const TCALC r2 = (dx * dx) + (dy * dy) + (dz * dz);
+          if (r2 < ctrl.vdw_cut_sq) {
+            const TCALC qq = recv_q * sending_q;
+#    ifdef TCALC_IS_SINGLE
+            const uint spl_idx = (__float_as_uint(r2) >> nrg_tab.index_shift_bits) + lkp_advance;
+#    else
+            const uint spl_idx = (__double_as_longlong(r2) >> nrg_tab.index_shift_bits) +
+                                 lkp_advance;
+#    endif
+            const TCALC4 coef = nrg_tab.force[spl_idx];
+            const TCALC invr2 = (TCALC)(1.0) / r2;
+            TCALC fmag = qq * ((r2 * coef.x) + coef.y + (((invr2 * coef.w) + coef.z) * invr2));
+            const int klj_idx = sending_ljidx + recv_ljidx;
+            const TCALC lja = __ldca(&poly_nbk.lja_coeff[klj_idx]);
+            const TCALC ljb = __ldca(&poly_nbk.ljb_coeff[klj_idx]);
+            const TCALC invr4 = invr2 * invr2;
+
+            // Use the fact that the table lookup advancement will be zero for non-excluded
+            // interactions.
+            fmag += (((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) *
+                    invr4 * invr4 * (TCALC)(lkp_advance == 0);
+            send_fx += fmag * dx;
+            send_fy += fmag * dy;
+            send_fz += fmag * dz;
+            recv_fx -= fmag * dx;
+            recv_fy -= fmag * dy;
+            recv_fz -= fmag * dz;
+          }
+          const int next_thread = ((lane_idx + 1) & warp_bits_mask_int);
+          recv_xcrd = SHFL(recv_xcrd, next_thread);
+          recv_ycrd = SHFL(recv_ycrd, next_thread);
+          recv_zcrd = SHFL(recv_zcrd, next_thread);
+          recv_fx = SHFL(recv_fx, next_thread);
+          recv_fy = SHFL(recv_fy, next_thread);
+          recv_fz = SHFL(recv_fz, next_thread);
+          recv_q = SHFL(recv_q, next_thread);
+          recv_ljidx = SHFL(recv_ljidx, next_thread);
+          recv_topl_idx = SHFL(recv_topl_idx, next_thread);
+        }
+#  endif // DUAL_GRIDS
+        
+        // Reduce the accumulated forces on receiving atoms, if required, and commit the results
+        // to global arrays by atomic operations.  The cell grid indices of each atom were stored
+        // in __shared__ arrays to reduce register pressure.  Calculate the appropriate index to
+        // read the cell grid index for.  The cell grid index is just like any other parameter, and
+        // however the receiving atoms are replicated the first batch of N unique atoms proceeds
+        // in order for threads 0, 1, ..., N-1.  Therefore, look at these indices of the __shared__
+        // array to obtain the cell grid indices for the reduced forces on N unique atoms.
+        int reorg_idx, reduction_steps;
+        if (jbatch_size > three_quarter_warp_size_int) {
+          reorg_idx = base_plan_idx[warp_idx];
+          reduction_steps = 0;
+        }
+        else if (jbatch_size > quarter_warp_size_int) {
+          reorg_idx = base_plan_idx[warp_idx] + 1;
+          reduction_steps = 1;
+        }
+        else {
+          reorg_idx = base_plan_idx[warp_idx] + 2;
+          reduction_steps = 2;
+        }
+        const int reduce_lane = __ldca(&tlpn.reduce_prep[(reorg_idx * warp_size_int) + lane_idx]);
+        recv_fx = SHFL(recv_fx, reduce_lane);
+        recv_fy = SHFL(recv_fy, reduce_lane);
+        recv_fz = SHFL(recv_fz, reduce_lane);
+        int lane_max;
+        if (reduction_steps == 1) {
+          lane_max = half_warp_size_int;
+          recv_fx = SHFL(recv_fx, lane_idx + half_warp_size_int);
+          recv_fy = SHFL(recv_fy, lane_idx + half_warp_size_int);
+          recv_fz = SHFL(recv_fz, lane_idx + half_warp_size_int);
+        }
+        else if (reduction_steps == 2) {
+          lane_max = quarter_warp_size_int;
+          recv_fx = SHFL(recv_fx, lane_idx + half_warp_size_int);
+          recv_fy = SHFL(recv_fy, lane_idx + half_warp_size_int);
+          recv_fz = SHFL(recv_fz, lane_idx + half_warp_size_int);
+          recv_fx = SHFL(recv_fx, lane_idx + quarter_warp_size_int);
+          recv_fy = SHFL(recv_fy, lane_idx + quarter_warp_size_int);
+          recv_fz = SHFL(recv_fz, lane_idx + quarter_warp_size_int);
+        }
+        else {
+          lane_max = warp_size_int;
+        }
+#  ifdef DUAL_GRIDS
+        const TCALC frc_scale = (warp_on_qq[warp_idx]) ? cgw_qq.frc_scale : cgw_lj.frc_scale;
+#  else
+        const TCALC frc_scale = cgw.frc_scale;
+#  endif
+        if (lane_idx < lane_max) {
+          const size_t img_idx = recving_img_idx[threadIdx.x];
+#  ifdef DUAL_GRIDS
+          if (warp_on_qq[warp_idx]) {
+            atomicSplit(recv_fx * frc_scale, img_idx, cgw_qq.xfrc, cgw_qq.xfrc_ovrf);
+            atomicSplit(recv_fy * frc_scale, img_idx, cgw_qq.yfrc, cgw_qq.yfrc_ovrf);
+            atomicSplit(recv_fz * frc_scale, img_idx, cgw_qq.zfrc, cgw_qq.zfrc_ovrf);
+          }
+          else {
+            atomicSplit(recv_fx * frc_scale, img_idx, cgw_lj.xfrc, cgw_lj.xfrc_ovrf);
+            atomicSplit(recv_fy * frc_scale, img_idx, cgw_lj.yfrc, cgw_lj.yfrc_ovrf);
+            atomicSplit(recv_fz * frc_scale, img_idx, cgw_lj.zfrc, cgw_lj.zfrc_ovrf);
+          }
+#  else
+          atomicSplit(recv_fx * frc_scale, img_idx, cgw.xfrc, cgw.xfrc_ovrf);
+          atomicSplit(recv_fy * frc_scale, img_idx, cgw.yfrc, cgw.yfrc_ovrf);
+          atomicSplit(recv_fz * frc_scale, img_idx, cgw.zfrc, cgw.zfrc_ovrf);
+#  endif
+        }
+        
+        // Hold on reducing the forces on sending atoms until all receiving atoms have been
+        // processed.  Commit results to local accumulators.
+#  ifndef LARGE_CHIP_CACHE
+        const int gbl_cache_pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+#  endif
+#  ifdef TCALC_IS_SINGLE
+#    ifdef LARGE_CHIP_CACHE
+        const int2 ifx = int63Sum(sending_xfrc[threadIdx.x], sending_xfrc_ovrf[threadIdx.x],
+                                  send_fx * frc_scale);
+        const int2 ify = int63Sum(sending_yfrc[threadIdx.x], sending_yfrc_ovrf[threadIdx.x],
+                                  send_fy * frc_scale);
+        const int2 ifz = int63Sum(sending_zfrc[threadIdx.x], sending_zfrc_ovrf[threadIdx.x],
+                                  send_fz * frc_scale);
+#    else
+        const int2 ifx = int63Sum(sending_xfrc[threadIdx.x], tlpn.xfrc_ovrf[gbl_cache_pos],
+                                  send_fx * frc_scale);
+        const int2 ify = int63Sum(sending_yfrc[threadIdx.x], tlpn.yfrc_ovrf[gbl_cache_pos],
+                                  send_fy * frc_scale);
+        const int2 ifz = int63Sum(sending_zfrc[threadIdx.x], tlpn.zfrc_ovrf[gbl_cache_pos],
+                                  send_fz * frc_scale);
+#    endif
+#  else
+#    ifdef LARGE_CHIP_CACHE
+        const int95_t ifx = int95Sum(sending_xfrc[threadIdx.x], sending_xfrc_ovrf[threadIdx.x],
+                                     send_fx * frc_scale);
+        const int95_t ify = int95Sum(sending_yfrc[threadIdx.x], sending_yfrc_ovrf[threadIdx.x],
+                                     send_fy * frc_scale);
+        const int95_t ifz = int95Sum(sending_zfrc[threadIdx.x], sending_zfrc_ovrf[threadIdx.x],
+                                     send_fz * frc_scale);
+#    else
+        const int95_t ifx = int95Sum(sending_xfrc[threadIdx.x], tlpn.xfrc_ovrf[gbl_cache_pos],
+                                     send_fx * frc_scale);
+        const int95_t ify = int95Sum(sending_yfrc[threadIdx.x], tlpn.yfrc_ovrf[gbl_cache_pos],
+                                     send_fy * frc_scale);
+        const int95_t ifz = int95Sum(sending_zfrc[threadIdx.x], tlpn.zfrc_ovrf[gbl_cache_pos],
+                                     send_fz * frc_scale);
+#    endif
+#  endif
+        sending_xfrc[threadIdx.x] = ifx.x;
+        sending_yfrc[threadIdx.x] = ify.x;
+        sending_zfrc[threadIdx.x] = ifz.x;
+#  ifdef LARGE_CHIP_CACHE
+        sending_xfrc_ovrf[threadIdx.x] = ifx.y;
+        sending_yfrc_ovrf[threadIdx.x] = ify.y;
+        sending_zfrc_ovrf[threadIdx.x] = ifz.y;
+#  else
+        tlpn.xfrc_ovrf[gbl_cache_pos] = ifx.y;
+        tlpn.yfrc_ovrf[gbl_cache_pos] = ify.y;
+        tlpn.zfrc_ovrf[gbl_cache_pos] = ifz.y;
+#  endif
+        // Again set the loop control variable back if there were between half and three quarters
+        // of a batch available.
+        const int jbatch_size_ii = plate_prefix_sum[12] - j;
+        if (jbatch_size_ii > half_warp_size_int && jbatch_size_ii <= three_quarter_warp_size_int) {
+          j -= half_warp_size_int;
+        }
+      }
+
+      // Reduce the accumulated forces on sending atoms, if required.  Commit the results to
+      // global arrays by atomic operations.
+#  ifndef LARGE_CHIP_CACHE
+      const size_t gbl_cache_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+#  endif
+#  ifdef TCALC_IS_SINGLE
+#    ifdef LARGE_CHIP_CACHE
+      int2 send_ifx = { sending_xfrc[threadIdx.x], sending_xfrc_ovrf[threadIdx.x] };
+      int2 send_ify = { sending_yfrc[threadIdx.x], sending_yfrc_ovrf[threadIdx.x] };
+      int2 send_ifz = { sending_zfrc[threadIdx.x], sending_zfrc_ovrf[threadIdx.x] };
+#    else
+      int2 send_ifx = { sending_xfrc[threadIdx.x], tlpn.xfrc_ovrf[gbl_cache_idx] };
+      int2 send_ify = { sending_yfrc[threadIdx.x], tlpn.yfrc_ovrf[gbl_cache_idx] };
+      int2 send_ifz = { sending_zfrc[threadIdx.x], tlpn.zfrc_ovrf[gbl_cache_idx] };
+#    endif
+#  else
+#    ifdef LARGE_CHIP_CACHE
+      int95_t send_ifx = { sending_xfrc[threadIdx.x], sending_xfrc_ovrf[threadIdx.x] };
+      int95_t send_ify = { sending_yfrc[threadIdx.x], sending_yfrc_ovrf[threadIdx.x] };
+      int95_t send_ifz = { sending_zfrc[threadIdx.x], sending_zfrc_ovrf[threadIdx.x] };
+#    else
+      int95_t send_ifx = { sending_xfrc[threadIdx.x], tlpn.xfrc_ovrf[gbl_cache_idx] };
+      int95_t send_ify = { sending_yfrc[threadIdx.x], tlpn.yfrc_ovrf[gbl_cache_idx] };
+      int95_t send_ifz = { sending_zfrc[threadIdx.x], tlpn.zfrc_ovrf[gbl_cache_idx] };
+#    endif
+#  endif
+      const int snd_plan_idx = base_plan_idx[warp_idx];
+      int lane_max;
+      if (snd_plan_idx == 3) {
+        lane_max = half_warp_size_int;
+      }
+      else if (snd_plan_idx == 6) {
+        lane_max = quarter_warp_size_int;
+      }
+      else {
+        lane_max = warp_size_int;
+      }
+      for (int next_lane = half_warp_size_int; next_lane >= lane_max; (next_lane >>= 1)) {
+#ifdef TCALC_IS_SINGLE
+        const int2 lsnd_ifx = { SHFL(send_ifx.x, next_lane), SHFL(send_ifx.y, next_lane) };
+        const int2 lsnd_ify = { SHFL(send_ify.x, next_lane), SHFL(send_ify.y, next_lane) };
+        const int2 lsnd_ifz = { SHFL(send_ifz.x, next_lane), SHFL(send_ifz.y, next_lane) };
+#else
+        const int95_t lsnd_ifx = { SHFL(send_ifx.x, next_lane), SHFL(send_ifx.y, next_lane) };
+        const int95_t lsnd_ify = { SHFL(send_ify.x, next_lane), SHFL(send_ify.y, next_lane) };
+        const int95_t lsnd_ifz = { SHFL(send_ifz.x, next_lane), SHFL(send_ifz.y, next_lane) };
+#endif
+        send_ifx = splitFPSum(send_ifx, lsnd_ifx);
+        send_ify = splitFPSum(send_ify, lsnd_ify);
+        send_ifz = splitFPSum(send_ifz, lsnd_ifz);
+      }
+      const uint img_idx = sending_img_idx[threadIdx.x];
+      if (lane_idx < lane_max) {
+#ifdef DUAL_GRIDS
+        if (warp_on_qq[warp_idx]) {
+          atomicSplit(send_ifx, img_idx, cgw_qq.xfrc, cgw_qq.xfrc_ovrf);
+          atomicSplit(send_ify, img_idx, cgw_qq.yfrc, cgw_qq.yfrc_ovrf);
+          atomicSplit(send_ifz, img_idx, cgw_qq.zfrc, cgw_qq.zfrc_ovrf);
+        }
+        else {
+          atomicSplit(send_ifx, img_idx, cgw_lj.xfrc, cgw_lj.xfrc_ovrf);
+          atomicSplit(send_ify, img_idx, cgw_lj.yfrc, cgw_lj.yfrc_ovrf);
+          atomicSplit(send_ifz, img_idx, cgw_lj.zfrc, cgw_lj.zfrc_ovrf);
+        }
+#else
+        atomicSplit(send_ifx, img_idx, cgw.xfrc, cgw.xfrc_ovrf);
+        atomicSplit(send_ify, img_idx, cgw.yfrc, cgw.yfrc_ovrf);
+        atomicSplit(send_ifz, img_idx, cgw.zfrc, cgw.zfrc_ovrf);
+#endif
+      }
+
+      // Set the tower atom loop counter back if there are more atoms to do.  Because this will
+      // only be the case if this is the final batch of warp_size_int atoms, this will not leave
+      // the loop staggered the wrong way in subsequent iterations.
+      const int ibatch_size = tower_prefix_sum[5] - i;
+      if (ibatch_size > half_warp_size_int && ibatch_size <= three_quarter_warp_size_int) {
+        i -= half_warp_size_int + (warp_size_int * (ctrl.nt_warp_mult - 1));
+      }
+    }
 
     // Loop over all atoms in the central cell, first completing a self-interaction tile, then
     // completing tiles with any other atoms in the central cell, and finally completing tiles
     // with all atoms in the lower part of the tower.
+    
+#endif // STORMM_USE_CUDA
 
     // Increment the work unit counter.
+    SYNCWARP;
     if (lane_idx == 0) {
       const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
-      nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
+      warp_cell_counters[warp_idx] = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
     }
+    SYNCWARP;
 #ifdef DUAL_GRIDS
   }
 #else
   }
 #endif
-  
+
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.nbwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.nbwu_progress[threadIdx.x] = gridDim.x;
+    }
+  }
 }

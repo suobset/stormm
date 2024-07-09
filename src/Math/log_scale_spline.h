@@ -49,7 +49,7 @@ template <typename T4> struct LogSplineTable {
   ///        member variable.
   LogSplineTable(BasisFunctions basis_in, TableIndexing lookup_in, int detail_bits_in,
                  int index_bound_in, uint sp_detail_mask_in, ullint dp_detail_mask_in,
-                 const T4* table_in);
+                 const float arg_offset_in, const T4* table_in);
 
   /// \brief The const-ness of member variables implicitly deletes the copy and move assignment
   ///        operators, but the default copy and move constructors are valid.
@@ -62,11 +62,11 @@ template <typename T4> struct LogSplineTable {
   /// spline:
   ///
   /// U(x) = A f(x) + B g(x) + C h(x) + D v(x)
-  BasisFunctions basis;
+  const BasisFunctions basis;
 
   /// The method of transforming the argument of the underlying benchmark function into a table
   /// index for selecting the correct spline
-  TableIndexing lookup;
+  const TableIndexing lookup;
   
   /// The number of bits of the corresponding floating point format of the range argument.  For a
   /// double4 LogSplineTable, the range argument is double and the number of detail bits (on any
@@ -105,7 +105,7 @@ template <typename T4> struct LogSplineTable {
   /// benchmark function) indexes into the table.  Applied only if the indexing method is
   /// ARG_OFFSET or SQ_ARG_OFFSET.  Represented as a float, as it must be a small power of two and
   /// thus entails no loss of information to represent it in the shorter format.
-  const float idx_offset;
+  const float arg_offset;
   
   /// The table of cubic spline coefficients
   const T4* table;
@@ -492,6 +492,18 @@ private:
   void evaluateOverallError();
 };
 
+/// \brief Create the detail mask for a double-precision logarithmic spline table.
+///
+/// \param mantissa_bits  The number of bits, in addition to the exponent and sign bits, used to
+///                       encode the table index
+ullint doublePrecisionSplineDetailMask(int mantissa_bits);
+
+/// \brief Create the detail mask for a single-precision logarithmic spline table.
+///
+/// \param mantissa_bits  The number of bits, in addition to the exponent and sign bits, used to
+///                       encode the table index
+uint singlePrecisionSplineDetailMask(int mantissa_bits);
+  
 /// \brief Restore the templated type of a LogScaleSpline object's abstract.  Overloads of this
 ///        function handle type restoration in their respective objects.
 ///

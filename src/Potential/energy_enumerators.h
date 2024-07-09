@@ -208,6 +208,22 @@ enum class PMIStrategy {
   NO_AUTOMATION          ///< Do not use any automated settings.
 };
 
+/// \brief List the ways in which the neighbor list can be represented.
+enum class NeighborListKind {
+  MONO,  ///< The neighbor list is provided as a unified whole, with all particles grouped into
+         ///<   cells based solely on their positions
+  DUAL   ///< The neighbor list is divided along particle properties, such that two lists store
+         ///<   particles based on whether they have electrostatic or van-der Waals
+         ///<   characteristics.  Particles may appear in both lists.
+};
+
+/// \brief Enumerate yes or no based on whether a CellGrid object contains one system with a
+///        short-sided box, four cell widths on one or more sides.
+enum class TinyBoxPresence {
+  YES,  ///< A tiny unit cell with one or more short sides is present
+  NO    ///< All simulation unit cells are at least five cells along each axis
+};
+  
 /// \brief Enumerate the available sizes of the valence work unit kernel.
 enum class ValenceKernelSize {
   XL = 0,  ///< Launch the kernel with the largest possible block size, up to 512 threads per
@@ -237,6 +253,8 @@ std::string getEnumerationName(SplineScaffold input);
 std::string getEnumerationName(CellGridAction input);
 std::string getEnumerationName(QMapMethod input);
 std::string getEnumerationName(PMIStrategy input);
+std::string getEnumerationName(NeighborListKind input);
+std::string getEnumerationName(TinyBoxPresence input);
 std::string getEnumerationName(ValenceKernelSize input);
 /// \}
 

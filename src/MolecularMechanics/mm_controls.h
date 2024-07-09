@@ -31,11 +31,13 @@ using energy::EvaluateForce;
 using energy::QMapMethod;
 using stmath::ReductionStage;
 using namelist::default_dynamics_time_step;
+using namelist::default_electrostatic_cutoff;
 using namelist::default_minimize_dx0;
 using namelist::default_minimize_maxcyc;
 using namelist::default_minimize_ncyc;
 using namelist::default_rattle_tolerance;
 using namelist::default_nt_warp_multiplicity;
+using namelist::default_van_der_waals_cutoff;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
@@ -50,11 +52,11 @@ template <typename T> struct MMControlKit {
   /// \brief The constructor takes a straight list of values and pointers.  The step number is
   ///        left modifiable so that the object can be re-used over successive time steps.
   MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T initial_step_in,
-               int nt_warp_mult_in, int* vwu_progress_in, int* vupt_progress_in,
-               int* vcns_progress_in, int* pupt_progress_in, int* gcns_progress_in,
-               int* nbwu_progress_in, int* pmewu_progress_in, int* gbrwu_progress_in,
-               int* gbdwu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
-               int* rdwu_progress_in);
+               int nt_warp_mult_in, const T elec_cut_in, const T vdw_cut_in, int* vwu_progress_in,
+               int* vupt_progress_in, int* vcns_progress_in, int* pupt_progress_in,
+               int* gcns_progress_in, int* nbwu_progress_in, int* pmewu_progress_in,
+               int* gbrwu_progress_in, int* gbdwu_progress_in, int* gtwu_progress_in,
+               int* scwu_progress_in, int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -68,6 +70,12 @@ template <typename T> struct MMControlKit {
   const T initial_step;    ///< Initial step size to be taken in energy minimization
   const int nt_warp_mult;  ///< The number of warps to use, per neighbor list decomposition cell,
                            ///<   in neutral territory tile processing
+  const T elec_cut;        ///< The cutoff for electrostatic interactions (this will be applied
+                           ///<   only if dual neighbor list grids are in effect)
+  const T vdw_cut;         ///< The cutoff for van-der Waals interactions (this will be the sole
+                           ///<   cutoff if dual neighbor list grids are not in effect)
+  const T elec_cut_sq;     ///< Squared cutoff for electrostatic interactions
+  const T vdw_cut_sq;      ///< Squared cutoff for van-der Waals interactions
   int* vwu_progress;       ///< Progress counters for valence work units
   int* vupt_progress;      ///< Progress counters for standalone velocity update work units
   int* vcns_progress;      ///< Progress counters for standalone velocity constraint work units
@@ -102,7 +110,9 @@ public:
   MolecularMechanicsControls(double initial_step_in = default_minimize_dx0,
                              int sd_cycles_in = default_minimize_ncyc,
                              int max_cycles_in = default_minimize_maxcyc,
-                             int nt_warp_multiplicity_in = default_nt_warp_multiplicity);
+                             int nt_warp_multiplicity_in = default_nt_warp_multiplicity,
+                             double electrostaitc_cutoff_in = default_electrostatic_cutoff,
+                             double van_der_waals_cutoff_in = default_van_der_waals_cutoff);
 
   MolecularMechanicsControls(const DynamicsControls &user_input);
                              
@@ -139,6 +149,12 @@ public:
 
   /// \brief Get the initial step for energy minimization.
   double getInitialMinimizationStep() const;
+
+  /// \brief Get the cutoff for non-bonded electrostatic interactions in periodic simulations.
+  double getElectrostaticCutoff() const;
+  
+  /// \brief Get the cutoff for non-bonded van-der Waals interactions in periodic simulations.
+  double getVanDerWaalsCutoff() const;
   
   /// \brief Get the value of one of the valence work unit progress counters on the host or the
   ///        HPC device.
@@ -265,13 +281,18 @@ public:
 #endif
   
 private:
-  int step_number;          ///< The step counter for the simulation
-  int sd_cycles;            ///< The number of steepest-descent energy minimization cycles
-  int max_cycles;           ///< The total number of energy minimization cycles or dynamics steps
-  int nt_warp_multiplicity; ///< The number of warps that should cooperate to evaluate all pair
-                            ///<   interactions in a cell grid neighbor list
-  double initial_step;      ///< The initial step length (for all systems, if these controls
-                            ///<   govern a synthesis) to take in energy minimization calculations
+  int step_number;              ///< The step counter for the simulation
+  int sd_cycles;                ///< The number of steepest-descent energy minimization cycles
+  int max_cycles;               ///< Total number of energy minimization cycles or dynamics steps
+  double initial_step;          ///< The initial step length (for all systems, if these controls
+                                ///<   govern a synthesis) to take in energy minimization
+                                ///<   calculations
+  int nt_warp_multiplicity;     ///< The number of warps that should cooperate to evaluate all pair
+                                ///<   interactions in a cell grid neighbor list
+  double electrostatic_cutoff;  ///< The cutoff to be applied to electrostatic interactions in
+                                ///<   periodic simulations
+  double van_der_waals_cutoff;  ///< The cutoff to be applied to van-der Waals interactions in
+                                ///<   periodic simulations
 
   /// Progress counters through valence work units, an array of two times the number of lanes per
   /// warp so that the valence work units kernel can perform resets of elements in this array with

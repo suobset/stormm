@@ -1186,6 +1186,16 @@ int PhaseSpaceSynthesis::getForceAccumulationBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+float PhaseSpaceSynthesis::getForceScalingFactor() const {
+  return force_scale;
+}
+
+//-------------------------------------------------------------------------------------------------
+float PhaseSpaceSynthesis::getInverseForceScalingFactor() const {
+  return inverse_force_scale;
+}
+
+//-------------------------------------------------------------------------------------------------
 const AtomGraph* PhaseSpaceSynthesis::getSystemTopologyPointer(const int system_index) const {
   validateSystemIndex(system_index, "getSystemTopologyPointer");
   return topologies[system_index];

@@ -276,6 +276,28 @@ std::string getEnumerationName(const PMIStrategy input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NeighborListKind input) {
+  switch (input) {
+  case NeighborListKind::MONO:
+    return std::string("MONO");
+  case NeighborListKind::DUAL:
+    return std::string("DUAL");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const TinyBoxPresence input) {
+  switch (input) {
+  case TinyBoxPresence::YES:
+    return std::string("YES");
+  case TinyBoxPresence::NO:
+    return std::string("NO");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const ValenceKernelSize input) {
   switch (input) {
   case ValenceKernelSize::XL:

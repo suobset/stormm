@@ -9,9 +9,10 @@ template <typename T4>
 LogSplineTable<T4>::LogSplineTable(const BasisFunctions basis_in, const TableIndexing lookup_in,
                                    const int detail_bits_in, const int index_bound_in,
                                    const uint sp_detail_mask_in, const ullint dp_detail_mask_in,
-                                   const T4* table_in) :
+                                   const float arg_offset_in, const T4* table_in) :
     basis{basis_in}, lookup{lookup_in}, detail_bits{detail_bits_in}, index_bound{index_bound_in},
-    sp_detail_mask{sp_detail_mask_in}, dp_detail_mask{dp_detail_mask_in}, table{table_in}
+    sp_detail_mask{sp_detail_mask_in}, dp_detail_mask{dp_detail_mask_in},
+    arg_offset{arg_offset_in}, table{table_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -356,7 +357,8 @@ const LogSplineTable<T4> LogScaleSpline<T4>::data(const HybridTargetLevel tier) 
     expsgn_bits = 9;
   }
   return LogSplineTable<T4>(basis_set, indexing_method, mantissa_bits + expsgn_bits, table.size(),
-                            sp_detail_bitmask, dp_detail_bitmask, table.data(tier));
+                            sp_detail_bitmask, dp_detail_bitmask, indexing_offset,
+                            table.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -371,7 +373,7 @@ LogScaleSpline<T4>::templateFreeData(const HybridTargetLevel tier) const {
   }
   return LogSplineTable<void>(basis_set, indexing_method, mantissa_bits + expsgn_bits,
                               table.size(), sp_detail_bitmask, dp_detail_bitmask,
-                              reinterpret_cast<const void*>(table.data(tier)));
+                              indexing_offset, reinterpret_cast<const void*>(table.data(tier)));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -469,14 +471,8 @@ void LogScaleSpline<T4>::setMantissaBits(const int mantissa_bits_in,
   segments_per_stride = round(pow(2, mantissa_bits));
 
   // Compute the detail masks for single- and double-precision
-  dp_detail_bitmask = 0LLU;
-  for (int i = 0; i < 52 - mantissa_bits; i++) {
-    dp_detail_bitmask |= (0x1LLU << i);
-  }
-  sp_detail_bitmask = 0U;
-  for (int i = 0; i < 23 - mantissa_bits; i++) {
-    sp_detail_bitmask |= (0x1U << i);
-  }
+  dp_detail_bitmask = doublePrecisionSplineDetailMask(mantissa_bits);
+  sp_detail_bitmask = singlePrecisionSplineDetailMask(mantissa_bits);
 }
 
 //-------------------------------------------------------------------------------------------------

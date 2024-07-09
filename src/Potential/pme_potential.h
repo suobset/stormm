@@ -31,10 +31,21 @@ using topology::NonbondedKit;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 
-// CHECK
-using trajectory::PhaseSpaceReader;
-using stmath::sum;
-// END CHECK
+/// \brief Staggering constants for warps in the non-bonded particle-particle interactions.  Each
+///        value is a 32-bit string.  Its high eight bits encode the baseline depth of the tile
+///        (assuming that there is a complete batch of receiving atoms and therefore no further
+///        subdivision of the tile occurs).  Bits 1-8, 9-16, and 17-24 encode the baseline stagger
+///        for the second, third, and fourth quarters of the warp, respectively. (The stagger of
+///        the first quarter of the warp is always zero.) If the tile is further subdivided by a
+///        short batch of receiving atoms, the baseline staggers will advance and the baseline
+///        depth of the tile evaluation will diminish as appropriate.
+/// \{
+#ifdef STORMM_USE_CUDA
+constexpr uint no_stagger = (0x20 << 24);
+constexpr uint half_stagger = ((0x10 << 24) | (0x10 << 16) | (0x10 << 8));
+constexpr uint quarter_stagger = ((0x8 << 24) | (0x18 << 16) | (0x10 << 8) | 0x8);
+#endif
+/// \}
   
 /// \brief Evaluate all interacting pairs between two cells of a simple neighbor list.  This is
 ///        only effective for a single system and is bound to perform double-precision

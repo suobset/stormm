@@ -48,6 +48,11 @@ constexpr int twice_warp_bits_mask_int = warp_bits_mask_int + warp_size_int;
 constexpr unsigned long int twice_warp_bits_mask_lu = warp_bits_mask_lu + warp_size_lu;
 constexpr long long int twice_warp_bits_mask_lld = warp_bits_mask_lld + warp_size_lld;
 constexpr unsigned long long int twice_warp_bits_mask_llu = warp_bits_mask_llu + warp_size_llu;
+constexpr int quarter_warp_size_int = (warp_size_int >> 2);
+constexpr int half_warp_size_int = (warp_size_int >> 1);
+constexpr int three_quarter_warp_size_int = quarter_warp_size_int + half_warp_size_int;
+constexpr int quarter_warp_bits = 3;
+constexpr int half_warp_bits = 4;
 /// \}
 
 /// \brief Enumerator for general block sizes
@@ -101,11 +106,16 @@ using constants::twice_warp_bits_mask_lu;
 using constants::twice_warp_bits_mask_lld;
 using constants::twice_warp_bits_mask_llu;
 using constants::warp_bits;
-using constants::warp_bits_mask_zu;
 using constants::warp_bits_mask_int;
 using constants::warp_bits_mask_lu;
 using constants::warp_bits_mask_lld;
 using constants::warp_bits_mask_llu;
+using constants::warp_bits_mask_zu;
+using constants::quarter_warp_size_int;
+using constants::half_warp_size_int;
+using constants::three_quarter_warp_size_int;
+using constants::quarter_warp_bits;
+using constants::half_warp_bits;
 using constants::BlockSize;
 using constants::large_block_size;
 using constants::medium_block_size;
