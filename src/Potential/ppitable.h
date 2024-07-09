@@ -2,11 +2,14 @@
 #ifndef STORMM_PPI_TABLE_H
 #define STORMM_PPI_TABLE_H
 
+#include <vector>
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/symbol_values.h"
+#include "DataTypes/common_types.h"
 #include "Math/log_scale_spline.h"
 #include "Math/math_enumerators.h"
+#include "Parsing/parsing_enumerators.h"
 #include "energy_enumerators.h"
 #include "pme_util.h"
 
@@ -19,22 +22,25 @@ using symbols::amber_ancient_bioq;
 using card::Hybrid;
 using card::HybridKind;
 using card::HybridTargetLevel;
+using parse::NumberFormat;
 using stmath::BasisFunctions;
 using stmath::LogScaleSpline;
 using stmath::LogSplineForm;
 using stmath::LogSplineTable;
 using stmath::TableIndexing;
+using stmath::doublePrecisionSplineDetailMask;
+using stmath::singlePrecisionSplineDetailMask;
 
 /// \brief Abstract for the particle-particle interaction table, with pointers to energies and
 ///        forces and sizing constants for navigating the excluded versus non-excluded
 ///        interactions.  Like the LogScaleSpline abstract, this is read-only.
-template <typename T4> class PPIKit {
+template <typename T, typename T4> struct PPIKit {
 
   /// \brief The constructor takes the customary list of pointers and critical constants.
   PPIKit(NonbondedTheme theme_in, BasisFunctions basis_in, TableIndexing lookup_in,
-         int index_bound_in, int excl_offset_in, uint sp_detail_mask_in, ullint dp_detail_mask_in,
-         float idx_offset_in, const T4* energy_in, const T4* force_in, const T4* energy_excl_in,
-         const T4* force_excl_in);
+         int index_bound_in, int excl_offset_in, int index_shift_bits_in, ullint dp_detail_mask_in,
+         uint sp_detail_mask_in, T arg_offset_in, const T4* energy_in, const T4* force_in,
+         const T4* energy_excl_in, const T4* force_excl_in);
 
   /// \brief With all const members, the copy and move assignment operators are implicitly
   ///        deleted, but with no pointers to repair the copy and move constructors are legal.
@@ -56,13 +62,16 @@ template <typename T4> class PPIKit {
   const int excl_offset;        ///< The offset to add to any spline index in the energy or force
                                 ///<   arrays in order to obtain the corresponding excluded energy
                                 ///<   or force spline coefficients
-  const uint sp_detail_mask;    ///< A pre-computed bitmask useful for converting an argument of
-                                ///<   the underlying benhmark function into a quantity for
-                                ///<   single-precision splines to operate on
+  const int index_shift_bits;   ///< The number of bits by which to shift a floating point number,
+                                ///<   after interpreting it as an unsigned integer, to the right
+                                ///<   before interpeting the result as a table index
   const ullint dp_detail_mask;  ///< A pre-computed bitmask useful for converting an argument of
                                 ///<   the underlying benhmark function into a quantity for
                                 ///<   double-precision splines to operate on
-  const float idx_offset;       ///< Offset used in transforming arguments of the underlying
+  const uint sp_detail_mask;    ///< A pre-computed bitmask useful for converting an argument of
+                                ///<   the underlying benchmark function into a quantity for
+                                ///<   single-precision splines to operate on
+  const T arg_offset;           ///< Offset used in transforming arguments of the underlying
                                 ///<   benchmark function into spline table indices
   const T4* energy;             ///< Table of energy coefficients.  Add excl_offset to any index
                                 ///<   for the raw energy to get the corresponding index in the
@@ -82,7 +91,7 @@ template <typename T4> class PPIKit {
 ///        interactions are contiguous and then all exclude interactions are contiguous.  The
 ///        offset for accessing an excluded interaction based on an index calculated from a
 ///        particle-particle distance is stored alongside the tabulated splines in the abstract.
-template <typename T4> class PPITable {
+class PPITable {
 public:
 
   /// \brief The constuctor can accept all of the arguments that might be useful for making a
@@ -92,19 +101,23 @@ public:
   PPITable(NonbondedTheme theme_in = NonbondedTheme::ELECTROSTATIC,
            BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
            TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
-           double cutoff_in = default_pme_cutoff, double dsum_tol_in = default_dsum_tol,
-           int mantissa_bits_in = 5, double coulomb_in = amber_ancient_bioq,
-           double min_spl_compute_range_in = 0.015625, double min_offset_in = 0.125);
-
+           double cutoff_in = default_pme_cutoff, double argument_offset_in = 0.0,
+           double dsum_tol_in = default_dsum_tol, int mantissa_bits_in = 5,
+           double coulomb_in = amber_ancient_bioq, double min_range_in = 0.015625);
+  
+  template <typename T4>
   PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
            const LogScaleSpline<T4> &spl_c, const LogScaleSpline<T4> &spl_d,
            double cutoff_in = default_pme_cutoff);
-  
+
+  template <typename T4>
   PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
            const LogScaleSpline<T4> &spl_c);
 
+  template <typename T4>
   PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b);
 
+  template <typename T4>
   PPITable(const LogScaleSpline<T4> &spl_a);
   /// \}
   
@@ -114,10 +127,10 @@ public:
   /// \param original  THe original object to copy or move
   /// \param other     Another object placed on the right hand side of the assignment statement
   /// \{
-  PPITable(const PPITable<T4> &original);
-  PPITable(PPITable<T4> &&original);
-  PPITable& operator=(const PPITable<T4> &original);
-  PPITable& operator=(PPITable<T4> &&original);
+  PPITable(const PPITable &original);
+  PPITable(PPITable &&original);
+  PPITable& operator=(const PPITable &original);
+  PPITable& operator=(PPITable &&original);
   /// \}
 
   /// \brief Get the non-bonded potential described by an object of this class.
@@ -129,6 +142,9 @@ public:
   /// \brief Get the maximum range of the spline.
   double getMaximumRange() const;
 
+  /// \brief Get the indexing argument offset, consistent across all tables.
+  double getIndexingOffset() const;
+  
   /// \brief Get the direct sum tolerance.
   double getDirectSumTolerance() const;
 
@@ -143,13 +159,15 @@ public:
   ///        used to perform the switching between short- and long-ranged potentials.
   double getGaussianWidth() const;
 
-  /// \brief Get the abstract for use of the splines in a manner like C programming.
+  /// \brief Get the double-precision abstract for use of the splines in a C programming style.
   ///
   /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
-  const PPIKit<T4> data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  const PPIKit<double, double4> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-  /// \brief Get an abstract for the object with its templated character cast away to void.
-  const PPIKit<void> temlateFreeData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \brief Get the single-precision abstract for use of the splines in a C programming style.
+  ///
+  /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
+  const PPIKit<float, float4> spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 private:
 
@@ -162,6 +180,13 @@ private:
                                   ///<   valid
   double max_range;               ///< The maximum interparticle distance for which the table can
                                   ///<   produce a result
+  double min_range;               ///< The minimum range for spline computations.  Below this
+                                  ///<   range, the spline values will be assumed to remain
+                                  ///<   constant at the lowest explicitly computed value.
+  double argument_offset;         ///< Offset that will be applied to the indexing argument when
+                                  ///<   accessing spline tables, e.g. if the table is indexed by
+                                  ///<   r2 plus 0.5, add 0.5 to the square of the inter-particle
+                                  ///<   distance before extracting the table index
   double dsum_tol;                ///< The direct sum tolerance, a proportion of each interaction
                                   ///<   that is discarded beginning at the particle-particle pair
                                   ///<   cutoff
@@ -172,29 +197,57 @@ private:
   int exclusion_offset;           ///< The first index of the table of excluded interactions.  The
                                   ///<   series of non-excluded interactions appears first in each
                                   ///<   table, whether of potentials or derivatives.
+  ullint dp_detail_bitmask;       ///< Detail mask for extracting the non-indexing bits from a
+                                  ///<   spline table based on DOUBLE precision float64_t numbers.
+  uint sp_detail_bitmask;         ///< Detail mask for extracting the non-indexing bits from a
+                                  ///<   spline table based on SINGLE precision float32_t numbers.
 
   // The main arrays, in full (double) precision
-  Hybrid<T4> energy;     ///< Double-precision coefficients for the energy, without exclusions
-  Hybrid<T4> force;      ///< Double-precision coefficients for the force, without exclusions
+  Hybrid<double4> energy;  ///< Double-precision coefficients for the energy, without exclusions
+  Hybrid<double4> force;   ///< Double-precision coefficients for the force, without exclusions
 
   /// \brief Double-precision coefficients for the energy, with excluded 1:4 interactions
-  Hybrid<T4> energy_with_exclusions;
+  Hybrid<double4> energy_with_exclusions;
 
   /// \brief Double-precision coefficients for the force, with excluded 1:4 interactions
-  Hybrid<T4> force_with_exclusions;
+  Hybrid<double4> force_with_exclusions;
 
-  // Storage for all coefficients (these are ARRAY-kind Hybrids, unlike the POINTER-kind Hybrids
-  // above)
-  Hybrid<T4> coeffs;     ///< Coefficients of the tables computed in double precision.  This is an
-                         ///<   ARRAY-kind Hybrid targeted by the  double-precision POINTER-kind
-                         ///<   Hybrid arrays above.
+  // The main arrays, in single precision
+  Hybrid<float4> sp_energy;  ///< Single-precision coefficients for the energy, without exclusions
+  Hybrid<float4> sp_force;   ///< Single-precision coefficients for the force, without exclusions
+  
+  /// Single-precision coefficients for the energy, with excluded 1:4 interactions
+  Hybrid<float4> sp_energy_with_exclusions;
 
+  /// Single-precision coefficients for the force, with excluded 1:4 interactions
+  Hybrid<float4> sp_force_with_exclusions;
+
+  /// Coefficients of the tables computed in double precision.  This is an ARRAY-kind Hybrid
+  /// targeted by the double-precision tuple POINTER-kind Hybrid arrays above.
+  Hybrid<double4> coeffs;
+
+  /// Coefficients of the tables computed in single precision.  This is an ARRAY-kind Hybrid
+  /// targeted by the single-precision tuple POINTER-kind Hybrid arrays above.
+  Hybrid<float4> sp_coeffs;
+
+  /// \brief Determine the theme of the particle-particle interaction table based on the form of
+  ///        one of the input spline tables.
+  ///
+  /// \param spl  The input spline table, assumed to be representative of the forms of other spline
+  ///             tables fed to the PPITable object
+  template <typename T4> NonbondedTheme findTheme(const LogScaleSpline<T4> &spl) const;
+
+  /// \brief Build the tables for energy and force computations from pairwise interactions and pack
+  ///        the results into a vector for later use.
+  template <typename T4> std::vector<LogScaleSpline<T4>> buildAllSplineTables() const;
+  
   /// \brief Find a potential function, without exclusions, among the spline tables provided.
   ///
   /// \param spl_a  The first spline table provided
   /// \param spl_b  The second spline table provided
   /// \param spl_c  The third spline table provided
   /// \param spl_d  The fourth spline table provided
+  template <typename T4>
   const LogScaleSpline<T4>& findNonExclPotential(const LogScaleSpline<T4> &spl_a,
                                                  const LogScaleSpline<T4> &spl_b,
                                                  const LogScaleSpline<T4> &spl_c,
@@ -202,6 +255,7 @@ private:
 
   /// \brief Find a potential function, with non-bonded 1:4 exclusions, among the spline tables
   ///        provided.  Descriptions of input parameters follow from findNonExclPotential() above.
+  template <typename T4>
   const LogScaleSpline<T4>& findExclPotential(const LogScaleSpline<T4> &spl_a,
                                               const LogScaleSpline<T4> &spl_b,
                                               const LogScaleSpline<T4> &spl_c,
@@ -209,6 +263,7 @@ private:
 
   /// \brief Find a force function, without exclusions, among the spline tables provided.
   ///        Descriptions of input parameters follow from findNonExclPotential() above.
+  template <typename T4>
   const LogScaleSpline<T4>& findNonExclForce(const LogScaleSpline<T4> &spl_a,
                                              const LogScaleSpline<T4> &spl_b,
                                              const LogScaleSpline<T4> &spl_c,
@@ -216,6 +271,7 @@ private:
 
   /// \brief Find a force function, with non-bonded 1:4 exclusions, among the spline tables
   ///        provided.  Descriptions of input parameters follow from findNonExclPotential() above.
+  template <typename T4>
   const LogScaleSpline<T4>& findExclForce(const LogScaleSpline<T4> &spl_a,
                                           const LogScaleSpline<T4> &spl_b,
                                           const LogScaleSpline<T4> &spl_c,
@@ -224,7 +280,15 @@ private:
   /// \brief Check a bit in a mask to signify the presence of a particular, necessary function.
   ///
   /// \param spl_x  A spline containing one function relevant to the PPITable
-  uint checkPriority(const LogScaleSpline<T4> &spl_x) const;
+  template <typename T4> uint checkPriority(const LogScaleSpline<T4> &spl_x) const;
+
+  /// \brief Check whether two splines share the same length and density parameters such that they
+  ///        would be compatible to place in a table together.
+  ///
+  /// \param spl_a  The first spline
+  /// \param spl_b  The second spline to compare against the first
+  template <typename T4> void checkSplineCompatibility(const LogScaleSpline<T4> &spl_a,
+                                                       const LogScaleSpline<T4> &spl_b);
   
   /// \brief Determine the highest-priority missing functional form.
   ///
@@ -243,13 +307,16 @@ private:
   /// \param spl_b  The second of up to three known spline tables
   /// \param spl_c  The third and last known spline table
   /// \{
+  template <typename T4>
   LogScaleSpline<T4> getTablePriority(const LogScaleSpline<T4> &spl_a,
                                       const LogScaleSpline<T4> &spl_b,
                                       const LogScaleSpline<T4> &spl_c) const;
 
+  template <typename T4>
   LogScaleSpline<T4> getTablePriority(const LogScaleSpline<T4> &spl_a,
-                                       const LogScaleSpline<T4> &spl_b) const;
+                                      const LogScaleSpline<T4> &spl_b) const;
 
+  template <typename T4>
   LogScaleSpline<T4> getTablePriority(const LogScaleSpline<T4> &spl_a) const;
   /// \}
 
@@ -260,24 +327,14 @@ private:
   /// \param du   The force spline table
   /// \param ux   The excluded energy spline table
   /// \param dux  The excluded force spline table
+  template <typename T4>
   void populateCoefficients(const LogScaleSpline<T4> &u, const LogScaleSpline<T4> &du,
-                            const LogScaleSpline<T4> &ux, const LogScaleSpline<T4> &dux)
+                            const LogScaleSpline<T4> &ux, const LogScaleSpline<T4> &dux);
 };
-
-/// \brief Restore the type of a particle-particle interaction kit, the abstract of the PPITable
-///        class above.
-///
-/// Overloaded:
-///   - Provide a const pointer to the template-free abstract
-///   - Provide a const reference the template-free abstract
-///
-/// \param rasa  The original abstract with all templated pointers cast to void, a "blank slate"
-/// \{
-template <typename T4> const PPIKit<T4> restoreType(const PPIKit<void> *rasa);
-template <typename T4> const PPIKit<T4> restoreType(const PPIKit<void> &rasa);
-/// \}
 
 } // namespace energy
 } // namespace stormm
+
+#include "ppitable.tpp"
 
 #endif

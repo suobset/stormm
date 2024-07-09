@@ -569,7 +569,7 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
 CheckResult snapshot(const std::string &filename, const TextFile &content,
                      const std::string &label, const std::string &error_message,
                      const SnapshotOperation activity, const PrintSituation expectation,
-                     const TestPriority urgency) {
+                     const TestPriority urgency, const int comparison_tolerance) {
   
   // Abort if some prior condition has made this test impossible to run
   if (urgency == TestPriority::ABORT) {
@@ -621,7 +621,8 @@ CheckResult snapshot(const std::string &filename, const TextFile &content,
         }
         i++;
       }
-      mismatch = (mismatch || line_content_differences.size());
+      mismatch = (mismatch ||
+                  (line_content_differences.size() > 0 && altered_chars > comparison_tolerance));
       if (mismatch) {
         printf("Snapshot MISMATCH: ");
         std::string error_edit("  ");
@@ -713,9 +714,9 @@ CheckResult snapshot(const std::string &filename, const TextFile &content,
 CheckResult snapshot(const std::string &filename, const std::string &content,
                      const std::string &label, const std::string &error_message,
                      const SnapshotOperation activity, const PrintSituation expectation,
-                     const TestPriority urgency) {
+                     const TestPriority urgency, const int comparison_tolerance) {
   return snapshot(filename, TextFile(content, TextOrigin::RAM), label, error_message, activity,
-                  expectation, urgency);
+                  expectation, urgency, comparison_tolerance);
 }
 
 //-------------------------------------------------------------------------------------------------

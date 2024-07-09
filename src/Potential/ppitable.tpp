@@ -5,16 +5,38 @@ namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
+template <typename T, typename T4>
+PPIKit<T, T4>::PPIKit(const NonbondedTheme theme_in, const BasisFunctions basis_in,
+                      const TableIndexing lookup_in, const int index_bound_in,
+                      const int excl_offset_in, const int index_shift_bits_in,
+                      const ullint dp_detail_mask_in, const uint sp_detail_mask_in,
+                      const T arg_offset_in, const T4* energy_in, const T4* force_in,
+                      const T4* energy_excl_in, const T4* force_excl_in) :
+    theme{theme_in}, basis{basis_in}, lookup{lookup_in}, index_bound{index_bound_in},
+    excl_offset{excl_offset_in}, index_shift_bits{index_shift_bits_in},
+    dp_detail_mask{dp_detail_mask_in}, sp_detail_mask{sp_detail_mask_in},
+    arg_offset{arg_offset_in}, energy{energy_in}, force{force_in}, energy_excl{energy_excl_in},
+    force_excl{force_excl_in}
+{}
+  
+//-------------------------------------------------------------------------------------------------
 template <typename T4>
-PPITable<T4>::PPITable(const NonbondedTheme theme_in, const BasisFunctions basis_set_in,
-                       const TableIndexing indexing_method_in, const double cutoff_in,
-                       const double dsum_tol_in, const int mantissa_bits_in,
-                       const double coulomb_in, const double min_spl_compute_range_in,
-                       const double min_offset_in) :
-    theme{theme_in}, basis_set{basis_set_in}, indexing_method{indexing_method_in},
-    cutoff{cutoff_in}, max_range{cutoff_in}, dsum_tol{dsum_tol_in},
-    ew_coeff{ewaldCoefficient(cutoff_in, dsum_tol_in)}, mantissa_bits{mantissa_bits_in},
-    coulomb{coulomb_in}, exclusion_offset{0},
+PPITable::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
+                   const LogScaleSpline<T4> &spl_c, const LogScaleSpline<T4> &spl_d,
+                   const double cutoff_in) :
+    theme{findTheme(spl_a)},
+    basis_set{spl_a.getBasisSet()},
+    indexing_method{spl_a.getIndexingMethod()},
+    cutoff{cutoff_in},
+    max_range{exp2(ceil(log2(cutoff)))},
+    argument_offset{spl_a.getIndexingOffset()},
+    dsum_tol{recoverDirectSumTolerance(spl_a.getEwaldCoefficient(), cutoff_in)},
+    ew_coeff{ewaldCoefficient(cutoff_in, dsum_tol)},
+    mantissa_bits{spl_a.getBitStride()},
+    coulomb{spl_a.getCoulombConstant()},
+    exclusion_offset{0},
+    dp_detail_bitmask{doublePrecisionSplineDetailMask(mantissa_bits)},
+    sp_detail_bitmask{singlePrecisionSplineDetailMask(mantissa_bits)},
     energy{HybridKind::POINTER, "etab_energy"},
     force{HybridKind::POINTER, "etab_force"},
     energy_with_exclusions{HybridKind::POINTER, "etab_energy_excl"},
@@ -26,23 +48,66 @@ PPITable<T4>::PPITable(const NonbondedTheme theme_in, const BasisFunctions basis
     coeffs{HybridKind::ARRAY, "etab_coeffs"},
     sp_coeffs{HybridKind::ARRAY, "etab_sp_coeffs"}
 {
-  // Create the four spline tables, then feed into the same templated functions for re-arranging
-  // them as the constructors taking spline table inputs.
-  max_range = exp2(ceil(log2(cutoff)));
-  double min_spl_compute_range = min_spl_compute_range_in;
-  double min_offset = min_offset_in;
-  switch (indexing_method) {
-  case TableIndexing::ARG:
-  case TableIndexing::ARG_OFFSET:
-    break;
-  case TableIndexing::SQUARED_ARG:
-  case TableIndexing::SQ_ARG_OFFSET:
-    min_offset *= min_offset;
-    min_spl_compute_range *= min_spl_compute_range;
-    break;
+  checkSplineCompatibility(spl_a, spl_b);
+  checkSplineCompatibility(spl_a, spl_c);
+  checkSplineCompatibility(spl_a, spl_d);
+
+  // Determine which potential is which and populate the appropriate coefficients array.
+  const LogScaleSpline<T4> *u_ptr = findNonExclPotential(spl_a, spl_b, spl_c, spl_d);
+  const LogScaleSpline<T4> *du_ptr = findNonExclForce(spl_a, spl_b, spl_c, spl_d);
+  const LogScaleSpline<T4> *u_excl_ptr = findExclPotential(spl_a, spl_b, spl_c, spl_d);
+  const LogScaleSpline<T4> *du_excl_ptr = findExclForce(spl_a, spl_b, spl_c, spl_d);
+  populateCoefficients<T4>(*u_ptr, *du_ptr, *u_excl_ptr, *du_excl_ptr);
+
+  // Populate the remaining coefficients array.
+  const size_t ct = std::type_index(typeid(T4)).hash_code();
+  if (ct == double4_type_index) {
+    const std::vector<LogScaleSpline<float4>> splv = buildAllSplineTables<float4>();
+    populateCoefficients<float4>(splv[0], splv[1], splv[2], splv[3]);
   }
-  std::vector<LogScaleSpline<T4>> splv;
-  splv.reserve(4);
+  else {
+    const std::vector<LogScaleSpline<double4>> splv = buildAllSplineTables<double4>();
+    populateCoefficients<double4>(splv[0], splv[1], splv[2], splv[3]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+PPITable::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
+                   const LogScaleSpline<T4> &spl_c) :
+    PPITable(spl_a, spl_b, spl_c, getTablePriority(spl_a, spl_b, spl_c))
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+PPITable::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b) :
+    PPITable(spl_a, spl_b, getTablePriority(spl_a, spl_b))
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4>
+PPITable::PPITable(const LogScaleSpline<T4> &spl_a) :
+    PPITable(spl_a, getTablePriority(spl_a))
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> NonbondedTheme PPITable::findTheme(const LogScaleSpline<T4> &spl) const {
+  switch (spl.getForm()) {
+  case LogSplineForm::ELEC_PME_DIRECT:
+  case LogSplineForm::ELEC_PME_DIRECT_EXCL:
+  case LogSplineForm::DELEC_PME_DIRECT:
+  case LogSplineForm::DELEC_PME_DIRECT_EXCL:
+    return NonbondedTheme::ELECTROSTATIC;
+  case LogSplineForm::CUSTOM:
+    return NonbondedTheme::ALL;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> std::vector<LogScaleSpline<T4>> PPITable::buildAllSplineTables() const {
+  std::vector<LogScaleSpline<T4>> result;
+  result.reserve(4);
   switch (theme) {
   case NonbondedTheme::ELECTROSTATIC:
     {
@@ -51,119 +116,25 @@ PPITable<T4>::PPITable(const NonbondedTheme theme_in, const BasisFunctions basis
                                                      LogSplineForm::ELEC_PME_DIRECT_EXCL,
                                                      LogSplineForm::DELEC_PME_DIRECT_EXCL };
       for (size_t i = 0; i < all_forms.size(); i++) {
-        splv.emplace_back(all_forms[i], ew_coeff, coulomb, mantissa_bits, max_range,
-                          min_spl_compute_range, indexing_method, basis_set, 2, min_offset,
-                          ExceptionResponse::DIE);
-      }
+        result.emplace_back(all_forms[i], ew_coeff, coulomb, mantissa_bits, max_range, min_range,
+                            indexing_method, basis_set, 2, argument_offset,
+                            ExceptionResponse::DIE);
+      } 
     }
+    break;
   case NonbondedTheme::VAN_DER_WAALS:
   case NonbondedTheme::ALL:
     break;
   }
-  populateCoefficients(findNonExclPotential(spl_a, spl_b, spl_c, spl_d),
-                       findNonExclForce(spl_a, spl_b, spl_c, spl_d),
-                       findExclPotential(spl_a, spl_b, spl_c, spl_d),
-                       findExclForce(spl_a, spl_b, spl_c, spl_d));
+  return result;
 }
-
+  
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-PPITable<T4>::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
-                       const LogScaleSpline<T4> &spl_c, const LogScaleSpline<T4> &spl_d,
-                       const double cutoff_in) :
-    theme{NonbondedTheme::ELECTROSTATIC},
-    precision{(std::type_index(typeid).hash_code() == double_type_index) ?
-              PrecisionModel::DOUBLE : PrecisionModel::SINGLE},
-    basis_set{spl_a.getBasisSet()},
-    indexing_method{spl_a.getIndexingMethod()},
-    cutoff{cutoff_in},
-    dsum_tol{recoverDirectSumTolerance(spl_a.getEwaldCoefficient(), cutoff_in)},
-    mantissa_bits{spl_a.getBitStride()},
-    coulomb{spl_a.getCoulombConstant()}
-    exclusion_offset{0},
-    energy{HybridKind::POINTER, "ppi_u"},
-    force{HybridKind::POINTER, "ppi_du"},
-    energy_with_exclusions{HybridKind::POINTER, "ppi_ux"},
-    force_with_exclusions{HybridKind::POINTER, "ppi_dux"},
-    coeffs{HybridKind::ARRAY, "ppi_coeffs"}
-{
-  checkSplineCompatibility(spl_a, spl_b);
-  checkSplineCompatibility(spl_a, spl_c);
-  checkSplineCompatibility(spl_a, spl_d);
-
-  // Determine which potential is which and populate the coefficients array.
-  populateCoefficients(findNonExclPotential(spl_a, spl_b, spl_c, spl_d),
-                       findNonExclForce(spl_a, spl_b, spl_c, spl_d),
-                       findExclPotential(spl_a, spl_b, spl_c, spl_d),
-                       findExclForce(spl_a, spl_b, spl_c, spl_d));
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
-PPITable<T4>::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b,
-                       const LogScaleSpline<T4> &spl_c) :
-    PPITable(spl_a, spl_b, spl_c, getTablePriority(spl_a, spl_b, spl_c))
-{}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
-PPITable<T4>::PPITable(const LogScaleSpline<T4> &spl_a, const LogScaleSpline<T4> &spl_b) :
-    PPITable(spl_a, spl_b, getTablePriority(spl_a, spl_b))
-{}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
-PPITable<T4>::PPITable(const LogScaleSpline<T4> &spl_a) :
-    PPITable(spl_a, getTablePriority(spl_a))
-{}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> NonbondedTheme PPITable<T4>::getTheme() const {
-  return theme;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> double PPITable<T4>::getCutoff() const {
-  return cutoff;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> double PPITable<T4>::getMaximumRange() const {
-  return max_range;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> double PPITable<T4>::getDirectSumTolerance() const {
-  return dsum_tol;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> int PPITable<T4>::getBitStride() const {
-  return mantissa_bits;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> double PPITable<T4>::getEwaldCoefficient() const {
-  return ew_coeff;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> double PPITable<T4>::getGaussianWidth() const {
-  return dsum_tol;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> const PPIKit PPITable<T4>::data(const HybridTargetLevel tier) const {
-  return PPIKit(theme, basis_set, indexing_method, exclusion_offset / 2, exclusion_offset,
-                
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4> const LogScaleSpline<T4>&
-PPITable<T4>::findNonExclPotential(const LogScaleSpline<T4> &spl_a,
-                                   const LogScaleSpline<T4> &spl_b,
-                                   const LogScaleSpline<T4> &spl_c,
-                                   const LogScaleSpline<T4> &spl_d) const {
+const LogScaleSpline<T4>& PPITable::findNonExclPotential(const LogScaleSpline<T4> &spl_a,
+                                                         const LogScaleSpline<T4> &spl_b,
+                                                         const LogScaleSpline<T4> &spl_c,
+                                                         const LogScaleSpline<T4> &spl_d) const {
   const std::vector<const LogScaleSpline<T4>*> lss = { spl_a.getSelfPointer(),
                                                        spl_b.getSelfPointer(),
                                                        spl_c.getSelfPointer(),
@@ -185,10 +156,10 @@ PPITable<T4>::findNonExclPotential(const LogScaleSpline<T4> &spl_a,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-const LogScaleSpline<T4>& PPITable<T4>::findExclPotential(const LogScaleSpline<T4> &spl_a,
-                                                          const LogScaleSpline<T4> &spl_b,
-                                                          const LogScaleSpline<T4> &spl_c,
-                                                          const LogScaleSpline<T4> &spl_d) const {
+const LogScaleSpline<T4>& PPITable::findExclPotential(const LogScaleSpline<T4> &spl_a,
+                                                      const LogScaleSpline<T4> &spl_b,
+                                                      const LogScaleSpline<T4> &spl_c,
+                                                      const LogScaleSpline<T4> &spl_d) const {
   const std::vector<const LogScaleSpline<T4>*> lss = { spl_a.getSelfPointer(),
                                                        spl_b.getSelfPointer(),
                                                        spl_c.getSelfPointer(),
@@ -211,10 +182,10 @@ const LogScaleSpline<T4>& PPITable<T4>::findExclPotential(const LogScaleSpline<T
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-const LogScaleSpline<T4>& PPITable<T4>::findNonExclForce(const LogScaleSpline<T4> &spl_a,
-                                                         const LogScaleSpline<T4> &spl_b,
-                                                         const LogScaleSpline<T4> &spl_c,
-                                                         const LogScaleSpline<T4> &spl_d) const {
+const LogScaleSpline<T4>& PPITable::findNonExclForce(const LogScaleSpline<T4> &spl_a,
+                                                     const LogScaleSpline<T4> &spl_b,
+                                                     const LogScaleSpline<T4> &spl_c,
+                                                     const LogScaleSpline<T4> &spl_d) const {
   const std::vector<const LogScaleSpline<T4>*> lss = { spl_a.getSelfPointer(),
                                                        spl_b.getSelfPointer(),
                                                        spl_c.getSelfPointer(),
@@ -236,10 +207,10 @@ const LogScaleSpline<T4>& PPITable<T4>::findNonExclForce(const LogScaleSpline<T4
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-const LogScaleSpline<T4>& PPITable<T4>::findExclForce(const LogScaleSpline<T4> &spl_a,
-                                                      const LogScaleSpline<T4> &spl_b,
-                                                      const LogScaleSpline<T4> &spl_c,
-                                                      const LogScaleSpline<T4> &spl_d) const {
+const LogScaleSpline<T4>& PPITable::findExclForce(const LogScaleSpline<T4> &spl_a,
+                                                  const LogScaleSpline<T4> &spl_b,
+                                                  const LogScaleSpline<T4> &spl_c,
+                                                  const LogScaleSpline<T4> &spl_d) const {
   const std::vector<const LogScaleSpline<T4>*> lss = { spl_a.getSelfPointer(),
                                                        spl_b.getSelfPointer(),
                                                        spl_c.getSelfPointer(),
@@ -260,7 +231,7 @@ const LogScaleSpline<T4>& PPITable<T4>::findExclForce(const LogScaleSpline<T4> &
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4> uint PPITable<T4>::checkPriority(const LogScaleSpline<T4> &spl_x) const {
+template <typename T4> uint PPITable::checkPriority(const LogScaleSpline<T4> &spl_x) const {
   switch (spl_x.getForm()) {
   case LogSplineForm::ELEC_PME_DIRECT:
     return 0x1;
@@ -277,9 +248,8 @@ template <typename T4> uint PPITable<T4>::checkPriority(const LogScaleSpline<T4>
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-void PPITable<T4>::checkSplineCompatibility(const LogScaleSpline<T4> &spl_a,
-                                            const LogScaleSpline<T4> &spl_b) {
+template <typename T4> void PPITable::checkSplineCompatibility(const LogScaleSpline<T4> &spl_a,
+                                                               const LogScaleSpline<T4> &spl_b) {
   if (spl_a.getIndexingMethod() != spl_b.getIndexingMethod()) {
     rtErr("Spline tables with different indexing methods (" +
           getEnumerationName(spl_a.getIndexingMethod()) + ", " +
@@ -325,27 +295,10 @@ void PPITable<T4>::checkSplineCompatibility(const LogScaleSpline<T4> &spl_a,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4> LogSplineForm PPITable<T4>::findMissingForm(const uint holdings) const {
-  if ((holdings & 0x1) == 0) {
-    return LogSplineForm::ELEC_PME_DIRECT;
-  }
-  else if ((holdings & 0x2) == 0) {
-    return LogSplineForm::ELEC_PME_DIRECT_EXCL;
-  }
-  else if ((holdings & 0x4) == 0) {
-    return LogSplineForm::DELEC_PME_DIRECT;
-  }
-  else if ((holdings & 0x8) == 0) {
-    return LogSplineForm::DELEC_PME_DIRECT_EXCL;
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
 template <typename T4>
-LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_a,
-                                                  const LogScaleSpline<T4> &spl_b,
-                                                  const LogScaleSpline<T4> &spl_c) const {
+LogScaleSpline<T4> PPITable::getTablePriority(const LogScaleSpline<T4> &spl_a,
+                                              const LogScaleSpline<T4> &spl_b,
+                                              const LogScaleSpline<T4> &spl_c) const {
   checkSplineCompatibility(spl_a, spl_b);
   checkSplineCompatibility(spl_b, spl_c);
   const uint holdings = checkPriority(spl_a) | checkPriority(spl_b) | checkPriority(spl_c);
@@ -358,8 +311,8 @@ LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_a,
-                                                  const LogScaleSpline<T4> &spl_b) {
+LogScaleSpline<T4> PPITable::getTablePriority(const LogScaleSpline<T4> &spl_a,
+                                              const LogScaleSpline<T4> &spl_b) const {
   checkSplineCompatibility(spl_a, spl_b);
   const uint holdings = checkPriority(spl_a) | checkPriority(spl_b);
   const LogSplineForm missing_form = findMissingForm(holdings);
@@ -371,7 +324,7 @@ LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_a) {
+LogScaleSpline<T4> PPITable::getTablePriority(const LogScaleSpline<T4> &spl_a) const {
   const uint holdings = checkPriority(spl_a);
   const LogSplineForm missing_form = findMissingForm(holdings);
   return LogScaleSpline<T4>(missing_form, spl_a.getEwaldCoefficient(), spl_a.getCoulombConstant(),
@@ -382,10 +335,8 @@ LogScaleSpline<T4> PPITable<T4>::getTablePriority(const LogScaleSpline<T4> &spl_
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-void PPITable<T4>:: populateCoefficients(const LogScaleSpline<T4> &u,
-                                         const LogScaleSpline<T4> &du,
-                                         const LogScaleSpline<T4> &ux,
-                                         const LogScaleSpline<T4> &dux) {
+void PPITable::populateCoefficients(const LogScaleSpline<T4> &u, const LogScaleSpline<T4> &du,
+                                    const LogScaleSpline<T4> &ux, const LogScaleSpline<T4> &dux) {
   const LogSplineTable tbl_u   = u.data();
   const LogSplineTable tbl_ux  = ux.data();
   const LogSplineTable tbl_du  = du.data();
@@ -395,40 +346,53 @@ void PPITable<T4>:: populateCoefficients(const LogScaleSpline<T4> &u,
   const size_t ct = std::type_index(typeid(T4)).hash_code();
   const size_t tbl_len = u.getSplineIndex(u.getMaximumRange());
   coeffs.resize(4 * exclusion_offset);
-  T4* coef_ptr = coeffs.data();
-  for (int i = 0; i < tbl_len; i++) {
-    coef_ptr[                i] = tbl_u.table[i];
-    coef_ptr[      tbl_len + i] = tbl_du.table[i];
-    coef_ptr[(2 * tbl_len) + i] = tbl_ux.table[i];
-    coef_ptr[(3 * tbl_len) + i] = tbl_dux.table[i];
+  double4* coef_ptr = coeffs.data();
+  float4* sp_coef_ptr = sp_coeffs.data();
+  if (ct == double4_type_index) {
+    for (int i = 0; i < tbl_len; i++) {
+      coef_ptr[                i].x = tbl_u.table[i].x;
+      coef_ptr[                i].y = tbl_u.table[i].y;
+      coef_ptr[                i].z = tbl_u.table[i].z;
+      coef_ptr[                i].w = tbl_u.table[i].w;
+      coef_ptr[      tbl_len + i].x = tbl_du.table[i].x;
+      coef_ptr[      tbl_len + i].y = tbl_du.table[i].y;
+      coef_ptr[      tbl_len + i].z = tbl_du.table[i].z;
+      coef_ptr[      tbl_len + i].w = tbl_du.table[i].w;
+      coef_ptr[(2 * tbl_len) + i].x = tbl_ux.table[i].x;
+      coef_ptr[(2 * tbl_len) + i].y = tbl_ux.table[i].y;
+      coef_ptr[(2 * tbl_len) + i].z = tbl_ux.table[i].z;
+      coef_ptr[(2 * tbl_len) + i].w = tbl_ux.table[i].w;
+      coef_ptr[(3 * tbl_len) + i].x = tbl_dux.table[i].x;
+      coef_ptr[(3 * tbl_len) + i].y = tbl_dux.table[i].y;
+      coef_ptr[(3 * tbl_len) + i].z = tbl_dux.table[i].z;
+      coef_ptr[(3 * tbl_len) + i].w = tbl_dux.table[i].w;
+    }
+  }
+  else if (ct == float4_type_index) {
+    for (int i = 0; i < tbl_len; i++) {
+      sp_coef_ptr[                i].x = tbl_u.table[i].x;
+      sp_coef_ptr[                i].y = tbl_u.table[i].y;
+      sp_coef_ptr[                i].z = tbl_u.table[i].z;
+      sp_coef_ptr[                i].w = tbl_u.table[i].w;
+      sp_coef_ptr[      tbl_len + i].x = tbl_du.table[i].x;
+      sp_coef_ptr[      tbl_len + i].y = tbl_du.table[i].y;
+      sp_coef_ptr[      tbl_len + i].z = tbl_du.table[i].z;
+      sp_coef_ptr[      tbl_len + i].w = tbl_du.table[i].w;
+      sp_coef_ptr[(2 * tbl_len) + i].x = tbl_ux.table[i].x;
+      sp_coef_ptr[(2 * tbl_len) + i].y = tbl_ux.table[i].y;
+      sp_coef_ptr[(2 * tbl_len) + i].z = tbl_ux.table[i].z;
+      sp_coef_ptr[(2 * tbl_len) + i].w = tbl_ux.table[i].w;
+      sp_coef_ptr[(3 * tbl_len) + i].x = tbl_dux.table[i].x;
+      sp_coef_ptr[(3 * tbl_len) + i].y = tbl_dux.table[i].y;
+      sp_coef_ptr[(3 * tbl_len) + i].z = tbl_dux.table[i].z;
+      sp_coef_ptr[(3 * tbl_len) + i].w = tbl_dux.table[i].w;
+    }
   }
   exclusion_offset = 2 * tbl_len;
   energy.setPointer(&coeffs,                           0, tbl_len);
   force.setPointer(&coeffs,                      tbl_len, tbl_len);
   energy_with_exclusions.setPointer(&coeffs, 2 * tbl_len, tbl_len);
   force_with_exclusions.setPointer(&coeffs,  3 * tbl_len, tbl_len);
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
-const PPIKit<T4> restoreType(const PPIKit<void> *rasa) {
-  return PPIKit<T4>(rasa->theme, rasa->basis rasa->lookup, rasa->index_bound, rasa->excl_offset,
-                    rasa->sp_detail_mask, rasa->dp_detail_mask, rasa->idx_offset,
-                    reinterpret_cast<const T4*>(rasa->energy),
-                    reinterpret_cast<const T4*>(rasa->force),
-                    reinterpret_cast<const T4*>(rasa->energy_excl),
-                    reinterpret_cast<const T4*>(rasa->force_excl));
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
-const PPIKit<T4> restoreType(const PPIKit<void> &rasa) {
-  return PPIKit<T4>(rasa.theme, rasa.basis rasa.lookup, rasa.index_bound, rasa.excl_offset,
-                    rasa.sp_detail_mask, rasa.dp_detail_mask, rasa.idx_offset,
-                    reinterpret_cast<const T4*>(rasa.energy),
-                    reinterpret_cast<const T4*>(rasa.force),
-                    reinterpret_cast<const T4*>(rasa.energy_excl),
-                    reinterpret_cast<const T4*>(rasa.force_excl));
 }
 
 } // namespace energy

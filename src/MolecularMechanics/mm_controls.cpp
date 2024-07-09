@@ -19,22 +19,25 @@ using trajectory::IntegrationStage;
 MolecularMechanicsControls::MolecularMechanicsControls(const double initial_step_in,
                                                        const int sd_cycles_in,
                                                        const int max_cycles_in,
-                                                       const int nt_warp_multiplicity_in) :
-  step_number{0}, sd_cycles{sd_cycles_in}, max_cycles{max_cycles_in},
-  initial_step{initial_step_in}, nt_warp_multiplicity{nt_warp_multiplicity_in},
-  vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
-  velocity_update_progress{HybridKind::POINTER, "mm_vupt_counters"},
-  velocity_constraint_progress{HybridKind::POINTER, "mm_vcns_counters"},
-  position_update_progress{HybridKind::POINTER, "mm_pupt_counters"},
-  geometry_constraint_progress{HybridKind::POINTER, "mm_gcns_counters"},
-  nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
-  pmewu_progress{HybridKind::POINTER, "mm_pmewu_counters"},
-  gbrwu_progress{HybridKind::POINTER, "mm_gbrwu_counters"},
-  gbdwu_progress{HybridKind::POINTER, "mm_gbdwu_counters"},
-  gather_wu_progress{HybridKind::POINTER, "mm_gtwu_counters"},
-  scatter_wu_progress{HybridKind::POINTER, "mm_scwu_counters"},
-  all_reduce_wu_progress{HybridKind::POINTER, "mm_rdwu_counters"},
-  int_data{24 * warp_size_int, "work_unit_prog_data"}
+                                                       const int nt_warp_multiplicity_in,
+                                                       const double electrostatic_cutoff_in,
+                                                       const double van_der_waals_cutoff_in) :
+    step_number{0}, sd_cycles{sd_cycles_in}, max_cycles{max_cycles_in},
+    initial_step{initial_step_in}, nt_warp_multiplicity{nt_warp_multiplicity_in},
+    electrostatic_cutoff{electrostatic_cutoff_in}, van_der_waals_cutoff{van_der_waals_cutoff_in},
+    vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
+    velocity_update_progress{HybridKind::POINTER, "mm_vupt_counters"},
+    velocity_constraint_progress{HybridKind::POINTER, "mm_vcns_counters"},
+    position_update_progress{HybridKind::POINTER, "mm_pupt_counters"},
+    geometry_constraint_progress{HybridKind::POINTER, "mm_gcns_counters"},
+    nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
+    pmewu_progress{HybridKind::POINTER, "mm_pmewu_counters"},
+    gbrwu_progress{HybridKind::POINTER, "mm_gbrwu_counters"},
+    gbdwu_progress{HybridKind::POINTER, "mm_gbdwu_counters"},
+    gather_wu_progress{HybridKind::POINTER, "mm_gtwu_counters"},
+    scatter_wu_progress{HybridKind::POINTER, "mm_scwu_counters"},
+    all_reduce_wu_progress{HybridKind::POINTER, "mm_rdwu_counters"},
+    int_data{24 * warp_size_int, "work_unit_prog_data"}
 {
   vwu_progress.setPointer(&int_data,                                  0, 2 * warp_size_int);
   velocity_update_progress.setPointer(&int_data,      2 * warp_size_int, 2 * warp_size_int);
@@ -53,13 +56,16 @@ MolecularMechanicsControls::MolecularMechanicsControls(const double initial_step
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const DynamicsControls &user_input) :
     MolecularMechanicsControls(default_minimize_dx0, default_minimize_ncyc,
-                               user_input.getStepCount(), user_input.getNTWarpMultiplicity())
+                               user_input.getStepCount(), user_input.getNTWarpMultiplicity(),
+                               user_input.getElectrostaticCutoff(),
+                               user_input.getVanDerWaalsCutoff())
 {}
 
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const MinimizeControls &user_input) :
     MolecularMechanicsControls(user_input.getInitialStep(), user_input.getSteepestDescentCycles(),
-                               user_input.getTotalCycles())
+                               user_input.getTotalCycles(), user_input.getElectrostaticCutoff(),
+                               user_input.getLennardJonesCutoff())
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -70,6 +76,8 @@ MolecularMechanicsControls(const MolecularMechanicsControls &original) :
   max_cycles{original.max_cycles},
   initial_step{original.initial_step},
   nt_warp_multiplicity{original.nt_warp_multiplicity},
+  electrostatic_cutoff{original.electrostatic_cutoff},
+  van_der_waals_cutoff{original.van_der_waals_cutoff},
   vwu_progress{original.vwu_progress},
   velocity_update_progress{original.velocity_update_progress},
   velocity_constraint_progress{original.velocity_constraint_progress},
@@ -100,6 +108,8 @@ MolecularMechanicsControls::operator=(const MolecularMechanicsControls &other) {
   max_cycles = other.max_cycles;
   initial_step = other.initial_step;
   nt_warp_multiplicity = other.nt_warp_multiplicity;
+  electrostatic_cutoff = other.electrostatic_cutoff;
+  van_der_waals_cutoff = other.van_der_waals_cutoff;
   vwu_progress = other.vwu_progress;
   velocity_update_progress = other.velocity_update_progress;
   velocity_constraint_progress = other.velocity_constraint_progress;
@@ -126,6 +136,8 @@ MolecularMechanicsControls::MolecularMechanicsControls(MolecularMechanicsControl
   max_cycles{original.max_cycles},
   initial_step{original.initial_step},
   nt_warp_multiplicity{original.nt_warp_multiplicity},
+  electrostatic_cutoff{original.electrostatic_cutoff},
+  van_der_waals_cutoff{original.van_der_waals_cutoff},
   vwu_progress{std::move(original.vwu_progress)},
   velocity_update_progress{std::move(original.velocity_update_progress)},
   velocity_constraint_progress{std::move(original.velocity_constraint_progress)},
@@ -154,6 +166,8 @@ MolecularMechanicsControls::operator=(MolecularMechanicsControls &&other) {
   max_cycles = other.max_cycles;
   initial_step = other.initial_step;
   nt_warp_multiplicity = other.nt_warp_multiplicity;
+  electrostatic_cutoff = other.electrostatic_cutoff;
+  van_der_waals_cutoff = other.van_der_waals_cutoff;
   vwu_progress = std::move(other.vwu_progress);
   velocity_update_progress = std::move(other.velocity_update_progress);
   velocity_constraint_progress = std::move(other.velocity_constraint_progress);
@@ -188,6 +202,16 @@ int MolecularMechanicsControls::getTotalCycles() const {
 //-------------------------------------------------------------------------------------------------
 double MolecularMechanicsControls::getInitialMinimizationStep() const {
   return initial_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolecularMechanicsControls::getElectrostaticCutoff() const {
+  return electrostatic_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolecularMechanicsControls::getVanDerWaalsCutoff() const {
+  return van_der_waals_cutoff;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -274,8 +298,8 @@ int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_i
 //-------------------------------------------------------------------------------------------------
 MMControlKit<double> MolecularMechanicsControls::dpData(const HybridTargetLevel tier) {
   return MMControlKit<double>(step_number, sd_cycles, max_cycles, initial_step,
-                              nt_warp_multiplicity, vwu_progress.data(tier),
-                              velocity_update_progress.data(tier),
+                              nt_warp_multiplicity, electrostatic_cutoff, van_der_waals_cutoff,
+                              vwu_progress.data(tier), velocity_update_progress.data(tier),
                               velocity_constraint_progress.data(tier),
                               position_update_progress.data(tier),
                               geometry_constraint_progress.data(tier), nbwu_progress.data(tier),
@@ -287,8 +311,8 @@ MMControlKit<double> MolecularMechanicsControls::dpData(const HybridTargetLevel 
 //-------------------------------------------------------------------------------------------------
 MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel tier) {
   return MMControlKit<float>(step_number, sd_cycles, max_cycles, initial_step,
-                             nt_warp_multiplicity, vwu_progress.data(tier),
-                             velocity_update_progress.data(tier),
+                             nt_warp_multiplicity, electrostatic_cutoff, van_der_waals_cutoff,
+                             vwu_progress.data(tier), velocity_update_progress.data(tier),
                              velocity_constraint_progress.data(tier),
                              position_update_progress.data(tier),
                              geometry_constraint_progress.data(tier), nbwu_progress.data(tier),

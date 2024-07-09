@@ -107,9 +107,10 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
   ///        variables.
   CellGridWriter(NonbondedTheme theme_in, int system_count_in, int total_cell_count_in,
                  int total_chain_count_in, int mesh_ticks_in, size_t cell_base_capacity_in,
-                 float lpos_scale_in, float lpos_inv_scale_in, const  ullint* system_cell_grids_in,
-                 Tcalc* system_cell_umat_in, T* system_cell_invu_in, T* system_pmig_invu,
-                 uint2* cell_limits_in, uint2* cell_limits_alt_in, const uint* chain_limits_in,
+                 float lpos_scale_in, float lpos_inv_scale_in, float frc_scale_in,
+                 const  ullint* system_cell_grids_in, Tcalc* system_cell_umat_in,
+                 T* system_cell_invu_in, T* system_pmig_invu, uint2* cell_limits_in,
+                 uint2* cell_limits_alt_in, const uint* chain_limits_in,
                  const int* system_chain_bounds_in, const int* chain_system_owner_in, T4* image_in,
                  T4* image_alt_in, uchar* migration_keys_in, int* flux_in, uint* fill_counters_in,
                  int* nonimg_atom_idx_in, int* nonimg_atom_idx_alt_in, uint* img_atom_idx_in,
@@ -145,6 +146,8 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                                     ///<   no more or less information if needed)
   const float lpos_inv_scale;       ///< The inverse scaling factor applied to coordinates in the
                                     ///<   images
+  const float frc_scale;            ///< Scaling factor to apply to forces prior to accumulation in
+                                    ///<   the available fixed-precision arrays
   const ullint* system_cell_grids;  ///< Dimensions of each cell grid and the starting point for
                                     ///<   its cells in the array.  This array has one element for
                                     ///<   each system in the underlying coordinate synthesis.
@@ -251,14 +254,15 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
   /// \{
   CellGridReader(NonbondedTheme theme_in, int system_count_in, int total_cell_count_in,
                  int total_chain_count_in, int mesh_ticks_in, size_t cell_base_capacity_in,
-                 float lpos_scale_in, float lpos_inv_scale_in, const ullint* system_cell_grids_in,
-                 const Tcalc* system_cell_umat_in, const T* system_cell_invu_in,
-                 const T* system_pmig_invu_in, const uint2* cell_limits_in,
-                 const uint* chain_limits_in, const int* system_chain_bounds_in,
-                 const int* chain_system_owner_in, const T4* image_in, const int* nonimg_atom_idx_in,
-                 const uint* img_atom_idx_in, const int* nt_groups_in, const Tacc* xfrc_in,
-                 const Tacc* yfrc_in, const Tacc* zfrc_in, const int* xfrc_ovrf_in,
-                 const int* yfrc_ovrf_in, const int* zfrc_ovrf_in);
+                 float lpos_scale_in, float lpos_inv_scale_in, float inv_frc_scale_in,
+                 const ullint* system_cell_grids_in, const Tcalc* system_cell_umat_in,
+                 const T* system_cell_invu_in, const T* system_pmig_invu_in,
+                 const uint2* cell_limits_in, const uint* chain_limits_in,
+                 const int* system_chain_bounds_in, const int* chain_system_owner_in,
+                 const T4* image_in, const int* nonimg_atom_idx_in, const uint* img_atom_idx_in,
+                 const int* nt_groups_in, const Tacc* xfrc_in, const Tacc* yfrc_in,
+                 const Tacc* zfrc_in, const int* xfrc_ovrf_in, const int* yfrc_ovrf_in,
+                 const int* zfrc_ovrf_in);
 
   CellGridReader(const CellGridWriter<T, Tacc, Tcalc, T4> &cgw);
 
@@ -292,6 +296,8 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                                     ///<   no more or less information if needed)
   const float lpos_inv_scale;       ///< The inverse scaling factor applied to coordinates in the
                                     ///<   images
+  const float inv_frc_scale;        ///< Scaling factor to apply to forces read from the available
+                                    ///<   fixed-precision arrays
   const ullint* system_cell_grids;  ///< Dimensions of each cell grid and the starting point for
                                     ///<   its cells in the array
   const Tcalc* system_cell_umat;    ///< Transformation matrices for taking Cartesian coordinates

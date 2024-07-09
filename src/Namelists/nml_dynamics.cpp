@@ -23,6 +23,8 @@ DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const Wrap
     diagnostic_frequency{default_dynamics_ntpr},
     trajectory_frequency{default_dynamics_ntwx},
     time_step{default_dynamics_time_step},
+    electrostatic_cutoff{default_electrostatic_cutoff},
+    van_der_waals_cutoff{default_van_der_waals_cutoff},
     constrain_geometry{std::string(default_geometry_constraint_behavior)},
     rattle_tolerance{default_rattle_tolerance},
     rattle_iterations{default_rattle_max_iter},
@@ -57,6 +59,10 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   t_nml.assignVariable(&trajectory_frequency, "ntwx");
   t_nml.assignVariable(&com_motion_purge_ferquency, "nscm");
   t_nml.assignVariable(&time_step, "dt");
+  t_nml.assignVariable(&electrostatic_cutoff, "elec_cut");
+  t_nml.assignVariable(&van_der_waals_cutoff, "vdw_cut");
+  t_nml.assignVariable(&electrostatic_cutoff, "cut");
+  t_nml.assignVariable(&van_der_waals_cutoff, "cut");
   t_nml.assignVariable(&rattle_tolerance, "tol");
   t_nml.assignVariable(&rattle_iterations, "rattle_iter");
   setCpuRattleMethod(t_nml.getStringValue("rattle_style"));
@@ -98,6 +104,7 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   validateTrajectoryPrintFrequency();
   validateCenterOfMassMotionPurgeFrequency();
   validateTimeStep();
+  validateCutoffs();
   validateRattleTolerance();
   validateRattleIterations();
   validateThermostatKind();
@@ -128,6 +135,16 @@ int DynamicsControls::getCenterOfMassMotionPurgeFrequency() const {
 //-------------------------------------------------------------------------------------------------
 double DynamicsControls::getTimeStep() const {
   return time_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+double DynamicsControls::getElectrostaticCutoff() const {
+  return electrostatic_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+double DynamicsControls::getVanDerWaalsCutoff() const {
+  return van_der_waals_cutoff;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -268,6 +285,25 @@ DynamicsControls::setCenterOfMassMotionPurgeFrequency(const int com_motion_purge
 void DynamicsControls::setTimeStep(const double time_step_in) {
   time_step = time_step_in;
   validateTimeStep();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setElectrostaticCutoff(const double cutoff_in) {
+  electrostatic_cutoff = cutoff_in;
+  validateCutoffs();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setVanDerWaalsCutoff(const double cutoff_in) {
+  van_der_waals_cutoff = cutoff_in;
+  validateCutoffs();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setCutoff(const double cutoff_in) {
+  electrostatic_cutoff = cutoff_in;
+  van_der_waals_cutoff = cutoff_in;
+  validateCutoffs();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -510,6 +546,45 @@ void DynamicsControls::validateTimeStep() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void DynamicsControls::validateCutoffs() {
+  if (electrostatic_cutoff < minimum_elec_cutoff) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The electrostatic cutoff (" +
+            realToString(electrostatic_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ") cannot be "
+            "set below a minimum value of " +
+            realToString(minimum_elec_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ".",
+            "DynamicsControls", "validateCutoffs");
+    case ExceptionResponse::WARN:
+      rtErr("The electrostatic cutoff (" +
+            realToString(electrostatic_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ") cannot be "
+            "set below a minimum value of " +
+            realToString(minimum_elec_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ".  This "
+            "minimum value will be applied.", "DynamicsControls", "validateCutoffs");
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  if (van_der_waals_cutoff < minimum_vdw_cutoff) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A van-der Waals cutoff of " +
+            realToString(van_der_waals_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " is too "
+            "short to permit accurate force and energy computations.", "DynamicsControls",
+            "validateCutoffs");
+    case ExceptionResponse::WARN:
+      rtWarn("A van-der Waals cutoff of " +
+             realToString(van_der_waals_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " is too "
+             "short to permit accurate force and energy computations.  The minimum value of " +
+             realToString(minimum_vdw_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " will be "
+             "applied.", "DynamicsControls", "validateCutoffs");
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void DynamicsControls::validateRattleTolerance() {
   if (rattle_tolerance < minimum_rattle_tolerance) {
     switch (policy) {
@@ -708,7 +783,10 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addKeyword("ntwx", NamelistType::INTEGER, std::to_string(default_dynamics_ntwx));
   t_nml.addKeyword("nscm", NamelistType::INTEGER, std::to_string(default_dynamics_nscm));
   t_nml.addKeyword("dt", NamelistType::REAL, std::to_string(default_dynamics_time_step));
-
+  t_nml.addKeyword("elec_cut", NamelistType::REAL, std::to_string(default_electrostatic_cutoff));
+  t_nml.addKeyword("vdw_cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
+  t_nml.addKeyword("cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
+  
   // Constraint keywords
   t_nml.addKeyword("rigid_geom", NamelistType::STRING);
   t_nml.addKeyword("tol", NamelistType::REAL,
@@ -761,6 +839,16 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addHelp("nscm", "The frequency with which to purge motion of the center of mass");
   t_nml.addHelp("dt", "The time step, in units of femtoseconds");
 
+  // Help messages for interaction cutoffs
+  t_nml.addHelp("elec_cut", "The inter-particle distance at which to begin discounting "
+                "electrostatic interactions (this applies to all methods for evaluating the "
+                "electrostatic potential.");
+  t_nml.addHelp("vdw_cut", "The inter-particle distance at which to begin discounting "
+                "van-der Waals interactions (this applies to all methods for evaluating the "
+                "van-der Waals potential).");
+  t_nml.addHelp("cut", "The inter-particle distance at which to begin neglecting pairwise, "
+                "particle-particle interactions");
+  
   // Help messages for geometry constraints keywords
   t_nml.addHelp("rigid_geom", "Indicate whether to enforce rigid geometries, namely bond length "
                 "constraints and rigid water molecules");

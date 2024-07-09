@@ -299,7 +299,9 @@ std::vector<int> LocalExclusionMask::extendMasks(const NonbondedKit<double> &nbk
     }
   }
   
-  // Seed an A-mode profile (no exclusions) if none yet exists.
+  // Seed an A-mode profile (no exclusions) if none yet exists.  This will register no exclusions
+  // and be referenced by placeholder atoms in the GPU non-bonded tiles, in addition to any real
+  // atoms such as monatomic ions which have no exclusions.
   std::vector<ullint> tmp_profiles = atom_profiles.readHost();
   std::vector<uint2> tmp_secondary_masks = secondary_masks.readHost();
   std::vector<bool> atoms_mapped(nbk.natom, false);

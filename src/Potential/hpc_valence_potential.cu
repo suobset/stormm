@@ -332,7 +332,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define MIX_FUNC  computeRestraintMixtureF
 #  define TCALC_IS_SINGLE
 
-// Compile the standard kernels with all combinations of energy, and force accumulation methods.
+// Compile the standard kernels with all combinations of energy and force accumulation methods.
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
 #      define VALENCE_KERNEL_THREAD_COUNT 512

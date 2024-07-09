@@ -436,6 +436,12 @@ public:
   /// \brief Get the force accumulation bit count
   int getForceAccumulationBits() const;
 
+  /// \brief Get the force scaling factor used in fixed-precision accumulation.
+  float getForceScalingFactor() const;
+
+  /// \brief Get the inverse of the force scaling factor used in fixed-precision accumulation.
+  float getInverseForceScalingFactor() const;
+
   /// \brief Get the topology pointer for a particular system within the synthesis.
   ///
   /// Overloaded:

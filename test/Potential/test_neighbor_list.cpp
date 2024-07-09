@@ -7,6 +7,7 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/formulas.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Numerics/host_popc.h"
 #include "../../src/Parsing/parse.h"
@@ -16,6 +17,7 @@
 #include "../../src/Potential/local_exclusionmask.h"
 #include "../../src/Potential/pmigrid.h"
 #include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/tile_manager.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
@@ -54,6 +56,7 @@ using stormm::int_type_index;
 using stormm::llint_type_index;
 using stormm::constants::ExceptionResponse;
 using stormm::constants::warp_size_int;
+using stormm::constants::warp_bits_mask_int;
 using stormm::data_types::int95_t;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
@@ -71,6 +74,7 @@ using stormm::parse::uppercase;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
+using stormm::stmath::ipow;
 using stormm::stmath::reduceUniqueValues;
 using stormm::stmath::tileVector;
 using stormm::synthesis::AtomGraphSynthesis;
@@ -1073,6 +1077,93 @@ void testCellMigration(CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg, PhaseSpaceSyn
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test the tile plans used to manage interacting particle sets in the neutral-territory
+// decomposition.
+//-------------------------------------------------------------------------------------------------
+void testTilePlans() {
+  const int2 lp = { 320, 256 };
+  const TileManager tlmn(lp);
+  for (int i = 0; i <= tlmn.getMaximumBatchDegeneracy(); i++) {
+    const int snd_deg = ipow(2, i);
+    const int snd_natom = warp_size_int / snd_deg;
+    const std::vector<int> send_atoms = tlmn.getSendingAtomLayout(snd_deg);
+
+    // Check the sending atom layout
+    std::vector<int> chk_send_atoms(warp_size_int);
+    int popcon = 0;
+    for (int j = 0; j < snd_deg; j++) {
+      for (int k = 0; k < snd_natom; k++) {
+        chk_send_atoms[popcon] = k;
+        popcon++;
+      }
+    }
+    check(send_atoms, RelationalOperator::EQUAL, chk_send_atoms, "The layout of sending atom "
+          "relative indices produced by a TileManager does not meet expectations.");
+
+    // Loop over various receiving atom configurations
+    for (int j = 0; j <= tlmn.getMaximumBatchDegeneracy(); j++) {
+      const int rcv_deg = ipow(2, j);
+      const int rcv_natom = warp_size_int / rcv_deg;
+      std::vector<std::vector<int>> intr(snd_natom, std::vector<int>(rcv_natom, 0));
+      std::vector<int> recv_atoms = tlmn.getReadAssignments(snd_deg, rcv_deg);
+      const int tile_depth = (snd_natom * rcv_natom) / warp_size_int;
+      bool off_tile_interactions = false;
+      for (int k = 0; k < tile_depth; k++) {
+
+        // Loop over all "threads" of the warp and record the interaction
+        for (int m = 0; m < warp_size_int; m++) {
+          if (send_atoms[m] < 0 || send_atoms[m] >= snd_natom ||
+              recv_atoms[m] < 0 || recv_atoms[m] >= rcv_natom) {
+            off_tile_interactions = true;
+          }
+          else {
+            intr[send_atoms[m]][recv_atoms[m]] += 1;
+          }
+        }
+
+        // Advance the receiving atoms, as if by shuffle instructions in the warp
+        const int zero_idx = recv_atoms[0];
+        for (int m = 0; m < warp_bits_mask_int; m++) {
+          recv_atoms[m] = recv_atoms[m + 1];
+        }
+        recv_atoms[warp_bits_mask_int] = zero_idx;
+      }
+      check(off_tile_interactions == false, "Off-tile interactions were included in evaluating " +
+            std::to_string(snd_natom) + " x " + std::to_string(rcv_natom) + " atoms with warp "
+            "size " + std::to_string(warp_size_int) + ".");
+      int missing_interactions = 0;
+      int double_counting      = 0;
+      for (int k = 0; k < snd_natom; k++) {
+        for (int m = 0; m < rcv_natom; m++) {
+          missing_interactions += (intr[k][m] == 0);
+          double_counting += (intr[k][m] > 1);
+        }
+      }
+      check(missing_interactions, RelationalOperator::EQUAL, 0, "Some interactions between atoms "
+            "were not counted in evaluating " + std::to_string(snd_natom) + " x " +
+            std::to_string(rcv_natom) + " atoms with warp size " + std::to_string(warp_size_int) +
+            ".");
+      check(double_counting, RelationalOperator::EQUAL, 0, "Some interactions between atoms "
+            "were counted multiple times in evaluating " + std::to_string(snd_natom) + " x " +
+            std::to_string(rcv_natom) + " atoms with warp size " + std::to_string(warp_size_int) +
+            ".");
+
+      // Apply the reorganization that would prepare for reduction of the accumulated forces.
+      // The receiving atom layout, after applying the reduction map, should look like a sending
+      // atom layout at the same level of degeneracy.
+      std::vector<int> reduce_deck(warp_size_int);
+      const std::vector<int> reduce_insr = tlmn.getReductionPreparations(snd_deg, rcv_deg);
+      for (int k = 0; k < warp_size_int; k++) {
+        reduce_deck[k] = recv_atoms[reduce_insr[k]];
+      }
+      const std::vector<int> reduce_ansr = tlmn.getSendingAtomLayout(rcv_deg);
+      check(reduce_deck, RelationalOperator::EQUAL, reduce_ansr, "The reduction-prepared "
+            "receiving atom layout is not suitable for collecting forces.");
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1099,6 +1190,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 3
   section("Local exclusion mask analysis");
+
+  // Section 4
+  section("Non-bonded tile mechanics");
   
   // Locate topologies and coordinate files
   const char osc = osSeparator();
@@ -1254,6 +1348,10 @@ int main(const int argc, const char* argv[]) {
   
   // Test the CellGrid object's particle migration
   testCellMigration(&cg, &poly_ps, &xrs, tsm.getTestingStatus());
+
+  // Test the tile plans
+  section(4);
+  testTilePlans();
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {
