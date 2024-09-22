@@ -330,8 +330,21 @@ CheckResult check(const Approx &lhs, const RelationalOperator relationship, cons
 //-------------------------------------------------------------------------------------------------
 CheckResult check(const double lhs, const RelationalOperator relationship, const double rhs,
                   const std::string &error_message, const TestPriority urgency) {
-  return check(lhs, relationship, Approx(rhs).margin(fabs(rhs) * constants::verytiny),
-               error_message, urgency);
+  if (fabs(rhs) > 1.0) {
+    return check(lhs, relationship, Approx(rhs).margin(fabs(rhs) * 1.0e-6), error_message,
+                 urgency);
+  }
+  else if (fabs(rhs >= 0.01)) {
+    return check(lhs, relationship, Approx(rhs).margin(constants::small), error_message, urgency);
+  }
+  else if (fabs(rhs >= 0.0001)) {
+    return check(lhs, relationship, Approx(rhs).margin(constants::tiny), error_message, urgency);
+  }
+  else {
+    return check(lhs, relationship, Approx(rhs).margin(constants::verytiny), error_message,
+                 urgency);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

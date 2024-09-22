@@ -31,7 +31,9 @@ using energy::ClashResponse;
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
 using energy::getEnumerationName;
+using energy::NeighborListKind;
 using energy::QMapMethod;
+using energy::TinyBoxPresence;
 using energy::ValenceKernelSize;
 using numerics::AccumulationMethod;
 using structure::GridDetail;
@@ -59,7 +61,10 @@ public:
   /// \param gpu_in   Details of the GPU in use (this is relevant, as it will be used to interpret
   ///                 the layout of any kernels)
   /// \param poly_ag  Topologies for all systems, offering details of the workload
+  /// \{
+  CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis *poly_ag);
   CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag);
+  /// \}
 
   /// \brief Get the architecture-specific block multiplier.  This will run a minimum number of
   ///        blocks per streaming multiprocessor on some cards, specifically NVIDIA's GTX 1080-Ti,
@@ -169,7 +174,46 @@ public:
   /// \param prec   The precision model in which to perform calculations and present results
   /// \param order  The order of the calculation (all to reference, or all to all)
   int2 getRMSDKernelDims(PrecisionModel prec, RMSDTask order) const;
-  
+
+  /// \brief Get the block and thread counts for a PME pair interactions kernel evaluating the
+  ///        purview of each nieghbor list cell in a neutral territory decomposition.
+  ///
+  /// \param coord_prec          Level of detail in which particle coordinate representations and
+  ///                            accumulation will take place
+  /// \param calc_prec           Level of detail in which arithmetic calculations will take place
+  /// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+  ///                            evaluate
+  /// \param has_tiny_box        Indicate whether there is a very small box somewhere within the
+  ///                            synthesis of systems
+  /// \param eval_frc            Indicate whether to evaluate the forces on all particle
+  /// \param eval_nrg            Indicate whether to evaluate each system's non-bonded energy
+  /// \param mitigation          Action to take in response to clashes in the structure
+  int2 getPMEPairsKernelDims(PrecisionModel coord_prec, PrecisionModel calc_prec,
+                             NeighborListKind grid_configuration, TinyBoxPresence has_tiny_box,
+                             EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                             ClashResponse mitigation) const;
+
+  /// \brief Get the block and thread counts for a particle migration kernel needed to update
+  ///        particle positions and cell locations as part of a molecular dynamics time step.
+  ///
+  /// \param coord_prec          Level of detail in which particle coordinate representations and
+  ///                            accumulation will take place
+  /// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+  ///                            evaluate
+  /// \param stage_number        The stage of the calculation
+  /// \param gpos_bits           The number of fixed-precision bits after the point used in the
+  ///                            global particle position representation.  This number is relevant
+  ///                            when stage_number is 1.  If left at its default value, kernel
+  ///                            launch dimensions for the more laborious form of the kernel
+  ///                            (invoking the overflow bits of the fixed-precision representation)
+  ///                            will be provided.
+  /// \param chain_count         The number of chains in the cell grids, each of which will become
+  ///                            the subject of one thread block and one work unit.  This can be
+  ///                            provided when retrieving the launch parameters for modification
+  ///                            of the launch grid based on the exact neighbor list situation.
+  int2 getMigrationKernelDims(PrecisionModel coord_prec, NeighborListKind grid_configuration,
+                              int stage_number, int gpos_bits = 0, int chain_count = 0) const;
+
 private:
 
   /// This parameter controls the valence kernel block multiplier.  There will always be at least
@@ -202,7 +246,7 @@ private:
   int gbderiv_block_multiplier_dp;
   int gbderiv_block_multiplier_sp;
   /// \}
-
+  
   /// Architecture-specific block multipliers for mapping kernels.  The specific multiplier for
   /// interpolation order k at a particular level of precision is given by the kth index of either
   /// array.  The "gen" prefix indicates a general-purpose mapping kernel, the "rac" prefix
@@ -347,6 +391,42 @@ private:
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogRMSDKernel(PrecisionModel prec, RMSDTask order,
                          const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the thread block counts for pair interaction kernels calculating pairs with one
+  ///        atom in the tower and one atom in the plate.
+  ///
+  /// \param coord_prec          Level of detail in which particle coordinate representations and
+  ///                            accumulation will take place
+  /// \param calc_prec           Level of detail in which particle arithmetic calculations will
+  ///                            take place
+  /// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+  ///                            evaluate
+  /// \param has_tiny_box        Indicate whether there is a very small box somewhere within the
+  ///                            synthesis of systems
+  /// \param eval_frc            Indicate whether to evaluate the forces on all particle
+  /// \param eval_nrg            Indicate whether to evaluate each system's non-bonded energy
+  /// \param mitigation          Action to take in response to clashes in the structure
+  /// \param kernel_name         [Optional] Name of the kernel in the actual code
+  /// \param span                Indicate the juxtaposition of each particle in the pair
+  ///                            interactions, as well as any kernel fusion
+  void catalogPMEPairsKernel(PrecisionModel coord_prec, PrecisionModel calc_prec,
+                             NeighborListKind grid_configuration, TinyBoxPresence has_tiny_box,
+                             EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                             ClashResponse mitigation,
+                             const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the block size and counts for particle migration kernels.
+  ///
+  /// \param coord_prec          Level of detail in which particle coordinate representations and
+  ///                            accumulation will take place
+  /// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+  ///                            evaluate
+  /// \param stage_number        The stage of the migration (accepted values 1, 2)
+  /// \param gpos_bits           The number of fixed-precision bits after the point used to
+  ///                            represent coordinates
+  void catalogMigrationKernel(PrecisionModel coord_prec, NeighborListKind grid_configuration,
+                              int stage_number, int gpos_bits,
+                              const std::string &kernel_name = std::string(""));
 };
 
 /// \brief Obtain the architecture-specific block multiplier for non-bonded interaction kernels.
@@ -395,6 +475,19 @@ int virtualSiteBlockMultiplier(PrecisionModel prec);
 /// \param prec  The type of floating point numbers in which the kernel shall work
 int rmsdBlockMultiplier(PrecisionModel prec);
 
+/// \brief Obtain the block multiplier for PME particle-particle pair calculation kernels.  Each
+///        block will run on up to 576 threads, reduced as necessary for register availability.
+///
+/// \param gpu         Details of the GPU that will perform the calculations
+/// \param coord_prec  The type of floating point numbers in which coordinates are stored
+/// \param calc_prec   The type of floating point numbers in which calculations are performed
+int pmePairsBlockMultiplier(const GpuDetails &gpu, PrecisionModel coord_prec,
+                            PrecisionModel calc_prec);
+
+/// \brief Obtain the block multiplier for PME migration kernels.  Each block will run on up to
+///        320 threads.
+int migrationBlockMultiplier();
+
 /// \brief Codify the kernel extension for various valence-related kernels.
 ///
 /// \param prec    The precision in which the kernel operates.  Double-precision kernels are
@@ -409,8 +502,8 @@ std::string valenceKernelWidthExtension(PrecisionModel prec, ValenceKernelSize k
 ///        - { e, f, fe }        Compute energies (e), forces (f), or both (ef)
 ///        - { s, w }            Accumulate forces in split integers (s) or whole integers (w)
 ///        - { m, a }            Move atoms (m) or accumulate forces or energies (a
-///        - { cl, nc }          Take no action (cl) in the event of a collision, or implement an
-///                              increase in the perceived distance between particles (nc) 
+///        - { cl, nc }          Take no action (cl) in the event of a collision, or implement a
+///                              soft-core interaction between such particles (nc)
 ///        - { xl, lg, md, sm }  Use an extra large (xl), large (lg), medium (md), or small (sm)
 ///                              kernel thread block
 ///
@@ -455,8 +548,8 @@ std::string integrationKernelKey(PrecisionModel prec, AccumulationMethod acc_met
 ///                             systems in isolated boundary conditions)
 ///        - { e, f, fe }       Compute energies (e), forces (f), or both (fe)
 ///        - { s, w }           Accumulate forces in split integers (s) or whole integers (w)
-///        - { cl, nc }         Take no action (cl) in the event of a collision, or implement an
-///                             increase in the perceived distance between particles (nc) 
+///        - { cl, nc }         Take no action (cl) in the event of a collision, or implement a
+///                             soft-core interaction between such particles ("no clash", nc)
 ///
 /// \param prec                The type of floating point numbers in which the kernel shall work
 /// \param kind                The type of non-bonded work unit to evaluate
@@ -562,6 +655,61 @@ std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity proces
 /// \param prec   The type of floating point numbers in which the kernel shall work
 /// \param order  The order of the calculation (all to reference, or all to all)
 std::string rmsdKernelKey(PrecisionModel prec, RMSDTask order);
+
+/// \brief Obtain a unique string identifier for one of the PME particle-particle pair interaction
+///        kernels.  Each identifier begins with "pme_" and is then appended with letter codes for
+///        different activities according to the following system:
+///        - { tp, tt }    Calculate pairs spanning tower and plate or spanning tower and tower
+///        - { d, f }      Take coordinates in double (d) or float (f) arithmetic
+///        - { d, f }      Perform calculations in double (d) or float (f) arithmetic
+///        - { pr, un }    Use separate neighbor lists for electrostatic and van-der Waals
+///                        interactions (pr) or a unified neighbor list that does both (un)
+///        - { e, f, fe }  Compute energies (e), forces (f), or both (fe)
+///        - { t, s }      Make accommodations for one or more tiny boxes (t) or assume larger,
+///                        standard dimensions (s) throughout the synthesis
+///        - { cl, nc }    Take no action (cl) in the event of a collision, or implement a
+///                        soft-core interaction between such particles ("no clash", nc)
+///
+/// \param coord_prec          Level of detail in which particle coordinate representations and
+///                            accumulation will take place
+/// \param calc_prec           Level of detail in which particle arithmetic calculations will
+///                            take place
+/// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+///                            evaluate
+/// \param has_tiny_box        Indicate whether there is a very small box somewhere within the
+///                            synthesis of systems
+/// \param eval_frc            Indicate whether to evaluate the forces on all particle
+/// \param eval_nrg            Indicate whether to evaluate each system's non-bonded energy
+/// \param mitigation          Action to take in response to clashes in the structure
+/// \param span                Indicate whether the pair spans the tower and plate, or the tower
+///                            central cell and the rest of the tower itself
+std::string pmePairsKernelKey(PrecisionModel coord_prec, PrecisionModel calc_prec,
+                              NeighborListKind grid_configuration, TinyBoxPresence has_tiny_box,
+                              EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                              ClashResponse mitigation);
+
+/// \brief Obtain a unique string identifier for one of the PME particle migration kernels.  Each
+///        identifier begins with "migr_" and is then appended with letter codes for different
+///        coordinate representations and neighbor list configurations as follows:
+///        - { d, f }      Take coordinates in double (d) or float (f) representations
+///        - { pr, un }    Use separate neighbor lists for electrostatic and van-der Waals
+///                        interactions (pr) or a unified neighbor list that does both (un)
+///        - { i, ii }     Stages 1 or 2
+///        - { _fn, _lr }  Coordinates are expressed in "fine" detail (more that a certain number
+///                        of fixed-precision bits after the decimal) or "low resolution" detail
+///
+/// \param coord_prec          Level of detail in which particle coordinate representations and
+///                            accumulation will take place
+/// \param grid_configuration  Indicate whether there are one or two neighbor list grids to
+///                            evaluate
+/// \param stage_number        The stage number of the migration process
+/// \param gpos_bits           The number of fixed-precision bits after the point used in the
+///                            coordinate representation.  This will be compared to a hard limit
+///                            on the format that determines whether Cartesian X, Y, or Z
+///                            coordinates can be assumed to fall entirely within the first 64
+///                            bits of their respective arrays in the PhaseSpaceSynthesis object.
+std::string migrationKernelKey(PrecisionModel coord_prec, NeighborListKind grid_configuration,
+                               int stage_number, int gpos_bits);
 
 } // namespace card
 } // namespace stormm

@@ -1,26 +1,27 @@
 // -*-c++-*-
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/hpc_bounds.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/bspline.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/hpc_summation.cuh"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Random/random.h"
 #include "../../src/Random/hpc_random.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using stormm::constants::ExceptionResponse;
-using stormm::constants::tiny;
-using stormm::constants::large_block_size;
-using stormm::constants::warp_bits_mask_int;
 using stormm::card::HpcConfig;
 using stormm::card::Hybrid;
 using stormm::card::HybridFormat;
 using stormm::card::HybridTargetLevel;
 using stormm::card::GpuDetails;
+using stormm::data_types::int95_t;
+using stormm::data_types::isFloatingPointScalarType;
 using stormm::data_types::llint;
 using stormm::data_types::ullint;
 using stormm::data_types::ullint2;
@@ -37,11 +38,59 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Xoshiro256ppGenerator;
 using stormm::random::default_xoroshiro128p_scrub;
 using stormm::random::default_xoshiro256pp_scrub;
+using namespace stormm::constants;
 using namespace stormm::stmath;
 using namespace stormm::hpc_math;
 using namespace stormm::testing;
+using namespace stormm::numerics;
 
+#include "../../src/Numerics/accumulation.cui"
 #include "../../src/Math/bspline.cui"
+
+//-------------------------------------------------------------------------------------------------
+// Enumerator for specifying the operator to be used during testing Split Fixed Precision Math
+//
+//   Operator:        The operator to be used (summation or subtraction)
+//-------------------------------------------------------------------------------------------------
+enum class Operator {
+  SUM,        ///< Split Fixed Integer Summation
+  SUBTRACT    ///< Split Fixed Integer Subtraction
+};
+
+//-------------------------------------------------------------------------------------------------
+// Enumerator for specifying the types of pairs to be used during Split Fixed Math operations
+//
+//   FusionStyle: Specifies the type of Split Fixed Precision numbers each of the operands are
+//-------------------------------------------------------------------------------------------------
+enum class FusionStyle {
+  FUSED_DECPL,  ///< The first number is fused, and the second number is a pair of free integers.
+  FUSED_FLOAT,  ///< The first number is fused, and the second number is fused in float type.
+  DECPL_DECPL,  ///< Both numbers are pairs of free integers.
+  DECPL_FLOAT,  ///< The first number is a pair of free integers, and the second number is float.
+  FUSED_FUSED   ///< Both the numbers are fused.
+};
+
+//-------------------------------------------------------------------------------------------------
+// Helper functions to return strings versions of enumerators above.
+//-------------------------------------------------------------------------------------------------
+std::string getOperatorName(const Operator& op) {
+  switch (op) {
+    case Operator::SUBTRACT: return "SUBTRACT";
+    case Operator::SUM: return "SUM";
+  }
+  return "";
+}
+
+std::string getFusionStyleName(const FusionStyle& fusion) {
+  switch (fusion) {
+    case FusionStyle::FUSED_DECPL: return "FUSED_DECPL";
+    case FusionStyle::FUSED_FLOAT: return "FUSED_FLOAT";
+    case FusionStyle::DECPL_DECPL: return "DECPL_DECPL";
+    case FusionStyle::DECPL_FLOAT: return "DECPL_FLOAT";
+    case FusionStyle::FUSED_FUSED: return "FUSED_FUSED";
+  }
+  return "";
+}
 
 //-------------------------------------------------------------------------------------------------
 // Load a vector of random numbers using a CPU-based Ran2 generator.
@@ -442,6 +491,479 @@ void testBSplineDeviceFuncs() {
 }
 
 //-------------------------------------------------------------------------------------------------
+// CUDA kernels to perform split fixed precision addition & subtraction on different
+// variable types. 
+//
+// Arguments:
+//   arr_a:         Split Fixed Precision Array
+//   arr_a_ovrf:    Split Fixed Precision Array Overflow for arr_a
+//   arr_b:         Split Fixed Precision Array
+//   arr_b_ovrf:    Split Fixed Precision Array Overflow for arr_b
+//   results:       Array carrying results of an operation on arr_a and arr_b
+//   results_ovrf:  Split Fixed Precision Array Overflow for results
+//   cur_operator:  Enumerator detailing the current Math operator to apply
+//   nums:          The number of total elements in each array
+//   
+//-------------------------------------------------------------------------------------------------
+__global__ void testSplitFixedPrecision(int *arr_a, int *arr_a_ovrf, int *arr_b, int *arr_b_ovrf,
+                                        int *results, int *results_ovrf,
+                                        const Operator cur_operator, const FusionStyle method,
+                                        const int nums) {
+  int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+  while (tid < nums) {
+    int2 cur_result;
+    switch (cur_operator) {
+    case Operator::SUBTRACT: 
+      switch(method) {
+      case FusionStyle::FUSED_FUSED: 
+        {
+          const int2 lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const int2 rh_number = { arr_b[tid], arr_b_ovrf[tid] };
+          cur_result = splitFPSubtract(lh_number, rh_number);
+        } 
+        break;
+      case FusionStyle::FUSED_DECPL:
+        {
+          const int2 lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          cur_result = splitFPSubtract(lh_number, arr_b[tid], arr_b_ovrf[tid]);
+        }
+        break;
+      case FusionStyle::DECPL_DECPL:
+        cur_result = int63Subtract(arr_a[tid], arr_a_ovrf[tid], arr_b[tid], arr_b_ovrf[tid]);
+        break;
+      }
+      break;
+
+    case Operator::SUM:
+      switch(method) {
+      case FusionStyle::FUSED_FUSED: 
+        {
+          const int2 lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const int2 rh_number = { arr_b[tid], arr_b_ovrf[tid] };
+          cur_result = splitFPSum(lh_number, rh_number);
+        } 
+        break;
+      case FusionStyle::FUSED_DECPL:
+        {
+          const int2 lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          cur_result = splitFPSum(lh_number, arr_b[tid], arr_b_ovrf[tid]);
+        }
+        break;
+      case FusionStyle::FUSED_FLOAT:
+        {
+          const int2 lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const float rh_number = int63ToFloat(arr_b[tid], arr_b_ovrf[tid]);
+          cur_result = splitFPSum(lh_number, rh_number);
+        }
+        break;
+      case FusionStyle::DECPL_DECPL:
+        cur_result = int63Sum(arr_a[tid], arr_a_ovrf[tid], arr_b[tid], arr_b_ovrf[tid]);
+        break;
+      case FusionStyle::DECPL_FLOAT:
+        {
+          const float rh_number = int63ToFloat(arr_b[tid], arr_b_ovrf[tid]);
+          cur_result = int63Sum(arr_a[tid], arr_a_ovrf[tid], rh_number);
+        }
+        break;
+      }
+      break;
+    }
+    results[tid] = cur_result.x;
+    results_ovrf[tid] = cur_result.y;
+    tid += (blockDim.x * gridDim.x);
+  }
+}
+
+__global__ void testSplitFixedPrecision(llint *arr_a, int *arr_a_ovrf,
+                                        llint *arr_b, int *arr_b_ovrf, 
+                                        llint *results, int *results_ovrf,
+                                        const Operator cur_operator, const FusionStyle method,
+                                        const int nums) {
+  int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+  while (tid < nums) {
+    int95_t cur_result;
+    switch (cur_operator) {
+    case Operator::SUBTRACT: 
+      switch(method) {
+      case FusionStyle::FUSED_FUSED: 
+        {
+          const int95_t lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const int95_t rh_number = { arr_b[tid], arr_b_ovrf[tid] };
+          cur_result = splitFPSubtract(lh_number, rh_number);
+        } 
+        break;
+      case FusionStyle::FUSED_DECPL:
+        {
+          const int95_t lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          cur_result = splitFPSubtract(lh_number, arr_b[tid], arr_b_ovrf[tid]);
+        }
+        break;
+      case FusionStyle::DECPL_DECPL:
+        cur_result = int95Subtract(arr_a[tid], arr_a_ovrf[tid], arr_b[tid], arr_b_ovrf[tid]);
+        break;
+      }
+      break;
+
+    case Operator::SUM:
+      switch(method) {
+      case FusionStyle::FUSED_FUSED: 
+        {
+          const int95_t lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const int95_t rh_number = { arr_b[tid], arr_b_ovrf[tid] };
+          cur_result = splitFPSum(lh_number, rh_number);
+        } 
+        break;
+      case FusionStyle::FUSED_DECPL:
+        {
+          const int95_t lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          cur_result = splitFPSum(lh_number, arr_b[tid], arr_b_ovrf[tid]);
+        }
+        break;
+      case FusionStyle::FUSED_FLOAT:
+        {
+          const int95_t lh_number = { arr_a[tid], arr_a_ovrf[tid] };
+          const double rh_number = int95ToDouble(arr_b[tid], arr_b_ovrf[tid]);
+          cur_result = splitFPSum(lh_number, rh_number);
+        }
+        break;
+      case FusionStyle::DECPL_DECPL:
+        cur_result = int95Sum(arr_a[tid], arr_a_ovrf[tid], arr_b[tid], arr_b_ovrf[tid]);
+        break;
+      case FusionStyle::DECPL_FLOAT:
+        {
+          const double rh_number = int95ToDouble(arr_b[tid], arr_b_ovrf[tid]);
+          cur_result = int95Sum(arr_a[tid], arr_a_ovrf[tid], rh_number);
+        }
+        break;
+      }
+      break;
+    }
+    results[tid] = cur_result.x;
+    results_ovrf[tid] = cur_result.y;
+    tid += (blockDim.x * gridDim.x);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Perform multiplication on split fixed-precision numbers.  The results will bedeposited in a pair
+// of holding arrays which can then be downloaded for inspection.
+//
+// Overloaded:
+//   - Operate on int63_t (int2) factors
+//   - Operate on int95_t factors
+//
+// Arguments:
+//   primary:      Array of primary accumulators
+//   overflow:     Array of overflow accumulators
+//   multipliers:  Array of multiplier values
+//   result_prim:  Array of primary accumulators for the results
+//   result_ovrf:  Array of overflow accumulators for the results
+//   ntest:        The number of tests to vectorize
+//   fuse_inputs:  Flag to have input values fused into a tuple or remain separate (to engage
+//                 distinct inline __device__ functions) 
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(small_block_size, 4)
+testSFPMultiplication(const int* primary, const int* overflow, const int* multipliers,
+                      int* results_prim, int* results_ovrf, const int ntest,
+                      const bool fuse_inputs) {
+  for (int i = threadIdx.x; i < ntest; i += blockDim.x * gridDim.x) {
+    int2 r;
+    if (fuse_inputs) {
+      const int2 base = { primary[i], overflow[i] };
+      r = splitFPMult(base, multipliers[i]);
+    }
+    else {
+      r = int63Mult(primary[i], overflow[i], multipliers[i]);
+    }
+    results_prim[i] = r.x;
+    results_ovrf[i] = r.y;
+  }
+}
+
+__global__ void __launch_bounds__(small_block_size, 4)
+testSFPMultiplication(const llint* primary, const int* overflow, const int* multipliers,
+                      llint* results_prim, int* results_ovrf, const int ntest,
+                      const bool fuse_inputs) {
+  for (int i = threadIdx.x; i < ntest; i += blockDim.x * gridDim.x) {
+    int95_t r;
+    if (fuse_inputs) {
+      const int95_t base = { primary[i], overflow[i] };
+      r = splitFPMult(base, multipliers[i]);
+    }
+    else {
+      r = int95Mult(primary[i], overflow[i], multipliers[i]);
+    }
+    results_prim[i] = r.x;
+    results_ovrf[i] = r.y;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test split fixed-precision addition and subtraction on HPC resources in extreme value cases.
+//
+// Arguments:
+//   nsmp:  The number of stremaing multiprocessors detected on the GPU
+//   xrs:   Source of random numbers for additional tests
+//-------------------------------------------------------------------------------------------------
+void testSplitFixedPrecision(const int nsmp, Xoroshiro128pGenerator *xrs) {
+  const int nums = 1024;
+  const HybridTargetLevel devc_layer = HybridTargetLevel::DEVICE;
+  Hybrid<int> arr_a(nums), arr_a_ovrf(nums), arr_b(nums), arr_b_ovrf(nums);
+  Hybrid<int> results(nums), results_ovrf(nums);
+  Hybrid<llint> llarr_a(nums), llarr_b(nums), llresults(nums);
+  int* arr_a_pointer = arr_a.data();
+  int* arr_a_ovrf_pointer = arr_a_ovrf.data();
+  int* arr_b_pointer = arr_b.data();
+  int* arr_b_ovrf_pointer = arr_b_ovrf.data();
+  llint* llarr_a_pointer = llarr_a.data();
+  llint* llarr_b_pointer = llarr_b.data();
+  std::vector<double> rdc_a(nums), rdc_b(nums);
+  std::vector<double> llrdc_a(nums), llrdc_b(nums);
+  std::vector<double> target_ab_subtract(nums), target_ab_sum(nums);
+  std::vector<double> lltarget_ab_subtract(nums), lltarget_ab_sum(nums);
+
+  // Stage testing data and targets.
+  const double scale_down = pow(2.0, -31.0);
+  const double scale_down_ll = pow(2, -63);
+  int ijkm = 0;
+  for (int i = -2; i <= 2; ++i) {
+    for (int j = -2; j <= 2; ++j) {
+      for (int k = -2; k <= 2; ++k) {
+        for (int m = -2; m <= 2; ++m) {
+          if (i < 0) {
+           arr_a_pointer[ijkm] = INT_MAX - (-1 - i);
+           arr_b_pointer[ijkm] = INT_MAX - (-1 - k);
+           llarr_a_pointer[ijkm] = LLONG_MAX - (-1 - i);
+           llarr_b_pointer[ijkm] = LLONG_MAX - (-1 - k);
+          }
+          else {
+           arr_a_pointer[ijkm] = INT_MIN + i;
+           arr_b_pointer[ijkm] = INT_MIN + k;
+           llarr_a_pointer[ijkm] = LLONG_MIN + i;
+           llarr_b_pointer[ijkm] = LLONG_MIN + k;
+          }
+          arr_a_ovrf_pointer[ijkm] = j;
+          arr_b_ovrf_pointer[ijkm] = m;
+          rdc_a[ijkm] = hostInt63ToDouble(arr_a_pointer[ijkm], arr_a_ovrf_pointer[ijkm]);
+          rdc_b[ijkm] = hostInt63ToDouble(arr_b_pointer[ijkm], arr_b_ovrf_pointer[ijkm]);
+          llrdc_a[ijkm] = hostInt95ToDouble(llarr_a_pointer[ijkm], arr_a_ovrf_pointer[ijkm]);
+          llrdc_b[ijkm] = hostInt95ToDouble(llarr_b_pointer[ijkm], arr_b_ovrf_pointer[ijkm]);
+          target_ab_subtract[ijkm] = (rdc_a[ijkm] - rdc_b[ijkm]) * scale_down;
+          target_ab_sum[ijkm] = (rdc_a[ijkm] + rdc_b[ijkm]) * scale_down;
+          lltarget_ab_subtract[ijkm] = (llrdc_a[ijkm] - llrdc_b[ijkm]) * scale_down_ll;
+          lltarget_ab_sum[ijkm] = (llrdc_a[ijkm] + llrdc_b[ijkm]) * scale_down_ll;
+          ijkm++;
+        }
+      }
+    }
+  } 
+  arr_a.upload();
+  arr_a_ovrf.upload();
+  arr_b.upload();
+  arr_b_ovrf.upload();
+  llarr_a.upload();
+  llarr_b.upload();
+  std::vector<Operator> operators = { Operator::SUBTRACT, Operator::SUM };
+  std::vector<FusionStyle> fusions = { FusionStyle::FUSED_FUSED, FusionStyle::FUSED_DECPL,
+                                       FusionStyle::FUSED_FLOAT, FusionStyle::DECPL_DECPL,
+                                       FusionStyle::DECPL_FLOAT };
+  for (Operator& cur_operator : operators) {
+    for (FusionStyle& cur_fusion : fusions) {
+      if (cur_operator == Operator::SUBTRACT &&
+          (cur_fusion == FusionStyle::FUSED_FLOAT || cur_fusion == FusionStyle::DECPL_FLOAT)) {
+        continue;
+      }
+      testSplitFixedPrecision<<<4 * nsmp, small_block_size>>>(arr_a.data(devc_layer),
+                                                              arr_a_ovrf.data(devc_layer), 
+                                                              arr_b.data(devc_layer),
+                                                              arr_b_ovrf.data(devc_layer), 
+                                                              results.data(devc_layer),
+                                                              results_ovrf.data(devc_layer),
+                                                              cur_operator, cur_fusion, nums);
+      results.download();
+      results_ovrf.download();
+      std::vector<double> rdc_gpu(nums);
+      for (int i = 0; i < nums; i++) {
+        rdc_gpu[i] = hostInt63ToDouble(results.readHost(i), results_ovrf.readHost(i));
+        rdc_gpu[i] *= scale_down;
+      }
+      switch(cur_operator) {
+      case Operator::SUBTRACT:
+        check(rdc_gpu, RelationalOperator::EQUAL, target_ab_subtract, 
+              "Operation involving int63 fails. Operator: " + 
+              getOperatorName(cur_operator) + " | FusionStyle: " +
+              getFusionStyleName(cur_fusion) + "\n");
+        break;
+      case Operator::SUM:
+        check(rdc_gpu, RelationalOperator::EQUAL, target_ab_sum, 
+              "Operation involving int63 fails. Operator: " + 
+              getOperatorName(cur_operator) + " | FusionStyle: " +
+              getFusionStyleName(cur_fusion) + "\n");
+
+        break;
+      }
+      testSplitFixedPrecision<<<4 * nsmp, small_block_size>>>(llarr_a.data(devc_layer),
+                                                              arr_a_ovrf.data(devc_layer), 
+                                                              llarr_b.data(devc_layer),
+                                                              arr_b_ovrf.data(devc_layer), 
+                                                              llresults.data(devc_layer),
+                                                              results_ovrf.data(devc_layer),
+                                                              cur_operator, cur_fusion, nums);
+      llresults.download();
+      results_ovrf.download();
+      for (int i = 0; i < nums; i++) {
+        rdc_gpu[i] = hostInt95ToDouble(llresults.readHost(i), results_ovrf.readHost(i));
+        rdc_gpu[i] *= scale_down_ll;
+      }
+      switch (cur_operator) {
+      case Operator::SUBTRACT:
+        check(rdc_gpu, RelationalOperator::EQUAL, lltarget_ab_subtract, 
+              "Operation involving int95_t fails. Operator: " + 
+              getOperatorName(cur_operator) + " | FusionStyle: " +
+              getFusionStyleName(cur_fusion) + "\n");
+        break;
+      case Operator::SUM:
+        check(rdc_gpu, RelationalOperator::EQUAL, lltarget_ab_sum, 
+              "Operation involving int95_t fails. Operator: " + 
+              getOperatorName(cur_operator) + " | FusionStyle: " +
+              getFusionStyleName(cur_fusion) + "\n");
+        break;
+      }
+    }
+  }
+
+  // Test multiplication operations
+  const int n_mult_test = 216;
+  Hybrid<int> primary(n_mult_test), overflow(n_mult_test), resmul_prim(n_mult_test);
+  Hybrid<llint> primary_ll(n_mult_test), resmul_ll_prim(n_mult_test);
+  Hybrid<int> multipliers(n_mult_test), resmul_ovrf(n_mult_test);
+  int* primary_ptr = primary.data();
+  llint* primary_ll_ptr = primary_ll.data();
+  int* overflow_ptr = overflow.data();
+  int* multipliers_ptr = multipliers.data();
+  for (int i = 0; i < 5; i++) {
+    const int ext_val = (i < 2) ? INT_MAX - i : INT_MIN + (i - 2);
+    const llint ext_ll_val = (i < 2) ? LLONG_MAX - static_cast<llint>(i) :
+                                       LLONG_MIN + static_cast<llint>(i - 2);
+    for (int j = 0; j < 5; j++) {
+      const int ovrf_val = (j < 2) ? INT_MAX - j : INT_MIN + (j - 2);
+      for (int k = 0; k < 5; k++) {
+        const size_t test_idx = (((k * 6) + j) * 6) + i;
+        const int mult_val = (j < 2) ? INT_MAX - j : INT_MIN + (j - 2);
+        primary_ptr[test_idx] = ext_val;
+        primary_ll_ptr[test_idx] = ext_ll_val;
+        overflow_ptr[test_idx] = ovrf_val;
+        multipliers_ptr[test_idx] = mult_val;
+      }
+    }
+  }
+  for (int i = 0; i < 6; i++) {
+
+    // If the random numbers take these values far to the extremes, there may be truncation, but
+    // the test only needs values scattered across the number line. 
+    const int prim_val = (xrs->uniformRandomNumber() - 0.5) * static_cast<double>(UINT_MAX);
+    const llint prim_ll_val = (xrs->uniformRandomNumber() - 0.5) * static_cast<double>(ULLONG_MAX);
+    for (int j = 0; j < 6; j++) {
+      const int ovrf_val = (xrs->uniformRandomNumber() - 0.5) * static_cast<double>(256.0);
+      for (int k = 0; k < 6; k++) {
+        if (i < 5 && j < 5 && k < 5) {
+          continue;
+        }
+        const int mult_val = (xrs->uniformRandomNumber() - 0.5) * 256.0;
+        const size_t test_idx =	(((k * 6) + j) * 6) + i;
+        primary_ptr[test_idx] = prim_val;
+        primary_ll_ptr[test_idx] = prim_ll_val;
+        overflow_ptr[test_idx] = ovrf_val;
+        multipliers_ptr[test_idx] = mult_val;
+      }
+    }
+  }
+  std::vector<double> chk_multres(n_mult_test), chk_ll_multres(n_mult_test);
+  std::vector<double> multres(n_mult_test), ll_multres(n_mult_test);
+  for (int i = 0; i < n_mult_test; i++) {
+    chk_multres[i] = hostInt63ToDouble(hostInt63Mult(primary_ptr[i], overflow_ptr[i],
+                                                     multipliers_ptr[i])) * scale_down;
+    chk_ll_multres[i] = hostInt95ToDouble(hostInt95Mult(primary_ll_ptr[i], overflow_ptr[i],
+                                                        multipliers_ptr[i])) * scale_down_ll;
+  }
+  primary.upload();
+  primary_ll.upload();
+  overflow.upload();
+  multipliers.upload();
+  const std::vector<bool> fuse_or_not = { true, false };
+  const int* res_ptr = resmul_prim.data();
+  const llint* res_ll_ptr = resmul_ll_prim.data();
+  const int* res_ovrf_ptr = resmul_ovrf.data();
+  for (size_t i = 0; i < 2; i++) {
+    testSFPMultiplication<<<4 * nsmp, small_block_size>>>(primary.data(devc_layer),
+                                                          overflow.data(devc_layer),
+                                                          multipliers.data(devc_layer),
+                                                          resmul_prim.data(devc_layer),
+                                                          resmul_ovrf.data(devc_layer),
+                                                          n_mult_test, fuse_or_not[i]);
+    resmul_prim.download();
+    resmul_ovrf.download();
+    for (int j = 0; j < n_mult_test; j++) {
+      multres[j] = hostInt63ToDouble(res_ptr[j], res_ovrf_ptr[j]) * scale_down;
+    }
+    testSFPMultiplication<<<4 * nsmp, small_block_size>>>(primary_ll.data(devc_layer),
+                                                          overflow.data(devc_layer),
+                                                          multipliers.data(devc_layer),
+                                                          resmul_ll_prim.data(devc_layer),
+                                                          resmul_ovrf.data(devc_layer),
+                                                          n_mult_test, fuse_or_not[i]);
+    resmul_ll_prim.download();
+    resmul_ovrf.download();
+    for (int j = 0; j < n_mult_test; j++) {
+      multres[j] = hostInt95ToDouble(res_ll_ptr[j], res_ovrf_ptr[j]) * scale_down_ll;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Kernel to encapsulate the block-wide prefix sum.  The scratch arrays are held in __shared__
+// memory while the main prefix sum is computed in __global__ memory.
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+__global__ void __launch_bounds__(large_block_size, 1) kDoBlockPrefix(T* p, const int ntest) {
+  __shared__ T s1[warp_size_int * warp_size_int], s2[warp_size_int];
+  if (blockIdx.x == 0) {
+    blockExclusivePrefixSum(p, s1, s2, ntest);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test the block-wide prefix sum.
+//
+// Arguments:
+//   ntest:  The quantity of numbers in the prefix sum series.
+//   xrs:    Source of random numbers for prefix sums
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void testBlockPrefixSum(const int ntest, Xoroshiro128pGenerator *xrs) {
+  Hybrid<T> p(ntest + 1, "prefix_array");
+  std::vector<T> pv(ntest + 1, static_cast<T>(0));
+  if (isFloatingPointScalarType<T>()) {
+    for (int i = 0; i < ntest; i++) {
+      pv[i] = xrs->uniformRandomNumber() * 50.0;
+    }
+  }
+  else {
+    for (int i = 0; i < ntest; i++) {
+      pv[i] = round(xrs->uniformRandomNumber() * 50.0);
+    }
+  }
+  p.putHost(pv, 0, ntest + 1);
+  p.upload();
+  kDoBlockPrefix<T><<<1, large_block_size>>>(p.data(HybridTargetLevel::DEVICE), ntest + 1);
+  prefixSumInPlace<T>(&pv, PrefixSumType::EXCLUSIVE);
+  const std::vector<T> pd = p.readDevice();
+  check(pd, RelationalOperator::EQUAL, Approx(pd).margin(1.0e-4), "A prefix sum of " +
+        getStormmScalarTypeName<T>() + " computed by the parallel GPU method did not match that "
+        "computed by the serial CPU method.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -592,12 +1114,18 @@ int main(const int argc, const char* argv[]) {
         "numbers from an array of Xoshiro256++ generators computed on the CPU and GPU do not "
         "agree.");
 
-  // Test other device
+  // Test other device operations
   section(3);
   testBSplineDeviceFuncs();
+  testSplitFixedPrecision(nsmp, &xrs128p_check);
+  const std::vector<int> prfx_lengths = { 29, 30, 31, 32, 33, 34, 62, 63, 64, 65, 66, 1022, 1023,
+                                          1024, 1025, 1026, 2046, 2047, 2048, 2049, 2050 };
+  for (size_t i = 0; i < prfx_lengths.size(); i++) {
+    testBlockPrefixSum<int>(prfx_lengths[i], &fast_prng);
+    testBlockPrefixSum<double>(prfx_lengths[i], &fast_prng);
+  }
   
   // Print results
   printTestSummary(oe.getVerbosity());
-  
-  return 0;
+  return countGlobalTestFailures();
 }

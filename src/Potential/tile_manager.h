@@ -1,5 +1,6 @@
 // -*-c++-*-
 #ifndef STORMM_TILE_MANAGER_H
+#define STORMM_TILE_MANAGER_H
 
 #include <vector>
 #include "copyright.h"
@@ -20,7 +21,8 @@ struct TilePlan {
 
   /// \brief The constructor follows from other abstracts and takes a list of all pointers and
   ///        critical constants.
-  TilePlan(int nchoice_in, const int* read_assign_in, const int* reduce_prep_in,
+  TilePlan(int nchoice_in, const int* read_assign_in, const int* self_assign_in,
+           const int* reduce_prep_in, const int* self_prep_in, const float* scalings_in,
            const int* nt_stencil_in, int* xfrc_ovrf_in, int* yfrc_ovrf_in, int* zfrc_ovrf_in);
 
   /// \brief The presence of const member variables negates copy and move assignment operations,
@@ -49,7 +51,21 @@ struct TilePlan {
                            ///<   of nchoice.
   const int* read_assign;  ///< Reading assignments for threads, following the layout described
                            ///<   above.
-  const int* reduce_prep;  ///< Reduction preparation shuffle lane assignments for threads
+  const int* self_assign;  ///< Reading assignments for threads in self-interaction tiles, arranged
+                           ///<   in a manner similar to read_assign but with only M x M tiles
+                           ///<   (squares, not rectangles).
+  const int* reduce_prep;  ///< Reduction preparation shuffle lane assignments for threads.  There
+                           ///<   are nchoice sets of assignments, each the width of a warp.
+  const int* self_prep;    ///< Reduction preparation shuffle lane assignments for threads handling
+                           ///<   self interaction tiles.  There are two time nchoice sets of data,
+                           ///<   each the width of a warp.  The first nchoice sets handle tiles
+                           ///<   where the sending and receiving atoms are truly one and the same
+                           ///<   and the number of iterations in the inner loop is thereby reduced
+                           ///<   by half.  The second nchoice sets handle tiles where the sending
+                           ///<   and receiving atoms are not the same but nonetheless come from
+                           ///<   the same central neighbor list decomposition cell.
+  const float* scalings;   ///< Scaling factors to be applied to each interaction computed by the
+                           ///<   threads of a warp in the first iteration of evaluating the tile
   const int* nt_stencil;   ///< Coded bitmasks instructing each thread which cell, relative to the
                            ///<   center, to access in order to complete the neutral territory
                            ///<   tower-plate arrangement.  These instructions will be combined
@@ -101,9 +117,6 @@ public:
   /// \param sending_atom_degeneracy  Base-2 logarithm of degeneracy in the sending atom batch
   std::vector<int> getSendingAtomLayout(const int sending_atom_degeneracy) const;
 
-  /// \brief Get the map of the neutral territory decomposition, for inspection.
-  std::vector<int> getNeutralTerritoryStencil() const;
-  
   /// \brief Get the list of reading assignments (for inspection) pertaining to given degeneracies
   ///        in the sending (tile X-axis) and receiving (tile Y-axis) atoms.
   ///
@@ -112,12 +125,32 @@ public:
   std::vector<int> getReadAssignments(int sending_atom_degeneracy,
                                       int recving_atom_degeneracy) const;
 
+  /// \brief Get the list of reading assignments (for inspection) pertaining to given degeneracies
+  ///        in the tiles of the central cell, where sending and receiving atoms may be one and
+  ///        the same.  Descriptions of input parameters follow from getReadAssignments(), above.
+  std::vector<int> getSelfAssignments(int sending_atom_degeneracy,
+                                      int recving_atom_degeneracy) const;
+  
   /// \brief Get the list of reduction preparations (for inspection) pertaining to given
   ///        degeneracies in the sending (tile X-axis) and receiving (tile Y-axis) atoms.
   ///        Descriptions of input parameters follow from getReadAssignments(), above.
   std::vector<int> getReductionPreparations(int sending_atom_degeneracy,
                                             int recving_atom_degeneracy) const;
 
+  /// \brief Get the list of reduction preparations (for inspection) as above, but for tiles that
+  ///        might include self interactions.  Descriptions of input parameters follow from
+  ///        getReadAssignments(), above.
+  std::vector<int> getSelfPreparations(int sending_atom_degeneracy,
+                                       int recving_atom_degeneracy) const;
+
+  /// \brief Get the scaling factors to be applied to each thread's computed interaction in the
+  ///        first iteration to evaluate the tile, given an atom degeneracy.  This is for developer
+  ///        inspection and debugging.
+  std::vector<float> getThreadScalings(int atom_degeneracy) const;
+  
+  /// \brief Get the map of the neutral territory decomposition, for inspection.
+  std::vector<int> getNeutralTerritoryStencil() const;
+  
   /// \brief Get the abstract.
   ///
   /// \param tier  Indicate whether to obtain pointers to data on the CPU host or GPU device
@@ -144,10 +177,34 @@ private:
                                     ///<   the relative indices simply proceed in increasing order
                                     ///<   up to the total number of atoms in the batch, then the
                                     ///<   sequence repeats until the warp is filled.
+  Hybrid<int> self_assignments;     ///< Assignments for reading atoms of the receiving batch in
+                                    ///<   tiles evaluated for the central cell.  These are
+                                    ///<   specialized to account for the case of tiles wherein
+                                    ///<   the sending and receiving atoms are the same.
   Hybrid<int> reduce_preparations;  ///< The other threads that each thread of the warp must read
                                     ///<   from (shuffle instructions) so that the degenerate batch
                                     ///<   of atoms into an order suitable for reducing accumulated
                                     ///<   forces.
+  Hybrid<int> self_preparations;    ///< These assignments serve the same purpose as those in
+                                    ///<   reduce_preparations, but applicable to tiles in the 
+                                    ///<   central cell where sending and receiving atoms might be
+                                    ///<   one and the same.  There are two halves to this array:
+                                    ///<   the first half contains sets of shuffle assignments
+                                    ///<   to be used when the sending and receiving atoms are the
+                                    ///<   same.  The second half contains sets of atoms to be used
+                                    ///<   when the sending and receiving atoms are different (this
+                                    ///<   will be the same content as the trace of the
+                                    ///<   reduce_preparations matrix of assignments).  Tiles of
+                                    ///<   central cell are all square, and when the sending and
+                                    ///<   receiving atoms are the same the number of iterations
+                                    ///<   needed to evaluate the tile is cut by half, implying a
+                                    ///<   different set of shuffling assignments to prepare for
+                                    ///<   data dumps.
+  Hybrid<float> thread_scalings;    ///< Values to be applied to interactions (force as well as
+                                    ///<   energy) computed by each thread in the first iteration
+                                    ///<   of tile evaluation, if requested in a self-interacting
+                                    ///<   tile where sending and receiving atoms are one and the
+                                    ///<   same.
   Hybrid<int> tower_plate_stencil;  ///< Stencil for relative displacements that threads of a warp
                                     ///<   should calculate in order to obtain their assigned cells
                                     ///<   when constructing indexing limits and prefix sums for

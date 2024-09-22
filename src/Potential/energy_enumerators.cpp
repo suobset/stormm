@@ -231,10 +231,6 @@ std::string getEnumerationName(const CellGridAction input) {
     return std::string("INIT_FORCES");
   case CellGridAction::XFER_FORCES:
     return std::string("XFER_FORCES");
-  case CellGridAction::UPDATE_IMG_COORD:
-    return std::string("UPDATE_IMG_COORD");
-  case CellGridAction::UPDATE_IMG_CELLS:
-    return std::string("UPDATE_IMG_CELLS");
   }
   __builtin_unreachable();
 }
@@ -296,7 +292,7 @@ std::string getEnumerationName(const TinyBoxPresence input) {
   }
   __builtin_unreachable();
 }
-  
+
 //-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const ValenceKernelSize input) {
   switch (input) {

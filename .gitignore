@@ -1,8 +1,9 @@
 build
 
-# Common IDE files
+# Common IDE/OS files
 .vscode
 .idea
+.DS_Store
 
 # Local conda environments
 .conda

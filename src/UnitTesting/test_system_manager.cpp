@@ -12,6 +12,7 @@ namespace stormm {
 namespace testing {
 
 using constants::getEnumerationName;
+using diskutil::assembleFilePath;
 using diskutil::DrivePathType;
 using diskutil::getDefaultFileExtension;
 using diskutil::getDrivePathType;
@@ -64,10 +65,10 @@ TestSystemManager::TestSystemManager(const std::string &topology_base_in,
   coordinate_names.reserve(system_count);
   const char osc = osSeparator();
   for (int i = 0; i < system_count; i++) {
-    topology_names.emplace_back(topology_base_in + osc + topology_names_in[i] + '.' +
-                                topology_extn_in);
-    coordinate_names.emplace_back(coordinate_base_in + osc + coordinate_names_in[i] + '.' +
-                                  coordinate_extn_in);
+    topology_names.emplace_back(assembleFilePath(topology_base_in, topology_names_in[i],
+                                                 topology_extn_in));
+    coordinate_names.emplace_back(assembleFilePath(coordinate_base_in, coordinate_names_in[i],
+                                                   coordinate_extn_in));
   }
   fault_response = fault_response_in;
   all_go_response = all_go_response_in;
@@ -287,6 +288,46 @@ TestSystemManager::getQualifyingSystems(const std::vector<UnitCellType> &uc_choi
     if (included[i]) {
       result[nqual] = i;
       nqual++;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+TestSystemManager::getQualifyingSystems(const int critical_atom_count,
+                                        const RelationalOperator rel) const {
+  std::vector<int> result;
+  for (int i = 0; i < system_count; i++) {
+    bool add_i;
+    switch (rel) {
+    case RelationalOperator::EQUAL:
+    case RelationalOperator::EQ:
+      add_i = (all_topologies[i].getAtomCount() == critical_atom_count);
+      break;
+    case RelationalOperator::NOT_EQUAL:
+    case RelationalOperator::NE:
+      add_i = (all_topologies[i].getAtomCount() != critical_atom_count);
+      break;
+    case RelationalOperator::GREATER_THAN:
+    case RelationalOperator::GT:
+      add_i = (all_topologies[i].getAtomCount() > critical_atom_count);
+      break;
+    case RelationalOperator::LESS_THAN:
+    case RelationalOperator::LT:
+      add_i = (all_topologies[i].getAtomCount() < critical_atom_count);
+      break;
+    case RelationalOperator::GREATER_THAN_OR_EQUAL:
+    case RelationalOperator::GE:
+      add_i = (all_topologies[i].getAtomCount() >= critical_atom_count);
+      break;
+    case RelationalOperator::LESS_THAN_OR_EQUAL:
+    case RelationalOperator::LE:
+      add_i = (all_topologies[i].getAtomCount() <= critical_atom_count);
+      break;
+    }
+    if (add_i) {
+      result.push_back(i);
     }
   }
   return result;

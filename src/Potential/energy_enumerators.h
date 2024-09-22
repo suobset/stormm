@@ -46,7 +46,7 @@ enum class StateVariable {
   VDW_ONE_FOUR,           ///< van-der Waals (typically, Lennard Jones) energy from 1-4 attenuated
                           ///<   interactions
   ELECTROSTATIC,          ///< Electrostatic energy from non-bonded interactions
-  ELEC_ONE_FOUR, ///< Electrostatic energy from 1-4 attenuated interactions
+  ELEC_ONE_FOUR,          ///< Electrostatic energy from 1-4 attenuated interactions
   GENERALIZED_BORN,       ///< Generalized Born (implicit solvent) energy
   RESTRAINT,              ///< Energy due to flat-bottom bimodal harmonic potential restraints
   KINETIC,                ///< Energy due to particle motion
@@ -167,13 +167,8 @@ enum class SplineScaffold {
 ///        simulation.
 enum class CellGridAction {
   INIT_FORCES,       ///< Initialize forces, setting all accumulators of the current image to zero.
-  XFER_FORCES,       ///< Transfer forces from the current image to the associated coordinate
+  XFER_FORCES        ///< Transfer forces from the current image to the associated coordinate
                      ///<   synthesis.
-  UPDATE_IMG_COORD,  ///< Update the coordinates, the first step in turning the current image into
-                     ///<   the new image.  This will leave the CellGrid in an intermediate state,
-                     ///<   without a valid current image until executing processes associated with
-                     ///<   UPDATE_IMG_CELLS.
-  UPDATE_IMG_CELLS   ///< Complete the new image by re-organizing cells.
 };
 
 /// \brief Differentiate between different strategies of mapping (spreading) particle density to

@@ -11,6 +11,68 @@ cannot happen in the same manner, the contents and format of basic data arrays d
 actual algorithm in any severe way.
 
 ---------------------------------------------------------------------------------------------------
+  Installation Instructions
+---------------------------------------------------------------------------------------------------
+Here are some basic instructions:
+
+- Download the repository and unpack the source in ```/your/STORMM/source/dir/```
+- Set environment variables:
+```
+    STORMM_SOURCE  set to /your/STORMM/source/dir/
+    STORMM_HOME    set to /your/STORMM/source/dir/
+    STORMM_BUILD   set to /your/STORMM/build/dir/
+    STORMM_VERBOSE set to COMPACT for concise testing output or FULL for more detailed results if
+                   test programs are run manually (this can help to trace errors)
+```
+- Have CMake version 3.18 or greater, for CUDA compatibility.
+- Make a new directory ```/your/STORMM/build/dir/``` and go to it, then type
+  ```cmake ${STORMM_SOURCE} -DCMAKE_BUILD_TYPE=RELEASE [ additional cmake variable definitions ]```
+  **OR**
+- Execute ```cmake -b ${STORMM_BUILD} -s ${STORMM_SOURCE} -DCMAKE_BUILD_TYPE=RELEASE [ additional scmake variable definitions ]```
+- Go to the ```${STORMM_BUILD}``` directory, if you are not already there.
+- Type ```make -j``` to build with all possible resources.
+- Type ```make test``` if the compilation is successful to run the test suite
+
+There are several additional definitions that one can apply to the build.  Each is provided with
+the cmake command prefaced with ```-D``` ("define").  They include:
+
+- ```-DCMAKE_BUILD_TYPE``` with values ```RELEASE``` or ```DEBUG```.  The ```DEBUG``` version will
+  eliminate optimizations present in the ```RELEASE``` version and engage debugging flags (that is
+  ```-g``` to a C++ or Fortran compiler).  We use ```valgrind``` a lot when tracing errors in
+  STORMM development, and the debugging flags are essential to getting line numbers in functions
+  that exhibit memory errors or other exceptions.
+- ```-DSTORMM_ENABLE_CUDA``` with values ```ON``` or ```OFF``` (default ```OFF```).  This will
+  toggle the STORMM installation between CUDA-enabled and CPU-only versions.  The CPU-only version
+  implements most features of the CUDA-enabled version, but some of the algorithms and precision
+  models are not as expansive.  The intent is that, in the long run, the CPU version will be able
+  to replicate all of what the GPU does using equivalent methods, albeit more slowly.
+- ```-DSTORMM_ENABLE_RDKIT``` with values ```ON``` or ```OFF``` (default ```OFF```).  This will
+  enable RDKit to communicate with STORMM, but requires a valid RDKit installation and does not yet
+  unlock any real functionality.  Some features of STORMM are a stepping stone to information
+  processing with RDKit, and some features of RDKit will enhance the capabilities on the STORMM
+  roadmap.
+- ```-DCUSTOM_GPU_ARCH``` with many values separated by semicolons (```;```) with no spaces.  Apply
+  whatever architectures will be necessary for the GPUs available.  ```52``` will serve Maxwell
+  GPUs such as the GTX 980, ```61``` will serve consumer-grade Pascal GPUs such as the GTX 1080 Ti,
+  ```75``` will serve Turing GPUs such as T4 and the common RTX 2080 Ti, ```86``` will serve
+  consumer-grade GPUs in the Ampere line (RTX 30xx (Ti), A40), ```89``` will serve consumer-grade
+  GPUs in the Lovelace line (RTX 40xx (Ti)), and settings such as ```60```, ```70```, or ```80```
+  will serve X100 series data-center grade GPUs suchas GP100, V100 ("Volta"), and A100.  The Hopper
+  line (H100, input value ```90```) is not well tested and some features were encountering errors.
+  The default behavior, triggered in the absence of ```-DCUSTOM_GPU_ARCH``` specification, is to
+  set the native ```CMAKE_CUDA_ARCHITECTURES``` variable to ```52;60;61;70;75;80;86;89```.
+  Trimming the list, particularly with regard to older GPU hardware, will reduce build times.  The
+  new variable ```CUSTOM_GPU_ARCH``` is provided because the native ```CMAKE_CUDA_ARCHITECTURES```
+  comes with a preset of ```52``` which will omit a lot of optimizations on more recent cards.
+- ```-DCMAKE_SHOW_PTXAS``` with values ```ON``` or ```OFF``` and default ```OFF```.  This will
+  cause the compiler to output ```--ptxas``` output to the terminal, which can be helpful in
+  gauging kernel performance (in particular, regarding register usage).  Setting this to ```ON```
+  will output 3-4 lines for every version of every kernel compiled, which can be a lot to parse as
+  some of the lines are 240+ characters in length.
+- ```-DSTORMM_ENABLE_TEST_COVERAGE``` which is undefined by default but can be defined with a valid
+  installation of ```gcov``` to check the coverage of unit testing code during development.
+
+---------------------------------------------------------------------------------------------------
   Code Standards
 ---------------------------------------------------------------------------------------------------
 - This code base will follow the C++17 standard, in particular for enum classes, member
@@ -31,8 +93,9 @@ actual algorithm in any severe way.
   seldom appear in the STORMM libraries themselves.  Programmers writing backend or small programs
   that link to the STORMM libraries may use these features at their discretion.
 - All dynamic memory intended to operate in a hybrid CPU / GPU environment should be allocated with
-  Hybrid objects from the STORMM library.  This class functions with many of the features of the STL
-  vector container and interfaces with it for easy conversion to any function requiring that type.
+  Hybrid objects from the STORMM library.  This class functions with many of the features of the
+  STL vector container and interfaces with it for easy conversion to any function requiring that
+  type.
 
 ---------------------------------------------------------------------------------------------------
   Coding Conventions
