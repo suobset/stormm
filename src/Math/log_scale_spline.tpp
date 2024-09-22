@@ -17,43 +17,6 @@ LogSplineTable<T4>::LogSplineTable(const BasisFunctions basis_in, const TableInd
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
-LogScaleSpline<T4>::LogScaleSpline(const TableIndexing indexing_method_in,
-                                   const BasisFunctions basis_set_in,
-                                   const float indexing_offset_in) :
-    target_form{LogSplineForm::CUSTOM},
-    indexing_method{indexing_method_in},
-    basis_set{basis_set_in},
-    mantissa_bits{default_logtab_mantissa_bits},
-    segments_per_stride{static_cast<int>(round(pow(2.0, mantissa_bits)))},
-    ewald_coefficient{0.0},
-    coulomb_constant{amber_ancient_bioq},
-    maximum_range{default_logtab_max_range * default_logtab_max_range},
-    minimum_absolute_range{default_logtab_min_range * default_logtab_min_range},
-    minimum_significant_range{0.5},
-    indexing_offset{checkIndexingOffset(indexing_offset_in)},
-    ulp_optimization_depth{2},
-    precision{PrecisionModel::SINGLE},
-    table{},
-    mean_overall_error{0.0}, stdev_overall_error{0.0}, max_overall_error{0.0},
-    mean_segment_error{},
-    stdev_segment_error{},
-    max_segment_error{}
-{
-  // Set the precision model and check the data type
-  const size_t ct = std::type_index(typeid(T4)).hash_code();
-  if (ct == float4_type_index) {
-    precision = PrecisionModel::SINGLE;
-  }
-  else if (ct == double4_type_index) {
-    precision = PrecisionModel::DOUBLE;
-  }
-  else {
-    rtErr("The only allowed table types are float and double four-tuples.", "LogScaleSpline");
-  }  
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename T4>
 LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
                                    const double ewald_coefficient_in,
                                    const double coulomb_constant_in, const int mantissa_bits_in,
@@ -63,8 +26,27 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
                                    const int ulp_optimization_depth_in,
                                    const float indexing_offset_in,
                                    const ExceptionResponse policy) :
-    LogScaleSpline(indexing_method_in, basis_set_in, indexing_offset_in)
+    target_form{LogSplineForm::CUSTOM},
+    indexing_method{indexing_method_in},
+    basis_set{basis_set_in},
+    mantissa_bits{default_logtab_mantissa_bits},
+    segments_per_stride{static_cast<int>(round(pow(2.0, mantissa_bits)))},
+    ewald_coefficient{0.0},
+    coulomb_constant{amber_ancient_bioq},
+    maximum_range{max_range_in},
+    minimum_absolute_range{min_range_in},
+    minimum_significant_range{0.5},
+    indexing_offset{checkIndexingOffset(indexing_offset_in)},
+    ulp_optimization_depth{2},
+    precision{PrecisionModel::SINGLE},
+    table{HybridKind::ARRAY, "log_spline_table"},
+    mean_overall_error{0.0}, stdev_overall_error{0.0}, max_overall_error{0.0},
+    mean_segment_error{},
+    stdev_segment_error{},
+    max_segment_error{}
 {
+  setPrecisionModel();
+
   // Set additional constants.  Coulomb's constant is accepted, whereas the Ewald coefficient will
   // be checked for validity. 
   setTargetForm(target_form_in);
@@ -100,8 +82,26 @@ LogScaleSpline<T4>::LogScaleSpline(const LogSplineForm target_form_in,
                                    const int ulp_optimization_depth_in,
                                    const float indexing_offset_in,
                                    const ExceptionResponse policy) :
-    LogScaleSpline(indexing_method_in, basis_set_in, indexing_offset_in)
+    target_form{LogSplineForm::CUSTOM},
+    indexing_method{indexing_method_in},
+    basis_set{basis_set_in},
+    mantissa_bits{default_logtab_mantissa_bits},
+    segments_per_stride{static_cast<int>(round(pow(2.0, mantissa_bits)))},
+    ewald_coefficient{0.0},
+    coulomb_constant{amber_ancient_bioq},
+    maximum_range{default_logtab_max_range * default_logtab_max_range},
+    minimum_absolute_range{default_logtab_min_range * default_logtab_min_range},
+    minimum_significant_range{0.5},
+    indexing_offset{checkIndexingOffset(indexing_offset_in)},
+    ulp_optimization_depth{2},
+    precision{PrecisionModel::SINGLE},
+    table{HybridKind::ARRAY, "log_spline_table"},
+    mean_overall_error{0.0}, stdev_overall_error{0.0}, max_overall_error{0.0},
+    mean_segment_error{},
+    stdev_segment_error{},
+    max_segment_error{}
 {
+  setPrecisionModel();
   setTargetForm(target_form_in, custom_form_in);
   setMantissaBits(mantissa_bits_in, policy);
   setMinimumAbsoluteRange(min_range_in);
@@ -147,7 +147,17 @@ template <typename T4> double LogScaleSpline<T4>::getCoulombConstant() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4> double LogScaleSpline<T4>::getMaximumRange() const {
-  return maximum_range;
+  switch (indexing_method) {
+  case TableIndexing::ARG:
+    return maximum_range;
+  case TableIndexing::SQUARED_ARG:
+    return sqrt(maximum_range);
+  case TableIndexing::ARG_OFFSET:
+    return maximum_range - indexing_offset;
+  case TableIndexing::SQ_ARG_OFFSET:
+    return sqrt(maximum_range - indexing_offset);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -271,9 +281,7 @@ double LogScaleSpline<T4>::evaluate(const double r) const {
     switch (precision) {
     case PrecisionModel::DOUBLE:
       {
-        Ecumenical8 xfrm = { .d = r };
-        xfrm.ulli = (((xfrm.ulli & dp_detail_bitmask) << mantissa_bits) | 0x3ff0000000000000ULL);
-        double dr = xfrm.d;
+        const double dr = doublePrecisionSplineArgument(r, mantissa_bits, dp_detail_bitmask);
         result = coefs.x + ((coefs.y + ((coefs.z + (coefs.w * dr)) * dr)) * dr);
       }
       break;
@@ -286,9 +294,7 @@ double LogScaleSpline<T4>::evaluate(const double r) const {
         // single-precision and then converted to double-precision, as it would be in situations
         // where the single-precision spline table is relevant, the double type number preserves
         // all information present in the original float, and reproduces the original float here.
-        Ecumenical4 xfrm = { .f = static_cast<float>(r) };
-        xfrm.ui = (((xfrm.ui & sp_detail_bitmask) << mantissa_bits) | 0x3f800000U);
-        float dr = xfrm.f;
+        const float dr = singlePrecisionSplineArgument(r, mantissa_bits, sp_detail_bitmask);
         result = coefs.x + ((coefs.y + ((coefs.z + (coefs.w * dr)) * dr)) * dr);
       }
       break;
@@ -383,17 +389,31 @@ template <typename T4> const LogScaleSpline<T4>* LogScaleSpline<T4>::getSelfPoin
 
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-void LogScaleSpline<T4>::upload() {
+template <typename T4> void LogScaleSpline<T4>::upload() {
   table.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T4>
-void LogScaleSpline<T4>::download() {
+template <typename T4> void LogScaleSpline<T4>::download() {
   table.download();
 }
 #endif
+
+//-------------------------------------------------------------------------------------------------
+template <typename T4> void LogScaleSpline<T4>::setPrecisionModel() {
+
+  // Set the precision model and check the data type
+  const size_t ct = std::type_index(typeid(T4)).hash_code();
+  if (ct == float4_type_index) {
+    precision = PrecisionModel::SINGLE;
+  }
+  else if (ct == double4_type_index) {
+    precision = PrecisionModel::DOUBLE;
+  }
+  else {
+    rtErr("The only allowed table types are float and double four-tuples.", "LogScaleSpline");
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
@@ -478,11 +498,11 @@ void LogScaleSpline<T4>::setMantissaBits(const int mantissa_bits_in,
 //-------------------------------------------------------------------------------------------------
 template <typename T4>
 void LogScaleSpline<T4>::setMinimumAbsoluteRange(const double min_range_in) {
-
+  
   // The minimum applicable range of the spline is a speed optimization.  If it is too small then
   // simply set it to zero.
   const Ecumenical8 lowest_bar = { .ulli = (static_cast<ullint>(mantissa_bits + 4) << 52) };
-  minimum_absolute_range = (min_range_in < lowest_bar.d) ? lowest_bar.d : min_range_in;
+  minimum_absolute_range = std::max(min_range_in, lowest_bar.d);
 }
 
 //-------------------------------------------------------------------------------------------------

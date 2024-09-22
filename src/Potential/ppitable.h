@@ -83,6 +83,75 @@ template <typename T, typename T4> struct PPIKit {
   const T4* energy_excl;        ///< Table of excluded energy coefficients
   const T4* force_excl;         ///< Table of excluded force coefficients
 };
+
+/// \brief An equivalent abstract which delivers the tabulated data with all tuples broken into
+///        separate arrays of their individual components.  This abstract is obtained with distinct
+///        accessors from PPITable, below.  The "e" is for "element-wise."
+template <typename T> struct PPIeKit {
+
+  /// \brief The constructor takes the customary list of pointers and critical constants.
+  PPIeKit(NonbondedTheme theme_in, BasisFunctions basis_in, TableIndexing lookup_in,
+          int index_bound_in, int excl_offset_in, int index_shift_bits_in,
+          ullint dp_detail_mask_in, uint sp_detail_mask_in, T arg_offset_in, const T* energy_x_in,
+          const T* energy_y_in, const T* energy_z_in, const T* energy_w_in, const T* force_x_in,
+          const T* force_y_in, const T* force_z_in, const T* force_w_in, const T* energy_excl_x_in,
+          const T* energy_excl_y_in, const T* energy_excl_z_in, const T* energy_excl_w_in,
+          const T* force_excl_x_in, const T* force_excl_y_in, const T* force_excl_z_in,
+          const T* force_excl_w_in);
+
+  /// \brief With all const members, the copy and move assignment operators are implicitly
+  ///        deleted, but with no pointers to repair the copy and move constructors are legal.
+  ///
+  /// \param original  The original PPIKit tocopy or move
+  /// \{
+  PPIeKit(const PPIeKit &original) = default;
+  PPIeKit(PPIeKit &&original) = default;
+  /// \}
+
+  const NonbondedTheme theme;   ///< The type of non-bonded potential and derivatives approximated
+                                ///<   by the splines
+  const BasisFunctions basis;   ///< The type of basis functions scaled by spline coefficients to
+                                ///<   obtain the result
+  const TableIndexing lookup;   ///< The method of transforming the argument to the underlying
+                                ///<   function
+  const int index_bound;        ///< The upper bound of spline indices in any given table.  This
+                                ///<   is half the value of excl_offset.
+  const int excl_offset;        ///< The offset to add to any spline index in the energy or force
+                                ///<   arrays in order to obtain the corresponding excluded energy
+                                ///<   or force spline coefficients
+  const int index_shift_bits;   ///< The number of bits by which to shift a floating point number,
+                                ///<   after interpreting it as an unsigned integer, to the right
+                                ///<   before interpeting the result as a table index
+  const ullint dp_detail_mask;  ///< A pre-computed bitmask useful for converting an argument of
+                                ///<   the underlying benhmark function into a quantity for
+                                ///<   double-precision splines to operate on
+  const uint sp_detail_mask;    ///< A pre-computed bitmask useful for converting an argument of
+                                ///<   the underlying benchmark function into a quantity for
+                                ///<   single-precision splines to operate on
+  const T arg_offset;           ///< Offset used in transforming arguments of the underlying
+                                ///<   benchmark function into spline table indices
+  const T* energy_x;            ///< Table of energy function spline x coefficients.  Add
+                                ///<   excl_offset to any index for the raw energy to get the
+                                ///<   corresponding index for the x coefficient in the excluded
+                                ///<   energy table.
+  const T* energy_y;            ///< Table of energy function spline y coefficients
+  const T* energy_z;            ///< Table of energy function spline z coefficients
+  const T* energy_w;            ///< Table of energy function spline w coefficients
+  const T* force_x;             ///< Table of force function spline x coefficients.  Add
+                                ///<   excl_offset to obtain the force x coefficient for an
+                                ///<   excluded interaction.
+  const T* force_y;             ///< Table of force function spline y coefficients
+  const T* force_z;             ///< Table of force function spline z coefficients
+  const T* force_w;             ///< Table of force function spline w coefficients
+  const T* energy_excl_x;       ///< Excluded interation energy function spline x coefficients
+  const T* energy_excl_y;       ///< Excluded interation energy function spline y coefficients
+  const T* energy_excl_z;       ///< Excluded interation energy function spline z coefficients
+  const T* energy_excl_w;       ///< Excluded interation energy function spline w coefficients
+  const T* force_excl_x;        ///< Excluded interation energy function spline x coefficients
+  const T* force_excl_y;        ///< Excluded interation energy function spline y coefficients
+  const T* force_excl_z;        ///< Excluded interation energy function spline z coefficients
+  const T* force_excl_w;        ///< Excluded interation energy function spline w coefficients
+};
   
 /// \brief A tabulated non-bonded potential, with or without exclusions, to be used in the context
 ///        of particle-particle, particle-mesh calculations.  The key is to create two tables, one
@@ -159,6 +228,41 @@ public:
   ///        used to perform the switching between short- and long-ranged potentials.
   double getGaussianWidth() const;
 
+  /// \brief Get the spline index that would be accessed in order to evaluate a given argument.
+  ///
+  /// \param arg  The value of the spline table indexing argument
+  int getTableIndex(double arg, PrecisionModel prec = PrecisionModel::SINGLE) const;
+
+  /// \brief Get the spline index that would be accessed in order to evaluate a given argument.
+  ///
+  /// \param arg  The value of the spline table indexing argument
+  int getTableIndexByRealArg(double arg, PrecisionModel prec = PrecisionModel::SINGLE) const;
+
+  /// \brief Evaluate the spline table at a given inter-particle distance expressed in the manner
+  ///        used for the class object's table indexing.  For example, if the object indexes its
+  ///        tables by the squared value of the displacement, enter 49.0 A^2 in order to get the
+  ///        force, energy, or excluded form thereof for two particles separated by a distance of
+  ///        7.0 A.
+  ///
+  /// \param arg                   The value of the spline table indexing argument
+  /// \param kind                  Indicate whether to evaluate the potential, the force, or an
+  ///                              excluded form of either quantity
+  /// \param prec                  The precision of the table from which to retrieve calculations
+  ///                              (also implies a precision model for the spline calculation)
+  /// \param use_elemental_tables  Indicate whether to use elementwise tables, in which each of the
+  ///                              spline coefficients are accessed individually, or tuple tables
+  ///                              in which they are all accessed at once.  The default behavior is
+  ///                              to use tuple-baed tables.
+  double evaluate(double arg, LogSplineForm kind, PrecisionModel prec = PrecisionModel::SINGLE,
+                  bool use_elemental_tables = false) const;
+
+  /// \brief Evaluate the spline table at a given inter-particle distance expressed as the absolute
+  ///         value of the displacement between two particles.  Descriptions of input parameters
+  ///         otherwise follow from evaluate(), above.
+  double evaluateByRealArg(double arg, LogSplineForm kind,
+                           PrecisionModel prec = PrecisionModel::SINGLE,
+                           bool use_elemental_tables = false) const;
+  
   /// \brief Get the double-precision abstract for use of the splines in a C programming style.
   ///
   /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
@@ -168,6 +272,28 @@ public:
   ///
   /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
   const PPIKit<float, float4> spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the double-precision abstract for use of the splines in a C programming style,
+  ///        with all spline tuples broken into their individual components.  This abstract may be
+  ///        more suitable for kernels where register pressure constrains performance.
+  ///
+  /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
+  const PPIeKit<double> dpeData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the single-precision abstract for use of the splines in a C programming style,
+  ///        with all spline tuples broken into their individual components.  This abstract may be
+  ///        more suitable for kernels where register pressure constrains performance.
+  ///
+  /// \param tier  Indicate whether to obtain pointers for data on the CPU host or GPU device
+  const PPIeKit<float> speData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+#ifdef STORMM_USE_HPC
+  /// \brief Upload data to the GPU device.
+  void upload();
+  
+  /// \brief Download data from the GPU device.
+  void download();
+#endif
 
 private:
 
@@ -194,9 +320,12 @@ private:
                                   ///<   between short- and long-ranged components
   int mantissa_bits;              ///< Number of mantissa bits used to index into various tables
   double coulomb;                 ///< The object's take on Coulomb's constant
-  int exclusion_offset;           ///< The first index of the table of excluded interactions.  The
-                                  ///<   series of non-excluded interactions appears first in each
-                                  ///<   table, whether of potentials or derivatives.
+  int dp_exclusion_offset;        ///< The offset between excluded and non-excluded spline table
+                                  ///<   segments for DOUBLE-precision splines, when computing
+                                  ///<   either energies or forces.
+  int sp_exclusion_offset;        ///< The offset between excluded and non-excluded spline table
+                                  ///<   segments for SINGLE-precision splines, when computing
+                                  ///<   either energies or forces.
   ullint dp_detail_bitmask;       ///< Detail mask for extracting the non-indexing bits from a
                                   ///<   spline table based on DOUBLE precision float64_t numbers.
   uint sp_detail_bitmask;         ///< Detail mask for extracting the non-indexing bits from a
@@ -230,6 +359,96 @@ private:
   /// targeted by the single-precision tuple POINTER-kind Hybrid arrays above.
   Hybrid<float4> sp_coeffs;
 
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each cubic spline function, without exclusions.  These are the "x", "y", "z", and "w"
+  /// components of the energy member variable above.
+  /// \{
+  Hybrid<double> energy_x;
+  Hybrid<double> energy_y;
+  Hybrid<double> energy_z;
+  Hybrid<double> energy_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each cubic spline function, without exclusions.  These are the "x", "y", "z", and "w"
+  /// components of the energy member variable above.
+  /// \{
+  Hybrid<double> force_x;
+  Hybrid<double> force_y;
+  Hybrid<double> force_z;
+  Hybrid<double> force_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each excluded energy cubic spline function, without exclusions.  These are the "x", "y", "z",
+  /// and "w" components of the energy_with_exclusions member variable above.
+  /// \{
+  Hybrid<double> energy_with_excl_x;
+  Hybrid<double> energy_with_excl_y;
+  Hybrid<double> energy_with_excl_z;
+  Hybrid<double> energy_with_excl_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each excluded force cubic spline function, without exclusions.  These are the "x", "y", "z",
+  /// and "w" components of the force_with_exclusions member variable above.
+  /// \{
+  Hybrid<double> force_with_excl_x;
+  Hybrid<double> force_with_excl_y;
+  Hybrid<double> force_with_excl_z;
+  Hybrid<double> force_with_excl_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each cubic spline function, without exclusions.  These are the "x", "y", "z", and "w"
+  /// components of the energy member variable above.
+  /// \{
+  Hybrid<float> sp_energy_x;
+  Hybrid<float> sp_energy_y;
+  Hybrid<float> sp_energy_z;
+  Hybrid<float> sp_energy_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each cubic spline function, without exclusions.  These are the "x", "y", "z", and "w"
+  /// components of the energy member variable above.
+  /// \{
+  Hybrid<float> sp_force_x;
+  Hybrid<float> sp_force_y;
+  Hybrid<float> sp_force_z;
+  Hybrid<float> sp_force_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each excluded energy cubic spline function, without exclusions.  These are the "x", "y", "z",
+  /// and "w" components of the energy_with_exclusions member variable above.
+  /// \{
+  Hybrid<float> sp_energy_with_excl_x;
+  Hybrid<float> sp_energy_with_excl_y;
+  Hybrid<float> sp_energy_with_excl_z;
+  Hybrid<float> sp_energy_with_excl_w;
+  /// \}
+
+  /// Double-precision coefficients for the scalar, first, second, and third-order portions of
+  /// each excluded force cubic spline function, without exclusions.  These are the "x", "y", "z",
+  /// and "w" components of the force_with_exclusions member variable above.
+  /// \{
+  Hybrid<float> sp_force_with_excl_x;
+  Hybrid<float> sp_force_with_excl_y;
+  Hybrid<float> sp_force_with_excl_z;
+  Hybrid<float> sp_force_with_excl_w;
+  /// \}
+
+  /// Coefficients of all tables computed in double-precision, with all tuples broken into their
+  /// component members.  This is an ARRAY-kind Hybrid targeted by the double-precision tuple
+  /// POINTER-kind Hybrid arrays above.
+  Hybrid<double> elemental_coeffs;
+  
+  /// Coefficients of all tables computed in single-precision, with all tuples broken into their
+  /// component members.  This is, again, an ARRAY-kind Hybrid targeted by the double-precision
+  /// tuple POINTER-kind Hybrid arrays above.
+  Hybrid<float> sp_elemental_coeffs;
+  
   /// \brief Determine the theme of the particle-particle interaction table based on the form of
   ///        one of the input spline tables.
   ///
@@ -288,7 +507,7 @@ private:
   /// \param spl_a  The first spline
   /// \param spl_b  The second spline to compare against the first
   template <typename T4> void checkSplineCompatibility(const LogScaleSpline<T4> &spl_a,
-                                                       const LogScaleSpline<T4> &spl_b);
+                                                       const LogScaleSpline<T4> &spl_b) const;
   
   /// \brief Determine the highest-priority missing functional form.
   ///

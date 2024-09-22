@@ -13,6 +13,7 @@ test:
     - apt update && apt upgrade -y
     - apt install wget -y
     - apt install python3-pip -y
+    - apt install git -y
     - pip install gcovr
     - nvidia-smi
 
@@ -24,7 +25,7 @@ test:
 
     - rm -rf build deploy .conda
 
-    - conda create --prefix=${CI_PROJECT_DIR}/.conda cmake
+    - conda create --prefix=${CI_PROJECT_DIR}/.conda cmake python=3.10
 
     - if [ "$RDKIT" == "YES" ]; then
          conda install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen boost;
@@ -35,12 +36,13 @@ test:
     - mkdir build && cd build
 
     - conda run --no-capture-output --prefix ${CI_PROJECT_DIR}/.conda
-      cmake -DCMAKE_BUILD_TYPE=DEBUG 
+      cmake -DCMAKE_BUILD_TYPE=RELEASE 
             -DSTORMM_ENABLE_CUDA=$CUDA 
             -DSTORMM_ENABLE_RDKIT=$RDKIT
             -DCMAKE_PREFIX_PATH=${CI_PROJECT_DIR}/.conda/
             -DSTORMM_ENABLE_TEST_COVERAGE=YES 
-            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy ..
+            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" ..
     - make -j
     - make test -j
     - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
@@ -65,7 +67,8 @@ test:
   parallel:
     matrix:
       - CUDA: ["NO"]
-        RDKIT: ["NO", "YES"]
+        #RDKIT: ["NO", "YES"]
+        RDKIT: ["NO"]
         NEO_TAG: ["intel"]
       - CUDA: ["YES"]
         RDKIT: ["NO"]
@@ -107,7 +110,7 @@ prepare-deployment:
     paths:
       # Pass the build files / environment into the next step
       - ./stormm-recipe-feedstock
-    expire_in: 1 hour
+    expire_in: 1h 30m
   only:
     - tags
 

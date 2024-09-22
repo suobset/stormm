@@ -155,10 +155,6 @@ public:
   /// \param policy          Indicate what to do in the event of bad input, i.e. if custom spline
   ///                        data is not able to fulfill the range requested
   /// \{
-  LogScaleSpline(TableIndexing indexing_method_in = TableIndexing::SQUARED_ARG,
-                 BasisFunctions basis_set_in = BasisFunctions::POLYNOMIAL,
-                 float indexing_offset_in = 0.0);
-
   LogScaleSpline(LogSplineForm target_form_in, double ewald_coefficient_in,
                  double coulomb_constant_in = amber_ancient_bioq,
                  int mantissa_bits_in = default_logtab_mantissa_bits,
@@ -401,6 +397,9 @@ private:
                                             ///<   individual spline segments
   std::vector<double> max_segment_error;    ///< Maximum errors identified in each spline segment
 
+  /// \brief Set the precision model.  Check the underlying data type in the process.
+  void setPrecisionModel();
+  
   /// \brief Set the target form of the function and check for the existence of the proper inputs
   ///
   /// \param target_form_in  The form of the function that the spline table is to emulate
@@ -503,7 +502,22 @@ ullint doublePrecisionSplineDetailMask(int mantissa_bits);
 /// \param mantissa_bits  The number of bits, in addition to the exponent and sign bits, used to
 ///                       encode the table index
 uint singlePrecisionSplineDetailMask(int mantissa_bits);
-  
+
+/// \brief Compute the modified argument based on the "detail bits" for use in calculations with
+///        POLYNOMIAL spline basis functions with DOUBLE-precision spline tables.
+///
+/// \param arg            The basic argument used to generate a spline table lookup index, e.g.
+///                       the squared distance between two particles
+/// \param mantissa_bits  The number of bits, in addition to the exponent and sign bits, used to
+///                       encode the table index
+/// \param detail_mask    The mask used to transform arg into the real-valued spline argument
+double doublePrecisionSplineArgument(double arg, int mantissa_bits, ullint detail_mask);
+
+/// \brief Compute the modified argument based on the "detail bits" for use in calculations with
+///        POLYNOMIAL spline basis functions with SINGLE-precision spline tables.  Descriptions of
+///        input arguments follow from doublePrecisionSplineArgument(), above.
+float singlePrecisionSplineArgument(float arg, int mantissa_bits, uint detail_mask);
+
 /// \brief Restore the templated type of a LogScaleSpline object's abstract.  Overloads of this
 ///        function handle type restoration in their respective objects.
 ///

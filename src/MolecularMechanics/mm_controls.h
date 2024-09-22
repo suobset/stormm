@@ -28,7 +28,9 @@ using energy::CellGrid;
 using energy::ClashResponse;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
+using energy::NeighborListKind;
 using energy::QMapMethod;
+using energy::TinyBoxPresence;
 using stmath::ReductionStage;
 using namelist::default_dynamics_time_step;
 using namelist::default_electrostatic_cutoff;
@@ -202,7 +204,7 @@ public:
   /// \brief Prime the work unit counters based on a particular GPU configuration.
   ///
   /// Overloaded:
-  ///   - Provide information about the PME charge mapping approach
+  ///   - Provide information about the PME approach
   ///   - Make provisions for clashes to be forgiven (or not) with softcore potential functions
   ///   - Provide only basic information for a vacuum-phase MM calculation
   /// 
@@ -233,6 +235,7 @@ public:
                              PrecisionModel valence_prec, PrecisionModel nonbond_prec,
                              QMapMethod qspread_approach, PrecisionModel acc_prec,
                              size_t image_coord_type, int qspread_order,
+                             NeighborListKind nbgr_config, TinyBoxPresence has_tiny_box,
                              const AtomGraphSynthesis &poly_ag);
 
   void primeWorkUnitCounters(const CoreKlManager &launcher, EvaluateForce eval_frc,
@@ -256,9 +259,10 @@ public:
   ///   - Accept one neighbor list and specifications the GPU that will perform the calculations
   ///   - Accept two neighbor lists and the specifications of the GPU
   ///
-  /// \param cg_a  The first cell grid neighbor list
-  /// \param cg_b  The second (optional) cell grid neighbor list
-  /// \param gpu   Details of the GPU that will evaluate pairwise interactions
+  /// \param cg_a     The first cell grid neighbor list
+  /// \param cg_b     The second (optional) cell grid neighbor list
+  /// \param gpu      Details of the GPU that will evaluate pairwise interactions
+  /// \param mult_in  The multiplicity to explicitly set
   /// \{
   template <typename T, typename Tacc, typename Tcalc, typename T4>
   void setNTWarpMultiplicity(const CellGrid<T, Tacc, Tcalc, T4> *cg_a,
@@ -266,6 +270,8 @@ public:
 
   template <typename T, typename Tacc, typename Tcalc, typename T4>
   void setNTWarpMultiplicity(const CellGrid<T, Tacc, Tcalc, T4> *cg_a, const GpuDetails &gpu);
+
+  void setNTWarpMultiplicity(int mult_in);
   /// \}
   
   /// \brief Increment the step counter, moving the controls to a different progress counter.

@@ -22,5 +22,21 @@ uint singlePrecisionSplineDetailMask(const int mantissa_bits) {
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+double doublePrecisionSplineArgument(const double arg, const int mantissa_bits,
+                                     const ullint detail_mask) {
+  Ecumenical8 xfrm = { .d = arg };
+  xfrm.ulli = (((xfrm.ulli & detail_mask) << mantissa_bits) | 0x3ff0000000000000ULL);
+  return xfrm.d;
+}
+
+//-------------------------------------------------------------------------------------------------
+float singlePrecisionSplineArgument(const float arg, const int mantissa_bits,
+                                    const uint detail_mask) {
+  Ecumenical4 xfrm = { .f = arg };
+  xfrm.ui = (((xfrm.ui & detail_mask) << mantissa_bits) | 0x3f800000U);
+  return xfrm.f;
+}
+
 } // namespace stmath
 } // namespace stormm

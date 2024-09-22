@@ -2,14 +2,18 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
+#include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
+#include "Potential/energy_enumerators.h"
 #ifdef STORMM_USE_HPC
 #include "Math/hpc_reduction.h"
 #include "Math/reduction_workunit.h"
+#include "Potential/cellgrid.h"
 #include "Potential/hpc_map_density.h"
 #include "Potential/hpc_nonbonded_potential.h"
+#include "Potential/hpc_pme_potential.h"
 #include "Potential/hpc_valence_potential.h"
 #include "Structure/hpc_rmsd.h"
 #include "Structure/hpc_virtual_site_handling.h"
@@ -26,15 +30,18 @@ using constants::ExceptionResponse;
 using energy::queryBornRadiiKernelRequirements;
 using energy::queryBornDerivativeKernelRequirements;
 using energy::queryGeneralQMapKernelRequirements;
-using energy::queryShrAccQMapKernelRequirements;
+using energy::queryMigrationKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
+using energy::queryPMEPairsKernelRequirements;
+using energy::queryShrAccQMapKernelRequirements;
 using energy::queryValenceKernelRequirements;
-using stmath::queryReductionKernelRequirements;
 using stmath::optReductionKernelSubdivision;
+using stmath::queryReductionKernelRequirements;
 using structure::queryRMSDKernelRequirements;
 using structure::queryVirtualSiteKernelRequirements;
 using trajectory::queryIntegrationKernelRequirements;
 #endif
+using numerics::globalpos_scale_nonoverflow_bits;
 using stmath::findBin;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::half_valence_work_unit_atoms;
@@ -44,15 +51,15 @@ using parse::CaseSensitivity;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
-CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
+CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis *poly_ag) :
     KernelManager(gpu_in),
-    valence_kernel_width{poly_ag.getValenceThreadBlockSize()},
-    nonbond_block_multiplier_dp{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType(),
+    valence_kernel_width{poly_ag->getValenceThreadBlockSize()},
+    nonbond_block_multiplier_dp{nonbondedBlockMultiplier(gpu_in, poly_ag->getUnitCellType(),
                                                          PrecisionModel::DOUBLE,
-                                                         poly_ag.getImplicitSolventModel())},
-    nonbond_block_multiplier_sp{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType(),
+                                                         poly_ag->getImplicitSolventModel())},
+    nonbond_block_multiplier_sp{nonbondedBlockMultiplier(gpu_in, poly_ag->getUnitCellType(),
                                                          PrecisionModel::SINGLE,
-                                                         poly_ag.getImplicitSolventModel())},
+                                                         poly_ag->getImplicitSolventModel())},
     gbradii_block_multiplier_dp{gbRadiiBlockMultiplier(gpu_in, PrecisionModel::DOUBLE)},
     gbradii_block_multiplier_sp{gbRadiiBlockMultiplier(gpu_in, PrecisionModel::SINGLE)},
     gbderiv_block_multiplier_dp{gbDerivativeBlockMultiplier(gpu_in, PrecisionModel::DOUBLE)},
@@ -66,7 +73,7 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     sac_qmap_block_multiplier_sp{densityMappingBlockMultiplier(gpu_in, PrecisionModel::SINGLE,
                                                                QMapMethod::ACC_SHARED)},
     reduction_block_multiplier{reductionBlockMultiplier()},
-    virtual_site_kernel_width{poly_ag.getValenceThreadBlockSize()},
+    virtual_site_kernel_width{poly_ag->getValenceThreadBlockSize()},
     rmsd_block_multiplier_dp{rmsdBlockMultiplier(PrecisionModel::DOUBLE)},
     rmsd_block_multiplier_sp{rmsdBlockMultiplier(PrecisionModel::SINGLE)}
 {
@@ -127,7 +134,7 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                                                           ImplicitSolventModel::NECK_GB };
     const std::vector<std::string> is_model_names = { "Vacuum", "GB", "GBNeck" };
     for (int j = 0; j < 3; j++) {
-      switch (poly_ag.getUnitCellType()) {
+      switch (poly_ag->getUnitCellType()) {
       case UnitCellType::NONE:
         catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
                                EvaluateEnergy::YES, AccumulationMethod::SPLIT, is_models[j],
@@ -197,10 +204,11 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                                                           IntegrationStage::VELOCITY_CONSTRAINT,
                                                           IntegrationStage::POSITION_ADVANCE,
                                                           IntegrationStage::GEOMETRY_CONSTRAINT };
+  const std::vector<std::string> time_step_abbrevs = { "VelAdv", "VelCnst", "PosAdv", "GeomCnst" };
 #endif
   const std::vector<IntegrationStage> time_step_parts = { IntegrationStage::VELOCITY_CONSTRAINT,
                                                           IntegrationStage::GEOMETRY_CONSTRAINT };
-  const std::vector<std::string> time_step_abbrevs = { "VelAdv", "VelCnst", "PosAdv", "GeomCnst" };
+  const std::vector<std::string> time_step_abbrevs = { "VelCnst", "GeomCnst" };
   for (size_t i = 0; i < time_step_parts.size(); i++) {
     catalogIntegrationKernel(PrecisionModel::DOUBLE, AccumulationMethod::SPLIT,
                              valence_kernel_width, time_step_parts[i],
@@ -263,7 +271,7 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
   }
 
   // Reduction kernel entries
-  const int reduction_div = optReductionKernelSubdivision(poly_ag.getSystemAtomCounts(), gpu_in);
+  const int reduction_div = optReductionKernelSubdivision(poly_ag->getSystemAtomCounts(), gpu_in);
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
                          ReductionStage::GATHER, reduction_div, "kdgtConjGrad");
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
@@ -297,8 +305,122 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
   catalogRMSDKernel(PrecisionModel::SINGLE, RMSDTask::REFERENCE, "kfComputeRMSDToReference");
   catalogRMSDKernel(PrecisionModel::DOUBLE, RMSDTask::MATRIX, "kdComputeRMSDMatrix");
   catalogRMSDKernel(PrecisionModel::SINGLE, RMSDTask::MATRIX, "kfComputeRMSDMatrix");
+
+  // PME pair interactions
+  const std::vector<NeighborListKind> all_neighbor_lists = { NeighborListKind::DUAL,
+                                                             NeighborListKind::MONO };
+  const std::vector<TinyBoxPresence> all_box_wrappings = { TinyBoxPresence::YES,
+                                                           TinyBoxPresence::NO };
+  std::string kname("kxx");
+  kname.reserve(96);
+  for (size_t i = 0; i < all_prec.size(); i++) {
+    switch (all_prec[i]) {
+    case PrecisionModel::DOUBLE:
+      kname[1] = 'd';
+      break;
+    case PrecisionModel::SINGLE:
+      kname[1] = 'f';
+      break;
+    }
+    for (size_t j = 0; j < all_prec.size(); j++) {
+      switch (all_prec[j]) {
+      case PrecisionModel::DOUBLE:
+        kname[2] = 'd';
+        break;
+      case PrecisionModel::SINGLE:
+        kname[2] = 'f';
+        break;
+      }
+      for (size_t k = 0; k < all_neighbor_lists.size(); k++) {
+        std::string kextn;
+        switch (all_neighbor_lists[k]) {
+        case NeighborListKind::MONO:
+          break;
+        case NeighborListKind::DUAL:
+          kextn += "Dual";
+          break;
+        }
+        const int kextn_ngbr_len = kextn.size();
+        for (size_t m = 0; m < all_box_wrappings.size(); m++) {
+          kextn.resize(kextn_ngbr_len);
+          switch (all_box_wrappings[m]) {
+          case TinyBoxPresence::NO:
+            break;
+          case TinyBoxPresence::YES:
+            kextn += "Tiny";
+            break;
+          }
+          const int kextn_wrap_len = kextn.size();
+          for (size_t n = 0; n < clash_policy.size(); n++) {
+            kextn.resize(kextn_wrap_len);
+            switch (clash_policy[n]) {
+            case ClashResponse::NONE:
+              break;
+            case ClashResponse::FORGIVE:
+              kextn += "NonClash";
+              break;
+            }
+            const int kextn_bump_len = kextn.size();
+            kname.resize(3);
+            kname += "TowerPlate";
+            kname += "FE" + kextn;
+            catalogPMEPairsKernel(all_prec[i], all_prec[j], all_neighbor_lists[k],
+                                  all_box_wrappings[m], EvaluateForce::YES, EvaluateEnergy::YES,
+                                  clash_policy[n], kname);
+            kname.resize(13);
+            kname += "FX" + kextn;
+            catalogPMEPairsKernel(all_prec[i], all_prec[j], all_neighbor_lists[k],
+                                  all_box_wrappings[m], EvaluateForce::YES, EvaluateEnergy::NO,
+                                  clash_policy[n], kname);
+            kname.resize(13);
+            kname += "XE" + kextn;
+            catalogPMEPairsKernel(all_prec[i], all_prec[j], all_neighbor_lists[k],
+                                  all_box_wrappings[m], EvaluateForce::NO, EvaluateEnergy::YES,
+                                  clash_policy[n], kname);
+          }
+        }
+      }
+    }
+  }
+
+  // Particle migration kernels
+  for (size_t i = 0; i < all_prec.size(); i++) {
+    for (size_t j = 0; j < all_neighbor_lists.size(); j++) {
+      for (int k = 1; k <= 2; k++) {
+        std::string kname = "k";
+        switch (all_prec[i]) {
+        case PrecisionModel::DOUBLE:
+          kname += "d";
+          break;
+        case PrecisionModel::SINGLE:
+          kname += "f";
+          break;
+        }
+        kname += "Migration";
+        kname += (k == 1) ? "One" : "Two";
+        switch (all_neighbor_lists[j]) {
+        case NeighborListKind::DUAL:
+          kname += "Dual";
+          break;
+        case NeighborListKind::MONO:
+          break;
+        }
+        catalogMigrationKernel(all_prec[i], all_neighbor_lists[j], k,
+                               globalpos_scale_nonoverflow_bits - 1, kname);
+        if (k == 1) {
+          catalogMigrationKernel(all_prec[i], all_neighbor_lists[j], k,
+                                 globalpos_scale_nonoverflow_bits + 1, kname);
+        }
+      }
+    }
+  }
 #endif
 }
+
+//-------------------------------------------------------------------------------------------------
+CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
+    CoreKlManager(gpu_in, poly_ag.getSelfPointer())
+{}
 
 //-------------------------------------------------------------------------------------------------
 void CoreKlManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
@@ -624,6 +746,60 @@ void CoreKlManager::catalogRMSDKernel(const PrecisionModel prec, const RMSDTask 
 }
 
 //-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogPMEPairsKernel(const PrecisionModel coord_prec,
+                                          const PrecisionModel calc_prec,
+                                          const NeighborListKind grid_configuration,
+                                          const TinyBoxPresence has_tiny_box,
+                                          const EvaluateForce eval_frc,
+                                          const EvaluateEnergy eval_nrg,
+                                          const ClashResponse mitigation,
+                                          const std::string &kernel_name) {
+  const std::string k_key = pmePairsKernelKey(coord_prec, calc_prec, grid_configuration,
+                                              has_tiny_box, eval_frc, eval_nrg, mitigation);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("PME particle-particle pair interactions kernel identifier " + k_key + " already exists "
+          "in the kernel map.", "CoreKlManager", "catalogPMEPairsKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryPMEPairsKernelRequirements(coord_prec, calc_prec,
+                                                                  grid_configuration, eval_frc,
+                                                                  eval_nrg, has_tiny_box,
+                                                                  mitigation);
+  k_dictionary[k_key] = KernelFormat(attr, pmePairsBlockMultiplier(gpu, coord_prec, calc_prec), 1,
+                                     gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogMigrationKernel(const PrecisionModel coord_prec,
+                                           const NeighborListKind grid_configuration,
+                                           const int stage_number, const int gpos_bits,
+                                           const std::string &kernel_name) {
+  const std::string k_key = migrationKernelKey(coord_prec, grid_configuration, stage_number,
+                                               gpos_bits);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("PME particle migration kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "CoreKlManager", "catalogMigrationKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryMigrationKernelRequirements(coord_prec,
+                                                                   grid_configuration,
+                                                                   stage_number, gpos_bits);
+  k_dictionary[k_key] = KernelFormat(attr, migrationBlockMultiplier(), 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 int2 CoreKlManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const AccumulationMethod acc_meth,
@@ -771,6 +947,48 @@ int2 CoreKlManager::getRMSDKernelDims(const PrecisionModel prec, const RMSDTask 
           "CoreKlManager", "getRMSDKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getPMEPairsKernelDims(const PrecisionModel coord_prec,
+                                          const PrecisionModel calc_prec,
+                                          const NeighborListKind grid_configuration,
+                                          const TinyBoxPresence has_tiny_box,
+                                          const EvaluateForce eval_frc,
+                                          const EvaluateEnergy eval_nrg,
+                                          const ClashResponse mitigation) const {
+  const std::string k_key = pmePairsKernelKey(coord_prec, calc_prec, grid_configuration,
+                                              has_tiny_box, eval_frc, eval_nrg, mitigation);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("PME particle-particle pair interactions kernel identifier " + k_key + " was not found "
+          "in the kernel map.", "CoreKlManager", "getPMEPairsKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getMigrationKernelDims(const PrecisionModel coord_prec,
+                                           const NeighborListKind grid_configuration,
+                                           const int stage_number, const int gpos_bits,
+                                           const int chain_count) const {
+  const std::string k_key = migrationKernelKey(coord_prec, grid_configuration, stage_number,
+                                               gpos_bits);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("PME particle migration kernel identifier " + k_key + " was not found in the kernel "
+          "map.", "CoreKlManager", "getMigrationKernelDims");
+  }
+
+  // While the topology itself may offer sufficient clues about the workflow for modifying other
+  // kernel launches, the chain count in CellGrid objects, which the developer will not be held
+  // responsible for having available when the kernel manager is constructed, informs the
+  // subdivision of the migration kernels.  Apply that here.
+  int2 result = k_dictionary.at(k_key).getLaunchParameters();
+  const int nsmp = gpu.getSMPCount();
+  if (chain_count == 0 || chain_count > nsmp * 2) {
+    result.x *= 2;
+    result.y /= 2;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -957,7 +1175,25 @@ int virtualSiteBlockMultiplier(const PrecisionModel prec) {
 int rmsdBlockMultiplier(const PrecisionModel prec) {
 #ifdef STORMM_USE_HPC
   return 4;
-  __builtin_unreachable();
+#else
+  return 1;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+int pmePairsBlockMultiplier(const GpuDetails &gpu, const PrecisionModel coord_prec,
+                            const PrecisionModel calc_prec) {
+#ifdef STORMM_USE_HPC
+  return 2;
+#else
+  return 1;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+int migrationBlockMultiplier() {
+#ifdef STORMM_USE_HPC
+  return 2;
 #else
   return 1;
 #endif
@@ -1372,6 +1608,113 @@ std::string rmsdKernelKey(const PrecisionModel prec, const RMSDTask order) {
   case RMSDTask::MATRIX:
     k_key += "_m";
     break;
+  }
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string pmePairsKernelKey(const PrecisionModel coord_prec, const PrecisionModel calc_prec,
+                              const NeighborListKind grid_configuration,
+                              const TinyBoxPresence has_tiny_box, const EvaluateForce eval_frc,
+                              const EvaluateEnergy eval_nrg, const ClashResponse mitigation) {
+  std::string k_key("pme_tp_");
+  switch (coord_prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (calc_prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (grid_configuration) {
+  case NeighborListKind::DUAL:
+    k_key += "pr";
+    break;
+  case NeighborListKind::MONO:
+    k_key += "un";
+    break;
+  }
+  switch (eval_frc) {
+  case EvaluateForce::YES:
+    switch (eval_nrg) {
+    case EvaluateEnergy::YES:
+      k_key += "fe";
+      break;
+    case EvaluateEnergy::NO:
+      k_key += "f";
+      break;
+    }
+    break;
+  case EvaluateForce::NO:
+    switch (eval_nrg) {
+    case EvaluateEnergy::YES:
+      k_key += "e";
+      break;
+    case EvaluateEnergy::NO:
+
+      // This erroneous case will be trapped elsewhere
+      break;
+    }
+    break;
+  }
+  switch (has_tiny_box) {
+  case TinyBoxPresence::YES:
+    k_key += "t";
+    break;
+  case TinyBoxPresence::NO:
+    k_key += "s";
+    break;
+  }
+  switch (mitigation) {
+  case ClashResponse::FORGIVE:
+    k_key += "nc";
+    break;
+  case ClashResponse::NONE:
+    k_key += "cl";
+    break;
+  }
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string migrationKernelKey(const PrecisionModel coord_prec,
+                               const NeighborListKind grid_configuration,
+                               const int stage_number, const int gpos_bits) {
+  std::string k_key("migr_");
+  switch (coord_prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (grid_configuration) {
+  case NeighborListKind::DUAL:
+    k_key += "pr";
+    break;
+  case NeighborListKind::MONO:
+    k_key += "un";
+    break;
+  }
+  if (stage_number < 1 || stage_number > 2) {
+    rtErr("The accepted stages of particle migration are 1 and 2.  " +
+          std::to_string(stage_number) + " is invalid.", "migrationKernelKey");
+  }
+  k_key += std::to_string(stage_number);
+  if (gpos_bits > 0 && gpos_bits <= globalpos_scale_nonoverflow_bits) {
+    k_key += "_lr";
+  }
+  else {
+    k_key += "_fn";
   }
   return k_key;
 }

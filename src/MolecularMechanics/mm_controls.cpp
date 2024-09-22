@@ -333,6 +333,8 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        const PrecisionModel acc_prec,
                                                        const size_t image_coord_type,
                                                        const int qspread_order,
+                                                       const NeighborListKind nbgr_config,
+                                                       const TinyBoxPresence has_tiny_box,
                                                        const AtomGraphSynthesis &poly_ag) {
   const GpuDetails wgpu = launcher.getGpu();
   const ImplicitSolventModel igb = poly_ag.getImplicitSolventModel();
@@ -380,8 +382,15 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
       const int2 pmewu_lp = launcher.getDensityMappingKernelDims(qspread_approach, nonbond_prec,
                                                                  acc_prec, true, image_coord_type,
                                                                  qspread_order);
+      const PrecisionModel cellgrid_prec = (image_coord_type == double_type_index ||
+                                            image_coord_type == llint_type_index) ?
+                                           PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
+      const int2 nbwu_lp = launcher.getPMEPairsKernelDims(cellgrid_prec, nonbond_prec, nbgr_config,
+                                                          has_tiny_box, eval_frc, eval_nrg,
+                                                          softcore);
       for (int i = 0; i < twice_warp_size_int; i++) {
         pmewu_progress.putHost(pmewu_lp.x, i);
+        nbwu_progress.putHost(nbwu_lp.x * (nbwu_lp.y / warp_size_int), i);
       }
     }
     break;
@@ -419,7 +428,7 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        const AtomGraphSynthesis &poly_ag) {
   primeWorkUnitCounters(launcher, eval_frc, eval_nrg, softcore, purpose, valence_prec,
                         nonbond_prec, QMapMethod::GENERAL_PURPOSE, valence_prec, int_type_index,
-                        4, poly_ag);
+                        4, NeighborListKind::MONO, TinyBoxPresence::NO, poly_ag);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -432,7 +441,7 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        const AtomGraphSynthesis &poly_ag) {
   primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, purpose, valence_prec,
                         nonbond_prec, QMapMethod::GENERAL_PURPOSE, valence_prec, int_type_index,
-                        4, poly_ag);
+                        4, NeighborListKind::MONO, TinyBoxPresence::NO, poly_ag);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -444,7 +453,12 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        const AtomGraphSynthesis &poly_ag) {
   primeWorkUnitCounters(launcher, eval_frc, eval_nrg, ClashResponse::NONE, purpose, general_prec,
                         general_prec, QMapMethod::GENERAL_PURPOSE, general_prec, int_type_index,
-                        4, poly_ag);
+                        4, NeighborListKind::MONO, TinyBoxPresence::NO, poly_ag);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::setNTWarpMultiplicity(const int mult_in) {
+  nt_warp_multiplicity = mult_in;
 }
 
 //-------------------------------------------------------------------------------------------------

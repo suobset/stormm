@@ -2,6 +2,7 @@
 #ifndef STORMM_BINARY_ENCODING_H
 #define STORMM_BINARY_ENCODING_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include "copyright.h"
