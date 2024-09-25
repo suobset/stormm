@@ -11,7 +11,7 @@
 #include "../../src/Math/log_scale_spline.h"
 #include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/vector_ops.h"
-#include "../../src/Numerics/host_popc.h"
+#include "../../src/Numerics/host_bit_counting.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/cellgrid.h"
 #include "../../src/Potential/energy_enumerators.h"

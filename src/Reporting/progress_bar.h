@@ -97,7 +97,13 @@ public:
   ///
   /// \param stream   The standard output stream to use for rendering the progress bar.
   void setOutputStream(std::ostream &stream);
-  
+
+  /// \brief  Allows the user to set a custom terminal width for the ProgressBar.
+  ///         If this function is called, it will override the dynamically inferred width.
+  ///
+  /// \param width  The new width of the terminal in characters
+  void setTerminalWidth(int width);
+
   /// \brief  Function to update the ProgressBar, incrementing the number of iterations by 1,
   ///         calculating the appropriate percentage, and rendering the ProgressBar in the
   ///         terminal.

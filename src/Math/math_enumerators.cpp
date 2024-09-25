@@ -144,6 +144,19 @@ std::string getEnumerationName(const FFTMode input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const HilbertCurveMode input) {
+  switch (input) {
+  case HilbertCurveMode::STRETCH:
+    return std::string("STRETCH");
+  case HilbertCurveMode::OVERSPAN:
+    return std::string("OVERSPAN");
+  case HilbertCurveMode::EXACT:
+    return std::string("EXACT");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 FFTMode translateFFTMode(const std::string &input) {
   if (strcmpCased(input, std::string("in_place"), CaseSensitivity::NO) ||
       strcmpCased(input, std::string("in-place"), CaseSensitivity::NO) ||

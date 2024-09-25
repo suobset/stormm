@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -35,32 +36,47 @@ int main(const int argc, const char* argv[]) {
   // Section 3
   section("Test the minimal progress bar, percentage only");
 
-  // Section 4
-  section("Test the progress bar outside a loop");
-
-  section(1);
-  
   // Initialize progress bar with 10000 iterations
-  const int initial_iterations = 10000;
+  section(1);
+  const int initial_iterations = 5000;
   progressBar.initialize(initial_iterations);
-
-  // Simulate work with sleep
+  progressBar.setTerminalWidth(80);
   for (int i = 0; i < initial_iterations; ++i) {
     progressBar.update();
-    std::this_thread::sleep_for(std::chrono::microseconds(150));
+
+    // Simulate work with sleep
+    std::this_thread::sleep_for(std::chrono::microseconds(120));
   }
-  std::cerr << std::endl;
-  
+  std::cout << std::endl;
   section(2);
 
   // Reset and modify progress bar settings
-  const int new_iterations = 5000;
+  const int new_iterations = 2500;
   progressBar.setIterations(new_iterations);
   progressBar.reset();
   progressBar.setTodoChar(" ");
-  progressBar.setDoneChar("█");
+  progressBar.setDoneChar("|");
   progressBar.setOpeningBracketChar("{");
   progressBar.setClosingBracketChar("}");
+
+  for (int i = 0; i < new_iterations; ++i) {
+    progressBar.update();
+    // Simulate work with a sleep
+    std::this_thread::sleep_for(std::chrono::microseconds(120));
+  }
+  // TODO: Changing this error reporting to STORMM format
+  std::cout << std::endl;
+
+  section(3);
+  // Disable bar display
+  progressBar.reset();
+  progressBar.showBar(false);
+  for (int i = 0; i < new_iterations; ++i) {
+    progressBar.update();
+    std::this_thread::sleep_for(std::chrono::microseconds(150));
+  }
+  // TODO: Changing this error reporting to STORMM format
+  std::cout << std::endl;
 
   // Simulate work with sleep
   for (int i = 0; i < new_iterations; ++i) {
@@ -68,8 +84,16 @@ int main(const int argc, const char* argv[]) {
     std::this_thread::sleep_for(std::chrono::microseconds(150));
   }
 
-  // TODO: Changing this error reporting to STORMM format
-  std::cerr << std::endl;
+  progressBar.update();
+  
+  // Simulate work
+  std::this_thread::sleep_for(std::chrono::milliseconds(800));
+  progressBar.update();
+  
+  // Simulate work
+  std::this_thread::sleep_for(std::chrono::milliseconds(700));
+  
+  std::cout << std::endl;
 
   section(3);
 
@@ -93,19 +117,19 @@ int main(const int argc, const char* argv[]) {
   progressBar.update();
 
   // Simulate work
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  std::this_thread::sleep_for(std::chrono::milliseconds(80));
   progressBar.update();
 
   // Simulate work
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  std::this_thread::sleep_for(std::chrono::milliseconds(80));
   progressBar.update();
 
   // Simulate work
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  std::this_thread::sleep_for(std::chrono::milliseconds(80));
   progressBar.update();
 
   // Simulate work
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  std::this_thread::sleep_for(std::chrono::milliseconds(80));
 
   // Return an accounting of all errors and test results
   printf("\n");

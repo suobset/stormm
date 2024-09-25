@@ -80,59 +80,82 @@ void ProgressBar::setOutputStream(std::ostream& stream) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ProgressBar::setTerminalWidth(int width) {
+  if (width > 0) {
+    termWidth = width;
+  } else {
+    rtErr("Terminal width must be positive.", "ProgressBar", "setTerminalWidth");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ProgressBar::update() {
-  if (nCycles == 0) {
-    rtErr("The number of cycles has not been set.", "ProgressBar", "update");
-  }
-  if (updateIsCalled == false) {
-    updateIsCalled = true;
-  }
-  
-  // Subtract characters for brackets and the percentage filled.
-  const int percent = progress * 100 / (nCycles - 1);
-  int barWidth = termWidth - (openingBracketChar.length() + closingBracketChar.length() + 7);
-
-  // Ensure barWidth is at least 10 to accommodate the minimum length of the bar.
-  barWidth = std::max(barWidth, 10);
-
-  // Redraw the entire progress bar for each update.
-  if (doShowBar) {
-
-    // Move to the beginning of the line.
-    *output << "\r" << openingBracketChar;
-
-    // Draw the progress part of the bar.
-    int numDoneChars = percent * barWidth / 100;
-    for (int i = 0; i < numDoneChars; ++i) {
-      *output << doneChar;
+    if (nCycles == 0) {
+        rtErr("The number of cycles has not been set.", "ProgressBar", "update");
     }
+    if (!updateIsCalled) {
+        updateIsCalled = true;
+    }
+
+    // Calculate the percentage of progress
+    const int percent = progress * 100 / (nCycles - 1);
     
-    // Draw the remaining part of the bar.
-    for (int i = numDoneChars; i < barWidth; ++i) {
-      *output << todoChar;
-    }
-    
-    // Close the bar and display the percentage.
-    *output << closingBracketChar << ' ' << percent << '%';
-  }
-  else {
+    if (doShowBar) {
+        int barWidth = termWidth - (openingBracketChar.length() + closingBracketChar.length() + 7);
+        barWidth = std::max(barWidth, 10);  // Ensure minimum bar width
 
-    // Just print the percentage if the bar is not being shown.
-    if (percent < 10) {
-      *output << "\r  " << percent << '%';
-    }
-    else if (percent < 100) {
-      *output << "\r " << percent << '%';
-    }
-    else {
-      *output << "\r" << percent << '%';
-    }
-  }
+        // Preallocate the string to avoid dynamic allocations
+        std::string progressBarString;
+        progressBarString.resize(termWidth);
 
-  // Flush the output to update the display and increment the internal counters.
-  *output << std::flush;
-  lastPercent = percent;
-  ++progress;
+        // Place the carriage return character to move to the start of the line
+        progressBarString[0] = '\r';
+
+        // Fill in the opening bracket character
+        size_t position = 1;
+        for (char c : openingBracketChar) {
+            progressBarString[position++] = c;
+        }
+
+        // Calculate the number of done and todo characters
+        int numDoneChars = percent * barWidth / 100;
+
+        // Fill the done characters in the string
+        for (int i = 0; i < numDoneChars; ++i) {
+            progressBarString[position++] = doneChar[0];
+        }
+
+        // Fill the remaining part of the bar with todo characters
+        for (int i = numDoneChars; i < barWidth; ++i) {
+            progressBarString[position++] = todoChar[0];
+        }
+
+        // Fill in the closing bracket character
+        for (char c : closingBracketChar) {
+            progressBarString[position++] = c;
+        }
+
+        // Add a space and the percentage display
+        progressBarString[position++] = ' ';
+        std::string percentString = std::to_string(percent) + "%";
+        for (char c : percentString) {
+            progressBarString[position++] = c;
+        }
+
+        // Resize the string to the actual length
+        progressBarString.resize(position);
+
+        // Output the entire string at once, overwriting the current line
+        *output << progressBarString << std::flush;
+    } else {
+        // If the bar is hidden, only show the percentage.
+        std::string percentString = std::to_string(percent) + "%";
+        *output << "\r" << percentString << std::flush;
+    }
+
+    // Update internal counters
+    lastPercent = percent;
+    ++progress;
 }
 
 //-------------------------------------------------------------------------------------------------
