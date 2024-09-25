@@ -1,5 +1,5 @@
 #include "copyright.h"
-#include "Numerics/host_popc.h"
+#include "Numerics/host_bit_counting.h"
 #include "background_mesh.h"
 
 namespace stormm {

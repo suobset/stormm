@@ -134,6 +134,17 @@ enum class FFTMode {
                 ///<   into an array with nx * ny * nz elements for real data of dimensions nx, ny,
                 ///<   and nz.
 };
+
+enum class HilbertCurveMode {
+  STRETCH,   ///< A curve will be generated based on a single power of two, then stretched to
+             ///<   whatever dimensions are required.
+  OVERSPAN,  ///< The curve will extend beyond the region of interest out to the nearest power of
+             ///<   two in all dimensions.  Only those parts of the curve that are within the
+             ///<   region of interest will be valid. 
+  EXACT      ///< The curve will double back on itself as necessary, shifting to a planar curve of
+             ///<   thickness one or even a straight line in order to span the space with no
+             ///<   invalid volume.
+};
   
 /// \brief Get a human-readable string describing an enumeration of the provided type.  Various
 ///        overloads of this function serve enumerators across many libraries.
@@ -148,6 +159,7 @@ std::string getEnumerationName(TableIndexing input);
 std::string getEnumerationName(BasisFunctions input);
 std::string getEnumerationName(BSplineUnity input);
 std::string getEnumerationName(FFTMode input);
+std::string getEnumerationName(HilbertCurveMode input);
 /// \}
 
 /// \brief Translate a human-readable string (likely from user input) into one of the modes for

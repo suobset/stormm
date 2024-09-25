@@ -7,6 +7,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/bspline.h"
 #include "../../src/Math/formulas.h"
+#include "../../src/Math/hilbert_sfc.h"
 #include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/matrix.h"
 #include "../../src/Math/matrix_ops.h"
@@ -36,6 +37,7 @@ using stormm::ulint;
 using stormm::ullint;
 #ifndef STORMM_USE_HPC
 using stormm::int2;
+using stormm::int3;
 using stormm::double2;
 using stormm::double3;
 using stormm::double4;
@@ -1372,6 +1374,70 @@ void testSigmoid(const double crossover, const double intensity) {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test a specific space-filling curve.
+//-------------------------------------------------------------------------------------------------
+void checkCurve(const int xdim, const int ydim, const int zdim, const HilbertCurveMode method,
+                const std::vector<int> &path_x, const std::vector<int> &path_y,
+                const std::vector<int> &path_z) {
+  HilbertSFC design(xdim, ydim, zdim, method);
+  const std::vector<int3> design_curve = design.getCurve();
+  const int3 design_dims = design.getDimensions();
+  check(design_dims.x, RelationalOperator::EQUAL, xdim, "The Hilbert space-filling curve was not "
+        "formed with the proper dimension along the X axis.  Mode: " + getEnumerationName(method) +
+        ".");
+  check(design_dims.y, RelationalOperator::EQUAL, ydim, "The Hilbert space-filling curve was not "
+        "formed with the proper dimension along the Y axis.  Mode: " + getEnumerationName(method) +
+        ".");
+  check(design_dims.z, RelationalOperator::EQUAL, zdim, "The Hilbert space-filling curve was not "
+        "formed with the proper dimension along the Z axis.  Mode: " + getEnumerationName(method) +
+        ".");
+  const int nsc_pts = design_dims.x * design_dims.y * design_dims.z;
+  std::vector<int> design_x(nsc_pts), design_y(nsc_pts), design_z(nsc_pts);
+  for (int i = 0; i < nsc_pts; i++) {
+    design_x[i] = design_curve[i].x;
+    design_y[i] = design_curve[i].y;
+    design_z[i] = design_curve[i].z;
+  }
+  check(design_x, RelationalOperator::EQUAL, path_x, "The Hilbert space-filling curve was not "
+        "formed with the expected X coordinates along its path.  Mode: " +
+        getEnumerationName(method) + ".");
+  check(design_y, RelationalOperator::EQUAL, path_y, "The Hilbert space-filling curve was not "
+        "formed with the expected Y coordinates along its path.  Mode: " +
+        getEnumerationName(method) + ".");
+  check(design_z, RelationalOperator::EQUAL, path_z, "The Hilbert space-filling curve was not "
+        "formed with the expected Z coordinates along its path.  Mode: " +
+        getEnumerationName(method) + ".");
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test methods for drawing a space-filling curve.
+//-------------------------------------------------------------------------------------------------
+void testSpaceFillingCurve() {
+  const std::vector<int> first_cube_x_ans = { 0,  1,  1,  0,  0,  1,  1,  0 };
+  const std::vector<int> first_cube_y_ans = { 0,  0,  1,  1,  1,  1,  0,  0 };
+  const std::vector<int> first_cube_z_ans = { 0,  0,  0,  0,  1,  1,  1,  1 };
+  checkCurve(2, 2, 2, HilbertCurveMode::STRETCH, first_cube_x_ans, first_cube_y_ans,
+             first_cube_z_ans);
+  const std::vector<int> second_cube_x_ans = { 0,  0,  0,  0,  1,  1,  1,  1,  2,  2,  3,  3,  3,
+                                               3,  2,  2,  2,  2,  3,  3,  3,  3,  2,  2,  1,  0,
+                                               0,  1,  1,  0,  0,  1,  1,  0,  0,  1,  1,  0,  0,
+                                               1,  2,  2,  3,  3,  3,  3,  2,  2,  2,  2,  3,  3,
+                                               3,  3,  2,  2,  1,  1,  1,  1,  0,  0,  0,  0 };
+  const std::vector<int> second_cube_y_ans = { 0,  1,  1,  0,  0,  1,  1,  0,  0,  0,  0,  0,  1,
+                                               1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,
+                                               2,  2,  2,  2,  3,  3,  3,  3,  2,  2,  2,  2,  3,
+                                               3,  3,  3,  3,  3,  2,  2,  2,  2,  1,  1,  1,  1,
+                                               0,  0,  0,  0,  0,  1,  1,  0,  0,  1,  1,  0 };
+  const std::vector<int> second_cube_z_ans = { 0,  0,  1,  1,  1,  1,  0,  0,  0,  1,  1,  0,  0,
+                                               1,  1,  0,  0,  1,  1,  0,  0,  1,  1,  0,  0,  0,
+                                               0,  0,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,
+                                               3,  3,  2,  2,  3,  3,  2,  2,  3,  3,  2,  2,  3,
+                                               3,  2,  2,  3,  3,  3,  2,  2,  2,  2,  3,  3 };
+  checkCurve(4, 4, 4, HilbertCurveMode::STRETCH, second_cube_x_ans, second_cube_y_ans,
+             second_cube_z_ans);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1402,6 +1468,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 7
   section("Customized formulas");
+
+  // Section 8
+  section("Space-filling curves");
   
   // Check vector processing capabilities
   section(1);
@@ -2467,6 +2536,10 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> segments_ans_d = { 13, 13, 3 };
   check(segments, RelationalOperator::EQUAL, segments_ans_d, "The partitioning of 29 did not "
         "return the expected result.");
+
+  // Check the Hilbert space-filling curve methods
+  section(8);
+  testSpaceFillingCurve();
   
   // Print results
   printTestSummary(oe.getVerbosity());

@@ -13,6 +13,7 @@
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/radial_derivatives.h"
 #include "../../src/Math/vector_ops.h"
+#include "../../src/Numerics/host_bit_counting.h"
 #include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/pme_util.h"
@@ -899,6 +900,32 @@ void testExtremeInt95t() {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test certain bit-counting functions coded in C++ to match HPC language intrinsics.
+//-------------------------------------------------------------------------------------------------
+void testBitCountingFunctions() {
+  const uint test_a = 65536;
+  check(hostPopc(test_a), RelationalOperator::EQUAL, 1, "The C++ __popc() function applied to "
+        "65536 yields incorrect results.");
+  check(hostFfs(test_a), RelationalOperator::EQUAL, 16, "The C++ __ffs() function applied to "
+        "65536 yields incorrect results.");
+  const uint test_b = 65536 + 7 + (31 * 32);
+  check(hostPopc(test_b), RelationalOperator::EQUAL, 9, "The C++ __popc() function applied to " +
+        std::to_string(test_b) + " yields incorrect results.");
+  check(hostFfs(test_b), RelationalOperator::EQUAL, 16, "The C++ __ffs() function applied to " +
+        std::to_string(test_b) + " yields incorrect results.");
+  const int test_c = -1;
+  check(hostPopc(test_c), RelationalOperator::EQUAL, 32, "The C++ __popc() function applied to "
+        "-1 yields incorrect results.");
+  check(hostFfs(test_c), RelationalOperator::EQUAL, 31, "The C++ __ffs() function applied to "
+        "-1 yields incorrect results.");
+  const int test_d = INT_MIN + 31;
+  check(hostPopc(test_d), RelationalOperator::EQUAL, 6, "The C++ __popc() function applied to " +
+        std::to_string(test_d) + " yields incorrect results.");
+  check(hostFfs(test_d), RelationalOperator::EQUAL, 31, "The C++ __ffs() function applied to " +
+        std::to_string(test_d) + " yields incorrect results.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -931,6 +958,9 @@ int main(const int argc, const char* argv[]) {
   // Section 7
   section("Test adaptations of Norbert Juffa's 32-bit math functions");
 
+  // Section 8
+  section("Host-side integer bit counting");
+  
   // Make a series of prime numbers
   std::vector<llint> primes(1, 2);
   int p = 3;
@@ -1275,6 +1305,10 @@ int main(const int argc, const char* argv[]) {
   // Test Norbert Juffa's various 32-bit floating point functions
   section(7);
   testJuffaImplementations();
+
+  // Test host-bound integer bit counting functions
+  section(8);
+  testBitCountingFunctions();
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {
