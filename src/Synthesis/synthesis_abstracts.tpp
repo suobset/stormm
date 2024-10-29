@@ -105,7 +105,7 @@ SyNonbondedKit<T, T2>::SyNonbondedKit(const int nsys_in, const UnitCellType unit
 template <typename T, typename T2, typename T4>
 SyAtomUpdateKit<T, T2, T4>::SyAtomUpdateKit(const T* masses_in, const T* inv_masses_in,
                                             const int largest_group_in, const T4* vs_params_in,
-                                            const T4* settle_geom_in, const T2* settle_mass_in,
+                                            const T4* settle_geom_in, const T4* settle_mass_in,
                                             const T2* cnst_grp_params_in,
                                             const uint2* vste_insr_in, const uint2* sett_insr_in,
                                             const uint2* cnst_insr_in, const uint2* vwu_manip_in) :

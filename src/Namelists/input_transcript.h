@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "command_line_parser.h"
 #include "user_settings.h"
 #include "namelist_emulator.h"
 
@@ -14,11 +15,11 @@ namespace namelist {
 
 /// \brief Form a string for printing the command line based on the series of CLI arguments.
 ///
-/// \param ui     Primary compendium of user input, containing a list of the command line arguments
+/// \param clip   Primary compendium of user input, containing a list of the command line arguments
 /// \param width  Width of horizontal rule to print ahead of the command line.  If set to less than
 ///               or equal to zero, no horizontal rule will be printed.
-std::string commandLineAsString(const UserSettings &ui, int width = 0);
-  
+std::string commandLineAsString(const CommandLineParser &clip, int width = 0);
+
 /// \brief Transcribe input values from all applicable namelists to a file that will aid users in
 ///        understanding how their specific inputs may have interacted with pre-existing defaults.
 ///

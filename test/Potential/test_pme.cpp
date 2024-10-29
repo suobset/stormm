@@ -446,7 +446,7 @@ void spatialDecompositionOuter(const AtomGraphSynthesis &poly_ag,
   case PrecisionModel::DOUBLE:
     if (cast_cg_in_fp) {
       section(1);
-      CellGrid<llint, llint, double, llint4> cg(poly_ps, poly_ag, 4.5, 0.25, mesh_ticks, cg_theme);
+      CellGrid<llint, llint, double, llint4> cg(poly_ps, poly_ag, 9.0, 0.25, mesh_ticks, cg_theme);
       inspectCellGrids(cg, poly_ag, do_tests);
       section(2);
       spatialDecompositionInner<llint, llint, double, llint4>(cg, pmi_grid_prec, pm_acc_bits,
@@ -456,7 +456,7 @@ void spatialDecompositionOuter(const AtomGraphSynthesis &poly_ag,
     }
     else {
       section(1);
-      CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 4.5, 0.25, mesh_ticks,
+      CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 9.0, 0.25, mesh_ticks,
                                                   cg_theme);
       inspectCellGrids(cg, poly_ag, do_tests);
       section(2);
@@ -469,7 +469,7 @@ void spatialDecompositionOuter(const AtomGraphSynthesis &poly_ag,
   case PrecisionModel::SINGLE:
     if (cast_cg_in_fp) {
       section(1);
-      CellGrid<int, int, float, int4> cg(poly_ps, poly_ag, 4.5, 0.25, mesh_ticks, cg_theme);
+      CellGrid<int, int, float, int4> cg(poly_ps, poly_ag, 9.0, 0.25, mesh_ticks, cg_theme);
       inspectCellGrids(cg, poly_ag, do_tests);
       section(2);
       spatialDecompositionInner<int, int, float, int4>(cg, pmi_grid_prec, pm_acc_bits, pm_order,
@@ -478,7 +478,7 @@ void spatialDecompositionOuter(const AtomGraphSynthesis &poly_ag,
     }
     else {
       section(1);
-      CellGrid<float, int, float, float4> cg(poly_ps, poly_ag, 4.5, 0.25, mesh_ticks, cg_theme);
+      CellGrid<float, int, float, float4> cg(poly_ps, poly_ag, 9.0, 0.25, mesh_ticks, cg_theme);
       inspectCellGrids(cg, poly_ag, do_tests);
       section(2);
       spatialDecompositionInner<float, int, float, float4>(cg, pmi_grid_prec, pm_acc_bits,
@@ -1034,7 +1034,7 @@ void finiteDifferenceNeighborListTest(const TestSystemManager &tsm,
         little_psw.zcrd_ovrf[target_atoms[j]] = adj_z.y;
       }
       CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> cg(little_systems, little_topologies,
-                                                0.5 * default_pme_cutoff, 0.1, 4, nbkinds[i]);
+                                                default_pme_cutoff, 0.1, 4, nbkinds[i]);
       const CellGridReader cgr = cg.data();
       const LocalExclusionMask little_lema(little_topologies, nbkinds[i]);
       ScoreCard sc(little_nsys);
@@ -1157,9 +1157,9 @@ std::vector<double> pairIKT(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   switch (ngbr_v) {
   case NeighborListKind::DUAL:
     {
-      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg_qq(poly_ps, poly_ag, 0.5 * elec_cut, 0.1, 4,
+      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg_qq(poly_ps, poly_ag, elec_cut, 0.1, 4,
                                                     NonbondedTheme::ELECTROSTATIC);
-      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg_lj(poly_ps, poly_ag, 0.5 * vdw_cut, 0.1, 4,
+      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg_lj(poly_ps, poly_ag, vdw_cut, 0.1, 4,
                                                     NonbondedTheme::VAN_DER_WAALS);
       const TinyBoxPresence has_tiny_box = (cg_qq.getTinyBoxPresence() == TinyBoxPresence::YES ||
                                             cg_lj.getTinyBoxPresence() == TinyBoxPresence::YES) ?
@@ -1185,7 +1185,7 @@ std::vector<double> pairIKT(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     break;
   case NeighborListKind::MONO:
     {
-      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg(poly_ps, poly_ag, 0.5 * vdw_cut, 0.1, 4,
+      CellGrid<Tcoord, Tacc, Tcoord, Tcoord4> cg(poly_ps, poly_ag, vdw_cut, 0.1, 4,
                                                  NonbondedTheme::ALL);
       TileManager tlmn(launcher.getPMEPairsKernelDims(coord_v, calc_v, ngbr_v,
                                                       cg.getTinyBoxPresence(), force_v, energy_v,
@@ -1465,7 +1465,7 @@ void pairInteractionKernelLoop(PhaseSpaceSynthesis *poly_ps, AtomGraphSynthesis 
     std::vector<EvaluateForce>(1, EvaluateForce::YES) : force_x;
   const std::vector<EvaluateEnergy> energy_exec = (energy_x.size() == 0) ?
     std::vector<EvaluateEnergy>(1, EvaluateEnergy::YES) : energy_x;
-
+  
   // Loop over all enumerated possibilities
   int test_no = 0;
   for (size_t calc_idx = 0; calc_idx < calc_exec.size(); calc_idx++) {
@@ -1942,7 +1942,7 @@ int main(const int argc, const char* argv[]) {
   const char osc = osSeparator();
   const std::string testdir = oe.getStormmSourcePath() + osc + "test" + osc;
   TestSystemManager tsm(testdir + "Topology", "top", pbc_systems, testdir + "Trajectory", "inpcrd",
-                        pbc_systems);
+                        pbc_systems, ExceptionResponse::SILENT);
   timer.assignTime(setup_walltime);
   
   // Create a synthesis of systems and the associated particle-mesh interaction grids
@@ -2025,7 +2025,7 @@ int main(const int argc, const char* argv[]) {
                             2.4e-6, launcher);
 
   // Check some input traps
-  CellGrid<double, llint, double, double4> cg_test(poly_ps, poly_ag, 4.5, 0.25, 4,
+  CellGrid<double, llint, double, double4> cg_test(poly_ps, poly_ag, 9.0, 0.25, 4,
                                                    NonbondedTheme::ELECTROSTATIC);
   CHECK_THROWS_SOFT(PMIGrid pm_bad(cg_test, NonbondedTheme::ELECTROSTATIC, 5,
                                    PrecisionModel::DOUBLE, FFTMode::OUT_OF_PLACE, 16), "A set of "
@@ -2153,7 +2153,7 @@ int main(const int argc, const char* argv[]) {
   tower_plate_zfrc.resize(nsys);
   PsSynthesisWriter poly_psw = poly_ps.data();
   for (size_t i = 0; i < nbkinds.size(); i++) {
-    CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 0.5 * default_pme_cutoff, 0.1,
+    CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, default_pme_cutoff, 0.1,
                                                 4, nbkinds[i]);
     checkCellGridContents(cg, tsm.getTestingStatus());
     const LocalExclusionMask poly_lema(poly_ag, nbkinds[i]);

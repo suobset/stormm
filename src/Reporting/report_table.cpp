@@ -17,6 +17,7 @@ using parse::char4ToString;
 using parse::minimalRealFormat;
 using parse::NumberFormat;
 using parse::realToString;
+using parse::separateText;
 using parse::TextFile;
 using parse::TextOrigin;
 using stmath::sum;
@@ -25,7 +26,8 @@ using stmath::sum;
 ReportTable::ReportTable(const std::vector<std::string> &data_in,
                          const std::vector<std::string> &column_headings_in,
                          const std::string &variable_name_in, const int format_width_in,
-                         const std::vector<JustifyText> &alignments) :
+                         const std::vector<JustifyText> &alignments,
+                         const bool enforce_format_width) :
     column_count{static_cast<int>(column_headings_in.size())},
     data_row_count{static_cast<int>(data_in.size() / column_headings_in.size())},
     header_row_count{1},
@@ -48,6 +50,102 @@ ReportTable::ReportTable(const std::vector<std::string> &data_in,
   for (int i = 0; i < column_count; i++) {
     for (int j = 0; j < data_row_count; j++) {
       data_widths[i] = std::max(data_widths[i], rendered_data[(i * data_row_count) + j].size());
+    }
+  }
+  if (enforce_format_width && (sum<int>(data_widths) + (2 * column_count)) > format_width - 3) {
+
+    // Determine whether each column can be reduced in width
+    std::vector<int> min_widths(data_widths.begin(), data_widths.end());
+    std::vector<std::vector<std::string>> pieces(column_count * data_row_count);
+    for (int i = 0; i < column_count; i++) {
+      size_t longest_pc = 0;
+      for (int j = 0; j < data_row_count; j++) {
+        const int ij_idx = (i * data_row_count) + j;
+        pieces[ij_idx] = separateText(data_in[ij_idx]);
+        const size_t npc = pieces[ij_idx].size();
+        for (size_t k = 0; k < npc; k++) {
+          longest_pc = std::max(longest_pc, pieces[ij_idx][k].size());
+        }
+        const std::vector<std::string> header_pieces = separateText(column_headings_in[i]);
+        const size_t hd_npc = header_pieces.size();
+        for (size_t k = 0; k < hd_npc; k++) {
+          longest_pc = std::max(longest_pc, header_pieces[k].size());
+        }
+      }
+      min_widths[i] = longest_pc;
+    }
+    if (sum<int>(min_widths) < format_width - 3) {
+
+      // The table contents can be reformatted to fit within the available space.  Resize the
+      // columns such that they shrink in proportion to what is feasible.
+      std::vector<size_t> best_widths(min_widths.begin(), min_widths.end());
+      std::vector<double> dbest_w(best_widths.begin(), best_widths.end());
+      std::vector<double> ddata_w(data_widths.begin(), data_widths.end());
+      for (int j = 0; j < column_count; j++) {
+        ddata_w[j] = std::max(ddata_w[j], dbest_w[j]);
+      }
+      int curr_width = sum<int>(best_widths) + (2 * column_count);
+      while (curr_width < format_width - 3) {
+
+        // Find the next column to contribute to.  Favor the final column if no candidates stand
+        // out.
+        double biggest_loss = 1.0;
+        int poorest_clmn = column_count - 1;
+        for (int i = 0; i < column_count; i++) {
+          if (dbest_w[i] / ddata_w[i] < biggest_loss) {
+            biggest_loss = dbest_w[i] / ddata_w[i];
+            poorest_clmn = i;
+          }
+        }
+        best_widths[poorest_clmn] += 1;
+        dbest_w[poorest_clmn] += 1.0;
+        curr_width++;
+      }
+
+      // Reformat each row to fit within its new column widths
+      std::vector<std::vector<std::string>> all_columns(column_count);
+      for (int i = 0; i < data_row_count; i++) {
+        std::vector<std::vector<std::string>> trow(column_count,
+                                                   std::vector<std::string>(1, std::string("")));
+        int max_subrow = 0;
+        for (int j = 0; j < column_count; j++) {
+          int td_ln = 0;
+          size_t pcij_con = 0;
+          const int ij_idx = (j * data_row_count) + i;
+          while (pcij_con < pieces[ij_idx].size()) {
+            const std::string& next_word = pieces[ij_idx][pcij_con];
+            if (trow[j][td_ln].size() == 0) {
+              trow[j][td_ln] = next_word;
+            }
+            else if (trow[j][td_ln].size() + next_word.size() + 1 < best_widths[j]) {
+              trow[j][td_ln] += " " + next_word;
+            }
+            else {
+              trow[j].push_back(next_word);
+              td_ln++;
+            }
+            pcij_con++;
+          }
+          max_subrow = std::max(max_subrow, td_ln + 1);
+        }
+        for (int j = 0; j < column_count; j++) {
+          int nk = trow[j].size();
+          for (int k = 0; k < nk; k++) {
+            all_columns[j].push_back(trow[j][k]);
+          }
+          for (int k = nk; k < max_subrow; k++) {
+            all_columns[j].push_back("");
+          }
+        }
+      }
+    
+      // Replace the data widths and content
+      rendered_data = {};
+      for (int j = 0; j < column_count; j++) {
+        data_widths[j] = best_widths[j];
+        rendered_data.insert(rendered_data.end(), all_columns[j].begin(), all_columns[j].end());
+      }
+      data_row_count = all_columns[0].size();
     }
   }
   

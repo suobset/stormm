@@ -82,7 +82,9 @@ void moleculeValidityCheck(int low_index, int high_index, int max_molecules,
 /// \param item_count           The number of items (trusted length of atoms_from_the_item)
 /// \param atoms_from_the_item  Array of atoms within whatever item of interest
 /// \param bounds_ptr           The developing bounds array
-void affectorBoundsContribution(int item_count, const int* atoms_from_the_item, int *bounds_ptr);
+/// \param relevance            The relevance of each interaction, if applicable
+void affectorBoundsContribution(int item_count, const int* atoms_from_the_item, int *bounds_ptr,
+                                const uint* relevance = nullptr);
 
 /// \brief Assemble the list of numbered items affecting any given atom, provided a bounds list
 ///        and a list of atoms to which the items contribute.  This can be applied repeatedly for
@@ -92,8 +94,9 @@ void affectorBoundsContribution(int item_count, const int* atoms_from_the_item, 
 /// \param atoms_from_the_item  Array of atoms within whatever item of interest
 /// \param bounds_ptr           The developing bounds array
 /// \param list_ptr             The developing list of items affecting each atom
+/// \param relevance            The relevance of each interaction, if applicable
 void affectorListAssembly(int item_count, const int* atoms_from_the_item, int *bounds_ptr,
-                          int* list_ptr);
+                          int* list_ptr, const uint* relevance = nullptr);
 
 /// \brief Mark all atoms affected by a particular set of terms, each term affecting up to five
 ///        atoms.
@@ -109,10 +112,11 @@ void affectorListAssembly(int item_count, const int* atoms_from_the_item, int *b
 /// \param k_atoms          Third atoms of each item
 /// \param l_atoms          Fourth atoms of each item
 /// \param m_atoms          Fifth atoms of each item, i.e. atom M from each CMAP term
+/// \param relevance        Indicate whether each interaction is relevant for computation
 void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affector_list,
                        int item_count, const int* i_atoms, const int* j_atoms = nullptr,
                        const int* k_atoms = nullptr, const int* l_atoms = nullptr,
-                       const int* m_atoms = nullptr);
+                       const int* m_atoms = nullptr, const uint* relevance = nullptr);
 
 } // namespace topology
 } // namespace stormm

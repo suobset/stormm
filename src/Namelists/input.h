@@ -75,7 +75,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
 int readNamelist(const TextFile &tf, NamelistEmulator *nml, int start_line = 0,
                  WrapTextSearch wrap = WrapTextSearch::NO, int end_line = -1,
                  bool *found = nullptr);
-  
+
 } // namespace namelist
 } // namespace stormm
 

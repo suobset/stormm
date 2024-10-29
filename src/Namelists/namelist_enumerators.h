@@ -58,6 +58,17 @@ enum class NamelistIntroduction {
                    ///<   or title)
   NONE             ///< Prin no headings, title, or spacing
 };
+
+/// \brief The days of the week, codified into a convenient enumerator.
+enum class DayOfTheWeek {
+  SUN = 0,  ///< Sunday
+  MON,  ///< Monday
+  TUE,  ///< Tuesday
+  WED,  ///< Wednesday
+  THU,  ///< Thursday
+  FRI,  ///< Friday
+  SAT   ///< Saturday
+};
   
 /// \brief Return a string corresponding to the namelist data type enumerations.  Various overloads
 ///        of this function are also found in other libraries.
@@ -71,18 +82,19 @@ std::string getEnumerationName(InputStatus input);
 std::string getEnumerationName(RestraintAnchoring input);
 std::string getEnumerationName(KeyRequirement input);
 std::string getEnumerationName(NamelistIntroduction input);
+std::string getEnumerationName(DayOfTheWeek input);
 /// \}
 
 /// \brief Interpret various inputs into a KeyRequirement enumeration.
 ///
 /// \param input  The word or phrase to translate
 KeyRequirement translateKeyRequirement(const std::string &input);
-  
-/// \brief Return a string corresponding to an input status setting.
+
+/// \brief Interpret various inputs for naming a day of the week.
 ///
-/// \param stt  The status of interest
-std::string getInputStatusString(InputStatus stt);
-  
+/// \param input  The word or phrase to translate
+DayOfTheWeek translateDayOfTheWeek(const std::string &input);
+
 } // namespace namelist
 } // namespace stormm
 

@@ -12,7 +12,6 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
 #include "../../src/Sampling/temp_distributions.h"
-#include "../../src/Sampling/replica_probability.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_analysis.h"

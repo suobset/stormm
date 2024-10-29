@@ -234,7 +234,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     }
     __syncthreads();
 #endif // CONSTRAINT_STANDALONE
-
+    
+    // Begin executing RATTLE velocity constraints on hub-and-spoke atom groups.
     pos = ((threadIdx.x >> warp_bits) << warp_bits);
     const int cgrp_lane_idx = (threadIdx.x & warp_bits_mask_int);
 #ifdef CONSTRAINT_STANDALONE
@@ -474,6 +475,196 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
+    
+    // Implement SETTLE velocity constraints for rigid water molecules (and perhaps other
+    // groups)
+//#ifdef PME_COMPATIBLE
+    vterm_limit += (vwu_padded_task_count[(size_t)(VwuAbstractMap::SETTLE)] << 2);
+    while (pos < vterm_limit) {
+      const int task_offset = vwu_map[(size_t)(VwuAbstractMap::SETTLE)].x;
+      uint2 tinsr;
+      const int rel_pos = ((pos + cgrp_lane_idx -
+                            vwu_padded_task_count[(size_t)(VwuAbstractMap::CGROUP)]) >> 2);
+
+      // The warp must remain coalesced in order to carry out shuffle instructions later on.
+      if (rel_pos < vwu_task_count[(size_t)(VwuAbstractMap::SETTLE)]) {
+        tinsr = __ldcv(&poly_auk.sett_insr[task_offset + rel_pos]);
+      }
+      else {
+        tinsr = { 0U, 0xffffffffU };
+      }
+      int my_choice = (cgrp_lane_idx & 0x3);
+      my_choice -= 3 * (my_choice == 3);
+      const int atm_idx = ((tinsr.x >> (10 * my_choice)) & 0x3ff);
+
+      // Compute displacements and velocity deltas based on the atom that each thread holds and
+      // the atom held by the next higher lane index.  Having the fourth thread of the group
+      // tending to each SETTLE instruction also take the coordinates of the heavy atom helps to
+      // wrap the circular relationship.
+#ifdef TCALC_IS_SINGLE
+      const llint idpos_x = sh_xcrd[atm_idx];
+      const llint idpos_y = sh_ycrd[atm_idx];
+      const llint idpos_z = sh_zcrd[atm_idx];
+      TCALC dpos_x = (SHFL(idpos_x, cgrp_lane_idx + 1) - idpos_x) * poly_psw.inv_gpos_scale_f;
+      TCALC dpos_y = (SHFL(idpos_y, cgrp_lane_idx + 1) - idpos_y) * poly_psw.inv_gpos_scale_f;
+      TCALC dpos_z = (SHFL(idpos_z, cgrp_lane_idx + 1) - idpos_z) * poly_psw.inv_gpos_scale_f;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+      const llint idvel_x = int63ToLongLong(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx]);
+      const llint idvel_y = int63ToLongLong(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx]);
+      const llint idvel_z = int63ToLongLong(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx]);
+#  else
+      const llint idvel_x = sh_xfrc[atm_idx];
+      const llint idvel_y = sh_yfrc[atm_idx];
+      const llint idvel_z = sh_zfrc[atm_idx];
+#  endif
+      const TCALC dvel_x = (SHFL(idvel_x, cgrp_lane_idx + 1) - idvel_x) *
+                           poly_psw.inv_vel_scale_f;
+      const TCALC dvel_y = (SHFL(idvel_y, cgrp_lane_idx + 1) - idvel_y) *
+                           poly_psw.inv_vel_scale_f;
+      const TCALC dvel_z = (SHFL(idvel_z, cgrp_lane_idx + 1) - idvel_z) *
+                           poly_psw.inv_vel_scale_f;
+#else // TCALC_IS_SINGLE
+      const size_t local_idx = atm_idx + EXCL_GMEM_OFFSET;
+      int95_t idpos_x = { __ldca(&gmem_r.xcrd[local_idx]), __ldca(&gmem_r.xcrd_ovrf[local_idx]) };
+      int95_t idpos_y = { __ldca(&gmem_r.ycrd[local_idx]), __ldca(&gmem_r.ycrd_ovrf[local_idx]) };
+      int95_t idpos_z = { __ldca(&gmem_r.zcrd[local_idx]), __ldca(&gmem_r.zcrd_ovrf[local_idx]) };
+      idpos_x = int95Subtract(SHFL(idpos_x.x, cgrp_lane_idx + 1),
+                              SHFL(idpos_x.y, cgrp_lane_idx + 1), idpos_x.x, idpos_x.y);
+      idpos_y = int95Subtract(SHFL(idpos_y.x, cgrp_lane_idx + 1),
+                              SHFL(idpos_y.y, cgrp_lane_idx + 1), idpos_y.x, idpos_y.y);
+      idpos_z = int95Subtract(SHFL(idpos_z.x, cgrp_lane_idx + 1),
+                              SHFL(idpos_z.y, cgrp_lane_idx + 1), idpos_z.x, idpos_z.y);
+      TCALC dpos_x = splitFPToReal(idpos_x) * poly_psw.inv_gpos_scale_f;
+      TCALC dpos_y = splitFPToReal(idpos_y) * poly_psw.inv_gpos_scale_f;
+      TCALC dpos_z = splitFPToReal(idpos_z) * poly_psw.inv_gpos_scale_f;
+      int95_t idvel_x = { sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx] };
+      int95_t idvel_y = { sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx] };
+      int95_t idvel_z = { sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx] };
+      idvel_x = int95Subtract(SHFL(idvel_x.x, cgrp_lane_idx + 1),
+                              SHFL(idvel_x.y, cgrp_lane_idx + 1), idvel_x.x, idvel_x.y);
+      idvel_y = int95Subtract(SHFL(idvel_y.x, cgrp_lane_idx + 1),
+                              SHFL(idvel_y.y, cgrp_lane_idx + 1), idvel_y.x, idvel_y.y);
+      idvel_z = int95Subtract(SHFL(idvel_z.x, cgrp_lane_idx + 1),
+                              SHFL(idvel_z.y, cgrp_lane_idx + 1), idvel_z.x, idvel_z.y);
+      const TCALC dvel_x = splitFPToReal(idvel_x) * poly_psw.inv_vel_scale_f;
+      const TCALC dvel_y = splitFPToReal(idvel_y) * poly_psw.inv_vel_scale_f;
+      const TCALC dvel_z = splitFPToReal(idvel_z) * poly_psw.inv_vel_scale_f;
+#endif // TCALC_IS_SINGLE
+      const TCALC inv_mag_dpos = (TCALC)(1.0) /
+                                 SQRT_FUNC((dpos_x * dpos_x) + (dpos_y * dpos_y) +
+                                           (dpos_z * dpos_z));
+      dpos_x *= inv_mag_dpos;
+      dpos_y *= inv_mag_dpos;
+      dpos_z *= inv_mag_dpos;
+      
+      // Calculate the projections.  As of now, the first, second, and third threads of the group
+      // of four tasked with this SETTLE group hold the positional and velocity deltas between the
+      // heavy atom (HA) and light atom I (LAi), light atoms I and II (LAi and LAii), and LAii and
+      // The fourth lane served to provide extra heavy atom data to make the shuffles simpler.
+      const TCALC pv_dot = (dpos_x * dvel_x) + (dpos_y * dvel_y) + (dpos_z * dvel_z);
+      const TCALC sgrp_base_lane = ((cgrp_lane_idx >> 2) << 2);
+      const TCALC voh = SHFL(pv_dot, sgrp_base_lane);
+      const TCALC vhh = SHFL(pv_dot, sgrp_base_lane + 1);
+      const TCALC vho = SHFL(pv_dot, sgrp_base_lane + 2);
+      
+      // Calculating the various angles takes a bit more work to determine the proper lane.  In
+      // order to get what is cos_a (the angle between the vectors HA => LAi and LAii => HA) in
+      // the first of the four lanes, cos_b (the angle between the vectors LAi => LAii and
+      // HA => LAi) in the second of four lanes, and cos_x (the angle between the vectors
+      // LAii => HA and LAi => LAii), each lane will need to read from the lane one to its left
+      // (shuffle lane -1), but if that goes below zero then add three.
+      const int shfl_read_lane = cgrp_lane_idx - 1 + (3 * ((cgrp_lane_idx & 3) == 0));
+      const TCALC my_ang = -((dpos_x * SHFL(dpos_x, shfl_read_lane)) +
+                             (dpos_y * SHFL(dpos_y, shfl_read_lane)) +
+                             (dpos_z * SHFL(dpos_z, shfl_read_lane)));
+      const TCALC cos_a = SHFL(my_ang, sgrp_base_lane);
+      const TCALC cos_b = SHFL(my_ang, sgrp_base_lane + 1);
+      const TCALC cos_c = SHFL(my_ang, sgrp_base_lane + 2);
+      
+      // Compute the corrections. Initializing the adjustment factor and the thread's atomic mass
+      // to 1.0 ensures that bogus numbers will not enter the calculation, even on threads bound
+      // to do nothing.
+      TCALC adj_factor = (TCALC)(1.0);
+      TCALC atm_mass = (TCALC)(1.0);
+      if (tinsr.y != 0xffffffffU) {
+#ifdef TCALC_IS_SINGLE
+        const TCALC4 smass = __ldca(&poly_auk.settle_mass[tinsr.y]);
+        const TCALC4 sgeom = __ldca(&poly_auk.settle_geom[tinsr.y]);
+#else // TCALC_IS_SINGLE
+        const TCALC4 smass = poly_auk.settle_mass[tinsr.y];
+        const TCALC4 sgeom = poly_auk.settle_geom[tinsr.y];
+#endif
+        const TCALC m_o  = smass.x; 
+        const TCALC m_h  = smass.y;
+        const TCALC m_oh = sgeom.w;
+        if ((cgrp_lane_idx & 3) == 0) {
+          adj_factor = ((voh * (((TCALC)(2.0) * m_oh) - (m_o * cos_c * cos_c))) +
+                        (vhh * ((m_h * cos_c * cos_a) - (m_oh * cos_b))) +
+                        (vho * ((m_o * cos_b * cos_c) - ((TCALC)(2.0) * m_h * cos_a)))) * m_o;
+          atm_mass = m_o;
+        }
+        else if ((cgrp_lane_idx & 3) == 1) {
+          adj_factor = ((vhh * ((m_oh * m_oh) - (m_h * m_h * cos_a * cos_a))) +
+                        (vho * m_o * ((m_h * cos_a * cos_b) - (m_oh * cos_c))) +
+                        (voh * m_o * ((m_h * cos_c * cos_a) - (m_oh * cos_b))));
+          atm_mass = m_h;
+        }
+        else if ((cgrp_lane_idx & 3) == 2) {
+          adj_factor = ((vho * (((TCALC)(2.0) * m_oh) - (m_o * cos_b * cos_b))) +
+                        (voh * ((m_o * cos_b * cos_c) - ((TCALC)(2.0) * m_h * cos_a))) +
+                        (vhh * ((m_h * cos_a * cos_b) - (m_oh * cos_c)))) * m_o;
+          atm_mass = m_h;
+        }
+        adj_factor *= (TCALC)(0.5) * poly_psw.vel_scale_f * m_h /
+                      ((m_oh * m_oh) + (m_h * cos_a * ((m_o * cos_b * cos_c) - (m_h * cos_a))) -
+                       ((TCALC)(0.5) * m_o * m_oh * ((cos_b * cos_b) + (cos_c * cos_c))));
+      }
+      TCALC atm_bump_x = adj_factor * dpos_x;
+      TCALC atm_bump_y = adj_factor * dpos_y;
+      TCALC atm_bump_z = adj_factor * dpos_z;
+      atm_bump_x -= SHFL(atm_bump_x, shfl_read_lane);
+      atm_bump_y -= SHFL(atm_bump_y, shfl_read_lane);
+      atm_bump_z -= SHFL(atm_bump_z, shfl_read_lane);
+      atm_bump_x /= atm_mass;
+      atm_bump_y /= atm_mass;
+      atm_bump_z /= atm_mass;
+      
+      // Apply the corrections.
+      if ((cgrp_lane_idx & 3) < 3 && tinsr.y != 0xffffffffU) {
+#ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        const int2 nvx = int63Sum(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx], atm_bump_x);
+        sh_xfrc[atm_idx] = nvx.x;
+        sh_xfrc_overflow[atm_idx] = nvx.y;
+        const int2 nvy = int63Sum(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx], atm_bump_y);
+        sh_yfrc[atm_idx] = nvy.x;
+        sh_yfrc_overflow[atm_idx] = nvy.y;
+        const int2 nvz = int63Sum(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx], atm_bump_z);
+        sh_zfrc[atm_idx] = nvz.x;
+        sh_zfrc_overflow[atm_idx] = nvz.y;
+#  else
+        sh_xfrc[atm_idx] += LLCONV_FUNC(atm_bump_x);
+        sh_yfrc[atm_idx] += LLCONV_FUNC(atm_bump_y);
+        sh_zfrc[atm_idx] += LLCONV_FUNC(atm_bump_z);
+#  endif
+#else // TCALC_IS_SINGLE
+        const int95_t nvx = int95Sum(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx], atm_bump_x);
+        sh_xfrc[atm_idx] = nvx.x;
+        sh_xfrc_overflow[atm_idx] = nvx.y;
+        const int95_t nvy = int95Sum(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx], atm_bump_y);
+        sh_yfrc[atm_idx] = nvy.x;
+        sh_yfrc_overflow[atm_idx] = nvy.y;
+        const int95_t nvz = int95Sum(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx], atm_bump_z);
+        sh_zfrc[atm_idx] = nvz.x;
+        sh_zfrc_overflow[atm_idx] = nvz.y;
+#endif // TCALC_IS_SINGLE
+      }
+
+      // Increment the instruction counter by a quarter of the block width, to reflect the fact
+      // that four threads are working on each SETTLE instruction.
+      pos += blockDim.x;
+    }
+//#endif // PME_COMPATIBLE
     __syncthreads();
 
     // Write the updated velocities (of all particles which this work unit is responsible for
@@ -588,6 +779,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #endif // CONSTRAINT_STANDALONE
       base_ps += blockDim.x;
     }
+    
     // No additional synchronization occurs for the core of the code, as anywhere this code is
     // included will be expected to have a __syncthreads() call immediately following it.
 #ifdef CONSTRAINT_STANDALONE

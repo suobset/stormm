@@ -2466,6 +2466,8 @@ PhaseSpace PhaseSpaceSynthesis::exportSystem(const int index, const HybridTarget
   checkFormatCompatibility(tier, format, "PhaseSpaceSynthesis", "exportSystem");
   validateSystemIndex(index, "exportSystem");
   PhaseSpace result(atom_counts.readHost(index), unit_cell);
+
+  // The export feature will always deliver the result to the HOST-side of the PhaseSpace object.
   extractSystem(&result, index, tier);
   return result;
 }
@@ -3391,15 +3393,16 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_index,
-                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
+void PhaseSpaceSynthesis::importSystem(const PhaseSpaceReader &psr, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const HybridTargetLevel tier) {
   CoordinateCycle focus = orientation;
-  import(psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.boxdim, system_index, focus, 1.0,
-         TrajectoryKind::POSITIONS, tier);
-  import(psr.xvel, psr.yvel, psr.zvel, nullptr, nullptr, nullptr, system_index, focus, 1.0,
-         TrajectoryKind::VELOCITIES, tier);
-  import(psr.xfrc, psr.yfrc, psr.zfrc, nullptr, nullptr, nullptr, system_index, focus, 1.0,
-         TrajectoryKind::FORCES, tier);
+  importSystem(psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.boxdim, system_index, focus,
+               1.0, TrajectoryKind::POSITIONS, tier);
+  importSystem(psr.xvel, psr.yvel, psr.zvel, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+               TrajectoryKind::VELOCITIES, tier);
+  importSystem(psr.xfrc, psr.yfrc, psr.zfrc, nullptr, nullptr, nullptr, system_index, focus, 1.0,
+               TrajectoryKind::FORCES, tier);
   switch (orientation) {
   case CoordinateCycle::BLACK:
     focus = CoordinateCycle::WHITE;
@@ -3408,83 +3411,85 @@ void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_i
     focus = CoordinateCycle::BLACK;
     break;
   }
-  import(psr.xalt, psr.yalt, psr.zalt, psr.umat_alt, psr.invu_alt, psr.boxdim_alt, system_index,
-         focus, 1.0, TrajectoryKind::POSITIONS, tier);
-  import(psr.vxalt, psr.vyalt, psr.vzalt, nullptr, nullptr, nullptr, system_index, focus, 1.0,
-         TrajectoryKind::VELOCITIES, tier);
-  import(psr.fxalt, psr.fyalt, psr.fzalt, nullptr, nullptr, nullptr, system_index, focus, 1.0,
-         TrajectoryKind::FORCES, tier);
+  importSystem(psr.xalt, psr.yalt, psr.zalt, psr.umat_alt, psr.invu_alt, psr.boxdim_alt,
+               system_index, focus, 1.0, TrajectoryKind::POSITIONS, tier);
+  importSystem(psr.vxalt, psr.vyalt, psr.vzalt, nullptr, nullptr, nullptr, system_index, focus,
+               1.0, TrajectoryKind::VELOCITIES, tier);
+  importSystem(psr.fxalt, psr.fyalt, psr.fzalt, nullptr, nullptr, nullptr, system_index, focus,
+               1.0, TrajectoryKind::FORCES, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpaceReader &psr, const int system_index,
-                                 const HybridTargetLevel tier) {
-  import(psr, system_index, cycle_position, tier);
+void PhaseSpaceSynthesis::importSystem(const PhaseSpaceReader &psr, const int system_index,
+                                       const HybridTargetLevel tier) {
+  importSystem(psr, system_index, cycle_position, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpaceWriter &psw, const int system_index,
-                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
-  import(PhaseSpaceReader(psw), system_index, orientation, tier);
+void PhaseSpaceSynthesis::importSystem(const PhaseSpaceWriter &psw, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const HybridTargetLevel tier) {
+  importSystem(PhaseSpaceReader(psw), system_index, orientation, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpaceWriter &psw, const int system_index,
-                                 const HybridTargetLevel tier) {
-  import(PhaseSpaceReader(psw), system_index, cycle_position, tier);
+void PhaseSpaceSynthesis::importSystem(const PhaseSpaceWriter &psw, const int system_index,
+                                       const HybridTargetLevel tier) {
+  importSystem(PhaseSpaceReader(psw), system_index, cycle_position, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpace &ps, const int system_index,
-                                 const CoordinateCycle orientation, const HybridTargetLevel tier) {
-  import(ps.data(tier), system_index, orientation, tier);
+void PhaseSpaceSynthesis::importSystem(const PhaseSpace &ps, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const HybridTargetLevel tier) {
+  importSystem(ps.data(tier), system_index, orientation, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const PhaseSpace &ps, const int system_index,
-                                 const HybridTargetLevel tier) {
-  import(ps.data(tier), system_index, tier);
+void PhaseSpaceSynthesis::importSystem(const PhaseSpace &ps, const int system_index,
+                                       const HybridTargetLevel tier) {
+  importSystem(ps.data(tier), system_index, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrameReader &cfr, const int system_index,
-                                 const CoordinateCycle orientation, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrameReader &cfr, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
          orientation, 1.0, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrameReader &cfr, const int system_index,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
-  import(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrameReader &cfr, const int system_index,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.boxdim, system_index,
          cycle_position, 1.0, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrameWriter &cfw, const int system_index,
-                                 const CoordinateCycle orientation, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(cfw, system_index, orientation, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrameWriter &cfw, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cfw, system_index, orientation, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrameWriter &cfw, const int system_index,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
-  import(cfw, system_index, cycle_position, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrameWriter &cfw, const int system_index,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cfw, system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrame &cf, const int system_index,
-                                 const CoordinateCycle orientation, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(cf.data(tier), system_index, orientation, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrame &cf, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cf.data(tier), system_index, orientation, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::import(const CoordinateFrame &cf, const int system_index,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
-  import(cf.data(tier), system_index, cycle_position, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateFrame &cf, const int system_index,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cf.data(tier), system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------

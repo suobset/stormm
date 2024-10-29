@@ -62,42 +62,9 @@ using namespace conf_app::setup;
 using namespace conf_app::analysis;
 
 //-------------------------------------------------------------------------------------------------
-// Display a general help message for this program.
-//-------------------------------------------------------------------------------------------------
-void displayGeneralHelpMessage(const std::vector<std::string> &all_namelists) {
-  const std::string base_msg =
-    terminalFormat("A program for probing conformations of chemical structures and returning "
-                   "those with the lowest energy.\n\n", "conformer");
-  std::string list_of_nml;
-  for (size_t i = 0; i < all_namelists.size(); i++) {
-    list_of_nml += "  - " + all_namelists[i] + "\n";
-  }
-  const std::string nml_msg =
-    terminalFormat("Applicable namelists (re-run with one of these terms as the command-line "
-                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n" +
-                   list_of_nml, nullptr, nullptr, 0, 2, 2);
-  printf("%s", base_msg.c_str());
-  printf("%s", nml_msg.c_str());
-  printf("\n");
-}
-
-//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
-
-  // Check for a help message
-  const std::vector<std::string> my_namelists = {
-    "&files", "&conformer", "&restraint", "&solvent", "&random", "&minimize", "&report",
-    "&precision"
-  };
-  if (detectHelpSignal(argc, argv)) {
-    displayGeneralHelpMessage(my_namelists);
-    return 0;
-  }
-  if (displayNamelistHelp(argc, argv, my_namelists)) { 
-    return 0;
-  }
 
   // Wall time tracking
   StopWatch master_timer("Master timings for conformer.stormm");
@@ -106,9 +73,21 @@ int main(int argc, const char* argv[]) {
   master_timer.addCategory(tm_coordinate_expansion);
   master_timer.addCategory(tm_energy_minimization);
   master_timer.addCategory(tm_conformer_selection);
+
+  // Parse the command line
+  CommandLineParser clip("conformer.stormm", "A program for exploring conformations of ligands.");
+  clip.addStandardApplicationInputs();
+  const std::vector<std::string> my_namelists = { "&files", "&conformer", "&restraint",
+                                                  "&solvent", "&random", "&minimize", "&report",
+                                                  "&precision" };
+  clip.addControlBlocks(my_namelists);
+  if (displayNamelistHelp(argc, argv, my_namelists) && clip.doesProgramExitOnHelp()) {
+    return 0;
+  }
+  clip.parseUserInput(argc, argv);
   
   // Read information from the command line and initialize the UserSettings object
-  UserSettings ui(argc, argv, AppName::CONFORMER);
+  UserSettings ui(clip, { "-pe", "-ce", "-rg" });
   
   // Get details of the GPU to use
 #ifdef STORMM_USE_HPC
@@ -148,13 +127,6 @@ int main(int argc, const char* argv[]) {
   }
   AtomGraphSynthesis sandbox_ag(unique_topologies, sandbox_restraints, sandbox_topology_indices, 
                                 incrementingSeries<int>(0, sandbox.getSystemCount(), 1));
-
-  // CHECK
-#if 0
-  const std::vector<double> pre_gr = radiusOfGyration(sandbox, sandbox_ag);
-#endif
-  // END CHECK
-
 #ifdef STORMM_USE_HPC
   StaticExclusionMaskSynthesis sandbox_sems(sandbox_ag.getUniqueTopologies(),
                                             sandbox_ag.getTopologyIndices());
@@ -206,7 +178,7 @@ int main(int argc, const char* argv[]) {
     PhaseSpace psi = sandbox.exportSystem(i);
     const AtomGraph *agi = sandbox_ag.getSystemTopologyPointer(i);
     ScoreCard emin_i = minimize(&psi, agi, sandbox_masks[sandbox_topology_indices[i]], mincon);
-    emin.import(emin_i, i, 0);
+    emin.importCard(emin_i, i, 0);
     coordCopy(&sandbox, i, psi);
   }
 #endif
@@ -216,18 +188,6 @@ int main(int argc, const char* argv[]) {
 #ifdef STORMM_USE_HPC
   sandbox.download();
   emin.download();
-
-  // CHECK
-#if 0
-  const std::vector<double> post_gr = radiusOfGyration(sandbox, sandbox_ag);
-  std::vector<double> dgr(post_gr.size());
-  for (size_t i = 0; i < pre_gr.size(); i++) {
-    dgr[i] = (post_gr[i] - pre_gr[i]) / pre_gr[i];
-  }
-  printf("Change in G(R) = %12.8lf +/- %12.8lf\n", mean(dgr),
-         variance(dgr, VarianceMethod::STANDARD_DEVIATION));
-#endif
-  // END CHECK
   
   //Condensate sandbox_snapshot(sandbox, PrecisionModel::SINGLE, gpu);
 #else
@@ -246,7 +206,7 @@ int main(int argc, const char* argv[]) {
   printResults(sandbox, best_confs, emin, sc, sandbox_map, ui.getConformerNamelistInfo(),
                ui.getReportNamelistInfo());
   writeInputTranscript(ui);
-  printReport(sc, ui, sandbox_prm, sandbox_map, emin, best_confs);
+  printReport(sc, clip, ui, sandbox_prm, sandbox_map, emin, best_confs);
   
   // Print timings results
   master_timer.printResults();

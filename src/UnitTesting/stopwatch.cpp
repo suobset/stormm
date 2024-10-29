@@ -280,10 +280,28 @@ void StopWatch::printResults(const double precision) {
   fmt_key[0] = NumberFormat::INTEGER;
   printTable({"Category Name", "Samples", "Total Time, s", "Mean Time, s", "Standard Deviation",
               "Minimum Time, s", "Maximum Time, s"}, print_names,
-             {polyNumericVector(print_samples), polyNumericVector(print_total_times),
-              polyNumericVector(mean_ctg_times), polyNumericVector(std_ctg_times),
-              polyNumericVector(print_min_interval), polyNumericVector(print_max_interval)},
+             { polyNumericVector(print_samples), polyNumericVector(print_total_times),
+               polyNumericVector(mean_ctg_times), polyNumericVector(std_ctg_times),
+               polyNumericVector(print_min_interval), polyNumericVector(print_max_interval) },
              fmt_key, std::string(""), BorderFormat::FULL);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 StopWatch::timeDifferential(const std::string &catg_a, const std::string &catg_b,
+                                    const std::string &referring_function) const {
+  validateCategoryName(catg_a, referring_function);
+  validateCategoryName(catg_b, referring_function);
+  const int icatg_a = getCategoryIndex(catg_a);
+  const int icatg_b = getCategoryIndex(catg_b);
+  return computeDifferential(icatg_a, icatg_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 StopWatch::timeDifferential(const int catg_a, const int catg_b,
+                                    const std::string &referring_function) const {
+  validateCategoryIndex(catg_a, referring_function);
+  validateCategoryIndex(catg_b, referring_function);
+  return computeDifferential(catg_a, catg_b);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -292,7 +310,23 @@ double StopWatch::translateCurrentTime() const {
   gettimeofday(&x, nullptr);
   return static_cast<double>(x.tv_sec) + (static_cast<double>(x.tv_usec) * 1.0e-6);
 }
-
+  
+//-------------------------------------------------------------------------------------------------
+double2 StopWatch::computeDifferential(const int catg_a, const int catg_b) const {
+  double2 result;
+  const double ns_a = category_samples[catg_a];
+  const double ns_b = category_samples[catg_b];
+  const double s1_a = category_total_times[catg_a];
+  const double s1_b = category_total_times[catg_b];
+  result.x = (s1_a / ns_a) - (s1_b / ns_b);
+  const double s2_a = category_squared_times[catg_a];
+  const double s2_b = category_squared_times[catg_b];
+  const double std_a = sqrt((ns_a * s2_a) - (s1_a * s1_a)) / sqrt(ns_a * (ns_a - 1.0));
+  const double std_b = sqrt((ns_b * s2_b) - (s1_b * s1_b)) / sqrt(ns_b * (ns_b - 1.0));
+  result.y = sqrt(std_a * std_b);
+  return result;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void StopWatch::validateCategoryIndex(const int index,
                                       const std::string &referring_function) const {

@@ -17,12 +17,14 @@
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/nml_precision.h"
 #include "../../../src/Namelists/nml_random.h"
+#include "../../../src/Namelists/nml_remd.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Potential/energy_enumerators.h"
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Reporting/present_energy.h"
 #include "../../../src/Reporting/progress_bar.h"
+#include "../../../src/Sampling/exchange_nexus.h"
 #include "../../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/static_mask_synthesis.h"
@@ -44,6 +46,7 @@ using namespace stormm::random;
 using namespace stormm::reporting;
 using namespace stormm::restraints;
 using namespace stormm::review;
+using namespace stormm::sampling;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -51,43 +54,12 @@ using namespace stormm::trajectory;
 using namespace dyna_app::setup;
 
 //-------------------------------------------------------------------------------------------------
-// Display a general help message for this program.
-//-------------------------------------------------------------------------------------------------
-void displayGeneralHelpMessage(const std::vector<std::string> &all_namelists) {
-  const std::string base_msg =
-    terminalFormat("A program for carrying out dynamics on molecular systems using standard "
-                   "coordinates and topologies.\n\n", "dynamics");
-  std::string list_of_nml;
-  for (size_t i = 0; i < all_namelists.size(); i++) {
-    list_of_nml += "  - " + all_namelists[i] + "\n";
-  }
-  const std::string nml_msg =
-    terminalFormat("Applicable namelists (re-run with one of these terms as the command-line "
-                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n" +
-                   list_of_nml, nullptr, nullptr, 0, 2, 2);
-  printf("%s", base_msg.c_str());
-  printf("%s", nml_msg.c_str());
-  printf("\n");
-}
-
-//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
 
   // Check for a help message
-  const std::vector<std::string> my_namelists = {
-    "&files", "&dynamics", "&restraint", "&solvent", "&random", "&minimize", "&report",
-    "&precision"
-  };
-  if (detectHelpSignal(argc, argv)) {
-    displayGeneralHelpMessage(my_namelists);
-    return 0;
-  }
-  if (displayNamelistHelp(argc, argv, my_namelists)) {
-    return 0;
-  }
-  
+
   // Wall time tracking
   StopWatch timer("Timings for dynamics.stormm");
   const int file_parse_tm = timer.addCategory("File Parsing");
@@ -110,8 +82,21 @@ int main(int argc, const char* argv[]) {
 #endif
   timer.assignTime(gen_setup_tm);
 
+  // Parse the command line
+  CommandLineParser clip("dynamics.stormm", "The principal molecular dynamics engine in STORMM.");
+  clip.addStandardApplicationInputs();
+  const std::vector<std::string> my_namelists = {
+    "&files", "&dynamics", "&remd", "&restraint", "&solvent", "&random", "&minimize", "&report",
+    "&precision"
+  };
+  clip.addControlBlocks(my_namelists);
+  if (displayNamelistHelp(argc, argv, my_namelists) && clip.doesProgramExitOnHelp()) {
+    return 0;
+  }
+  clip.parseUserInput(argc, argv);
+  
   // Read information from the command line and initialize the UserSettings object
-  UserSettings ui(argc, argv, AppName::DYNAMICS);
+  UserSettings ui(clip, { "-pe", "-ce" });
   
   // Read topologies and coordinate files.  Assemble critical deatils about each system.
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::NO,
@@ -134,6 +119,36 @@ int main(int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis poly_se = createMaskSynthesis(sc);
   SynthesisCacheMap scmap(incrementingSeries(0, poly_ps.getSystemCount()), &sc, &poly_ag,
                           &poly_ps);
+
+  // Initialization of trajectories for a given REMD process. 
+  if(ui.getRemdPresence()) {
+    RemdControls remdcon = ui.getRemdNamelistInfo();
+    int total_swap_count = remdcon.getTotalSwapCount();
+    std::string remd_type = remdcon.getRemdType();
+    int frequency_swaps_count = remdcon.getFrequencyOfSwaps();
+    std::string swap_storage = remdcon.getSwapStore();
+    std::string temp_distribution = remdcon.getTemperatureDistributionMethod();
+    double exchange_probability = remdcon.getExchangeProbability();
+    double tolerance = remdcon.getTolerance();
+    int max_replicas = remdcon.getMaxReplicas();
+    double low_temperature = remdcon.getLowTemperature();
+    double high_temperature = remdcon.getHighTemperature();
+
+    ExchangeNexus remd_a( system_count, total_swap_count, remd_type, frequency_swaps_count,
+                          swap_storage, temp_distribution, exchange_probability, tolerance,
+                          max_replicas, low_temperature, high_temperature);
+
+    remd_a.setAtomGraphSynthesis(&poly_ag);
+    
+    std::vector<double> t_replicas = remd_a.getTempDistribution();
+
+    std::vector<int> remd_top(t_replicas.size());
+
+    for(int i = 0; i < remd_top.size(); ++i){
+      remd_top[i] = 0;
+    }
+    scmap = SynthesisCacheMap(remd_top, &sc, &poly_ag, &poly_ps);
+  }
 
   // Set the progress bar to system_count
   ProgressBar progress_bar;
@@ -218,7 +233,7 @@ int main(int argc, const char* argv[]) {
         rtErr("Minimization and dynamics are not yet operational for periodic boundary "
               "conditions.", "main");
       }
-      poly_ps.import(ps, i);
+      poly_ps.importSystem(ps, i);
     }
     // After end of loop, endl for the rest of the program to print correctly
     std::cout << std::endl;
@@ -321,46 +336,124 @@ int main(int argc, const char* argv[]) {
     const int nstep = dyncon.getStepCount();
     const int ntpr  = dyncon.getDiagnosticPrintFrequency();
     ScoreCard edyn(system_count, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
+    if (ui.getRemdPresence()) {
+      RemdControls remdcon = ui.getRemdNamelistInfo();
+      int total_swap_count = remdcon.getTotalSwapCount();
+      std::string remd_type = remdcon.getRemdType();
+      int nstep = remdcon.getFrequencyOfSwaps();
+      std::string swap_storage = remdcon.getSwapStore();
+      std::string temp_distribution = remdcon.getTemperatureDistributionMethod();
+      double exchange_probability = remdcon.getExchangeProbability();
+      double tolerance = remdcon.getTolerance();
+      int max_replicas = remdcon.getMaxReplicas();
+      double low_temperature = remdcon.getLowTemperature();
+      double high_temperature = remdcon.getHighTemperature();
+      const int ntpr = dyncon.getDiagnosticPrintFrequency();
 
-    // Reset Progress bar before loop, print the purpose of the loop.  Technically, we do not need
-    // to do a setIterations() here, since system_count is the same throughout.
-    progress_bar.reset();
-    progress_bar.setIterations(system_count);
-    std::cout << "Dynamics" << std::endl;
-
-    for (int i = 0; i < system_count; i++) {
+      ExchangeNexus remd_a(system_count, total_swap_count, remd_type, nstep,
+                          swap_storage, temp_distribution, exchange_probability, tolerance,
+                          max_replicas, low_temperature, high_temperature);
       
-      // Update progress bar at the beginning of the loop
-      progress_bar.update();
-      PhaseSpace ps = poly_ps.exportSystem(i);
-      AtomGraph *ag = sc.getSystemTopologyPointer(i);
-      Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
-                      dyncon.getThermostatEvolutionStart(), dyncon.getThermostatEvolutionEnd());
-      itst.setGeometryConstraints(dyncon.constrainGeometry());
-      itst.setRattleTolerance(dyncon.getRattleTolerance());
-      itst.setRattleIterations(dyncon.getRattleIterations());
+      // Initialize ScoreCard for REMD
+      edyn = ScoreCard(system_count, ((nstep + ntpr - 1) / ntpr) + 1,
+                       preccon.getEnergyScalingBits());
 
-      // Set the implicit solvent model here if it has not been done already.
-      if (ui.getMinimizePresence() == false) {
-        ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
+      bool flag = false;
+      // Initialize progress bars for REMD
+      ProgressBar remd_progress;
+      remd_progress.initialize(remdcon.getTotalSwapCount());
+      progress_bar.reset();
+      progress_bar.setIterations(system_count);
+
+      std::cout << "Starting REMD process..." << std::endl;
+
+      // REMD outer loop for swap attempts
+      for (int x = 0; x < remdcon.getTotalSwapCount(); ++x) {
+        remd_progress.update(); // Update REMD progress bar
+
+        // Inner loop over each system replica
+        for (int i = 0; i < system_count; i++) {
+          // Update progress bar for dynamics within each replica
+          progress_bar.update();
+
+          // Export system state
+          PhaseSpace ps = poly_ps.exportSystem(i);
+          AtomGraph* ag = sc.getSystemTopologyPointer(i);
+          Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
+                          dyncon.getThermostatEvolutionStart(),
+                          dyncon.getThermostatEvolutionEnd());
+          itst.setGeometryConstraints(dyncon.constrainGeometry());
+          itst.setRattleTolerance(dyncon.getRattleTolerance());
+          itst.setRattleIterations(dyncon.getRattleIterations());
+
+          if (!ui.getMinimizePresence()) {
+            ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
+          }
+
+          const RestraintApparatus& ra = sc.getRestraints(i);
+          timer.assignTime(dyn_setup_tm);
+
+          // Run dynamics with the current replica
+          ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
+          switch (ps.getUnitCellType()) {
+            case UnitCellType::NONE:
+              dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(i), ra, dyncon, 0);
+              timer.assignTime(dyn_run_tm);
+              break;
+            case UnitCellType::ORTHORHOMBIC:
+            case UnitCellType::TRICLINIC:
+              rtErr("Minimization and dynamics are not yet operational for periodic boundary "
+                    "conditions.", "main");
+              break;
+          }
+
+          // Import dynamics data into the main scorecard
+          edyn.importCard(iedyn, i, 0);
+        }
       }
-      const RestraintApparatus& ra = sc.getRestraints(i);
-      timer.assignTime(dyn_setup_tm);
-      ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
-      switch(ps.getUnitCellType()) {
-      case UnitCellType::NONE:
-        dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(i), ra, dyncon, 0);
-        timer.assignTime(dyn_run_tm);
-        break;
-      case UnitCellType::ORTHORHOMBIC:
-      case UnitCellType::TRICLINIC:
-        rtErr("Minimization and dynamics are not yet operational for periodic boundary "
-              "conditions.", "main");
-      }
-      edyn.import(iedyn, i, 0);
     }
-    // At the end of the progress bar, endl for the rest of the program
-    std::cout << std::endl;
+    else {
+
+      // Reset Progress bar before loop, print the purpose of the loop.  Technically, we do not
+      // need to do a setIterations() here, since system_count is the same throughout.
+      progress_bar.reset();
+      progress_bar.setIterations(system_count);
+      std::cout << "Dynamics" << std::endl;
+
+      for (int i = 0; i < system_count; i++) {
+        
+        // Update progress bar at the beginning of the loop
+        progress_bar.update();
+        PhaseSpace ps = poly_ps.exportSystem(i);
+        AtomGraph *ag = sc.getSystemTopologyPointer(i);
+        Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
+                        dyncon.getThermostatEvolutionStart(), dyncon.getThermostatEvolutionEnd());
+        itst.setGeometryConstraints(dyncon.constrainGeometry());
+        itst.setRattleTolerance(dyncon.getRattleTolerance());
+        itst.setRattleIterations(dyncon.getRattleIterations());
+
+        // Set the implicit solvent model here if it has not been done already.
+        if (ui.getMinimizePresence() == false) {
+          ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
+        }
+        const RestraintApparatus& ra = sc.getRestraints(i);
+        timer.assignTime(dyn_setup_tm);
+        ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
+        switch(ps.getUnitCellType()) {
+        case UnitCellType::NONE:
+          dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(i), ra, dyncon, 0);
+          timer.assignTime(dyn_run_tm);
+          break;
+        case UnitCellType::ORTHORHOMBIC:
+        case UnitCellType::TRICLINIC:
+          rtErr("Minimization and dynamics are not yet operational for periodic boundary "
+                "conditions.", "main");
+        }
+        edyn.importCard(iedyn, i, 0);
+      }
+      // At the end of the progress bar, endl for the rest of the program
+      std::cout << std::endl;
+    }
 #endif
 
     // Turn the energy tracking data into an output report

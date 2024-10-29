@@ -252,7 +252,7 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   ///        are omitted to save space on the constants imported as arguments to each kernel.  The
   ///        numbers of each instruction are found in the valence work units.
   SyAtomUpdateKit(const T* masses_in, const T* inv_masses_in, int largest_group_in,
-                  const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
+                  const T4* vs_params_in, const T4* settle_geom_in, const T4* settle_mass_in,
                   const T2* cnst_grp_params_in, const uint2* vste_insr_in,
                   const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
 
@@ -274,15 +274,20 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
                               ///<   dimension parameters in the 
   const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
                               ///<   SETTLE instructions will indicate which parameter set, and
-                              ///<   thus which index of this array to take.
-  const T2* settle_mass;      ///< Inverse mass considerations for SETTLE-constrained groups.  The
+                              ///<   thus which index of this array to take.  The "x", "y", "z",
+                              ///<   and "w" members of each tuple contain what are known as ra,
+                              ///<   rb, rc, and the combined mass of the heavy atom and one of the
+                              ///<   light atoms (for lack of a better place to put the information
+                              ///<   which is needed at nearly the same time as the three geometric
+                              ///<   values).
+  const T4* settle_mass;      ///< Inverse mass considerations for SETTLE-constrained groups.  The
                               ///<   SETTLE instructions will indicate which parameter set, and
-                              ///<   thus which index of this array to take.  
+                              ///<   thus which index of this array, to take.  
   const T2* cnst_grp_params;  ///< Squared bond length (x member) and the sum of inverse masses for
                               ///<   both atoms (y member) in one constraint (of perhaps several)
                               ///<   of a hub-and-spoke constraint group.
   const uint2* vste_insr;     ///< Virtual site placement instructions
-  const uint2* sett_insr;     ///< SETLLE group constraints instructions
+  const uint2* sett_insr;     ///< SETTLE group constraints instructions
   const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
   const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
                               ///<   for all valence work units

@@ -1,17 +1,22 @@
 #include "copyright.h"
 #include "systemcache.h"
+#include "Constants/symbol_values.h"
 #include "FileManagement/file_listing.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
+#include "Namelists/namelist_emulator.h"
+#include "Namelists/namelist_enumerators.h"
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
+#include "Structure/structure_enumerators.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 
 namespace stormm {
 namespace synthesis {
 
+using diskutil::detectTopologyKind;
 using diskutil::getBaseName;
 using diskutil::osSeparator;
 using diskutil::splitPath;
@@ -22,9 +27,20 @@ using stmath::incrementingSeries;
 using stmath::prefixSumInPlace;
 using stmath::PrefixSumType;
 using stmath::sum;
+using namelist::InputStatus;
 using namelist::MoleculeSystem;
 using parse::findStringInVector;
+using structure::ApplyConstraints;
 using structure::readStructureDataFile;
+using symbols::amber_ancient_bioq;
+using symbols::charmm_gromacs_bioq;
+using topology::amber_default_elec14_screen;
+using topology::amber_default_vdw14_screen;
+using topology::charmm_default_elec14_screen;
+using topology::charmm_default_vdw14_screen;
+using topology::default_charge_rounding_tol;
+using topology::default_charge_precision_inc;
+using topology::TopologyKind;
 using topology::UnitCellType;
 using topology::ValenceKit;
 using trajectory::detectCoordinateFileKind;
@@ -48,7 +64,7 @@ SystemCache::SystemCache(const ExceptionResponse policy_in,
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
-                         const ExceptionResponse policy_in,
+                         const DynamicsControls &dyncon, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in,
                          StopWatch *timer_in) :
@@ -62,7 +78,8 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
   topology_cache.reserve(n_free_top);
   for (int i = 0; i < n_free_top; i++) {
     try {
-      topology_cache.push_back(AtomGraph(fcon.getFreeTopologyName(i)));
+      extendTopologyList(&topology_cache, fcon.getFreeTopologyName(i), dyncon, policy,
+                         "SystemCache");
     }
     catch (std::runtime_error) {
       switch (policy) {
@@ -899,10 +916,19 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
 }
 
 //-------------------------------------------------------------------------------------------------
+SystemCache::SystemCache(const FilesControls &fcon, const DynamicsControls &dyncon,
+                         const ExceptionResponse policy_in,
+                         const MapRotatableGroups map_chemfe_rotators,
+                         const PrintSituation expectation_in, StopWatch *timer_in) :
+    SystemCache(fcon, {}, dyncon, policy_in, map_chemfe_rotators, expectation_in, timer_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy_in,
                          const MapRotatableGroups map_chemfe_rotators,
                          const PrintSituation expectation_in, StopWatch *timer_in) :
-    SystemCache(fcon, {}, policy_in, map_chemfe_rotators, expectation_in, timer_in)
+    SystemCache(fcon, {}, DynamicsControls(), policy_in, map_chemfe_rotators, expectation_in,
+                timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -1863,6 +1889,80 @@ std::string SystemCache::nondegenerateName(const std::string &fname_in,
     result = fname_in;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void extendTopologyList(std::vector<AtomGraph> *list, const std::string &fname,
+			const DynamicsControls &dyncon, const ExceptionResponse policy,
+                        const std::string &caller) {
+  ApplyConstraints use_shake, use_settle;
+  switch (dyncon.constrainGeometry()) {
+  case ApplyConstraints::NO:
+    use_shake = dyncon.useShake();
+    use_settle = dyncon.useSettle();
+    break;
+  case ApplyConstraints::YES:
+    use_shake = ApplyConstraints::YES;
+    use_settle = ApplyConstraints::YES;
+    break;
+  }
+  const TopologyKind tpl_form = detectTopologyKind(fname, caller);
+  double elec14_screen, vdw14_screen, coulomb_constant;
+  if (dyncon.elec14SetByUser()) {
+    elec14_screen = dyncon.getElec14Screening();
+  }
+  else {
+    switch (tpl_form) {
+    case TopologyKind::AMBER:
+      elec14_screen = amber_default_elec14_screen;
+      break;
+    case TopologyKind::CHARMM:
+      elec14_screen = charmm_default_elec14_screen;
+      break;
+    case TopologyKind::GROMACS:
+    case TopologyKind::OPENMM:
+    case TopologyKind::UNKNOWN:
+      elec14_screen = 1.0;
+      break;
+    }
+  }
+  if (dyncon.vdw14SetByUser()) {
+    vdw14_screen = dyncon.getVdw14Screening();
+  }
+  else {
+    switch (tpl_form) {
+    case TopologyKind::AMBER:
+      vdw14_screen = amber_default_vdw14_screen;
+      break;
+    case TopologyKind::CHARMM:
+      vdw14_screen = charmm_default_vdw14_screen;
+      break;
+    case TopologyKind::GROMACS:
+    case TopologyKind::OPENMM:
+    case TopologyKind::UNKNOWN:
+      vdw14_screen = 1.0;
+      break;
+    }
+  }
+  if (dyncon.coulombSetByUser()) {
+    coulomb_constant = dyncon.getCoulombConstant();
+  }
+  else {
+    switch (tpl_form) {
+    case TopologyKind::AMBER:
+      coulomb_constant = amber_ancient_bioq;
+      break;
+    case TopologyKind::CHARMM:
+    case TopologyKind::GROMACS:
+    case TopologyKind::OPENMM:
+    case TopologyKind::UNKNOWN:
+      coulomb_constant = charmm_gromacs_bioq;
+      break;
+    }        
+  }
+  list->emplace_back(fname, policy, tpl_form, coulomb_constant, elec14_screen, vdw14_screen,
+                     default_charge_rounding_tol, default_charge_precision_inc, use_shake,
+                     use_settle);
 }
 
 //-------------------------------------------------------------------------------------------------

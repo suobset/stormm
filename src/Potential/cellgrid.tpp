@@ -31,9 +31,10 @@ CellGridWriter<T, Tacc, Tcalc, T4>::CellGridWriter(const NonbondedTheme theme_in
                                                    uint* img_atom_idx_alt_in,
                                                    ushort* img_atom_chn_cell_in,
                                                    ushort* img_atom_chn_cell_alt_in,
-                                                   const int* nt_groups_in, Tacc* xfrc_in,
-                                                   Tacc* yfrc_in, Tacc* zfrc_in, int* xfrc_ovrf_in,
-                                                   int* yfrc_ovrf_in, int* zfrc_ovrf_in) :
+                                                   const int* nt_groups_in, ushort* relevance_in,
+                                                   Tacc* xfrc_in, Tacc* yfrc_in, Tacc* zfrc_in,
+                                                   int* xfrc_ovrf_in, int* yfrc_ovrf_in,
+                                                   int* zfrc_ovrf_in) :
     theme{theme_in}, system_count{system_count_in}, total_cell_count{total_cell_count_in},
     twice_cell_count{total_cell_count_in * 2}, total_chain_count{total_chain_count_in},
     mesh_ticks{mesh_ticks_in}, cell_base_capacity{cell_base_capacity_in},
@@ -48,8 +49,8 @@ CellGridWriter<T, Tacc, Tcalc, T4>::CellGridWriter(const NonbondedTheme theme_in
     nonimg_atom_idx{nonimg_atom_idx_in}, nonimg_atom_idx_alt{nonimg_atom_idx_alt_in},
     img_atom_idx{img_atom_idx_in}, img_atom_idx_alt{img_atom_idx_alt_in},
     img_atom_chn_cell{img_atom_chn_cell_in}, img_atom_chn_cell_alt{img_atom_chn_cell_alt_in},
-    nt_groups{nt_groups_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
-    yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
+    nt_groups{nt_groups_in}, relevance{relevance_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in},
+    xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -76,8 +77,9 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const NonbondedTheme theme_in
                                                    const uint* img_atom_idx_in,
                                                    const ushort* img_atom_chn_cell_in,
                                                    const int* nt_groups_in,
-                                                   const Tacc* xfrc_in, const Tacc* yfrc_in,
-                                                   const Tacc* zfrc_in, const int* xfrc_ovrf_in,
+                                                   const ushort* relevance_in, const Tacc* xfrc_in,
+                                                   const Tacc* yfrc_in, const Tacc* zfrc_in,
+                                                   const int* xfrc_ovrf_in,
                                                    const int* yfrc_ovrf_in,
                                                    const int* zfrc_ovrf_in) :
     theme{theme_in}, system_count{system_count_in}, total_cell_count{total_cell_count_in},
@@ -89,8 +91,8 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const NonbondedTheme theme_in
     cell_limits{cell_limits_in}, chain_limits{chain_limits_in},
     system_chain_bounds{system_chain_bounds_in}, chain_system_owner{chain_system_owner_in},
     image{image_in}, nonimg_atom_idx{nonimg_atom_idx_in}, img_atom_idx{img_atom_idx_in},
-    img_atom_chn_cell{img_atom_chn_cell_in}, nt_groups{nt_groups_in}, xfrc{xfrc_in},
-    yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in},
+    img_atom_chn_cell{img_atom_chn_cell_in}, nt_groups{nt_groups_in}, relevance{relevance_in},
+    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in}, yfrc_ovrf{yfrc_ovrf_in},
     zfrc_ovrf{zfrc_ovrf_in}
 {}
 
@@ -107,9 +109,9 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const CellGridWriter<T, Tacc,
     cell_limits{cgw.cell_limits}, chain_limits{cgw.chain_limits},
     system_chain_bounds{cgw.system_chain_bounds}, chain_system_owner{cgw.chain_system_owner},
     image{cgw.image}, nonimg_atom_idx{cgw.nonimg_atom_idx}, img_atom_idx{cgw.img_atom_idx},
-    img_atom_chn_cell{cgw.img_atom_chn_cell}, nt_groups{cgw.nt_groups}, xfrc{cgw.xfrc},
-    yfrc{cgw.yfrc}, zfrc{cgw.zfrc}, xfrc_ovrf{cgw.xfrc_ovrf}, yfrc_ovrf{cgw.yfrc_ovrf},
-    zfrc_ovrf{cgw.zfrc_ovrf}
+    img_atom_chn_cell{cgw.img_atom_chn_cell}, nt_groups{cgw.nt_groups}, relevance{cgw.relevance},
+    xfrc{cgw.xfrc}, yfrc{cgw.yfrc}, zfrc{cgw.zfrc}, xfrc_ovrf{cgw.xfrc_ovrf},
+    yfrc_ovrf{cgw.yfrc_ovrf}, zfrc_ovrf{cgw.zfrc_ovrf}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -126,22 +128,22 @@ CellGridReader<T, Tacc, Tcalc, T4>::CellGridReader(const CellGridWriter<T, Tacc,
     system_chain_bounds{cgw->system_chain_bounds}, chain_system_owner{cgw->chain_system_owner},
     image{cgw->image}, nonimg_atom_idx{cgw->nonimg_atom_idx}, img_atom_idx{cgw->img_atom_idx},
     img_atom_chn_cell{cgw->img_atom_chn_cell}, nt_groups{cgw->nt_groups},
-    xfrc{cgw->xfrc}, yfrc{cgw->yfrc}, zfrc{cgw->zfrc}, xfrc_ovrf{cgw->xfrc_ovrf},
-    yfrc_ovrf{cgw->yfrc_ovrf}, zfrc_ovrf{cgw->zfrc_ovrf}
+    relevance{cgw->relevance}, xfrc{cgw->xfrc}, yfrc{cgw->yfrc}, zfrc{cgw->zfrc},
+    xfrc_ovrf{cgw->xfrc_ovrf}, yfrc_ovrf{cgw->yfrc_ovrf}, zfrc_ovrf{cgw->zfrc_ovrf}
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in,
                                        const AtomGraphSynthesis *poly_ag_ptr_in,
-                                       const double cutoff, const double padding,
+                                       const double cutoff_in, const double padding_in,
                                        const int mesh_subdivisions_in,
                                        const NonbondedTheme theme_in,
                                        const uint cell_base_capacity_in,
                                        const ExceptionResponse policy_in) :
     system_count{0}, total_cell_count{0}, total_chain_count{0},
-    cell_base_capacity{cell_base_capacity_in},
-    effective_cutoff{validateEffectiveCutoff(cutoff + padding, policy_in)},
+    cell_base_capacity{cell_base_capacity_in}, cutoff{cutoff_in}, padding{padding_in},
+    effective_cutoff{validateEffectiveCutoff(0.5 * cutoff + padding, policy_in)},
     mesh_subdivisions{mesh_subdivisions_in},
     policy{policy_in},
     theme{theme_in},
@@ -173,6 +175,7 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
     wandering_atom_count_alt{HybridKind::ARRAY, "cg_wander_count_alt"},
     wanderers{HybridKind::ARRAY, "cg_wanderers"},
     nt_work_groups{HybridKind::ARRAY, "cg_nt_work_groups"},
+    image_relevance{HybridKind::ARRAY, "cg_relevance"},
     x_force{HybridKind::ARRAY, "cg_xfrc"},
     y_force{HybridKind::ARRAY, "cg_yfrc"},
     z_force{HybridKind::ARRAY, "cg_zfrc"},
@@ -489,18 +492,19 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
     // conservative option is to run through the systems once more and recompute the results
     // once the arrays have been allocated.
   }
-
+  
   // Set the upper bounds for various arrays
   image_chain_limits.putHost(icl_atom_counter,
                              system_chain_bounds.readHost(poly_psr.system_count));
   
   // Allocate the images and related bounds arrays
-  image.resize(icl_atom_counter);
-  image_alt.resize(icl_atom_counter);
-  nonimaged_atom_indices.resize(icl_atom_counter);
-  nonimaged_atom_indices_alt.resize(icl_atom_counter);
-  image_chain_cell_indices.resize(icl_atom_counter);
-  image_chain_cell_indices_alt.resize(icl_atom_counter);  
+  image.resize(image_size);
+  image_alt.resize(image_size);
+  nonimaged_atom_indices.resize(image_size);
+  nonimaged_atom_indices_alt.resize(image_size);
+  image_chain_cell_indices.resize(image_size);
+  image_chain_cell_indices_alt.resize(image_size);
+  image_relevance.resize(image_size);
 
   // Allocate space for moving atoms between chains and cells within each chain
   cell_migrations.resize(image_size);
@@ -514,7 +518,10 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
 
   // Arrange the fixed-precision cell origins
   drawNeighborListRulers();  
-  
+
+  // Compute the relevances of various particles
+  markImageRelevance();
+
   // Create work units to support the "tower and plate" neutral territory decomposition
   prepareWorkGroups();
 }
@@ -522,22 +529,24 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis *poly_ps_in,
-                                       const AtomGraphSynthesis &poly_ag_in, const double cutoff,
-                                       const double padding, const int mesh_subdivisions_in,
+                                       const AtomGraphSynthesis &poly_ag_in,
+                                       const double cutoff_in, const double padding_in,
+                                       const int mesh_subdivisions_in,
                                        const NonbondedTheme theme_in, const uint base_capacity_in,
                                        const ExceptionResponse policy_in) :
-    CellGrid(poly_ps_in, poly_ag_in.getSelfPointer(), cutoff, padding, mesh_subdivisions_in,
+    CellGrid(poly_ps_in, poly_ag_in.getSelfPointer(), cutoff_in, padding_in, mesh_subdivisions_in,
              theme_in, base_capacity_in, policy_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const PhaseSpaceSynthesis &poly_ps_in,
-                                       const AtomGraphSynthesis &poly_ag_in, const double cutoff,
-                                       const double padding, const int mesh_subdivisions_in,
+                                       const AtomGraphSynthesis &poly_ag_in,
+                                       const double cutoff_in, const double padding_in,
+                                       const int mesh_subdivisions_in,
                                        const NonbondedTheme theme_in, const uint base_capacity_in,
                                        const ExceptionResponse policy_in) :
-    CellGrid(poly_ps_in.getSelfPointer(), poly_ag_in.getSelfPointer(), cutoff, padding,
+    CellGrid(poly_ps_in.getSelfPointer(), poly_ag_in.getSelfPointer(), cutoff_in, padding_in,
              mesh_subdivisions_in, theme_in, base_capacity_in, policy_in)
 {}
 
@@ -548,6 +557,8 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const CellGrid &original) :
     total_cell_count{original.total_cell_count},
     total_chain_count{original.total_chain_count},
     cell_base_capacity{original.cell_base_capacity},
+    cutoff{original.cutoff},
+    padding{original.padding},
     effective_cutoff{original.effective_cutoff},
     mesh_subdivisions{original.mesh_subdivisions},
     policy{original.policy},
@@ -584,6 +595,7 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(const CellGrid &original) :
     wandering_atom_count_alt{original.wandering_atom_count_alt},
     wanderers{original.wanderers},
     nt_work_groups{original.nt_work_groups},
+    image_relevance{original.image_relevance},
     x_force{original.x_force},
     y_force{original.y_force},
     z_force{original.z_force},
@@ -631,6 +643,8 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(CellGrid &&original) :
     total_cell_count{original.total_cell_count},
     total_chain_count{original.total_chain_count},
     cell_base_capacity{original.cell_base_capacity},
+    cutoff{original.cutoff},
+    padding{original.padding},
     effective_cutoff{original.effective_cutoff},
     mesh_subdivisions{original.mesh_subdivisions},
     policy{original.policy},
@@ -667,6 +681,7 @@ CellGrid<T, Tacc, Tcalc, T4>::CellGrid(CellGrid &&original) :
     wandering_atom_count_alt{std::move(original.wandering_atom_count_alt)},
     wanderers{std::move(original.wanderers)},
     nt_work_groups{std::move(original.nt_work_groups)},
+    image_relevance{std::move(original.image_relevance)},
     x_force{std::move(original.x_force)},
     y_force{std::move(original.y_force)},
     z_force{std::move(original.z_force)},
@@ -716,6 +731,8 @@ CellGrid<T, Tacc, Tcalc, T4>& CellGrid<T, Tacc, Tcalc, T4>::operator=(const Cell
   total_cell_count = other.total_cell_count;
   total_chain_count = other.total_chain_count;
   cell_base_capacity = other.cell_base_capacity;
+  cutoff = other.cutoff;
+  padding = other.padding;
   effective_cutoff = other.effective_cutoff;
   mesh_subdivisions = other.mesh_subdivisions;
   policy = other.policy;
@@ -752,6 +769,7 @@ CellGrid<T, Tacc, Tcalc, T4>& CellGrid<T, Tacc, Tcalc, T4>::operator=(const Cell
   wandering_atom_count_alt = other.wandering_atom_count_alt;
   wanderers = other.wanderers;
   nt_work_groups = other.nt_work_groups;
+  image_relevance = other.image_relevance;
   x_force = other.x_force;
   y_force = other.y_force;
   z_force = other.z_force;
@@ -805,6 +823,8 @@ CellGrid<T, Tacc, Tcalc, T4>& CellGrid<T, Tacc, Tcalc, T4>::operator=(CellGrid &
   total_cell_count = other.total_cell_count;
   total_chain_count = other.total_chain_count;
   cell_base_capacity = other.cell_base_capacity;
+  cutoff = other.cutoff;
+  padding = other.padding;
   effective_cutoff = other.effective_cutoff;
   mesh_subdivisions = other.mesh_subdivisions;
   policy = other.policy;
@@ -841,6 +861,7 @@ CellGrid<T, Tacc, Tcalc, T4>& CellGrid<T, Tacc, Tcalc, T4>::operator=(CellGrid &
   wandering_atom_count_alt = std::move(other.wandering_atom_count_alt);
   wanderers = std::move(other.wanderers);
   nt_work_groups = std::move(other.nt_work_groups);
+  image_relevance = std::move(other.image_relevance);
   x_force = std::move(other.x_force);
   y_force = std::move(other.y_force);
   z_force = std::move(other.z_force);
@@ -934,6 +955,18 @@ int CellGrid<T, Tacc, Tcalc, T4>::getCellCount(const int index,
 template <typename T, typename Tacc, typename Tcalc, typename T4>
 uint CellGrid<T, Tacc, Tcalc, T4>::getCellBaseCapacity() const {
   return cell_base_capacity;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+double CellGrid<T, Tacc, Tcalc, T4>::getCutoff() const {
+  return cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+double CellGrid<T, Tacc, Tcalc, T4>::getPadding() const {
+  return padding;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1152,8 +1185,8 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      image_array_indices.data(tier),
                                      image_chain_cell_indices_alt.data(tier),
                                      image_chain_cell_indices.data(tier),
-                                     nt_work_groups.data(tier), x_force.data(tier),
-                                     y_force.data(tier), z_force.data(tier),
+                                     nt_work_groups.data(tier), image_relevance.data(tier),
+                                     x_force.data(tier), y_force.data(tier), z_force.data(tier),
                                      x_force_overflow.data(tier), y_force_overflow.data(tier),
                                      z_force_overflow.data(tier));
   case CoordinateCycle::WHITE:
@@ -1176,8 +1209,8 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      image_array_indices_alt.data(tier),
                                      image_chain_cell_indices.data(tier),
                                      image_chain_cell_indices_alt.data(tier),
-                                     nt_work_groups.data(tier), x_force.data(tier),
-                                     y_force.data(tier), z_force.data(tier),
+                                     nt_work_groups.data(tier), image_relevance.data(tier),
+                                     x_force.data(tier), y_force.data(tier), z_force.data(tier),
                                      x_force_overflow.data(tier), y_force_overflow.data(tier),
                                      z_force_overflow.data(tier));
   }
@@ -1212,8 +1245,8 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      nonimaged_atom_indices_alt.data(tier),
                                      image_array_indices_alt.data(tier),
                                      image_chain_cell_indices_alt.data(tier),
-                                     nt_work_groups.data(tier), x_force.data(tier),
-                                     y_force.data(tier), z_force.data(tier),
+                                     nt_work_groups.data(tier), image_relevance.data(tier),
+                                     x_force.data(tier), y_force.data(tier), z_force.data(tier),
                                      x_force_overflow.data(tier), y_force_overflow.data(tier),
                                      z_force_overflow.data(tier));
   case CoordinateCycle::WHITE:
@@ -1230,8 +1263,8 @@ CellGrid<T, Tacc, Tcalc, T4>::data(const CoordinateCycle orientation,
                                      nonimaged_atom_indices.data(tier),
                                      image_array_indices.data(tier),
                                      image_chain_cell_indices.data(tier),
-                                     nt_work_groups.data(tier), x_force.data(tier),
-                                     y_force.data(tier), z_force.data(tier),
+                                     nt_work_groups.data(tier), image_relevance.data(tier),
+                                     x_force.data(tier), y_force.data(tier), z_force.data(tier),
                                      x_force_overflow.data(tier), y_force_overflow.data(tier),
                                      z_force_overflow.data(tier));
   }
@@ -1275,7 +1308,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                       image_array_indices.data(tier),
                                       image_chain_cell_indices_alt.data(tier),
                                       image_chain_cell_indices.data(tier),
-                                      nt_work_groups.data(tier),
+                                      nt_work_groups.data(tier), image_relevance.data(tier),
                                       reinterpret_cast<void*>(x_force.data(tier)),
                                       reinterpret_cast<void*>(y_force.data(tier)),
                                       reinterpret_cast<void*>(z_force.data(tier)),
@@ -1306,7 +1339,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                       image_array_indices_alt.data(tier),
                                       image_chain_cell_indices.data(tier),
                                       image_chain_cell_indices_alt.data(tier),
-                                      nt_work_groups.data(tier),
+                                      nt_work_groups.data(tier), image_relevance.data(tier),
                                       reinterpret_cast<void*>(x_force.data(tier)),
                                       reinterpret_cast<void*>(y_force.data(tier)),
                                       reinterpret_cast<void*>(z_force.data(tier)),
@@ -1349,7 +1382,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                         nonimaged_atom_indices_alt.data(tier),
                                         image_array_indices_alt.data(tier),
                                         image_chain_cell_indices_alt.data(tier),
-                                        nt_work_groups.data(tier),
+                                        nt_work_groups.data(tier), image_relevance.data(tier),
                                         reinterpret_cast<const void*>(x_force.data(tier)),
                                         reinterpret_cast<const void*>(y_force.data(tier)),
                                         reinterpret_cast<const void*>(z_force.data(tier)),
@@ -1375,7 +1408,7 @@ CellGrid<T, Tacc, Tcalc, T4>::templateFreeData(const CoordinateCycle orientation
                                       nonimaged_atom_indices.data(tier),
                                       image_array_indices.data(tier),
                                       image_chain_cell_indices.data(tier),
-                                      nt_work_groups.data(tier),
+                                      nt_work_groups.data(tier), image_relevance.data(tier),
                                       reinterpret_cast<const void*>(x_force.data(tier)),
                                       reinterpret_cast<const void*>(y_force.data(tier)),
                                       reinterpret_cast<const void*>(z_force.data(tier)),
@@ -1586,6 +1619,142 @@ void CellGrid<T, Tacc, Tcalc, T4>::initializeForces(const HybridTargetLevel tier
     }
     break;
 #endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+void CellGrid<T, Tacc, Tcalc, T4>::markImageRelevance(const HybridTargetLevel tier,
+                                                      const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+
+    // Pass through to the CPU-bound code.
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+
+    // Launch the GPU kernel, then return.
+    return;
+#endif
+  }
+  
+  const int xfrm_stride = roundUp(9, warp_size_int);
+  CellGridWriter<T, Tacc, Tcalc, T4> cgw = this->data();
+  const UnitCellType uc = poly_ps_ptr->getUnitCellType();
+  const T value_two = 2.0;
+  const T cutoff_sq = cutoff * cutoff;
+  ushort* imrel_ptr = image_relevance.data();
+  for (int i = 0; i < total_cell_count; i++) {
+    const uint2 cell_lims = cgw.cell_limits[i];
+    const int system_idx = (cell_lims.y & 0xffff);
+    const T* cell_invu = &cgw.system_cell_invu[system_idx * xfrm_stride];
+    const uint jlim = cell_lims.x + (cell_lims.y >> 16);
+    for (uint j = cell_lims.x; j < jlim; j++) {
+      const T4 crdq = cgw.image[j];
+
+      // Initialize with all the bits for neighbor list cells in the tower or plate adjacent to the
+      // home cell at the nexus of the tower and plate.
+      uint relevance = 0x69c0U;
+
+      // The distance upwards to the lower plane boundary of the plate is the neighbor list cell
+      // height, minus the Cartesian Z elevation of the particle in the neighbor list cell, plus
+      // another portion of the neighbor list cell height.
+      relevance |= (((value_two * cell_invu[8]) - crdq.z < cutoff) << 12);
+
+      // The distance to the upper plane boundary of the plate is the elevation of the particle
+      // within its neighbor list cell, plus one full neighbor list cell height.
+      relevance |= (((crdq.z + cell_invu[8]) < cutoff) << 15);
+
+      // When determining the relevance of particles in the plate cells, orthorhombic unit cells
+      // afford a great deal of optimization.  In an orthorhombic unit cell, all of the C axis
+      // lines are vertical and the B axis lies along the Cartesian Y axis.  The unit cell A axis
+      // always lies along the Cartesian X axis.
+      switch (uc) {
+      case UnitCellType::ORTHORHOMBIC:
+        {
+          // First row of cells:  X X C        X X C        X X C        X X C        X X C    
+          //                      X X X X X => X X X X X => X X X X X => X X X X X => X X X X X
+          //                      . X X X X    X . X X X    X X . X X    X X X . X    X X X X .
+          double dx = (value_two * cell_invu[0]) - crdq.x;
+          double dy = (value_two * cell_invu[4]) - crdq.y;
+          relevance |= ((dx * dx) + (dy * dy) < cutoff_sq);
+          dx = cell_invu[0] - crdq.x;
+          relevance |= (((dx * dx) + (dy * dy) < cutoff_sq) << 1);
+          relevance |= ((dy < cutoff) << 2);
+          relevance |= (((crdq.x * crdq.x) + (dy * dy) < cutoff_sq) << 3);
+          dx = cell_invu[0] + crdq.x;
+          relevance |= (((dx * dx) + (dy * dy) < cutoff_sq) << 4);
+
+          // Second row of cells: X X C        X X C        X X C        X X C        X X C    
+          //                      . X X X X => X SKIP  X => X SKIP  X => X SKIP  X => X X X X .
+          //                      X X X X X    X X X X X    X X X X X    X X X X X    X X X X X
+          dx = (value_two * cell_invu[0]) - crdq.x;
+          dy = cell_invu[4] - crdq.y;
+          relevance |= (((dx * dx) + (dy * dy) < cutoff_sq) << 5);
+          dx = cell_invu[0] + crdq.x;
+          relevance |= (((dx * dx) + (dy * dy) < cutoff_sq) << 9);
+
+          // Third row of cells:  . X C        X . C
+          //                      X X X X X => X SKIP  X
+          //                      X X X X X    X X X X X
+          dx = (value_two * cell_invu[0]) - crdq.x;
+          relevance |= ((dx < cutoff) << 10);
+        }
+        break;
+      case UnitCellType::TRICLINIC:
+        {
+          // Translate the point down to the base of its present neighbor list cell (the face lying
+          // in the Cartesian XY plane), along a line parallel to the neighbor list cell's C axis.
+          const T rise = crdq.z / cell_invu[8];
+          const T base_x = crdq.x - (rise * cell_invu[6]);
+          const T base_y = crdq.y - (rise * cell_invu[7]);
+
+          // For each cell that the point might interact with, the nearest it might get to the
+          // tower will be defined by some line on the border of the other cell's base.  The task
+          // is then to find the point-to-line distance to lines along the other cell's A or B
+          // axes.  The distance to the line along other cell's A axis is easily defined, it's just
+          // the Cartesian Y displacement of the "base image" (base_x and base_y, computed above)
+          // from the other cell's base.  The closest point along that line will have the same
+          // Cartesian X coordinate as the particle's base X coordinate, so if base_x is within the
+          // bounds of the other cell's footprint along the Cartesian X axis, the nearest that the
+          // particle comes to the tower will be somewhere along a line parallel to the unit cell C
+          // axis passing through (base_x, oc_y), where oc_y is the Cartesian Y displacement of the
+          // other cell in the coordinate frame of the particle's own cell.  This is illustrated
+          // for point i, below.
+          //
+          //             B ^
+          //                \
+          //                 \--------------\
+          //                  \     Other    \
+          //                   \     Cell     \
+          //                  / \     Base     \
+          //                 /   \--------------\   --> A
+          //              j *        |
+          //                         |
+          //                       i *
+          //
+          // If, however, the intercept does not hit along the other cell's lower edge parallel to
+          // the unit cell A axis, then it is necessary to test the nearest distannce and intercept
+          // to the other cell's B axis.  The way to do that is to rotate the unit cell's B axis
+          // 90 degrees counter-clockwise and take its slope in the XY-plane, then determine the
+          // point at which a line drawn from the particle's base footprint will intercept the
+          // other cell's B axis.  The way to do that is to first see whether such a perpendicular
+          // line drawn from the particle will shoot below the lower corner (take the lower corner
+          // as the point of interest), above the upper corner (take the upper corner), or between
+          // them (solve a set of two equations to determine at which point the rise and run of the
+          // B axis emitted from the other cell's nearest corner will equal the rise and run of the
+          // perpendicular line emitted from the particle's base footprint.
+
+        }
+        break;
+      case UnitCellType::NONE:
+        break;
+      }
+
+      // Store the result
+      imrel_ptr[j] = relevance;
+    }
   }
 }
 
@@ -2877,7 +3046,7 @@ CellGridWriter<T, Tacc, Tcalc, T4> restoreType(CellGridWriter<void, void, void, 
                                    rasa->nonimg_atom_idx_alt, rasa->img_atom_idx,
                                    rasa->img_atom_idx_alt, rasa->img_atom_chn_cell,
                                    rasa->img_atom_chn_cell_alt, rasa->nt_groups,
-                                   reinterpret_cast<Tacc*>(rasa->xfrc),
+                                   rasa->relevance, reinterpret_cast<Tacc*>(rasa->xfrc),
                                    reinterpret_cast<Tacc*>(rasa->yfrc),
                                    reinterpret_cast<Tacc*>(rasa->zfrc), rasa->xfrc_ovrf,
                                    rasa->yfrc_ovrf, rasa->zfrc_ovrf);
@@ -2902,7 +3071,8 @@ CellGridWriter<T, Tacc, Tcalc, T4> restoreType(CellGridWriter<void, void, void, 
                                    rasa.wanderers, rasa.nonimg_atom_idx, rasa.nonimg_atom_idx_alt,
                                    rasa.img_atom_idx, rasa.img_atom_idx_alt,
                                    rasa.img_atom_chn_cell, rasa.img_atom_chn_cell_alt,
-                                   rasa.nt_groups, reinterpret_cast<Tacc*>(rasa.xfrc),
+                                   rasa.nt_groups, rasa.relevance,
+                                   reinterpret_cast<Tacc*>(rasa.xfrc),
                                    reinterpret_cast<Tacc*>(rasa.yfrc),
                                    reinterpret_cast<Tacc*>(rasa.zfrc), rasa.xfrc_ovrf,
                                    rasa.yfrc_ovrf, rasa.zfrc_ovrf);
@@ -2925,7 +3095,7 @@ restoreType(const CellGridReader<void, void, void, void> *rasa) {
                                    rasa->system_chain_bounds, rasa->chain_system_owner,
                                    reinterpret_cast<const T4*>(rasa->image),
                                    rasa->nonimg_atom_idx, rasa->img_atom_idx,
-                                   rasa->img_atom_chn_cell, rasa->nt_groups,
+                                   rasa->img_atom_chn_cell, rasa->nt_groups, rasa->relevance,
                                    reinterpret_cast<const Tacc*>(rasa->xfrc),
                                    reinterpret_cast<const Tacc*>(rasa->yfrc),
                                    reinterpret_cast<const Tacc*>(rasa->zfrc), rasa->xfrc_ovrf,
@@ -2948,7 +3118,7 @@ restoreType(const CellGridReader<void, void, void, void> &rasa) {
                                    rasa.chain_system_owner,
                                    reinterpret_cast<const T4*>(rasa.image), rasa.nonimg_atom_idx,
                                    rasa.img_atom_idx, rasa.img_atom_chn_cell, rasa.nt_groups,
-                                   reinterpret_cast<const Tacc*>(rasa.xfrc),
+                                   rasa.relevance, reinterpret_cast<const Tacc*>(rasa.xfrc),
                                    reinterpret_cast<const Tacc*>(rasa.yfrc),
                                    reinterpret_cast<const Tacc*>(rasa.zfrc), rasa.xfrc_ovrf,
                                    rasa.yfrc_ovrf, rasa.zfrc_ovrf);

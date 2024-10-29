@@ -147,8 +147,8 @@ public:
   ///                    the beginning of an input file if no such namelist is found starting
   ///                    from the original starting point
   /// \{
-  DynamicsControls(ExceptionResponse policy_in = ExceptionResponse::DIE,
-                   WrapTextSearch wrap = WrapTextSearch::NO);
+  DynamicsControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  
   DynamicsControls(const TextFile &tf, int *start_line, bool *found_nml,
                    ExceptionResponse policy_in = ExceptionResponse::DIE,
                    WrapTextSearch wrap = WrapTextSearch::NO);
@@ -184,11 +184,40 @@ public:
     
   /// \brief Get the van-der Waals pairwise cutoff in periodic simulations.
   double getVanDerWaalsCutoff() const;
+
+  /// \brief Get the value of Coulomb's constant.
+  double getCoulombConstant() const;
+
+  /// \brief Get the electrostatic 1:4 screening value.
+  double getElec14Screening() const;
   
-  /// \brief Indicate whether geometric constraints (RATTLE for hub-and-spoke bonded groups,
-  ///        SETTLE for rigid water molecules) are to be implemented.
+  /// \brief Get the van-der Waals 1:4 screening value.
+  double getVdw14Screening() const;
+
+  /// \brief Report whether the value of Coulomb's constant was set explicitly or left at the
+  ///        default value.
+  bool coulombSetByUser() const;
+
+  /// \brief Report whether the electrostatic 1:4 scaling was set explicitly or left at its
+  ///        default value.
+  bool elec14SetByUser() const;
+  
+  /// \brief Report whether the van-der Waals 1:4 scaling was set explicitly or left at its
+  ///        default value.
+  bool vdw14SetByUser() const;
+  
+  /// \brief Indicate whether general geometric constraints (RATTLE for hub-and-spoke bonded
+  ///        groups, SETTLE for rigid water molecules) are to be implemented.
   ApplyConstraints constrainGeometry() const;
-  
+
+  /// \brief Indicate whether SHAKE (and, by extension, RATTLE in the velocity-Verlet integrator)
+  ///        should be implemented.
+  ApplyConstraints useShake() const;
+
+  /// \brief Indicate whether SHAKE (and, by extension, RATTLE in the velocity-Verlet integrator)
+  ///        should be implemented.
+  ApplyConstraints useSettle() const;
+
   /// \brief Get the RATTLE tolerance.
   double getRattleTolerance() const;
 
@@ -299,6 +328,21 @@ public:
   ///
   /// \param cutoff_in
   void setCutoff(double cutoff_in);
+
+  /// \brief Set the value of Coulomb's constant.
+  ///
+  /// \param coulomb_in  Define Coulomb's constant for the simulation
+  void setCoulombConstant(double coulomb_in);
+
+  /// \brief Set the screening factor for 1:4 electrostatic interactions.
+  ///
+  /// \param screening_in  The screening factor to set
+  void setElec14Screening(double screening_in);
+  
+  /// \brief Set the screening factor for 1:4 van-der Waals interactions.
+  ///
+  /// \param screening_in  The screening factor to set
+  void setVdw14Screening(double screening_in);
   
   /// \brief Stipulate whether geometric constraints will be implemented.
   ///
@@ -312,6 +356,25 @@ public:
   void setGeometricConstraints(ApplyConstraints constrain_geometry_in = ApplyConstraints::YES);
   /// \}
 
+  /// \brief Stipulate whether bonds to hydrogen atoms will be held rigid at their equilibrium
+  ///        length.  Overloading follows from setGeometricConstraints(), above.
+  ///
+  /// \param use_shake_in
+  /// \{
+  void setUseShake(const std::string &use_shake_in);
+  void setUseShake(ApplyConstraints use_shake_in = ApplyConstraints::YES);
+  /// \}
+  
+  /// \brief Stipulate whether three-atom isosceles arrangements with two light atoms (e.g. water)
+  ///        will be held rigid at their equilibrium geometries.  Overloading follows from
+  ///        setGeometricConstraints(), above.
+  ///
+  /// \param use_settle_in
+  /// \{
+  void setUseSettle(const std::string &use_settle_in);
+  void setUseSettle(ApplyConstraints use_settle_in = ApplyConstraints::YES);
+  /// \}
+  
   /// \brief Set the RATTLE protocol to be used in CPU operations (the GPU will always use the
   ///        "CENTER_SUM" approach).
   ///
@@ -426,8 +489,30 @@ private:
                                    ///<   in periodic simulations
   double van_der_waals_cutoff;     ///< Cutoff applied to van-der Waals short-ranged interactions
                                    ///<   in periodic simulations
-  std::string constrain_geometry;  ///< Indicate whether RATTLE bond length constraints and SETTLE
-                                   ///<   rigid water constraints should be implemented
+  double coulomb;                  ///< Coulomb's constant may be defined by the user in the input
+  double elec_14_screening;        ///< The screening factor on 1:4 non-bonded interactions.  To
+                                   ///<   specify that such interactions take place at 5/6 nominal
+                                   ///<   strength, provide the value 6/5, 1.2.
+  double vdw_14_screening;         ///< The screening factor on 1:4 non-bonded van-der Waals
+                                   ///<   (Lennard-Jones) interactions
+  bool coulomb_set_by_user;        ///< Flag to indicate that Coulomb's constant has been set by
+                                   ///<   the user.  This will also read TRUE if a value is fed in
+                                   ///<   through the setCoulombConstant() member function.
+  bool elec_14_set_by_user;        ///< Flag to indicate that the electrostatic 1:4 screening
+                                   ///<   factor was set by the user.  This will also read true if
+                                   ///<   a value is fed in through the setElec14Screeningt()
+                                   ///<   member function.
+  bool vdw_14_set_by_user;         ///< Flag to indicate that the van-der Waals 1:4 screening
+      	      	      	      	   ///<   factor was set by the user.  This will also read true if
+      	      	      	      	   ///<   a value is fed in through the setVdw14Screeningt()
+                                   ///<   member function.
+  std::string constrain_geometry;  ///< Indicate whether SHAKE bond length constraints and SETTLE
+                                   ///<   rigid water constraints should be implemented.  This will
+                                   ///<   enforce both types of constraints.
+  std::string use_shake;           ///< Indicate whether SHAKE (and, by extension, RATTLE in the
+                                   ///<   velocity-Verlet integrator) should be implemented.
+  std::string use_settle;          ///< Indicate whether SETTLE rigid water constraints should be
+                                   ///<   implemented.
   double rattle_tolerance;         ///< The tolerance to apply to bond constraint calculations
   int rattle_iterations;           ///< Maximum number of RATTLE iterations to attempt in order to
                                    ///<   achieve convergence at or below the specified tolerance

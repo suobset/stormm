@@ -403,7 +403,7 @@ void coordCopy(CoordinateSeries<T> *destination, const int frame_dest,
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
-      destination->import(origin, frame_dest);
+      destination->importFrame(origin, frame_dest);
       break;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:

@@ -590,12 +590,12 @@ void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, size_t length, double mul
                     RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
 
 template <typename Trng>
-void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf, size_t length,
-                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf, double mult,
+                    double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
 
 template <typename Trng>
-void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, size_t length,
-                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, double mult, double scale,
+                    RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
 
 template <typename Trng>
 void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, llint* y, int* y_ovrf, llint* z,
@@ -605,13 +605,13 @@ void addRandomNoise(Trng *prng, llint* x, int* x_ovrf, llint* y, int* y_ovrf, ll
 template <typename Trng>
 void addRandomNoise(Trng *prng, std::vector<llint> *x, std::vector<int> *x_ovrf,
                     std::vector<llint> *y, std::vector<int> *y_ovrf, std::vector<llint> *z,
-                    std::vector<int> *z_ovrf, size_t length, double mult, double scale,
+                    std::vector<int> *z_ovrf, double mult, double scale,
                     RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
 
 template <typename Trng>
 void addRandomNoise(Trng *prng, Hybrid<llint> *x, Hybrid<int> *x_ovrf, Hybrid<llint> *y,
-                    Hybrid<int> *y_ovrf, Hybrid<llint> *z, Hybrid<int> *z_ovrf, size_t length,
-                    double mult, double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
+                    Hybrid<int> *y_ovrf, Hybrid<llint> *z, Hybrid<int> *z_ovrf, double mult,
+                    double scale, RandomNumberKind kind = RandomNumberKind::GAUSSIAN);
 /// \}
   
 } // namespace random

@@ -11,7 +11,7 @@
 #include "Random/hpc_random.h"
 #endif
 #include "Reporting/error_format.h"
-#include "Structure/rattle.h"
+#include "Structure/hub_and_spoke.h"
 #include "Topology/atomgraph_analysis.h"
 #include "UnitTesting/approx.h"
 #include "thermostat.h"
@@ -39,7 +39,7 @@ using random::RandomNumberKind;
 using random::Xoshiro256ppGenerator;
 using stmath::incrementingSeries;
 using stmath::roundUp;
-using structure::rattlePositions;
+using structure::shakePositions;
 using structure::rattleVelocities;
 using structure::translateApplyConstraints;
 using synthesis::SyNonbondedKit;
@@ -1269,10 +1269,10 @@ void velocityKickStart(PhaseSpace *ps, const AtomGraph *ag, Thermostat *tst,
         psw.yalt[i] = psw.ycrd[i];
         psw.zalt[i] = psw.zcrd[i];
       }
-      rattlePositions<double,
-                      double>(psw.xalt, psw.yalt, psw.zalt, psw.vxalt, psw.vyalt, psw.vzalt,
-                              psw.xcrd, psw.ycrd, psw.zcrd, cnk, 1.0, dyncon.getRattleTolerance(),
-                              dyncon.getRattleIterations(), dyncon.getCpuRattleMethod());
+      shakePositions<double,
+                     double>(psw.xalt, psw.yalt, psw.zalt, psw.vxalt, psw.vyalt, psw.vzalt,
+                             psw.xcrd, psw.ycrd, psw.zcrd, cnk, 1.0, dyncon.getRattleTolerance(),
+                             dyncon.getRattleIterations(), dyncon.getCpuRattleMethod());
       for (int i = 0; i < psw.natom; i++) {
         psw.xcrd[i] = psw.xalt[i];
         psw.ycrd[i] = psw.yalt[i];
@@ -1446,8 +1446,8 @@ void velocityKickStart(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *p
 
     // Apply positional constraints
     if (tstw_d.cnst_geom) {
-      rattlePositions(poly_ps, poly_ag, prec, tst->getTimeStep(), tst->getRattleTolerance(),
-                      tst->getRattleIterations());
+      shakePositions(poly_ps, poly_ag, prec, tst->getTimeStep(), tst->getRattleTolerance(),
+                     tst->getRattleIterations());
     }
 
     // Perform the basic velocity reset.

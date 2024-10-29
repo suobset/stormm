@@ -109,7 +109,7 @@ CoordinateSeries<T>::CoordinateSeries(PhaseSpace *ps, const int nframe_in,
                      format_in)
 {
   for (int i = 0; i < frame_count; i++) {
-    import(ps, 0, ps->getAtomCount(), i);
+    importFrame(ps, 0, ps->getAtomCount(), i);
   }
 }
 
@@ -122,7 +122,7 @@ CoordinateSeries<T>::CoordinateSeries(const PhaseSpace &ps, const int nframe_in,
                      format_in)
 {
   for (int i = 0; i < frame_count; i++) {
-    import(ps, 0, ps.getAtomCount(), i);
+    importFrame(ps, 0, ps.getAtomCount(), i);
   }
 }
 
@@ -135,7 +135,7 @@ CoordinateSeries<T>::CoordinateSeries(CoordinateFrame *cf, const int nframe_in,
                      format_in)
 {
   for (int i = 0; i < frame_count; i++) {
-    import(cf, 0, cf->getAtomCount(), i);
+    importFrame(cf, 0, cf->getAtomCount(), i);
   }
 }
 
@@ -148,7 +148,7 @@ CoordinateSeries<T>::CoordinateSeries(const CoordinateFrame &cf, const int nfram
                      format_in)
 {
   for (int i = 0; i < frame_count; i++) {
-    import(cf, 0, cf.getAtomCount(), i);
+    importFrame(cf, 0, cf.getAtomCount(), i);
   }
 }
 
@@ -179,7 +179,7 @@ CoordinateSeries<T>::CoordinateSeries(const CoordinateSeries<Toriginal> &origina
 {
   for (int i = 0; i < frame_count; i++) {
     const CoordinateFrame cf = original.exportFrame(i);
-    import(cf, 0, cf.getAtomCount(), i);
+    importFrame(cf, 0, cf.getAtomCount(), i);
   }
 }
 
@@ -958,8 +958,8 @@ template <typename T> void CoordinateSeries<T>::download() {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrameReader &cfr, const int atom_start,
-                                 const int atom_end, const int frame_index) {
+void CoordinateSeries<T>::importFrame(const CoordinateFrameReader &cfr, const int atom_start,
+                                      const int atom_end, const int frame_index) {
   const int actual_atom_end = (atom_end > atom_start) ? atom_end : cfr.natom;
   if (actual_atom_end - atom_start != atom_count) {
     rtErr("A CoordinateSeries with frames of " + std::to_string(atom_count) + " atoms cannot "
@@ -1027,64 +1027,68 @@ void CoordinateSeries<T>::import(const CoordinateFrameReader &cfr, const int ato
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrameReader &cfr, const int frame_index) {
-  import(cfr, 0, cfr.natom, frame_index);
+void CoordinateSeries<T>::importFrame(const CoordinateFrameReader &cfr, const int frame_index) {
+  importFrame(cfr, 0, cfr.natom, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrameWriter &cfw, const int atom_start,
-                                 const int atom_end, const int frame_index) {
-  import(CoordinateFrameReader(cfw), atom_start, atom_end, frame_index);
+void CoordinateSeries<T>::importFrame(const CoordinateFrameWriter &cfw, const int atom_start,
+                                      const int atom_end, const int frame_index) {
+  importFrame(CoordinateFrameReader(cfw), atom_start, atom_end, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrameWriter &cfw, const int frame_index) {
-  import(CoordinateFrameReader(cfw), 0, cfw.natom, frame_index);
+void CoordinateSeries<T>::importFrame(const CoordinateFrameWriter &cfw, const int frame_index) {
+  importFrame(CoordinateFrameReader(cfw), 0, cfw.natom, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrame &cf, const int atom_start,
-                                 const int atom_end, const int frame_index) {
-  import(cf.data(), atom_start, atom_end, frame_index);
+void CoordinateSeries<T>::importFrame(const CoordinateFrame &cf, const int atom_start,
+                                      const int atom_end, const int frame_index) {
+  importFrame(cf.data(), atom_start, atom_end, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const CoordinateFrame *cf, const int frame_index) {
-  import(cf->data(), 0, cf->getAtomCount(), frame_index);
+void CoordinateSeries<T>::importFrame(const CoordinateFrame *cf, const int frame_index) {
+  importFrame(cf->data(), 0, cf->getAtomCount(), frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const PhaseSpace &ps, const int frame_index,
-                                 const TrajectoryKind kind, const CoordinateCycle orientation) {
-  import(CoordinateFrameReader(ps, kind, orientation), 0, ps.getAtomCount(), frame_index);
+void CoordinateSeries<T>::importFrame(const PhaseSpace &ps, const int frame_index,
+                                      const TrajectoryKind kind,
+                                      const CoordinateCycle orientation) {
+  importFrame(CoordinateFrameReader(ps, kind, orientation), 0, ps.getAtomCount(), frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const PhaseSpace *ps, const int frame_index,
-                                 const TrajectoryKind kind, const CoordinateCycle orientation) {
-  import(CoordinateFrameReader(ps, kind, orientation), 0, ps->getAtomCount(), frame_index);
+void CoordinateSeries<T>::importFrame(const PhaseSpace *ps, const int frame_index,
+                                      const TrajectoryKind kind,
+                                      const CoordinateCycle orientation) {
+  importFrame(CoordinateFrameReader(ps, kind, orientation), 0, ps->getAtomCount(), frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const PhaseSpace &ps, const int atom_start, const int atom_end,
-                                 const int frame_index, const TrajectoryKind kind,
-                                 const CoordinateCycle orientation) {
-  import(CoordinateFrameReader(ps, kind, orientation), atom_start, atom_end, frame_index);
+void CoordinateSeries<T>::importFrame(const PhaseSpace &ps, const int atom_start,
+                                      const int atom_end, const int frame_index,
+                                      const TrajectoryKind kind,
+                                      const CoordinateCycle orientation) {
+  importFrame(CoordinateFrameReader(ps, kind, orientation), atom_start, atom_end, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void CoordinateSeries<T>::import(const PhaseSpace *ps, const int atom_start, const int atom_end,
-                                 const int frame_index, const TrajectoryKind kind,
-                                 const CoordinateCycle orientation) {
-  import(CoordinateFrameReader(ps, kind, orientation), atom_start, atom_end, frame_index);
+void CoordinateSeries<T>::importFrame(const PhaseSpace *ps, const int atom_start,
+                                      const int atom_end, const int frame_index,
+                                      const TrajectoryKind kind,
+                                      const CoordinateCycle orientation) {
+  importFrame(CoordinateFrameReader(ps, kind, orientation), atom_start, atom_end, frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1148,10 +1152,10 @@ void CoordinateSeries<T>::importFromFile(const std::string &file_name,
                            tmp_cfw.umat, tmp_cfw.invu, tmp_cfw.boxdim, actual_frame_numbers[i]);
         for (int j = 0; j < replica_count; j++) {
           if (frame_index_start < 0) {
-            import(tmp_cfr, orig_frame_count + i + (j * nimports));
+            importFrame(tmp_cfr, orig_frame_count + i + (j * nimports));
           }
           else {
-            import(tmp_cfr, frame_index_start + i + (j * nimports));            
+            importFrame(tmp_cfr, frame_index_start + i + (j * nimports));            
           }
         }
       }
@@ -1196,10 +1200,10 @@ void CoordinateSeries<T>::importFromFile(const std::string &file_name,
       const int orig_frame_count = frame_count;
       for (int i = 0; i < replica_count; i++) {
         if (frame_index_start < 0) {
-          import(tmp_cfr, orig_frame_count + i);
+          importFrame(tmp_cfr, orig_frame_count + i);
         }
         else {
-          import(tmp_cfr, frame_index_start + i);
+          importFrame(tmp_cfr, frame_index_start + i);
         }
       }
     }
@@ -1257,7 +1261,7 @@ void CoordinateSeries<T>::resize(const int new_frame_count, const CoordinateFram
   allocate(new_frame_count);
   const int orig_frame_count = frame_count;
   for (int i = orig_frame_count; i < new_frame_count; i++) {
-    import(cfr, atom_start, atom_end, i);
+    importFrame(cfr, atom_start, atom_end, i);
   }
   frame_count = new_frame_count;
 }
@@ -1305,7 +1309,7 @@ void CoordinateSeries<T>::pushBack(const CoordinateFrameReader &cfr, const int a
   if (frame_count >= frame_capacity) {
     allocate(((frame_count * 5) + 3) / 4);
   }
-  import(cfr, atom_start, atom_end, orig_frame_count);
+  importFrame(cfr, atom_start, atom_end, orig_frame_count);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -541,18 +541,25 @@ int countWords(const TextFile &tf, const int line, const int start_pos, const in
 ///   - Return the result as a new Standard Template Library string
 ///   - Return the result in a pre-allocated string or character array
 ///
-/// \param text
-/// \param start_pos
-/// \param length
-/// \param separators
-/// \param n_separators
-/// \param delimiters
-/// \param n_delimiters
-/// \param output
-/// \param quote_mask
-/// \param comment_mask
-/// \param output_quoted
-/// \param output_commented
+/// \param text              The text to process
+/// \param start_pos         Starting position at which to begin processing the text (any material
+///                          prior to start_pos will not become part of the result)
+/// \param length            Trusted length of the text array
+/// \param separators        Array of characters that can act as separators (these will be flanked
+///                          by white space on either side in the result)
+/// \param n_separators      Number of unique separator characters, trust length of separators
+/// \param delimiters        Array of characters that can act as delimiters (these will be replaced
+///                          by white space in the result)
+/// \param n_delimiters      Number of unique delimiter characters, trusted length of delimiters
+/// \param output            Pre-allocated buffer to hold the processed text
+/// \param quote_mask        Mask of characters in the input string that are known to be within
+///                          quotations
+/// \param comment_mask      Mask of characters in the input string that are known to be within
+///                          comments
+/// \param output_quoted     Bitmask indicating whether characters in the processed string or array
+///                          are enclosed within quotations
+/// \param output_commented  Bitmask indicating whether characters in the processed string or array
+///                          are enclosed within a comment
 /// \{
 void digestText(const char* text, size_t start_pos, size_t length, const char* separators,
                 int n_separators, const char* delimiters, int n_delimiters, char* output,

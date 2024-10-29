@@ -1097,6 +1097,7 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::setWaterResidueName(const char4 new_name) {
   water_residue_name = new_name;
+  characterizeWaterResidue();
 }
 
 //-------------------------------------------------------------------------------------------------

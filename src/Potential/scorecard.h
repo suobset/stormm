@@ -437,12 +437,12 @@ public:
   /// \param source_index    System index of the original object to import results from
   /// \param source_indices  System indices of the original object to import results from
   /// \{
-  void import(const ScoreCard *other, size_t fill_index, size_t source_index);
-  void import(const ScoreCard &other, size_t fill_index, size_t source_index);
-  void import(const ScoreCard *other, const std::vector<int> &fill_indices,
-              const std::vector<int> &source_indices);
-  void import(const ScoreCard &other, const std::vector<int> &fill_indices,
-              const std::vector<int> &source_indices);
+  void importCard(const ScoreCard *other, size_t fill_index, size_t source_index);
+  void importCard(const ScoreCard &other, size_t fill_index, size_t source_index);
+  void importCard(const ScoreCard *other, const std::vector<int> &fill_indices,
+                  const std::vector<int> &source_indices);
+  void importCard(const ScoreCard &other, const std::vector<int> &fill_indices,
+                  const std::vector<int> &source_indices);
   /// \}
   
 private:

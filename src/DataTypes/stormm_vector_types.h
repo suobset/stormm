@@ -441,6 +441,7 @@ union Ecumenical8 {
   double d;
   int2 i2;
   uint2 ui2;
+  float2 f2;
 };
 /// \}
 

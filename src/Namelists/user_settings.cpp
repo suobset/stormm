@@ -15,6 +15,7 @@ namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
+using constants::translateExceptionResponse;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
 using errors::rtErr;
@@ -27,15 +28,15 @@ using trajectory::getEnumerationName;
 using trajectory::translateCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
-UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
+UserSettings::UserSettings(const CommandLineParser &clip,
+                           const std::vector<std::string> &sys_reqs) :
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
     has_files_nml{false}, has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
     has_precision_nml{false}, has_conformer_nml{false}, has_receptor_nml{false},
     has_dynamics_nml{false}, has_remd_nml{false}, has_ffmorph_nml{false}, has_report_nml{false},
     restraint_nml_count{0}, input_file{std::string(default_conformer_input_file)},
-    command_line_args{}, file_io_input{}, line_min_input{}, solvent_input{}, prng_input{},
-    conf_input{}, receptor_input{}, dyna_input{}, remd_input{}, ffmod_input{}, diagnostic_input{},
-    rstr_inputs{}
+    file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{},
+    receptor_input{}, dyna_input{}, remd_input{}, ffmod_input{}, diagnostic_input{}, rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -43,86 +44,59 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   std::vector<std::string> cval_topology_file_names;
   std::vector<std::string> cval_coordinate_file_names;
   
-  // Make a record of the command-line arguments for future reference
-  command_line_args.reserve(argc);
-  for (int i = 0; i < argc; i++) {
-    command_line_args.emplace_back(argv[i]);
-  }
-  
   // Detect command line arguments, and note that their presence overrides similar directives
   // in the input deck.
   bool cli_inpfile          = false;
   bool cli_igseed           = false;
   bool cli_report           = false;
   bool cli_input_transcript = false;
-  bool cli_confname         = false;
+  bool cli_trajname         = false;
   CoordinateFileKind c_kind = default_filecon_inpcrd_type;
   CoordinateFileKind x_kind = default_filecon_outcrd_type;
   CoordinateFileKind r_kind = default_filecon_chkcrd_type;
-  for (int i = 1; i < argc; i++) {
-    if (i < argc - 1 && strcmp(argv[i], "-i") == 0) {
-      input_file = std::string(argv[i + 1]);
-      cli_inpfile = true;
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-igseed") == 0) {
-      if (verifyNumberFormat(argv[i + 1], NumberFormat::INTEGER) == false) {
-        rtErr("The random seed " + std::string(argv[i + 1]) + " is not valid.", "UserSettings");
-      }
-      cval_igseed = atoi(argv[i + 1]);
-      cli_igseed = true;
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-p") == 0) {
-      std::string tmp_top(argv[i + 1]);
-      cval_topology_file_names.push_back(tmp_top);
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-c") == 0) {
-      std::string tmp_crd(argv[i + 1]);
-      cval_coordinate_file_names.push_back(tmp_crd);
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-o") == 0) {
-      cval_report_file = std::string(argv[i + 1]);
-      cli_report = true;
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-t") == 0) {
-      cval_input_transcript_file = std::string(argv[i + 1]);
-      cli_input_transcript = true;
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-x") == 0) {
-      cval_traj_file_name = std::string(argv[i + 1]);
-      cli_confname = true;
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-c_kind") == 0) {
-      c_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-x_kind") == 0) {
-      x_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
-      i++;
-    }
-    else if (i < argc - 1 && strcmp(argv[i], "-r_kind") == 0) {
-      r_kind = translateCoordinateFileKind(std::string(argv[i + 1]));
-      i++;
-    }
-    else if (strcmp(argv[i], "-warn") == 0) {
-      policy = ExceptionResponse::WARN;
-    }
-    else if (strcmp(argv[i], "-silent") == 0) {
-      policy = ExceptionResponse::SILENT;
-    }
-    else if (strcmp(argv[i], "-O") == 0) {
-      print_policy = PrintSituation::OVERWRITE;
-    }
-    else {
-      rtErr("Command line argument " + std::string(argv[i]) + " was not recognized.",
-            "UserSettings");
-    }
+  const NamelistEmulator *t_nml = clip.getNamelistPointer();
+  const InputStatus user_spec = InputStatus::USER_SPECIFIED;
+  if (t_nml->hasKeyword("-i") && t_nml->getKeywordStatus("-i") == user_spec) {
+    input_file = t_nml->getStringValue("-i");
+    cli_inpfile = true;
+  }
+  if (t_nml->hasKeyword("-ig_seed") &&
+      t_nml->getKeywordStatus("-ig_seed") == user_spec) {
+    cval_igseed = t_nml->getIntValue("-ig_seed");
+    cli_igseed = true;
+  }
+  if (t_nml->hasKeyword("-p") && t_nml->getKeywordStatus("-p") == user_spec) {
+    cval_topology_file_names = t_nml->getAllStringValues("-p");
+  }
+  if (t_nml->hasKeyword("-c") && t_nml->getKeywordStatus("-c") == user_spec) {
+    cval_coordinate_file_names = t_nml->getAllStringValues("-c");
+  }
+  if (t_nml->hasKeyword("-o") && t_nml->getKeywordStatus("-o") == user_spec) {
+    cval_report_file = t_nml->getStringValue("-o");
+    cli_report = true;
+  }
+  if (t_nml->hasKeyword("-t") && t_nml->getKeywordStatus("-t") == user_spec) {
+    cval_input_transcript_file = t_nml->getStringValue("-t");
+    cli_input_transcript = true;
+  }
+  if (t_nml->hasKeyword("-x") && t_nml->getKeywordStatus("-x") == user_spec) {
+    cval_traj_file_name = t_nml->getStringValue("-x");
+    cli_trajname = true;
+  }
+  if (t_nml->hasKeyword("-c_kind") && t_nml->getKeywordStatus("-c_kind") == user_spec) {
+    c_kind = translateCoordinateFileKind(t_nml->getStringValue("-c_kind"));
+  }
+  if (t_nml->hasKeyword("-x_kind") && t_nml->getKeywordStatus("-x_kind") == user_spec) {
+    x_kind = translateCoordinateFileKind(t_nml->getStringValue("-x_kind"));
+  }
+  if (t_nml->hasKeyword("-r_kind") && t_nml->getKeywordStatus("-r_kind") == user_spec) {
+    r_kind = translateCoordinateFileKind(t_nml->getStringValue("-r_kind"));
+  }
+  if (t_nml->hasKeyword("-except") && t_nml->getKeywordStatus("-except") == user_spec) {
+    policy = translateExceptionResponse(t_nml->getStringValue("-except"));
+  }
+  if (t_nml->hasKeyword("-O") && t_nml->getBoolValue("-O")) {
+    print_policy = PrintSituation::OVERWRITE;
   }
   
   // Process the input file.  Take only the first instance of each namelist, as found by searching
@@ -135,21 +109,12 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   }
   TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable",
                   "UserSettings");
+
   std::vector<std::string> alternatives = {
     "coordinate_input_format",      getEnumerationName(c_kind),
     "coordinate_output_format",     getEnumerationName(x_kind),
     "coordinate_checkpoint_format", getEnumerationName(r_kind)
   };
-  std::vector<std::string> sys_reqs = { "-pe", "-ce" };
-  switch (prog_set) {
-  case AppName::CONFORMER:
-    sys_reqs.push_back("-rg");
-    break;
-  case AppName::DYNAMICS:
-    break;
-  case AppName::FFREFINE:
-    break;
-  }
   int start_line = 0;
   file_io_input = FilesControls(inp_tf, &start_line, &has_files_nml, policy, WrapTextSearch::NO,
                                 alternatives, sys_reqs);
@@ -184,25 +149,6 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     }
   }
   
-  // Check the validity of input namelists
-  switch (prog_set) {
-  case AppName::CONFORMER:
-    if (has_dynamics_nml) {
-      rtWarn("A &dynamics namelist was detected in the input, but content will be ignored by "
-             "this program.  The dynamics.stormm application will make use of such input.",
-             "UserSettings");
-    }
-    break;
-  case AppName::DYNAMICS:
-  case AppName::FFREFINE:
-    if (has_conformer_nml) {
-      rtWarn("A &conformer namelist was detected in the input, but content will be ignored by "
-             "this program.  The conformer.stormm application will make use of such input.",
-             "UserSettings");
-    }
-    break;
-  }
-  
   // Superimpose, or contribute, command line directives
   if (cli_igseed) {
     prng_input.setRandomSeed(cval_igseed);    
@@ -210,7 +156,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   if (cli_report) {
     file_io_input.setReportFileName(cval_report_file);
   }
-  if (cli_confname) {
+  if (cli_trajname) {
     file_io_input.setGeneralTrajectoryFileName(cval_traj_file_name);
   }
   if (cli_input_transcript) {
@@ -236,11 +182,6 @@ ExceptionResponse UserSettings::getExceptionBehavior() const {
 //-------------------------------------------------------------------------------------------------
 const std::string& UserSettings::getInputFileName() const {
   return input_file;
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<std::string>& UserSettings::getCommandLineArguments() const {
-  return command_line_args;
 }
 
 //-------------------------------------------------------------------------------------------------

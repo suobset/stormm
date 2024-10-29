@@ -73,19 +73,25 @@ double evaluateBondTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const T
   double bond_energy = 0.0;
   llint bond_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
-
+  
   // Accumulate the results (energy in both precision models)
   for (int pos = 0; pos < vk.nbond; pos++) {
-    const int param_idx = vk.bond_param_idx[pos];
-    const double du =
-      evalHarmonicStretch<Tcoord, Tforce, Tcalc>(vk.bond_i_atoms[pos], vk.bond_j_atoms[pos],
-                                                 vk.bond_keq[param_idx],
-                                                 fabs(vk.bond_leq[param_idx]),
-                                                 xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
-                                                 yfrc, zfrc, eval_force, inv_gpos_factor,
-                                                 force_factor);
-    bond_energy += du;
-    bond_acc += llround(du * nrg_scale_factor);
+
+    // Only evaluate bonded terms that are not held rigid
+    const int pos_elem = (pos >> 5);
+    const int pos_bit = pos - (pos_elem << 5);
+    if ((vk.bond_relevance[pos_elem] >> pos_bit) & 0x1U) {
+      const int param_idx = vk.bond_param_idx[pos];
+      const double du =
+        evalHarmonicStretch<Tcoord, Tforce, Tcalc>(vk.bond_i_atoms[pos], vk.bond_j_atoms[pos],
+                                                   vk.bond_keq[param_idx],
+                                                   fabs(vk.bond_leq[param_idx]),
+                                                   xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                                   yfrc, zfrc, eval_force, inv_gpos_factor,
+                                                   force_factor);
+      bond_energy += du;
+      bond_acc += llround(du * nrg_scale_factor);
+    }
   }
   
   // Contribute results
@@ -232,15 +238,21 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const 
 
   // Accumulate results by looping over all angle bending terms.
   for (int pos = 0; pos < vk.nangl; pos++) {
-    const int param_idx = vk.angl_param_idx[pos];
-    const double du =
-      evalHarmonicBend<Tcoord, Tforce, Tcalc>(vk.angl_i_atoms[pos], vk.angl_j_atoms[pos],
-                                              vk.angl_k_atoms[pos], vk.angl_keq[param_idx],
-                                              vk.angl_theta[param_idx], xcrd, ycrd, zcrd, umat,
-                                              invu, unit_cell, xfrc, yfrc, zfrc, eval_force,
-                                              inv_gpos_factor, force_factor);
-    angl_energy += du;
-    angl_acc += llround(du * nrg_scale_factor);
+
+    // Only evaluate bond angle terms that are not held rigid
+    const int pos_elem = (pos >> 5);
+    const int pos_bit = pos - (pos_elem << 5);
+    if ((vk.angl_relevance[pos_elem] >> pos_bit) & 0x1U) {
+      const int param_idx = vk.angl_param_idx[pos];
+      const double du =
+        evalHarmonicBend<Tcoord, Tforce, Tcalc>(vk.angl_i_atoms[pos], vk.angl_j_atoms[pos],
+                                                vk.angl_k_atoms[pos], vk.angl_keq[param_idx],
+                                                vk.angl_theta[param_idx], xcrd, ycrd, zcrd, umat,
+                                                invu, unit_cell, xfrc, yfrc, zfrc, eval_force,
+                                                inv_gpos_factor, force_factor);
+      angl_energy += du;
+      angl_acc += llround(du * nrg_scale_factor);
+    }
   }
 
   // Contribute results
@@ -468,7 +480,8 @@ double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, co
   llint improper_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
 
-  // Accumulate results by looping over all dihedral terms.
+  // Accumulate results by looping over all dihedral terms.  All dihedral terms are considered
+  // relevant, regardless of whether they contain virtual sites or rigid bonds to hydrogen atoms.
   for (int pos = 0; pos < vk.ndihe; pos++) {
     const int param_idx = vk.dihe_param_idx[pos];
     const double du =

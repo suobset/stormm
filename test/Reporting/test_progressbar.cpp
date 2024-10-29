@@ -61,7 +61,6 @@ int main(const int argc, const char* argv[]) {
 
   for (int i = 0; i < new_iterations; ++i) {
     progressBar.update();
-    // Simulate work with a sleep
     std::this_thread::sleep_for(std::chrono::microseconds(120));
   }
   // TODO: Changing this error reporting to STORMM format
@@ -107,7 +106,6 @@ int main(const int argc, const char* argv[]) {
 
   // TODO: Changing this error reporting to STORMM format
   std::cerr << std::endl;
-  section(4);
 
   // Re-enable bar display and change output stream to std::cout
   // As well as conduct this outside the constraints of a loop

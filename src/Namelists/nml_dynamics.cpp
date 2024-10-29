@@ -1,6 +1,8 @@
 #include "copyright.h"
+#include "Constants/symbol_values.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
+#include "Topology/atomgraph_constants.h"
 #include "namelist_element.h"
 #include "nml_dynamics.h"
 
@@ -14,10 +16,13 @@ using parse::NumberFormat;
 using parse::strcmpCased;
 using structure::translateApplyConstraints;
 using structure::translateRattleMethod;
+using symbols::amber_ancient_bioq;
+using topology::amber_default_elec14_screen;
+using topology::amber_default_vdw14_screen;
 using trajectory::translateThermostatKind;
   
 //-------------------------------------------------------------------------------------------------
-DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
+DynamicsControls::DynamicsControls(const ExceptionResponse policy_in) :
     policy{policy_in},
     total_step_count{default_dynamics_nstlim},
     diagnostic_frequency{default_dynamics_ntpr},
@@ -25,7 +30,15 @@ DynamicsControls::DynamicsControls(const ExceptionResponse policy_in, const Wrap
     time_step{default_dynamics_time_step},
     electrostatic_cutoff{default_electrostatic_cutoff},
     van_der_waals_cutoff{default_van_der_waals_cutoff},
+    coulomb{amber_ancient_bioq},
+    elec_14_screening{amber_default_elec14_screen},
+    vdw_14_screening{amber_default_vdw14_screen},
+    coulomb_set_by_user{false},
+    elec_14_set_by_user{false},
+    vdw_14_set_by_user{false},
     constrain_geometry{std::string(default_geometry_constraint_behavior)},
+    use_shake{std::string(default_geometry_constraint_behavior)},
+    use_settle{std::string(default_geometry_constraint_behavior)},
     rattle_tolerance{default_rattle_tolerance},
     rattle_iterations{default_rattle_max_iter},
     rattle_protocol{std::string(default_rattle_protocol)},
@@ -63,13 +76,22 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   t_nml.assignVariable(&van_der_waals_cutoff, "vdw_cut");
   t_nml.assignVariable(&electrostatic_cutoff, "cut");
   t_nml.assignVariable(&van_der_waals_cutoff, "cut");
+  t_nml.assignVariable(&coulomb, "coulomb");
+  t_nml.assignVariable(&elec_14_screening, "scee");
+  t_nml.assignVariable(&vdw_14_screening, "scnb");
   t_nml.assignVariable(&rattle_tolerance, "tol");
   t_nml.assignVariable(&rattle_iterations, "rattle_iter");
   setCpuRattleMethod(t_nml.getStringValue("rattle_style"));
   
-  // Detect whether RATTLE and SETTLE should be activated
+  // Detect whether SHAKE, RATTLE, and SETTLE should be activated
   if (t_nml.getKeywordStatus("rigid_geom") != InputStatus::MISSING) {
     setGeometricConstraints(t_nml.getStringValue("rigid_geom"));
+  }
+  if (t_nml.getKeywordStatus("rigid_h") != InputStatus::MISSING) {
+    setUseShake(t_nml.getStringValue("rigid_h"));
+  }
+  if (t_nml.getKeywordStatus("rigid_wat") != InputStatus::MISSING) {
+    setUseSettle(t_nml.getStringValue("rigid_wat"));
   }
   
   // Detect the thermostat kind and assign global properties.  Then, fill out arrays of temperature
@@ -148,8 +170,48 @@ double DynamicsControls::getVanDerWaalsCutoff() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double DynamicsControls::getCoulombConstant() const {
+  return coulomb;
+}
+
+//-------------------------------------------------------------------------------------------------
+double DynamicsControls::getElec14Screening() const {
+  return elec_14_screening;
+}
+
+//-------------------------------------------------------------------------------------------------
+double DynamicsControls::getVdw14Screening() const {
+  return vdw_14_screening;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool DynamicsControls::coulombSetByUser() const {
+  return coulomb_set_by_user;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool DynamicsControls::elec14SetByUser() const {
+  return elec_14_set_by_user;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool DynamicsControls::vdw14SetByUser() const {
+  return vdw_14_set_by_user;
+}
+
+//-------------------------------------------------------------------------------------------------
 ApplyConstraints DynamicsControls::constrainGeometry() const {
   return translateApplyConstraints(constrain_geometry);
+}
+
+//-------------------------------------------------------------------------------------------------
+ApplyConstraints DynamicsControls::useShake() const {
+  return translateApplyConstraints(use_shake);
+}
+
+//-------------------------------------------------------------------------------------------------
+ApplyConstraints DynamicsControls::useSettle() const {
+  return translateApplyConstraints(use_settle);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -307,6 +369,24 @@ void DynamicsControls::setCutoff(const double cutoff_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void DynamicsControls::setCoulombConstant(const double coulomb_in) {
+  coulomb = coulomb_in;
+  coulomb_set_by_user = true;
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setElec14Screening(const double screening_in) {
+  elec_14_screening = screening_in;
+  elec_14_set_by_user = true;
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setVdw14Screening(const double screening_in) {
+  vdw_14_screening = screening_in;
+  vdw_14_set_by_user = true;
+}
+
+//-------------------------------------------------------------------------------------------------
 void DynamicsControls::setGeometricConstraints(const std::string &constrain_geometry_in) {
   constrain_geometry = constrain_geometry_in;
   try {
@@ -333,7 +413,63 @@ void DynamicsControls::setGeometricConstraints(const std::string &constrain_geom
 void DynamicsControls::setGeometricConstraints(const ApplyConstraints constrain_geometry_in) {
   constrain_geometry = getEnumerationName(constrain_geometry_in);
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setUseShake(const std::string &use_shake_in) {
+  use_shake = use_shake_in;
+  try {
+    const ApplyConstraints trial = translateApplyConstraints(use_shake_in);
+  }
+  catch (std::runtime_error) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid constraint activation \"" + use_shake_in + "\" provided.",
+            "DynamicsControls", "setUseShake");
+    case ExceptionResponse::WARN:
+      rtWarn("Invalid constraint activation \"" + use_shake_in + "\" provided.  The default of " +
+             std::string(default_geometry_constraint_behavior) + " will be reinstated.",
+             "DynamicsControls", "setUseShake");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    use_shake = std::string(default_geometry_constraint_behavior);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setUseShake(const ApplyConstraints use_shake_in) {
+  use_shake = getEnumerationName(use_shake_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setUseSettle(const std::string &use_settle_in) {
+  use_settle = use_settle_in;
+  try {
+    const ApplyConstraints trial = translateApplyConstraints(use_settle_in);
+  }
+  catch (std::runtime_error) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Invalid constraint activation \"" + use_settle_in + "\" provided.",
+            "DynamicsControls", "setUseSettle");
+    case ExceptionResponse::WARN:
+      rtWarn("Invalid constraint activation \"" + use_settle_in + "\" provided.  The default of " +
+             std::string(default_geometry_constraint_behavior) + " will be reinstated.",
+             "DynamicsControls", "setUseSettle");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    use_settle = std::string(default_geometry_constraint_behavior);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setUseSettle(const ApplyConstraints use_settle_in) {
+  use_settle = getEnumerationName(use_settle_in);
+}
+
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setCpuRattleMethod(const std::string &rattle_protocol_in) {
   rattle_protocol = rattle_protocol_in;
@@ -786,9 +922,14 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addKeyword("elec_cut", NamelistType::REAL, std::to_string(default_electrostatic_cutoff));
   t_nml.addKeyword("vdw_cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
   t_nml.addKeyword("cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
+  t_nml.addKeyword("coulomb", NamelistType::REAL, std::to_string(amber_ancient_bioq));
+  t_nml.addKeyword("scee", NamelistType::REAL, std::to_string(amber_default_elec14_screen));
+  t_nml.addKeyword("scnb", NamelistType::REAL, std::to_string(amber_default_vdw14_screen));
   
   // Constraint keywords
   t_nml.addKeyword("rigid_geom", NamelistType::STRING);
+  t_nml.addKeyword("rigid_h", NamelistType::STRING);
+  t_nml.addKeyword("rigid_wat", NamelistType::STRING);
   t_nml.addKeyword("tol", NamelistType::REAL,
                    realToString(default_rattle_tolerance, 9, 2, NumberFormat::SCIENTIFIC));
   t_nml.addKeyword("rattle_iter", NamelistType::INTEGER, std::to_string(default_rattle_max_iter));
@@ -848,10 +989,22 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
                 "for evaluating the van-der Waals potential).");
   t_nml.addHelp("cut", "The inter-particle distance at which to begin neglecting pairwise, "
                 "particle-particle interactions, in units of Angstroms");
+  t_nml.addHelp("coulomb", "Define Coulomb's constant for the simulation, in units of "
+                "kcal/mol-e^2, where e is the charge of a proton (atomic unit of charge).");
+  t_nml.addHelp("scee", "The unitless screening factor on electrostatic 1:4 interactions.  To "
+                "attenuate such interactions between near neighbors to 83.333% of their nominal "
+                "value, specify 6/5, i.e. 1.2.");
+  t_nml.addHelp("scnb", "The unitless screening factor on van-der Waals 1:4 interactions.  To "
+                "attenuate such interactions between near neighbors to 50% of their nominal "
+                "value, specify 1/2, i.e. 0.5.");
   
   // Help messages for geometry constraints keywords
-  t_nml.addHelp("rigid_geom", "Indicate whether to enforce rigid geometries, namely bond length "
+  t_nml.addHelp("rigid_geom", "Indicate whether to enforce all rigid geometries, both bond length "
                 "constraints and rigid water molecules");
+  t_nml.addHelp("rigid_h", "Indicate whether to enforce rigid bond lengths to hydrogen atoms");
+  t_nml.addHelp("rigid_wat", "Indicate whether to enforce the geometry of trigonal water "
+                "molecules bonded in a ring.  Rigid water models such as TIP3P, SPC/E, TIP4P-Ew, "
+                "and others make use of these analytic constraints.");
   t_nml.addHelp("tol", "Tolerance by which to constrain rigid bonds involving hydrogen atoms.  "
                 "The units of this tolerance are squared Angstroms, implying that the rigid "
                 "geometry will be correct to within the square root of this tolerance after all "

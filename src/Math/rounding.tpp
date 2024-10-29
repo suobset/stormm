@@ -10,6 +10,17 @@ template <typename T> T roundUp(T jagged, T increment) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> T roundDown(T jagged, T increment) {
+  if (jagged >= 0) {
+    return (jagged / increment) * increment;
+  }
+  else {
+    return ((jagged - increment + static_cast<T>(1)) / increment) * increment;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
 Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
                         const Tcalc* bc, const Tcalc* scr) {

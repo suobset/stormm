@@ -8,6 +8,7 @@
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
+#include "Structure/structure_enumerators.h"
 #include "atomgraph_enumerators.h"
 
 namespace stormm {
@@ -15,11 +16,13 @@ namespace topology {
 
 using constants::ExceptionResponse;
 using parse::WildCardKind;
+using structure::ApplyConstraints;
 
 /// \brief Unguarded struct to assemble the basic bond, angle, and dihedral indexing from an Amber
 ///        or other topology file.  All Class I force fields will have, or could have, terms like
 ///        these.  All descriptions follow from the eponymous member variables in an AtomGraph.
-struct BasicValenceTable {
+class BasicValenceTable {
+public:
 
   /// \brief The constructor simply allocates memory, if dimensions are available.
   ///
@@ -27,13 +30,13 @@ struct BasicValenceTable {
   ///   - Create an empty object
   ///   - Create an object with pre-allocated memory for each type of basic valence term
   ///
-  /// \param natom_in  The number of atoms in the system (for bounds arrays)
-  /// \param nbond_in  The number of bonds to prepare for (atom indices will be filled if more
-  ///                  information is provided)
-  /// \param nangl_in  The number of angles to prepare for (atom indices will be filled if more
-  ///                  information is provided)
-  /// \param ndihe_in  The number of dihedrals to prepare for (atom indices will be filled if more
-  ///                  information is provided)
+  /// \param natom_in          The number of atoms in the system (for bounds arrays)
+  /// \param nbond_in          The number of bonds to prepare for (atom indices will be filled if
+  ///                          more information is provided)
+  /// \param nangl_in          The number of angles to prepare for (atom indices will be filled if
+  ///                          more information is provided)
+  /// \param ndihe_in          The number of dihedrals to prepare for (atom indices will be filled
+  ///                          if more information is provided)
   /// \{
   BasicValenceTable();
   BasicValenceTable(int natom_in, int nbond_in, int nangl_in, int ndihe_in,
@@ -51,10 +54,31 @@ struct BasicValenceTable {
                     const std::vector<int> &dihe_param_idx_in = {});
   /// \}
 
+  /// \brief Detail the relevance of each bond or angle in the system.  Bonds involving virtual
+  ///        sites are irrelevant to typical molecular mechanics calculations, as are angles (the
+  ///        virtual sites are set at particular geometries based on their frame atoms), although
+  ///        dihedrals involving virtual sites may have unique potentials that depend on more than
+  ///        just the frame atoms.  When geometric constraints are in effect, bonds involving
+  ///        hydrogen atoms are irrelevant to typical molecular mechanics calculations.  Angles
+  ///        wherein all three atoms are bonded in a rigid triangle (not, for example, an -NH3
+  ///        group where the hydrogens can move around and the H-N-H angles can change, but rigid
+  ///        waters where the H-O-H angle is fixed due to an H-H "bond") are also irrelevant.
+  ///
+  /// \param use_shake   Indicate whether rigid geometry constraints will be put into effect for
+  ///                    bonds to individual hydrogen atoms, which can alter how many bond and
+  ///                    angle terms the topology evaluates
+  /// \param use_settle  Indicate whether the rigid geometry of trigonal water molecules (or other
+  ///                    three-atom groups which make an isosceles triangle) will be enforced by
+  ///                    the SETTLE algorithm.  This is a stronger constraint than merely
+  ///                    constraining individual bonds between hydrogens and the one heavy atom.
+  void checkBondAngleRelevance(ApplyConstraints use_shake, ApplyConstraints use_settle,
+                               const std::vector<int> &atomic_numbers);
+  
   /// \brief Populate the atom assignments for this object.  This can only be called once the
   ///        Atom index arrays have been assigned.
   void makeAtomAssignments();
-  
+
+  // The member variables of this class are public.
   int total_bonds;                        ///< Total number of harmonic bond terms in the topology
   int total_angls;                        ///< Total number of harmonic angle terms in the topology
   int total_dihes;                        ///< Total number of cosine-based proper and improper
@@ -111,14 +135,23 @@ struct BasicValenceTable {
                                           ///<   ordering set forth in bond_assigned_bounds)
   std::vector<char4> angl_assigned_mods;  ///< Notes on angles assigned to each atom
   std::vector<char4> dihe_assigned_mods;  ///< Notes on torsions assigned to each atom
+  std::vector<uint> bond_relevance;       ///< Notes on whether to evaluate each bond term.  Each
+                                          ///<   bond gets a bit in one of the unsigned integer
+                                          ///<   elements, 1 for "yes, evaluate the bond" and 0 for
+                                          ///<   "no, do not evaluate the bond by the standard MM
+                                          ///<   evaluation functions."
+  std::vector<uint> angl_relevance;       ///< Notes on whether to evaluate each angle term.  Each
+                                          ///<   angle gets a bit, similar to bond_relevance,
+                                          ///<   above.
 };
 
 /// \brief Unguarded struct to assemble special "CHARMM" force field terms read from an Amber or
 ///        other topology file.  These include Urey-Bradley harmonic angle terms, CHARMM improper
 ///        harmonic dihedrals, and CMAP terms.  All descriptions follow from the eponymous member
 ///        variables in an AtomGraph.
-struct CharmmValenceTable {
-
+class CharmmValenceTable {
+public:
+  
   /// \brief The constructor simply allocates memory, if dimensions are available.
   ///
   /// Overloaded:
@@ -150,11 +183,12 @@ struct CharmmValenceTable {
                      const std::vector<int> &cmap_m_atoms_in = {},
                      const std::vector<int> &cmap_param_idx_in = {});
   /// \}
-
+  
   /// \brief Populate the atom assignments for this object.  This can only be called once the
   ///        Atom index arrays have been assigned.
   void makeAtomAssignments();
 
+  // The member variables of this class are public.
   int total_ub_angles;
   int total_impropers;
   int total_cmaps;
@@ -353,12 +387,16 @@ struct CmapAccessories {
 ///        each distinct SETTLE-suitable molecule.  In GPU implementations the information will be
 ///        held by two- and four-tuples.
 struct SettleParm {
-  double mormt;  ///< Proportional mass of the "oxygen" atoms in SETTLE groups
-  double mhrmt;  ///< Proportional mass of "hydrogen" atoms in SETTLE groups
-  double ra;     ///< Internal distance measurement of each SETTLE group
-  double rb;     ///< Internal distance measurement of each SETTLE group
-  double rc;     ///< Internal distance measurement of each SETTLE group
-  double invra;  ///< Inverse of ra in each SETTLE group
+  double mo;     ///< Mass of the heavy "oxygen" atoms in a SETTLE group
+  double mh;     ///< Mass of the light "hydrogen" atoms in a SETTLE group
+  double moh;    ///< Combined mass of the heavy and one of the light atoms in a SETTLE group
+  double mormt;  ///< Proportional mass of the "oxygen" atoms in a SETTLE group
+  double mhrmt;  ///< Proportional mass of "hydrogen" atoms in a SETTLE group
+  double ra;     ///< Internal distance measurement (heavy atom - center of mass) of a SETTLE group
+  double rb;     ///< Internal distance measurement of a SETTLE group (light atoms - center of mass
+                 ///<   along the heavy atom / CoM axis)
+  double rc;     ///< Internal distance measurement of a SETTLE group (half the distance between
+                 ///<   light atoms)
 };
 
 /// \brief Unguarded struct to hold the results of a constraint analysis.  Constraint groups as
@@ -440,7 +478,7 @@ struct AttenuatedPair {
   double lj_scaling;    ///< Scaling factor for van-der Waals interactions
   double elec_scaling;  ///< Scaling factor for electrostatic interactions
 };
-
+  
 /// \brief Smooth a set of charges subject to the constraint that, when expressed in a particular
 ///        precision, they will add to the correct integer value.  Ignore if the initial sum is
 ///        too far from any integral value.  Charges are assumed to be in internal units (atomic
@@ -492,7 +530,7 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
                               std::vector<double> *lj_14_c_values,
                               std::vector<double> *hb_a_values, std::vector<double> *hb_b_values,
                               int n_lj_types, const std::vector<int> &nb_param_index);
-
+  
 /// \brief Process the exclusions recorded from an Amber topology.  See the CondensedExclusion
 ///        helper struct for a description of how the file format can contain confusing information
 ///        that is best removed.  The results from this function can be stashed in the appropriate

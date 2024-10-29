@@ -20,13 +20,20 @@ using symbols::pi_f;
 using symbols::near_to_one_f;
 using symbols::near_to_one_lf;
   
-/// \brief Round a number to the increment.  A templated function can deal with each integral
-///        type.  Running this function with float or double will just produce the original number
-///        plus the increment minus one, all divided by the increment.
+/// \brief Round a number upwards to the increment.  A templated function can deal with each
+///        integral type.  Running this function with float or double will just produce the
+///        original number plus the increment minus one, all divided by the increment.
 ///
 /// \param jagged     The original number, a jagged cut that needs rounding
 /// \param increment  The rounding increment
 template <typename T> T roundUp(T jagged, T increment);
+
+  
+/// \brief Round a number downwards to the increment.
+///
+/// \param jagged     The original number, a jagged cut that needs rounding
+/// \param increment  The rounding increment
+template <typename T> T roundDown(T jagged, T increment);
 
 /// \brief Return a vector containing the unique prime factors found within a positive integer, out
 ///        of a list of primes.

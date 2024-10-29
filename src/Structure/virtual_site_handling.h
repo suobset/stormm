@@ -107,7 +107,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
 void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph *ag);
 
 template <typename Tcalc>
-void transmitVirtualSiteForces(PhaseSpace psw, VirtualSiteKit<Tcalc> vsk);
+void transmitVirtualSiteForces(PhaseSpace *psw, const VirtualSiteKit<Tcalc> vsk);
 /// \}
   
 } // namespace structure

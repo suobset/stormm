@@ -1757,9 +1757,19 @@ int main(const int argc, const char* argv[]) {
   const size_t szt_a_round = roundUp<size_t>(szt_a, 32);
   check(szt_a_round, RelationalOperator::EQUAL, Approx(159296).margin(1.0e-6), "Rounding upwards "
         "to the nearest increment of 32 failed.");
-  const int szt_b_round = roundUp<size_t>(szt_a, 128);
+  const size_t szt_a_round_down = roundDown<size_t>(szt_a, 32);
+  check(szt_a_round_down, RelationalOperator::EQUAL, Approx(159264).margin(1.0e-6), "Rounding "
+        "downwards to the nearest increment of 32 failed.");
+  const size_t szt_b_round = roundUp<size_t>(szt_a, 128);
   check(szt_b_round, RelationalOperator::EQUAL, Approx(159360).margin(1.0e-6), "Rounding upwards "
         "to the nearest increment of 128 failed.");
+  const size_t szt_b_round_down = roundDown<size_t>(szt_a, 128);
+  check(szt_b_round_down, RelationalOperator::EQUAL, Approx(159232).margin(1.0e-6), "Rounding "
+        "downwards to the nearest increment of 128 failed.");
+  const int neg_int = -77;
+  const int neg_int_round_down = roundDown(neg_int, 16);
+  check(neg_int_round_down, RelationalOperator::EQUAL, -80, "Rounding down to the nearest "
+        "increment of 16 failed.");
   const ulint prime_composite = 2 * 2 * 5 * 3 * 7 * 19;
   const std::vector<uint> primes = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 };
   const std::vector<uint> factors_i = primeFactorCounts(prime_composite, primes, 7);

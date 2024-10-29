@@ -78,10 +78,63 @@ void storeRecvForces(const int batch_size, const int lane_idx, const int base_pl
     my_acc_fy += SHFL(my_acc_fy, lane_idx + quarter_warp_size_int);
     my_acc_fz += SHFL(my_acc_fz, lane_idx + quarter_warp_size_int);
   }
-  if (lane_idx < lane_max && img_idx != 0xffffffff) {
-    atomicSplit(my_acc_fx * cgw.frc_scale, img_idx, cgw.xfrc, cgw.xfrc_ovrf);
-    atomicSplit(my_acc_fy * cgw.frc_scale, img_idx, cgw.yfrc, cgw.yfrc_ovrf);
-    atomicSplit(my_acc_fz * cgw.frc_scale, img_idx, cgw.zfrc, cgw.zfrc_ovrf);
+  if (lane_max == warp_size_int) {
+    if (img_idx != 0xffffffff) {
+      atomicSplit(my_acc_fx * cgw.frc_scale, img_idx, cgw.xfrc, cgw.xfrc_ovrf);
+      atomicSplit(my_acc_fy * cgw.frc_scale, img_idx, cgw.yfrc, cgw.yfrc_ovrf);
+      atomicSplit(my_acc_fz * cgw.frc_scale, img_idx, cgw.zfrc, cgw.zfrc_ovrf);
+    }
+  }
+  else if (lane_max == half_warp_size_int) {
+    Tacc* my_dest;
+    int* my_dest_ovrf;
+    Tcalc my_contrib = SHFL(my_acc_fy, (lane_idx & 0xf));
+    const uint tmp_img_idx = SHFL(img_idx, (lane_idx & 0xf));
+    if (lane_idx < half_warp_size_int) {
+      my_dest = cgw.xfrc;
+      my_dest_ovrf = cgw.xfrc_ovrf;
+      my_contrib = my_acc_fx;
+    }
+    else {
+      my_dest = cgw.yfrc;
+      my_dest_ovrf = cgw.yfrc_ovrf;
+    }
+    if (tmp_img_idx != 0xffffffff) {
+        
+      // Contribute X and Y forces
+      atomicSplit(my_contrib * cgw.frc_scale, tmp_img_idx, my_dest, my_dest_ovrf);
+
+      // Contribute Z forces
+      if (lane_idx < half_warp_size_int) {
+        atomicSplit(my_acc_fz * cgw.frc_scale, img_idx, cgw.zfrc, cgw.zfrc_ovrf);
+      }
+    }
+  }
+  else if (lane_max == quarter_warp_size_int) {
+    Tacc* my_dest;
+    int* my_dest_ovrf;
+    Tcalc my_contrib = SHFL(my_acc_fy, (lane_idx & 0x7));
+    Tcalc tmp_acc_fz = SHFL(my_acc_fz, (lane_idx & 0x7));
+    const uint tmp_img_idx = SHFL(img_idx, (lane_idx & 0x7));
+    if (lane_idx < quarter_warp_size_int) {
+      my_dest = cgw.xfrc;
+      my_dest_ovrf = cgw.xfrc_ovrf;
+      my_contrib = my_acc_fx;
+    }
+    else if (lane_idx < half_warp_size_int) {
+      my_dest = cgw.yfrc;
+      my_dest_ovrf = cgw.yfrc_ovrf;
+    }
+    else {
+      my_dest = cgw.zfrc;
+      my_dest_ovrf = cgw.zfrc_ovrf;
+      my_contrib = tmp_acc_fz;
+    }
+    
+    // Contribute X, Y, and Z forces
+    if (lane_idx < three_quarter_warp_size_int && tmp_img_idx != 0xffffffff) {
+      atomicSplit(my_contrib * cgw.frc_scale, tmp_img_idx, my_dest, my_dest_ovrf);
+    }
   }
 }
 
@@ -176,29 +229,19 @@ void storeSendForces(const int lane_idx, const int base_plan_index, const int ac
 /// \{
 template <typename Tcalc> __device__ __forceinline__
 void cacheSendForces(const Tcalc acc_frc, const Tcalc frc_scale, llint* sh_frc,
-                     int* var_frc_ovrf) {
-#ifdef LARGE_CHIP_CACHE
-  const size_t var_idx = threadIdx.x;
-#else
-  const size_t var_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-#endif
+                     int* sh_frc_ovrf) {
   const size_t thr_idx_zu = threadIdx.x;
-  const int95_t ifrc = int95Sum(sh_frc[thr_idx_zu], var_frc_ovrf[var_idx], acc_frc * frc_scale);
+  const int95_t ifrc = int95Sum(sh_frc[thr_idx_zu], sh_frc_ovrf[thr_idx_zu], acc_frc * frc_scale);
   sh_frc[thr_idx_zu] = ifrc.x;
-  var_frc_ovrf[var_idx] = ifrc.y;
+  sh_frc_ovrf[thr_idx_zu] = ifrc.y;
 }
 
 template <typename Tcalc> __device__ __forceinline__
-void cacheSendForces(const Tcalc acc_frc, const Tcalc frc_scale, int* sh_frc, int* var_frc_ovrf) {
-#ifdef LARGE_CHIP_CACHE
-  const size_t var_idx = threadIdx.x;
-#else
-  const size_t var_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-#endif
+void cacheSendForces(const Tcalc acc_frc, const Tcalc frc_scale, int* sh_frc, int* sh_frc_ovrf) {
   const size_t thr_idx_zu = threadIdx.x;
-  const int2 ifrc = int63Sum(sh_frc[thr_idx_zu], var_frc_ovrf[var_idx], acc_frc * frc_scale);
+  const int2 ifrc = int63Sum(sh_frc[thr_idx_zu], sh_frc_ovrf[thr_idx_zu], acc_frc * frc_scale);
   sh_frc[thr_idx_zu] = ifrc.x;
-  var_frc_ovrf[var_idx] = ifrc.y;
+  sh_frc_ovrf[thr_idx_zu] = ifrc.y;
 }
 /// \}
 

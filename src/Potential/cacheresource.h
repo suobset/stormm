@@ -66,9 +66,19 @@ public:
   /// \brief The constructor does not take a GPU description, but instead maximum numbers of
   ///        blocks and atoms per block that might be required, allocating space as appropriate.
   ///
+  /// Overloaded:
+  ///   - Provide a general work unit size to allocate
+  ///   - Provide a pair of work unit sizes to allocate (the larger of the two will be taken)
+  ///
   /// \param block_limit_in  The maximum number of thread blocks that will need resources
   /// \param atom_limit_in   The maximum number of atoms per block requiring local copies
+  /// \param atom_limits_in  Maximum numbers of atoms per block requiring local copies, for work
+  ///                        units containing organic molecules in the "x" member of the tuple
+  ///                        and work units assumed to contain only water in the "y" member
+  /// \{
   CacheResource(int block_limit_in, int atom_limit_in);
+  CacheResource(int block_limit_in, int2 atom_limits_in);
+  /// \}
 
   /// \brief Basic copy and move constructors
   ///

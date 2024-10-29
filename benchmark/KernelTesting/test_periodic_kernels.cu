@@ -212,13 +212,13 @@ void testSystemMigration(const TestSystemManager &tsm, const int system_idx,
   
   // Branch the cases of one or two neighbor lists, as in other programs
   if (use_dual_cg) {
-    CellGrid<T, Tacc, T, T4> cg_qq(&poly_ps, poly_ag, (0.5 * elec_cutoff), cell_padding, 4,
+    CellGrid<T, Tacc, T, T4> cg_qq(&poly_ps, poly_ag, elec_cutoff, cell_padding, 4,
                                    NonbondedTheme::ELECTROSTATIC);
     CellGridWriter<T, Tacc, T, T4> white_cg_qqw = cg_qq.data(CoordinateCycle::WHITE, devc);
     CellGridWriter<T, Tacc, T, T4> black_cg_qqw = cg_qq.data(CoordinateCycle::BLACK, devc);
     const CellOriginsReader white_corg_qq = cg_qq.getRulers(CoordinateCycle::WHITE, devc);
     const CellOriginsReader black_corg_qq = cg_qq.getRulers(CoordinateCycle::BLACK, devc);
-    CellGrid<T, Tacc, T, T4> cg_lj(&poly_ps, poly_ag, (0.5 * vdw_cutoff), cell_padding, 4,
+    CellGrid<T, Tacc, T, T4> cg_lj(&poly_ps, poly_ag, vdw_cutoff, cell_padding, 4,
                                    NonbondedTheme::VAN_DER_WAALS);
     CellGridWriter<T, Tacc, T, T4> white_cg_ljw = cg_lj.data(CoordinateCycle::WHITE, devc);
     CellGridWriter<T, Tacc, T, T4> black_cg_ljw = cg_lj.data(CoordinateCycle::BLACK, devc);
@@ -250,7 +250,7 @@ void testSystemMigration(const TestSystemManager &tsm, const int system_idx,
     timer->assignTime(migration_time);
   }
   else {
-    CellGrid<T, Tacc, T, T4> cg(&poly_ps, poly_ag, (0.5 * vdw_cutoff), cell_padding, 4,
+    CellGrid<T, Tacc, T, T4> cg(&poly_ps, poly_ag, vdw_cutoff, cell_padding, 4,
                                 NonbondedTheme::ALL);
     CellGridWriter<T, Tacc, T, T4> white_cgw = cg.data(CoordinateCycle::WHITE, devc);
     CellGridWriter<T, Tacc, T, T4> black_cgw = cg.data(CoordinateCycle::BLACK, devc);
@@ -264,13 +264,6 @@ void testSystemMigration(const TestSystemManager &tsm, const int system_idx,
     const int2 bt_ii = launcher.getMigrationKernelDims(prec, NeighborListKind::MONO, 2,
                                                        white_psw.gpos_bits,
                                                        white_cgw.total_chain_count);
-
-    // CHECK
-    printf("Launch  I on %3d %3d (gpos_bits = %2d total chains = %4d)\n", bt_i.x, bt_i.y,
-           white_psw.gpos_bits, white_cgw.total_chain_count);
-    printf("Launch II on %3d %3d\n", bt_ii.x, bt_ii.y);
-    // END CHECK
-    
     for (int i = 0; i < iter; i++) {
       if (i & 0x1) {
         kScrambleCoordinates<<<nscramble_block, small_block_size>>>(white_psw, cfr,

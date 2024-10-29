@@ -173,6 +173,29 @@ public:
   ///                   known to within one part in at least this amount. However, the maximum
   ///                   number of decimals that will be printed is 4, one 10,000th of a second.
   void printResults(double precision = 1.0e6);
+
+  /// \brief Obtain the time taken as the difference of two categories, catg_a - catg_b.  The
+  ///        result is returned as the mean differential, which is exact, and an estimate of the
+  ///        standard deviation of the differential (based on the standard deviations of each
+  ///        category individually).
+  ///
+  /// Overloaded:
+  ///   - Provide the categories by their string identifiers
+  ///   - Provide the categories by their integer identifiers
+  ///
+  /// \param catg_a              The first category, likely the longer of two categories or a
+  ///                            category which comprises some or all of the activity in the second
+  ///                            category
+  /// \param catg_b              The second category, likely to be composed of a subset of the
+  ///                            activities in the first category
+  /// \param referring_function  The function calling for a differential (for error tracing)
+  /// \{
+  double2 timeDifferential(const std::string &catg_a, const std::string &catg_b,
+                           const std::string &referring_function = std::string("")) const;
+
+  double2 timeDifferential(int catg_a, int catg_b,
+                           const std::string &referring_function = std::string("")) const;
+  /// \}
   
 private:
   int category_count;                         ///< Number of categories tracked by this StopWatch
@@ -194,6 +217,13 @@ private:
   /// \brief Convert the system time into a more convenient real number.
   double translateCurrentTime() const;
 
+  /// \brief Compute the differential between two categories with trusted indices.  The public
+  ///        member function timeDifferential() calls this private member function.
+  ///
+  /// \param catg_a  The first of the two categories
+  /// \param catg_b  The second of the two categories
+  double2 computeDifferential(int catg_a, int catg_b) const;
+  
   /// \brief Determine if a section index is valid for this StopWatch.
   ///
   /// \param index               Index of the section in question

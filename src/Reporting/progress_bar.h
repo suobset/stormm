@@ -2,32 +2,6 @@
 #ifndef STORMM_PROGRESSBAR_H
 #define STORMM_PROGRESSBAR_H
 
-//-------------------------------------------------------------------------------------------------
-// Copyright (c) 2017 Luigi Pertoldi
-//
-// Modified by Psivant Therapeutics, 2024
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software
-// and associated documentation files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all copies or
-// substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
-// BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-// Progress bar implementation, originally created by Luigi Pertoldi
-// Modified by Kush Srivastava, Psivant Therapeutics to suit the STORMM framework
-// 
-// Original: https://github.com/gipert/progressbar/tree/master
-//-------------------------------------------------------------------------------------------------
-
 #include <iostream>
 #include <ostream>
 #include <string>
@@ -39,21 +13,18 @@ namespace reporting {
 class ProgressBar {
 public:
   /// \brief The constructor for a ProgressBar.
-  ///
-  /// \param n        Number of iterations the ProgressBar is divided into.
-  /// \param showbar  Indicate whether to show a visual progress bar or just a percentage
-  /// \param out      Indicate the C standard output stream to use.  The default is cout, but the
-  ///                 bar can use cerr or C++ methods such as printf.
-  ProgressBar(int n = 0, bool showbar = true, std::ostream &out = std::cout);
+  ProgressBar(int cycle_count_in = 0, bool show_bar_in = true,
+              std::ostream &output_in = std::cout);
+
+  /// \brief Get the current state of the progress bar, for inspection.
+  const std::string& getState() const;
   
   /// \brief  Initializes a new Progress Bar from scratch, taking in user-specified information.
   ///         To be used when we want to do a hard-refresh on the existing ProgressBar object.
   ///
-  /// \param  n       Number of iterations the ProgressBar is divided into.
-  /// \param  showbar Determines if we want to show a visual progress bar or just a percentage
   /// \param  out     Determines which C standard output stream to use. Default is cout, can
   ///                 use cerr or C++ methods such as printf.
-  void initialize(int n = 0, bool showbar = true, std::ostream &out = std::cout);
+  void initialize(int n = 0, bool show_bar_in = true, std::ostream &out = std::cout);
 
   /// \brief  Resets the current instance of the ProgressBar object (sets percentage to 0).
   ///         To be used before a new loop, with every other setting remaining the same.
@@ -104,30 +75,38 @@ public:
   /// \param width  The new width of the terminal in characters
   void setTerminalWidth(int width);
 
+  /// \brief  Function to allocate the bar_contents string for the ProgressBar object.
+  ///         This is called when the bar is first initialized or when 
+  ///         the terminal width is changed.
+  void allocateBarContents();
+
   /// \brief  Function to update the ProgressBar, incrementing the number of iterations by 1,
   ///         calculating the appropriate percentage, and rendering the ProgressBar in the
   ///         terminal.
   void update();
-
+  
 private:
 
   int progress;                   ///< The amount of iterations that have been completed by 
-                                  ///  the ProgressBar
-  int nCycles;                    ///< The number of iterations the ProgressBar has to go 
-                                  ///  through in total
-  int lastPercent;                ///< The percentage value that the ProgressBar calculated so far
-  bool doShowBar;                 ///< Boolean value determining if we want to show the 
-                                  ///  visual ProgressBar
-  bool updateIsCalled;            ///< Boolean flag to determine if the bar has been rendered 
-                                  ///  at least once
-  std::string doneChar;           ///< String that appears when a percentage is done
-  std::string todoChar;           ///< String that appears for the rest of the ProgressBar
-  std::string openingBracketChar; ///< String at the start of a ProgressBar
-  std::string closingBracketChar; ///< String at the end of a ProgressBar
-
-  std::ostream* output;           ///< C std output stream to render the bar through.
-
-  int termWidth;                  ///< Stores the width of the terminal screen
+                                  ///< the ProgressBar
+  int cycle_count;                ///< The number of iterations the ProgressBar has to go 
+                                  ///< through in total
+  int last_percent;               ///< The percentage value that the ProgressBar calculated so far
+  bool show_bar;                  ///< Boolean value determining if we want to show the 
+                                  ///< visual ProgressBar
+  bool update_called;             ///< Boolean flag to determine if the bar has been rendered 
+                                  ///< at least once
+  std::string finished_mark;      ///< String that appears when a percentage is done
+  std::string todo_mark;          ///< String that appears for the rest of the ProgressBar
+  std::string prgb_open_bracket;  ///< String at the start of a ProgressBar
+  std::string prgb_close_bracket; ///< String at the end of a ProgressBar
+  std::ostream* output;           ///< C std output stream throuth which to render the bar
+  int terminal_width;             ///< The detected width of the terminal screen
+  std::string bar_contents;       ///< The current state of the progress bar.  Updates that edit
+                                  ///<   the state of the progress bar will alter a minimal number
+                                  ///<   of characters in this string, and any display of the
+                                  ///<   progress bar will dump the entire contents of this string
+                                  ///<   to the chosen output mode.
   
   /// \brief  Function to dynamically infer terminal width to draw an appropriate ProgressBar.
   ///         This function is called implicitly and does not require user input.
@@ -138,3 +117,4 @@ private:
 } // namespace stormm
 
 #endif // STORMM_PROGRESSBAR_H
+

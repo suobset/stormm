@@ -33,9 +33,14 @@ public:
   ///         the first string in the list as the name of the calling program itself.
   ///
   /// \param program_description  A help message tailored for the program as a whole
+  /// \{
   CommandLineParser(const std::string &program_name_in, const std::string &program_description,
                     const std::vector<std::string> &noted_imports_in = {},
                     ExceptionResponse policy_in = ExceptionResponse::WARN);
+
+  CommandLineParser(const std::string &program_name_in, const std::string &program_description,
+                    ExceptionResponse policy_in);
+  /// \}
 
   /// \brief With no pointers to repair and all members coming from or built using Standard
   ///        Template Library objects, the default copy and move constructors, as well as copy and
@@ -50,6 +55,17 @@ public:
   CommandLineParser& operator=(CommandLineParser &&original) = default;
   /// \}
 
+  /// \brief Return the command line text as a string.
+  ///
+  /// \param width  The width with which to print the command line text, implying a point at which
+  ///               the text wraps
+  std::string getInputAsString(int width = 0) const;
+
+  /// \brief Obtain a verdict on whether the program is to exit after displaying a help message.
+  ///        This does not affect the setting within the object, but instead reports what the
+  ///        setting is.
+  bool doesProgramExitOnHelp() const;
+  
   /// \brief Activate the printout of help messages if no command line arguments are provided.
   void activateHelpOnNoArgs();
 
@@ -82,12 +98,25 @@ public:
                               const char* key_c = nullptr, const char* key_d = nullptr);
   /// \}
 
-  /// \brief Inpart some common benchmarking keywords to the command line interface.  Overloading
+  /// \brief Impart some common benchmarking keywords to the command line interface.  Overloading
   ///        and descriptions of input parameters follow from addStandardAmberInputs(), above.
   /// \{
   void addStandardBenchmarkingInputs(const std::vector<std::string> &cli_keys);
   void addStandardBenchmarkingInputs(const char* key_a, const char* key_b = nullptr,
                                      const char* key_c = nullptr, const char* key_d = nullptr);  
+  /// \}
+
+  /// \brief Impart some common application command line arguments to the interface.  Overloading
+  ///        and descriptions of input parameters follow from addStandardAmberInputs(), above, in
+  ///        addition to:
+  ///
+  /// Overloaded:
+  ///   - Load all standard application command line arguments
+  /// \{
+  void addStandardApplicationInputs(const std::vector<std::string> &cli_keys);
+  void addStandardApplicationInputs(const char* key_a, const char* key_b = nullptr,
+                                    const char* key_c = nullptr, const char* key_d = nullptr);
+  void addStandardApplicationInputs();
   /// \}
   
   /// \brief Return a pointer to the internal namelist.
@@ -118,6 +147,13 @@ public:
   ///               command line inputs
   void coordinateWithPartner(CommandLineParser *other);
   
+  /// \brief Add a list of relevant namelists that will be displayed in the context of any help
+  ///        message.  Arguments to the command line corresponding to each namelist, if recognized,
+  ///        will be passed down to trigger a display of the namelist's own documentation.
+  ///
+  /// \param list  The collection of relevant namelists
+  void addControlBlocks(const std::vector<std::string> &list);
+  
 private:
 
   ExceptionResponse policy;  ///< The course of action to take in the event of bad user input, or
@@ -139,6 +175,9 @@ private:
   /// A list of all command line arguments, kept for documenting user activity in report files
   std::vector<std::string> command_line_text;
 
+  /// A list of all namelists that the program might take as control blocks
+  std::vector<std::string> control_blocks;
+  
   /// List of all other class objects to which this object is coordinated
   std::vector<CommandLineParser*> coordinations;
 

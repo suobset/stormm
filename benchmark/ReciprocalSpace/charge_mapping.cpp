@@ -225,7 +225,7 @@ void singleBSplineTests(const bool apply_unity) {
 //   poly_ag:            The topology synthesis spanning all systems
 //   order:              The order of interpolation
 //   unification:        Method for B-spline evaluation
-//   half_cutoff:        Indicate the minimum width of the spatial decomposition cells
+//   cutoff:             The non-bonded cutoff used to define the neighbor list decomposition
 //   cutoff_pad:         Minimum padding added to each cell width (in real simulations, this
 //                       ensures that the cells are unlikely to shrink beneath the cutoff
 //                       requirements)
@@ -235,7 +235,7 @@ void singleBSplineTests(const bool apply_unity) {
 void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphSynthesis &poly_ag,
                             const int order,
                             const BSplineUnity unification = BSplineUnity::CENTER_FILL,
-                            const double half_cutoff = 4.5, const double cutoff_pad = 0.15,
+                            const double cutoff = 9.0, const double cutoff_pad = 0.15,
                             const int mesh_subdivisions = 4) {
   const int nsys = poly_ps.getSystemCount();
   std::vector<std::vector<double>> bnch_density(nsys), fcrd_dcalc_density(nsys);
@@ -244,7 +244,7 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
 
   // Create a cell grid with as much double-precision content as possible.
   CellGrid<double, llint, double, double4> cg_dd(poly_ps.getSelfPointer(),
-                                                 poly_ag.getSelfPointer(), half_cutoff, cutoff_pad,
+                                                 poly_ag.getSelfPointer(), cutoff, cutoff_pad,
                                                  mesh_subdivisions, NonbondedTheme::ELECTROSTATIC);
   const CellGridReader cg_ddr = cg_dd.data();
   
@@ -311,7 +311,7 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
   // this level of approximation.  The local coordinate axes of the spatial decomposition cells
   // afford an advantage for positional rounding.
   CellGrid<float, llint, float, float4> cg_ff(poly_ps.getSelfPointer(),
-                                              poly_ag.getSelfPointer(), half_cutoff, cutoff_pad,
+                                              poly_ag.getSelfPointer(), cutoff, cutoff_pad,
                                               mesh_subdivisions, NonbondedTheme::ELECTROSTATIC);
   const std::vector<PrecisionModel> models = { PrecisionModel::DOUBLE, PrecisionModel::SINGLE };
   std::vector<std::vector<double>> cg_mean_errors(models.size()), cg_stdev(models.size());
@@ -356,8 +356,7 @@ void benchmarkChargeDensity(const PhaseSpaceSynthesis &poly_ps, const AtomGraphS
 //   category_label:      Basic label to apply to timings from various tests.  This should describe
 //                        the nature of the system or collection of systems, to which various
 //                        markers for the precision model will be appended.
-//   half_cutoff:         Half of the non-bonded cutoff for particle interactions computed in real
-//                        space
+//   cutoff:              The non-bonded cutoff for particle interactions computed in real space
 //   cutoff_pad:          The padding applied to each minimum cell width (half_cutoff) ensuring
 //                        that contraction of the box does not cause the cutoff to be violated
 //                        with the pre-calculated partitioning
@@ -373,11 +372,11 @@ void benchmarkAccumulationKernels(const PhaseSpaceSynthesis &poly_ps,
                                   const AtomGraphSynthesis &poly_ag,
                                   const int order, StopWatch *timer, const GpuDetails &gpu,
                                   const std::string &category_label,
-                                  const double half_cutoff = 4.5, const double cutoff_pad = 0.15,
+                                  const double cutoff = 9.0, const double cutoff_pad = 0.15,
                                   const int mesh_subdivisions = 4, const int n_trials = 4,
                                   const int n_repeats = 100, const int fp_bit_count = 32) {
   CoreKlManager launcher(gpu, poly_ag);
-  CellGrid<T, llint, Tcalc, T4> cg(poly_ps.getSelfPointer(), poly_ag.getSelfPointer(), half_cutoff,
+  CellGrid<T, llint, Tcalc, T4> cg(poly_ps.getSelfPointer(), poly_ag.getSelfPointer(), cutoff,
                                    cutoff_pad, mesh_subdivisions, NonbondedTheme::ELECTROSTATIC);
   cg.upload();
   const std::vector<PrecisionModel> models = { PrecisionModel::DOUBLE, PrecisionModel::SINGLE };
@@ -526,7 +525,7 @@ template <typename T, typename Tcalc, typename T4>
 void replicateAndMapCharges(TestSystemManager *tsm, const int system_index,
                             const int replicas, const int order, StopWatch *timer,
                             const GpuDetails &gpu, const std::string &category_label,
-                            const double half_cutoff = 4.5, const double cutoff_pad = 0.15,
+                            const double cutoff = 9.0, const double cutoff_pad = 0.15,
                             const int mesh_subdivisions = 4, const int n_trials = 4,
                             const int n_repeats = 100, const int fp_bit_count = 32) {
   const std::vector<int> tiles(replicas, system_index);
@@ -535,7 +534,7 @@ void replicateAndMapCharges(TestSystemManager *tsm, const int system_index,
   poly_ps.upload();
   poly_ag.upload();
   benchmarkAccumulationKernels<T, Tcalc, T4>(poly_ps, poly_ag, order, timer, gpu, category_label,
-                                             half_cutoff, cutoff_pad, mesh_subdivisions, n_trials,
+                                             cutoff, cutoff_pad, mesh_subdivisions, n_trials,
                                              n_repeats, fp_bit_count);
 }
 #endif
@@ -637,7 +636,7 @@ int main(const int argc, const char* argv[]) {
   const std::string cat_lab = "Kinase (" + std::to_string(ordr) + "th order) (" +
                               std::to_string(n_replicas) + ")";
   replicateAndMapCharges<float, float, float4>(&tsm, 0, n_replicas, ordr, &timer, gpu, cat_lab,
-                                               0.5 * cutoff, cutoff_pad, n_grids, n_trials,
+                                               cutoff, cutoff_pad, n_grids, n_trials,
                                                n_repeats, fp_bits);
 #endif
 

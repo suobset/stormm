@@ -26,6 +26,7 @@ using stmath::maxValue;
 using stmath::minValue;
 using stmath::PrefixSumType;
 using stmath::prefixSumInPlace;
+using stmath::readBitFromMask;
 using stmath::sum;
 using parse::char4ToString;
 using parse::NumberFormat;
@@ -43,7 +44,7 @@ BasicValenceTable::BasicValenceTable() :
     bond_assigned_index{}, bond_assigned_terms{}, bond_assigned_bounds{}, angl_assigned_atoms{},
     angl_assigned_index{}, angl_assigned_terms{}, angl_assigned_bounds{}, dihe_assigned_atoms{},
     dihe_assigned_index{}, dihe_assigned_terms{}, dihe_assigned_bounds{}, bond_assigned_mods{},
-    angl_assigned_mods{}, dihe_assigned_mods{}
+    angl_assigned_mods{}, dihe_assigned_mods{}, bond_relevance{}, angl_relevance{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -137,6 +138,72 @@ BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void BasicValenceTable::checkBondAngleRelevance(const ApplyConstraints use_shake,
+                                                const ApplyConstraints use_settle,
+                                                const std::vector<int> &atomic_numbers) {
+  const int nbits_uint = sizeof(uint) * 8;
+  const int bshft_uint = round(log2(nbits_uint));
+  bond_relevance = std::vector<uint>((total_bonds + nbits_uint - 1) / nbits_uint, 0U);
+  angl_relevance = std::vector<uint>((total_angls + nbits_uint - 1) / nbits_uint, 0U);
+
+  // When enforcing rigid geometry, each atom in the bond must be heavier than hydrogen for it
+  // to be evaluated (otherwise, it is constrained to its equilibrium geometry).  Bonds between
+  // virtual sites and their parent atoms will never be evaluated.
+  int zn_threshold;
+  switch (use_shake) {
+  case ApplyConstraints::NO:
+    zn_threshold = 0;
+    break;
+  case ApplyConstraints::YES:
+    zn_threshold = 1;
+    break;
+  }
+  for (int pos = 0; pos < total_bonds; pos++) {
+    const int elem_idx = (pos >> bshft_uint);
+    const int bit_idx = pos - (elem_idx << bshft_uint);
+    bond_relevance[elem_idx] |= ((atomic_numbers[bond_i_atoms[pos]] > zn_threshold &&
+                                  atomic_numbers[bond_j_atoms[pos]] > zn_threshold) << bit_idx);
+  }
+  for (int pos = 0; pos < total_angls; pos++) {
+    const int atom_i = angl_i_atoms[pos];
+    const int atom_j = angl_j_atoms[pos];
+    const int atom_k = angl_k_atoms[pos];
+
+    // The ways an angle can become irrelevant are for one of the atoms to be a virtual site,
+    // or for all three atoms to be connected in a ring and at least two of them to be hydrogens.
+    bool is_relevant = (atomic_numbers[atom_i] > 0 && atomic_numbers[atom_j] > 0 &&
+                        atomic_numbers[atom_k] > 0);
+    if (is_relevant && (use_settle == ApplyConstraints::YES)) {
+      bool i_bonds_j = false;
+      bool j_bonds_k = false;
+      bool k_bonds_i = false;
+      for (int m = bond_assigned_bounds[atom_i]; m < bond_assigned_bounds[atom_i + 1]; m++) {
+        i_bonds_j = (i_bonds_j || (bond_assigned_atoms[m] == atom_j));
+        k_bonds_i = (k_bonds_i || (bond_assigned_atoms[m] == atom_k));
+      }
+      for (int m = bond_assigned_bounds[atom_j]; m < bond_assigned_bounds[atom_j + 1]; m++) {
+        j_bonds_k = (j_bonds_k || (bond_assigned_atoms[m] == atom_k));
+        i_bonds_j = (i_bonds_j || (bond_assigned_atoms[m] == atom_i));
+      }
+      for (int m = bond_assigned_bounds[atom_k]; m < bond_assigned_bounds[atom_k + 1]; m++) {
+        k_bonds_i = (k_bonds_i || (bond_assigned_atoms[m] == atom_i));
+        j_bonds_k = (j_bonds_k || (bond_assigned_atoms[m] == atom_j));
+      }
+      if (i_bonds_j && j_bonds_k && k_bonds_i) {
+        const int nhyd = (atomic_numbers[atom_i] == 1) + (atomic_numbers[atom_j] == 1) +
+                         (atomic_numbers[atom_k] == 1);
+        is_relevant = (nhyd < 2);
+      }
+    }
+    if (is_relevant) {
+      const int elem_idx = (pos >> bshft_uint);
+      const int bit_idx = pos - (elem_idx << bshft_uint);
+      angl_relevance[elem_idx] |= (0x1 << bit_idx);
+    }
+  }
+}
+  
 //-------------------------------------------------------------------------------------------------
 void BasicValenceTable::makeAtomAssignments() {
 
@@ -3007,7 +3074,8 @@ SettleParm getSettleParameters(const int ox_idx, const int h1_idx, const int h2_
   const double t1 = 0.5 * ox_mass / hd_mass;
   const double rc = 0.5 * hh_dist;
   const double ra = sqrt((oh1_dist * oh1_dist) - (rc * rc)) / (1.0 + t1);
-  return { ox_mass * inv_total_mass, hd_mass * inv_total_mass, ra, t1 * ra, rc, 1.0 / ra };
+  return { ox_mass, hd_mass, ox_mass + hd_mass, ox_mass * inv_total_mass, hd_mass * inv_total_mass,
+           ra, t1 * ra, rc };
 }
 
 } // namespace topology

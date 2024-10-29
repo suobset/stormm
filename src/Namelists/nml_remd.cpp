@@ -102,13 +102,14 @@ double RemdControls::getTolerance() {
 int RemdControls::getMaxReplicas() const{
   return max_replicas;
 }
+
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getInitialTemperature() {
+const double RemdControls::getLowTemperature() {
   return low_temperature;
 }
 
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getEquilibriumTemperature() {
+const double RemdControls::getHighTemperature() {
   return high_temperature;
 }
 
@@ -158,12 +159,12 @@ void RemdControls::setMaxReplicas(int max_replicas_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void RemdControls::setInitialTemperature(double low_temperature_in) {
+void RemdControls::setLowTemperature(double low_temperature_in) {
   low_temperature = low_temperature_in;
 }
 
 //-------------------------------------------------------------------------------------------------
-void RemdControls::setEquilibriumTemperature(double high_temperature_in) {
+void RemdControls::setHighTemperature(double high_temperature_in) {
   high_temperature = high_temperature_in;
 }
 

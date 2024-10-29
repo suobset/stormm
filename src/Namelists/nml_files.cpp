@@ -941,6 +941,13 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
   
   return t_nml;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
+                            const ExceptionResponse policy, const WrapTextSearch wrap) {
+  return filesInput(tf, start_line, found, {}, policy, wrap, default_filecon_inpcrd_type,
+                    default_filecon_outcrd_type, default_filecon_chkcrd_type);
+}
+
 } // namespace namelist
 } // namespace stormm

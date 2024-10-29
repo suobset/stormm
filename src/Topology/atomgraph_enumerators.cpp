@@ -19,6 +19,8 @@ std::string getEnumerationName(const TopologyKind input) {
     return std::string("GROMACS");
   case TopologyKind::OPENMM:
     return std::string("OPENMM");
+  case TopologyKind::UNKNOWN:
+    return std::string("UNKNOWN");
   }
   __builtin_unreachable();
 }
@@ -191,28 +193,6 @@ std::string getEnumerationName(const MobilitySetting input) {
     return std::string("ON");
   case MobilitySetting::TOGGLE:
     return std::string("TOGGLE");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const ShakeSetting input) {
-  switch (input) {
-  case ShakeSetting::OFF:
-    return std::string("OFF");
-  case ShakeSetting::ON:
-    return std::string("ON");
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const SettleSetting input) {
-  switch (input) {
-  case SettleSetting::OFF:
-    return std::string("OFF");
-  case SettleSetting::ON:
-    return std::string("ON");
   }
   __builtin_unreachable();
 }

@@ -6,12 +6,12 @@ namespace synthesis {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* z_import,
-                                 const double* box_xform_in, const double* inverse_xform_in,
-                                 const double* box_dimensions_in, const int system_index,
-                                 const CoordinateCycle orientation,
-                                 const double inverse_scaling_factor, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
+void PhaseSpaceSynthesis::importSystem(const T* x_import, const T* y_import, const T* z_import,
+                                       const double* box_xform_in, const double* inverse_xform_in,
+                                       const double* box_dimensions_in, const int system_index,
+                                       const CoordinateCycle orientation,
+                                       const double inverse_scaling_factor,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
   checkFormatCompatibility(tier, format, "PhaseSpaceSynthesis", "import");
   llint *x_recv, *y_recv, *z_recv;
   int *x_recv_ovrf, *y_recv_ovrf, *z_recv_ovrf;
@@ -156,56 +156,56 @@ void PhaseSpaceSynthesis::import(const T* x_import, const T* y_import, const T* 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeriesReader<T> &csr, const int frame_index,
-                                 const int system_index, const CoordinateCycle orientation,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeriesReader<T> &csr, const int frame_index,
+                                       const int system_index, const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
   const size_t xfrm_offset = frame_index * roundUp(9, warp_size_int);
   const size_t bdim_offset = frame_index * roundUp(6, warp_size_int);
   const size_t atom_offset = static_cast<size_t>(frame_index) *
                              static_cast<size_t>(roundUp(csr.natom, warp_size_int));
-  import(&csr.xcrd[atom_offset], &csr.ycrd[atom_offset], &csr.zcrd[atom_offset],
+  importSystem(&csr.xcrd[atom_offset], &csr.ycrd[atom_offset], &csr.zcrd[atom_offset],
          &csr.umat[xfrm_offset], &csr.invu[xfrm_offset], &csr.boxdim[bdim_offset], system_index,
          orientation, csr.inv_gpos_scale, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeriesReader<T> &csr, const int frame_index,
-                                 const int system_index, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(csr, frame_index, system_index, cycle_position, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeriesReader<T> &csr, const int frame_index,
+                                       const int system_index, const TrajectoryKind kind,
+                                       const HybridTargetLevel tier) {
+  importSystem(csr, frame_index, system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeriesWriter<T> &csw, const int frame_index,
-                                 const int system_index, const CoordinateCycle orientation,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
-  import(CoordinateSeriesReader<T>(csw), frame_index, system_index, orientation, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeriesWriter<T> &csw, const int frame_index,
+                                       const int system_index, const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(CoordinateSeriesReader<T>(csw), frame_index, system_index, orientation, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeriesWriter<T> &csw, const int frame_index,
-                                 const int system_index, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(CoordinateSeriesReader<T>(csw), frame_index, system_index, cycle_position, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeriesWriter<T> &csw, const int frame_index,
+                                       const int system_index, const TrajectoryKind kind,
+                                       const HybridTargetLevel tier) {
+  importSystem(CoordinateSeriesReader<T>(csw), frame_index, system_index, cycle_position, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeries<T> &cs, const int frame_index,
-                                 const int system_index, const CoordinateCycle orientation,
-                                 const TrajectoryKind kind, const HybridTargetLevel tier) {
-  import(cs.data(), frame_index, system_index, orientation, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeries<T> &cs, const int frame_index,
+                                       const int system_index, const CoordinateCycle orientation,
+                                       const TrajectoryKind kind, const HybridTargetLevel tier) {
+  importSystem(cs.data(), frame_index, system_index, orientation, kind, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void PhaseSpaceSynthesis::import(const CoordinateSeries<T> &cs, const int frame_index,
-                                 const int system_index, const TrajectoryKind kind,
-                                 const HybridTargetLevel tier) {
-  import(cs.data(), frame_index, system_index, cycle_position, kind, tier);
+void PhaseSpaceSynthesis::importSystem(const CoordinateSeries<T> &cs, const int frame_index,
+                                       const int system_index, const TrajectoryKind kind,
+                                       const HybridTargetLevel tier) {
+  importSystem(cs.data(), frame_index, system_index, cycle_position, kind, tier);
 }
 
 } // namespace synthesis

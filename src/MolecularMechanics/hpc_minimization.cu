@@ -77,19 +77,6 @@ using trajectory::ThermostatWriter;
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
-extern void minimizationKernelSetup() {
-  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
-  if (cudaFuncSetSharedMemConfig(kdLineAdvance, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdLineAdvance __shared__ memory bank size to eight bytes.",
-          "minimizationKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfLineAdvance, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kdLineAdvance __shared__ memory bank size to eight bytes.",
-          "minimizationKernelSetup");
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryMinimizationKernelRequirements(const PrecisionModel prec) {
   cudaFuncAttributes result;
   switch (prec) {

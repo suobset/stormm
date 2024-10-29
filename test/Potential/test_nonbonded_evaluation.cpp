@@ -1673,19 +1673,19 @@ int main(const int argc, const char* argv[]) {
       const std::vector<double> trial_tote = trial_sc.reportTotalEnergies();
       std::vector<double> tote_target(4 * nsys);
       for (int i = 0; i < nsys; i++) {
-        multi_sc.import(trial_sc, i, i);
-        multi_sc.import(trial_sc, (2 * nsys) - (i + 1), i);
-        multi_sc.import(trial_sc, (2 * nsys) + i, i);
-        multi_sc.import(trial_sc, (3 * nsys) + i, i);
+        multi_sc.importCard(trial_sc, i, i);
+        multi_sc.importCard(trial_sc, (2 * nsys) - (i + 1), i);
+        multi_sc.importCard(trial_sc, (2 * nsys) + i, i);
+        multi_sc.importCard(trial_sc, (3 * nsys) + i, i);
         tote_target[i] = trial_tote[i];
         tote_target[(2 * nsys) - (i + 1)] = trial_tote[i];
         tote_target[(2 * nsys) + i] = trial_tote[i];
         tote_target[(3 * nsys) + i] = trial_tote[i];
       }
-      CHECK_THROWS(multi_sc.import(trial_sc, (4 * nsys) + 8, 0), "Importation of information into "
-                   "a non-existent entry of the destination was allowed.");
-      CHECK_THROWS(multi_sc.import(trial_sc, 0, (3 * nsys) + 2), "Importation of information from "
-                   "a non-existent entry of the source material was allowed.");
+      CHECK_THROWS(multi_sc.importCard(trial_sc, (4 * nsys) + 8, 0), "Importation of information "
+                   "into a non-existent entry of the destination was allowed.");
+      CHECK_THROWS(multi_sc.importCard(trial_sc, 0, (3 * nsys) + 2), "Importation of information "
+                   "from a non-existent entry of the source material was allowed.");
       const std::vector<double> multi_tote = multi_sc.reportTotalEnergies();
       check(multi_tote, RelationalOperator::EQUAL, tote_target, "Energies imported into a new "
             "ScoreCard do not align with a similar series accumulated from the original source.");

@@ -7,6 +7,7 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "FileManagement/file_enumerators.h"
+#include "Namelists/command_line_parser.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
@@ -46,16 +47,6 @@ constexpr PrintSituation default_file_writing_directive = PrintSituation::OPEN_N
 constexpr char default_conformer_input_file[] = "cgen.in";
 constexpr char default_ffrefine_input_file[] = "ffld.in";
 /// \}
-
-/// \brief Enumerate the various apps using STORMM libraries, and which use this UserSettings
-///        object as a way to collect common namelists and other command line input.  This
-///        enumerator makes it possible to tailor the contents of UserSettings to a specific
-///        application, and to tune the behavior in response to particular inputs.
-enum class AppName {
-  CONFORMER,  ///< The STORMM conformer generator
-  DYNAMICS,   ///< The STORMM molecular dynamics program
-  FFREFINE    ///< The STORMM force field refinement tool
-};
   
 /// \brief Object to hold general user input data, including file names or regular expressions for
 ///        topology and coordinate files, energy minimization settings, analysis protocols, and
@@ -64,9 +55,16 @@ struct UserSettings {
 
   /// \brief The constructor requires an input file, similar to mdin for the Amber sander program.
   ///
-  /// \param argc  Number of command-line variables
-  /// \param argv  List of command line argument strings
-  UserSettings(int argc, const char* argv[], AppName prog_set);
+  /// \param clip      User input obtained from the command line
+  /// \param sys_reqs  A list of state descriptors for system files.  This will be passed down to
+  ///                  the &files namelist.  To specify -p, -c, -x, or -r in an element of this
+  ///                  array means that the topology, input coordinates file, output trajectory
+  ///                  file, or checkpoint file must be named.  To append "e" after any of these
+  ///                  strings implies that the named file must also exist.  To append "g" after
+  ///                  any of these strings implies that to specify such a file name is a bogus
+  ///                  input.
+  UserSettings(const CommandLineParser &clip,
+               const std::vector<std::string> &sys_reqs = { "-pe", "-ce" });
 
   /// \brief With no const members and Standard Template Library objects comprising the only
   ///        complexity beyond scalar data types, the default copy and move constructors as well
@@ -87,9 +85,6 @@ struct UserSettings {
   /// \brief Get the name of the input file.
   const std::string& getInputFileName() const;
 
-  /// \brief Get the list of command-line arguments
-  const std::vector<std::string>& getCommandLineArguments() const;
-  
   /// \brief Detect whether a &files namelist was present
   bool getFilesPresence() const;
 
@@ -182,9 +177,6 @@ private:
   /// Name of the original input file
   std::string input_file;
 
-  /// A record of the command-line arguments
-  std::vector<std::string> command_line_args;
-  
   // Control parameters: these structs each encapsulate their own namelist from the input file.
   FilesControls file_io_input;      ///< All input and output file names, save for the command file
   MinimizeControls line_min_input;  ///< Line minimization directives

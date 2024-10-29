@@ -32,7 +32,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dielectric_constant{1.0}, is_kappa{0.0}, salt_concentration{0.0},
     gb_offset{default_gb_radii_offset}, gb_neckscale{default_gb_neck_scale},
     gb_neckcut{default_gb_neck_cut}, coulomb_constant{amber_ancient_bioq},
-    use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
+    use_shake{ApplyConstraints::NO}, use_settle{ApplyConstraints::NO},
     largest_constraint_group{0}, water_residue_name{' ', ' ', ' ', ' '},
     pb_radii_sets{std::vector<AtomicRadiusSet>(system_count, AtomicRadiusSet::NONE)},
 
@@ -356,7 +356,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
 
     // Valence work unit instruction sets and energy accumulation masks
-    total_valence_work_units{0}, valence_work_unit_size{maximum_valence_work_unit_atoms},
+    total_valence_work_units{0},
+    valence_work_unit_size{maximum_valence_work_unit_atoms, maximum_valence_work_unit_atoms},
     valence_thread_block_size{ValenceKernelSize::XL},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
@@ -437,8 +438,20 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
-  valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts, gpu.getSMPCount(),
+  std::vector<int> top_reps(topologies.size(), 0);
+  for (int i = 0; i < system_count; i++) {
+    top_reps[topology_indices.readHost(i)] += 1;
+  }
+  valence_work_unit_size = calculateValenceWorkUnitSize(topologies, top_reps, gpu.getSMPCount(),
                                                         &valence_thread_block_size);
+  switch (periodic_box_class) {
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    valence_thread_block_size = ValenceKernelSize::XL;
+    break;
+  case UnitCellType::NONE:
+    break;
+  }
   loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 
@@ -522,7 +535,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const AtomGraphSynthesis &original) :
     gb_neckscale{original.gb_neckscale},
     gb_neckcut{original.gb_neckcut},
     coulomb_constant{original.coulomb_constant},
-    use_bond_constraints{original.use_bond_constraints},
+    use_shake{original.use_shake},
     use_settle{original.use_settle},
     largest_constraint_group{original.largest_constraint_group},
     water_residue_name{original.water_residue_name},
@@ -934,7 +947,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(AtomGraphSynthesis &&original) :
     gb_neckscale{original.gb_neckscale},
     gb_neckcut{original.gb_neckcut},
     coulomb_constant{original.coulomb_constant},
-    use_bond_constraints{original.use_bond_constraints},
+    use_shake{original.use_shake},
     use_settle{original.use_settle},
     largest_constraint_group{original.largest_constraint_group},
     water_residue_name{original.water_residue_name},
@@ -1349,7 +1362,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(const AtomGraphSynthesis &othe
   gb_neckscale = other.gb_neckscale;
   gb_neckcut = other.gb_neckcut;
   coulomb_constant = other.coulomb_constant;
-  use_bond_constraints = other.use_bond_constraints;
+  use_shake = other.use_shake;
   use_settle = other.use_settle;
   largest_constraint_group = other.largest_constraint_group;
   water_residue_name = other.water_residue_name;
@@ -1770,7 +1783,7 @@ AtomGraphSynthesis& AtomGraphSynthesis::operator=(AtomGraphSynthesis &&other) {
   gb_neckscale = other.gb_neckscale;
   gb_neckcut = other.gb_neckcut;
   coulomb_constant = other.coulomb_constant;
-  use_bond_constraints = other.use_bond_constraints;
+  use_shake = other.use_shake;
   use_settle = other.use_settle;
   largest_constraint_group = other.largest_constraint_group;
   water_residue_name = other.water_residue_name;

@@ -45,7 +45,7 @@ test:
             -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" ..
     - make -j
     - make test -j
-    - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
+    - gcovr --xml-pretty --exclude-unreachable-branches --gcov-ignore-parse-errors --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
 
     - make install
 

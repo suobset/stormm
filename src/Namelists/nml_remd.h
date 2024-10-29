@@ -93,10 +93,10 @@ public:
   
   /// \brief Get the vector of initial temperature targets for all groups of atoms and systems.
   // TODO: Change this to just a double
-  const double getInitialTemperature();
+  const double getLowTemperature();
 
   /// \brief Get the vector of final temperature targets for all groups of atoms and systems.
-  const double getEquilibriumTemperature();
+  const double getHighTemperature();
   
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;
@@ -145,12 +145,12 @@ public:
   /// \brief Set the initial temperature for the REMD simulation
   /// 
   /// \param low_temperature_in Initial temperature
-  void setInitialTemperature(double low_temperature_in);
+  void setLowTemperature(double low_temperature_in);
 
   /// \brief Set the equilibrium temperature for the REMD simulation
   ///
   /// \param high_temperature_in The equilibrium temperature
-  void setEquilibriumTemperature(double high_temperature_in);
+  void setHighTemperature(double high_temperature_in);
 
 private:
   ExceptionResponse policy;      ///< The course to take when encountering bad input

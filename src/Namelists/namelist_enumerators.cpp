@@ -110,6 +110,27 @@ std::string getEnumerationName(const NamelistIntroduction input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const DayOfTheWeek input) {
+  switch (input) {
+  case DayOfTheWeek::SUN:
+    return std::string("SUN");
+  case DayOfTheWeek::MON:
+    return std::string("MON");
+  case DayOfTheWeek::TUE:
+    return std::string("TUE");
+  case DayOfTheWeek::WED:
+    return std::string("WED");
+  case DayOfTheWeek::THU:
+    return std::string("THU");
+  case DayOfTheWeek::FRI:
+    return std::string("FRI");
+  case DayOfTheWeek::SAT:
+    return std::string("SAT");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 KeyRequirement translateKeyRequirement(const std::string &input) {
   if (strcmpCased(input, "optional", CaseSensitivity::NO)) {
     return KeyRequirement::OPTIONAL;
@@ -128,14 +149,44 @@ KeyRequirement translateKeyRequirement(const std::string &input) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getInputStatusString(const InputStatus stt) {
-  switch (stt) {
-  case InputStatus::USER_SPECIFIED:
-    return std::string("USER SPECIFIED");
-  case InputStatus::DEFAULT:
-    return std::string("DEFAULT");
-  case InputStatus::MISSING:
-    return std::string("MISSING");
+DayOfTheWeek translateDayOfTheWeek(const std::string &input) {
+  if (strcmpCased(input, "sun", CaseSensitivity::NO) ||	
+      strcmpCased(input, "sunday", CaseSensitivity::NO) ||
+      strcmpCased(input, "s", CaseSensitivity::NO)) {
+    return DayOfTheWeek::SUN;
+  }
+  else if (strcmpCased(input, "mon", CaseSensitivity::NO) ||
+           strcmpCased(input, "monday", CaseSensitivity::NO) ||
+           strcmpCased(input, "m", CaseSensitivity::NO)) {      
+    return DayOfTheWeek::MON;
+  }
+  else if (strcmpCased(input, "tue", CaseSensitivity::NO) ||	
+           strcmpCased(input, "tuesday", CaseSensitivity::NO) ||
+           strcmpCased(input, "t", CaseSensitivity::NO)) {
+    return DayOfTheWeek::TUE;
+  }
+  else if (strcmpCased(input, "wed", CaseSensitivity::NO) ||	
+           strcmpCased(input, "wednesday", CaseSensitivity::NO) ||
+           strcmpCased(input, "w", CaseSensitivity::NO)) {
+    return DayOfTheWeek::WED;
+  }
+  else if (strcmpCased(input, "thu", CaseSensitivity::NO) ||	
+           strcmpCased(input, "thursday", CaseSensitivity::NO) ||
+           strcmpCased(input, "th", CaseSensitivity::NO)) {
+    return DayOfTheWeek::THU;
+  }
+  else if (strcmpCased(input, "fri", CaseSensitivity::NO) ||	
+           strcmpCased(input, "friday", CaseSensitivity::NO) ||
+           strcmpCased(input, "f", CaseSensitivity::NO)) {
+    return DayOfTheWeek::FRI;
+  }
+  else if (strcmpCased(input, "sat", CaseSensitivity::NO) ||	
+           strcmpCased(input, "saturday", CaseSensitivity::NO) ||
+           strcmpCased(input, "sa", CaseSensitivity::NO)) {
+    return DayOfTheWeek::SAT;
+  }
+  else {
+    rtErr("Invalid day \"" + input + ".\"", "translateDayOfTheWeek");
   }
   __builtin_unreachable();
 }

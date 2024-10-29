@@ -18,6 +18,7 @@
 #include "../../src/Math/reduction_workunit.h"
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting_enumerators.h"
+#include "../../src/Math/series_ops.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Namelists/nml_files.h"
@@ -34,6 +35,7 @@
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Structure/local_arrangement.h"
+#include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Synthesis/brickwork.h"
 #include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
@@ -46,6 +48,7 @@
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
+#include "../../src/UnitTesting/test_system_manager.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::chemistry::AtomMask;
@@ -74,6 +77,7 @@ using stormm::restraints::RestraintApparatus;
 using stormm::restraints::RestraintKit;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
+using stormm::structure::ApplyConstraints;
 using stormm::structure::distance;
 using stormm::structure::angle;
 using stormm::structure::dihedralAngle;
@@ -136,13 +140,19 @@ bool checkNaiveDistance(const int i, const int j, const CoordinateFrameReader &c
 // Run a series of tests using valence work units.
 //
 // Arguments:
-//   top_name:  Name of the topology to use
-//   crd_name:  Name of the coordinate file to use
-//   oe:        Operating environment information (for error reporting)
-//   my_prng:   Random number generator (modified by use inside this function)
+//   top_name:    Name of the topology to use
+//   crd_name:    Name of the coordinate file to use
+//   oe:          Operating environment information (for error reporting)
+//   my_prng:     Random number generator (modified by use inside this function)
+//   rigid_h:     Flag to have bonds to hydrogen constrained at their equilibrium values (this
+//                will affect the inclusion of some bond and perhaps angle terms)
+//   rigid_wat:   Flag to rigid water geometries constraints (this will affect the inclusion of
+//                some bond and perhaps angle terms)
 //-------------------------------------------------------------------------------------------------
 void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd_name,
-                             const TestEnvironment &oe, Xoroshiro128pGenerator *my_prng) {
+                             const TestEnvironment &oe, Xoroshiro128pGenerator *my_prng,
+                             const ApplyConstraints rigid_h = ApplyConstraints::NO,
+                             const ApplyConstraints rigid_wat = ApplyConstraints::NO) {
   const bool files_exist = (getDrivePathType(top_name) == DrivePathType::FILE &&
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
@@ -151,6 +161,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
            "sure that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  
   AtomGraph ag  = (files_exist) ? AtomGraph(top_name, ExceptionResponse::SILENT) :
                                   AtomGraph();
   PhaseSpace ps = (files_exist) ? PhaseSpace(crd_name) : PhaseSpace();
@@ -167,6 +178,8 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                                  trgt.z + 0.5 - my_prng->uniformRandomNumber() });
   }
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
   const int solute_extent = ag.getLastSoluteAtom();
   const int min_iinc = std::max(solute_extent / 8, 4);
   for (int i = min_iinc; i < solute_extent; i += min_iinc) {
@@ -283,13 +296,60 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                                                  all_vwu[i].getSimpleTaskList(VwuTask::INFR14),
                                                  &infr_coverage, infr_range_problem);
   }
-  const std::vector<int> bond_coverage_answer(vk.nbond, 1);
-  const std::vector<int> angl_coverage_answer(vk.nangl, 1);
+
+  // Bonds and angles may not be relevant if they contain rigid bonds to hydrogen or virtual sites.
+  // Examine each term to verify its inclusion.
+  std::vector<int> bond_coverage_answer(vk.nbond, 1);
+  std::vector<int> angl_coverage_answer(vk.nangl, 1);
   const std::vector<int> dihe_coverage_answer(vk.ndihe, 1);
   const std::vector<int> ubrd_coverage_answer(vk.nubrd, 1);
   const std::vector<int> cimp_coverage_answer(vk.ncimp, 1);
   const std::vector<int> cmap_coverage_answer(vk.ncmap, 1);
   const std::vector<int> infr_coverage_answer(vk.ninfr14, 1);
+  int zn_threshold;
+  switch (rigid_h) {
+  case ApplyConstraints::NO:
+    zn_threshold = 0;
+    break;
+  case ApplyConstraints::YES:
+    zn_threshold = 1;
+    break;
+  }
+  for (int pos = 0; pos < vk.nbond; pos++) {
+    const int atomi = vk.bond_i_atoms[pos];
+    const int atomj = vk.bond_j_atoms[pos];
+    if (cdk.z_numbers[atomi] <= zn_threshold || cdk.z_numbers[atomj] <= zn_threshold) {
+      bond_coverage_answer[pos] = 0;
+    }
+  }
+  switch (rigid_wat) {
+  case ApplyConstraints::NO:
+    break;
+  case ApplyConstraints::YES:
+    for (int pos = 0; pos < vk.nangl; pos++) {
+      const int ati = vk.angl_i_atoms[pos];
+      const int atj = vk.angl_j_atoms[pos];
+      const int atk = vk.angl_k_atoms[pos];
+      if ((cdk.z_numbers[ati] == 1) + (cdk.z_numbers[atj] == 1) + (cdk.z_numbers[atk] == 1) >= 2) {
+        bool i_bonds_j = false;
+        bool j_bonds_k = false;
+        bool k_bonds_i = false;
+        for (int m = nbk.nb12_bounds[ati]; m < nbk.nb12_bounds[ati + 1]; m++) {
+          i_bonds_j = (i_bonds_j || nbk.nb12x[m] == atj);
+          k_bonds_i = (k_bonds_i || nbk.nb12x[m] == atk);
+        }
+        for (int m = nbk.nb12_bounds[atj]; m < nbk.nb12_bounds[atj + 1]; m++) {
+          j_bonds_k = (j_bonds_k || nbk.nb12x[m] == atk);
+          i_bonds_j = (i_bonds_j || nbk.nb12x[m] == ati);      
+        }
+        for (int m = nbk.nb12_bounds[atk]; m < nbk.nb12_bounds[atk + 1]; m++) {
+          k_bonds_i = (k_bonds_i || nbk.nb12x[m] == ati);
+          j_bonds_k = (j_bonds_k || nbk.nb12x[m] == atj);
+        }
+      }
+    }
+    break;
+  }
   if (vk.nbond > 0) {
     check(bond_range_problem == false, "Composite bond instructions reference a bad topology bond "
           "index in valence work units for topology " + ag.getFileName() + ".", do_tests);
@@ -917,7 +977,7 @@ void testVwuSizingAlgorithm() {
 
   // Try mock ligands with small hypothetical GPUs
   Xoroshiro128pGenerator xrs(88014239);
-  std::vector<int> vwu_cap(18);
+  std::vector<int2> vwu_cap(18);
   std::vector<ValenceKernelSize> kwidths(18);
   std::vector<int> atom_counts(32);
   uniformRand(&xrs, &atom_counts, 48.0, 1.0);
@@ -947,11 +1007,15 @@ void testVwuSizingAlgorithm() {
     vwu_cap[iplc] = calculateValenceWorkUnitSize(atom_counts, i, &kwidths[iplc]);
     iplc++;
   }
-  const std::vector<int> vwu_cap_ans = { 51, 68, 68, 68, 68, 68,
-                                         51, 68, 68, 68, 68, 68,
-                                         68, 68, 68, 68, 68, 68 };
-  check(vwu_cap, RelationalOperator::EQUAL, vwu_cap_ans, "The calcualted valence work unit sizes "
-        "did not meet expectations.");
+  std::vector<int> vwu_cap_x(vwu_cap.size());
+  for (size_t i = 0; i < vwu_cap.size(); i++) {
+    vwu_cap_x[i] = vwu_cap[i].x;
+  }
+  const std::vector<int> vwu_cap_ans = { 48, 64, 64, 64, 64, 64,
+                                         64, 64, 64, 64, 64, 64,
+                                         64, 64, 64, 64, 64, 64 };
+  check(vwu_cap_x, RelationalOperator::EQUAL, vwu_cap_ans, "The calculated valence work unit "
+        "sizes did not meet expectations.");
   std::vector<int> kwidths_int(iplc);
   for (int i = 0; i < iplc; i++) {
     kwidths_int[i] = static_cast<int>(kwidths[i]);
@@ -967,14 +1031,16 @@ void testVwuSizingAlgorithm() {
   // Try protein-sized systems with an approximation of an Ampere-era NVIDIA GPU
   const std::vector<int> prot_atom_counts = { 2000, 4000, 6000, 8000, 10000, 20000, 30000, 40000 };
   const int nprot_trials = prot_atom_counts.size();
-  std::vector<int> prot_vwu_cap(nprot_trials), prot_kwidths_int(nprot_trials);
+  std::vector<int2> prot_vwu_cap(nprot_trials);
+  std::vector<int> prot_kwidths_int(nprot_trials), prot_vwu_cap_x(nprot_trials);
   std::vector<ValenceKernelSize> prot_kwidths(nprot_trials);
   for (int i = 0; i < nprot_trials; i++) {
     const std::vector<int> tmp_atom_counts(1, prot_atom_counts[i]);
-    prot_vwu_cap[i] = calculateValenceWorkUnitSize(tmp_atom_counts, 68, &prot_kwidths[i]);
+    prot_vwu_cap[i] = calculateValenceWorkUnitSize(tmp_atom_counts, 64, &prot_kwidths[i]);
+    prot_vwu_cap_x[i] = prot_vwu_cap[i].x;
   }
-  const std::vector<int> prot_vwu_cap_ans = { 34, 51, 68, 85, 102, 170, 238, 323 };
-  check(prot_vwu_cap, RelationalOperator::EQUAL, prot_vwu_cap_ans, "The valence work unit sizes "
+  const std::vector<int> prot_vwu_cap_ans = { 32, 48, 64, 80, 96, 176, 256, 336 };
+  check(prot_vwu_cap_x, RelationalOperator::EQUAL, prot_vwu_cap_ans, "The valence work unit sizes "
         "selected for a series of protein-sized systems do not meet expectations.");
   for (int i = 0; i < nprot_trials; i++) {
     prot_kwidths_int[i] = static_cast<int>(prot_kwidths[i]);
@@ -1143,7 +1209,7 @@ int main(const int argc, const char* argv[]) {
   check(prnt_situ, RelationalOperator::EQUAL, prnt_situ_ans, "The printing protocols for multiple "
         "systems grouped under the same label feeding into a common output file able to accept "
         "multiple frames do not meet expectations.");
-
+  
   // Create some topologies and coordinate sets.
   Xoroshiro128pGenerator my_prng(oe.getRandomSeed());
   const std::string base_crd_name = testdir + "Trajectory";
@@ -1178,6 +1244,30 @@ int main(const int argc, const char* argv[]) {
            "environment variable to make sure that it is set properly.  A number of tests will "
            "be skipped.", "test_phase_space_synthesis");
   }
+
+  // Make a new system cache with abnormal values of Coulomb's constant as well as short-ranged
+  // scaling factors, then verify that the information filters down to the topology synthesis.
+  DynamicsControls dyncon;
+  dyncon.setCoulombConstant(332.0);
+  dyncon.setElec14Screening(2.5);
+  dyncon.setVdw14Screening(1.6);
+  const std::vector<std::string> system_names = { "tip3p", "tip4p", "trpcage_in_water", "jac" };
+  const std::string top_ext = "top";
+  const std::string crd_ext = "inpcrd";
+  TestSystemManager tsm(base_top_name, top_ext, system_names, base_crd_name, crd_ext,
+                        system_names, dyncon);
+  std::vector<double> coulomb_cs(tsm.getSystemCount());
+  for (int i = 0; i < tsm.getSystemCount(); i++) {
+    coulomb_cs[i] = tsm.getTopologyPointer(i)->getCoulombConstant();
+  }
+  check(coulomb_cs, RelationalOperator::EQUAL, std::vector<double>(tsm.getSystemCount(), 332.0),
+        "Topologies created with an arrtificial value of Coulomb's constant do not display the "
+        "unique quality as intended.", tsm.getTestingStatus());
+  const std::vector<int> all_sys_idx = incrementingSeries<int>(0, tsm.getSystemCount());
+  AtomGraphSynthesis weird_poly_ag = tsm.exportAtomGraphSynthesis(all_sys_idx);
+  check(weird_poly_ag.getCoulombConstant(), RelationalOperator::EQUAL, 332.0, "A synthesis of "
+        "topologies all created with a unique value of Coulomb's constant does not retain that "
+        "artificial value.", tsm.getTestingStatus());
   
   // Make a PhaseSpaceSynthesis the meticulous way
   section(2);
