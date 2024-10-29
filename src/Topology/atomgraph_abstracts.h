@@ -102,9 +102,10 @@ template <typename T> struct ValenceKit {
                       const T* dihe_phi_in, const T* attn14_elec_in, const T* attn14_vdw_in,
                       const int* bond_i_atoms_in, const int* bond_j_atoms_in,
                       const int* bond_param_idx_in, const char4* bond_modifiers_in,
-                      const int* angl_i_atoms_in, const int* angl_j_atoms_in,
-                      const int* angl_k_atoms_in, const int* angl_param_idx_in,
-                      const char4* angl_modifiers_in, const int* dihe_i_atoms_in,
+                      const uint* bond_relevance_in, const int* angl_i_atoms_in,
+                      const int* angl_j_atoms_in, const int* angl_k_atoms_in,
+                      const int* angl_param_idx_in, const char4* angl_modifiers_in,
+                      const uint* angl_relevance_in, const int* dihe_i_atoms_in,
                       const int* dihe_j_atoms_in, const int* dihe_k_atoms_in,
                       const int* dihe_l_atoms_in, const int* dihe_param_idx_in,
                       const int* dihe14_param_idx_in, const char4* dihe_modifiers_in,
@@ -179,11 +180,17 @@ template <typename T> struct ValenceKit {
   const int* bond_j_atoms;      ///< Array of second atoms in each bond
   const int* bond_param_idx;    ///< Parameter indices for each bond in the system
   const char4* bond_modifiers;  ///< Modifying details of each bond stretching term
+  const uint* bond_relevance;   ///< Array detailing the relevance of each bonded interaction,
+                                ///<   whether it should be evaluated given directives on the
+                                ///<   rigidity of bonds to hydrogen atoms or virtual sites
   const int* angl_i_atoms;      ///< Array of first atoms in each bond angle
   const int* angl_j_atoms;      ///< Array of second atoms in each bond angle
   const int* angl_k_atoms;      ///< Array of third atoms in each bond angle
   const int* angl_param_idx;    ///< Parameter indices for each bond angle in the system
   const char4* angl_modifiers;  ///< Modifying details of each angle bending term
+  const uint* angl_relevance;   ///< Array detailing the relevance of each bond angle interaction,
+                                ///<   whether it should be evaluated given directives on the
+                                ///<   rigidity of bonds to hydrogen atoms or virtual sites
   const int* dihe_i_atoms;      ///< Array of first atoms in each cosine-based dihedral
   const int* dihe_j_atoms;      ///< Array of second atoms in each cosine-based dihedral
   const int* dihe_k_atoms;      ///< Array of third atoms in each cosine-based dihedral (these are
@@ -414,8 +421,8 @@ struct ChemicalDetailsKit {
   const int* mol_limits;       ///< Molecule limits, the bounds by which to read mol_contents
   const double* masses;        ///< Masses of atoms in the system
   const float* sp_masses;      ///< Masses of atoms in the system (single precision)
-  const double* inv_masses;    ///< Masses of atoms in the system
-  const float* sp_inv_masses;  ///< Masses of atoms in the system (single precision)
+  const double* inv_masses;    ///< Inverse masses of atoms in the system
+  const float* sp_inv_masses;  ///< Inverse masses of atoms in the system (single precision)
 };
 
 /// \brief Information needed for the placement of virtual sites and transmission of forces on
@@ -465,10 +472,11 @@ template <typename T> struct ConstraintKit {
                          const int* settle_h1_atoms_in, const int* settle_h2_atoms_in,
                          const int* settle_param_idx_in, const int* group_list_in,
                          const int* group_bounds_in, const int* group_param_idx_in,
-                         const int* group_param_bounds_in, const T* settle_mormt_in,
+                         const int* group_param_bounds_in, const T* settle_mo_in,
+                         const T* settle_mh_in, const T* settle_moh_in, const T* settle_mormt_in,
                          const T* settle_mhrmt_in, const T* settle_ra_in, const T* settle_rb_in,
-                         const T* settle_rc_in, const T* settle_invra_in,
-                         const T* group_sq_lengths_in, const T* group_inv_masses_in);
+                         const T* settle_rc_in, const T* group_sq_lengths_in,
+                         const T* group_inv_masses_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -500,12 +508,17 @@ template <typename T> struct ConstraintKit {
                                   ///<   limits, and apply the lengths and inverse masses to each
                                   ///<   particle in the group.
   const int* group_param_bounds;  ///< Bounds array for the constraint group parameter arrays below
-  const T* settle_mormt;          ///< Proportional mass of "oxygen" in SETTLE systems
+  const T* settle_mo;             ///< Mass of the oxygen (or, heaviest) atom
+  const T* settle_mh;             ///< Mass of the hydrogen (or, lightest) atom
+  const T* settle_moh;            ///< Combined mass of the heaviest and one of the two light atoms
+  const T* settle_mormt;          ///< Proportional mass of "oxygen" in SETTLE systems.  The values
+                                  ///<   for this and other mass-related arrays are pre-calculated
+                                  ///<   in double-precision, then converted to the native type,
+                                  ///<   compact retrieval and to mitigate roundoff error.
   const T* settle_mhrmt;          ///< Proportional mass of "hydrogen" in SETTLE systems
   const T* settle_ra;             ///< Internal distance measurement of SETTLE groups
   const T* settle_rb;             ///< Internal distance measurement of SETTLE groups
   const T* settle_rc;             ///< Internal distance measurement of SETTLE groups
-  const T* settle_invra;          ///< Internal distance measurement of SETTLE groups
   const T* group_sq_lengths;      ///< Bond length targets for the group atoms
   const T* group_inv_masses;      ///< Inverse masses for the particles in each group
 };

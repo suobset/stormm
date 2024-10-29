@@ -8,6 +8,7 @@
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_precision.h"
 #include "Namelists/nml_random.h"
+#include "Namelists/nml_remd.h"
 #include "Namelists/nml_report.h"
 #include "Namelists/nml_restraint.h"
 #include "Namelists/nml_solvent.h"
@@ -26,6 +27,7 @@ using namelist::filesInput;
 using namelist::minimizeInput;
 using namelist::precisionInput;
 using namelist::randomInput;
+using namelist::remdInput;
 using namelist::reportInput;
 using namelist::restraintInput;
 using namelist::solventInput;
@@ -89,13 +91,17 @@ bool detectHelpSignal(const int argc, const char* argv[], const HelpSignalKind k
 
 //-------------------------------------------------------------------------------------------------
 bool displayNamelistHelp(const int argc, const char* argv[],
-                         const std::vector<std::string> &module_name) {
+                         const std::vector<std::string> &module_name,
+                         const bool (*aux_recognition)(const std::string)) {
   const int n_names = module_name.size();
   bool found = false;
   for (int i = 0; i < n_names; i++) {
+    const std::string module_less_amp = (module_name[i][0] == '&') ? module_name[i].substr(1) :
+                                                                     module_name[i];
     for (int j = 0; j < argc; j++) {
-      if (strcmp(argv[j], module_name[i].c_str()) == 0) {
-        found = (found || displayNamelistHelp(module_name[i]));
+      if (strcmp(argv[j], module_name[i].c_str()) == 0 ||
+          strcmp(argv[j], module_less_amp.c_str()) == 0) {
+        found = (found || displayNamelistHelp(module_name[i], aux_recognition));
       }
     }
   }
@@ -103,68 +109,81 @@ bool displayNamelistHelp(const int argc, const char* argv[],
 }
 
 //-------------------------------------------------------------------------------------------------
-bool displayNamelistHelp(const int argc, const char* argv[], const std::string &module_name) {
-  return displayNamelistHelp(argc, argv, std::vector<std::string>(1, module_name));
+bool displayNamelistHelp(const int argc, const char* argv[], const std::string &module_name,
+                         const bool (*aux_recognition)(const std::string)) {
+  return displayNamelistHelp(argc, argv, std::vector<std::string>(1, module_name),
+                             aux_recognition);
 }
 
 //-------------------------------------------------------------------------------------------------
-bool displayNamelistHelp(const std::string &module_name) {
+bool displayNamelistHelp(const std::string &module_name,
+                         const bool (*aux_recognition)(const std::string)) {
   const TextFile tf(std::string(""), TextOrigin::RAM);
   int start_line = 0;
-  if (strcmpCased(module_name, "&files", CaseSensitivity::YES)) {
+  const std::string search_name = (module_name[0] == '&') ? module_name.substr(1) : module_name;
+  if (strcmpCased(search_name, "files", CaseSensitivity::YES)) {
     const std::vector<KeyRequirement> sys_keyword_reqs(1, KeyRequirement::REQUIRED);
     const NamelistEmulator t_nml = filesInput(tf, &start_line, nullptr, sys_keyword_reqs);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&restraint", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "restraint", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = restraintInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&solvent", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "solvent", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = solventInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&minimize", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "minimize", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = minimizeInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&conformer", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "conformer", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = conformerInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&dynamics", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "dynamics", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = dynamicsInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&report", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "remd", CaseSensitivity::YES)) {
+    const NamelistEmulator t_nml = remdInput(tf, &start_line, nullptr);
+    t_nml.printHelp();
+    return true;
+  }
+  else if (strcmpCased(search_name, "report", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = reportInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&random", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "random", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = randomInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&precision", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "precision", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = precisionInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
-  else if (strcmpCased(module_name, "&ffmorph", CaseSensitivity::YES)) {
+  else if (strcmpCased(search_name, "ffmorph", CaseSensitivity::YES)) {
     const NamelistEmulator t_nml = ffmorphInput(tf, &start_line, nullptr);
     t_nml.printHelp();
     return true;
   }
   else {
-    rtErr("No namelist " + module_name + " is known in the STORMM libraries.",
-          "displayNamelistHelp");
+    if (aux_recognition == nullptr) {
+      return false;
+    }
+    else {
+      return aux_recognition(search_name);
+    }
   }
   __builtin_unreachable();
 }

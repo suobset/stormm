@@ -28,11 +28,21 @@ void dynaStep(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const 
                                             EvaluateForce::YES, system_index, tstw.step);
   transmitVirtualSiteForces<Tcoord, Tcoord, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr,
                                                    nullptr, UnitCellType::NONE, vsk);
+
+  // Find the mass array that is amenable to the template.  This is not an ideal thing to do, but
+  // it will cast the float* array to Tcalc* if Tcalc is float and the double* array to Tcalc* if
+  // Tcalc is double.  This requirement is the legacy of ChemicalDetailsKit originally not
+  // containing the array of masses and therefore having no need to be templated in its own right.
+  const bool tcalc_is_double = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index);
+  const Tcalc* mass_ptr = (tcalc_is_double) ? reinterpret_cast<const Tcalc*>(cdk.masses) :
+                                              reinterpret_cast<const Tcalc*>(cdk.sp_masses);
   
   // Update the velocities by the first half step with the new forces.
   velocityVerletVelocityUpdate<Tcoord, Tcalc>(xvel, yvel, zvel, xfrc, yfrc, zfrc, cdk.natom,
-                                              cdk.masses, vxalt, vyalt, vzalt, tstw,
-                                              vel_scale_factor, frc_scale_factor);
+                                              mass_ptr, vxalt, vyalt, vzalt, tstw, nullptr,
+                                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                              nullptr, nullptr, 0, vel_scale_factor,
+                                              frc_scale_factor);
   
   // Constrain velocities
   if (tstw.cnst_geom) {
@@ -56,16 +66,18 @@ void dynaStep(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const 
 
   // Move particles, placing their new positions in the {x,y,z}alt arrays.
   velocityVerletCoordinateUpdate<Tcoord, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, cdk.natom,
-                                                cdk.masses, xalt, yalt, zalt, vxalt, vyalt, vzalt,
-                                                tstw, gpos_scale_factor, vel_scale_factor,
-                                                frc_scale_factor);
+                                                mass_ptr, xalt, yalt, zalt, vxalt, vyalt, vzalt,
+                                                tstw, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                                nullptr, nullptr, 0, gpos_scale_factor,
+                                                vel_scale_factor, frc_scale_factor);
 
   // Apply positional constraints
   if (tstw.cnst_geom) {
-    rattlePositions<Tcoord, Tcalc>(xalt, yalt, zalt, vxalt, vyalt, vzalt, xcrd, ycrd, zcrd, cnk,
-                                   tstw.dt, dyncon.getRattleTolerance(),
-                                   dyncon.getRattleIterations(), dyncon.getCpuRattleMethod(),
-                                   gpos_scale_factor, vel_scale_factor);
+    shakePositions<Tcoord, Tcalc>(xalt, yalt, zalt, vxalt, vyalt, vzalt, xcrd, ycrd, zcrd, cnk,
+                                  tstw.dt, dyncon.getRattleTolerance(),
+                                  dyncon.getRattleIterations(), dyncon.getCpuRattleMethod(),
+                                  gpos_scale_factor, vel_scale_factor);
   }
 
   // Replace virtual sites

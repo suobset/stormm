@@ -1,9 +1,13 @@
 #include "copyright.h"
 #include "FileManagement/file_listing.h"
+#include "FileManagement/file_util.h"
 #include "Math/vector_ops.h"
 #include "MoleculeFormat/mdlmol.h"
 #include "Parsing/textfile.h"
 #include "Namelists/nml_files.h"
+#include "Structure/structure_enumerators.h"
+#include "Topology/atomgraph_constants.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "test_system_manager.h"
 #include "test_environment.h"
@@ -13,6 +17,7 @@ namespace testing {
 
 using constants::getEnumerationName;
 using diskutil::assembleFilePath;
+using diskutil::detectTopologyKind;
 using diskutil::DrivePathType;
 using diskutil::getDefaultFileExtension;
 using diskutil::getDrivePathType;
@@ -24,7 +29,16 @@ using parse::TextFile;
 using parse::TextOrigin;
 using stmath::minValue;
 using stmath::maxValue;
+using structure::ApplyConstraints;
 using structure::MdlMol;
+using synthesis::extendTopologyList;
+using topology::amber_default_elec14_screen;
+using topology::amber_default_vdw14_screen;
+using topology::charmm_default_elec14_screen;
+using topology::charmm_default_vdw14_screen;
+using topology::default_charge_rounding_tol;
+using topology::default_charge_precision_inc;
+using topology::TopologyKind;
 using trajectory::CoordinateFileKind;
 using trajectory::translateCoordinateFileKind;
 using trajectory::detectCoordinateFileKind;
@@ -47,7 +61,8 @@ TestSystemManager::TestSystemManager(const std::string &topology_base_in,
                                      const std::vector<std::string> &coordinate_names_in,
                                      const ExceptionResponse policy,
                                      const TestPriority fault_response_in,
-                                     const TestPriority all_go_response_in) :
+                                     const TestPriority all_go_response_in,
+                                     const DynamicsControls &dyncon) :
     TestSystemManager()
 {
   topology_base = topology_base_in;
@@ -78,12 +93,14 @@ TestSystemManager::TestSystemManager(const std::string &topology_base_in,
   coordinate_success.resize(system_count);
   compatibility.resize(system_count, false);
   all_topologies.reserve(system_count);
+  const bool enforce_geometry = (dyncon.constrainGeometry() == ApplyConstraints::YES);
   for (int i = 0; i < system_count; i++) {
     topology_exist[i] = (getDrivePathType(topology_names[i]) == DrivePathType::FILE);
     coordinate_exist[i] = (getDrivePathType(coordinate_names[i]) == DrivePathType::FILE);
     if (topology_exist[i]) {
       try {
-        all_topologies.emplace_back(topology_names[i], policy);
+        extendTopologyList(&all_topologies, topology_names[i], dyncon, policy,
+                           "TestSystemManager");
         topology_success[i] = true;
       }
       catch (std::runtime_error) {
@@ -188,15 +205,42 @@ TestSystemManager::TestSystemManager(const std::string &topology_base_in,
 
 //-------------------------------------------------------------------------------------------------
 TestSystemManager::TestSystemManager(const std::string &topology_base_in,
+                                     const std::string &topology_extn_in,
+                                     const std::vector<std::string> &topology_names_in,
+                                     const std::string &coordinate_base_in,
+                                     const std::string &coordinate_extn_in,
+                                     const std::vector<std::string> &coordinate_names_in,
+                                     const DynamicsControls &dyncon,
+                                     const ExceptionResponse policy) :
+    TestSystemManager(topology_base_in, topology_extn_in, topology_names_in, coordinate_base_in,
+                      coordinate_extn_in, coordinate_names_in, policy, TestPriority::ABORT,
+                      TestPriority::CRITICAL, dyncon)
+{}
+
+//-------------------------------------------------------------------------------------------------
+TestSystemManager::TestSystemManager(const std::string &topology_base_in,
                                      const std::vector<std::string> &topology_names_in,
                                      const std::string &coordinate_base_in,
                                      const std::vector<std::string> &coordinate_names_in,
                                      const ExceptionResponse policy,
                                      const TestPriority fault_response_in,
-                                     const TestPriority all_go_response_in) :
+                                     const TestPriority all_go_response_in,
+                                     const DynamicsControls &dyncon) :
     TestSystemManager(topology_base_in, std::string(""), topology_names_in, coordinate_base_in,
                       std::string(""), coordinate_names_in, policy, fault_response_in,
-                      all_go_response_in)
+                      all_go_response_in, dyncon)
+{}
+
+//-------------------------------------------------------------------------------------------------
+TestSystemManager::TestSystemManager(const std::string &topology_base_in,
+                                     const std::vector<std::string> &topology_names_in,
+                                     const std::string &coordinate_base_in,
+                                     const std::vector<std::string> &coordinate_names_in,
+                                     const DynamicsControls &dyncon,
+                                     const ExceptionResponse policy) :
+    TestSystemManager(topology_base_in, std::string(""), topology_names_in, coordinate_base_in,
+                      std::string(""), coordinate_names_in, policy, TestPriority::ABORT,
+                      TestPriority::CRITICAL, dyncon)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -204,10 +248,21 @@ TestSystemManager::TestSystemManager(const std::vector<std::string> &topology_na
                                      const std::vector<std::string> &coordinate_names_in,
                                      const ExceptionResponse policy,
                                      const TestPriority fault_response_in,
-                                     const TestPriority all_go_response_in) :
+                                     const TestPriority all_go_response_in,
+                                     const DynamicsControls &dyncon) :
     TestSystemManager(std::string(""), std::string(""), topology_names_in, std::string(""),
                       std::string(""), coordinate_names_in, policy, fault_response_in,
-                      all_go_response_in)
+                      all_go_response_in, dyncon)
+{}
+
+//-------------------------------------------------------------------------------------------------
+TestSystemManager::TestSystemManager(const std::vector<std::string> &topology_names_in,
+                                     const std::vector<std::string> &coordinate_names_in,
+                                     const DynamicsControls &dyncon,
+                                     const ExceptionResponse policy) :
+    TestSystemManager(std::string(""), std::string(""), topology_names_in, std::string(""),
+                      std::string(""), coordinate_names_in, policy, TestPriority::ABORT,
+                      TestPriority::CRITICAL, dyncon)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -516,32 +571,35 @@ TestSystemManager::exportPhaseSpaceSynthesis(const std::vector<UnitCellType> &uc
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis
 TestSystemManager::exportAtomGraphSynthesis(const std::vector<int> &index_key,
-                                            const ExceptionResponse policy) const {
+                                            const ExceptionResponse policy,
+                                            const GpuDetails &gpu) const {
   std::vector<AtomGraph*> ag_pointers(system_count);
   for (size_t i = 0; i < system_count; i++) {
     ag_pointers[i] = const_cast<AtomGraph*>(&all_topologies[i]);
   }
-  AtomGraphSynthesis result(ag_pointers, index_key, policy);
+  AtomGraphSynthesis result(ag_pointers, index_key, policy, gpu);
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis
 TestSystemManager::exportAtomGraphSynthesis(const UnitCellType uc_choice,
-                                            const ExceptionResponse policy) const {
-  return exportAtomGraphSynthesis(getQualifyingSystems(uc_choice));
+                                            const ExceptionResponse policy,
+                                            const GpuDetails &gpu) const {
+  return exportAtomGraphSynthesis(getQualifyingSystems(uc_choice), policy, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis
 TestSystemManager::exportAtomGraphSynthesis(const std::vector<UnitCellType> &uc_choice,
-                                            const ExceptionResponse policy) const {
+                                            const ExceptionResponse policy,
+                                            const GpuDetails &gpu) const {
   std::vector<int> all_quals;
   for (size_t i = 0; i < uc_choice.size(); i++) {
     const std::vector<int> matches = getQualifyingSystems(uc_choice[i]);
     all_quals.insert(all_quals.end(), matches.begin(), matches.end());
   }
-  return exportAtomGraphSynthesis(all_quals);
+  return exportAtomGraphSynthesis(all_quals, policy, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------

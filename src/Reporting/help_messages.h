@@ -41,11 +41,14 @@ bool detectHelpSignal(const int argc, const char* argv[],
 /// \param t_nml        An actual example of the namelist, provided to support functionality in
 /// \{
 bool displayNamelistHelp(const int argc, const char* argv[],
-                         const std::vector<std::string> &module_name);
+                         const std::vector<std::string> &module_name,
+                         const bool (*aux_recognition)(const std::string) = nullptr);
 
-bool displayNamelistHelp(const int argc, const char* argv[], const std::string &module_name);
+bool displayNamelistHelp(const int argc, const char* argv[], const std::string &module_name,
+                         const bool (*aux_recognition)(const std::string) = nullptr);
 
-bool displayNamelistHelp(const std::string &module_name);
+bool displayNamelistHelp(const std::string &module_name,
+                         const bool (*aux_recognition)(const std::string) = nullptr);
 /// \}
 
 } // namespace display

@@ -75,13 +75,19 @@ NamelistEmulator genericNamelist() {
   return t_nml;
 }
 //-------------------------------------------------------------------------------------------------
-// The UserSettings class
+// Test the UserSettings class
+//
+// Arguments:
+//   remdynamics:  Name of some mock input file, by the naming convention it would be for REMD
 //-------------------------------------------------------------------------------------------------
 UserSettings spaceSettings(const std::string &remdynamics) {
 
   // Testing the UserSettings Class
   const char* argv[] = {"", "-i", remdynamics.c_str()};
-  UserSettings ui(3, argv, AppName::DYNAMICS);
+  CommandLineParser clip("test_cli", "A test command line parser");
+  clip.addStandardApplicationInputs();
+  clip.parseUserInput(3, argv);
+  UserSettings ui(clip, { "-pe", "-ce" });
   check(ui.getRemdPresence(), "The UserInput object created from " + remdynamics + " did not "
         "contain a &remd namelist.");
   check(ui.getDynamicsPresence(), "The UserInput object created from " + remdynamics + " did not "
@@ -386,8 +392,8 @@ int main(const int argc, const char* argv[]) {
   const double exchange_probability = remd_a.getExchangeProbability();
   const double tolerance = remd_a.getTolerance();
   const int max_replicas = remd_a.getMaxReplicas();
-  const double low_temperature = remd_a.getInitialTemperature();
-  const double high_temperature = remd_a.getEquilibriumTemperature();
+  const double low_temperature = remd_a.getLowTemperature();
+  const double high_temperature = remd_a.getHighTemperature();
   check(total_steps, RelationalOperator::EQUAL, 10000, "The total number of swaps recorded from "
         "the &remd namelist do not meet expectations.");
   check(remd_type, RelationalOperator::EQUAL, "Temperature", "The type of REMD recorded from the "

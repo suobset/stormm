@@ -16,8 +16,10 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
+#include "../../src/Structure/global_manipulation.h"
 #include "../../src/Structure/local_arrangement.h"
-#include "../../src/Structure/rattle.h"
+#include "../../src/Structure/hub_and_spoke.h"
+#include "../../src/Structure/settle.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
@@ -56,11 +58,13 @@ using stormm::data_types::float4;
 using stormm::data_types::int2;
 using stormm::data_types::uint2;
 #endif
+using stormm::data_types::int95_t;
 using stormm::data_types::llint;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getBaseName;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
+
 using stormm::energy::EvaluateForce;
 using stormm::energy::evaluateNonbondedEnergy;
 using stormm::energy::ScoreCard;
@@ -75,6 +79,7 @@ using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
 using stormm::stmath::computeBoxTransform;
 using stormm::symbols::pi;
+using stormm::symbols::pi_f;
 using stormm::topology::AtomGraph;
 using stormm::topology::ConstraintKit;
 using stormm::topology::listVirtualSiteFrameTypes;
@@ -689,6 +694,81 @@ void testGroupMomenta(const PhaseSpace &ps, const AtomGraph &ag, const Precision
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check coordinate rotations.
+//
+// Arguments:
+//   xsr:   source of random numbers for coordinates and rotations
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void checkRotations(Xoshiro256ppGenerator *xsr) {
+  const bool tcalc_is_double = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index);
+  
+  // Lay out a series of coordinates
+  const int npts = 100;
+  std::vector<T> pts_x(npts), pts_y(npts), pts_z(npts);
+  Tcalc om_x, om_y, om_z;
+  if (tcalc_is_double) {
+    const std::vector<double> pre_pts_x = uniformRand(xsr, npts, 10.0);
+    const std::vector<double> pre_pts_y = uniformRand(xsr, npts, 10.0);
+    const std::vector<double> pre_pts_z = uniformRand(xsr, npts, 10.0);
+    for (int i = 0; i < npts; i++) {
+      pts_x[i] = pre_pts_x[i];
+      pts_y[i] = pre_pts_y[i];
+      pts_z[i] = pre_pts_z[i];
+    }
+    om_x = ((2.0 * xsr->uniformRandomNumber()) - 1.0) - stormm::symbols::pi;
+    om_y = ((2.0 * xsr->uniformRandomNumber()) - 1.0) - stormm::symbols::pi;
+    om_z = ((2.0 * xsr->uniformRandomNumber()) - 1.0) - stormm::symbols::pi;
+  }
+  else {
+    const std::vector<float> pre_pts_x = spUniformRand(xsr, npts, 10.0);
+    const std::vector<float> pre_pts_y = spUniformRand(xsr, npts, 10.0);
+    const std::vector<float> pre_pts_z = spUniformRand(xsr, npts, 10.0);
+    for (int i = 0; i < npts; i++) {
+      pts_x[i] = pre_pts_x[i];
+      pts_y[i] = pre_pts_y[i];
+      pts_z[i] = pre_pts_z[i];
+    }
+    om_x = ((2.0f * xsr->spUniformRandomNumber()) - 1.0f) - stormm::symbols::pi_f;
+    om_y = ((2.0f * xsr->spUniformRandomNumber()) - 1.0f) - stormm::symbols::pi_f;
+    om_z = ((2.0f * xsr->spUniformRandomNumber()) - 1.0f) - stormm::symbols::pi_f;
+  }
+
+  // Copy the coordinates
+  std::vector<T> cpy_pts_x(pts_x), cpy_pts_y(pts_y), cpy_pts_z(pts_z);
+
+  // Compute inter-particle distances
+  std::vector<std::vector<Tcalc>> distances(npts);
+  for (int i = 0; i < npts; i++) {
+    distances[i].resize(npts, 0.0);
+    for (int j = 0; j < i; j++) {
+      const Tcalc dx = pts_x[i] - pts_x[j];
+      const Tcalc dy = pts_y[i] - pts_y[j];
+      const Tcalc dz = pts_z[i] - pts_z[j];
+      distances[i][j] = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                            sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    }
+  }
+
+  // Rotate the coordinates and their copies
+  const std::vector<Tcalc> axis_x = { 1.0, 0.0, 0.0 };
+  const std::vector<Tcalc> axis_y = { 0.0, 1.0, 0.0 };
+  const std::vector<Tcalc> axis_z = { 0.0, 0.0, 1.0 };
+  const std::vector<Tcalc> rotmat = beardRotationMatrix<Tcalc>(om_x, om_y, om_z);
+  const std::vector<Tcalc> axis_tx = { rotmat[0], rotmat[3], rotmat[6] };
+  const std::vector<Tcalc> axis_ty = { rotmat[1], rotmat[4], rotmat[7] };
+  const std::vector<Tcalc> axis_tz = { rotmat[2], rotmat[5], rotmat[8] };
+  rotateCoordinates<T, Tcalc>(&pts_x, &pts_y, &pts_z, axis_tx, axis_ty, axis_tz, 1.0);
+  rotateCoordinates<T, Tcalc>(&cpy_pts_x, &cpy_pts_y, &cpy_pts_z, rotmat, 1.0);
+  check(pts_x, RelationalOperator::EQUAL, cpy_pts_x, "Different overloads for rotating "
+        "coordinates did not return similar results along the Cartesian X axis.");
+  check(pts_y, RelationalOperator::EQUAL, cpy_pts_y, "Different overloads for rotating "
+        "coordinates did not return similar results along the Cartesian Y axis.");
+  check(pts_z, RelationalOperator::EQUAL, cpy_pts_z, "Different overloads for rotating "
+        "coordinates did not return similar results along the Cartesian Z axis.");
+}
+
+//-------------------------------------------------------------------------------------------------
 // Check the operations of RATTLE constraints.
 //
 // Arguments:
@@ -752,7 +832,7 @@ void checkRattleFunctionality(const TestSystemManager &tsm, const PrecisionModel
     }
 
     // Restore the correct bond lengths with RATTLE.
-    rattlePositions(&ps, ag, prec, 1.0, 1.0e-6, 100, style);
+    shakePositions(&ps, ag, prec, 1.0, 1.0e-6, 100, style);
     testBondLengths(ps, ag, prec, style, 2.0e-6, tsm.getTestingStatus(i));
     
     // Further perturb the random velocities, as if performing a force calculation.
@@ -863,14 +943,15 @@ void synthesisConstraintInsrScan(const AtomGraphSynthesis &poly_ag, const SyVale
               param_mistakes += char4ToString(ag_ptr->getAtomName(top_ca_idx)) + " - " +
                                 char4ToString(ag_ptr->getAtomName(top_pl_idx)) +
                                 "(synthesis indices " + std::to_string(central_atom) + ", " +
-                std::to_string(peripheral_atom) + " : expected " +
-                realToString(cnst_length[jcnst], 9, 6, NumberFormat::STANDARD_REAL) + " A and " +
-                realToString(cnst_sum_atom_invmass[jcnst], 9, 6, NumberFormat::STANDARD_REAL) +
-                " mol/g, found " +
-                realToString(poly_auk.cnst_grp_params[param_idx].x, 9, 6,
-                             NumberFormat::STANDARD_REAL) + " A and " +
-                realToString(poly_auk.cnst_grp_params[param_idx].y, 9, 6,
-                             NumberFormat::STANDARD_REAL) + " mol/g)";
+                                std::to_string(peripheral_atom) + " : expected " +
+                                realToString(cnst_length[jcnst], 9, 6,
+                                             NumberFormat::STANDARD_REAL) + " A and " +
+                                realToString(cnst_sum_atom_invmass[jcnst], 9, 6,
+                                             NumberFormat::STANDARD_REAL) + " mol/g, found " +
+                                realToString(poly_auk.cnst_grp_params[param_idx].x, 9, 6,
+                                             NumberFormat::STANDARD_REAL) + " A and " +
+                                realToString(poly_auk.cnst_grp_params[param_idx].y, 9, 6,
+                                             NumberFormat::STANDARD_REAL) + " mol/g)";
               n_param_errors++;
             }
           }
@@ -929,7 +1010,12 @@ void checkSynthesisConstraintInstructions(const TestSystemManager &tsm,
 // of the CPU double-precision methods.
 //
 // Arguments:
-//   
+//   ref_psw:        Reference coordinate set
+//   test_psw:       Test coordinate set
+//   cnk:            Details of constraints to apply, including position constraint parameters
+//   tol:            Tolerance for judging fidelity to the correct 
+//   topology_name:  Name of the topology file
+//   do_tests:       Indicate whether tests are possible
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void checkSystemPositionConstraints(const PhaseSpaceWriter &ref_psw,
@@ -1030,7 +1116,7 @@ void checkSynthesisRattleC(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceS
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
     PhaseSpace ref_ps = raw.exportSystem(i, tier);
     const AtomGraph *ag_ptr = raw.getSystemTopologyPointer(i);
-    rattlePositions(&ref_ps, ag_ptr, prec, dt, tol, 30, RattleMethod::CENTER_SUM);
+    shakePositions(&ref_ps, ag_ptr, prec, dt, tol, 30, RattleMethod::CENTER_SUM);
     PhaseSpaceWriter ref_psw = ref_ps.data();
     const PhaseSpace test_ps = poly_ps.exportSystem(i, tier);
     
@@ -1283,7 +1369,7 @@ void checkRattle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
   coordCopy(&raw, poly_ps, pairs, HybridTargetLevel::DEVICE, HybridTargetLevel::DEVICE);
 #endif
   // Constrain the positions and adjust the velocities as appropriate.
-  rattlePositions(&poly_ps, poly_ag, prec, 1.0, rtol);
+  shakePositions(&poly_ps, poly_ag, prec, 1.0, rtol);
 #ifdef STORMM_USE_HPC
   launchIntegrationProcess(&poly_ps, &intg_cache, &velcns_tst, &mmctrl_ie, poly_ag, launcher, prec,
                            AccumulationMethod::SPLIT, IntegrationStage::GEOMETRY_CONSTRAINT);
@@ -1303,6 +1389,579 @@ void checkRattle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
                                             chk_tol, tiers[i], tsm.getTestingStatus(index_key));
       break;
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute and record the centers of mass fore ach SETTLE-constrained group in a topology.
+//
+// Arguments:
+//   cnst:   Holds SETTLE groups and their parameters
+//   psr:    Holds coordiantes of all particles in the system
+//   com_x:  Array of Cartesian X values for the center of mass coordinates, filled and returned
+//   com_y:  Array of Cartesian Y values for the center of mass coordinates, filled and returned
+//   com_z:  Array of Cartesian Z values for the center of mass coordinates, filled and returned
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void settleGroupCentersOfMass(const ConstraintKit<T> &cnst, const PhaseSpaceReader &psr,
+                              std::vector<T> *com_x, std::vector<T> *com_y,
+                              std::vector<T> *com_z) {
+  const T value_two = 2.0;
+  T* xptr = com_x->data();
+  T* yptr = com_y->data();
+  T* zptr = com_z->data();
+  for (int i = 0; i < cnst.nsettle; i++) {
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+    const int parm_idx = cnst.settle_param_idx[i];
+    const T tmp_mo = cnst.settle_mo[parm_idx];
+    const T tmp_mh = cnst.settle_mh[parm_idx];
+    const T total_mass = (tmp_mo + (value_two * tmp_mh));
+    xptr[i] = ((tmp_mo * psr.xalt[oxy_idx]) +
+               (tmp_mh * (psr.xalt[hd1_idx] + psr.xalt[hd2_idx]))) / total_mass;
+    yptr[i] = ((tmp_mo * psr.yalt[oxy_idx]) +
+               (tmp_mh * (psr.yalt[hd1_idx] + psr.yalt[hd2_idx]))) / total_mass;
+    zptr[i] = ((tmp_mo * psr.zalt[oxy_idx]) +
+               (tmp_mh * (psr.zalt[hd1_idx] + psr.zalt[hd2_idx]))) / total_mass;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute normals to the planes of each SETTLE group.  The plane normals will be computed in
+// double-precision regardless of the parameters' data type.
+//
+// Arguments:
+//   cnst:   Holds SETTLE groups and their parameters
+//   psr:    Holds coordiantes of all particles in the system
+//   pln_x:  List of Cartesian X components of the plane normal vectors, filled and returned
+//   pln_y:  List of Cartesian Y components of the plane normal vectors, filled and returned
+//   pln_z:  List of Cartesian Z components of the plane normal vectors, filled and returned
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void settleGroupPlaneNormals(const ConstraintKit<T> &cnst, const PhaseSpaceReader &psr,
+                             std::vector<T> *pln_x, std::vector<T> *pln_y,
+                             std::vector<T> *pln_z) {
+  T* xptr = pln_x->data();
+  T* yptr = pln_y->data();
+  T* zptr = pln_z->data();
+  for (int i = 0; i < cnst.nsettle; i++) {
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+    const double3 oh1 = { psr.xalt[hd1_idx] - psr.xalt[oxy_idx],
+                          psr.yalt[hd1_idx] - psr.yalt[oxy_idx],
+                          psr.zalt[hd1_idx] - psr.zalt[oxy_idx] };
+    const double3 oh2 = { psr.xalt[hd2_idx] - psr.xalt[oxy_idx],
+                          psr.yalt[hd2_idx] - psr.yalt[oxy_idx],
+                          psr.zalt[hd2_idx] - psr.zalt[oxy_idx] };
+    double3 nrm = crossProduct(oh1, oh2);
+    normalize<double3, double>(&nrm);
+    xptr[i] = nrm.x;
+    yptr[i] = nrm.y;
+    zptr[i] = nrm.z;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Execute the inner loop to check each SETTLE group.
+//
+// Arguments:
+//   ag:        Holds the the original file name
+//   cnst:      Constraint group information, obtained at a particular level of precision
+//   ps:        Coordinates and velocities of the particles in question
+//   xsr:       Source of random numbers with which to generate perturbations
+//   gen_tol:   General testing tolerance
+//   pln_tol:   Tolerance on tests for the alignment of plane normal vectors of SETTLE groups
+//              before and after the application of constraints (unitless, merely the deviation
+//              from the exact value of one)
+//   len_tol:   Tolerance on tests for the lengths of constrained bonds within SETTLE groups, in
+//              units of Angstroms
+//   do_tests:  Indicate whether test are possible with valid systems
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T3>
+void checkSettleLoop(const AtomGraph *ag, const ConstraintKit<T> &cnst, PhaseSpace *ps,
+                     Xoshiro256ppGenerator *xsr, const double gen_tol, const double pln_tol,
+                     const double len_tol, const TestPriority do_tests) {
+  PhaseSpaceWriter psw = ps->data();
+  const T value_half = 0.5;
+  const T value_two = 2.0;
+  const PrecisionModel prec = (std::type_index(typeid(T)).hash_code() == double_type_index) ?
+                              PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
+  const std::string calc_prec = getEnumerationName(prec);
+
+  // Set the rigid waters in their ideal geometries, although not with the SETTLE algorithm (just
+  // do it based on the positions of the oxygen atom and the first hydrogen).
+  idealizeSettleReference(ps, ag, prec);
+  std::vector<double> hh_targets(cnst.nsettle), oh_targets(cnst.nsettle);
+  for (int i = 0; i < cnst.nsettle; i++) {
+
+    // Locate the various atoms
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+
+    // Find the ideal distances between SETTLE oxygen and hydrogen atoms.
+    const int parm_idx = cnst.settle_param_idx[i];
+    const T hh = cnst.settle_rc[parm_idx] * value_two;
+    hh_targets[i] = hh;
+    const T t1 = value_half * cnst.settle_mo[parm_idx] / cnst.settle_mh[parm_idx];
+    const T tri_oh = cnst.settle_ra[parm_idx] * (1.0 + t1);
+    const T tri_oh2 = tri_oh * tri_oh;
+    const T oh = sqrt(tri_oh2 + (cnst.settle_rc[parm_idx] * cnst.settle_rc[parm_idx]));
+    oh_targets[i] = oh;
+
+    // Set the initial velocities and those of the developing water, to simulate "forces" acting
+    // on the system.  This is performed in double-precision regardless of the calculation model.
+    psw.xvel[oxy_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.yvel[oxy_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.zvel[oxy_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.xvel[hd1_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.yvel[hd1_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.zvel[hd1_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.xvel[hd2_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.yvel[hd2_idx] = 0.02 * xsr->gaussianRandomNumber();
+    psw.zvel[hd2_idx] = 0.02 * xsr->gaussianRandomNumber();
+    const T oxy_fx = (0.01 * xsr->gaussianRandomNumber());
+    const T oxy_fy = (0.01 * xsr->gaussianRandomNumber());
+    const T oxy_fz = (0.01 * xsr->gaussianRandomNumber());
+    const T hd1_fx = (0.01 * xsr->gaussianRandomNumber());
+    const T hd1_fy = (0.01 * xsr->gaussianRandomNumber());
+    const T hd1_fz = (0.01 * xsr->gaussianRandomNumber());
+    const T hd2_fx = (0.01 * xsr->gaussianRandomNumber());
+    const T hd2_fy = (0.01 * xsr->gaussianRandomNumber());
+    const T hd2_fz = (0.01 * xsr->gaussianRandomNumber());
+    psw.xfrc[oxy_idx] = oxy_fx;
+    psw.yfrc[oxy_idx] = oxy_fy;
+    psw.zfrc[oxy_idx] = oxy_fz;
+    psw.xfrc[hd1_idx] = hd1_fx;
+    psw.yfrc[hd1_idx] = hd1_fy;
+    psw.zfrc[hd1_idx] = hd1_fz;
+    psw.xfrc[hd2_idx] = hd2_fx;
+    psw.yfrc[hd2_idx] = hd2_fy;
+    psw.zfrc[hd2_idx] = hd2_fz;
+    psw.vxalt[oxy_idx] = psw.xvel[oxy_idx] + (value_half * oxy_fx);
+    psw.vyalt[oxy_idx] = psw.yvel[oxy_idx] + (value_half * oxy_fy);
+    psw.vzalt[oxy_idx] = psw.zvel[oxy_idx] + (value_half * oxy_fz);
+    psw.vxalt[hd1_idx] = psw.xvel[hd1_idx] + (value_half * hd1_fx);
+    psw.vyalt[hd1_idx] = psw.yvel[hd1_idx] + (value_half * hd1_fy);
+    psw.vzalt[hd1_idx] = psw.zvel[hd1_idx] + (value_half * hd1_fz);
+    psw.vxalt[hd2_idx] = psw.xvel[hd2_idx] + (value_half * hd2_fx);
+    psw.vyalt[hd2_idx] = psw.yvel[hd2_idx] + (value_half * hd2_fy);
+    psw.vzalt[hd2_idx] = psw.zvel[hd2_idx] + (value_half * hd2_fz);
+  }
+
+  // Save the unconstrained velocities
+  std::vector<T> save_vx(psw.natom), save_vy(psw.natom), save_vz(psw.natom);
+  for (int i = 0; i < psw.natom; i++) {
+    save_vx[i] = psw.vxalt[i];
+    save_vy[i] = psw.vyalt[i];
+    save_vz[i] = psw.vzalt[i];
+  }
+    
+  // Constrain velocities with SETTLE
+  settleVelocities(psw.xcrd, psw.ycrd, psw.zcrd, psw.vxalt, psw.vyalt, psw.vzalt, cnst);
+  int nox_mass_fail = 0;
+  int nhd_mass_fail = 0;
+  std::vector<double> ref_tmx(cnst.nsettle), ref_tmy(cnst.nsettle), ref_tmz(cnst.nsettle);
+  std::vector<double> ref_rmx(cnst.nsettle), ref_rmy(cnst.nsettle), ref_rmz(cnst.nsettle);
+  std::vector<double> cns_tmx(cnst.nsettle), cns_tmy(cnst.nsettle), cns_tmz(cnst.nsettle);
+  std::vector<double> cns_rmx(cnst.nsettle), cns_rmy(cnst.nsettle), cns_rmz(cnst.nsettle);
+  for (int i = 0; i < cnst.nsettle; i++) {
+
+    // Re-derive the SETTLE parameters
+    const int parm_idx = cnst.settle_param_idx[i];
+    const double hh = cnst.settle_rc[parm_idx] * value_two;
+    const double t1 = value_half * cnst.settle_mo[parm_idx] / cnst.settle_mh[parm_idx];
+    const double tri_oh = cnst.settle_ra[parm_idx] * (1.0 + t1);
+    const double tri_oh2 = tri_oh * tri_oh;
+    const double oh = sqrt(tri_oh2 + (cnst.settle_rc[parm_idx] * cnst.settle_rc[parm_idx]));
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+
+    // Compute the translational and rotational momenta
+    const double tmp_mo = cnst.settle_mo[parm_idx];
+    const double tmp_mh = cnst.settle_mh[parm_idx];
+    nox_mass_fail += (fabs(tmp_mo - ag->getAtomicMass<T>(oxy_idx)) > 1.0e-6);
+    nhd_mass_fail += (fabs(tmp_mh - ag->getAtomicMass<T>(hd1_idx)) > 1.0e-6);
+    nhd_mass_fail += (fabs(tmp_mh - ag->getAtomicMass<T>(hd2_idx)) > 1.0e-6);
+    const double tmass = tmp_mo + (value_two * tmp_mh);
+    ref_tmx[i] = (tmp_mo * save_vx[oxy_idx]) + (tmp_mh * (save_vx[hd1_idx] + save_vx[hd2_idx]));
+    ref_tmy[i] = (tmp_mo * save_vy[oxy_idx]) + (tmp_mh * (save_vy[hd1_idx] + save_vy[hd2_idx]));
+    ref_tmz[i] = (tmp_mo * save_vz[oxy_idx]) + (tmp_mh * (save_vz[hd1_idx] + save_vz[hd2_idx]));
+    cns_tmx[i] = (tmp_mo * psw.vxalt[oxy_idx]) +
+                 (tmp_mh * (psw.vxalt[hd1_idx] + psw.vxalt[hd2_idx]));
+    cns_tmy[i] = (tmp_mo * psw.vyalt[oxy_idx]) +
+                 (tmp_mh * (psw.vyalt[hd1_idx] + psw.vyalt[hd2_idx]));
+    cns_tmz[i] = (tmp_mo * psw.vzalt[oxy_idx]) +
+                 (tmp_mh * (psw.vzalt[hd1_idx] + psw.vzalt[hd2_idx]));
+    const double com_x = ((tmp_mo * psw.xcrd[oxy_idx]) +
+                          (tmp_mh * (psw.xcrd[hd1_idx] + psw.xcrd[hd2_idx]))) / tmass;
+    const double com_y = ((tmp_mo * psw.ycrd[oxy_idx]) +
+                          (tmp_mh * (psw.ycrd[hd1_idx] + psw.ycrd[hd2_idx]))) / tmass;
+    const double com_z = ((tmp_mo * psw.zcrd[oxy_idx]) +
+                          (tmp_mh * (psw.zcrd[hd1_idx] + psw.zcrd[hd2_idx]))) / tmass;
+    const double3 oxy_r = { psw.xcrd[oxy_idx] - com_x, psw.ycrd[oxy_idx] - com_y,
+                            psw.zcrd[oxy_idx] - com_z };
+    const double3 hd1_r = { psw.xcrd[hd1_idx] - com_x, psw.ycrd[hd1_idx] - com_y,
+                            psw.zcrd[hd1_idx] - com_z };
+    const double3 hd2_r = { psw.xcrd[hd2_idx] - com_x, psw.ycrd[hd2_idx] - com_y,
+                            psw.zcrd[hd2_idx] - com_z };
+    const double3 ref_oxy_rv = crossProduct(oxy_r, { save_vx[oxy_idx], save_vy[oxy_idx],
+                                                     save_vz[oxy_idx] });
+    const double3 ref_hd1_rv = crossProduct(hd1_r, { save_vx[hd1_idx], save_vy[hd1_idx],
+                                                     save_vz[hd1_idx] });
+    const double3 ref_hd2_rv = crossProduct(hd2_r, { save_vx[hd2_idx], save_vy[hd2_idx],
+                                                     save_vz[hd2_idx] });
+    ref_rmx[i] = (tmp_mo * ref_oxy_rv.x) + (tmp_mh * (ref_hd1_rv.x + ref_hd2_rv.x));
+    ref_rmy[i] = (tmp_mo * ref_oxy_rv.y) + (tmp_mh * (ref_hd1_rv.y + ref_hd2_rv.y));
+    ref_rmz[i] = (tmp_mo * ref_oxy_rv.z) + (tmp_mh * (ref_hd1_rv.z + ref_hd2_rv.z));
+    const double3 nv_oxy = { psw.vxalt[oxy_idx], psw.vyalt[oxy_idx], psw.vzalt[oxy_idx] };
+    const double3 nv_hd1 = { psw.vxalt[hd1_idx], psw.vyalt[hd1_idx], psw.vzalt[hd1_idx] };
+    const double3 nv_hd2 = { psw.vxalt[hd2_idx], psw.vyalt[hd2_idx], psw.vzalt[hd2_idx] };
+    const double3 cns_oxy_rv = crossProduct(oxy_r, nv_oxy);
+    const double3 cns_hd1_rv = crossProduct(hd1_r, nv_hd1);
+    const double3 cns_hd2_rv = crossProduct(hd2_r, nv_hd2);
+    cns_rmx[i] = (tmp_mo * cns_oxy_rv.x) + (tmp_mh * (cns_hd1_rv.x + cns_hd2_rv.x));
+    cns_rmy[i] = (tmp_mo * cns_oxy_rv.y) + (tmp_mh * (cns_hd1_rv.y + cns_hd2_rv.y));
+    cns_rmz[i] = (tmp_mo * cns_oxy_rv.z) + (tmp_mh * (cns_hd1_rv.z + cns_hd2_rv.z));
+  }
+
+  // Check the SETTLE parameters
+  check(nox_mass_fail, RelationalOperator::EQUAL, 0, "In topology " +
+        getBaseName(ag->getFileName()) + ", the oxygen masses incorporated into some SETTLE "
+        "groups do not match the atoms' masses in the topology.  Calculation precision: " +
+        calc_prec + ".", do_tests);
+  check(nhd_mass_fail, RelationalOperator::EQUAL, 0, "In topology " +
+        getBaseName(ag->getFileName()) + ", the hydrogen masses incorporated into some SETTLE "
+        "groups do not match the atoms' masses in the topology.  Calculation precision: " +
+        calc_prec + ".", do_tests);
+
+  // Check the SETTLE velocity constraints
+  check(cns_tmx, RelationalOperator::EQUAL, Approx(ref_tmx).margin(gen_tol), "Translational "
+        "momentum in the Cartesian X direction was not maintained by CPU-based SETTLE velocity "
+        "application.  Calculation precision: " + calc_prec + ".");
+  check(cns_tmy, RelationalOperator::EQUAL, Approx(ref_tmy).margin(gen_tol), "Translational "
+        "momentum in the Cartesian Y direction was not maintained by CPU-based SETTLE velocity "
+        "application.  Calculation precision: " + calc_prec + ".");
+  check(cns_tmz, RelationalOperator::EQUAL, Approx(ref_tmz).margin(gen_tol), "Translational "
+        "momentum in the Cartesian Z direction was not maintained by CPU-based SETTLE velocity "
+        "application.  Calculation precision: " + calc_prec + ".");
+  check(cns_rmx, RelationalOperator::EQUAL, Approx(ref_rmx).margin(gen_tol), "Rotational momentum "
+        "about the Cartesian X axis was not maintained by CPU-based SETTLE velocity application.  "
+        "Calculation precision: " + calc_prec + ".");
+  check(cns_rmy, RelationalOperator::EQUAL, Approx(ref_rmy).margin(gen_tol), "Rotational momentum "
+        "about the Cartesian Y axis was not maintained by CPU-based SETTLE velocity application.  "
+        "Calculation precision: " + calc_prec + ".");
+  check(cns_rmz, RelationalOperator::EQUAL, Approx(ref_rmz).margin(gen_tol), "Rotational momentum "
+        "about the Cartesian Z axis was not maintained by CPU-based SETTLE velocity application.  "
+        "Calculation precision: " + calc_prec + ".");
+
+  // Advance the velocities again, then advance positions
+  for (int i = 0; i < cnst.nsettle; i++) {
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+    psw.vxalt[oxy_idx] += value_half * psw.xfrc[oxy_idx];
+    psw.vyalt[oxy_idx] += value_half * psw.yfrc[oxy_idx];
+    psw.vzalt[oxy_idx] += value_half * psw.zfrc[oxy_idx];
+    psw.vxalt[hd1_idx] += value_half * psw.xfrc[hd1_idx];
+    psw.vyalt[hd1_idx] += value_half * psw.yfrc[hd1_idx];
+    psw.vzalt[hd1_idx] += value_half * psw.zfrc[hd1_idx];
+    psw.vxalt[hd2_idx] += value_half * psw.xfrc[hd2_idx];
+    psw.vyalt[hd2_idx] += value_half * psw.xfrc[hd2_idx];
+    psw.vzalt[hd2_idx] += value_half * psw.xfrc[hd2_idx];
+    psw.xalt[oxy_idx] = psw.xcrd[oxy_idx] + psw.vxalt[oxy_idx];
+    psw.yalt[oxy_idx] = psw.ycrd[oxy_idx] + psw.vyalt[oxy_idx];
+    psw.zalt[oxy_idx] = psw.zcrd[oxy_idx] + psw.vzalt[oxy_idx];
+    psw.xalt[hd1_idx] = psw.xcrd[hd1_idx] + psw.vxalt[hd1_idx];
+    psw.yalt[hd1_idx] = psw.ycrd[hd1_idx] + psw.vyalt[hd1_idx];
+    psw.zalt[hd1_idx] = psw.zcrd[hd1_idx] + psw.vzalt[hd1_idx];
+    psw.xalt[hd2_idx] = psw.xcrd[hd2_idx] + psw.vxalt[hd2_idx];
+    psw.yalt[hd2_idx] = psw.ycrd[hd2_idx] + psw.vyalt[hd2_idx];
+    psw.zalt[hd2_idx] = psw.zcrd[hd2_idx] + psw.vzalt[hd2_idx];
+  }
+
+  // Compute properties of each unconstrained group that will be useful for testing.
+  std::vector<T> ref_com_x(cnst.nsettle), ref_com_y(cnst.nsettle), ref_com_z(cnst.nsettle);
+  settleGroupCentersOfMass(cnst, psw, &ref_com_x, &ref_com_y, &ref_com_z);
+  std::vector<T> ref_pln_x(cnst.nsettle), ref_pln_y(cnst.nsettle), ref_pln_z(cnst.nsettle);
+  settleGroupPlaneNormals(cnst, psw, &ref_pln_x, &ref_pln_y, &ref_pln_z);
+
+  // Apply SETTLE constraints to the positions
+  settlePositions<double, T, T3>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xalt, psw.yalt, psw.zalt,
+                                 psw.vxalt, psw.vyalt, psw.vzalt, cnst, 1.0);
+
+  // Recompute geometric properties of each constrained group for comparison to those above.
+  std::vector<T> cns_com_x(cnst.nsettle), cns_com_y(cnst.nsettle), cns_com_z(cnst.nsettle);
+  settleGroupCentersOfMass(cnst, psw, &cns_com_x, &cns_com_y, &cns_com_z);
+  std::vector<T> cns_pln_x(cnst.nsettle), cns_pln_y(cnst.nsettle), cns_pln_z(cnst.nsettle);
+  settleGroupPlaneNormals(cnst, psw, &cns_pln_x, &cns_pln_y, &cns_pln_z);
+
+  // Check the consistency of the center of mass after SETTLE constraints on the positions
+  check(cns_com_x, RelationalOperator::EQUAL, Approx(ref_com_x).margin(gen_tol), "Centers of mass "
+        "(in the Cartesian X direction) were not preserved by the CPU-based SETTLE positions "
+        "routine.  Calculation precision: " + calc_prec + ".", do_tests);
+  check(cns_com_y, RelationalOperator::EQUAL, Approx(ref_com_y).margin(gen_tol), "Centers of mass "
+        "(in the Cartesian Y direction) were not preserved by the CPU-based SETTLE positions "
+        "routine.  Calculation precision: " + calc_prec + ".", do_tests);
+  check(cns_com_z, RelationalOperator::EQUAL, Approx(ref_com_z).margin(gen_tol), "Centers of mass "
+        "(in the Cartesian Z direction) were not preserved by the CPU-based SETTLE positions "
+        "routine.  Calculation precision: " + calc_prec + ".", do_tests);
+
+  // Check that SETTLE-constrained groups remain coplanar with their unconstrained progenitors.
+  // The plane normals are normalized, thus their dot product will be at most 1.0, when they run
+  // parallel to one another.
+  std::vector<double> pln_align(cnst.nsettle);
+  for (int i = 0; i < cnst.nsettle; i++) {
+    pln_align[i] = ((ref_pln_x[i] * cns_pln_x[i]) + (ref_pln_y[i] * cns_pln_y[i]) +
+                    (ref_pln_z[i] * cns_pln_z[i]));
+  }
+  check(pln_align, RelationalOperator::EQUAL,
+        Approx(std::vector<double>(cnst.nsettle, 1.0)).margin(pln_tol), "Plane normal vectors do "
+        "not align before and after SETTLE constraints are applied in the " +
+        getBaseName(ag->getFileName()) + " system.  Calculation precision: " + calc_prec + ".",
+        do_tests);
+
+  // Check the bond lengths of SETTLE-constrained groups
+  std::vector<double> oh1_found(cnst.nsettle), oh2_found(cnst.nsettle), hh_found(cnst.nsettle);
+  for (int i = 0; i < cnst.nsettle; i++) {        
+    const int oxy_idx = cnst.settle_ox_atoms[i];
+    const int hd1_idx = cnst.settle_h1_atoms[i];
+    const int hd2_idx = cnst.settle_h2_atoms[i];
+    const double oh1_dx = psw.xalt[hd1_idx] - psw.xalt[oxy_idx];
+    const double oh1_dy = psw.yalt[hd1_idx] - psw.yalt[oxy_idx];
+    const double oh1_dz = psw.zalt[hd1_idx] - psw.zalt[oxy_idx];
+    const double oh2_dx = psw.xalt[hd2_idx] - psw.xalt[oxy_idx];
+    const double oh2_dy = psw.yalt[hd2_idx] - psw.yalt[oxy_idx];
+    const double oh2_dz = psw.zalt[hd2_idx] - psw.zalt[oxy_idx];
+    const double hh_dx = psw.xalt[hd2_idx] - psw.xalt[hd1_idx];
+    const double hh_dy = psw.yalt[hd2_idx] - psw.yalt[hd1_idx];
+    const double hh_dz = psw.zalt[hd2_idx] - psw.zalt[hd1_idx];
+    oh1_found[i] = sqrt((oh1_dx * oh1_dx) + (oh1_dy * oh1_dy) + (oh1_dz * oh1_dz));
+    oh2_found[i] = sqrt((oh2_dx * oh2_dx) + (oh2_dy * oh2_dy) + (oh2_dz * oh2_dz));
+    hh_found[i] = sqrt((hh_dx * hh_dx) + (hh_dy * hh_dy) + (hh_dz * hh_dz));
+  }
+  check(oh1_found, RelationalOperator::EQUAL, Approx(oh_targets).margin(len_tol), "Constrained "
+        "bond lengths between the heavy atoms and first light atoms of SETTLE groups do not "
+        "agree with the parameter set.  Precision of the calculations: " + calc_prec + ".",
+        do_tests);
+  check(oh2_found, RelationalOperator::EQUAL, Approx(oh_targets).margin(len_tol), "Constrained "
+        "bond lengths between the heavy atoms and second light atoms of SETTLE groups do not "
+        "agree with the parameter set.  Precision of the calculations: " + calc_prec + ".",
+        do_tests);
+  check(hh_found, RelationalOperator::EQUAL, Approx(hh_targets).margin(len_tol), "Constrained "
+        "bond lengths between the two light atoms of SETTLE groups do not agree with the "
+        "parameter set.  Precision of the calculations: " + calc_prec + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the application of SETTLE constraints for rigid water molecules.
+//
+// Arguments:
+//   tsm:      Collection of test systems
+//   xsr:      Source of random numbers for making perturbations and assigning initial velocities
+//   prec:     The precision in which to carry out calculations (the atomic positions and
+//             velocities of the particles in their global configuration will be represented by
+//             double-precision floating point numbers)
+//   gen_tol:  General testing tolerance
+//   pln_tol:  Tolerance on tests for the alignment of plane normal vectors of SETTLE groups
+//             before and after the application of constraints (unitless, merely the deviation
+//             from the exact value of one)
+//   len_tol:  Tolerance on tests for the lengths of constrained bonds within SETTLE groups, in
+//             units of Angstroms
+//-------------------------------------------------------------------------------------------------
+void checkSettle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
+                 const PrecisionModel prec, const double gen_tol, const double pln_tol,
+                 const double len_tol) {
+  const std::vector<UnitCellType> pbct = { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC };
+  const int nsys = tsm.getSystemCount();
+  const int nuc = pbct.size();
+  std::vector<int> index_key;
+  for (int i = 0; i < nsys; i++) {
+    if (tsm.getTopologyPointer(i)->getRigidWaterCount() == 0) {
+      continue;
+    }
+    for (int j = 0; j < nuc; j++) {
+      if (tsm.getTopologyPointer(i)->getUnitCellType() == pbct[j]) {
+        index_key.push_back(i);
+      }
+    }
+  }
+  const int nhyd_sys = index_key.size();
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(index_key);
+  for (int i = 0; i < nhyd_sys; i++) {
+    PhaseSpace ps_i = poly_ps.exportSystem(i);
+    const AtomGraph* ag_i = poly_ps.getSystemTopologyPointer(i);
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      {
+        const ConstraintKit<double> cnst = ag_i->getDoublePrecisionConstraintKit();
+        check(cnst.nsettle >= 1, "The number of rigid waters in topology " +
+              getBaseName(ag_i->getFileName()) + " was reported by the AtomGraph "
+              "getRigidWaterCount() accessor as " + std::to_string(ag_i->getRigidWaterCount()) +
+              " but the number of SETTLE-constrained waters is " + std::to_string(cnst.nsettle) +
+              ".  Precision of the constraints: " + getEnumerationName(prec) + ".",
+              tsm.getTestingStatus());
+        if (cnst.nsettle >= 1) {
+          checkSettleLoop<double, double3>(ag_i, cnst, &ps_i, xsr, gen_tol, pln_tol, len_tol,
+                                           tsm.getTestingStatus());
+        }
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      {
+        const ConstraintKit<float> cnst = ag_i->getSinglePrecisionConstraintKit();
+        if (cnst.nsettle >= 1) {
+          checkSettleLoop<float, float3>(ag_i, cnst, &ps_i, xsr, gen_tol, pln_tol, len_tol,
+                                         tsm.getTestingStatus());
+        }
+      }
+      break;
+    }
+  }
+
+  // Try a different approach, one centered around the coordinate and topology syntheses.  If the
+  // previous tests have passed, then the single-system, CPU-based routines are in good order.  Use
+  // them to check the work inside the PhaseSpaceSynthesis.
+  std::vector<PhaseSpace> psvec;
+  std::vector<const AtomGraph*> agvec;
+  psvec.reserve(nhyd_sys);
+  agvec.reserve(nhyd_sys);
+  for (int i = 0; i < nhyd_sys; i++) {
+    psvec.emplace_back(poly_ps.exportSystem(i));
+    agvec.emplace_back(poly_ps.getSystemTopologyPointer(i));
+    PhaseSpaceWriter psw = psvec.back().data();
+    for (int j = 0; j < psw.natom; j++) {
+      psw.xvel[j] = 0.02 * xsr->gaussianRandomNumber();
+      psw.yvel[j] = 0.02 * xsr->gaussianRandomNumber();
+      psw.zvel[j] = 0.02 * xsr->gaussianRandomNumber();
+      psw.xfrc[j] = 0.01 * xsr->gaussianRandomNumber();
+      psw.yfrc[j] = 0.01 * xsr->gaussianRandomNumber();
+      psw.zfrc[j] = 0.01 * xsr->gaussianRandomNumber();
+      psw.vxalt[j] = psw.xvel[j] + psw.xfrc[j];
+      psw.vyalt[j] = psw.yvel[j] + psw.yfrc[j];
+      psw.vzalt[j] = psw.zvel[j] + psw.zfrc[j];
+    }
+    poly_ps.importSystem(psvec.back(), i);
+
+    // Perform the SETTLE velocity operations on the PhaseSpace object
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      {
+        const ConstraintKit<double> cnst = agvec.back()->getDoublePrecisionConstraintKit();
+        settleVelocities(&psw, cnst);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      {
+        const ConstraintKit<float> cnst = agvec.back()->getSinglePrecisionConstraintKit();
+        settleVelocities(&psw, cnst);
+      }
+      break;
+    }
+
+    // Update the positions in the PhaseSpace object
+    for (int j = 0; j < psw.natom; j++) {
+      psw.vxalt[j] += psw.xfrc[j];
+      psw.vyalt[j] += psw.yfrc[j];
+      psw.vzalt[j] += psw.zfrc[j];
+      psw.xalt[j] = psw.xcrd[j] + psw.vxalt[j];
+      psw.yalt[j] = psw.ycrd[j] + psw.vyalt[j];
+      psw.zalt[j] = psw.zcrd[j] + psw.vzalt[j];
+    }
+
+    // Perform SETTLE on the positions in the PhaseSapce object
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      {
+        const ConstraintKit<double> cnst = agvec.back()->getDoublePrecisionConstraintKit();
+        settlePositions<double, double3>(&psw, cnst, 1.0);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      {
+        const ConstraintKit<float> cnst = agvec.back()->getSinglePrecisionConstraintKit();
+        settlePositions<float, float3>(&psw, cnst, 1.0);
+      }
+      break;
+    }
+  }
+  
+  // Perform SETTLE velocity operations on the coordinate synthesis
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(index_key);
+  settleVelocities(&poly_ps, poly_ag, prec);
+
+  // Update the velocities in the synthesis once more, based on the forces, then update positions.
+  PsSynthesisWriter poly_psw = poly_ps.data();
+  for (int i = 0; i < nhyd_sys; i++) {
+    const int j_llim = poly_psw.atom_starts[i];
+    const int j_hlim = j_llim + poly_psw.atom_counts[i];
+    for (int j = j_llim; j < j_hlim; j++) {
+      const double xpush = hostInt95ToDouble(poly_psw.xfrc[j], poly_psw.xfrc_ovrf[j]) *
+                           poly_psw.inv_frc_scale_f;
+      const double ypush = hostInt95ToDouble(poly_psw.yfrc[j], poly_psw.yfrc_ovrf[j]) *
+                           poly_psw.inv_frc_scale_f;
+      const double zpush = hostInt95ToDouble(poly_psw.zfrc[j], poly_psw.zfrc_ovrf[j]) *
+                           poly_psw.inv_frc_scale_f;
+      const int95_t xrate = hostInt95Sum(poly_psw.vxalt[j], poly_psw.vxalt_ovrf[j],
+                                         xpush * poly_psw.vel_scale_f);
+      const int95_t yrate = hostInt95Sum(poly_psw.vyalt[j], poly_psw.vyalt_ovrf[j],
+                                         ypush * poly_psw.vel_scale_f);
+      const int95_t zrate = hostInt95Sum(poly_psw.vzalt[j], poly_psw.vzalt_ovrf[j],
+                                         zpush * poly_psw.vel_scale_f);
+      poly_psw.vxalt[j] = xrate.x;
+      poly_psw.vyalt[j] = yrate.x;
+      poly_psw.vzalt[j] = zrate.x;
+      poly_psw.vxalt_ovrf[j] = xrate.y;
+      poly_psw.vyalt_ovrf[j] = yrate.y;
+      poly_psw.vzalt_ovrf[j] = zrate.y;
+      const double xloc = hostInt95ToDouble(poly_psw.xcrd[j], poly_psw.xcrd_ovrf[j]) *
+                          poly_psw.inv_gpos_scale_f;
+      const double yloc = hostInt95ToDouble(poly_psw.ycrd[j], poly_psw.ycrd_ovrf[j]) *
+                          poly_psw.inv_gpos_scale_f;
+      const double zloc = hostInt95ToDouble(poly_psw.zcrd[j], poly_psw.zcrd_ovrf[j]) *
+                          poly_psw.inv_gpos_scale_f;
+      const double dxrate = hostInt95ToDouble(xrate) * poly_psw.inv_vel_scale_f;
+      const double dyrate = hostInt95ToDouble(yrate) * poly_psw.inv_vel_scale_f;
+      const double dzrate = hostInt95ToDouble(zrate) * poly_psw.inv_vel_scale_f;
+      const int95_t xupd = hostDoubleToInt95((xloc + dxrate) * poly_psw.gpos_scale_f);
+      const int95_t yupd = hostDoubleToInt95((yloc + dyrate) * poly_psw.gpos_scale_f);
+      const int95_t zupd = hostDoubleToInt95((zloc + dzrate) * poly_psw.gpos_scale_f);
+      poly_psw.xalt[j] = xupd.x;
+      poly_psw.yalt[j] = yupd.x;
+      poly_psw.zalt[j] = zupd.x;
+      poly_psw.xalt_ovrf[j] = xupd.y;
+      poly_psw.yalt_ovrf[j] = yupd.y;
+      poly_psw.zalt_ovrf[j] = zupd.y;
+    }
+  }
+
+  // Perform SETTLE position operations on the coordinate synthesis
+  settlePositions(&poly_ps, poly_ag, 1.0, prec);
+  
+  // Check that the positions and velocities of the synthesis are consistent with those in the
+  // array of individual systems.
+  const TrajectoryKind vels = TrajectoryKind::VELOCITIES;
+  const TrajectoryKind locs = TrajectoryKind::POSITIONS;
+  const CoordinateCycle cdev = CoordinateCycle::BLACK;
+  for (int i = 0; i < nhyd_sys; i++) {
+    const PhaseSpace ps_i = poly_ps.exportSystem(i);
+    const std::vector<double> vcns = ps_i.getInterlacedCoordinates(cdev, vels);
+    const std::vector<double> vcns_ans = psvec[i].getInterlacedCoordinates(cdev, vels);
+    check(vcns, RelationalOperator::EQUAL, vcns_ans, "The constrained velocities computed by the "
+          "CPU SETTLE implementation for a synthesis of systems do not agree with those computed "
+          "by the CPU SETTLE implementation for individual systems.  System origin: " +
+          getBaseName(agvec[i]->getFileName()) + ".  Calculation precision: " +
+          getEnumerationName(prec) + ".");
+    const std::vector<double> xcns = ps_i.getInterlacedCoordinates(cdev, locs);
+    const std::vector<double> xcns_ans = psvec[i].getInterlacedCoordinates(cdev, locs);
+    check(xcns, RelationalOperator::EQUAL, xcns_ans, "The constrained positions computed by the "
+          "CPU SETTLE implementation for a synthesis of systems do not agree with those computed "
+          "by the CPU SETTLE implementation for individual systems.  System origin: " +
+          getBaseName(agvec[i]->getFileName()) + ".  Calculation precision: " +
+          getEnumerationName(prec) + ".");
   }
 }
 
@@ -1635,6 +2294,8 @@ int main(const int argc, const char* argv[]) {
         tsm.getTestingStatus());
   checkGeometrics(tsm, { UnitCellType::NONE });
   checkGeometrics(tsm, { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC });
+  checkRotations<float, float>(&xsr);
+  checkRotations<double, double>(&xsr);
   
   // Check the placement of virtual sites, frame type by frame type.  Scramble and recover the
   // virtual site locations, then place the entire system back in the primary unit cell and
@@ -1754,6 +2415,8 @@ int main(const int argc, const char* argv[]) {
               PrecisionModel::DOUBLE, gpu);
   checkRattle(tsm, &xsr, std::vector<UnitCellType>(1, UnitCellType::NONE),
               PrecisionModel::SINGLE, gpu);
+  checkSettle(tsm, &xsr, PrecisionModel::DOUBLE, 1.0e-7, 2.1e-5, 4.0e-10);
+  checkSettle(tsm, &xsr, PrecisionModel::SINGLE, 3.0e-6, 5.4e-5, 4.0e-7);
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

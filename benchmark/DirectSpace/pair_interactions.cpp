@@ -379,20 +379,34 @@ double3 ParticleGroup::evaluateInteractions(const PhaseSpaceSynthesis &poly_ps) 
 // Determine the number and sizes of atom batches needed to span a given total number of atoms.
 //
 // Arguments:
-//   total_atoms:  The total number of atoms to cover
-//   max_batch:    The maximum batch size to use in covering all atoms
-//   min_batch:    The minimum batch size to use in covering all atoms
+//   total_atoms:       The total number of atoms to cover
+//   max_batch:         The maximum batch size to use in covering all atoms
+//   min_batch:         The minimum batch size to use in covering all atoms
+//   trim_final_batch:  Indicate that the final batch should be trimmed to the smallest possible
+//                      size, conserving store operations while trimming the total tile area
 //-------------------------------------------------------------------------------------------------
-std::vector<int> batchList(const int total_atoms, const int max_batch, const int min_batch) {
+std::vector<int> batchList(const int total_atoms, const int max_batch, const int min_batch,
+                           const bool trim_final_batch) {
   int ncovered = 0;
   int bsize = max_batch;
   int bmask = min_batch - 1;
   std::vector<int> result;
   const int twice_min_batch = min_batch * 2;
   while (ncovered < total_atoms) {
-    if (total_atoms - ncovered >= bsize || bsize == min_batch ||
-        (bsize == twice_min_batch && total_atoms - ncovered > (bsize >> 1))) {
-      result.push_back(bsize);
+    const int atoms_left = total_atoms - ncovered;
+    if (atoms_left >= bsize || (bsize == min_batch * 4 && atoms_left < bsize &&
+                                atoms_left > 3 * min_batch) || bsize == min_batch ||
+        (bsize == twice_min_batch && atoms_left > min_batch)) {
+      if (atoms_left >= bsize || trim_final_batch == false) {
+        result.push_back(bsize);
+      }
+      else {
+        int best_final_batch = bsize;
+        while (best_final_batch / 2 >= atoms_left) {
+          best_final_batch >>= 1;
+        }
+        result.push_back(best_final_batch);
+      }
       ncovered += bsize;
     }
     else if (bsize >= min_batch) {
@@ -406,13 +420,20 @@ std::vector<int> batchList(const int total_atoms, const int max_batch, const int
 // Analyze the theoretical occupancy of the tower-plate kernel.
 //
 // Arguments:
-//   cg:       The cell grid to analyze
-//   sys_idx:  Index of the system of interest within the cell grid
-//   cutoff:   The particle-particle cutoff determining valid interactions
+//   cg:                The cell grid to analyze
+//   sys_idx:           Index of the system of interest within the cell grid
+//   cutoff:            The particle-particle cutoff determining valid interactions
+//   min_batch:         The minimum batch size to consider when making tiles
+//   max_batch:         The minimum batch size to consider when making tiles
+//   trim_final_batch:  Indicate whether to trim the final batch along any portion of the
+//                      tower-plate decomposition
+//   cull_irrelevant:   Indicate whether to cull atoms in the tower and plate which could not
+//                      possibly be within range of those they would need to interact with
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
 void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
-                               const double cutoff) {
+                               const double cutoff, const int min_batch, const int max_batch,
+                               const bool trim_final_batch, const bool cull_irrelevant) {
 
   // Construct the tower-plate arrangement
   const std::vector<int> tw_rel_a = {  0,  0,  0,  0,  0 };
@@ -427,7 +448,7 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
   int overall_max_pop = 0;
   std::vector<double> running_sum, squared_sum;
   std::vector<double> tp_ideal_work(cgr.system_count, 0.0), tp_total_work(cgr.system_count, 0.0);
-  std::vector<double> tp_successful(cgr.system_count, 0.0);
+  std::vector<double> tp_successful(cgr.system_count, 0.0), tp_stores(cgr.system_count, 0.0);
   for (int sys_idx = 0; sys_idx < cgr.system_count; sys_idx++) {
     const ullint sys_dims = cgr.system_cell_grids[sys_idx];
     const int na_cell = ((sys_dims >> 28) & 0xfff);
@@ -436,7 +457,7 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
     const int cell_start = (sys_dims & 0xfffffff);
     const int nabc_cells = na_cell * nb_cell * nc_cell;
     std::vector<int> tower_cells(5), plate_cells(12), tower_offsets(5), plate_offsets(12);
-    std::vector<int> tower_prefix(6), plate_prefix(13);
+    std::vector<int> tower_prefix(6), plate_prefix(13), tower_;
     const int xfrm_offset = sys_idx * roundUp(9, warp_size_int);
     std::vector<double> cg_invu(9);
     for (int i = 0; i < 9; i++) {
@@ -458,7 +479,7 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
     for (int i = 0; i < na_cell; i++) {
       for (int j = 0; j < nb_cell; j++) {
         for (int k = 0; k < nc_cell; k++) {
-
+          
           // Determine the cell identities
           for (int m = 0; m < 5; m++) {
             int c_a = i + tw_rel_a[m];
@@ -470,7 +491,29 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
             tower_cells[m] = (((c_c * nb_cell) + c_b) * na_cell) + c_a + cell_start;
             const uint2 cldat = cgr.cell_limits[tower_cells[m]];
             tower_offsets[m] = cldat.x;
-            tower_prefix[m] = (cldat.y >> 16);
+            if (cull_irrelevant) {
+              const uint nlim = cldat.x + (cldat.y >> 16);
+              if (m == 0) {
+                int nrel = 0;
+                for (uint n = cldat.x; n < nlim; n++) {
+                  nrel += ((cgr.relevance[n] >> 12) & 0x1);
+                }
+                tower_prefix[m] = nrel;
+              }
+              else if (m == 4) {
+                int nrel = 0;
+                for (uint n = cldat.x; n < nlim; n++) {
+                  nrel += ((cgr.relevance[n] >> 15) & 0x1);
+                }
+                tower_prefix[m] = nrel;
+              }
+              else {
+                tower_prefix[m] = (cldat.y >> 16);
+              }
+            }
+            else {
+              tower_prefix[m] = (cldat.y >> 16);
+            }
           }
           tower_prefix[5] = 0;
           prefixSumInPlace<int>(&tower_prefix, PrefixSumType::EXCLUSIVE);
@@ -485,17 +528,31 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
             plate_cells[m] = (((c_c * nb_cell) + c_b) * na_cell) + c_a + cell_start;
             const uint2 cldat = cgr.cell_limits[plate_cells[m]];
             plate_offsets[m] = cldat.x;
-            plate_prefix[m] = (cldat.y >> 16);
+            if (cull_irrelevant) {
+              int nrel = 0;
+              const uint nlim = cldat.x + (cldat.y >> 16);
+              for (uint n = cldat.x; n < nlim; n++) {
+                nrel += ((cgr.relevance[n] >> m) & 0x1);
+              }
+              plate_prefix[m] = nrel;
+            }
+            else {
+              plate_prefix[m] = (cldat.y >> 16);
+            }
           }
           plate_prefix[12] = 0;
           prefixSumInPlace<int>(&plate_prefix, PrefixSumType::EXCLUSIVE);
           tp_ideal_work[sys_idx] += static_cast<double>(tower_prefix[5] * plate_prefix[12]);
 
           // Determine the number and sizes of tower sets for tower-plate interactions
-          const std::vector<int> tower_sets = batchList(tower_prefix[5], 32, 8);
-          const std::vector<int> plate_sets = batchList(plate_prefix[12], 32, 8);
-          const std::vector<int> centr_sets = batchList(tower_prefix[3] - tower_prefix[2], 32, 8);
-          const std::vector<int> lower_sets = batchList(tower_prefix[2], 32, 8);
+          const std::vector<int> tower_sets = batchList(tower_prefix[5], max_batch, min_batch,
+                                                        trim_final_batch);
+          const std::vector<int> plate_sets = batchList(plate_prefix[12], max_batch, min_batch,
+                                                        trim_final_batch);
+          const std::vector<int> centr_sets = batchList(tower_prefix[3] - tower_prefix[2],
+                                                        max_batch, min_batch, trim_final_batch);
+          const std::vector<int> lower_sets = batchList(tower_prefix[2], max_batch, min_batch,
+                                                        trim_final_batch);
           const double tower_atoms_tiled = sum<int>(tower_sets);
           const double plate_atoms_tiled = sum<int>(plate_sets);
           const double centr_atoms_tiled = sum<int>(centr_sets);
@@ -503,6 +560,9 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
           tp_total_work[sys_idx] += (tower_atoms_tiled * plate_atoms_tiled) +
                                     (centr_atoms_tiled * ((centr_atoms_tiled / 2) +
                                                           lower_atoms_tiled));
+          tp_stores[sys_idx] += (tower_sets.size() * (plate_sets.size() + 1)) +
+                                (centr_sets.size() * (lower_sets.size() + 1)) +
+                                (centr_sets.size() * (centr_sets.size() + 1) / 2);
 
           // Stage the tower and plate atoms
           std::vector<double> tower_x(tower_prefix[5]);
@@ -513,32 +573,40 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
           std::vector<double> plate_z(plate_prefix[12]);
           size_t npt = 0;
           for (int m = 0; m < 5; m++) {
-            const uint plim = tower_offsets[m] + tower_prefix[m + 1] - tower_prefix[m];
+            const uint2 cldat = cgr.cell_limits[tower_cells[m]];
+            const uint poslim = cldat.x + (cldat.y >> 16);
             const double stack_mult = m - 2;
             const double x_del = stack_mult * cg_invu[6];
             const double y_del = stack_mult * cg_invu[7];
             const double z_del = stack_mult * cg_invu[8];
-            for (uint pos = tower_offsets[m]; pos < plim; pos++) {
-              const Tcoord4 atom_img = cgr.image[pos];
-              tower_x[npt] = atom_img.x + x_del;
-              tower_y[npt] = atom_img.y + y_del;
-              tower_z[npt] = atom_img.z + z_del;
-              npt++;
+            for (uint pos = cldat.x; pos < poslim; pos++) {
+              if (cull_irrelevant == false || (m != 0 && m != 4) ||
+                  (m == 0 && ((cgr.relevance[pos] >> 12) & 0x1)) ||
+                  (m == 4 && ((cgr.relevance[pos] >> 15) & 0x1))) {
+                const Tcoord4 atom_img = cgr.image[pos];
+                tower_x[npt] = atom_img.x + x_del;
+                tower_y[npt] = atom_img.y + y_del;
+                tower_z[npt] = atom_img.z + z_del;
+                npt++;
+              }
             }
           }
           npt = 0;
           for (int m = 0; m < 12; m++) {
-            const uint plim = plate_offsets[m] + plate_prefix[m + 1] - plate_prefix[m];
+            const uint2 cldat = cgr.cell_limits[plate_cells[m]];
+            const uint poslim = cldat.x + (cldat.y >> 16);
             const double stack_mult_x = static_cast<double>(m - ((m / 5) * 5) - 2);
             const double stack_mult_y = static_cast<double>((m / 5) - 2);
             const double x_del = (stack_mult_x * cg_invu[0]) + (stack_mult_y * cg_invu[3]);
             const double y_del =                               (stack_mult_y * cg_invu[4]);
-            for (uint pos = plate_offsets[m]; pos < plim; pos++) {
-              const Tcoord4 atom_img = cgr.image[pos];
-              plate_x[npt] = atom_img.x + x_del;
-              plate_y[npt] = atom_img.y + y_del;
-              plate_z[npt] = atom_img.z;
-              npt++;
+            for (uint pos = cldat.x; pos < poslim; pos++) {
+              if (cull_irrelevant == false || ((cgr.relevance[pos] >> m) & 0x1)) {
+                const Tcoord4 atom_img = cgr.image[pos];
+                plate_x[npt] = atom_img.x + x_del;
+                plate_y[npt] = atom_img.y + y_del;
+                plate_z[npt] = atom_img.z;
+                npt++;
+              }
             }
           }
 
@@ -608,12 +676,15 @@ void reportTowerPlateOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &cg,
   const VarianceMethod stdev = VarianceMethod::STANDARD_DEVIATION;
   const double v_idt = (cgr.system_count > 2) ? variance(ideal_oo_total, stdev) : 0.0;
   const double v_sid = (cgr.system_count > 2) ? variance(success_oo_ideal, stdev) : 0.0;
-  const double v_it = (cgr.system_count > 2) ? variance(success_oo_total, stdev) : 0.0;
-  printf("  Cutoff %9.4lf : Real Atom Content     %7.2lf %% +/- %7.2lf %%\n"
-         "                     Success in Real Pairs %7.2lf %% +/- %7.2lf %%\n"
-         "                     Success in All Pairs  %7.2lf %% +/- %7.2lf %%\n\n", cutoff,
+  const double v_it  = (cgr.system_count > 2) ? variance(success_oo_total, stdev) : 0.0;
+  const double v_str = (cgr.system_count > 2) ? variance(tp_stores, stdev) : 0.0;
+  printf("  Cutoff %9.4lf : Real Atom Content       %7.2lf %% +/- %7.2lf %%\n"
+         "                     Success in Real Pairs   %7.2lf %% +/- %7.2lf %%\n"
+         "                     Success in All Pairs    %7.2lf %% +/- %7.2lf %%\n"
+         "                     Total store events    %9.1lf %% +/- %7.0lf\n\n", cutoff,
          mean(ideal_oo_total) * 100.0, v_idt * 100.0, mean(success_oo_ideal) * 100.0,
-         v_sid * 100.0, mean(success_oo_total) * 100.0, v_it * 100.0);
+         v_sid * 100.0, mean(success_oo_total) * 100.0, v_it * 100.0, mean(tp_stores),
+         v_str);
   printf("  Cell Population  Count\n  ---------------  -----\n");
   const double dnsys = cgr.system_count;
   for (int i = 0; i <= overall_max_pop; i++) {
@@ -736,11 +807,16 @@ void reportHilbertSpaceOccupancy(const CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> &c
       grp_idx++;
       grp_base += group_size;
     }
-
-    // CHECK
-    printf("  %9.4lf %% success\n", 100.0 * all_contrib[sys_idx].z / all_contrib[sys_idx].y);
-    // END CHECK
   }
+  std::vector<double> all_proportion(cgr.system_count);
+  for (int i = 0; i < cgr.system_count; i++) {
+    all_proportion[i] = 100.0 * all_contrib[i].z / all_contrib[i].y;
+  }
+  const double hsfc_mean = mean(all_proportion);
+  const double hsfc_var = (cgr.system_count > 2) ? variance(all_proportion,
+                                                            VarianceMethod::STANDARD_DEVIATION) :
+                                                   0.0;
+  printf("Hilbert space-filling curve:  %7.2lf +/- %7.2lf %% success\n\n", hsfc_mean, hsfc_var);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -832,35 +908,34 @@ int main (const int argc, const char* argv[]) {
                          "which various GPU kernels can compute all pairwise particle-particle "
                          "interactions within one or more systems.", { "-timings" });
   clip.addStandardAmberInputs("-c", "-p", "-ig_seed");
-  clip.addStandardBenchmarkingInputs({ "-iter", "-trials", "-replicas", "-cutoff", "-elec_cutoff",
-                                       "-vdw_cutoff", "-pad" });
+  clip.addStandardBenchmarkingInputs({ "-iter", "-trials", "-replicas", "-skip_cpu_check",
+                                       "-cutoff", "-elec_cutoff", "-vdw_cutoff", "-pad",
+                                       "-eval_nrg", "-omit_frc", "-fp_bits", "-blur" });
 
   // Custom inputs for this benchmarking program
-  NamelistEmulator* t_nml = clip.getNamelistPointer();
+  NamelistEmulator *t_nml = clip.getNamelistPointer();
   t_nml->addKeyword("-dual_cg", NamelistType::BOOLEAN);
   t_nml->addHelp("-dual_cg", "Force the use of dual neighbor lists, if the electrostatic and "
                  "van-der Waals cutoffs are not already distinct.");
-  t_nml->addKeyword("-skip_cpu_check", NamelistType::BOOLEAN);
-  t_nml->addHelp("-skip_cpu_check", "Skip a CPU_based check on the forces computed by the GPU.");
-  t_nml->addKeyword("-occupancy", NamelistType::BOOLEAN);
-  t_nml->addHelp("-occupancy", "Compute the occupancy of GPU warps during the pairs calculation.");
-  t_nml->addKeyword("-eval_nrg", NamelistType::BOOLEAN);
-  t_nml->addHelp("-eval_nrg", "Request that the overall system non-bonded energy components be "
-                 "evaluated, in addition to the forces on particles.");
-  t_nml->addKeyword("-omit_frc", NamelistType::BOOLEAN);
-  t_nml->addHelp("-omit_frc", "Request that the forces on particles be omitted from the GPU "
-                 "calculation.  This will also omit the CPU check on forces, and compel an "
-                 "evaluation of the energy so as to have at least one quantity for the GPU to "
-                 "compute.");
-  t_nml->addKeyword("-fp_bits", NamelistType::INTEGER, std::to_string(24));
-  t_nml->addHelp("-fp_bits", "The number of fixed precision bits after the point (values in "
-                 "kcal/mol-A) with which to accumulate forces on all particles.");
   t_nml->addKeyword("-warp_mult", NamelistType::INTEGER, std::to_string(1));
   t_nml->addHelp("-warp_mult", "The number of warps to devote to processing each neighbor list "
                  "cell's assigned pair interactions.");
-  t_nml->addKeyword("-blur", NamelistType::REAL, std::to_string(0.1));
-  t_nml->addHelp("-blur", "The Gaussian width by which to blur particle positions in each replica "
-                 "of the system, in units of Angstroms.");
+  t_nml->addKeyword("-occupancy", NamelistType::BOOLEAN);
+  t_nml->addHelp("-occupancy", "Compute the occupancy of GPU warps during the pairs calculation.");
+  t_nml->addKeyword("-min_batch", NamelistType::INTEGER, std::to_string(8));
+  t_nml->addHelp("-min_batch", "The minimum batch size to consider when creating mock tiles for "
+                 "the STORMM pairs calculation based on interactions among a tower-plate neutral "
+                 "territory decomposition");
+  t_nml->addKeyword("-max_batch", NamelistType::INTEGER, std::to_string(32));
+  t_nml->addHelp("-max_batch", "The minimum batch size to consider when creating mock tiles for "
+                 "the STORMM pairs calculation based on interactions among a tower-plate neutral "
+                 "territory decomposition");
+  t_nml->addKeyword("-trim_last", NamelistType::BOOLEAN);
+  t_nml->addHelp("-trim_last", "Trim the final batch of atoms in any sector of the tower-plate "
+                 "decomposition, conserving store operations while reducing total tile area.");
+  t_nml->addKeyword("-cull_distal", NamelistType::BOOLEAN);
+  t_nml->addHelp("-cull_distal", "Trim the distal atoms in the tower and plate which will never "
+                 "be within range of any they would need to interact with.");
   t_nml->addKeyword("-hs_margin", NamelistType::REAL, std::to_string(1.5));
   t_nml->addHelp("-hs_margin", "The width of the margin to include in neighbor list building "
                  "based on a Hilbert space-fillin curve, in units of Angstroms.  This margin will "
@@ -887,14 +962,14 @@ int main (const int argc, const char* argv[]) {
   const std::string inpcrd_file = t_nml->getStringValue("-c");
   const std::string topology_file = t_nml->getStringValue("-p");
   bool use_dual_cg = t_nml->getBoolValue("-dual_cg");
-  bool skip_cpu_check = t_nml->getBoolValue("-skip_cpu_check");
-  bool est_occupancy = t_nml->getBoolValue("-occupancy");
-  int n_trials = t_nml->getIntValue("-trials");
-  int n_repeats = t_nml->getIntValue("-iter");
-  int n_replicas = t_nml->getIntValue("-replicas");
-  int fp_bits = t_nml->getIntValue("-fp_bits");
-  int warp_mult = t_nml->getIntValue("-warp_mult");
-  int ig_seed = t_nml->getIntValue("-ig_seed");
+  const bool skip_cpu_check = t_nml->getBoolValue("-skip_cpu_check");
+  const bool est_occupancy = t_nml->getBoolValue("-occupancy");
+  const int n_trials = t_nml->getIntValue("-trials");
+  const int n_repeats = t_nml->getIntValue("-iter");
+  const int n_replicas = t_nml->getIntValue("-replicas");
+  const int fp_bits = t_nml->getIntValue("-fp_bits");
+  const int warp_mult = t_nml->getIntValue("-warp_mult");
+  const int ig_seed = t_nml->getIntValue("-ig_seed");
   bool have_user_cutoff = false;
   double elec_cutoff, vdw_cutoff;
   if (t_nml->getKeywordStatus("-cutoff") == InputStatus::USER_SPECIFIED) {
@@ -930,6 +1005,10 @@ int main (const int argc, const char* argv[]) {
   const double nl_margin = t_nml->getRealValue("-hs_margin");
   const int hs_group_size = t_nml->getIntValue("-hs_group");
   const int hs_grid_size = t_nml->getIntValue("-hs_grid");
+  const bool trim_final_batch = t_nml->getBoolValue("-trim_last");
+  const bool cull_irrelevant = t_nml->getBoolValue("-cull_distal");
+  const int min_batch = t_nml->getIntValue("-min_batch");
+  const int max_batch = t_nml->getIntValue("-max_batch");
 
   // Input checks
   if (n_replicas <= 0) {
@@ -958,7 +1037,8 @@ int main (const int argc, const char* argv[]) {
   MolecularMechanicsControls mmctrl(0.01, 1, 1, warp_mult, elec_cutoff, vdw_cutoff);
 
   // Create the basic objects
-  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(std::vector<int>(n_replicas, 0));
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(std::vector<int>(n_replicas, 0),
+                                                              0.0, ig_seed, 40, 44, fp_bits);
   PsSynthesisWriter host_psw = poly_ps.data();
   Xoshiro256ppGenerator xrs(ig_seed);
   for (int i = 1; i < host_psw.system_count; i++) {
@@ -974,7 +1054,7 @@ int main (const int argc, const char* argv[]) {
     elec_cutoff = vdw_cutoff;
   }
   const NeighborListKind layout = (use_dual_cg) ? NeighborListKind::DUAL : NeighborListKind::MONO;
-  CoreKlManager launcher(gpu, poly_ag);
+  const CoreKlManager launcher(gpu, poly_ag);
   PPITable direct_space_table(NonbondedTheme::ELECTROSTATIC, BasisFunctions::MIXED_FRACTIONS,
                               TableIndexing::SQUARED_ARG, elec_cutoff);
   const double ew_coeff = direct_space_table.getEwaldCoefficient();
@@ -993,9 +1073,9 @@ int main (const int argc, const char* argv[]) {
 
   // Create the neighbor list cell grids and run calculations
   if (use_dual_cg) {
-    CellGrid<float, int, float, float4> cg_qq(&poly_ps, &poly_ag, 0.5 * elec_cutoff, cutoff_pad, 4,
+    CellGrid<float, int, float, float4> cg_qq(&poly_ps, &poly_ag, elec_cutoff, cutoff_pad, 4,
                                               NonbondedTheme::ELECTROSTATIC);
-    CellGrid<float, int, float, float4> cg_lj(&poly_ps, &poly_ag, 0.5 * vdw_cutoff, cutoff_pad, 4,
+    CellGrid<float, int, float, float4> cg_lj(&poly_ps, &poly_ag, vdw_cutoff, cutoff_pad, 4,
                                               NonbondedTheme::VAN_DER_WAALS);
     const TinyBoxPresence has_tiny_box = (cg_qq.getTinyBoxPresence() == TinyBoxPresence::YES ||
                                           cg_lj.getTinyBoxPresence() == TinyBoxPresence::YES) ?
@@ -1063,12 +1143,18 @@ int main (const int argc, const char* argv[]) {
 
     // Estimate the thread occupancy of the GPU during the calculation
     if (est_occupancy) {
-      reportTowerPlateOccupancy(cg_qq, elec_cutoff);
-      reportTowerPlateOccupancy(cg_lj, vdw_cutoff);
+      reportTowerPlateOccupancy(cg_qq, elec_cutoff, min_batch, max_batch, trim_final_batch,
+                                cull_irrelevant);
+      reportTowerPlateOccupancy(cg_lj, vdw_cutoff, min_batch, max_batch, trim_final_batch,
+                                cull_irrelevant);
+      reportHilbertSpaceOccupancy(cg_qq, elec_cutoff, nl_margin, hs_group_size, hs_grid_size,
+                                  hs_grid_size, hs_grid_size);
+      reportHilbertSpaceOccupancy(cg_lj, vdw_cutoff, nl_margin, hs_group_size, hs_grid_size,
+                                  hs_grid_size, hs_grid_size);
     }
   }
   else {
-    CellGrid<float, int, float, float4> cg(&poly_ps, &poly_ag, 0.5 * vdw_cutoff, cutoff_pad, 4,
+    CellGrid<float, int, float, float4> cg(&poly_ps, &poly_ag, vdw_cutoff, cutoff_pad, 4,
                                            NonbondedTheme::ALL);
     const TinyBoxPresence has_tiny_box = cg.getTinyBoxPresence();
     const int2 tp_bt = launcher.getPMEPairsKernelDims(PrecisionModel::SINGLE,
@@ -1129,7 +1215,8 @@ int main (const int argc, const char* argv[]) {
 
     // Estimate the thread occupancy of the GPU during the calculation
     if (est_occupancy) {
-      reportTowerPlateOccupancy(cg, vdw_cutoff);
+      reportTowerPlateOccupancy(cg, vdw_cutoff, min_batch, max_batch, trim_final_batch,
+                                cull_irrelevant);
       reportHilbertSpaceOccupancy(cg, vdw_cutoff, nl_margin, hs_group_size, hs_grid_size,
                                   hs_grid_size, hs_grid_size);
     }

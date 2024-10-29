@@ -26,12 +26,16 @@ public:
 
   /// \brief The constructor takes multiple input formats but converts all data to strings for
   ///        internal storage, negating the need for templating.
+  ///
+  /// \param enforce_format_width  In a table based on strings, setting this to TRUE will attempt
+  ///                              to enforce the overall table width to fit within the display
+  ///                              space by shrinking the widest column
   /// \{
   ReportTable(const std::vector<std::string> &data_in,
               const std::vector<std::string> &column_headings,
               const std::string &variable_name_in = std::string(""),
               int format_width_in = default_output_file_width,
-              const std::vector<JustifyText> &alignments = {});
+              const std::vector<JustifyText> &alignments = {}, bool enforce_format_width = false);
 
   ReportTable(const std::vector<double> &data_in, const std::vector<std::string> &column_headings,
               double precision = 1.0e-6, const std::string &variable_name_in = std::string(""),
@@ -132,9 +136,8 @@ public:
   void printTable(std::ofstream *foutp, OutputSyntax style, int width = -1, int data_row_start = 0,
                   int data_row_end = -1) const;
 
-  void printTable(const std::string &file_name, PrintSituation expectation,
-                  OutputSyntax style, int width = -1, int data_row_start = 0,
-                  int data_row_end = -1) const;
+  void printTable(const std::string &file_name, PrintSituation expectation, OutputSyntax style,
+                  int width = -1, int data_row_start = 0, int data_row_end = -1) const;
   /// \}
 
   /// \brief Set the variable name associated with this table

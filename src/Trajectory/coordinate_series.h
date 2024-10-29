@@ -500,28 +500,28 @@ public:
   /// \param frame_index  Index of the frame into which the coordinates should be imported.  The
   ///                     default value of -1 adds the new coordinates to the end of the list.
   /// \{
-  void import(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
-              int frame_index = -1);
-  void import(const CoordinateFrameReader &cfr, int frame_index = -1);
-  void import(const CoordinateFrameWriter &cfw, int atom_start, int atom_end,
-              int frame_index = -1);
-  void import(const CoordinateFrameWriter &cfw, int frame_index = -1);
-  void import(const CoordinateFrame &cf, int atom_start, int atom_end, int frame_index = -1);
-  void import(const CoordinateFrame &cf, int frame_index = -1);
-  void import(const CoordinateFrame *cf, int atom_start, int atom_end, int frame_index = -1);
-  void import(const CoordinateFrame *cf, int frame_index = -1);
-  void import(const PhaseSpace &ps, int atom_start, int atom_end, int frame_index = -1,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::WHITE);
-  void import(const PhaseSpace &ps, int frame_index = -1,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::WHITE);
-  void import(const PhaseSpace *ps, int atom_start, int atom_end, int frame_index = -1,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::WHITE);
-  void import(const PhaseSpace *ps, int frame_index = -1,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              CoordinateCycle orientation = CoordinateCycle::WHITE);
+  void importFrame(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
+                   int frame_index = -1);
+  void importFrame(const CoordinateFrameReader &cfr, int frame_index = -1);
+  void importFrame(const CoordinateFrameWriter &cfw, int atom_start, int atom_end,
+                   int frame_index = -1);
+  void importFrame(const CoordinateFrameWriter &cfw, int frame_index = -1);
+  void importFrame(const CoordinateFrame &cf, int atom_start, int atom_end, int frame_index = -1);
+  void importFrame(const CoordinateFrame &cf, int frame_index = -1);
+  void importFrame(const CoordinateFrame *cf, int atom_start, int atom_end, int frame_index = -1);
+  void importFrame(const CoordinateFrame *cf, int frame_index = -1);
+  void importFrame(const PhaseSpace &ps, int atom_start, int atom_end, int frame_index = -1,
+                   TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                   CoordinateCycle orientation = CoordinateCycle::WHITE);
+  void importFrame(const PhaseSpace &ps, int frame_index = -1,
+                   TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                   CoordinateCycle orientation = CoordinateCycle::WHITE);
+  void importFrame(const PhaseSpace *ps, int atom_start, int atom_end, int frame_index = -1,
+                   TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                   CoordinateCycle orientation = CoordinateCycle::WHITE);
+  void importFrame(const PhaseSpace *ps, int frame_index = -1,
+                   TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                   CoordinateCycle orientation = CoordinateCycle::WHITE);
   /// \}
 
   /// \brief Import coordinates from a file.  This function accepts directives to read a subset of

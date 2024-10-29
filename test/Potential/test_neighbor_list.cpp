@@ -1292,8 +1292,17 @@ void testCellOrigins(const TestSystemManager &tsm, const std::vector<int> &syste
   AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(system_idx);
   PhaseSpaceSynthesis poly_ps_copy = poly_ps;
   PsSynthesisWriter poly_psw = poly_ps.data();
-  CellGrid<double, llint, double, double4> cg(&poly_ps, poly_ag, 4.8, 0.05, 4,
+  CellGrid<double, llint, double, double4> cg(&poly_ps, poly_ag, 9.6, 0.05, 4,
                                               NonbondedTheme::ALL);
+
+  // This is a good opportunity to test some non-standard cutoff and padding values, to ensure that
+  // the cells are being sized as intended.
+  check(cg.getCutoff(), RelationalOperator::EQUAL, 9.6, "The particle-particle cutoff returned by "
+        "a CellGrid object does not meet expectations.");
+  check(cg.getPadding(), RelationalOperator::EQUAL, 0.05, "The cell width padding incorporated by "
+        "a CellGrid object does not meet expectations.");
+  check(cg.getEffectiveCutoff(), RelationalOperator::EQUAL, 4.85, "The effective cell width used "
+        "by a CellGrid object does not meet expectations.");
   CellGridWriter cgw = cg.data();
   const CellOriginsReader corg = cg.getRulers();
   const int xfrm_stride = roundUp(9, warp_size_int);
@@ -1324,7 +1333,7 @@ void testCellOrigins(const TestSystemManager &tsm, const std::vector<int> &syste
           }
           const double dm = m;
 
-          // The fractional coordinates of the neighbor list cell origin are alreayd at hand.
+          // The fractional coordinates of the neighbor list cell origin are already at hand.
           // Compute the Cartesian position.
           const double da = dj / cell_dna;
           const double db = dk / cell_dnb;
@@ -1450,8 +1459,12 @@ void testGpuCellMigration(const TestSystemManager &ions, const int ncopy, const 
   }
   AtomGraphSynthesis poly_ag = ions.exportAtomGraphSynthesis(std::vector<int>(ncopy, 0));
   poly_ag.upload();
+
+  // The cells on this cell grid are cut very large in order to put 6 x 6 x 6 in a cube of 50 A
+  // on all sides, to permit a very high migration rate without creating an excessive number of
+  // wandering particles.
   CellGrid<Tcoord, Tacc,
-           Tcalc, Tcoord4> cg(&poly_ps, &poly_ag, 8.0, 0.05, 4, NonbondedTheme::ALL, 1000);
+           Tcalc, Tcoord4> cg(&poly_ps, &poly_ag, 16.0, 0.05, 4, NonbondedTheme::ALL, 1000);
   cg.upload();
   
   // Introduce a perturbation to the official coordinates for the neighbor list to adopt
@@ -1902,7 +1915,8 @@ int main(const int argc, const char* argv[]) {
                                                                   UnitCellType::TRICLINIC });
   PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(pbc_systems);
   AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(pbc_systems);
-  CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 5.0, 0.25, 4, NonbondedTheme::ALL);
+  CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, 10.0, 0.25, 4,
+                                              NonbondedTheme::ALL);
   for (size_t i = 0; i < poly_ps.getSystemCount(); i++) {
     checkCellGridPlacements<double, llint, double, double4>(poly_ps, i, cg, 1.0e-8,
                                                             tsm.getTestingStatus());

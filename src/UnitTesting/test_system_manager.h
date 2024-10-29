@@ -5,11 +5,13 @@
 #include "copyright.h"
 #include <string>
 #include <vector>
+#include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
+#include "Namelists/nml_dynamics.h"
 #include "Numerics/split_fixed_precision.h"
 #include "Random/random.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -26,8 +28,10 @@
 namespace stormm {
 namespace testing {
 
+using card::GpuDetails;
 using constants::ExceptionResponse;
 using stmath::roundUp;
+using namelist::DynamicsControls;
 using numerics::hostDoubleToInt95;
 using numerics::hostSplitFPSum;
 using numerics::default_velocity_scale_bits;
@@ -71,7 +75,15 @@ public:
                     const std::vector<std::string> &coordinate_names_in,
                     ExceptionResponse policy = ExceptionResponse::WARN,
                     TestPriority fault_response_in = TestPriority::ABORT,
-                    TestPriority all_go_response_in = TestPriority::CRITICAL);
+                    TestPriority all_go_response_in = TestPriority::CRITICAL,
+                    const DynamicsControls &dyncon = DynamicsControls());
+
+  TestSystemManager(const std::string &topology_base_in, const std::string &topology_extn_in,
+                    const std::vector<std::string> &topology_names_in,
+                    const std::string &coordinate_base_in, const std::string &coordinate_extn_in,
+                    const std::vector<std::string> &coordinate_names_in,
+                    const DynamicsControls &dyncon,
+                    ExceptionResponse policy = ExceptionResponse::WARN);
 
   TestSystemManager(const std::string &topology_base_in,
                     const std::vector<std::string> &topology_names_in,
@@ -79,13 +91,27 @@ public:
                     const std::vector<std::string> &coordinate_names_in,
                     ExceptionResponse policy = ExceptionResponse::WARN,
                     TestPriority fault_response_in = TestPriority::ABORT,
-                    TestPriority all_go_response_in = TestPriority::CRITICAL);
+                    TestPriority all_go_response_in = TestPriority::CRITICAL,
+                    const DynamicsControls &dyncon = DynamicsControls());
 
+  TestSystemManager(const std::string &topology_base_in,
+                    const std::vector<std::string> &topology_names_in,
+                    const std::string &coordinate_base_in,
+                    const std::vector<std::string> &coordinate_names_in,
+                    const DynamicsControls &dyncon,
+                    ExceptionResponse policy = ExceptionResponse::WARN);
+  
   TestSystemManager(const std::vector<std::string> &topology_names_in,
                     const std::vector<std::string> &coordinate_names_in,
                     ExceptionResponse policy = ExceptionResponse::WARN,
                     TestPriority fault_response_in = TestPriority::ABORT,
-                    TestPriority all_go_response_in = TestPriority::CRITICAL);
+                    TestPriority all_go_response_in = TestPriority::CRITICAL,
+                    const DynamicsControls &dyncon = DynamicsControls());
+
+  TestSystemManager(const std::vector<std::string> &topology_names_in,
+                    const std::vector<std::string> &coordinate_names_in,
+                    const DynamicsControls &dyncon,
+                    ExceptionResponse policy = ExceptionResponse::WARN);
   /// \}
 
   /// \brief Get the number of systems in the object.
@@ -255,18 +281,23 @@ public:
   ///                AtomGraphSynthesis will report being given a longer list of topologies than
   ///                was required (unused topologies).  For most testing purposes, this is benign,
   ///                and should not be raised to the end user's attention.
+  /// \param gpu     Details of the GPU that will handle the workload (this helps in laying out
+  ///                valence work units)
   /// \{
   AtomGraphSynthesis
   exportAtomGraphSynthesis(const std::vector<int> &index_key,
-                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
+                           ExceptionResponse policy = ExceptionResponse::SILENT,
+                           const GpuDetails &gpu = null_gpu) const;
 
   AtomGraphSynthesis
   exportAtomGraphSynthesis(UnitCellType uc_choice,
-                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
+                           ExceptionResponse policy = ExceptionResponse::SILENT,
+                           const GpuDetails &gpu = null_gpu) const;
 
   AtomGraphSynthesis
   exportAtomGraphSynthesis(const std::vector<UnitCellType> &uc_choice,
-                           ExceptionResponse policy = ExceptionResponse::SILENT) const;
+                           ExceptionResponse policy = ExceptionResponse::SILENT,
+                           const GpuDetails &gpu = null_gpu) const;
   /// \}
 
   /// \brief Produce a SystemCache based on a compilation of the systems read into the manager.

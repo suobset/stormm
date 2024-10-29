@@ -1112,10 +1112,10 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<float> sp_filtered_attn14_elec, sp_filtered_attn14_vdw;
   std::vector<double> filtered_chrg;
   std::vector<float> sp_filtered_chrg;
-  std::vector<double4> filtered_vste_params, filtered_sett_geom;
-  std::vector<float4> sp_filtered_vste_params, sp_filtered_sett_geom;
-  std::vector<double2> filtered_sett_mass, filtered_cnst_group_params;
-  std::vector<float2> sp_filtered_sett_mass, sp_filtered_cnst_group_params;
+  std::vector<double4> filtered_vste_params, filtered_sett_geom, filtered_sett_mass;
+  std::vector<float4> sp_filtered_vste_params, sp_filtered_sett_geom, sp_filtered_sett_mass;
+  std::vector<double2> filtered_cnst_group_params;
+  std::vector<float2> sp_filtered_cnst_group_params;
   std::vector<int> filtered_cnst_group_bounds(1, 0);
   int n_unique_bond = 0;
   int n_unique_angl = 0;
@@ -1413,7 +1413,6 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_ra(i_cnk.settle_ra[j], constants::verytiny);
       const Approx ij_rb(i_cnk.settle_rb[j], constants::verytiny);
       const Approx ij_rc(i_cnk.settle_rc[j], constants::verytiny);
-      const Approx ij_invra(i_cnk.settle_invra[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph *kag_ptr = topologies[k];
         const ConstraintKit<double> k_cnk = kag_ptr->getDoublePrecisionConstraintKit();
@@ -1422,19 +1421,21 @@ void AtomGraphSynthesis::condenseParameterTables() {
           if (sett_synthesis_index[topology_sett_table_offsets[k] + m] < 0 &&
               ij_mormt.test(k_cnk.settle_mormt[m]) && ij_mhrmt.test(k_cnk.settle_mhrmt[m]) &&
               ij_ra.test(k_cnk.settle_ra[m]) && ij_rb.test(k_cnk.settle_rb[m]) &&
-              ij_rc.test(k_cnk.settle_rc[m]) && ij_invra.test(k_cnk.settle_invra[m])) {
+              ij_rc.test(k_cnk.settle_rc[m])) {
             sett_synthesis_index[topology_sett_table_offsets[k] + m] = n_unique_sett;
           }
         }
       }
 
       // Catalog this unique SETTLE group geometry
-      filtered_sett_mass.push_back({ i_cnk.settle_mormt[j], i_cnk.settle_mhrmt[j] });
+      filtered_sett_mass.push_back({ i_cnk.settle_mo[j], i_cnk.settle_mh[j], i_cnk.settle_mormt[j],
+                                     i_cnk.settle_mhrmt[j] });
       filtered_sett_geom.push_back({ i_cnk.settle_ra[j], i_cnk.settle_rb[j], i_cnk.settle_rc[j],
-                                     i_cnk.settle_invra[j] });
-      sp_filtered_sett_mass.push_back({ i_cnk_sp.settle_mormt[j], i_cnk_sp.settle_mhrmt[j] });
+                                     i_cnk.settle_moh[j] });
+      sp_filtered_sett_mass.push_back({ i_cnk_sp.settle_mo[j], i_cnk_sp.settle_mh[j],
+                                        i_cnk_sp.settle_mormt[j], i_cnk_sp.settle_mhrmt[j] });
       sp_filtered_sett_geom.push_back({ i_cnk_sp.settle_ra[j], i_cnk_sp.settle_rb[j],
-                                        i_cnk_sp.settle_rc[j], i_cnk_sp.settle_invra[j] });
+                                        i_cnk_sp.settle_rc[j], i_cnk_sp.settle_moh[j] });
       n_unique_sett++;
     }
 
@@ -2303,7 +2304,7 @@ int AtomGraphSynthesis::setVwuAbstractLimits(const int item_counter, const int v
 }
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
+void AtomGraphSynthesis::loadValenceWorkUnits(const int2 vwu_atom_limits) {
 
   // Loop over all systems and create lists of valence work units
   std::vector<std::vector<ValenceWorkUnit>> all_vwu;
@@ -2319,7 +2320,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
     const RestraintApparatus ra_blank = RestraintApparatus(ag);
     const RestraintApparatus *ra = (restraint_networks[rn] == nullptr) ? &ra_blank :
                                                                          restraint_networks[rn];
-    all_vwu.push_back(buildValenceWorkUnits(ag, ra, vwu_atom_limit));
+    all_vwu.push_back(buildValenceWorkUnits(ag, ra, vwu_atom_limits));
     total_vwu += all_vwu[i].size();    
   }
 
@@ -2995,7 +2996,7 @@ int AtomGraphSynthesis::getValenceWorkUnitCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int AtomGraphSynthesis::getValenceWorkUnitSize() const {
+int2 AtomGraphSynthesis::getValenceWorkUnitSize() const {
   return valence_work_unit_size;
 }
 

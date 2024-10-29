@@ -14,7 +14,9 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/citation.h"
+#include "Structure/structure_enumerators.h"
 #include "atomgraph_abstracts.h"
+#include "atomgraph_constants.h"
 #include "atomgraph_enumerators.h"
 #include "atomgraph_refinement.h"
 #include "topology_limits.h"
@@ -27,23 +29,8 @@ using constants::PrecisionModel;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using parse::Citation;
+using structure::ApplyConstraints;
 using symbols::amber_ancient_bioq;
-
-/// \brief Use the lowest bit of a 32-bit float representing the range [1.0, 2.0) as the default
-///        input for the smoothCharges function, ensuring that all charges in the range (-2e, +2e)
-///        will be expressed in increments that a floating point number can represent exactly.
-///        The hexfloat would read 0x1p-23.
-constexpr double charge_precision_inc = 1.1920928955078125E-7;
-
-/// \brief Default 1:4 non-bonded screening factors are taken from various major codes.
-/// \{
-constexpr double amber_default_elec14_screen = 1.2;
-constexpr double amber_default_vdw14_screen = 2.0;
-constexpr double charmm_default_elec14_screen = 1.0;
-constexpr double charmm_default_vdw14_screen = 1.0;
-constexpr double glycam_default_elec14_screen = 1.0;
-constexpr double glycam_default_vdw14_screen = 1.0;
-/// \}
 
 /// \brief A struct to hold information relating to an Amber topology.  This struct's member
 ///        functions are limited to getters for its private data.  Because the primary means of
@@ -91,7 +78,9 @@ public:
   AtomGraph(const std::string &file_name, ExceptionResponse policy, TopologyKind engine_format,
             double coulomb_constant_in, double default_elec14_screening,
             double default_vdw14_screening, double charge_rounding_tol,
-            double charge_discretization);
+            double charge_discretization,
+            ApplyConstraints use_bond_constraints_in = ApplyConstraints::NO,
+            ApplyConstraints use_settle = ApplyConstraints::NO);
 
   AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
             ExceptionResponse policy = ExceptionResponse::DIE);
@@ -124,68 +113,6 @@ public:
   /// \param other  Another AtomGraph to form the basis for re-assigning members of this one  
   AtomGraph& operator=(AtomGraph &&other);
 
-  /// \brief Load the  AtomGraph's various Hybrid objects with data held in temporary CPU
-  ///        std::vectors.  See the function itself for details on each argument, but the arguments
-  ///        generally follow the names of member variables in the AtomGraph itself.
-  void loadHybridArrays(const std::vector<int> &tmp_desc,
-                        const std::vector<int> &tmp_residue_limits,
-                        const std::vector<int> &tmp_atom_struc_numbers,
-                        const std::vector<int> &tmp_residue_numbers,
-                        const std::vector<int> &tmp_molecule_limits,
-                        const std::vector<int> &tmp_atomic_numbers,
-                        const std::vector<int> &tmp_molecule_membership,
-                        const std::vector<int> &tmp_mobile_atoms,
-                        const std::vector<int> &tmp_molecule_contents,
-                        const std::vector<int> &tmp_cmap_surf_dims,
-                        const std::vector<int> &tmp_cmap_surf_bounds,
-                        const std::vector<int> &tmp_charge_indices,
-                        const std::vector<int> &tmp_lennard_jones_indices,
-                        const std::vector<int> &tmp_inferred_14_i_atoms,
-                        const std::vector<int> &tmp_inferred_14_j_atoms,
-                        const std::vector<int> &tmp_inferred_14_param_idx,
-                        const std::vector<int> &tmp_neck_gb_indices,
-                        const std::vector<int> &tmp_tree_joining_info,
-                        const std::vector<int> &tmp_last_rotator_info,
-                        const std::vector<double> &tmp_charges,
-                        const std::vector<double> &tmp_masses,
-                        const std::vector<double> &tmp_ub_stiffnesses,
-                        const std::vector<double> &tmp_ub_equilibria,
-                        const std::vector<double> &tmp_charmm_impr_stiffnesses,
-                        const std::vector<double> &tmp_charmm_impr_phase_angles,
-                        const std::vector<double> &tmp_cmap_surfaces,
-                        const std::vector<double> &tmp_bond_stiffnesses,
-                        const std::vector<double> &tmp_bond_equilibria,
-                        const std::vector<double> &tmp_angl_stiffnesses,
-                        const std::vector<double> &tmp_angl_equilibria,
-                        const std::vector<double> &tmp_dihe_amplitudes,
-                        const std::vector<double> &tmp_dihe_periodicities,
-                        const std::vector<double> &tmp_dihe_phase_angles,
-                        const std::vector<double> &tmp_charge_parameters,
-                        const std::vector<double> &tmp_lj_a_values,
-                        const std::vector<double> &tmp_lj_b_values,
-                        const std::vector<double> &tmp_lj_c_values,
-                        const std::vector<double> &tmp_lj_14_a_values,
-                        const std::vector<double> &tmp_lj_14_b_values,
-                        const std::vector<double> &tmp_lj_14_c_values,
-                        const std::vector<double> &tmp_atomic_pb_radii,
-                        const std::vector<double> &tmp_gb_screening_factors,
-                        const std::vector<double> &tmp_gb_coef,
-                        const std::vector<double> &tmp_solty_info,
-                        const std::vector<double> &tmp_hbond_a_values,
-                        const std::vector<double> &tmp_hbond_b_values,
-                        const std::vector<double> &tmp_hbond_cutoffs,
-                        const std::vector<char4> &tmp_atom_names,
-                        const std::vector<char4> &tmp_atom_types,
-                        const std::vector<char4> &tmp_residue_names,
-                        const std::vector<char4> &tmp_tree_symbols,
-                        const CmapAccessories &cmap_table,
-                        const CondensedExclusions &cond_excl,
-                        const BasicValenceTable &basic_vtable,
-                        const CharmmValenceTable &charmm_vtable,
-                        const AttenuationParameterSet &attn_parm,
-                        const VirtualSiteTable &vsite_table,
-                        const Map1234 &all_nb_excl, const ConstraintTable &cnst_table);
-  
   /// \brief Build an AtomGraph form a file.  This is called by the general-purpose constructor
   ///        or also by the developer after instantiating an empty object.
   ///
@@ -196,8 +123,8 @@ public:
                        double coulomb_constant_in = amber_ancient_bioq,
                        double default_elec14_screening = amber_default_elec14_screen,
                        double default_vdw14_screening = amber_default_vdw14_screen,
-                       double charge_rounding_tol = 0.001,
-                       double charge_discretization = charge_precision_inc);
+                       double charge_rounding_tol = default_charge_rounding_tol,
+                       double charge_discretization = default_charge_precision_inc);
 
   // Most getter functions (getThisStuff) will return the corresponding member variable.  Usually
   // a variable with a single value is an int, but it could also be an enumeration or a string.
@@ -222,9 +149,21 @@ public:
   /// \brief Get the number of separate molecules in the system
   int getMoleculeCount() const;
   
-  /// \brief Get the number of organic compounds in the system
-  int getOrganicCompoundsCount() const;
+  /// \brief Get the number of organic molecules in the system, based on the criteria of greater
+  ///        than or equal to eight total real atoms and at least one carbon atom.
+  int getOrganicMoleculeCount() const;
 
+  /// \brief Get the number of organic atoms in the system, based on the criteria of greater
+  ///        than or equal to eight total real atoms and at least one carbon atom.
+  int getOrganicAtomCount() const;
+
+  /// \brief Get the number of particles (which may include virtual sites) in a single water
+  ///        molecule within the system.
+  int getWaterResidueSize() const;
+
+  /// \brief Get the number of water residues in the system.
+  int getWaterResidueCount() const;
+  
   /// \brief Get the number of separate molecules in the system
   int getLargestResidueSize() const;
 
@@ -710,6 +649,12 @@ public:
   /// \brief Get the PB Radii set
   std::string getPBRadiiSet() const;
 
+  /// \brief Get the status of SHAKE and RATTLE constraints in the system.
+  bool usesShake() const;
+
+  /// \brief Get the status of SETTLE rigid water constraints in the system.
+  bool usesSettle() const;
+
   /// \brief Get the water residue name
   std::string getWaterResidueName() const;
   
@@ -717,6 +662,10 @@ public:
   ///        groups and confirm the number that are, by their chemistry, water.
   int getRigidWaterCount() const;
 
+  /// \brief Get the number of atoms in a rigid water molecule of the system, if the system has
+  ///        rigid waters.  This function will return zero if the system has no rigid waters.
+  int getRigidWaterAtomCount() const;
+  
   /// \brief Get the number of SETTLE groups in the system
   int getSettleGroupCount() const;
 
@@ -1241,6 +1190,8 @@ private:
                                   ///<   of elastic band beads, or other population of a system
                                   ///<   with many implicit copies
   int largest_molecule_size;      ///< Size of the largest single molecule in the system
+  int water_residue_size;         ///< Size of each water residue in the system
+  int water_residue_count;        ///< The total number of water residues in the system
   int unconstrained_dof;          ///< Total number of degrees of freedom in the system, without
                                   ///<   any geometric constraints
   int constrained_dof;            ///< Total number of degrees of freedom in the system, with
@@ -1484,6 +1435,12 @@ private:
                                          ///<   dihe_assigned_bounds[a_idx + 1])
   Hybrid<int> dihe_assigned_terms;       ///< Indices of dihedral terms which this atom commands
   Hybrid<int> dihe_assigned_bounds;      ///< Bounds arrays for atom-controlled dihedral indexing
+  Hybrid<int> bond_evaluation_mask;      ///< Array of bitmasks (interpret as unsigned integers)
+                                         ///<   indicating whether each bond is to be evaluated,
+                                         ///<   based on the use_bond_constraints setting below
+  Hybrid<int> angl_evaluation_mask;      ///< Array of bitmasks (interpret as unsigned integers)
+                                         ///<   indicating whether each angle is to be evaluated,
+                                         ///<   based on the use_bond_constraints setting below
   Hybrid<char4> bond_modifiers;          ///< Enumerations for special characteristics of bonds
   Hybrid<char4> angl_modifiers;          ///< Enumerations for special characteristics of angles
   Hybrid<char4> dihe_modifiers;          ///< Enumerations for special characteristics of dihedrals
@@ -1633,8 +1590,8 @@ private:
   Hybrid<float> sp_gb_gamma_parameters;  ///< Single-precision Generalized Born gamma parameters
 
   // MD propagation algorithm directives
-  ShakeSetting use_bond_constraints;           ///< Toggles use of bond length constraints
-  SettleSetting use_settle;                    ///< Toggles analytic constraints on rigid water
+  ApplyConstraints use_shake;                  ///< Toggles use of bond length constraints
+  ApplyConstraints use_settle;                 ///< Toggles analytic constraints on rigid water
   PerturbationSetting use_perturbation_info;   ///< Toggles perturbations
   SolventCapSetting use_solvent_cap_option;    ///< Toggles the solvent cap option
   PolarizationSetting use_polarization;        ///< Toggles use of polarization
@@ -1695,22 +1652,29 @@ private:
                                                ///<   constraint_squared_lengths, respectively.
   Hybrid<int> constraint_parameter_bounds;     ///< Bounds array for constraint_inverse_masses and
                                                ///<   constraint_squared_lengths below
-  Hybrid<double> settle_mormt;                 ///< Proportional mass of "oxygen" in SETTLE systems
+  Hybrid<double> settle_mo;                    ///< Mass of "oxygen" in SETTLE groups
+  Hybrid<double> settle_mh;                    ///< Mass of "hydrogen" in SETTLE groups
+  Hybrid<double> settle_moh;                   ///< Combined mass of the heavy "oxygen" and one of
+                                               ///<   the light "hydrogen" atoms in SETTLE groups
+  Hybrid<double> settle_mormt;                 ///< Proportional mass of "oxygen" in SETTLE groups
   Hybrid<double> settle_mhrmt;                 ///< Proportional mass of "hydrogen" in SETTLE
-                                               ///<   systems
+                                               ///<   groups
   Hybrid<double> settle_ra;                    ///< Internal distance measurement of SETTLE groups
   Hybrid<double> settle_rb;                    ///< Internal distance measurement of SETTLE groups
   Hybrid<double> settle_rc;                    ///< Internal distance measurement of SETTLE groups
-  Hybrid<double> settle_invra;                 ///< Internal distance measurement of SETTLE groups
   Hybrid<double> constraint_inverse_masses;    ///< Inverse masses for atoms of constrained groups
   Hybrid<double> constraint_squared_lengths;   ///< Target lengths for constrained bonds
-  Hybrid<float> sp_settle_mormt;               ///< Proportional mass of "oxygen" in SETTLE systems
+  Hybrid<float> sp_settle_mo;                  ///< Mass of "oxygen" in SETTLE groups
+  Hybrid<float> sp_settle_mh;                  ///< Mass of "hydrogen" in SETTLE groups
+  Hybrid<float> sp_settle_moh;                 ///< Combined mass of the heavy "oxygen" and one of
+                                               ///<   the light "hydrogen" atoms in SETTLE groups
+  Hybrid<float> sp_settle_mormt;               ///< Proportional mass of "oxygen" in SETTLE groups
+                                               ///<   (single-precision)
   Hybrid<float> sp_settle_mhrmt;               ///< Proportional mass of "hydrogen" in SETTLE
-                                               ///<   systems
+                                               ///<   groups (single-precision)
   Hybrid<float> sp_settle_ra;                  ///< Internal distance measurement of SETTLE groups
   Hybrid<float> sp_settle_rb;                  ///< Internal distance measurement of SETTLE groups
   Hybrid<float> sp_settle_rc;                  ///< Internal distance measurement of SETTLE groups
-  Hybrid<float> sp_settle_invra;               ///< Internal distance measurement of SETTLE groups
   Hybrid<float> sp_constraint_inverse_masses;  ///< Inverse masses for atoms of constrained groups
   Hybrid<float> sp_constraint_squared_lengths; ///< Target lengths for constrained bonds
 
@@ -1748,9 +1712,77 @@ private:
   Hybrid<char4> char4_data;
   /// \}
   
+  /// \brief Load the  AtomGraph's various Hybrid objects with data held in temporary CPU
+  ///        std::vectors.  See the function itself for details on each argument, but the arguments
+  ///        generally follow the names of member variables in the AtomGraph itself.
+  void loadHybridArrays(const std::vector<int> &tmp_desc,
+                        const std::vector<int> &tmp_residue_limits,
+                        const std::vector<int> &tmp_atom_struc_numbers,
+                        const std::vector<int> &tmp_residue_numbers,
+                        const std::vector<int> &tmp_molecule_limits,
+                        const std::vector<int> &tmp_atomic_numbers,
+                        const std::vector<int> &tmp_molecule_membership,
+                        const std::vector<int> &tmp_mobile_atoms,
+                        const std::vector<int> &tmp_molecule_contents,
+                        const std::vector<int> &tmp_cmap_surf_dims,
+                        const std::vector<int> &tmp_cmap_surf_bounds,
+                        const std::vector<int> &tmp_charge_indices,
+                        const std::vector<int> &tmp_lennard_jones_indices,
+                        const std::vector<int> &tmp_inferred_14_i_atoms,
+                        const std::vector<int> &tmp_inferred_14_j_atoms,
+                        const std::vector<int> &tmp_inferred_14_param_idx,
+                        const std::vector<int> &tmp_neck_gb_indices,
+                        const std::vector<int> &tmp_tree_joining_info,
+                        const std::vector<int> &tmp_last_rotator_info,
+                        const std::vector<double> &tmp_charges,
+                        const std::vector<double> &tmp_masses,
+                        const std::vector<double> &tmp_ub_stiffnesses,
+                        const std::vector<double> &tmp_ub_equilibria,
+                        const std::vector<double> &tmp_charmm_impr_stiffnesses,
+                        const std::vector<double> &tmp_charmm_impr_phase_angles,
+                        const std::vector<double> &tmp_cmap_surfaces,
+                        const std::vector<double> &tmp_bond_stiffnesses,
+                        const std::vector<double> &tmp_bond_equilibria,
+                        const std::vector<double> &tmp_angl_stiffnesses,
+                        const std::vector<double> &tmp_angl_equilibria,
+                        const std::vector<double> &tmp_dihe_amplitudes,
+                        const std::vector<double> &tmp_dihe_periodicities,
+                        const std::vector<double> &tmp_dihe_phase_angles,
+                        const std::vector<double> &tmp_charge_parameters,
+                        const std::vector<double> &tmp_lj_a_values,
+                        const std::vector<double> &tmp_lj_b_values,
+                        const std::vector<double> &tmp_lj_c_values,
+                        const std::vector<double> &tmp_lj_14_a_values,
+                        const std::vector<double> &tmp_lj_14_b_values,
+                        const std::vector<double> &tmp_lj_14_c_values,
+                        const std::vector<double> &tmp_atomic_pb_radii,
+                        const std::vector<double> &tmp_gb_screening_factors,
+                        const std::vector<double> &tmp_gb_coef,
+                        const std::vector<double> &tmp_solty_info,
+                        const std::vector<double> &tmp_hbond_a_values,
+                        const std::vector<double> &tmp_hbond_b_values,
+                        const std::vector<double> &tmp_hbond_cutoffs,
+                        const std::vector<char4> &tmp_atom_names,
+                        const std::vector<char4> &tmp_atom_types,
+                        const std::vector<char4> &tmp_residue_names,
+                        const std::vector<char4> &tmp_tree_symbols,
+                        const CmapAccessories &cmap_table,
+                        const CondensedExclusions &cond_excl,
+                        const BasicValenceTable &basic_vtable,
+                        const CharmmValenceTable &charmm_vtable,
+                        const AttenuationParameterSet &attn_parm,
+                        const VirtualSiteTable &vsite_table,
+                        const Map1234 &all_nb_excl, const ConstraintTable &cnst_table);
+  
   /// \brief Function to wrap pointer re-assignments after copy constructor initialization or
   ///        a copy assignment operation.
   void rebasePointers();
+
+  /// \brief Function to seek out and identify a water molecule in the topology.  Identifying
+  ///        what is water in a general way, or by a name given by the user, is not a trivial
+  ///        task.  This function will be called by the constructor and each time the water
+  ///        residue name is edited.
+  void characterizeWaterResidue();
 
   /// Allow the AtomGraphStage to access private members directly to modify and guide construction
   /// of topologies used in STORMM's production calculations.

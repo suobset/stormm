@@ -1,6 +1,9 @@
+#include <chrono>
 #include <regex>
+#include <thread>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include "copyright.h"
 #include "../../src/Chemistry/chemical_features.h"
@@ -19,6 +22,7 @@
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_mesh.h"
 #include "../../src/Namelists/nml_minimize.h"
+#include "../../src/Namelists/nml_nice.h"
 #include "../../src/Namelists/nml_random.h"
 #include "../../src/Namelists/nml_receptor.h"
 #include "../../src/Namelists/nml_remd.h"
@@ -95,17 +99,11 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   const std::string updated_error = error_message + " in the &" + nml_name + " namelist.";
   
   // Run the test, which may send messages to stdout
-  if (strcmpCased(nml_name, "minimize")) {
-    CHECK_THROWS(MinimizeControls t_mincon(bad_input, &start_line, &found_nml), updated_error);
+  if (strcmpCased(nml_name, "conformer")) {
+    CHECK_THROWS(ConformerControls t_confcon(bad_input, &start_line, &found_nml), updated_error);
   }
   else if (strcmpCased(nml_name, "dynamics")) {
     CHECK_THROWS(DynamicsControls t_dyncon(bad_input, &start_line, &found_nml), updated_error);
-  }
-  else if (strcmpCased(nml_name, "random")) {
-    CHECK_THROWS(RandomControls t_rngcon(bad_input, &start_line, &found_nml), updated_error);
-  }
-  else if (strcmpCased(nml_name, "remd")) {
-  	CHECK_THROWS(RemdControls t_remcon(bad_input, &start_line, &found_nml), updated_error);
   }
   else if (strcmpCased(nml_name, "solvent")) {
     CHECK_THROWS(SolventControls t_watcon(bad_input, &start_line, &found_nml), updated_error);
@@ -113,17 +111,26 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
   else if (strcmpCased(nml_name, "ffmorph")) {
     CHECK_THROWS(FFMorphControls t_ffmcon(bad_input, &start_line, &found_nml), updated_error);
   }
-  else if (strcmpCased(nml_name, "report")) {
-    CHECK_THROWS(ReportControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
+  else if (strcmpCased(nml_name, "minimize")) {
+    CHECK_THROWS(MinimizeControls t_mincon(bad_input, &start_line, &found_nml), updated_error);
   }
-  else if (strcmpCased(nml_name, "conformer")) {
-    CHECK_THROWS(ConformerControls t_confcon(bad_input, &start_line, &found_nml), updated_error);
+  else if (strcmpCased(nml_name, "mesh")) {
+    CHECK_THROWS(MeshControls t_meshcon(bad_input, &start_line, &found_nml), updated_error);
+  }
+  else if (strcmpCased(nml_name, "nice")) {
+    CHECK_THROWS(FFMorphControls t_ffmcon(bad_input, &start_line, &found_nml), updated_error);
+  }
+  else if (strcmpCased(nml_name, "random")) {
+    CHECK_THROWS(RandomControls t_rngcon(bad_input, &start_line, &found_nml), updated_error);
   }
   else if (strcmpCased(nml_name, "receptor")) {
     CHECK_THROWS(ReceptorControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
   }
-  else if (strcmpCased(nml_name, "mesh")) {
-    CHECK_THROWS(MeshControls t_meshcon(bad_input, &start_line, &found_nml), updated_error);
+  else if (strcmpCased(nml_name, "remd")) {
+  	CHECK_THROWS(RemdControls t_remcon(bad_input, &start_line, &found_nml), updated_error);
+  }
+  else if (strcmpCased(nml_name, "report")) {
+    CHECK_THROWS(ReportControls t_repcon(bad_input, &start_line, &found_nml), updated_error);
   }
   else {
     rtErr("The namelist &" + nml_name + " does not pair with any known case.", "test_namelists");
@@ -184,6 +191,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 12
   section("Test the REMD Namelist");
+
+  // Section 13
+  section("Test the &nice namelist");
   
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any STORMM app
@@ -348,7 +358,7 @@ int main(const int argc, const char* argv[]) {
   testBadNamelist("ffmorph", "dihedral { -ti CG -tk CV -tl CN -n 2 -amp 0.97 }", "A dihedral "
                   "keyword entry with too few atom types was accepted");
   testBadNamelist("ffmorph", "dihedral { -ti CG -tk CV -tj OS -tl CN -tl H1 -n 2 -amp 0.97 }",
-                  "A dihedral keyword entry with repeated atom types was accepted");
+                  "A dihedral keyword entry with repeated atom type designations was accepted");
 
   // The restraint namelist can build individual restraints as well as ensembles of them
   section(6);
@@ -682,7 +692,6 @@ int main(const int argc, const char* argv[]) {
   const TextFile remd_tf_a(remd_nml_a, TextOrigin::RAM);
   start_line = 0;
   RemdControls remd_a(remd_tf_a, &start_line, nullptr, ExceptionResponse::SILENT);
-  
   const int total_steps = remd_a.getTotalSwapCount();
   const std::string remd_type = remd_a.getRemdType();
   const int freq_swaps = remd_a.getFrequencyOfSwaps();
@@ -691,8 +700,8 @@ int main(const int argc, const char* argv[]) {
   const double exchange_probability = remd_a.getExchangeProbability();
   const double tolerance = remd_a.getTolerance();
   const int max_replicas = remd_a.getMaxReplicas();
-  const double low_temperature = remd_a.getInitialTemperature();
-  const double high_temperature = remd_a.getEquilibriumTemperature();
+  const double low_temperature = remd_a.getLowTemperature();
+  const double high_temperature = remd_a.getHighTemperature();
   check(total_steps, RelationalOperator::EQUAL, 10000, "The total number of swaps recorded from "
         "the &remd namelist do not meet expectations.");
   check(remd_type, RelationalOperator::EQUAL, "Temperature", "The type of REMD recorded from the "
@@ -719,6 +728,32 @@ int main(const int argc, const char* argv[]) {
                   "replica count.");
   testBadNamelist("remd", "freq_swaps = -100", "Input was accepted with a nonsensical frequency "
                   "of steps to attempt before attempting to do a swap.");
+
+  // Test the job control namelist
+  section(13);
+  start_line = 0;
+  NiceControls nice_a(tf, &start_line, nullptr, ExceptionResponse::SILENT);
+  const std::string wd_start = nice_a.getWorkdayStart();
+  const std::string wd_end = nice_a.getWorkdayEnd();
+  check(wd_start, RelationalOperator::EQUAL, "8:07 AM", "The start of the workday was not "
+        "transcribed as expected in a &nice namelist.");
+  check(wd_end, RelationalOperator::EQUAL, "5:35 PM", "The end of the workday was not "
+        "transcribed as expected in a &nice namelist.");
+  int nsuccess = 0;
+  for (int i = 0; i < 6; i++) {
+    std::time_t raw_time = std::time(nullptr);
+    std::tm* current_time = std::localtime(&raw_time);
+    const int this_minute = (current_time->tm_hour * 60) + current_time->tm_min;
+    const bool time_to_work = (current_time->tm_wday != 0 && current_time->tm_wday != 2 &&
+                               current_time->tm_wday != 5 &&
+                               this_minute >= 487 && this_minute < 1055);
+    nsuccess += (nice_a.isWorkTimeNow() == time_to_work);
+    std::this_thread::sleep_for(std::chrono::milliseconds(3));
+  }
+  check(nsuccess, RelationalOperator::GE, 2, "A &nice namelist renders an incorrect verdict on "
+        "whether the workday is on, based on an independent measurement.  This was measured "
+        "three times in all, to eliminate the remote possibility that between the calculation by "
+        "the namelist and the indepedent measurement the clock did, in fact, turn over.");
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -11,6 +11,7 @@
 #include "Constants/fixed_precision.h"
 #include "FileManagement/file_enumerators.h"
 #include "MoleculeFormat/mdlmol.h"
+#include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_restraint.h"
 #include "Potential/forward_exclusionmask.h"
@@ -35,6 +36,7 @@ using constants::ExceptionResponse;
 using diskutil::PrintSituation;
 using energy::ForwardExclusionMask;
 using energy::StaticExclusionMask;
+using namelist::DynamicsControls;
 using namelist::FilesControls;
 using namelist::RestraintControls;
 using numerics::default_globalpos_scale_bits;
@@ -84,6 +86,12 @@ public:
               PrintSituation expectation_in = PrintSituation::OPEN_NEW);
 
   SystemCache(const FilesControls &fcon, const std::vector<RestraintControls> &rstcon,
+              const DynamicsControls &dyncon, ExceptionResponse policy_in = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              PrintSituation expectation_in = PrintSituation::OPEN_NEW,
+              StopWatch *timer_in = nullptr);
+
+  SystemCache(const FilesControls &fcon, const DynamicsControls &dyncon,
               ExceptionResponse policy_in = ExceptionResponse::DIE,
               MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
               PrintSituation expectation_in = PrintSituation::OPEN_NEW,
@@ -805,6 +813,21 @@ private:
                                 int system_index) const;
 };
 
+/// \brief Extend a list of topologies, making use of constants and settings found in a &dynamics
+///        control block.
+///
+/// \param list    The growing list of topologies
+/// \param fname   Name of the file containing a topology to add to the list
+/// \param dyncon  Collection of user inputs (or developer-encoded directives), used to direct
+///                the creation of topologies
+/// \param policy  The course of action to take if errors are encountered when reading the new
+///                topology
+/// \param caller  Name of the calling function (for backtracing purposes)
+void extendTopologyList(std::vector<AtomGraph> *list, const std::string &fname,
+                        const DynamicsControls &dyncon,
+                        ExceptionResponse policy = ExceptionResponse::DIE,
+                        const std::string &caller = std::string(""));
+  
 /// \brief Obtain a synthesis of static exclusion masks appropriate to all systems in the provided
 ///        cache.  This will also check the cache for consistent boundary conditions on all
 ///        systems.

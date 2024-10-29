@@ -1,5 +1,5 @@
 #include "copyright.h"
-#include "rattle.h"
+#include "hub_and_spoke.h"
 
 namespace stormm {
 namespace structure {
@@ -7,7 +7,7 @@ namespace structure {
 using trajectory::getNextCyclePosition;
 
 //-------------------------------------------------------------------------------------------------
-void rattlePositions(PhaseSpace *ps, const AtomGraph *ag, const PrecisionModel prec,
+void shakePositions(PhaseSpace *ps, const AtomGraph *ag, const PrecisionModel prec,
                      const double dt, const double tol, const int max_iter,
                      const RattleMethod style) {
 
@@ -16,24 +16,23 @@ void rattlePositions(PhaseSpace *ps, const AtomGraph *ag, const PrecisionModel p
   PhaseSpaceWriter psw = ps->data();
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    rattlePositions<double>(&psw, ag->getDoublePrecisionConstraintKit(), dt, tol, max_iter,
-                            style);
+    shakePositions<double>(&psw, ag->getDoublePrecisionConstraintKit(), dt, tol, max_iter, style);
     break;
   case PrecisionModel::SINGLE:
-    rattlePositions<float>(&psw, ag->getSinglePrecisionConstraintKit(), dt, tol, max_iter, style);
+    shakePositions<float>(&psw, ag->getSinglePrecisionConstraintKit(), dt, tol, max_iter, style);
     break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void rattlePositions(PhaseSpace *ps, const AtomGraph &ag, const PrecisionModel prec,
+void shakePositions(PhaseSpace *ps, const AtomGraph &ag, const PrecisionModel prec,
                      const double dt, const double tol, const int max_iter,
                      const RattleMethod style) {
-  rattlePositions(ps, ag.getSelfPointer(), prec, dt, tol, max_iter, style);
+  shakePositions(ps, ag.getSelfPointer(), prec, dt, tol, max_iter, style);
 }
 
 //-------------------------------------------------------------------------------------------------
-void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
+void shakePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
                      const PrecisionModel prec, const double dt, const double tol,
                      const int max_iter) {
 
@@ -42,24 +41,24 @@ void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *pol
   PsSynthesisWriter poly_psw = poly_ps->data();
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    rattlePositions<double,
-                    double2, double4>(&poly_psw, poly_ag->getDoublePrecisionValenceKit(),
-                                      poly_ag->getDoublePrecisionAtomUpdateKit(), dt, tol,
-                                      max_iter);
+    shakePositions<double,
+                   double2, double4>(&poly_psw, poly_ag->getDoublePrecisionValenceKit(),
+                                     poly_ag->getDoublePrecisionAtomUpdateKit(), dt, tol,
+                                     max_iter);
     break;
   case PrecisionModel::SINGLE:
-    rattlePositions<float,
-                    float2, float4>(&poly_psw, poly_ag->getSinglePrecisionValenceKit(),
-                                    poly_ag->getSinglePrecisionAtomUpdateKit(), dt, tol, max_iter);
+    shakePositions<float,
+                   float2, float4>(&poly_psw, poly_ag->getSinglePrecisionValenceKit(),
+                                   poly_ag->getSinglePrecisionAtomUpdateKit(), dt, tol, max_iter);
     break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
+void shakePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
                      const PrecisionModel prec, const double dt, const double tol,
                      const int max_iter) {
-  rattlePositions(poly_ps, poly_ag.getSelfPointer(), prec, dt, tol, max_iter);
+  shakePositions(poly_ps, poly_ag.getSelfPointer(), prec, dt, tol, max_iter);
 }
   
 //-------------------------------------------------------------------------------------------------

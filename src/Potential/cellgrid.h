@@ -149,8 +149,8 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                  int* wander_count_alt_in, uint2* wanderers_in, int* nonimg_atom_idx_in,
                  int* nonimg_atom_idx_alt_in, uint* img_atom_idx_in, uint* img_atom_idx_alt_in,
                  ushort* img_atom_chn_cell_in, ushort* img_atom_chn_cell_alt_in,
-                 const int* nt_groups_in, Tacc* xfrc_in, Tacc* yfrc_in, Tacc* zfrc_in,
-                 int* xfrc_ovrf_in, int* yfrc_ovrf_in, int* zfrc_ovrf_in);
+                 const int* nt_groups_in, ushort* relevance_in, Tacc* xfrc_in, Tacc* yfrc_in,
+                 Tacc* zfrc_in, int* xfrc_ovrf_in, int* yfrc_ovrf_in, int* zfrc_ovrf_in);
 
   /// \brief The presence of const array sizing members implicitly deletes the copy and move
   ///        assignment operators, but the default copy and move constructors are valid.
@@ -275,6 +275,10 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                                     ///<   of 16 elements from this list enumerates the cells to
                                     ///<   associate with the ith cell, whose atom limits are
                                     ///<   described in the cell_limits or cell_limits_alt arrays.
+  ushort* relevance;                ///< Indicators of the relevance of each atom in the present
+                                    ///<   image to the neighbor list cells surrounding it, in
+                                    ///<   terms of the atom being within range of any volume
+                                    ///<   element of the nearby
   Tacc* xfrc;                       ///< Accumulators for Cartesian X forces on imaged particles
   Tacc* yfrc;                       ///< Accumulators for Cartesian Y forces on imaged particles
   Tacc* zfrc;                       ///< Accumulators for Cartesian Z forces on imaged particles
@@ -303,8 +307,9 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                  const int* system_chain_bounds_in, const int* chain_system_owner_in,
                  const T4* image_in, const int* nonimg_atom_idx_in, const uint* img_atom_idx_in,
                  const ushort* img_atom_chn_cell_in, const int* nt_groups_in,
-                 const Tacc* xfrc_in, const Tacc* yfrc_in, const Tacc* zfrc_in,
-                 const int* xfrc_ovrf_in, const int* yfrc_ovrf_in, const int* zfrc_ovrf_in);
+                 const ushort* relevance_in, const Tacc* xfrc_in, const Tacc* yfrc_in,
+                 const Tacc* zfrc_in, const int* xfrc_ovrf_in, const int* yfrc_ovrf_in,
+                 const int* zfrc_ovrf_in);
 
   CellGridReader(const CellGridWriter<T, Tacc, Tcalc, T4> &cgw);
 
@@ -400,6 +405,10 @@ template <typename T, typename Tacc, typename Tcalc, typename T4> struct CellGri
                                     ///<   of 16 elements from this list enumerates the cells to
                                     ///<   associate with the ith cell, whose atom limits are
                                     ///<   described in the cell_limits or cell_limits_alt arrays.
+  const ushort* relevance;          ///< Indicators of the relevance of each atom in the present
+                                    ///<   image to the neighbor list cells surrounding it, in
+                                    ///<   terms of the atom being within range of any volume
+                                    ///<   element of the nearby
   const Tacc* xfrc;                 ///< Accumulated Cartesian X forces on all imaged particles
   const Tacc* yfrc;                 ///< Accumulated Cartesian Y forces on all imaged particles
   const Tacc* zfrc;                 ///< Accumulated Cartesian Z forces on all imaged particles
@@ -558,9 +567,6 @@ public:
   ///        The total cell count and cell layout can be modulated by specifying a cutoff and
   ///        a padding related to how much larger each cell should be sized.
   ///
-  /// \param cutoff                 The minimum distance between any two cell sides
-  /// \param padding                An amount added to cutoff in the determination of the minimum
-  ///                               cell size
   /// \param mesh_subdivisions_in   The number of mesh elements along each axis of one of the
   ///                               spatial decomposition cell.  This value, times the cell grid
   ///                               dimensions themselves, defines the size of a particle-mesh
@@ -578,17 +584,17 @@ public:
   /// \param policy_in              Course of action in the case of bad input
   /// \{
   CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in, const AtomGraphSynthesis *poly_ag_ptr_in,
-           double cutoff, double padding, int mesh_subdivisions_in, NonbondedTheme theme_in,
+           double cutoff_in, double padding_in, int mesh_subdivisions_in, NonbondedTheme theme_in,
            uint cell_base_capacity_in = default_cellgrid_base_capacity,
            ExceptionResponse policy_in = ExceptionResponse::WARN);
 
   CellGrid(const PhaseSpaceSynthesis *poly_ps_ptr_in, const AtomGraphSynthesis &poly_ag_ptr_in,
-           double cutoff, double padding, int mesh_subdivisions_in, NonbondedTheme theme_in,
+           double cutoff_in, double padding_in, int mesh_subdivisions_in, NonbondedTheme theme_in,
            uint cell_base_capacity_in = default_cellgrid_base_capacity,
            ExceptionResponse policy_in = ExceptionResponse::WARN);
 
   CellGrid(const PhaseSpaceSynthesis &poly_ps_ptr_in, const AtomGraphSynthesis &poly_ag_ptr_in,
-           double cutoff, double padding, int mesh_subdivisions_in, NonbondedTheme theme_in,
+           double cutoff_in, double padding_in, int mesh_subdivisions_in, NonbondedTheme theme_in,
            uint cell_base_capacity_in = default_cellgrid_base_capacity,
            ExceptionResponse policy_in = ExceptionResponse::WARN);
   /// \}
@@ -630,6 +636,12 @@ public:
   ///        the same base capacity.
   uint getCellBaseCapacity() const;
 
+  /// \brief Get the particle-particle cutoff defining the neighbor list.
+  double getCutoff() const;
+
+  /// \brief Get the padding incorporated into each neighbor list cell.
+  double getPadding() const;
+  
   /// \brief Get the effective cutoff.
   double getEffectiveCutoff() const;
 
@@ -807,6 +819,37 @@ public:
   void initializeForces(HybridTargetLevel tier = HybridTargetLevel::HOST,
                         const GpuDetails &gpu = null_gpu);
 
+  /// \brief Compute whether various atoms may be within range of the tower when they are in the
+  ///        plate of various neutral territory decompositions.  Bitwise information (1 for
+  ///        relevant, 0 for irrelevant) is recorded in a 16-bit unsigned integer for each atom in
+  ///        the current image, as indicated by its stage in the coordinate cycle.
+  ///
+  ///        On GPU resources, the functionality in this routine is fused with particle
+  ///        migration.
+  ///
+  ///        The bitwise map is such that any work unit with a given home cell and twelve
+  ///        surrounding "plate" cells 0 (-2 cells along the A axis, -2 cells along the B axis
+  ///        relative to the home cell), 1 (-1, -2 cells along the A and B axes), ..., 4 (+2, -2),
+  ///        ..., 9 (+2, -1), 10 (-2, 0) and 11 (-1, 0) will look in bits 0, 1, ..., 11 to
+  ///        determine whether the atom is relevant.  The relevance of atoms in the "tower" cells
+  ///        0 (-2 along the C axis relative to the home cell), 1 (-1 along the C axis), 3 (+1
+  ///        along the C axis), and 4 (+2 along the C axis) can be tested by looking at bits 12,
+  ///        13, 14, and 15, respectively.  Only atoms in the bottom and top cells of the tower
+  ///        might be culled due to being more than the cutoff from the nearest plane bounding the
+  ///        plate.  Similarly, atoms in the "inner" four cells of the plate (6, 7, 8, and 10) will
+  ///        almost always be relevant.  These facts will be utilized when filling the bit mask:
+  ///        only two cells of the tower (for which the calculation is a simple comparison of the
+  ///        Cartesian Z position and the height of a neighbor list cell) and eight cells of the
+  ///        plate are needed.  If the unit cell is orthorhombic, the calculations for eight plate
+  ///        cells are likewise very simple.  If it is not, the calculations involve finding the
+  ///        location of a point along which to situate a line parallel to the unit cell C axis,
+  ///        then finding the distance of the particle to that line.
+  ///
+  /// \param tier  Indicate whether to update the relevance array on the CPU host or GPU device
+  /// \param gpu   Specifications of the GPU that will carry out calculations
+  void markImageRelevance(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                          const GpuDetails &gpu = null_gpu);
+  
   /// \brief Contribute forces accumulated in the cell grid back to a coordinate synthesis with
   ///        its own force accumulators and forces from other sources.
   ///
@@ -858,8 +901,11 @@ private:
                                  ///<   a free space in which the cells along the chain arrange
                                  ///<   their atoms in fully contiguous memory
   uint cell_base_capacity;       ///< Maximum atom load that any one cell is allocated to handle
-  double effective_cutoff;       ///< The combination of cutoff and padding that contributes to the
-                                 ///<   minimum distance measurement for each cell
+  double cutoff;                 ///< The non-bonded cutoff governing creation of the neighbor list
+  double padding;                ///< The minimal padding defining 
+  double effective_cutoff;       ///< The combination of half the cutoff and the full amount of
+                                 ///<   padding that contributes to the minimum distance
+                                 ///<   measurement for each cell
   int mesh_subdivisions;         ///< The number of discretizations of the associated particle-mesh
                                  ///<   grid, per spatial decomposition cell.  A common value is
                                  ///<   four.
@@ -1043,6 +1089,24 @@ private:
   /// Work groups indicating the cells associated with any given cell in order to complete the
   /// neutral territory interactions by the "tower and plate" method.
   Hybrid<int> nt_work_groups;
+
+  /// Markings to indicate whether an atom is within range of surrounding neighbor list cells.
+  /// Each 16-bit unsigned integer is marked in the order that it might be read by a work unit in
+  /// one of the nearby cells.  Bit numbers are indicated on the following diagram.  A work unit
+  /// focusing on center cell CC would read the numbered bit from all atoms in its associated
+  /// cells, e.g. read the 10th bit from atoms in the plate cell located -2 along the unit cell A
+  /// axis, read the 4th bit from atoms in the plate cell located (+2, -2) in the AB plane, and
+  /// the 15th bit from atoms in the cell directly above +2 along the unit cell C axis.
+  ///
+  ///                  ^    Plate Cells                 Tower Cells
+  ///                  |
+  ///             Unit |   10 11 CC
+  ///             Cell |   5  6  7  8  9               12 13 CC 14 15
+  ///               B  |   0  1  2  3  4            --- Unit Cell C --->
+  ///                  |
+  ///                  +--- Unit Cell A --->
+  ///
+  Hybrid<ushort> image_relevance;
   
   // Force accumulation arrays track the total number of atoms in the atoms or sp_atoms list.
   // These accumulators are split, with the primary accummulators being llint for double-precision

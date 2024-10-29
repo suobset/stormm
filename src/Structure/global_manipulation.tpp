@@ -39,6 +39,211 @@ std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(T *x, T *y, T *z, const Tcalc* axis_a, const Tcalc* axis_b,
+                       const Tcalc* axis_c, const Tcalc globalpos_scale_factor) {
+  if (isSignedIntegralScalarType<T>()) {
+    const Tcalc xval = static_cast<Tcalc>(*x) / globalpos_scale_factor;
+    const Tcalc yval = static_cast<Tcalc>(*y) / globalpos_scale_factor;
+    const Tcalc zval = static_cast<Tcalc>(*z) / globalpos_scale_factor;
+    const Tcalc tmp_x = (axis_a[0] * xval) + (axis_a[1] * yval) + (axis_a[2] * zval);
+    const Tcalc tmp_y = (axis_b[0] * xval) + (axis_b[1] * yval) + (axis_b[2] * zval);
+    const Tcalc tmp_z = (axis_c[0] * xval) + (axis_c[1] * yval) + (axis_c[2] * zval);
+    *x = llround(tmp_x * globalpos_scale_factor);
+    *y = llround(tmp_y * globalpos_scale_factor);
+    *z = llround(tmp_z * globalpos_scale_factor);
+  }
+  else {
+    const Tcalc xval = *x;
+    const Tcalc yval = *y;
+    const Tcalc zval = *z;
+    const Tcalc tmp_x = (axis_a[0] * xval) + (axis_a[1] * yval) + (axis_a[2] * zval);
+    const Tcalc tmp_y = (axis_b[0] * xval) + (axis_b[1] * yval) + (axis_b[2] * zval);
+    const Tcalc tmp_z = (axis_c[0] * xval) + (axis_c[1] * yval) + (axis_c[2] * zval);
+    *x = tmp_x;
+    *y = tmp_y;
+    *z = tmp_z;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(T *x, T *y, T *z, const Tcalc* umat, const Tcalc globalpos_scale_factor) {
+  if (isSignedIntegralScalarType<T>()) {
+    const Tcalc xval = static_cast<Tcalc>(*x) / globalpos_scale_factor;
+    const Tcalc yval = static_cast<Tcalc>(*y) / globalpos_scale_factor;
+    const Tcalc zval = static_cast<Tcalc>(*z) / globalpos_scale_factor;
+    const Tcalc tmp_x = (umat[0] * xval) + (umat[3] * yval) + (umat[6] * zval);
+    const Tcalc tmp_y = (umat[1] * xval) + (umat[4] * yval) + (umat[7] * zval);
+    const Tcalc tmp_z = (umat[2] * xval) + (umat[5] * yval) + (umat[8] * zval);
+    *x = llround(tmp_x * globalpos_scale_factor);
+    *y = llround(tmp_y * globalpos_scale_factor);
+    *z = llround(tmp_z * globalpos_scale_factor);
+  }
+  else {
+    const Tcalc xval = *x;
+    const Tcalc yval = *y;
+    const Tcalc zval = *z;
+    const Tcalc tmp_x = (umat[0] * xval) + (umat[3] * yval) + (umat[6] * zval);
+    const Tcalc tmp_y = (umat[1] * xval) + (umat[4] * yval) + (umat[7] * zval);
+    const Tcalc tmp_z = (umat[2] * xval) + (umat[5] * yval) + (umat[8] * zval);
+    *x = tmp_x;
+    *y = tmp_y;
+    *z = tmp_z;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(T* x, T* y, T* z, const size_t n, const Tcalc* axis_a, const Tcalc* axis_b,
+                       const Tcalc* axis_c, const Tcalc globalpos_scale_factor) {
+  if (isSignedIntegralScalarType<T>()) {
+    for (size_t i = 0; i < n; i++) {
+      const Tcalc xval = static_cast<Tcalc>(x[i]) / globalpos_scale_factor;
+      const Tcalc yval = static_cast<Tcalc>(y[i]) / globalpos_scale_factor;
+      const Tcalc zval = static_cast<Tcalc>(z[i]) / globalpos_scale_factor;
+      const Tcalc tmp_x = (axis_a[0] * xval) + (axis_a[1] * yval) + (axis_a[2] * zval);
+      const Tcalc tmp_y = (axis_b[0] * xval) + (axis_b[1] * yval) + (axis_b[2] * zval);
+      const Tcalc tmp_z = (axis_c[0] * xval) + (axis_c[1] * yval) + (axis_c[2] * zval);
+      x[i] = llround(tmp_x * globalpos_scale_factor);
+      y[i] = llround(tmp_y * globalpos_scale_factor);
+      z[i] = llround(tmp_z * globalpos_scale_factor);
+    }
+  }
+  else {
+    for (size_t i = 0; i < n; i++) {
+      const Tcalc xval = x[i];
+      const Tcalc yval = y[i];
+      const Tcalc zval = z[i];
+      const Tcalc tmp_x = (axis_a[0] * xval) + (axis_a[1] * yval) + (axis_a[2] * zval);
+      const Tcalc tmp_y = (axis_b[0] * xval) + (axis_b[1] * yval) + (axis_b[2] * zval);
+      const Tcalc tmp_z = (axis_c[0] * xval) + (axis_c[1] * yval) + (axis_c[2] * zval);
+      x[i] = tmp_x;
+      y[i] = tmp_y;
+      z[i] = tmp_z;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(T* x, T* y, T* z, const size_t n, const Tcalc* umat,
+                       const Tcalc globalpos_scale_factor) {
+  if (isSignedIntegralScalarType<T>()) {
+    for (size_t i = 0; i < n; i++) {
+      const Tcalc xval = static_cast<Tcalc>(x[i]) / globalpos_scale_factor;
+      const Tcalc yval = static_cast<Tcalc>(y[i]) / globalpos_scale_factor;
+      const Tcalc zval = static_cast<Tcalc>(z[i]) / globalpos_scale_factor;
+      const Tcalc tmp_x = (umat[0] * xval) + (umat[3] * yval) + (umat[6] * zval);
+      const Tcalc tmp_y = (umat[1] * xval) + (umat[4] * yval) + (umat[7] * zval);
+      const Tcalc tmp_z = (umat[2] * xval) + (umat[5] * yval) + (umat[8] * zval);
+      x[i] = llround(tmp_x * globalpos_scale_factor);
+      y[i] = llround(tmp_y * globalpos_scale_factor);
+      z[i] = llround(tmp_z * globalpos_scale_factor);
+    }
+  }
+  else {
+    for (size_t i = 0; i < n; i++) {
+      const Tcalc xval = x[i];
+      const Tcalc yval = y[i];
+      const Tcalc zval = z[i];
+      const Tcalc tmp_x = (umat[0] * xval) + (umat[3] * yval) + (umat[6] * zval);
+      const Tcalc tmp_y = (umat[1] * xval) + (umat[4] * yval) + (umat[7] * zval);
+      const Tcalc tmp_z = (umat[2] * xval) + (umat[5] * yval) + (umat[8] * zval);
+      x[i] = tmp_x;
+      y[i] = tmp_y;
+      z[i] = tmp_z;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(std::vector<T> *x, std::vector<T> *y, std::vector<T> *z,
+                       const std::vector<Tcalc> &axis_a, const std::vector<Tcalc> &axis_b,
+                       const std::vector<Tcalc> &axis_c, const Tcalc globalpos_scale_factor) {
+  const size_t target_size = x->size();
+  if (target_size != y->size() || target_size != z->size()) {
+    rtErr("Standard Template Library vectors of sizes " + std::to_string(target_size) + ", " +
+          std::to_string(y->size()) + ", and " + std::to_string(z->size()) + " are incompatible.",
+          "rotateCoordinates");
+  }
+  rotateCoordinates(x->data(), y->data(), z->data(), target_size, axis_a.data(), axis_b.data(),
+                    axis_c.data(), globalpos_scale_factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(std::vector<T> *x, std::vector<T> *y, std::vector<T> *z,
+                       const std::vector<Tcalc> &umat, const Tcalc globalpos_scale_factor) {
+  const size_t target_size = x->size();
+  if (target_size != y->size() || target_size != z->size()) {
+    rtErr("Standard Template Library vectors of sizes " + std::to_string(target_size) + ", " +
+          std::to_string(y->size()) + ", and " + std::to_string(z->size()) + " are incompatible.",
+          "rotateCoordinates");
+  }
+  rotateCoordinates(x->data(), y->data(), z->data(), target_size, umat.data(),
+                    globalpos_scale_factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(Hybrid<T> *x, Hybrid<T> *y, Hybrid<T> *z, const Hybrid<Tcalc> &axis_a,
+                       const Hybrid<Tcalc> &axis_b, const Hybrid<Tcalc> &axis_c,
+                       const Tcalc globalpos_scale_factor) {
+  const size_t target_size = x->size();
+  if (target_size != y->size() || target_size != z->size()) {
+    rtErr("Hybrid objects of sizes " + std::to_string(target_size), + ", " +
+          std::to_string(y->size()) + ", and " + std::to_string(z->size()) + " are incompatible.",
+          "rotateCoordinates");
+  }
+  rotateCoordinates(x->data(), y->data(), z->data(), target_size, axis_a.data(), axis_b.data(),
+                    axis_c.data(), globalpos_scale_factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tcalc>
+void rotateCoordinates(Hybrid<T> *x, Hybrid<T> *y, Hybrid<T> *z, const Hybrid<Tcalc> &umat,
+                       const Tcalc globalpos_scale_factor) {
+  const size_t target_size = x->size();
+  if (target_size != y->size() || target_size != z->size()) {
+    rtErr("Hybrid objects of sizes " + std::to_string(target_size), + ", " +
+          std::to_string(y->size()) + ", and " + std::to_string(z->size()) + " are incompatible.",
+          "rotateCoordinates");
+  }
+  rotateCoordinates(x->data(), y->data(), z->data(), target_size, umat.data(),
+                    globalpos_scale_factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T3, typename Tcalc>
+void rotateCoordinates(T3 *c, const T3 axis_a, const T3 axis_b, const T3 axis_c,
+                       const Tcalc globalpos_scale_factor) {
+  if (isSignedIntegralHpcVectorType<T3>()) {
+    const Tcalc xval = static_cast<Tcalc>(c->x) / globalpos_scale_factor;
+    const Tcalc yval = static_cast<Tcalc>(c->y) / globalpos_scale_factor;
+    const Tcalc zval = static_cast<Tcalc>(c->z) / globalpos_scale_factor;
+    const Tcalc tmp_x = (axis_a.x * xval) + (axis_a.y * yval) + (axis_a.z * zval);
+    const Tcalc tmp_y = (axis_b.x * xval) + (axis_b.y * yval) + (axis_b.z * zval);
+    const Tcalc tmp_z = (axis_c.x * xval) + (axis_c.y * yval) + (axis_c.z * zval);
+    c->x = llround(tmp_x * globalpos_scale_factor);
+    c->y = llround(tmp_y * globalpos_scale_factor);
+    c->z = llround(tmp_z * globalpos_scale_factor);
+  }
+  else {
+    const Tcalc xval = c->x;
+    const Tcalc yval = c->y;
+    const Tcalc zval = c->z;
+    const Tcalc tmp_x = (axis_a.x * xval) + (axis_a.y * yval) + (axis_a.z * zval);
+    const Tcalc tmp_y = (axis_b.x * xval) + (axis_b.y * yval) + (axis_b.z * zval);
+    const Tcalc tmp_z = (axis_c.x * xval) + (axis_c.y * yval) + (axis_c.z * zval);
+    c->x = tmp_x;
+    c->y = tmp_y;
+    c->z = tmp_z;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
 void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc alpha,
                        const Tcalc beta, const Tcalc gamma, const int lower_limit,
@@ -46,31 +251,8 @@ void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc alp
                        const Tcalc globalpos_scale_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const std::vector<Tcalc> rmat = beardRotationMatrix(alpha, beta, gamma);
-  if (isSignedIntegralScalarType<Tcoord>()) {
-    const Tcalc value_one = 1.0;
-    const Tcalc inv_globalpos_scale_factor = value_one / globalpos_scale_factor;
-    for (int i = lower_limit; i < upper_limit; i++) {
-      const Tcalc xc = static_cast<Tcalc>(xcrd[i]) * inv_globalpos_scale_factor;
-      const Tcalc yc = static_cast<Tcalc>(ycrd[i]) * inv_globalpos_scale_factor;
-      const Tcalc zc = static_cast<Tcalc>(zcrd[i]) * inv_globalpos_scale_factor;
-      xcrd[i] = llround(((rmat[0] * xc) + (rmat[3] * yc) + (rmat[6] * zc)) *
-                        globalpos_scale_factor);
-      ycrd[i] = llround(((rmat[1] * xc) + (rmat[4] * yc) + (rmat[7] * zc)) *
-                        globalpos_scale_factor);
-      zcrd[i] = llround(((rmat[2] * xc) + (rmat[5] * yc) + (rmat[8] * zc)) *
-                        globalpos_scale_factor);
-    }
-  }
-  else {
-    for (int i = lower_limit; i < upper_limit; i++) {
-      const Tcoord xc = xcrd[i];
-      const Tcoord yc = ycrd[i];
-      const Tcoord zc = zcrd[i];
-      xcrd[i] = (rmat[0] * xc) + (rmat[3] * yc) + (rmat[6] * zc);
-      ycrd[i] = (rmat[1] * xc) + (rmat[4] * yc) + (rmat[7] * zc);
-      zcrd[i] = (rmat[2] * xc) + (rmat[5] * yc) + (rmat[8] * zc);
-    }
-  }
+  rotateCoordinates<Tcoord, Tcalc>(&xcrd[lower_limit], &ycrd[lower_limit], &zcrd[lower_limit],
+                                   upper_limit - lower_limit, rmat.data(), globalpos_scale_factor);
 
   // Reposition virtual sites, if information is present to do so.  This assumes no unit cell
   // with periodic boundary conditions, as is approriate for coordinates undergoing global
@@ -130,7 +312,7 @@ void rotateCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index, con
     const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit : cfr.natom;
     rotateCoordinates<double, double>(cfr.xcrd, cfr.ycrd, cfr.zcrd, alpha, beta, gamma,
                                       lower_limit, actual_upper_limit, &vsk);
-    poly_ps->import(cf, system_index, TrajectoryKind::POSITIONS);
+    poly_ps->importSystem(cf, system_index, TrajectoryKind::POSITIONS);
   }
   else {
     const VirtualSiteKit<float> vsk = ag->getSinglePrecisionVirtualSiteKit();
@@ -139,7 +321,7 @@ void rotateCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index, con
     const int actual_upper_limit = (upper_limit > lower_limit) ? upper_limit : cfr.natom;
     rotateCoordinates<double, float>(cfr.xcrd, cfr.ycrd, cfr.zcrd, alpha, beta, gamma,
                                       lower_limit, actual_upper_limit, &vsk);
-    poly_ps->import(cf, system_index, TrajectoryKind::POSITIONS);
+    poly_ps->importSystem(cf, system_index, TrajectoryKind::POSITIONS);
   }
 }
 

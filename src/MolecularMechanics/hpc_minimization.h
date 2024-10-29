@@ -41,10 +41,6 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::StaticExclusionMaskSynthesis;
 using testing::StopWatch;
-  
-/// \brief Set the __shared__ memory access size for the conjugate gradient particle advancement
-///        kernels.
-void minimizationKernelSetup();
 
 /// \brief Get the launch parameters for conjugate gradient particle advancement kernels.
 ///

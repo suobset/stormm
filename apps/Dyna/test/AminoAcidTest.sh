@@ -20,7 +20,7 @@ cat > md.in << EOF
 &end
 
 &dynamics
-  nstlim = 1000000,  ntpr = 2500,  ntwx = 0, dt = 1.0,
+  nstlim = 10000,  ntpr = 2500,  ntwx = 0, dt = 1.0,
   ntt = 0,
   rigid_geom on,
   temperature = { tempi 100.0, temp0 300.0, -label GlyArg },
@@ -40,4 +40,4 @@ cat > md.in << EOF
 &end
 EOF
 
-${STORMM_BUILD}/apps/Dyna/dynamics.stormm.cuda -O -i md.in -warn
+${STORMM_BUILD}/apps/Dyna/dynamics.stormm.cuda -O -i md.in -except warn

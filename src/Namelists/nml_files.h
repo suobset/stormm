@@ -559,6 +559,14 @@ private:
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place
 ///        of a great deal of command line input in the Amber pmemd and sander programs.
 ///
+/// Overloaded:
+///   - Take a list of system file requirements, as well as file formats
+///   - Take inputs in the format and order of all other <namelist>Input functions.  This level of
+///     conformity is necessary to make a list of NamelistToken objects (see namelist_inventory.h)
+///     that can be used to loop over all namelists and produce documentation with mock input.
+///     This overload will supply a blank list of system requirements and the default file types
+///     when delegating to the primary function variant.
+///
 /// \param tf                 Input text file to scan immediately after the namelist is created
 /// \param start_line         Line at which to begin scanning the input file for the namelist
 ///                           (this will wrap back to the beginning of the file in search of a
@@ -573,6 +581,7 @@ private:
 /// \param crd_input_format   The default type for input coordinate files describing each system
 /// \param crd_output_format  The default type for trajectory files written based on each system
 /// \param crd_chkpt_format   The default type for restart files written based on each system
+/// \{
 NamelistEmulator
 filesInput(const TextFile &tf, int *start_line, bool *found,
            const std::vector<KeyRequirement> &sys_keyword_reqs,
@@ -581,6 +590,11 @@ filesInput(const TextFile &tf, int *start_line, bool *found,
            CoordinateFileKind crd_input_format = default_filecon_inpcrd_type,
            CoordinateFileKind crd_output_format = default_filecon_outcrd_type,
            CoordinateFileKind crd_checkpoint_format = default_filecon_chkcrd_type);
+
+NamelistEmulator
+filesInput(const TextFile &tf, int *start_line, bool *found, ExceptionResponse policy,
+           WrapTextSearch wrap);
+/// \}
 
 } // namespace namelist
 } // namespace stormm

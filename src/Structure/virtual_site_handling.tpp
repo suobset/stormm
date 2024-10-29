@@ -907,9 +907,9 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-void transmitVirtualSiteForces(PhaseSpaceWriter psw, const VirtualSiteKit<Tcalc> vsk) {
-  transmitVirtualSiteForces(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc,
-                            psw.umat, psw.invu, psw.unit_cell, vsk);
+void transmitVirtualSiteForces(PhaseSpaceWriter *psw, const VirtualSiteKit<Tcalc> vsk) {
+  transmitVirtualSiteForces(psw->xcrd, psw->ycrd, psw->zcrd, psw->xfrc, psw->yfrc, psw->zfrc,
+                            psw->umat, psw->invu, psw->unit_cell, vsk);
 }
 
 } // namespace structure

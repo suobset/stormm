@@ -570,7 +570,7 @@ NamelistEmulator pppmInput(const TextFile &tf, int *start_line, bool *found,
                 "'a' in the equation erf(a * r) / (r^n) for the particle-mesh interaction "
                 "component of a potential of the form 1 / (r^n).  Units of this quantity are "
                 "inverse Angstroms.");
-  t_nml.addKeyword("gaussian", NamelistType::REAL);
+  t_nml.addKeyword("gss_sigma", NamelistType::REAL);
   t_nml.addHelp("gss_sigma", "The RMS width of the Gaussian used in splitting the potential, in "
                 "units of Angstroms.  This is related to the 'Ewald Coefficient' ew_coeff by the "
                 "expression ew_coeff = 0.5 / gss_sigma, and splits a potential of the form 1 / "

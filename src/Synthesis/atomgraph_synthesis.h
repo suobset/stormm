@@ -12,6 +12,7 @@
 #include "Math/reduction_workunit.h"
 #include "Potential/energy_enumerators.h"
 #include "Restraints/restraint_apparatus.h"
+#include "Structure/structure_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Topology/topology_util.h"
@@ -32,14 +33,13 @@ using stmath::RdwuPerSystem;
 using stmath::ReductionWorkUnit;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
+using structure::ApplyConstraints;
 using topology::AtomGraph;
 using topology::AtomicRadiusSet;
 using topology::ChemicalDetailsKit;
 using topology::getRealParameters;
 using topology::ImplicitSolventModel;
 using topology::MassForm;
-using topology::SettleSetting;
-using topology::ShakeSetting;
 using topology::UnitCellType;
 using testing::StopWatch;
 using namespace generalized_born_defaults;
@@ -307,9 +307,10 @@ public:
   ///        all systems.
   int getValenceWorkUnitCount() const;
 
-  /// \brief Get the maximum size of valence work units.  This will have been either set by the
-  ///        user or tailored by the automated heuristics to produce the best saturation.
-  int getValenceWorkUnitSize() const;
+  /// \brief Get the maximum size of valence work units, whether for organic molecules or solvent
+  ///        (rigid water) residues.  This will have been either set by the user or tailored by
+  ///        the automated heuristics to produce the best saturation.
+  int2 getValenceWorkUnitSize() const;
 
   /// \brief Get the necessary thread block size for evaluating the valence work units.
   ValenceKernelSize getValenceThreadBlockSize() const;
@@ -537,8 +538,8 @@ private:
   double coulomb_constant;            ///< Coulomb's constant in units of kcal-A/mol-e^2 (Amber
                                       ///<   differs from other programs in terms of what this is,
                                       ///<   so it can be set here)
-  ShakeSetting use_bond_constraints;  ///< Toggles use of bond length constraints
-  SettleSetting use_settle;           ///< Toggles analytic constraints on rigid water
+  ApplyConstraints use_shake;         ///< Toggles use of bond length constraints
+  ApplyConstraints use_settle;        ///< Toggles analytic constraints on rigid water
   int largest_constraint_group;       ///< Number of bonds involved in the largest hub-and-spoke
                                       ///<   constraint group for any system in the synthesis
   char4 water_residue_name;           ///< Name of water residue, compared to residue_names
@@ -1135,16 +1136,22 @@ private:
 
   // SETTLE constraint group parameter sets and atom indices
   Hybrid<double4> settle_group_geometry;    ///< SETTLE group geometric parameters (ra, rb, rc,
-                                            ///<   and invra in the tuple's x, y, z, and w
+                                            ///<   and the combined mass of the heavy atoms and one
+                                            ///<   light atom in the tuple's x, y, z, and w
                                             ///<   members, respectively)
-  Hybrid<double2> settle_group_masses;      ///< SETTLE group inverse masses (mormt and mhrmt in
-                                            ///<   the tuple's x and y members, respectively)
+  Hybrid<double4> settle_group_masses;      ///< SETTLE group masses and inverse masses (masses of
+                                            ///<   the heavy atom, the light atom, heavy atom as a
+                                            ///<   proportion of the total, and light atom as a
+                                            ///<   proportion of the total) in the tuple's x, y, z,
+                                            ///<   and w members, respectively)
   Hybrid<float4> sp_settle_group_geometry;  ///< SETTLE group geometric parameters (ra, rb, rc,
                                             ///<   and invra in the tuple's x, y, z, and w
                                             ///<   members, respectively), single precision
-  Hybrid<float2> sp_settle_group_masses;    ///< SETTLE group inverse masses (mormt and mhrmt in
-                                            ///<   the tuple's x and y members, respectively),
-                                            ///<   single precision
+  Hybrid<float4> sp_settle_group_masses;    ///< SETTLE group masses and inverse masses (masses of
+                                            ///<   the heavy atom, the light atom, heavy atom as a
+                                            ///<   proportion of the total, and light atom as a
+                                            ///<   proportion of the total) in the tuple's x, y, z,
+                                            ///<   and w members, respectively), single precision
   Hybrid<int4> settle_group_indexing;       ///< Oxygen atom indices, first and second hydrogen
                                             ///<   atom indices, and SETTLE parameter indices in
                                             ///<   the tuple's x, y, z, and w members, respectively
@@ -1182,7 +1189,10 @@ private:
   // the cached atoms.  Forces are accumulated on all atoms in __shared__ memory and then
   // contributed back to the global arrays.
   int total_valence_work_units;  ///< Total count of valence work units spanning all systems
-  int valence_work_unit_size;    ///< Maximum size of the value work units
+  int2 valence_work_unit_size;   ///< Maximum size of the value work units.  The size for valence
+                                 ///<   work units containing "solute" atoms is given in the "x"
+                                 ///<   member of the tuple while the size for work units packed
+                                 ///<   with rigid water is given in the "y" member of the tuple.
 
   /// The thread block size needed to launch valence work units associated with this synthesis.
   /// Larger thread blocks may be used, but this is the minimum recommended size.
@@ -1295,9 +1305,9 @@ private:
   Hybrid<uint2> vste_instructions;
 
   /// Instructions for SETTLE group constraints.  These are relatively simple: three atom indices
-  /// are encoded in bits 1-10, 11-20, and 21-30 of the x member, while the constraint parameter
-  /// set (multiple SETTLE configurations are supported in one simulation) is stored in the
-  /// y member.
+  /// are encoded in bits 1-10 (heavy atom), 11-20 (first light atom), and 21-30 (second light
+  /// atom) of the x member, while the constraint parameter set (multiple SETTLE configurations
+  /// are supported in one simulation) is stored in the y member.
   Hybrid<uint2> sett_instructions;
 
   /// Instructions for hub-and-spoke constraint groups.  These are more complex: the size of the
@@ -1520,8 +1530,13 @@ private:
   /// \brief Construct valence work units for all systems and load their instructions into the
   ///        topology synthesis for availability on the GPU.
   ///
-  /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit
-  void loadValenceWorkUnits(int vwu_atom_limit = maximum_valence_work_unit_atoms);
+  /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit.
+  ///                        The maximum number of atoms for a work unit beginning with an atom in
+  ///                        an organic molecule is given in the "x" member while the maximum
+  ///                        number of atoms for a work unit beginning with an atom in water is
+  ///                        given in the "y" member.
+  void loadValenceWorkUnits(int2 vwu_atom_limits =  { maximum_valence_work_unit_atoms,
+                                                      maximum_valence_work_unit_atoms });
 
   /// \brief Construct the array of reduction work units.
   ///

@@ -43,32 +43,67 @@ int AtomGraph::getMoleculeCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int AtomGraph::getOrganicCompoundsCount() const {
-	int organic_compounds = 0;
-	size_t i = 0;
-	while(i < molecule_limits.size()) {
-		int start_limit = (i == 0) ? 0 : molecule_limits.readHost(i - 1);
-		int end_limit = molecule_limits.readHost(i);
-		// 1: Greater than eight atoms, so that acetate H3C-COOH is just below the cutoff
-		if(end_limit - start_limit > 8) {
-			bool hydrogen = false;
-			bool carbon = false;
-			for(int j = start_limit; j <= end_limit; j++){
-				// 2: At least one hydrogen and one carbon atom
-				if(molecule_contents.readHost(j) == 1) {
-					hydrogen = true;
-				} 
-				else if(molecule_contents.readHost(j) == 6) {
-					carbon = true;
-				}
-			}
-			if (hydrogen && carbon) {
-				organic_compounds += 1;
-			}
-		}
-		i++;
-	}
-	return organic_compounds;
+int AtomGraph::getOrganicMoleculeCount() const {
+  const int* molcon_ptr = molecule_contents.data();
+  const int* znum_ptr = atomic_numbers.data();
+  const int* mol_lims_ptr = molecule_limits.data();
+  int result = 0;
+  for (size_t i = 0; i < molecule_limits.size(); i++) {
+    int start_limit = mol_lims_ptr[i];
+    int end_limit = mol_lims_ptr[i + 1];
+
+    // 1: Greater than eight atoms, so that acetate H3C-COOH is just at the cutoff
+    if (end_limit - start_limit >= 8) {
+      int nreal = 0;
+      bool needs_carbon = true;
+      int j = start_limit;
+      while ((nreal < 8 || needs_carbon) && j < end_limit) {
+        
+        // 2: At least one hydrogen and one carbon atom
+        const int jatom_idx = molcon_ptr[j];
+        nreal += (znum_ptr[jatom_idx] > 0);
+        needs_carbon = (needs_carbon && znum_ptr[jatom_idx] != 6);
+        j++;
+      }
+      result += ((! needs_carbon) && nreal >= 8);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getOrganicAtomCount() const {
+  const int* molcon_ptr = molecule_contents.data();
+  const int* znum_ptr = atomic_numbers.data();
+  const int* mol_lims_ptr = molecule_limits.data();
+  int result = 0;
+  for (size_t i = 0; i < molecule_limits.size(); i++) {
+    int start_limit = mol_lims_ptr[i];
+    int end_limit = mol_lims_ptr[i + 1];
+    if (end_limit - start_limit >= 8) {
+      int nreal = 0;
+      bool needs_carbon = true;
+      int j = start_limit;
+      while ((nreal < 8 || needs_carbon) && j < end_limit) {
+        const int jatom_idx = molcon_ptr[j];
+        nreal += (znum_ptr[jatom_idx] > 0);
+        needs_carbon = (needs_carbon && znum_ptr[jatom_idx] != 6);
+        j++;
+      }
+      result += ((! needs_carbon) && nreal >= 8) * (end_limit - start_limit);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getWaterResidueSize() const {
+  return water_residue_size;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getWaterResidueCount() const {
+  return water_residue_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -625,6 +660,28 @@ std::string AtomGraph::getPBRadiiSet() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool AtomGraph::usesShake() const {
+  switch (use_shake) {
+  case ApplyConstraints::YES:
+    return true;
+  case ApplyConstraints::NO:
+    return false;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool AtomGraph::usesSettle() const {
+  switch (use_settle) {
+  case ApplyConstraints::YES:
+    return true;
+  case ApplyConstraints::NO:
+    return false;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getWaterResidueName() const {
   return char4ToString(water_residue_name);
 }
@@ -790,15 +847,17 @@ ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(const HybridTargetLev
                             attn14_elec_factors.data(tier), attn14_vdw_factors.data(tier),
                             bond_i_atoms.data(tier), bond_j_atoms.data(tier),
                             bond_parameter_indices.data(tier), bond_modifiers.data(tier),
+                            reinterpret_cast<const uint*>(bond_evaluation_mask.data(tier)),
                             angl_i_atoms.data(tier), angl_j_atoms.data(tier),
                             angl_k_atoms.data(tier), angl_parameter_indices.data(tier),
-                            angl_modifiers.data(tier), dihe_i_atoms.data(tier),
-                            dihe_j_atoms.data(tier), dihe_k_atoms.data(tier),
-                            dihe_l_atoms.data(tier), dihe_parameter_indices.data(tier),
-                            dihe14_parameter_indices.data(tier), dihe_modifiers.data(tier),
-                            infr14_i_atoms.data(tier), infr14_l_atoms.data(tier),
-                            infr14_parameter_indices.data(tier), urey_bradley_i_atoms.data(tier),
-                            urey_bradley_k_atoms.data(tier),
+                            angl_modifiers.data(tier),
+                            reinterpret_cast<const uint*>(angl_evaluation_mask.data(tier)),
+                            dihe_i_atoms.data(tier), dihe_j_atoms.data(tier),
+                            dihe_k_atoms.data(tier), dihe_l_atoms.data(tier),
+                            dihe_parameter_indices.data(tier), dihe14_parameter_indices.data(tier),
+                            dihe_modifiers.data(tier), infr14_i_atoms.data(tier),
+                            infr14_l_atoms.data(tier), infr14_parameter_indices.data(tier),
+                            urey_bradley_i_atoms.data(tier), urey_bradley_k_atoms.data(tier),
                             urey_bradley_parameter_indices.data(tier),
                             charmm_impr_i_atoms.data(tier), charmm_impr_j_atoms.data(tier),
                             charmm_impr_k_atoms.data(tier), charmm_impr_l_atoms.data(tier),
@@ -844,15 +903,17 @@ ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(const HybridTargetLeve
                            sp_attn14_elec_factors.data(tier), sp_attn14_vdw_factors.data(tier),
                            bond_i_atoms.data(tier), bond_j_atoms.data(tier),
                            bond_parameter_indices.data(tier), bond_modifiers.data(tier),
+                           reinterpret_cast<const uint*>(bond_evaluation_mask.data(tier)),
                            angl_i_atoms.data(tier), angl_j_atoms.data(tier),
                            angl_k_atoms.data(tier), angl_parameter_indices.data(tier),
-                           angl_modifiers.data(tier), dihe_i_atoms.data(tier),
-                           dihe_j_atoms.data(tier), dihe_k_atoms.data(tier),
-                           dihe_l_atoms.data(tier), dihe_parameter_indices.data(tier),
-                           dihe14_parameter_indices.data(tier), dihe_modifiers.data(tier),
-                           infr14_i_atoms.data(tier), infr14_l_atoms.data(tier),
-                           infr14_parameter_indices.data(tier), urey_bradley_i_atoms.data(tier),
-                           urey_bradley_k_atoms.data(tier),
+                           angl_modifiers.data(tier),
+                           reinterpret_cast<const uint*>(angl_evaluation_mask.data(tier)),
+                           dihe_i_atoms.data(tier), dihe_j_atoms.data(tier),
+                           dihe_k_atoms.data(tier), dihe_l_atoms.data(tier),
+                           dihe_parameter_indices.data(tier), dihe14_parameter_indices.data(tier),
+                           dihe_modifiers.data(tier), infr14_i_atoms.data(tier),
+                           infr14_l_atoms.data(tier), infr14_parameter_indices.data(tier),
+                           urey_bradley_i_atoms.data(tier), urey_bradley_k_atoms.data(tier),
                            urey_bradley_parameter_indices.data(tier),
                            charmm_impr_i_atoms.data(tier), charmm_impr_j_atoms.data(tier),
                            charmm_impr_k_atoms.data(tier), charmm_impr_l_atoms.data(tier),
@@ -994,9 +1055,10 @@ AtomGraph::getDoublePrecisionConstraintKit(const HybridTargetLevel tier) const {
                                constraint_group_bounds.data(tier),
                                constraint_parameter_indices.data(tier),
                                constraint_parameter_bounds.data(tier),
+                               settle_mo.data(tier), settle_mh.data(tier), settle_moh.data(tier),
                                settle_mormt.data(tier), settle_mhrmt.data(tier),
                                settle_ra.data(tier), settle_rb.data(tier), settle_rc.data(tier),
-                               settle_invra.data(tier), constraint_squared_lengths.data(tier),
+                               constraint_squared_lengths.data(tier),
                                constraint_inverse_masses.data(tier));
 }
 
@@ -1011,9 +1073,10 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
                               constraint_group_bounds.data(tier),
                               constraint_parameter_indices.data(tier),
                               constraint_parameter_bounds.data(tier),
-                              sp_settle_mormt.data(tier), sp_settle_mhrmt.data(tier),
-                              sp_settle_ra.data(tier), sp_settle_rb.data(tier),
-                              sp_settle_rc.data(tier), sp_settle_invra.data(tier),
+                              sp_settle_mo.data(tier), sp_settle_mh.data(tier),
+                              sp_settle_moh.data(tier), sp_settle_mormt.data(tier),
+                              sp_settle_mhrmt.data(tier), sp_settle_ra.data(tier),
+                              sp_settle_rb.data(tier), sp_settle_rc.data(tier),
                               sp_constraint_squared_lengths.data(tier),
                               sp_constraint_inverse_masses.data(tier));
 }
@@ -1022,6 +1085,8 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
 #  ifdef STORMM_USE_CUDA
 //-------------------------------------------------------------------------------------------------
 ValenceKit<double> AtomGraph::getDeviceViewToHostDPValenceKit() const {
+  const int* bevm = bond_evaluation_mask.getDeviceValidHostPointer();
+  const int* aevm = angl_evaluation_mask.getDeviceValidHostPointer();
   return ValenceKit<double>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                             bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                             inferred_14_attenuations, attenuated_14_type_count,
@@ -1040,11 +1105,13 @@ ValenceKit<double> AtomGraph::getDeviceViewToHostDPValenceKit() const {
                             bond_j_atoms.getDeviceValidHostPointer(),
                             bond_parameter_indices.getDeviceValidHostPointer(),
                             bond_modifiers.getDeviceValidHostPointer(),
+                            reinterpret_cast<const uint*>(bevm),
                             angl_i_atoms.getDeviceValidHostPointer(),
                             angl_j_atoms.getDeviceValidHostPointer(),
                             angl_k_atoms.getDeviceValidHostPointer(),
                             angl_parameter_indices.getDeviceValidHostPointer(),
                             angl_modifiers.getDeviceValidHostPointer(),
+                            reinterpret_cast<const uint*>(aevm),
                             dihe_i_atoms.getDeviceValidHostPointer(),
                             dihe_j_atoms.getDeviceValidHostPointer(),
                             dihe_k_atoms.getDeviceValidHostPointer(),
@@ -1109,6 +1176,8 @@ ValenceKit<double> AtomGraph::getDeviceViewToHostDPValenceKit() const {
 
 //-------------------------------------------------------------------------------------------------
 ValenceKit<float> AtomGraph::getDeviceViewToHostSPValenceKit() const {
+  const int* bevm = bond_evaluation_mask.getDeviceValidHostPointer();
+  const int* aevm = angl_evaluation_mask.getDeviceValidHostPointer();
   return ValenceKit<float>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                            bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                            inferred_14_attenuations, attenuated_14_type_count,
@@ -1127,11 +1196,13 @@ ValenceKit<float> AtomGraph::getDeviceViewToHostSPValenceKit() const {
                            bond_j_atoms.getDeviceValidHostPointer(),
                            bond_parameter_indices.getDeviceValidHostPointer(),
                            bond_modifiers.getDeviceValidHostPointer(),
+                           reinterpret_cast<const uint*>(bevm),
                            angl_i_atoms.getDeviceValidHostPointer(),
                            angl_j_atoms.getDeviceValidHostPointer(),
                            angl_k_atoms.getDeviceValidHostPointer(),
                            angl_parameter_indices.getDeviceValidHostPointer(),
                            angl_modifiers.getDeviceValidHostPointer(),
+                           reinterpret_cast<const uint*>(aevm),
                            dihe_i_atoms.getDeviceValidHostPointer(),
                            dihe_j_atoms.getDeviceValidHostPointer(),
                            dihe_k_atoms.getDeviceValidHostPointer(),
@@ -1336,12 +1407,14 @@ AtomGraph::getDeviceViewToHostDPConstraintKit() const {
                                constraint_group_bounds.getDeviceValidHostPointer(),
                                constraint_parameter_indices.getDeviceValidHostPointer(),
                                constraint_parameter_bounds.getDeviceValidHostPointer(),
+                               settle_mo.getDeviceValidHostPointer(),
+                               settle_mh.getDeviceValidHostPointer(),
+                               settle_moh.getDeviceValidHostPointer(),
                                settle_mormt.getDeviceValidHostPointer(),
                                settle_mhrmt.getDeviceValidHostPointer(),
                                settle_ra.getDeviceValidHostPointer(),
                                settle_rb.getDeviceValidHostPointer(),
                                settle_rc.getDeviceValidHostPointer(),
-                               settle_invra.getDeviceValidHostPointer(),
                                constraint_squared_lengths.getDeviceValidHostPointer(),
                                constraint_inverse_masses.getDeviceValidHostPointer());
 }
@@ -1359,12 +1432,14 @@ AtomGraph::getDeviceViewToHostSPConstraintKit() const {
                               constraint_group_bounds.getDeviceValidHostPointer(),
                               constraint_parameter_indices.getDeviceValidHostPointer(),
                               constraint_parameter_bounds.getDeviceValidHostPointer(),
+                              sp_settle_mo.getDeviceValidHostPointer(),
+                              sp_settle_mh.getDeviceValidHostPointer(),
+                              sp_settle_moh.getDeviceValidHostPointer(),
                               sp_settle_mormt.getDeviceValidHostPointer(),
                               sp_settle_mhrmt.getDeviceValidHostPointer(),
                               sp_settle_ra.getDeviceValidHostPointer(),
                               sp_settle_rb.getDeviceValidHostPointer(),
                               sp_settle_rc.getDeviceValidHostPointer(),
-                              sp_settle_invra.getDeviceValidHostPointer(),
                               sp_constraint_squared_lengths.getDeviceValidHostPointer(),
                               sp_constraint_inverse_masses.getDeviceValidHostPointer());
 }

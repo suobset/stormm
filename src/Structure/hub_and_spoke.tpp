@@ -6,11 +6,11 @@ namespace structure {
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tcalc>
-void rattlePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev, Tcoord* yvel_dev,
-                     Tcoord* zvel_dev, const Tcoord* xref, const Tcoord* yref, const Tcoord* zref,
-                     const ConstraintKit<Tcalc> &cnk, const Tcalc dt, const Tcalc tol,
-                     const int max_iter, const RattleMethod style, const Tcalc gpos_scale_factor,
-                     const Tcalc vel_scale_factor) {
+void shakePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev, Tcoord* yvel_dev,
+                    Tcoord* zvel_dev, const Tcoord* xref, const Tcoord* yref, const Tcoord* zref,
+                    const ConstraintKit<Tcalc> &cnk, const Tcalc dt, const Tcalc tol,
+                    const int max_iter, const RattleMethod style, const Tcalc gpos_scale_factor,
+                    const Tcalc vel_scale_factor) {
   const bool tcoord_is_real  = (isSignedIntegralScalarType<Tcoord>() == false);
   const bool tcalc_is_double = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index);
   const Tcoord zero = 0.0;
@@ -146,7 +146,7 @@ void rattlePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev,
     if (iter == max_iter && (! done)) {
       rtWarn("Maximum iteration count (" + std::to_string(iter) + ") was reached attempting to "
              "RATTLE a bond group centered at atom " + std::to_string(catom_idx) + " (" +
-             std::to_string(nbnd) + " bonds in all).", "rattlePositions");
+             std::to_string(nbnd) + " bonds in all).", "shakePositions");
     }
 
     // Apply the post-hoc velocity correction.  The particles moved by the amount of the correction
@@ -176,18 +176,18 @@ void rattlePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev,
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-void rattlePositions(PhaseSpaceWriter *psw, const ConstraintKit<Tcalc> &cnk, const Tcalc dt,
-                     const Tcalc tol, const int max_iter, const RattleMethod style) {
-  rattlePositions<double, Tcalc>(psw->xalt, psw->yalt, psw->zalt, psw->vxalt, psw->vyalt,
-                                 psw->vzalt, psw->xcrd, psw->ycrd, psw->zcrd, cnk, dt, tol,
-                                 max_iter, style);
+void shakePositions(PhaseSpaceWriter *psw, const ConstraintKit<Tcalc> &cnk, const Tcalc dt,
+                    const Tcalc tol, const int max_iter, const RattleMethod style) {
+  shakePositions<double, Tcalc>(psw->xalt, psw->yalt, psw->zalt, psw->vxalt, psw->vyalt,
+                                psw->vzalt, psw->xcrd, psw->ycrd, psw->zcrd, cnk, dt, tol,
+                                max_iter, style);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename T2, typename T4>
-void rattlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
-                     const SyAtomUpdateKit<T, T2, T4> &poly_auk, const T dt, const T tol,
-                     const int max_iter) {
+void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
+                    const SyAtomUpdateKit<T, T2, T4> &poly_auk, const T dt, const T tol,
+                    const int max_iter) {
   const bool tcalc_is_double = (std::type_index(typeid(T)).hash_code() == double_type_index);
   const T zero = 0.0;
 

@@ -1,22 +1,61 @@
 #include <cstdio>
 #include <cstdlib>
 #include "copyright.h"
+#include "Namelists/nml_conformer.h"
+#include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_ffmorph.h"
+#include "Namelists/nml_files.h"
+#include "Namelists/nml_mesh.h"
+#include "Namelists/nml_minimize.h"
+#include "Namelists/nml_nice.h"
+#include "Namelists/nml_pppm.h"
+#include "Namelists/nml_precision.h"
+#include "Namelists/nml_random.h"
+#include "Namelists/nml_report.h"
+#include "Namelists/nml_restraint.h"
+#include "Namelists/nml_solvent.h"
 #include "Parsing/parse.h"
 #include "Parsing/parsing_enumerators.h"
 #include "Parsing/textfile.h"
 #include "Potential/pme_util.h"
+#include "Reporting/reporting_enumerators.h"
+#include "Reporting/report_table.h"
+#include "Reporting/summary_file.h"
 #include "command_line_parser.h"
 #include "input.h"
+#include "namelist_inventory.h"
+#include "nml_dynamics.h"
+#include "nml_files.h"
 
 namespace stormm {
 namespace namelist {
 
 using energy::default_pme_cutoff;
+using namelist::conformerInput;
+using namelist::dynamicsInput;
+using namelist::filesInput;
+using namelist::ffmorphInput;
+using namelist::meshInput;
+using namelist::minimizeInput;
+using namelist::niceInput;
+using namelist::pppmInput;
+using namelist::precisionInput;
+using namelist::randomInput;
+using namelist::reportInput;
+using namelist::restraintInput;
+using namelist::solventInput;
 using parse::findStringInVector;
+using parse::strcmpCased;
+using parse::JustifyText;
 using parse::TextOrigin;
 using parse::TextFile;
 using parse::vectorOfStrings;
-
+using review::findFormatWidth;
+using review::printProtectedText;
+using review::protectText;
+using review::ReportTable;
+using review::OutputSyntax;
+  
 //-------------------------------------------------------------------------------------------------
 CommandLineParser::CommandLineParser(const std::string &program_name_in,
                                      const std::string &program_description,
@@ -29,14 +68,41 @@ CommandLineParser::CommandLineParser(const std::string &program_name_in,
     cli_nml{program_name, CaseSensitivity::YES, policy_in, program_description, true},
     help_on_no_args{true}, exit_on_help{true}, lead_parser{true},
     command_line_text{},
+    control_blocks{},
     coordinations{},
     excluded_keys{},
     noted_imports{noted_imports_in}
 {
+  const std::string help_msg("List command line arguments with descriptions.");
   cli_nml.addKeyword("--help", NamelistType::BOOLEAN);
-  cli_nml.addHelp("--help", "List command line arguments with descriptions.");
+  cli_nml.addHelp("--help", help_msg);
+  cli_nml.addKeyword("-help", NamelistType::BOOLEAN);
+  cli_nml.addHelp("-help", help_msg);
 }
 
+//-------------------------------------------------------------------------------------------------
+CommandLineParser::CommandLineParser(const std::string &program_name_in,
+                                     const std::string &program_description,
+                                     const ExceptionResponse policy_in) :
+    CommandLineParser(program_name_in, program_description, {}, policy_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+std::string CommandLineParser::getInputAsString(const int width) const {
+  std::string result = executable;
+  const int n_args = command_line_text.size();
+  for (int i = 0; i < n_args; i++) {
+    result += " ";
+    result += command_line_text[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool CommandLineParser::doesProgramExitOnHelp() const {
+  return exit_on_help;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void CommandLineParser::activateHelpOnNoArgs() {
   help_on_no_args = true;
@@ -66,7 +132,7 @@ void CommandLineParser::addStandardAmberInputs(const std::vector<std::string> &c
       cli_nml.addHelp("-i", "The primary input file, equivalent to Amber's mdin.");
     }
     else if (cli_keys[i] == "-O") {
-      cli_nml.addKeyword("-O", NamelistType::STRING, std::string(""));
+      cli_nml.addKeyword("-O", NamelistType::BOOLEAN);
       cli_nml.addHelp("-O", "Flag to activate overwriting of existing output files.");
     }
     else if (cli_keys[i] == "-p") {
@@ -110,14 +176,19 @@ void CommandLineParser::addStandardAmberInputs(const std::vector<std::string> &c
       cli_nml.addHelp("-ig_seed", "Seed for the random number gnenrator which will create "
                       "perturbations in each replica's coordinates.");
     }
+    else if (cli_keys[i] == "-temp0") {
+      cli_nml.addKeyword("-temp0", NamelistType::REAL,
+                         std::to_string(default_simulation_temperature));
+      cli_nml.addHelp("-temp0", "The temperature at which to stage systems or calculations");
+    }
     else {
       switch (policy) {
       case ExceptionResponse::DIE:
         rtErr("Invalid AMBER command line input keyword \"" + cli_keys[i] + "\".",
-              "CommandLineParser", "addStandardAmberInput");
+              "CommandLineParser", "addStandardAmberInputs");
       case ExceptionResponse::WARN:
         rtWarn("Invalid AMBER command line input keyword \"" + cli_keys[i] + "\".  This input "
-               "will be ignored.", "CommandLineParser", "addStandardAmberInput");
+               "will be ignored.", "CommandLineParser", "addStandardAmberInputs");
         break;
       case ExceptionResponse::SILENT:
         break;
@@ -153,6 +224,17 @@ void CommandLineParser::addStandardBenchmarkingInputs(const std::vector<std::str
                       "reported as an average of all trials, each of which may involve multiple "
                       "iterations of the calculation.");
     }
+    else if (cli_keys[i] == "-precision") {
+      cli_nml.addKeyword("-precision", NamelistType::STRING, std::string("single"));
+      cli_nml.addHelp("-precision", "The precision model in whcih to perform calculations.  Note "
+                      "that various coordinates (positions, velocities, forces) will likely "
+                      "remain in a fixed-precision representation.");
+    }
+    else if (cli_keys[i] == "-skip_cpu_check") {
+      cli_nml.addKeyword("-skip_cpu_check", NamelistType::BOOLEAN);
+      cli_nml.addHelp("-skip_cpu_check", "Skip a CPU_based check on the forces computed by the "
+                      "GPU.");
+    }
     else if (cli_keys[i] == "-cutoff") {
       cli_nml.addKeyword("-cutoff", NamelistType::REAL, std::to_string(default_pme_cutoff));
       cli_nml.addHelp("-cutoff", "The cutoff, in units of Angstroms, that will be applied to "
@@ -176,6 +258,47 @@ void CommandLineParser::addStandardBenchmarkingInputs(const std::vector<std::str
       cli_nml.addHelp("-pad", "The minimum padding, in units of Angstroms, added to the width of "
                       "each neighbor list cell when subdividing the simulation unit cell.");
     }
+    else if (cli_keys[i] == "-eval_nrg") {
+      cli_nml.addKeyword("-eval_nrg", NamelistType::BOOLEAN);
+      cli_nml.addHelp("-eval_nrg", "Request that the relevant system energy components be "
+                      "evaluated");
+    }
+    else if (cli_keys[i] == "-eval_frc") {
+      cli_nml.addKeyword("eval_frc", NamelistType::BOOLEAN);
+      cli_nml.addHelp("-eval_frc", "Request that forces on particles due to relevant interactions "
+                      "be evaluated");
+    }
+    else if (cli_keys[i] == "-omit_frc") {
+      cli_nml.addKeyword("-omit_frc", NamelistType::BOOLEAN);
+      cli_nml.addHelp("-omit_frc", "Request that the forces on particles be omitted from the GPU "
+                      "calculation.  This will also omit any CPU check on forces, and compel an "
+                      "evaluation of the energy so as to have at least one quantity for the GPU "
+                      "to compute.");
+    }
+    else if (cli_keys[i] == "-fp_bits") {
+      cli_nml.addKeyword("-fp_bits", NamelistType::INTEGER, std::to_string(24));
+      cli_nml.addHelp("-fp_bits", "The number of fixed precision bits after the point (values in "
+                      "kcal/mol-A) with which to accumulate forces on all particles.");
+    }
+    else if (cli_keys[i] == "-blur") {
+      cli_nml.addKeyword("-blur", NamelistType::REAL, std::to_string(0.04));
+      cli_nml.addHelp("-blur", "The Gaussian width by which to blur particle positions in each "
+                      "replica of the system and each iteration of the force or energy "
+                      "calculation, in units of Angstroms.");
+    }
+    else {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Invalid command line input keyword \"" + cli_keys[i] + "\".",
+              "CommandLineParser", "addStandardBenchmarkingInputs");
+      case ExceptionResponse::WARN:
+        rtWarn("Invalid command line input keyword \"" + cli_keys[i] + "\".  This input "
+               "will be ignored.", "CommandLineParser", "addStandardBenchmarkingInputs");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
   }
 }
 
@@ -183,6 +306,85 @@ void CommandLineParser::addStandardBenchmarkingInputs(const std::vector<std::str
 void CommandLineParser::addStandardBenchmarkingInputs(const char* key_a, const char* key_b,
                                                       const char* key_c, const char* key_d) {
   addStandardBenchmarkingInputs(vectorOfStrings(key_a, key_b, key_c, key_d));
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addStandardApplicationInputs(const std::vector<std::string> &cli_keys) {
+
+  // Shunt some imputs to the Amber loader
+  const size_t nkeys = cli_keys.size();
+  std::vector<std::string> amb_keys, nonamb_keys;
+  for (size_t i = 0; i < nkeys; i++) {
+    if (cli_keys[i] == "-i" || cli_keys[i] == "-ig_seed" || cli_keys[i] == "-p" ||
+        cli_keys[i] == "-c" || cli_keys[i] == "-o" || cli_keys[i] == "-O") {
+      amb_keys.push_back(cli_keys[i]);
+    }
+    else {
+      nonamb_keys.push_back(cli_keys[i]);
+    }
+  }
+  if (amb_keys.size() > 0) {
+    addStandardAmberInputs(amb_keys);
+  }
+
+  // Parse the remaining inputs
+  const size_t nrem = nonamb_keys.size();
+  for (size_t i = 0; i < nrem; i++) {
+    if (nonamb_keys[i] == "-x") {
+      cli_nml.addKeyword("-x", NamelistType::STRING, std::string(""));
+      cli_nml.addHelp("-x", "Name (or, base name) of the output trajectory file");
+    }
+    else if (nonamb_keys[i] == "-t") {
+      cli_nml.addKeyword("-t", NamelistType::STRING, std::string(""));
+      cli_nml.addHelp("-t", "Name of the input transcript file, holding a detailed record of all "
+                      "inputs given by the user as well as inputs which were possible with the "
+                      "available namelist blocks");
+    }
+    else if (nonamb_keys[i] == "-c_kind") {
+      cli_nml.addKeyword("-c_kind", NamelistType::STRING,
+                         getEnumerationName(default_filecon_inpcrd_type));
+      cli_nml.addHelp("-c_kind", "Expected format of the input coordinates file");
+    }
+    else if (nonamb_keys[i] == "-x_kind") {
+      cli_nml.addKeyword("-x_kind", NamelistType::STRING,
+                         getEnumerationName(default_filecon_outcrd_type));
+      cli_nml.addHelp("-x_kind", "Requested format of the output coordinates file");
+    }
+    else if (nonamb_keys[i] == "-r_kind") {
+      cli_nml.addKeyword("-r_kind", NamelistType::STRING,
+                         getEnumerationName(default_filecon_outcrd_type));
+      cli_nml.addHelp("-r_kind", "Requested format of the checkpoint file");
+    }
+    else if (nonamb_keys[i] == "-except") {
+      cli_nml.addKeyword("-except", NamelistType::STRING,
+                         getEnumerationName(ExceptionResponse::DIE));
+    }
+    else {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Unrecognized command line input keyword \"" + nonamb_keys[i] + "\".",
+              "CommandLineParser", "addStandardApplicationInputs");
+      case ExceptionResponse::WARN:
+        rtWarn("Unrecognized command line input keyword \"" + nonamb_keys[i] + "\".  This input "
+               "will be ignored.", "CommandLineParser", "addStandardApplicationInputs");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addStandardApplicationInputs(const char* key_a, const char* key_b,
+                                                     const char* key_c, const char* key_d) {
+  addStandardApplicationInputs(vectorOfStrings(key_a, key_b, key_c, key_d));
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addStandardApplicationInputs() {
+  addStandardApplicationInputs({ "-i", "-ig_seed", "-p", "-c", "-o", "-O", "-x", "-t", "-c_kind",
+                                 "-x_kind", "-r_kind", "-except" });
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -252,7 +454,8 @@ void CommandLineParser::parseUserInput(const int argc, const char* argv[]) {
 
   // Print help messages if the developer indicates and there are no arguments, or if the user
   // has specified "--help" as one of the command line keywords.
-  if ((help_on_no_args && argc == 1) || cli_nml.getBoolValue("--help")) {
+  if ((help_on_no_args && argc == 1) || cli_nml.getBoolValue("--help") ||
+      cli_nml.getBoolValue("-help")) {
     if (lead_parser) {
       if (coordinations.size() == 0) {
         cli_nml.printHelp();
@@ -272,6 +475,37 @@ void CommandLineParser::parseUserInput(const int argc, const char* argv[]) {
         }
         tmp_nml.printHelp();
       }
+      
+      // Print the list of associated namelists, control blocks that can go in the program's
+      // input file.
+      if (control_blocks.size() > 0) {
+        const int console_width = findFormatWidth(&std::cout);
+        std::vector<std::string> all_blk = control_blocks;
+        const TextFile mock_tf(std::string("Some text"), TextOrigin::RAM);
+        int start_line = 0;
+        bool found;
+        for (size_t i = 0; i < control_blocks.size(); i++) {
+          for (size_t j = 0; j < namelist_inventory.size(); j++) {
+            if (strcmpCased(control_blocks[i], namelist_inventory[j].getTitle(),
+                            CaseSensitivity::YES)) {
+              const NamelistEmulator t_nml = namelist_inventory[j].invoke(mock_tf, &start_line,
+                                                                          &found);
+              all_blk.push_back(t_nml.getHelp());
+            }
+          }
+        }
+        ReportTable tab_of_nml(all_blk, { "Namelist", "Description" }, std::string(""),
+                               console_width, { JustifyText::LEFT, JustifyText::LEFT }, true);
+        const std::string nml_msg = protectText("\nApplicable namelist control blocks (re-run "
+                                                "with one of these titles as the command-line "
+                                                "argument, in quotes if the leading '&' is "
+                                                "included, for a full description of all keywords "
+                                                "in the namelist):\n" +
+                                                tab_of_nml.printTable(OutputSyntax::STANDALONE),
+                                                ' ', console_width);
+        std::cout << nml_msg << std::endl;
+      }
+      
       if (exit_on_help) {
         exit(0);
       }
@@ -354,6 +588,19 @@ void CommandLineParser::coordinateWithPartner(CommandLineParser *other) {
   }
   coordinations.push_back(other);
   other->coordinations.push_back(this);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addControlBlocks(const std::vector<std::string> &list) {
+  control_blocks.insert(control_blocks.end(), list.begin(), list.end());
+
+  // Insert an ampersand & at the front of each namelist title
+  const size_t nblk = control_blocks.size();
+  for (size_t i = 0; i < nblk; i++) {
+    if (control_blocks[i][0] != '&') {
+      control_blocks[i] = "&" + control_blocks[i];
+    }
+  }
 }
 
 } // namespace namelist

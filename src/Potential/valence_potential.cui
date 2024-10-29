@@ -48,10 +48,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef PME_COMPATIBLE
 #  ifdef DUAL_GRIDS
-            const CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw_qq,
-            const CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw_lj,
+            const CellGridReader<TCOORD, TACC, TCOORD, TCOORD4> cgr_qq,
+            const CellGridReader<TCOORD, TACC, TCOORD, TCOORD4> cgr_lj,
 #  else
-            const CellGridWriter<TCOORD, TACC, TCALC, TCOORD4> cgw,
+            const CellGridReader<TCOORD, TACC, TCOORD, TCOORD4> cgr,
 #  endif
 #endif
 #ifdef CLASH_FORGIVENESS
@@ -119,13 +119,24 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   // __shared__ while coordinates are sent to the block's private __global__ resources.  In
   // single-precision mode, coordinates are taken into __shared__ while non-bonded parameters
   // are sent to __global__ arrays.  In either case, __shared__ resources handle 48 bytes per
-  // particle in the maximum work unit layouts, which with energy and task arrays comes to just
-  // under 64kB with 1088 particles stored across all blocks on a single streaming multiprocessor.
+  // particle in the maximum work unit layouts.  With energy arrays, task arrays, and the
+  // possibility of memory for stashing SETTLE groups' reference frame displacements, this comes in
+  // below 64kB with 1024 particles stored across all blocks on a single streaming multiprocessor.
+#ifdef UPDATE_ATOMS
+  __shared__ llint stash_xref[VALENCE_KERNEL_THREAD_COUNT >> 2];
+  __shared__ llint stash_yref[VALENCE_KERNEL_THREAD_COUNT >> 2];
+  __shared__ llint stash_zref[VALENCE_KERNEL_THREAD_COUNT >> 2];
+#endif
 #ifdef TCALC_IS_SINGLE
   __shared__ llint sh_xcrd[VALENCE_ATOM_CAPACITY];
   __shared__ llint sh_ycrd[VALENCE_ATOM_CAPACITY];
   __shared__ llint sh_zcrd[VALENCE_ATOM_CAPACITY];
 #else
+#  ifdef UPDATE_ATOMS
+  __shared__ int stash_xref_ovrf[VALENCE_KERNEL_THREAD_COUNT >> 2];
+  __shared__ int stash_yref_ovrf[VALENCE_KERNEL_THREAD_COUNT >> 2];
+  __shared__ int stash_zref_ovrf[VALENCE_KERNEL_THREAD_COUNT >> 2];
+#  endif
   __shared__ double sh_atom_q[VALENCE_ATOM_CAPACITY];
   __shared__ int sh_atom_ljidx[VALENCE_ATOM_CAPACITY];
 #endif
@@ -836,7 +847,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         TCALC stiffness_ii;
         TCALC f14 = (TCALC)(0.0);
 #endif
-        // Evaluate the accumulation bit once for all aspects of ths composite interaction
+        // Evaluate the accumulation bit once for all aspects of this composite interaction
 #if defined(COMPUTE_ENERGY) || !defined(UPDATE_ATOMS)
         const int acc_elem    = (pos - vterm_offset) / uint_bit_count_int;
         const int acc_bit     = pos - vterm_offset - (acc_elem * uint_bit_count_int);
@@ -2471,10 +2482,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     // Transfer forces from virtual particles to their frame atoms, which have mass.  This is done
     // in preparation for the integration process.  If integration is not to be performed (that is,
     // UPDATE_ATOMS is not defined), then this transfer must be made by a separate kernel call.
+
+#    ifdef PME_COMPATIBLE
     if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
 #    include "Structure/virtual_site_transmission.cui"
       __syncthreads();
     }
+#    endif
 #  endif
 
     // Perform the first Velocity-Verlet update, or store forces on relevant atoms
@@ -2490,42 +2504,42 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #      ifdef TCALC_IS_SINGLE
 #        ifdef PME_COMPATIBLE
 #          ifdef DUAL_GRIDS
-        const size_t qq_img_idx = __ldg(&cgw_qq.img_atom_idx[gbl_read_idx]);
-        const size_t lj_img_idx = __ldg(&cgw_lj.img_atom_idx[gbl_read_idx]);
+        const size_t qq_img_idx = __ldg(&cgr_qq.img_atom_idx[gbl_read_idx]);
+        const size_t lj_img_idx = __ldg(&cgr_lj.img_atom_idx[gbl_read_idx]);
 #            ifdef TCOORD_IS_LONG
-        const int2 qq_xfrc = longlongToInt63(__ldcv(&cgw_qq.xfrc[qq_img_idx]));
-        const int2 qq_yfrc = longlongToInt63(__ldcv(&cgw_qq.yfrc[qq_img_idx]));
-        const int2 qq_zfrc = longlongToInt63(__ldcv(&cgw_qq.zfrc[qq_img_idx]));
-        const int2 lj_xfrc = longlongToInt63(__ldcv(&cgw_lj.xfrc[lj_img_idx]));
-        const int2 lj_yfrc = longlongToInt63(__ldcv(&cgw_lj.yfrc[lj_img_idx]));
-        const int2 lj_zfrc = longlongToInt63(__ldcv(&cgw_lj.zfrc[lj_img_idx]));
+        const int2 qq_xfrc = longlongToInt63(__ldcv(&cgr_qq.xfrc[qq_img_idx]));
+        const int2 qq_yfrc = longlongToInt63(__ldcv(&cgr_qq.yfrc[qq_img_idx]));
+        const int2 qq_zfrc = longlongToInt63(__ldcv(&cgr_qq.zfrc[qq_img_idx]));
+        const int2 lj_xfrc = longlongToInt63(__ldcv(&cgr_lj.xfrc[lj_img_idx]));
+        const int2 lj_yfrc = longlongToInt63(__ldcv(&cgr_lj.yfrc[lj_img_idx]));
+        const int2 lj_zfrc = longlongToInt63(__ldcv(&cgr_lj.zfrc[lj_img_idx]));
         const int2 other_xfrc = splitFPSum(qq_xfrc, lj_xfrc);
         const int2 other_yfrc = splitFPSum(qq_yfrc, lj_yfrc);
         const int2 other_zfrc = splitFPSum(qq_zfrc, lj_zfrc);
 #            else
-        const int2 qq_xfrc = { __ldcv(&cgw_qq.xfrc[qq_img_idx]),
-                               __ldcv(&cgw_qq.xfrc_ovrf[qq_img_idx]) };
-        const int2 qq_yfrc = { __ldcv(&cgw_qq.yfrc[qq_img_idx]),
-                               __ldcv(&cgw_qq.yfrc_ovrf[qq_img_idx]) };
-        const int2 qq_zfrc = { __ldcv(&cgw_qq.zfrc[qq_img_idx]),
-                               __ldcv(&cgw_qq.zfrc_ovrf[qq_img_idx]) };
-        const int2 other_xfrc = splitFPSum(qq_xfrc, __ldcv(&cgw_lj.xfrc[lj_img_idx]),
-                                           __ldcv(&cgw_lj.xfrc_ovrf[lj_img_idx]));
-        const int2 other_yfrc = splitFPSum(qq_yfrc, __ldcv(&cgw_lj.yfrc[lj_img_idx]),
-                                           __ldcv(&cgw_lj.yfrc_ovrf[lj_img_idx]));
-        const int2 other_zfrc = splitFPSum(qq_zfrc, __ldcv(&cgw_lj.zfrc[lj_img_idx]),
-                                           __ldcv(&cgw_lj.zfrc_ovrf[lj_img_idx]));
+        const int2 qq_xfrc = { __ldcv(&cgr_qq.xfrc[qq_img_idx]),
+                               __ldcv(&cgr_qq.xfrc_ovrf[qq_img_idx]) };
+        const int2 qq_yfrc = { __ldcv(&cgr_qq.yfrc[qq_img_idx]),
+                               __ldcv(&cgr_qq.yfrc_ovrf[qq_img_idx]) };
+        const int2 qq_zfrc = { __ldcv(&cgr_qq.zfrc[qq_img_idx]),
+                               __ldcv(&cgr_qq.zfrc_ovrf[qq_img_idx]) };
+        const int2 other_xfrc = splitFPSum(qq_xfrc, __ldcv(&cgr_lj.xfrc[lj_img_idx]),
+                                           __ldcv(&cgr_lj.xfrc_ovrf[lj_img_idx]));
+        const int2 other_yfrc = splitFPSum(qq_yfrc, __ldcv(&cgr_lj.yfrc[lj_img_idx]),
+                                           __ldcv(&cgr_lj.yfrc_ovrf[lj_img_idx]));
+        const int2 other_zfrc = splitFPSum(qq_zfrc, __ldcv(&cgr_lj.zfrc[lj_img_idx]),
+                                           __ldcv(&cgr_lj.zfrc_ovrf[lj_img_idx]));
 #            endif
 #          else // DUAL_GRIDS
-        const size_t img_idx = __ldg(&cgw.img_atom_idx[gbl_read_idx]);
+        const size_t img_idx = __ldg(&cgr.img_atom_idx[gbl_read_idx]);
 #            ifdef TCOORD_IS_LONG
-        const int2 other_xfrc = longlongToInt63(__ldcv(&cgw.xfrc[img_idx]));
-        const int2 other_yfrc = longlongToInt63(__ldcv(&cgw.yfrc[img_idx]));
-        const int2 other_zfrc = longlongToInt63(__ldcv(&cgw.zfrc[img_idx]));
+        const int2 other_xfrc = longlongToInt63(__ldcv(&cgr.xfrc[img_idx]));
+        const int2 other_yfrc = longlongToInt63(__ldcv(&cgr.yfrc[img_idx]));
+        const int2 other_zfrc = longlongToInt63(__ldcv(&cgr.zfrc[img_idx]));
 #            else
-        const int2 other_xfrc = { __ldcv(&cgw.xfrc[img_idx]), __ldcv(&cgw.xfrc_ovrf[img_idx]) };
-        const int2 other_yfrc = { __ldcv(&cgw.yfrc[img_idx]), __ldcv(&cgw.yfrc_ovrf[img_idx]) };
-        const int2 other_zfrc = { __ldcv(&cgw.zfrc[img_idx]), __ldcv(&cgw.zfrc_ovrf[img_idx]) };
+        const int2 other_xfrc = { __ldcv(&cgr.xfrc[img_idx]), __ldcv(&cgr.xfrc_ovrf[img_idx]) };
+        const int2 other_yfrc = { __ldcv(&cgr.yfrc[img_idx]), __ldcv(&cgr.yfrc_ovrf[img_idx]) };
+        const int2 other_zfrc = { __ldcv(&cgr.zfrc[img_idx]), __ldcv(&cgr.zfrc_ovrf[img_idx]) };
 #            endif
 #          endif // DUAL_GRIDS
 #        else // PME_COMPATIBLE
@@ -2539,51 +2553,51 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #      else // TCALC_IS_SINGLE
 #        ifdef PME_COMPATIBLE
 #          ifdef DUAL_GRIDS
-        const size_t qq_img_idx = __ldg(&cgw_qq.img_atom_idx[gbl_read_idx]);
-        const size_t lj_img_idx = __ldg(&cgw_lj.img_atom_idx[gbl_read_idx]);
+        const size_t qq_img_idx = __ldg(&cgr_qq.img_atom_idx[gbl_read_idx]);
+        const size_t lj_img_idx = __ldg(&cgr_lj.img_atom_idx[gbl_read_idx]);
 #            ifdef TCOORD_IS_LOONG
-        const int95_t qq_xfrc = { __ldcv(&cgw_qq.xfrc[qq_img_idx]),
-                                  __ldcv(&cgw_qq.xfrc_ovrf[qq_img_idx]) };
-        const int95_t qq_yfrc = { __ldcv(&cgw_qq.yfrc[qq_img_idx]),
-                                  __ldcv(&cgw_qq.yfrc_ovrf[qq_img_idx]) };
-        const int95_t qq_zfrc = { __ldcv(&cgw_qq.zfrc[qq_img_idx]),
-                                  __ldcv(&cgw_qq.zfrc_ovrf[qq_img_idx]) };
-        const int95_t other_xfrc = splitFPSum(qq_xfrc, __ldcv(&cgw_lj.xfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.xfrc_ovrf[lj_img_idx]));
-        const int95_t other_yfrc = splitFPSum(qq_yfrc, __ldcv(&cgw_lj.yfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.yfrc_ovrf[lj_img_idx]));
-        const int95_t other_zfrc = splitFPSum(qq_zfrc, __ldcv(&cgw_lj.zfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.zfrc_ovrf[lj_img_idx]));
+        const int95_t qq_xfrc = { __ldcv(&cgr_qq.xfrc[qq_img_idx]),
+                                  __ldcv(&cgr_qq.xfrc_ovrf[qq_img_idx]) };
+        const int95_t qq_yfrc = { __ldcv(&cgr_qq.yfrc[qq_img_idx]),
+                                  __ldcv(&cgr_qq.yfrc_ovrf[qq_img_idx]) };
+        const int95_t qq_zfrc = { __ldcv(&cgr_qq.zfrc[qq_img_idx]),
+                                  __ldcv(&cgr_qq.zfrc_ovrf[qq_img_idx]) };
+        const int95_t other_xfrc = splitFPSum(qq_xfrc, __ldcv(&cgr_lj.xfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.xfrc_ovrf[lj_img_idx]));
+        const int95_t other_yfrc = splitFPSum(qq_yfrc, __ldcv(&cgr_lj.yfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.yfrc_ovrf[lj_img_idx]));
+        const int95_t other_zfrc = splitFPSum(qq_zfrc, __ldcv(&cgr_lj.zfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.zfrc_ovrf[lj_img_idx]));
 #            else
-        const llint qq_xfrc = int63ToLongLong(__ldcv(&cgw_qq.xfrc[qq_img_idx]),
-                                              __ldcv(&cgw_qq.xfrc_ovrf[qq_img_idx]));
-        const llint qq_yfrc = int63ToLongLong(__ldcv(&cgw_qq.yfrc[qq_img_idx]),
-                                              __ldcv(&cgw_qq.yfrc_ovrf[qq_img_idx]));
-        const llint qq_zfrc = int63ToLongLong(__ldcv(&cgw_qq.zfrc[qq_img_idx]),
-                                              __ldcv(&cgw_qq.zfrc_ovrf[qq_img_idx]));
-        const llint lj_xfrc = int63ToLongLong(__ldcv(&cgw_lj.xfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.xfrc_ovrf[lj_img_idx]));
-        const llint lj_yfrc = int63ToLongLong(__ldcv(&cgw_lj.yfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.yfrc_ovrf[lj_img_idx]));
-        const llint lj_zfrc = int63ToLongLong(__ldcv(&cgw_lj.zfrc[lj_img_idx]),
-                                              __ldcv(&cgw_lj.zfrc_ovrf[lj_img_idx]));
+        const llint qq_xfrc = int63ToLongLong(__ldcv(&cgr_qq.xfrc[qq_img_idx]),
+                                              __ldcv(&cgr_qq.xfrc_ovrf[qq_img_idx]));
+        const llint qq_yfrc = int63ToLongLong(__ldcv(&cgr_qq.yfrc[qq_img_idx]),
+                                              __ldcv(&cgr_qq.yfrc_ovrf[qq_img_idx]));
+        const llint qq_zfrc = int63ToLongLong(__ldcv(&cgr_qq.zfrc[qq_img_idx]),
+                                              __ldcv(&cgr_qq.zfrc_ovrf[qq_img_idx]));
+        const llint lj_xfrc = int63ToLongLong(__ldcv(&cgr_lj.xfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.xfrc_ovrf[lj_img_idx]));
+        const llint lj_yfrc = int63ToLongLong(__ldcv(&cgr_lj.yfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.yfrc_ovrf[lj_img_idx]));
+        const llint lj_zfrc = int63ToLongLong(__ldcv(&cgr_lj.zfrc[lj_img_idx]),
+                                              __ldcv(&cgr_lj.zfrc_ovrf[lj_img_idx]));
         const int95_t other_xfrc = { qq_xfrc + lj_xfrc, 0 };
         const int95_t other_yfrc = { qq_yfrc + lj_yfrc, 0 };
         const int95_t other_zfrc = { qq_zfrc + lj_zfrc, 0 };
 #            endif
 #          else // DUAL_GRIDS
-        const size_t img_idx = __ldg(&cgw.img_atom_idx[gbl_read_idx]);
+        const size_t img_idx = __ldg(&cgr.img_atom_idx[gbl_read_idx]);
 #            ifdef TCOORD_IS_LOONG
-        const int95_t other_xfrc = { __ldcv(&cgw.xfrc[img_idx]), __ldcv(&cgw.xfrc_ovrf[img_idx]) };
-        const int95_t other_yfrc = { __ldcv(&cgw.yfrc[img_idx]), __ldcv(&cgw.yfrc_ovrf[img_idx]) };
-        const int95_t other_zfrc = { __ldcv(&cgw.zfrc[img_idx]), __ldcv(&cgw.zfrc_ovrf[img_idx]) };
+        const int95_t other_xfrc = { __ldcv(&cgr.xfrc[img_idx]), __ldcv(&cgr.xfrc_ovrf[img_idx]) };
+        const int95_t other_yfrc = { __ldcv(&cgr.yfrc[img_idx]), __ldcv(&cgr.yfrc_ovrf[img_idx]) };
+        const int95_t other_zfrc = { __ldcv(&cgr.zfrc[img_idx]), __ldcv(&cgr.zfrc_ovrf[img_idx]) };
 #            else
-        const int95_t other_xfrc = { int63ToLongLong(__ldcv(&cgw.xfrc[img_idx]),
-                                                     __ldcv(&cgw.xfrc_ovrf[img_idx])), 0 };
-        const int95_t other_yfrc = { int63ToLongLong(__ldcv(&cgw.yfrc[img_idx]),
-                                                     __ldcv(&cgw.yfrc_ovrf[img_idx])), 0 };
-        const int95_t other_zfrc = { int63ToLongLong(__ldcv(&cgw.zfrc[img_idx]),
-                                                     __ldcv(&cgw.zfrc_ovrf[img_idx])), 0 };
+        const int95_t other_xfrc = { int63ToLongLong(__ldcv(&cgr.xfrc[img_idx]),
+                                                     __ldcv(&cgr.xfrc_ovrf[img_idx])), 0 };
+        const int95_t other_yfrc = { int63ToLongLong(__ldcv(&cgr.yfrc[img_idx]),
+                                                     __ldcv(&cgr.yfrc_ovrf[img_idx])), 0 };
+        const int95_t other_zfrc = { int63ToLongLong(__ldcv(&cgr.zfrc[img_idx]),
+                                                     __ldcv(&cgr.zfrc_ovrf[img_idx])), 0 };
 #            endif
 #          endif // DUAL_GRIDS
         const int95_t total_xfrc = splitFPSum(other_xfrc, sh_xfrc[pos], sh_xfrc_overflow[pos]);
@@ -2610,39 +2624,39 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    else // SPLIT_FORCE_ACCUMULATION
 #      ifdef PME_COMPATIBLE
 #        ifdef DUAL_GRIDS
-        const size_t qq_img_idx = __ldg(&cgw_qq.img_atom_idx[gbl_read_idx]);
-        const size_t lj_img_idx = __ldg(&cgw_lj.img_atom_idx[gbl_read_idx]);
+        const size_t qq_img_idx = __ldg(&cgr_qq.img_atom_idx[gbl_read_idx]);
+        const size_t lj_img_idx = __ldg(&cgr_lj.img_atom_idx[gbl_read_idx]);
 #          ifdef TCOORD_IS_LONG
-        sh_xfrc[pos] += __ldcv(&cgw_qq.xfrc[qq_img_idx]) + __ldcv(&cgw_lj.xfrc[lj_img_idx]);
-        sh_yfrc[pos] += __ldcv(&cgw_qq.yfrc[qq_img_idx]) + __ldcv(&cgw_lj.yfrc[lj_img_idx]);
-        sh_zfrc[pos] += __ldcv(&cgw_qq.zfrc[qq_img_idx]) + __ldcv(&cgw_lj.zfrc[lj_img_idx]);
+        sh_xfrc[pos] += __ldcv(&cgr_qq.xfrc[qq_img_idx]) + __ldcv(&cgr_lj.xfrc[lj_img_idx]);
+        sh_yfrc[pos] += __ldcv(&cgr_qq.yfrc[qq_img_idx]) + __ldcv(&cgr_lj.yfrc[lj_img_idx]);
+        sh_zfrc[pos] += __ldcv(&cgr_qq.zfrc[qq_img_idx]) + __ldcv(&cgr_lj.zfrc[lj_img_idx]);
 #          else
-        sh_xfrc[pos] += int63ToLongLong(__ldcv(&cgw_qq.xfrc[qq_img_idx]),
-                                        __ldcv(&cgw_qq.xfrc_ovrf[qq_img_idx])) +
-                        int63ToLongLong(__ldcv(&cgw_lj.xfrc[lj_img_idx]),
-                                        __ldcv(&cgw_lj.xfrc_ovrf[lj_img_idx]));
-        sh_yfrc[pos] += int63ToLongLong(__ldcv(&cgw_qq.yfrc[qq_img_idx]),
-                                        __ldcv(&cgw_qq.yfrc_ovrf[qq_img_idx])) +
-                        int63ToLongLong(__ldcv(&cgw_lj.yfrc[lj_img_idx]),
-                                        __ldcv(&cgw_lj.yfrc_ovrf[lj_img_idx]));
-        sh_zfrc[pos] += int63ToLongLong(__ldcv(&cgw_qq.zfrc[qq_img_idx]),
-                                        __ldcv(&cgw_qq.zfrc_ovrf[qq_img_idx])) +
-                        int63ToLongLong(__ldcv(&cgw_lj.zfrc[lj_img_idx]),
-                                        __ldcv(&cgw_lj.zfrc_ovrf[lj_img_idx]));
+        sh_xfrc[pos] += int63ToLongLong(__ldcv(&cgr_qq.xfrc[qq_img_idx]),
+                                        __ldcv(&cgr_qq.xfrc_ovrf[qq_img_idx])) +
+                        int63ToLongLong(__ldcv(&cgr_lj.xfrc[lj_img_idx]),
+                                        __ldcv(&cgr_lj.xfrc_ovrf[lj_img_idx]));
+        sh_yfrc[pos] += int63ToLongLong(__ldcv(&cgr_qq.yfrc[qq_img_idx]),
+                                        __ldcv(&cgr_qq.yfrc_ovrf[qq_img_idx])) +
+                        int63ToLongLong(__ldcv(&cgr_lj.yfrc[lj_img_idx]),
+                                        __ldcv(&cgr_lj.yfrc_ovrf[lj_img_idx]));
+        sh_zfrc[pos] += int63ToLongLong(__ldcv(&cgr_qq.zfrc[qq_img_idx]),
+                                        __ldcv(&cgr_qq.zfrc_ovrf[qq_img_idx])) +
+                        int63ToLongLong(__ldcv(&cgr_lj.zfrc[lj_img_idx]),
+                                        __ldcv(&cgr_lj.zfrc_ovrf[lj_img_idx]));
 #          endif
 #        else // DUAL_GRIDS
-        const size_t img_idx = __ldg(&cgw.img_atom_idx[gbl_read_idx]);
+        const size_t img_idx = __ldg(&cgr.img_atom_idx[gbl_read_idx]);
 #          ifdef TCOORD_IS_LONG
-        sh_xfrc[pos] += __ldcv(&cgw.xfrc[img_idx]);
-        sh_yfrc[pos] += __ldcv(&cgw.yfrc[img_idx]);
-        sh_zfrc[pos] += __ldcv(&cgw.zfrc[img_idx]);
+        sh_xfrc[pos] += __ldcv(&cgr.xfrc[img_idx]);
+        sh_yfrc[pos] += __ldcv(&cgr.yfrc[img_idx]);
+        sh_zfrc[pos] += __ldcv(&cgr.zfrc[img_idx]);
 #          else
-        sh_xfrc[pos] += int63ToLongLong(__ldcv(&cgw.xfrc[img_idx]),
-                                        __ldcv(&cgw.xfrc_ovrf[img_idx]));
-        sh_yfrc[pos] += int63ToLongLong(__ldcv(&cgw.yfrc[img_idx]),
-                                        __ldcv(&cgw.yfrc_ovrf[img_idx]));
-        sh_zfrc[pos] += int63ToLongLong(__ldcv(&cgw.zfrc[img_idx]),
-                                        __ldcv(&cgw.zfrc_ovrf[img_idx]));
+        sh_xfrc[pos] += int63ToLongLong(__ldcv(&cgr.xfrc[img_idx]),
+                                        __ldcv(&cgr.xfrc_ovrf[img_idx]));
+        sh_yfrc[pos] += int63ToLongLong(__ldcv(&cgr.yfrc[img_idx]),
+                                        __ldcv(&cgr.yfrc_ovrf[img_idx]));
+        sh_zfrc[pos] += int63ToLongLong(__ldcv(&cgr.zfrc[img_idx]),
+                                        __ldcv(&cgr.zfrc_ovrf[img_idx]));
 #          endif
 #        endif  // DUAL_GRIDS
 #      else // PME_COMPATIBLE
@@ -3222,11 +3236,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     }
 
     // Update virtual site positions.
+#    ifdef PME_COMPATIBLE
     if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
 #    include "Structure/virtual_site_placement.cui"
       __syncthreads();
     }
-    
+#    endif
+
     // Having applied positional constraints and placed any virtual sites, update the positions of
     // particles in the global arrays, which was not done immediately after the unconstrained
     // positions update in order to guard against conflicting updates of the positions by multiple

@@ -351,7 +351,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
 }
 
 //-------------------------------------------------------------------------------------------------
-void printReport(const SystemCache &sc, const UserSettings &ui,
+void printReport(const SystemCache &sc, const CommandLineParser &clip, const UserSettings &ui,
                  const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
                  const ScoreCard &prelim_emin, const std::vector<int> &best_confs) {
 
@@ -373,7 +373,7 @@ void printReport(const SystemCache &sc, const UserSettings &ui,
   // First section: a summary of the user input
   std::vector<SectionContents> parts;
   parts.emplace_back("User Input", std::string(""), repcon.getReportFileWidth());
-  parts.back().addNarration("Here is the command line input:\n" + commandLineAsString(ui));
+  parts.back().addNarration("Here is the command line input:\n" + commandLineAsString(clip));
   parts.back().addNarration("General statistics:\n"
                             "  - " + std::to_string(sc.getSystemCount()) + " systems\n"
                             "  - " + std::to_string(sc.getLabelCount()) + " label groups\n"

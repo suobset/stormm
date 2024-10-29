@@ -1150,7 +1150,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
-      destination->import(origin, index_dest, orientation, kind);
+      destination->importSystem(origin, index_dest, orientation, kind);
 
       // Return after completing the host-to-host transfer
       return;
@@ -1301,7 +1301,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest, const Tra
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
-      destination->import(origin, index_dest, orientation, kind);
+      destination->importSystem(origin, index_dest, orientation, kind);
 
       // Return after completing the host-to-host transfer
       return;
@@ -1363,7 +1363,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest,
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
-      destination->import(origin, index_dest);
+      destination->importSystem(origin, index_dest);
       break;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
@@ -1402,7 +1402,7 @@ void coordCopy(PhaseSpaceSynthesis *destination, const int index_dest,
   case HybridTargetLevel::HOST:
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
-      destination->import(origin, index_dest);
+      destination->importSystem(origin, index_dest);
       break;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:

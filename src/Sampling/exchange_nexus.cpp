@@ -2,7 +2,6 @@
 #include <cmath>
 #include "copyright.h"
 #include "exchange_nexus.h"
-#include "replica_probability.h"
 #include "temp_distributions.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
@@ -35,6 +34,7 @@ using topology::AtomGraph;
 using trajectory::CoordinateSeries;
 
 //-------------------------------------------------------------------------------------------------
+// TODO: Pass relevant &dynamics data in these constructors
 ExchangeNexus::ExchangeNexus( const int system_count_in, const int total_swap_count,
                               const std::string &remd_type_in, const int frequency_swaps_in, 
                               const std::string &swap_store_in,
@@ -58,6 +58,24 @@ ExchangeNexus::ExchangeNexus( const int system_count_in, const int total_swap_co
 {}
 
 //-------------------------------------------------------------------------------------------------
+ExchangeNexus::ExchangeNexus( const int system_count_in, const int total_swap_count,
+                              const std::string &remd_type_in, const int frequency_swaps_in, 
+                              const std::string &swap_store_in,
+                              const std::string &temperature_dist_in,
+                              const double exchange_probability_in, const double tolerance_in,
+                              const int max_replicas_in, 
+                              const double initial_temperature_in,
+                              const double equilibrium_temperature_in ) :
+    system_count{system_count_in}, total_swaps{total_swap_count},
+    remd_type{remd_type_in}, frequency_swaps{frequency_swaps_in},
+    swap_store{swap_store_in}, temperature_dist{temperature_dist_in},
+    exchange_probability{exchange_probability_in}, tolerance{tolerance_in}, 
+    max_replicas{max_replicas_in},
+    initial_temperature{initial_temperature_in}, 
+    equilibrium_temperature{equilibrium_temperature_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<double> ExchangeNexus::getPotentialEnergies(){
   return sc->reportInstantaneousStates(StateVariable::POTENTIAL_ENERGY);
 }
@@ -68,8 +86,10 @@ std::vector<double> ExchangeNexus::getKineticEnergies(){
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ExchangeNexus::getHamiltonian(std::vector<double> kinetic_energy, 
-                                                  std::vector<double> potential_energy){
+std::vector<double> ExchangeNexus::getHamiltonian(){
+  
+    std::vector<double> potential_energy = getPotentialEnergies();
+    std::vector<double> kinetic_energy = getKineticEnergies();
     std::vector<double> hamiltonian;
     if (kinetic_energy.size() >= potential_energy.size()) {
         for (size_t i = 0; i < kinetic_energy.size(); ++i) {
@@ -81,24 +101,103 @@ std::vector<double> ExchangeNexus::getHamiltonian(std::vector<double> kinetic_en
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ExchangeNexus::getTempDistribution(const double initial_temperature, 
-                                                         const double equilibrium_temperature,
-                                                         const std::string &temperature_dist,
-                                                         const double exchange_probability,
-                                                         const AtomGraphSynthesis &cur_ag) {
+std::vector<double> ExchangeNexus::getTempDistribution() {
 
-  // TODO: Implement different temperature algorithms and return a vector with temp distribution
-  std::vector<double> temperatures;
+  // TODO: Implement rigidity getters and setters and get this data out of AtomGraph and &dynamics
+  const AtomGraph* cur_ag = ag->getSystemTopologyPointer(0);
+  std::vector<double> temperatures = vanDerSpoel(exchange_probability, initial_temperature, 
+                                                 equilibrium_temperature, 
+                                                 cur_ag->getRigidWaterCount(),
+                                                 cur_ag->getOrganicMoleculeCount(), tolerance, 
+                                                 0, 0, 0, 0, 0, ExceptionResponse::WARN);
   return temperatures;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ExchangeNexus::initiateRemd() {
-    std::vector<double> temperatures = getTempDistribution(initial_temperature, 
-                                                           equilibrium_temperature,
-                                                           temperature_dist, exchange_probability,
-                                                           *ag);
-    int num_replicas = temperatures.size();
+double ExchangeNexus::getProbabilityAtReplica(const int replica, bool flag){
+  // Check for energy, return back a probability
+  // If a replica == phasespace; return current energies
+  // Else, recalculate
+  std::vector<double> hamiltonians = getHamiltonian();
+  if(!flag) {
+    double cur_energy = sc->reportInstantaneousStates(StateVariable::KINETIC, replica);
+    return cur_energy;  
+  }
+  if(replica == max_replicas){
+    return sc->reportInstantaneousStates(StateVariable::KINETIC, replica);
+  }
+  return sc->reportInstantaneousStates(StateVariable::KINETIC, replica+1);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ExchangeNexus::swapReplicas(int replica_a, double a_ener, int replica_b, double b_ener) {
+  sc->contribute(StateVariable::KINETIC, b_ener, replica_a);
+  sc->contribute(StateVariable::KINETIC, a_ener, replica_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ExchangeNexus::attemptSwaps(std::vector<double> cur_energy, std::vector<double> final_energy,
+																 bool flag) {
+    for (int i = 0; i < cur_energy.size(); ++i) {
+        bool performSwap = false;
+        int swapIndex = -1;
+
+        // If flag is true
+        if (flag) {
+            if (cur_energy[i] < final_energy[i]) {
+                if (i % 2 == 0 && i + 1 < cur_energy.size()) {
+                    // Even i, attempt swap with i + 1
+                    swapIndex = i + 1;
+                    performSwap = true;
+                } else if (i % 2 != 0 && i - 1 >= 0) {
+                    // Odd i, attempt swap with i - 1
+                    swapIndex = i - 1;
+                    performSwap = true;
+                }
+            }
+        }
+        // If flag is false (inverse logic)
+        else {
+            if (cur_energy[i] >= final_energy[i]) {
+                if (i % 2 != 0 && i + 1 < cur_energy.size()) {
+                    // Odd i, attempt swap with i + 1
+                    swapIndex = i + 1;
+                    performSwap = true;
+                } else if (i % 2 == 0 && i - 1 >= 0) {
+                    // Even i, attempt swap with i - 1
+                    swapIndex = i - 1;
+                    performSwap = true;
+                }
+            }
+        }
+
+        // If swap is possible, invoke swap and record it
+        if (performSwap && swapIndex != -1) {
+            swapReplicas(i, final_energy[i], swapIndex, final_energy[swapIndex]);
+
+            // Record the swap information
+            SwapRecord record;
+            record.index1 = i;
+            record.index2 = swapIndex;
+            record.successful = true;
+            swapHistory.push_back(record);
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ExchangeNexus::setPhaseSpaceSynthesis(const PhaseSpaceSynthesis* ps_in){
+  ps = const_cast<PhaseSpaceSynthesis*>(ps_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ExchangeNexus::setAtomGraphSynthesis(const AtomGraphSynthesis* ag_in){
+  ag = const_cast<AtomGraphSynthesis*>(ag_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ExchangeNexus::setScoreCard(const ScoreCard* sc_in){
+  sc = const_cast<ScoreCard*>(sc_in);
 }
 
 } // namespace sampling

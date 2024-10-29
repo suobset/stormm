@@ -613,8 +613,8 @@ template <typename T> void crossProduct(const std::vector<T> &va, const std::vec
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> T crossProduct(const T va, const T vb) {
-  T vc;
+template <typename T3> T3 crossProduct(const T3 va, const T3 vb) {
+  T3 vc;
   vc.x = (va.y * vb.z) - (va.z * vb.y);
   vc.y = (va.z * vb.x) - (va.x * vb.z);
   vc.z = (va.x * vb.y) - (va.y * vb.x);
@@ -682,6 +682,17 @@ template <typename T> double normalize(std::vector<T> *va) {
 //-------------------------------------------------------------------------------------------------
 template <typename T> double normalize(Hybrid<T> *va) {
   return normalize(va->data(), va->size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T3, typename Tcalc> Tcalc normalize(T3 *va) {
+  const Tcalc magvec = (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) ?
+                       sqrt((va->x * va->x) + (va->y * va->y) + (va->z * va->z)) :
+                       sqrtf((va->x * va->x) + (va->y * va->y) + (va->z * va->z));
+  va->x /= magvec;
+  va->y /= magvec;
+  va->z /= magvec;
+  return magvec;
 }
 
 //-------------------------------------------------------------------------------------------------

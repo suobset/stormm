@@ -483,7 +483,15 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #          undef DO_GENERALIZED_BORN
 #          undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #        undef COMPUTE_ENERGY
-#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#        ifdef STORMM_USE_CUDA
+#          if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
+#            define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#          else
+#            define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#          endif
+#        else
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#        endif
 #        define KERNEL_NAME ktgfsVacuumForceNonClash
 #          include "nonbonded_potential_tilegroups.cui"
 #        undef KERNEL_NAME
@@ -516,7 +524,15 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #        undef DO_GENERALIZED_BORN
 #        undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #      undef COMPUTE_ENERGY
-#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#      ifdef STORMM_USE_CUDA
+#        if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#        else
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#        endif
+#      else
+#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#      endif
 #      define KERNEL_NAME ktgfVacuumForceNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
@@ -533,7 +549,15 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #      undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #    undef COMPUTE_FORCE
 #    define COMPUTE_ENERGY
-#      define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#      ifdef STORMM_USE_CUDA
+#        if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#        else
+#          define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
+#        endif
+#      else
+#        define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
+#      endif
 #      define KERNEL_NAME ktgfVacuumEnergyNonClash
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME

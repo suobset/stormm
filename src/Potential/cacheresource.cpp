@@ -113,6 +113,11 @@ CacheResource::CacheResource(CacheResource &&original) :
 {}
 
 //-------------------------------------------------------------------------------------------------
+CacheResource::CacheResource(const int block_limit_in, const int2 atom_limits_in) :
+    CacheResource(block_limit_in, std::max(atom_limits_in.x, atom_limits_in.y))
+{}
+
+//-------------------------------------------------------------------------------------------------
 CacheResource& CacheResource::operator=(const CacheResource &other) {
 
   // Guard against self-assignment.  Otherwise, copy the necessary elements.

@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <climits>
 #include "copyright.h"
+#include "FileManagement/file_util.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
@@ -13,6 +14,7 @@ namespace topology {
 
 using card::HybridTargetLevel;
 using card::HybridKind;
+using diskutil::detectTopologyKind;
 using stmath::getSubsetIndexPattern;
 using stmath::extractIndexedValues;
 using stmath::prefixSumInPlace;
@@ -31,7 +33,7 @@ AtomGraph::AtomGraph() :
     atom_count{0}, residue_count{0}, molecule_count{0}, largest_residue_size{0},
     last_solute_residue{0}, last_solute_atom{0}, first_solvent_molecule{0},
     last_atom_before_cap{0}, implicit_copy_count{0}, largest_molecule_size{0},
-    unconstrained_dof{0}, constrained_dof{0},
+    water_residue_size{0}, water_residue_count{0}, unconstrained_dof{0}, constrained_dof{0},
     descriptors{HybridKind::POINTER, "tp_desc"},
     residue_limits{HybridKind::POINTER, "tp_res_limits"},
     atom_struc_numbers{HybridKind::POINTER, "tp_atom_struc_nums"},
@@ -153,6 +155,8 @@ AtomGraph::AtomGraph() :
     dihe_assigned_index{HybridKind::POINTER, "tp_dihe_asindex"},
     dihe_assigned_terms{HybridKind::POINTER, "tp_dihe_asterms"},
     dihe_assigned_bounds{HybridKind::POINTER, "tp_dihe_asbounds"},
+    bond_evaluation_mask{HybridKind::POINTER, "tp_bond_eval"},
+    angl_evaluation_mask{HybridKind::POINTER, "tp_angl_eval"},
     bond_modifiers{HybridKind::POINTER, "tp_bond_mods"},
     angl_modifiers{HybridKind::POINTER, "tp_angl_mods"},
     dihe_modifiers{HybridKind::POINTER, "tp_dihe_mods"},
@@ -233,7 +237,7 @@ AtomGraph::AtomGraph() :
     sp_gb_gamma_parameters{HybridKind::POINTER, "tp_gb_gamma_sp"},
 
     // MD propagation algorithm directives
-    use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
+    use_shake{ApplyConstraints::NO}, use_settle{ApplyConstraints::NO},
     use_perturbation_info{PerturbationSetting::OFF}, use_solvent_cap_option{SolventCapSetting::ON},
     use_polarization{PolarizationSetting::ON}, water_residue_name{' ', ' ', ' ', ' '},
     bond_constraint_mask{""}, bond_constraint_omit_mask{""}, bond_constraint_count{0},
@@ -247,20 +251,24 @@ AtomGraph::AtomGraph() :
     constraint_group_bounds{HybridKind::POINTER, "tp_cnst_bounds"},
     constraint_parameter_indices{HybridKind::POINTER, "tp_cnst_param_idx"},
     constraint_parameter_bounds{HybridKind::POINTER, "tp_cnst_param_bnds"},
-    settle_mormt{HybridKind::POINTER, "tp_cnst_sett_mormt"},
-    settle_mhrmt{HybridKind::POINTER, "tp_cnst_sett_mhrmt"},
-    settle_ra{HybridKind::POINTER, "tp_cnst_sett_ra"},
-    settle_rb{HybridKind::POINTER, "tp_cnst_sett_rb"},
-    settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
-    settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
+    settle_mo{HybridKind::POINTER, "tp_settle_mo"},
+    settle_mh{HybridKind::POINTER, "tp_settle_mh"},
+    settle_moh{HybridKind::POINTER, "tp_settle_moh"},
+    settle_mormt{HybridKind::POINTER, "tp_settle_mormt"},
+    settle_mhrmt{HybridKind::POINTER, "tp_settle_mhrmt"},
+    settle_ra{HybridKind::POINTER, "tp_settle_ra"},
+    settle_rb{HybridKind::POINTER, "tp_settle_rb"},
+    settle_rc{HybridKind::POINTER, "tp_settle_rc"},
     constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
     constraint_squared_lengths{HybridKind::POINTER, "tp_cnst_targets"},
-    sp_settle_mormt{HybridKind::POINTER, "tp_cnst_sett_mormt"},
-    sp_settle_mhrmt{HybridKind::POINTER, "tp_cnst_sett_mhrmt"},
-    sp_settle_ra{HybridKind::POINTER, "tp_cnst_sett_ra"},
-    sp_settle_rb{HybridKind::POINTER, "tp_cnst_sett_rb"},
-    sp_settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
-    sp_settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
+    sp_settle_mo{HybridKind::POINTER, "tp_settle_mo_sp"},
+    sp_settle_mh{HybridKind::POINTER, "tp_settle_mh_sp"},
+    sp_settle_moh{HybridKind::POINTER, "tp_settle_moh_sp"},
+    sp_settle_mormt{HybridKind::POINTER, "tp_settle_mormt_sp"},
+    sp_settle_mhrmt{HybridKind::POINTER, "tp_settle_mhrmt_sp"},
+    sp_settle_ra{HybridKind::POINTER, "tp_settle_ra_sp"},
+    sp_settle_rb{HybridKind::POINTER, "tp_settle_rb_sp"},
+    sp_settle_rc{HybridKind::POINTER, "tp_settle_rc_sp"},
     sp_constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
     sp_constraint_squared_lengths{HybridKind::POINTER, "tp_cnst_targets"},
 
@@ -293,14 +301,29 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
                      const TopologyKind engine_format) :
     AtomGraph()
 {
+  TopologyKind detected_engine_format;
   switch (engine_format) {
+  case TopologyKind::AMBER:
+  case TopologyKind::CHARMM:
+  case TopologyKind::GROMACS:
+  case TopologyKind::OPENMM:
+    detected_engine_format = engine_format;
+    break;
+  case TopologyKind::UNKNOWN:
+    detected_engine_format = detectTopologyKind(file_name, "AtomGraph");
+    break;
+  }
+  switch (detected_engine_format) {
   case TopologyKind::AMBER:
     buildFromPrmtop(file_name, policy);
     break;
   case TopologyKind::CHARMM:
   case TopologyKind::GROMACS:
   case TopologyKind::OPENMM:
-    rtErr("Construction from non-Amber format files is not yet implemented.", "AtomGraph");
+    rtErr("Construction from " + getEnumerationName(detected_engine_format) + " format files is "
+          "not yet implemented.", "AtomGraph");
+  case TopologyKind::UNKNOWN:
+    break;
   }
 }
 
@@ -308,10 +331,25 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
 AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse policy,
                      const TopologyKind engine_format, const double coulomb_constant_in,
                      const double default_elec14_screening, const double default_vdw14_screening,
-                     const double charge_rounding_tol, const double charge_discretization) :
+                     const double charge_rounding_tol, const double charge_discretization,
+                     const ApplyConstraints use_shake_in, const ApplyConstraints use_settle_in) :
     AtomGraph()
 {
+  TopologyKind detected_engine_format;
+  use_shake  = use_shake_in;
+  use_settle = use_settle_in;
   switch (engine_format) {
+  case TopologyKind::AMBER:
+  case TopologyKind::CHARMM:
+  case TopologyKind::GROMACS:
+  case TopologyKind::OPENMM:
+    detected_engine_format = engine_format;
+    break;
+  case TopologyKind::UNKNOWN:
+    detected_engine_format = detectTopologyKind(file_name, "AtomGraph");
+    break;
+  }
+  switch (detected_engine_format) {
   case TopologyKind::AMBER:
     buildFromPrmtop(file_name, policy, coulomb_constant_in, default_elec14_screening,
                     default_vdw14_screening, charge_rounding_tol, charge_discretization);
@@ -326,7 +364,7 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
                      const ExceptionResponse policy) :
-  AtomGraph()
+    AtomGraph()
 {
   // Sort the subset in ascending order
   std::vector<int> local_subset(atom_subset);
@@ -828,6 +866,8 @@ void AtomGraph::rebasePointers() {
   dihe_assigned_index.swapTarget(&int_data);
   dihe_assigned_terms.swapTarget(&int_data);
   dihe_assigned_bounds.swapTarget(&int_data);
+  bond_evaluation_mask.swapTarget(&int_data);
+  angl_evaluation_mask.swapTarget(&int_data);
   bond_modifiers.swapTarget(&char4_data);
   angl_modifiers.swapTarget(&char4_data);
   dihe_modifiers.swapTarget(&char4_data);
@@ -911,20 +951,24 @@ void AtomGraph::rebasePointers() {
   constraint_group_bounds.swapTarget(&int_data);
   constraint_parameter_indices.swapTarget(&int_data);
   constraint_parameter_bounds.swapTarget(&int_data);
+  settle_mo.swapTarget(&double_data);
+  settle_mh.swapTarget(&double_data);
+  settle_moh.swapTarget(&double_data);
   settle_mormt.swapTarget(&double_data);
   settle_mhrmt.swapTarget(&double_data);
   settle_ra.swapTarget(&double_data);
   settle_rb.swapTarget(&double_data);
   settle_rc.swapTarget(&double_data);
-  settle_invra.swapTarget(&double_data);
   constraint_inverse_masses.swapTarget(&double_data);
   constraint_squared_lengths.swapTarget(&double_data);
+  sp_settle_mo.swapTarget(&float_data);
+  sp_settle_mh.swapTarget(&float_data);
+  sp_settle_moh.swapTarget(&float_data);
   sp_settle_mormt.swapTarget(&float_data);
   sp_settle_mhrmt.swapTarget(&float_data);
   sp_settle_ra.swapTarget(&float_data);
   sp_settle_rb.swapTarget(&float_data);
   sp_settle_rc.swapTarget(&float_data);
-  sp_settle_invra.swapTarget(&float_data);
   sp_constraint_inverse_masses.swapTarget(&float_data);
   sp_constraint_squared_lengths.swapTarget(&float_data);
 
@@ -964,6 +1008,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     last_atom_before_cap{original.last_atom_before_cap},
     implicit_copy_count{original.implicit_copy_count},
     largest_molecule_size{original.largest_molecule_size},
+    water_residue_size{original.water_residue_size},
+    water_residue_count{original.water_residue_count},
     unconstrained_dof{original.unconstrained_dof},
     constrained_dof{original.constrained_dof},
     descriptors{original.descriptors},
@@ -1107,6 +1153,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     dihe_assigned_index{original.dihe_assigned_index},
     dihe_assigned_terms{original.dihe_assigned_terms},
     dihe_assigned_bounds{original.dihe_assigned_bounds},
+    bond_evaluation_mask{original.bond_evaluation_mask},
+    angl_evaluation_mask{original.angl_evaluation_mask},
     bond_modifiers{original.bond_modifiers},
     angl_modifiers{original.angl_modifiers},
     dihe_modifiers{original.dihe_modifiers},
@@ -1195,7 +1243,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_gb_gamma_parameters{original.sp_gb_gamma_parameters},
 
     // MD propagation algorithm directives (including constraints)
-    use_bond_constraints{original.use_bond_constraints},
+    use_shake{original.use_shake},
     use_settle{original.use_settle},
     use_perturbation_info{original.use_perturbation_info},
     use_solvent_cap_option{original.use_solvent_cap_option},
@@ -1217,20 +1265,24 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     constraint_group_bounds{original.constraint_group_bounds},
     constraint_parameter_indices{original.constraint_parameter_indices},
     constraint_parameter_bounds{original.constraint_parameter_bounds},
+    settle_mo{original.settle_mo},
+    settle_mh{original.settle_mh},
+    settle_moh{original.settle_moh},
     settle_mormt{original.settle_mormt},
     settle_mhrmt{original.settle_mhrmt},
     settle_ra{original.settle_ra},
     settle_rb{original.settle_rb},
     settle_rc{original.settle_rc},
-    settle_invra{original.settle_invra},
     constraint_inverse_masses{original.constraint_inverse_masses},
     constraint_squared_lengths{original.constraint_squared_lengths},
+    sp_settle_mo{original.sp_settle_mo},
+    sp_settle_mh{original.sp_settle_mh},
+    sp_settle_moh{original.sp_settle_moh},
     sp_settle_mormt{original.sp_settle_mormt},
     sp_settle_mhrmt{original.sp_settle_mhrmt},
     sp_settle_ra{original.sp_settle_ra},
     sp_settle_rb{original.sp_settle_rb},
     sp_settle_rc{original.sp_settle_rc},
-    sp_settle_invra{original.sp_settle_invra},
     sp_constraint_inverse_masses{original.sp_constraint_inverse_masses},
     sp_constraint_squared_lengths{original.sp_constraint_squared_lengths},
 
@@ -1303,6 +1355,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   last_atom_before_cap = other.last_atom_before_cap;
   implicit_copy_count = other.implicit_copy_count;
   largest_molecule_size = other.largest_molecule_size;
+  water_residue_size = other.water_residue_size;
+  water_residue_count = other.water_residue_count;
   unconstrained_dof = other.unconstrained_dof;
   constrained_dof = other.constrained_dof;
   descriptors = other.descriptors;
@@ -1446,6 +1500,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   dihe_assigned_index = other.dihe_assigned_index;
   dihe_assigned_terms = other.dihe_assigned_terms;
   dihe_assigned_bounds = other.dihe_assigned_bounds;
+  bond_evaluation_mask = other.bond_evaluation_mask;
+  angl_evaluation_mask = other.angl_evaluation_mask;
   bond_modifiers = other.bond_modifiers;
   angl_modifiers = other.angl_modifiers;
   dihe_modifiers = other.dihe_modifiers;
@@ -1534,7 +1590,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_gb_gamma_parameters = other.sp_gb_gamma_parameters;
 
   // Copy MD propagation algorithm directives
-  use_bond_constraints = other.use_bond_constraints;
+  use_shake = other.use_shake;
   use_settle = other.use_settle;
   use_perturbation_info = other.use_perturbation_info;
   use_solvent_cap_option = other.use_solvent_cap_option;
@@ -1556,20 +1612,24 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   constraint_group_bounds = other.constraint_group_bounds;
   constraint_parameter_indices = other.constraint_parameter_indices;
   constraint_parameter_bounds = other.constraint_parameter_bounds;
+  settle_mo = other.settle_mo;
+  settle_mh = other.settle_mh;
+  settle_moh = other.settle_moh;
   settle_mormt = other.settle_mormt;
   settle_mhrmt = other.settle_mhrmt;
   settle_ra = other.settle_ra;
   settle_rb = other.settle_rb;
   settle_rc = other.settle_rc;
-  settle_invra = other.settle_invra;
   constraint_inverse_masses = other.constraint_inverse_masses;
   constraint_squared_lengths = other.constraint_squared_lengths;
+  sp_settle_mo = other.sp_settle_mo;
+  sp_settle_mh = other.sp_settle_mh;
+  sp_settle_moh = other.sp_settle_moh;
   sp_settle_mormt = other.sp_settle_mormt;
   sp_settle_mhrmt = other.sp_settle_mhrmt;
   sp_settle_ra = other.sp_settle_ra;
   sp_settle_rb = other.sp_settle_rb;
   sp_settle_rc = other.sp_settle_rc;
-  sp_settle_invra = other.sp_settle_invra;
   sp_constraint_inverse_masses = other.sp_constraint_inverse_masses;
   sp_constraint_squared_lengths = other.sp_constraint_squared_lengths;
 
@@ -1626,6 +1686,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     last_atom_before_cap{original.last_atom_before_cap},
     implicit_copy_count{original.implicit_copy_count},
     largest_molecule_size{original.largest_molecule_size},
+    water_residue_size{original.water_residue_size},
+    water_residue_count{original.water_residue_count},
     unconstrained_dof{original.unconstrained_dof},
     constrained_dof{original.constrained_dof},
     descriptors{std::move(original.descriptors)},
@@ -1769,6 +1831,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     dihe_assigned_index{std::move(original.dihe_assigned_index)},
     dihe_assigned_terms{std::move(original.dihe_assigned_terms)},
     dihe_assigned_bounds{std::move(original.dihe_assigned_bounds)},
+    bond_evaluation_mask{std::move(original.bond_evaluation_mask)},
+    angl_evaluation_mask{std::move(original.angl_evaluation_mask)},
     bond_modifiers{std::move(original.bond_modifiers)},
     angl_modifiers{std::move(original.angl_modifiers)},
     dihe_modifiers{std::move(original.dihe_modifiers)},
@@ -1857,7 +1921,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_gb_gamma_parameters{std::move(original.sp_gb_gamma_parameters)},
 
     // Move information relevant to constraints and propagation of the MD algorithm
-    use_bond_constraints{original.use_bond_constraints},
+    use_shake{original.use_shake},
     use_settle{original.use_settle},
     use_perturbation_info{original.use_perturbation_info},
     use_solvent_cap_option{original.use_solvent_cap_option},
@@ -1879,20 +1943,24 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     constraint_group_bounds{std::move(original.constraint_group_bounds)},
     constraint_parameter_indices{std::move(original.constraint_parameter_indices)},
     constraint_parameter_bounds{std::move(original.constraint_parameter_bounds)},
+    settle_mo{std::move(original.settle_mo)},
+    settle_mh{std::move(original.settle_mh)},
+    settle_moh{std::move(original.settle_moh)},
     settle_mormt{std::move(original.settle_mormt)},
     settle_mhrmt{std::move(original.settle_mhrmt)},
     settle_ra{std::move(original.settle_ra)},
     settle_rb{std::move(original.settle_rb)},
     settle_rc{std::move(original.settle_rc)},
-    settle_invra{std::move(original.settle_invra)},
     constraint_inverse_masses{std::move(original.constraint_inverse_masses)},
     constraint_squared_lengths{std::move(original.constraint_squared_lengths)},
+    sp_settle_mo{std::move(original.sp_settle_mo)},
+    sp_settle_mh{std::move(original.sp_settle_mh)},
+    sp_settle_moh{std::move(original.sp_settle_moh)},
     sp_settle_mormt{std::move(original.sp_settle_mormt)},
     sp_settle_mhrmt{std::move(original.sp_settle_mhrmt)},
     sp_settle_ra{std::move(original.sp_settle_ra)},
     sp_settle_rb{std::move(original.sp_settle_rb)},
     sp_settle_rc{std::move(original.sp_settle_rc)},
-    sp_settle_invra{std::move(original.sp_settle_invra)},
     sp_constraint_inverse_masses{std::move(original.sp_constraint_inverse_masses)},
     sp_constraint_squared_lengths{std::move(original.sp_constraint_squared_lengths)},
 
@@ -1959,6 +2027,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   last_atom_before_cap = other.last_atom_before_cap;
   implicit_copy_count = other.implicit_copy_count;
   largest_molecule_size = other.largest_molecule_size;
+  water_residue_size = other.water_residue_size;
+  water_residue_count = other.water_residue_count;
   unconstrained_dof = other.unconstrained_dof;
   constrained_dof = other.constrained_dof;
   descriptors = std::move(other.descriptors);
@@ -2102,6 +2172,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   dihe_assigned_index = std::move(other.dihe_assigned_index);
   dihe_assigned_terms = std::move(other.dihe_assigned_terms);
   dihe_assigned_bounds = std::move(other.dihe_assigned_bounds);
+  bond_evaluation_mask = std::move(other.bond_evaluation_mask);
+  angl_evaluation_mask = std::move(other.angl_evaluation_mask);
   bond_modifiers = std::move(other.bond_modifiers);
   angl_modifiers = std::move(other.angl_modifiers);
   dihe_modifiers = std::move(other.dihe_modifiers);
@@ -2190,7 +2262,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_gb_gamma_parameters = std::move(other.sp_gb_gamma_parameters);
 
   // Copy or move information relevant to constraints and propagation of the MD algorithm
-  use_bond_constraints = other.use_bond_constraints;
+  use_shake = other.use_shake;
   use_settle = other.use_settle;
   use_perturbation_info = other.use_perturbation_info;
   use_solvent_cap_option = other.use_solvent_cap_option;
@@ -2212,20 +2284,24 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   constraint_group_bounds = std::move(other.constraint_group_bounds);
   constraint_parameter_indices = std::move(other.constraint_parameter_indices);
   constraint_parameter_bounds = std::move(other.constraint_parameter_bounds);
+  settle_mo = std::move(other.settle_mo);
+  settle_mh = std::move(other.settle_mh);
+  settle_moh = std::move(other.settle_moh);
   settle_mormt = std::move(other.settle_mormt);
   settle_mhrmt = std::move(other.settle_mhrmt);
   settle_ra = std::move(other.settle_ra);
   settle_rb = std::move(other.settle_rb);
   settle_rc = std::move(other.settle_rc);
-  settle_invra = std::move(other.settle_invra);
   constraint_inverse_masses = std::move(other.constraint_inverse_masses);
   constraint_squared_lengths = std::move(other.constraint_squared_lengths);
+  sp_settle_mo = std::move(other.sp_settle_mo);
+  sp_settle_mh = std::move(other.sp_settle_mh);
+  sp_settle_moh = std::move(other.sp_settle_moh);
   sp_settle_mormt = std::move(other.sp_settle_mormt);
   sp_settle_mhrmt = std::move(other.sp_settle_mhrmt);
   sp_settle_ra = std::move(other.sp_settle_ra);
   sp_settle_rb = std::move(other.sp_settle_rb);
   sp_settle_rc = std::move(other.sp_settle_rc);
-  sp_settle_invra = std::move(other.sp_settle_invra);
   sp_constraint_inverse_masses = std::move(other.sp_constraint_inverse_masses);
   sp_constraint_squared_lengths = std::move(other.sp_constraint_squared_lengths);
 

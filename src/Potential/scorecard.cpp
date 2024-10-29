@@ -1156,8 +1156,8 @@ void ScoreCard::setLastTimeStep(const int time_index, const HybridTargetLevel ti
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::import(const ScoreCard *other, const size_t fill_index,
-                       const size_t source_index) {
+void ScoreCard::importCard(const ScoreCard *other, const size_t fill_index,
+                           const size_t source_index) {
   ScoreCardReader src_r = other->data();
   if (source_index >= src_r.system_count) {
     rtErr("System index " + std::to_string(source_index) + " is invalid for a source ScoreCard "
@@ -1254,28 +1254,28 @@ void ScoreCard::import(const ScoreCard *other, const size_t fill_index,
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::import(const ScoreCard &other, const size_t fill_index,
-                       const size_t source_index) {
-  import(other.getSelfPointer(), fill_index, source_index);
+void ScoreCard::importCard(const ScoreCard &other, const size_t fill_index,
+                           const size_t source_index) {
+  importCard(other.getSelfPointer(), fill_index, source_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::import(const ScoreCard *other, const std::vector<int> &fill_indices,
-                       const std::vector<int> &source_indices) {
+void ScoreCard::importCard(const ScoreCard *other, const std::vector<int> &fill_indices,
+                           const std::vector<int> &source_indices) {
   const size_t nfill = fill_indices.size();
   if (nfill != source_indices.size()) {
     rtErr("A series of " + std::to_string(source_indices.size()) + " source systems cannot fill " +
           std::to_string(nfill) + ".", "ScoreCard", "import"); 
   }
   for (size_t i = 0; i < nfill; i++) {
-    import(other, fill_indices[i], source_indices[i]);
+    importCard(other, fill_indices[i], source_indices[i]);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::import(const ScoreCard &other, const std::vector<int> &fill_indices,
-                       const std::vector<int> &source_indices) {
-  import(other.getSelfPointer(), fill_indices, source_indices);
+void ScoreCard::importCard(const ScoreCard &other, const std::vector<int> &fill_indices,
+                           const std::vector<int> &source_indices) {
+  importCard(other.getSelfPointer(), fill_indices, source_indices);
 }
 
 //-------------------------------------------------------------------------------------------------

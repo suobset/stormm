@@ -365,14 +365,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define UPDATE_ATOMS
-#        define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsValenceAtomUpdateXL
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 256
+#        define VALENCE_KERNEL_THREAD_COUNT 192
 #          define VALENCE_BLOCK_MULTIPLICITY 4
 #            define KERNEL_NAME kfsValenceAtomUpdateLG
 #              include "valence_potential.cui"
@@ -380,14 +380,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define VALENCE_KERNEL_THREAD_COUNT 128
-#          define VALENCE_BLOCK_MULTIPLICITY 8
+#          define VALENCE_BLOCK_MULTIPLICITY 6
 #            define KERNEL_NAME kfsValenceAtomUpdateMD
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define VALENCE_KERNEL_THREAD_COUNT 64
-#          define VALENCE_BLOCK_MULTIPLICITY 16
+#          define VALENCE_BLOCK_MULTIPLICITY 12
 #            define KERNEL_NAME kfsValenceAtomUpdateSM
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
@@ -424,29 +424,29 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define UPDATE_ATOMS
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 320
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsValenceEnergyAtomUpdateXL
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
-#          define VALENCE_KERNEL_THREAD_COUNT 192
+#          define VALENCE_KERNEL_THREAD_COUNT 160
 #            define VALENCE_BLOCK_MULTIPLICITY 4
 #              define KERNEL_NAME kfsValenceEnergyAtomUpdateLG
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
-#          define VALENCE_KERNEL_THREAD_COUNT 96
-#            define VALENCE_BLOCK_MULTIPLICITY 8
+#          define VALENCE_KERNEL_THREAD_COUNT 128
+#            define VALENCE_BLOCK_MULTIPLICITY 5
 #              define KERNEL_NAME kfsValenceEnergyAtomUpdateMD
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #          define VALENCE_KERNEL_THREAD_COUNT 64
-#            define VALENCE_BLOCK_MULTIPLICITY 12
+#            define VALENCE_BLOCK_MULTIPLICITY 10
 #              define KERNEL_NAME kfsValenceEnergyAtomUpdateSM
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
@@ -484,14 +484,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef VALENCE_BLOCK_MULTIPLICITY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define UPDATE_ATOMS
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfValenceAtomUpdateXL
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
-#      define VALENCE_KERNEL_THREAD_COUNT 224
+#      define VALENCE_KERNEL_THREAD_COUNT 192
 #        define VALENCE_BLOCK_MULTIPLICITY 4
 #          define KERNEL_NAME kfValenceAtomUpdateLG
 #            include "valence_potential.cui"
@@ -499,14 +499,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define VALENCE_KERNEL_THREAD_COUNT 128
-#        define VALENCE_BLOCK_MULTIPLICITY 7
+#        define VALENCE_BLOCK_MULTIPLICITY 6
 #          define KERNEL_NAME kfValenceAtomUpdateMD
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define VALENCE_KERNEL_THREAD_COUNT 64
-#        define VALENCE_BLOCK_MULTIPLICITY 14
+#        define VALENCE_BLOCK_MULTIPLICITY 12
 #          define KERNEL_NAME kfValenceAtomUpdateSM
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
@@ -543,29 +543,29 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define UPDATE_ATOMS
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfValenceEnergyAtomUpdateXL
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 192
+#        define VALENCE_KERNEL_THREAD_COUNT 160
 #          define VALENCE_BLOCK_MULTIPLICITY 4
 #            define KERNEL_NAME kfValenceEnergyAtomUpdateLG
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 96
-#          define VALENCE_BLOCK_MULTIPLICITY 8
+#        define VALENCE_KERNEL_THREAD_COUNT 128
+#          define VALENCE_BLOCK_MULTIPLICITY 5
 #            define KERNEL_NAME kfValenceEnergyAtomUpdateMD
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define VALENCE_KERNEL_THREAD_COUNT 64
-#          define VALENCE_BLOCK_MULTIPLICITY 12
+#          define VALENCE_BLOCK_MULTIPLICITY 10
 #            define KERNEL_NAME kfValenceEnergyAtomUpdateSM
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
@@ -638,14 +638,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define UPDATE_ATOMS
-#          define VALENCE_KERNEL_THREAD_COUNT 448
+#          define VALENCE_KERNEL_THREAD_COUNT 384
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsValenceAtomUpdateNonClashXL
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
-#          define VALENCE_KERNEL_THREAD_COUNT 224
+#          define VALENCE_KERNEL_THREAD_COUNT 192
 #            define VALENCE_BLOCK_MULTIPLICITY 4
 #              define KERNEL_NAME kfsValenceAtomUpdateNonClashLG
 #                include "valence_potential.cui"
@@ -653,14 +653,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #          define VALENCE_KERNEL_THREAD_COUNT 128
-#            define VALENCE_BLOCK_MULTIPLICITY 7
+#            define VALENCE_BLOCK_MULTIPLICITY 6
 #              define KERNEL_NAME kfsValenceAtomUpdateNonClashMD
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
 #            undef VALENCE_BLOCK_MULTIPLICITY
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #          define VALENCE_KERNEL_THREAD_COUNT 64
-#            define VALENCE_BLOCK_MULTIPLICITY 14
+#            define VALENCE_BLOCK_MULTIPLICITY 12
 #              define KERNEL_NAME kfsValenceAtomUpdateNonClashSM
 #                include "valence_potential.cui"
 #              undef KERNEL_NAME
@@ -757,14 +757,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define UPDATE_ATOMS
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfValenceAtomUpdateNonClashXL
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
-#        define VALENCE_KERNEL_THREAD_COUNT 224
+#        define VALENCE_KERNEL_THREAD_COUNT 192
 #          define VALENCE_BLOCK_MULTIPLICITY 4
 #            define KERNEL_NAME kfValenceAtomUpdateNonClashLG
 #              include "valence_potential.cui"
@@ -772,14 +772,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define VALENCE_KERNEL_THREAD_COUNT 128
-#          define VALENCE_BLOCK_MULTIPLICITY 7
+#          define VALENCE_BLOCK_MULTIPLICITY 6
 #            define KERNEL_NAME kfValenceAtomUpdateNonClashMD
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define VALENCE_KERNEL_THREAD_COUNT 64
-#          define VALENCE_BLOCK_MULTIPLICITY 14
+#          define VALENCE_BLOCK_MULTIPLICITY 12
 #            define KERNEL_NAME kfValenceAtomUpdateNonClashSM
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
@@ -882,15 +882,14 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Make additional kernels for PME-based simulations, where the atom updates will also draw upon a
 // neighbor list cell grid, or even a pair of such grids.
 #  define PME_COMPATIBLE
-#  define COMPUTE_FORCE
 #  define UPDATE_ATOMS
-
+#  define COMPUTE_FORCE
 #  define TCOORD double
 #  define TACC llint
 #  define TCOORD4 double4
 #  define TCOORD_IS_LONG
 #    define SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 512
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfsdPmeValenceAtomUpdate
 #            include "valence_potential.cui"
@@ -898,7 +897,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsdPmeValenceEnergyAtomUpdate
 #              include "valence_potential.cui"
@@ -907,7 +906,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef COMPUTE_ENERGY
 #    undef SPLIT_FORCE_ACCUMULATION
-#    define VALENCE_KERNEL_THREAD_COUNT 448
+#    define VALENCE_KERNEL_THREAD_COUNT 384
 #      define VALENCE_BLOCK_MULTIPLICITY 2
 #        define KERNEL_NAME kfdPmeValenceAtomUpdate
 #          include "valence_potential.cui"
@@ -915,7 +914,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef VALENCE_BLOCK_MULTIPLICITY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define COMPUTE_ENERGY
-#      define VALENCE_KERNEL_THREAD_COUNT 384
+#      define VALENCE_KERNEL_THREAD_COUNT 320
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfdPmeValenceEnergyAtomUpdate
 #            include "valence_potential.cui"
@@ -925,7 +924,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    undef COMPUTE_ENERGY
 #    define DUAL_GRIDS
 #      define SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsdPmeDualValenceAtomUpdate
 #              include "valence_potential.cui"
@@ -933,7 +932,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define COMPUTE_ENERGY
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 320
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsdPmeDualValenceEnergyAtomUpdate
 #                include "valence_potential.cui"
@@ -942,7 +941,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef COMPUTE_ENERGY
 #      undef SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfdPmeDualValenceAtomUpdate
 #            include "valence_potential.cui"
@@ -950,7 +949,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfdPmeDualValenceEnergyAtomUpdate
 #              include "valence_potential.cui"
@@ -963,7 +962,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Make new kernels with a clash forgiveness check.
 #    define CLASH_FORGIVENESS
 #      define SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsdPmeValenceAtomUpdateNonClash
 #              include "valence_potential.cui"
@@ -980,7 +979,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef COMPUTE_ENERGY
 #      undef SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfdPmeValenceAtomUpdateNonClash
 #            include "valence_potential.cui"
@@ -1000,7 +999,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    define DUAL_GRIDS
 #      define CLASH_FORGIVENESS
 #        define SPLIT_FORCE_ACCUMULATION
-#          define VALENCE_KERNEL_THREAD_COUNT 448
+#          define VALENCE_KERNEL_THREAD_COUNT 384
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsdPmeDualValenceAtomUpdateNonClash
 #                include "valence_potential.cui"
@@ -1017,7 +1016,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #            undef VALENCE_KERNEL_THREAD_COUNT
 #          undef COMPUTE_ENERGY
 #        undef SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfdPmeDualValenceAtomUpdateNonClash
 #              include "valence_potential.cui"
@@ -1044,7 +1043,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TACC int
 #  define TCOORD4 float4
 #    define SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 512
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kfsfPmeValenceAtomUpdate
 #            include "valence_potential.cui"
@@ -1052,7 +1051,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsfPmeValenceEnergyAtomUpdate
 #              include "valence_potential.cui"
@@ -1061,7 +1060,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef COMPUTE_ENERGY
 #    undef SPLIT_FORCE_ACCUMULATION
-#    define VALENCE_KERNEL_THREAD_COUNT 448
+#    define VALENCE_KERNEL_THREAD_COUNT 384
 #      define VALENCE_BLOCK_MULTIPLICITY 2
 #        define KERNEL_NAME kffPmeValenceAtomUpdate
 #          include "valence_potential.cui"
@@ -1069,7 +1068,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef VALENCE_BLOCK_MULTIPLICITY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define COMPUTE_ENERGY
-#      define VALENCE_KERNEL_THREAD_COUNT 384
+#      define VALENCE_KERNEL_THREAD_COUNT 320
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kffPmeValenceEnergyAtomUpdate
 #            include "valence_potential.cui"
@@ -1079,7 +1078,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    undef COMPUTE_ENERGY
 #    define DUAL_GRIDS
 #      define SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 512
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsfPmeDualValenceAtomUpdate
 #              include "valence_potential.cui"
@@ -1087,7 +1086,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_BLOCK_MULTIPLICITY
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define COMPUTE_ENERGY
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 320
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsfPmeDualValenceEnergyAtomUpdate
 #                include "valence_potential.cui"
@@ -1096,7 +1095,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef COMPUTE_ENERGY
 #      undef SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kffPmeDualValenceAtomUpdate
 #            include "valence_potential.cui"
@@ -1104,7 +1103,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        undef VALENCE_BLOCK_MULTIPLICITY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 320
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kffPmeDualValenceEnergyAtomUpdate
 #              include "valence_potential.cui"
@@ -1117,7 +1116,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // Make new kernels with a clash forgiveness check.
 #    define CLASH_FORGIVENESS
 #      define SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kfsfPmeValenceAtomUpdateNonClash
 #              include "valence_potential.cui"
@@ -1134,7 +1133,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef COMPUTE_ENERGY
 #      undef SPLIT_FORCE_ACCUMULATION
-#      define VALENCE_KERNEL_THREAD_COUNT 448
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #        define VALENCE_BLOCK_MULTIPLICITY 2
 #          define KERNEL_NAME kffPmeValenceAtomUpdateNonClash
 #            include "valence_potential.cui"
@@ -1154,7 +1153,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    define DUAL_GRIDS
 #      define CLASH_FORGIVENESS
 #        define SPLIT_FORCE_ACCUMULATION
-#          define VALENCE_KERNEL_THREAD_COUNT 448
+#          define VALENCE_KERNEL_THREAD_COUNT 384
 #            define VALENCE_BLOCK_MULTIPLICITY 2
 #              define KERNEL_NAME kfsfPmeDualValenceAtomUpdateNonClash
 #                include "valence_potential.cui"
@@ -1171,7 +1170,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #            undef VALENCE_KERNEL_THREAD_COUNT
 #          undef COMPUTE_ENERGY
 #        undef SPLIT_FORCE_ACCUMULATION
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #          define VALENCE_BLOCK_MULTIPLICITY 2
 #            define KERNEL_NAME kffPmeDualValenceAtomUpdateNonClash
 #              include "valence_potential.cui"
@@ -1193,8 +1192,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef TACC
 #  undef TCOORD
 
-#  undef UPDATE_ATOMS
 #  undef COMPUTE_FORCE
+#  undef UPDATE_ATOMS
 #  undef PME_COMPATIBLE
 
 // Clear single-precision floating point definitions
@@ -1233,33 +1232,41 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SPLIT_FORCE_ACCUMULATION
 
 // Compile the standard kernels with all combinations of energy, and force accumulation methods.
-#  define VALENCE_KERNEL_THREAD_COUNT 256
-#    define COMPUTE_FORCE
+#  define COMPUTE_FORCE
+#    define VALENCE_KERNEL_THREAD_COUNT 256
 #      define KERNEL_NAME kdsValenceForceAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 192
 #      define UPDATE_ATOMS
 #        define KERNEL_NAME kdsValenceAtomUpdate
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef UPDATE_ATOMS
-#      define COMPUTE_ENERGY
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define COMPUTE_ENERGY
+#      define VALENCE_KERNEL_THREAD_COUNT 256
 #        define KERNEL_NAME kdsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
-#        define UPDATE_ATOMS
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define UPDATE_ATOMS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
 #          define KERNEL_NAME kdsValenceEnergyAtomUpdate
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
-#        undef UPDATE_ATOMS
-#      undef  COMPUTE_ENERGY
-#    undef COMPUTE_FORCE
-#    define COMPUTE_ENERGY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef UPDATE_ATOMS
+#    undef  COMPUTE_ENERGY
+#  undef COMPUTE_FORCE
+#  define COMPUTE_ENERGY
+#    define VALENCE_KERNEL_THREAD_COUNT 256
 #      define KERNEL_NAME kdsValenceEnergyAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
-#    undef COMPUTE_ENERGY
-#  undef VALENCE_KERNEL_THREAD_COUNT
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#  undef COMPUTE_ENERGY
 
 // Make new kernels with a clash forgiveness check.
 #  define CLASH_FORGIVENESS
@@ -1268,6 +1275,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        define KERNEL_NAME kdsValenceForceAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME  
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 192
 #        define UPDATE_ATOMS
 #          define KERNEL_NAME kdsValenceAtomUpdateNonClash
 #            include "valence_potential.cui"
@@ -1303,126 +1312,308 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 // type TCOORD and associated TACC may be defined independently.  Begin with double-precision
 // coordinates and 95-bit force accumulation in the neighbor list cell grids.
 #  define PME_COMPATIBLE
-#  define COMPUTE_FORCE
-#  define UPDATE_ATOMS
 #  define TCOORD double
 #  define TACC llint
 #  define TCOORD4 double4
 #  define TCOORD_IS_LONG
-#    define VALENCE_KERNEL_THREAD_COUNT 256
-#      define KERNEL_NAME kdsdPmeValenceAtomUpdate
+#  define UPDATE_ATOMS
+#    define COMPUTE_FORCE
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsdPmeValenceAtomUpdate
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define COMPUTE_ENERGY
+#          define KERNEL_NAME kdsdPmeValenceEnergyAtomUpdate
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef  COMPUTE_ENERGY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define CLASH_FORGIVENESS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsdPmeValenceAtomUpdateNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define COMPUTE_ENERGY
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define KERNEL_NAME kdsdPmeValenceEnergyAtomUpdateNonClash
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#        undef  COMPUTE_ENERGY
+#      undef CLASH_FORGIVENESS
+#      define DUAL_GRIDS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsdPmeDualValenceAtomUpdate
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define COMPUTE_ENERGY
+#            define KERNEL_NAME kdsdPmeDualValenceEnergyAtomUpdate
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef COMPUTE_ENERGY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define CLASH_FORGIVENESS
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define KERNEL_NAME kdsdPmeDualValenceAtomUpdateNonClash
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define COMPUTE_ENERGY
+#            define VALENCE_KERNEL_THREAD_COUNT 192
+#              define KERNEL_NAME kdsdPmeDualValenceEnergyAtomUpdateNonClash
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#          undef  COMPUTE_ENERGY
+#        undef CLASH_FORGIVENESS
+#      undef DUAL_GRIDS
+#    undef COMPUTE_FORCE
+#  undef UPDATE_ATOMS
+#  define COMPUTE_FORCE
+#    define VALENCE_KERNEL_THREAD_COUNT 192
+#      define KERNEL_NAME kdsdPmeValenceForceAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define VALENCE_KERNEL_THREAD_COUNT 192
 #      define COMPUTE_ENERGY
-#        define KERNEL_NAME kdsdPmeValenceEnergyAtomUpdate
+#        define KERNEL_NAME kdsdPmeValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef  COMPUTE_ENERGY
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define CLASH_FORGIVENESS
-#      define VALENCE_KERNEL_THREAD_COUNT 256
-#        define KERNEL_NAME kdsdPmeValenceAtomUpdateNonClash
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsdPmeValenceForceAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
 #        define VALENCE_KERNEL_THREAD_COUNT 192
-#          define KERNEL_NAME kdsdPmeValenceEnergyAtomUpdateNonClash
+#          define KERNEL_NAME kdsdPmeValenceForceEnergyAccumulationNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef  COMPUTE_ENERGY
 #    undef CLASH_FORGIVENESS
 #    define DUAL_GRIDS
-#      define VALENCE_KERNEL_THREAD_COUNT 256
-#        define KERNEL_NAME kdsdPmeDualValenceAtomUpdate
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsdPmeDualValenceForceAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 192
 #        define COMPUTE_ENERGY
-#          define KERNEL_NAME kdsdPmeDualValenceEnergyAtomUpdate
+#          define KERNEL_NAME kdsdPmeDualValenceForceEnergyAccumulation
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef COMPUTE_ENERGY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define CLASH_FORGIVENESS
-#        define VALENCE_KERNEL_THREAD_COUNT 256
-#          define KERNEL_NAME kdsdPmeDualValenceAtomUpdateNonClash
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsdPmeDualValenceForceAccumulationNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define COMPUTE_ENERGY
 #          define VALENCE_KERNEL_THREAD_COUNT 192
-#            define KERNEL_NAME kdsdPmeDualValenceEnergyAtomUpdateNonClash
+#            define KERNEL_NAME kdsdPmeDualValenceForceEnergyAccumulationNonClash
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef  COMPUTE_ENERGY
 #      undef CLASH_FORGIVENESS
 #    undef DUAL_GRIDS
+#  undef COMPUTE_FORCE
+#  define COMPUTE_ENERGY
+#    define VALENCE_KERNEL_THREAD_COUNT 192
+#      define KERNEL_NAME kdsdPmeValenceEnergyAccumulation
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define CLASH_FORGIVENESS
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsdPmeValenceEnergyAccumulationNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef CLASH_FORGIVENESS
+#    define DUAL_GRIDS
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsdPmeDualValenceEnergyAccumulation
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define CLASH_FORGIVENESS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsdPmeDualValenceEnergyAccumulationNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef CLASH_FORGIVENESS
+#    undef DUAL_GRIDS
+#  undef COMPUTE_ENERGY
 #  undef TCOORD_IS_LONG
 #  undef TCOORD4
 #  undef TACC
 #  undef TCOORD
-
+  
 // Define additional PME-compatible kernels for use with float coordinates and int63 accumulation
 // in the neighbor list's non-bonded forces.
 #  define TCOORD float
 #  define TACC int
 #  define TCOORD4 float4
-#    define VALENCE_KERNEL_THREAD_COUNT 256
-#      define KERNEL_NAME kdsfPmeValenceAtomUpdate
-#        include "valence_potential.cui"
-#      undef KERNEL_NAME
-#      define COMPUTE_ENERGY
-#        define KERNEL_NAME kdsfPmeValenceEnergyAtomUpdate
+#  define UPDATE_ATOMS
+#    define COMPUTE_FORCE
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsfPmeValenceAtomUpdate
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
-#      undef  COMPUTE_ENERGY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define COMPUTE_ENERGY
+#          define KERNEL_NAME kdsfPmeValenceEnergyAtomUpdate
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef  COMPUTE_ENERGY
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define CLASH_FORGIVENESS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsfPmeValenceAtomUpdateNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define COMPUTE_ENERGY
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define KERNEL_NAME kdsfPmeValenceEnergyAtomUpdateNonClash
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#        undef  COMPUTE_ENERGY
+#      undef CLASH_FORGIVENESS
+#      define DUAL_GRIDS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsfPmeDualValenceAtomUpdate
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define COMPUTE_ENERGY
+#            define KERNEL_NAME kdsfPmeDualValenceEnergyAtomUpdate
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef  COMPUTE_ENERGY
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define CLASH_FORGIVENESS
+#          define VALENCE_KERNEL_THREAD_COUNT 192
+#            define KERNEL_NAME kdsfPmeDualValenceAtomUpdateNonClash
+#              include "valence_potential.cui"
+#            undef KERNEL_NAME
+#          undef VALENCE_KERNEL_THREAD_COUNT
+#          define COMPUTE_ENERGY
+#            define VALENCE_KERNEL_THREAD_COUNT 192
+#              define KERNEL_NAME kdsfPmeDualValenceEnergyAtomUpdateNonClash
+#                include "valence_potential.cui"
+#              undef KERNEL_NAME
+#            undef VALENCE_KERNEL_THREAD_COUNT
+#          undef  COMPUTE_ENERGY
+#        undef CLASH_FORGIVENESS
+#      undef DUAL_GRIDS
+#    undef COMPUTE_FORCE
+#  undef UPDATE_ATOMS
+#  define COMPUTE_FORCE
+#    define VALENCE_KERNEL_THREAD_COUNT 224
+#      define KERNEL_NAME kdsfPmeValenceForceAccumulation
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
 #    undef VALENCE_KERNEL_THREAD_COUNT
+#    define COMPUTE_ENERGY
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsfPmeValenceForceEnergyAccumulation
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef  COMPUTE_ENERGY
 #    define CLASH_FORGIVENESS
-#      define VALENCE_KERNEL_THREAD_COUNT 256
-#        define KERNEL_NAME kdsfPmeValenceAtomUpdateNonClash
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsfPmeValenceForceAccumulationNonClash
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
 #        define VALENCE_KERNEL_THREAD_COUNT 192
-#          define KERNEL_NAME kdsfPmeValenceEnergyAtomUpdateNonClash
+#          define KERNEL_NAME kdsfPmeValenceForceEnergyAccumulationNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef  COMPUTE_ENERGY
 #    undef CLASH_FORGIVENESS
 #    define DUAL_GRIDS
-#      define VALENCE_KERNEL_THREAD_COUNT 256
-#        define KERNEL_NAME kdsfPmeDualValenceAtomUpdate
+#      define VALENCE_KERNEL_THREAD_COUNT 224
+#        define KERNEL_NAME kdsfPmeDualValenceForceAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
-#        define COMPUTE_ENERGY
-#          define KERNEL_NAME kdsfPmeDualValenceEnergyAtomUpdate
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define COMPUTE_ENERGY
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsfPmeDualValenceForceEnergyAccumulation
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
-#        undef  COMPUTE_ENERGY
-#      undef VALENCE_KERNEL_THREAD_COUNT
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef  COMPUTE_ENERGY
 #      define CLASH_FORGIVENESS
-#        define VALENCE_KERNEL_THREAD_COUNT 256
-#          define KERNEL_NAME kdsfPmeDualValenceAtomUpdateNonClash
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsfPmeDualValenceForceAccumulationNonClash
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef VALENCE_KERNEL_THREAD_COUNT
 #        define COMPUTE_ENERGY
 #          define VALENCE_KERNEL_THREAD_COUNT 192
-#            define KERNEL_NAME kdsfPmeDualValenceEnergyAtomUpdateNonClash
+#            define KERNEL_NAME kdsfPmeDualValenceForceEnergyAccumulationNonClash
 #              include "valence_potential.cui"
 #            undef KERNEL_NAME
 #          undef VALENCE_KERNEL_THREAD_COUNT
 #        undef  COMPUTE_ENERGY
 #      undef CLASH_FORGIVENESS
 #    undef DUAL_GRIDS
+#  undef COMPUTE_FORCE
+#  define COMPUTE_ENERGY
+#    define VALENCE_KERNEL_THREAD_COUNT 192
+#      define KERNEL_NAME kdsfPmeValenceEnergyAccumulation
+#        include "valence_potential.cui"
+#      undef KERNEL_NAME
+#    undef VALENCE_KERNEL_THREAD_COUNT
+#    define CLASH_FORGIVENESS
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsfPmeValenceEnergyAccumulationNonClash
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#    undef CLASH_FORGIVENESS
+#    define DUAL_GRIDS
+#      define VALENCE_KERNEL_THREAD_COUNT 192
+#        define KERNEL_NAME kdsfPmeDualValenceEnergyAccumulation
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define CLASH_FORGIVENESS
+#        define VALENCE_KERNEL_THREAD_COUNT 192
+#          define KERNEL_NAME kdsfPmeDualValenceEnergyAccumulationNonClash
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#      undef CLASH_FORGIVENESS
+#    undef DUAL_GRIDS
+#  undef  COMPUTE_ENERGY
+
 #  undef TCOORD4
 #  undef TACC
 #  undef TCOORD
-#  undef UPDATE_ATOMS
 #  undef PME_COMPATIBLE
 
 // Clear double-precision floating point definitions
@@ -1452,7 +1643,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
                                                          const VwuGoal purpose,
                                                          const ClashResponse collision_handling,
                                                          const ValenceKernelSize kwidth) {
-
+  
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes result;
@@ -1485,6 +1676,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           }
           break;
         }
+        break;
       case EvaluateForce::NO:
         cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation);
         break;
@@ -1695,6 +1887,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
           }
           break;
         }
+        break;
       case EvaluateForce::NO:
         cfa = cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulationNonClash);
         break;
@@ -1879,7 +2072,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
     }
     break;
   }
-
+  
   // Check for errors
   if (cfa != cudaSuccess) {
 
@@ -1953,6 +2146,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
     // Report the error
     rtErr(error_message, "queryValenceKernelRequirements");
   }
+  
   return result;
 }
 #endif
@@ -2552,6 +2746,292 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
 }
 
 //-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<double> &poly_vk,
+                          const SyRestraintKit<double, double2, double4> &poly_rk,
+                          const CellGridReader<double, llint, double, double4> &cgr,
+                          MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                          ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
+                          const double clash_distance, const double clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsdPmeValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                        *poly_psw, cgr,
+                                                                        clash_distance,
+                                                                        clash_ratio, *scw,
+                                                                        *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsdPmeValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, cgr, clash_distance,
+                                                                  clash_ratio, *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsdPmeValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, cgr, clash_distance,
+                                                                 clash_ratio, *scw, *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdsdPmeValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                               cgr, clash_distance, clash_ratio,
+                                                               poly_auk, *tstw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdsdPmeValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                         clash_distance, clash_ratio, poly_auk,
+                                                         *tstw, *gmem_r);
+        break;
+      }
+      break;
+    }
+  }
+  else {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsdPmeValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                cgr, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsdPmeValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                          *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsdPmeValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                         *scw, *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdsdPmeValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                       poly_auk, *tstw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdsdPmeValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                 poly_auk, *tstw, *gmem_r);
+        break;
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<double> &poly_vk,
+                          const SyRestraintKit<double, double2, double4> &poly_rk,
+                          const CellGridReader<float, int, float, float4> &cgr,
+                          MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                          ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
+                          const double clash_distance, const double clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsfPmeValenceForceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                        *poly_psw, cgr,
+                                                                        clash_distance,
+                                                                        clash_ratio, *scw,
+                                                                        *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsfPmeValenceForceAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, cgr, clash_distance,
+                                                                  clash_ratio, *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsfPmeValenceEnergyAccumulationNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, cgr, clash_distance,
+                                                                 clash_ratio, *scw, *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdsfPmeValenceEnergyAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                               cgr, clash_distance, clash_ratio,
+                                                               poly_auk, *tstw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdsfPmeValenceAtomUpdateNonClash<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                         clash_distance, clash_ratio, poly_auk,
+                                                         *tstw, *gmem_r);
+        break;
+      }
+      break;
+    }
+  }
+  else {
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kdsfPmeValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                cgr, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kdsfPmeValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                          *gmem_r);
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        kdsfPmeValenceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                         *scw, *gmem_r);
+        break;
+      }
+     break;
+    case VwuGoal::MOVE_PARTICLES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdsfPmeValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                       poly_auk, *tstw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdsfPmeValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, cgr,
+                                                 poly_auk, *tstw, *gmem_r);
+        break;
+      }
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<float> &poly_vk,
+                          const SyRestraintKit<float, float2, float4> &poly_rk,
+                          const CellGridReader<double, llint, double, double4> &cgr,
+                          MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                          ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const AccumulationMethod force_sum, const int2 bt,
+                          const float clash_distance, const float clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<float> &poly_vk,
+                          const SyRestraintKit<float, float2, float4> &poly_rk,
+                          const CellGridReader<float, int, float, float4> &cgr,
+                          MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                          ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const AccumulationMethod force_sum, const int2 bt,
+                          const float clash_distance, const float clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<double> &poly_vk,
+                          const SyRestraintKit<double, double2, double4> &poly_rk,
+                          const CellGridReader<double, llint, double, double4> &cgr_qq,
+                          const CellGridReader<double, llint, double, double4> &cgr_lj,
+                          MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                          ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
+                          const double clash_distance, const double clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<double> &poly_vk,
+                          const SyRestraintKit<double, double2, double4> &poly_rk,
+                          const CellGridReader<float, int, float, float4> &cgr_qq,
+                          const CellGridReader<float, int, float, float4> &cgr_lj,
+                          MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                          ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt,
+                          const double clash_distance, const double clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<float> &poly_vk,
+                          const SyRestraintKit<float, float2, float4> &poly_rk,
+                          const CellGridReader<double, llint, double, double4> &cgr_qq,
+                          const CellGridReader<double, llint, double, double4> &cgr_lj,
+                          MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                          ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const AccumulationMethod force_sum, const int2 bt,
+                          const float clash_distance, const float clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const SyValenceKit<float> &poly_vk,
+                          const SyRestraintKit<float, float2, float4> &poly_rk,
+                          const CellGridReader<float, int, float, float4> &cgr_qq,
+                          const CellGridReader<float, int, float, float4> &cgr_lj,
+                          MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                          const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                          ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const AccumulationMethod force_sum, const int2 bt,
+                          const float clash_distance, const float clash_ratio) {
+  if (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) {
+  }
+  else {
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                           Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
@@ -2613,6 +3093,294 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
   else {
     launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
                   purpose, AccumulationMethod::WHOLE, launcher, clash_distance, clash_ratio);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const AccumulationMethod force_sum,
+                   const CoreKlManager &launcher, const double clash_distance,
+                   const double clash_ratio) {
+  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(tier);
+  ScoreCardWriter scw = sc->data(tier);
+  const ClashResponse mitigate_clash = (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) ?
+                                       ClashResponse::FORGIVE : ClashResponse::NONE;
+  const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
+                                                AccumulationMethod::SPLIT, purpose,
+                                                mitigate_clash);
+  const CellGridReader<double, llint, double, double4> cgr = cg.data(tier);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      ThermostatWriter tstw = heat_bath->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchValence(poly_vk, poly_rk, cgr, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r,
+                    eval_force, eval_energy, purpose, bt, clash_distance, clash_ratio);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      ThermostatWriter tstw = heat_bath->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchValence(poly_vk, poly_rk, cgr, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r,
+                    eval_force, eval_energy, purpose, force_sum, bt, clash_distance, clash_ratio);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const CoreKlManager &launcher,
+                   const double clash_distance, const double clash_ratio) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchValence(prec, poly_ag, cg, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force,
+                  eval_energy, purpose, AccumulationMethod::SPLIT, launcher, clash_distance,
+                  clash_ratio);
+  }
+  else {
+    launchValence(prec, poly_ag, cg, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force,
+                  eval_energy, purpose, AccumulationMethod::WHOLE, launcher, clash_distance,
+                  clash_ratio);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg_qq,
+                   const CellGrid<double, llint, double, double4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const AccumulationMethod force_sum,
+                   const CoreKlManager &launcher, const double clash_distance,
+                   const double clash_ratio) {
+  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(tier);
+  ScoreCardWriter scw = sc->data(tier);
+  const ClashResponse mitigate_clash = (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) ?
+                                       ClashResponse::FORGIVE : ClashResponse::NONE;
+  const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
+                                                AccumulationMethod::SPLIT, purpose,
+                                                mitigate_clash);
+  const CellGridReader<double, llint, double, double4> cgr_qq = cg_qq.data(tier);
+  const CellGridReader<double, llint, double, double4> cgr_lj = cg_lj.data(tier);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      ThermostatWriter tstw = heat_bath->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchValence(poly_vk, poly_rk, cgr_qq, cgr_lj, &ctrl, &poly_psw, poly_auk, &tstw, &scw,
+                    &gmem_r, eval_force, eval_energy, purpose, bt, clash_distance, clash_ratio);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      ThermostatWriter tstw = heat_bath->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchValence(poly_vk, poly_rk, cgr_qq, cgr_lj, &ctrl, &poly_psw, poly_auk, &tstw, &scw,
+                    &gmem_r, eval_force, eval_energy, purpose, force_sum, bt, clash_distance,
+                    clash_ratio);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg_qq,
+                   const CellGrid<double, llint, double, double4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const CoreKlManager &launcher,
+                   const double clash_distance, const double clash_ratio) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchValence(prec, poly_ag, cg_qq, cg_lj,  mmctrl, poly_ps, heat_bath, sc, tb_space,
+                  eval_force, eval_energy, purpose, AccumulationMethod::SPLIT, launcher,
+                  clash_distance, clash_ratio);
+  }
+  else {
+    launchValence(prec, poly_ag, cg_qq, cg_lj, mmctrl, poly_ps, heat_bath, sc, tb_space,
+                  eval_force, eval_energy, purpose, AccumulationMethod::WHOLE, launcher,
+                  clash_distance, clash_ratio);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const AccumulationMethod force_sum,
+                   const CoreKlManager &launcher, const double clash_distance,
+                   const double clash_ratio) {
+  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(tier);
+  ScoreCardWriter scw = sc->data(tier);
+  const ClashResponse mitigate_clash = (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) ?
+                                       ClashResponse::FORGIVE : ClashResponse::NONE;
+  const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
+                                                AccumulationMethod::SPLIT, purpose,
+                                                mitigate_clash);
+  const CellGridReader<float, int, float, float4> cgr = cg.data(tier);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      ThermostatWriter tstw = heat_bath->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchValence(poly_vk, poly_rk, cgr, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r,
+                    eval_force, eval_energy, purpose, bt, clash_distance, clash_ratio);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      ThermostatWriter tstw = heat_bath->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchValence(poly_vk, poly_rk, cgr, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r,
+                    eval_force, eval_energy, purpose, force_sum, bt, clash_distance, clash_ratio);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const CoreKlManager &launcher,
+                   const double clash_distance, const double clash_ratio) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchValence(prec, poly_ag, cg, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force,
+                  eval_energy, purpose, AccumulationMethod::SPLIT, launcher, clash_distance,
+                  clash_ratio);
+  }
+  else {
+    launchValence(prec, poly_ag, cg, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force,
+                  eval_energy, purpose, AccumulationMethod::WHOLE, launcher, clash_distance,
+                  clash_ratio);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg_qq,
+                   const CellGrid<float, int, float, float4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const AccumulationMethod force_sum,
+                   const CoreKlManager &launcher, const double clash_distance,
+                   const double clash_ratio) {
+  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(tier);
+  ScoreCardWriter scw = sc->data(tier);
+  const ClashResponse mitigate_clash = (clash_distance >= 1.0e-6 || clash_ratio >= 1.0e-6) ?
+                                       ClashResponse::FORGIVE : ClashResponse::NONE;
+  const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
+                                                AccumulationMethod::SPLIT, purpose,
+                                                mitigate_clash);
+  const CellGridReader<float, int, float, float4> cgr_qq = cg_qq.data(tier);
+  const CellGridReader<float, int, float, float4> cgr_lj = cg_lj.data(tier);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      ThermostatWriter tstw = heat_bath->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchValence(poly_vk, poly_rk, cgr_qq, cgr_lj, &ctrl, &poly_psw, poly_auk, &tstw, &scw,
+                    &gmem_r, eval_force, eval_energy, purpose, bt, clash_distance, clash_ratio);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      ThermostatWriter tstw = heat_bath->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchValence(poly_vk, poly_rk, cgr_qq, cgr_lj, &ctrl, &poly_psw, poly_auk, &tstw, &scw,
+                    &gmem_r, eval_force, eval_energy, purpose, force_sum, bt, clash_distance,
+                    clash_ratio);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg_qq,
+                   const CellGrid<float, int, float, float4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                   const VwuGoal purpose, const CoreKlManager &launcher,
+                   const double clash_distance, const double clash_ratio) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchValence(prec, poly_ag, cg_qq, cg_lj,  mmctrl, poly_ps, heat_bath, sc, tb_space,
+                  eval_force, eval_energy, purpose, AccumulationMethod::SPLIT, launcher,
+                  clash_distance, clash_ratio);
+  }
+  else {
+    launchValence(prec, poly_ag, cg_qq, cg_lj, mmctrl, poly_ps, heat_bath, sc, tb_space,
+                  eval_force, eval_energy, purpose, AccumulationMethod::WHOLE, launcher,
+                  clash_distance, clash_ratio);
   }
 }
 

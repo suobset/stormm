@@ -51,3 +51,11 @@ This should be a comment, but placed here to ensure that test outside of a namel
   trial_limit 10, final_states 6,
   core_mask { atoms "@N,CA,C & !(:ACE,NME)" },
 &end
+
+// Nice all of this
+&nice
+  max_workday_gpu 0.75, running_watch 8.0, resume_watch 300.0,
+  stash_gpu_arrays,
+  working_day M, working_day W, working_day Th, working_day Sa,
+  workday_start "8:07 AM", workday_end 5:35PM,
+&end

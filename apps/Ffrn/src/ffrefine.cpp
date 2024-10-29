@@ -57,7 +57,7 @@ void displayGeneralHelpMessage() {
 int main(int argc, const char* argv[]) {
 
   // Wall time tracking
-  StopWatch timer("Timings for ffrefine.omni");
+  StopWatch timer("Timings for ffrefine.stormm");
 
   // Check for a help message
   if (detectHelpSignal(argc, argv)) {
@@ -67,14 +67,20 @@ int main(int argc, const char* argv[]) {
   if (displayNamelistHelp(argc, argv, { "&files", "&restraint", "&minimize", "&report" })) {
     return 0;
   }
-  
+
+  // Parse the command line
+  CommandLineParser clip("ffrefine.stormm", "A program for performing energy minimizations with "
+                         "experimental force fields.");
+  clip.addStandardApplicationInputs();
+  clip.parseUserInput(argc, argv);
+
   // Read information from the command line and initialize the UserSettings object
-  UserSettings ui(argc, argv, AppName::FFREFINE);
+  UserSettings ui(clip, { "-pe", "-ce" });
   
   // Read topologies and coordinate files.  Assemble critical details about each system.
   SystemCache sysc(ui.getFilesNamelistInfo(), ui.getRestraintNamelistInfo(),
-                   ui.getExceptionBehavior(), MapRotatableGroups::YES, ui.getPrintingPolicy(),
-                   &timer);
+                   ui.getDynamicsNamelistInfo(), ui.getExceptionBehavior(),
+                   MapRotatableGroups::YES, ui.getPrintingPolicy(), &timer);
   const int system_count = sysc.getSystemCount();
   std::vector<MdlMol> sdf_recovery = sysc.getStructureDataEntry();
   customizeDataItems(&sdf_recovery, sysc, ui.getReportNamelistInfo());

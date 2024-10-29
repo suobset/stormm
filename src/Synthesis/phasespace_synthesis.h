@@ -891,84 +891,85 @@ public:
   ///                           its own scaling factor.
   /// \param frame_index        Index of a CoordinateSeries object to be transferred
   /// \{
-  void import(const PhaseSpaceReader &psr, int system_index, CoordinateCycle orientation,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpaceReader &psr, int system_index, CoordinateCycle orientation,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const PhaseSpaceReader &psr, int system_index,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpaceReader &psr, int system_index,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const PhaseSpaceWriter &psw, int system_index, CoordinateCycle orientation,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpaceWriter &psw, int system_index, CoordinateCycle orientation,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const PhaseSpaceWriter &psw, int system_index,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpaceWriter &psw, int system_index,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const PhaseSpace &ps, int system_index, CoordinateCycle orientation,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpace &ps, int system_index, CoordinateCycle orientation,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const PhaseSpace &ps, int system_index,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const PhaseSpace &ps, int system_index,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrameReader &cfr, int system_index, CoordinateCycle orientation,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrameReader &cfr, int system_index,
+                    CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrameReader &cfr, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrameReader &cfr, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrameWriter &cfw, int system_index, CoordinateCycle orientation,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrameWriter &cfw, int system_index,
+                    CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrameWriter &cfw, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrameWriter &cfw, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrame &cf, int system_index, CoordinateCycle orientation,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrame &cf, int system_index, CoordinateCycle orientation,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  void import(const CoordinateFrame &cf, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
-
-  template <typename T>
-  void import(const T* x_import, const T* y_import, const T* z_import, const double* box_xform_in,
-              const double* inverse_xform_in, const double* box_dimensions_in, int system_index,
-              CoordinateCycle orientation, double inverse_scaling_factor = 1.0,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateFrame &cf, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
+  void importSystem(const T* x_import, const T* y_import, const T* z_import,
+                    const double* box_xform_in, const double* inverse_xform_in,
+                    const double* box_dimensions_in, int system_index,
+                    CoordinateCycle orientation, double inverse_scaling_factor = 1.0,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  template <typename T>
+  void importSystem(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
               CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
               HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateSeriesReader<T> &csr, int frame_index, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
-              CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
+                    CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateSeriesWriter<T> &csw, int frame_index, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
-              CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateSeries<T> &cs, int frame_index, int system_index,
+                    CoordinateCycle orientation, TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   template <typename T>
-  void import(const CoordinateSeries<T> &cs, int frame_index, int system_index,
-              TrajectoryKind kind = TrajectoryKind::POSITIONS,
-              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void importSystem(const CoordinateSeries<T> &cs, int frame_index, int system_index,
+                    TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   
 private:

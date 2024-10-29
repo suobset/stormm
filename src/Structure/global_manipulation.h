@@ -6,6 +6,7 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
+#include "Reporting/error_format.h"
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Topology/atomgraph.h"
@@ -21,6 +22,7 @@ namespace structure {
 
 using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
+using data_types::isSignedIntegralHpcVectorType;
 using synthesis::Condensate;
 using synthesis::CondensateWriter;
 using synthesis::PhaseSpaceSynthesis;
@@ -42,20 +44,41 @@ using trajectory::TrajectoryKind;
 ///        Daniel A. Beard and Tamar Schlick. "Unbiased Rotational Moves for Rigid-Body Dynamics."
 ///        Biophysical Journal 85:2973-2976.  2003.
 ///
-/// \param om_x  Rotation about the lab frame X axis (also can be the Euler angle alpha)
-/// \param om_y  Rotation about the lab frame Y axis (also can be the Euler angle beta)
-/// \param om_z  Rotation about the lab frame Z axis (also can be the Euler angle gamma)
+/// \param om_x  Rotation about the lab frame X axis (also can be the Euler angle alpha), valid
+///              range [ -pi, pi )
+/// \param om_y  Rotation about the lab frame Y axis (also can be the Euler angle beta), valid
+///              range [ 0, pi )
+/// \param om_z  Rotation about the lab frame Z axis (also can be the Euler angle gamma), valid
+///              range [ -pi, pi )
 template <typename T>
 std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z);
 
-/// \brief Rotate coordinates or a subset of coordinates.  All overloaded forms of this function
+/// \brief Rotate coordinates or a subset of coordinates.  Some overloaded forms of this function
 ///        can accept a VirtualSite kit abstract that will direct the repositioning of virtual
-///        sites, in case one or more frames were subject to partial rotations.
+///        sites, in case one or more frames were subject to partial rotations.  More general forms
+///        of the function work with rotation matrices or triads of unit vectors describing the
+///        new coordinate axes.
 ///
 /// Overloaded:
 ///   - Accept raw pointers with templated types
 ///   - Accept a pointer to a PhaseSpace or CoordinateFrame object, or abstracts thereof
+///   - Rotate coordinates of a point expressed as three scalar numbers
+///   - Rotate coordinates of many points expressed as a triad of vectors: C-style arrays, Standard
+///     template library vectors, or Hybrid objects
+///   - Rotate a three-tuple of coordinates
+///   - Provide the rotation as a triad of vectors or a 3 x 3 rotation matrix representing the
+///     unit cell axes of the new coordinate system
 ///
+/// \param x       First component of the particle's or particles' coordinates
+/// \param y       Second component of the particle's or particles' coordinates
+/// \param z       Third component of the particle's or particles' coordinates
+/// \param n       The number of coordinates, trusted length of x, y, and z when rotating multiple
+///                coordinates at once
+/// \param c       Tuple of coordinates with the X, Y, and Z components in the "x", "y", and "z"
+///                members, respectively
+/// \param axis_a  Unit vector describing the first dimension of the new coordinate system
+/// \param axis_b  Unit vector describing the second dimension of the new coordinate system
+/// \param axis_c  Unit vector describing the third dimension of the new coordinate system
 /// \param xcrd         Cartesian X coordinates of the particles
 /// \param ycrd         Cartesian Y coordinates of the particles
 /// \param zcrd         Cartesian Z coordinates of the particles
@@ -71,6 +94,44 @@ std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z);
 /// \param vsk          Topology abstract governing virtual site placement
 /// \param ag           System topology (contains information on virtual site placement)
 /// \{
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(T *x, T *y, T *z, const Tcalc* axis_a, const Tcalc* axis_b,
+                       const Tcalc* axis_c, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(T *x, T *y, T *z, const Tcalc* umat, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(T* x, T* y, T* z, size_t n, const Tcalc* axis_a, const Tcalc* axis_b,
+                       const Tcalc* axis_c, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(T* x, T* y, T* z, size_t n, const Tcalc* umat,
+                       Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(std::vector<T> *x, std::vector<T> *y, std::vector<T> *z,
+                       const std::vector<Tcalc> &axis_a, const std::vector<Tcalc> &axis_b,
+                       const std::vector<Tcalc> &axis_c, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(std::vector<T> *x, std::vector<T> *y, std::vector<T> *z,
+                       const std::vector<Tcalc> &umat, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(Hybrid<T> *x, Hybrid<T> *y, Hybrid<T> *z,
+                       const Hybrid<Tcalc> &axis_a, const Hybrid<Tcalc> &axis_b,
+                       const Hybrid<Tcalc> &axis_c, Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T, typename Tcalc>
+void rotateCoordinates(Hybrid<T> *x, Hybrid<T> *y, Hybrid<T> *z, const Hybrid<Tcalc> &umat,
+                       Tcalc globalpos_scale_factor = 1.0);
+
+template <typename T3, typename Tcalc>
+void rotateCoordinates(T3 *c, const T3 axis_a, const T3 axis_b, const T3 axis_c,
+                       Tcalc globalpos_scale_factor = 1.0);
+
 template <typename Tcoord, typename Tcalc>
 void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tcalc alpha, Tcalc beta,
                        Tcalc gamma, int lower_limit, int upper_limit,

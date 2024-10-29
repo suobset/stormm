@@ -347,7 +347,7 @@ template <typename T> void elementwiseDivide(Hybrid<T> *va, T factor);
 template <typename T> void crossProduct(const T* va, const T* vb, T* vc);
 template <typename T> void crossProduct(const std::vector<T> &va, const std::vector<T> &vb,
                                         std::vector<T> *vc);
-template <typename T> T crossProduct(const T va, const T vb);
+template <typename T3> T3 crossProduct(const T3 va, const T3 vb);
 /// \}
 
 /// \brief Compute the magnitude of a vector.  The result is always returned as a double-precision
@@ -382,6 +382,7 @@ template <typename T> T hypotenuse(const T a, const T b);
 ///   - Operate on a C-style array of trusted length
 ///   - Operate on a Standard Template Library vector
 ///   - Operate on a Hybrid object
+///   - Operate on a vector three-tuple
 ///
 /// \param va      The vector of interest
 /// \param length  Length of va  
@@ -389,6 +390,7 @@ template <typename T> T hypotenuse(const T a, const T b);
 template <typename T> double normalize(T* va, const size_t length);
 template <typename T> double normalize(std::vector<T> *va);
 template <typename T> double normalize(Hybrid<T> *va);
+template <typename T3, typename Tcalc> Tcalc normalize(T3 *va);
 /// \}
   
 /// \brief Compute the dot product of two vectors.  The result is always returned as a

@@ -26,6 +26,7 @@ namespace analysis {
 using stormm::card::GpuDetails;
 using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
+using stormm::namelist::CommandLineParser;
 using stormm::namelist::ConformerControls;
 using stormm::namelist::default_minimize_clash_r0;
 using stormm::namelist::default_minimize_clash_ratio;
@@ -82,6 +83,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
 ///        outcomes.
 ///
 /// \param sc           Cache of systems used to seed the calculations
+/// \param clip         Command line arguments provided by the user
 /// \param ui           Contains user-generated contol input
 /// \param sandbox_prm  Contains information on the permutations and combinatorial space available
 ///                     to each system in the systems cache sc
@@ -89,7 +91,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
 ///                     minimizations to the systems cache created based on the &files namelist
 /// \param prelim_emin  Outputs from preliminary energy minimization runs
 /// \param best_confs   List of the best configurations
-void printReport(const SystemCache &sc, const UserSettings &ui,
+void printReport(const SystemCache &sc, const CommandLineParser &clip, const UserSettings &ui,
                  const SynthesisPermutor &sandbox_prm, const SynthesisCacheMap &sandbox_map,
                  const ScoreCard &prelim_emin, const std::vector<int> &best_confs);
   

@@ -90,6 +90,16 @@ cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateF
 /// \param poly_ag      Compiled topologies of all systems
 /// \param poly_psw     Abstract for coordinates and forces of all systems
 /// \param poly_ps      Coordinates, velocities, and forces of all systems
+/// \param cgw          Abstract for the neighbor list cell grid, containing forces accumulated
+///                     in a general-purpose non-bonded calculation
+/// \param cg           Neighbor list cell grid, containing forces accumulated over the course of
+///                     a general-purpose non-bonded calculation
+/// \param cgw_qq       Abstract for an electrostatic neighbor list cell grid
+/// \param cg_qq        Neighbor list cell grid, containing electrostatic forces accumulated prior
+///                     to the valence force calculations
+/// \param cgw_lj       Abstract for a van-der Waals neighbor list cell grid
+/// \param cg_lj        Neighbor list cell grid, containing van-der Waals forces accumulated prior
+///                     to the valence force calculations
 /// \param tstw         Abstract of the thermostat
 /// \param heat_bath    Thermostat for keeping each system at a particular temperature
 /// \param gmem_r       Exclusive space in global memory arrays reserved for each thread block, to
@@ -113,7 +123,7 @@ void launchValence(const SyValenceKit<double> &poly_vk,
                    ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
-                   double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void launchValence(const SyValenceKit<float> &poly_vk,
                    const SyRestraintKit<float, float2, float4> &poly_rk,
@@ -122,20 +132,172 @@ void launchValence(const SyValenceKit<float> &poly_vk,
                    ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
-                   const int2 bt, float clash_minimum_distance = 0.0, float clash_ratio = 0.0);
+                   const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<double> &poly_vk,
+                   const SyRestraintKit<double, double2, double4> &poly_rk,
+                   const CellGridReader<double, llint, double, double4> &cgr,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                   ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<double> &poly_vk,
+                   const SyRestraintKit<double, double2, double4> &poly_rk,
+                   const CellGridReader<float, int, float, float4> &cgr,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                   ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<float> &poly_vk,
+                   const SyRestraintKit<float, float2, float4> &poly_rk,
+                   const CellGridReader<double, llint, double, double4> &cgr,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                   ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                   const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<float> &poly_vk,
+                   const SyRestraintKit<float, float2, float4> &poly_rk,
+                   const CellGridReader<float, int, float, float4> &cgr,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                   ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                   const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<double> &poly_vk,
+                   const SyRestraintKit<double, double2, double4> &poly_rk,
+                   const CellGridReader<double, llint, double, double4> &cgr_qq,
+                   const CellGridReader<double, llint, double, double4> &cgr_lj,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                   ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<double> &poly_vk,
+                   const SyRestraintKit<double, double2, double4> &poly_rk,
+                   const CellGridReader<float, llint, float, float4> &cgr_qq,
+                   const CellGridReader<float, llint, float, float4> &cgr_lj,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                   ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<float> &poly_vk,
+                   const SyRestraintKit<float, float2, float4> &poly_rk,
+                   const CellGridReader<double, llint, double, double4> &cgr_qq,
+                   const CellGridReader<double, llint, double, double4> &cgr_lj,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                   ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                   const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValence(const SyValenceKit<float> &poly_vk,
+                   const SyRestraintKit<float, float2, float4> &poly_rk,
+                   const CellGridReader<float, int, float, float4> &cgr_qq,
+                   const CellGridReader<float, int, float, float4> &cgr_lj,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                   ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                   CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                   const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
   
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
                    AccumulationMethod force_sum, const CoreKlManager &launcher,
-                   double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
 
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                    Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
                    EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                   const CoreKlManager &launcher, double clash_minimum_distance = 0.0,
+                   const CoreKlManager &launcher, double clash_distance = 0.0,
+                   double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   AccumulationMethod force_sum, const CoreKlManager &launcher,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   const CoreKlManager &launcher, double clash_distance = 0.0,
+                   double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg_qq,
+                   const CellGrid<double, llint, double, double4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   AccumulationMethod force_sum, const CoreKlManager &launcher,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<double, llint, double, double4> &cg_qq,
+                   const CellGrid<double, llint, double, double4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   const CoreKlManager &launcher, double clash_distance = 0.0,
+                   double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   AccumulationMethod force_sum, const CoreKlManager &launcher,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   const CoreKlManager &launcher, double clash_distance = 0.0,
+                   double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg_qq,
+                   const CellGrid<float, int, float, float4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   AccumulationMethod force_sum, const CoreKlManager &launcher,
+                   double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   const CellGrid<float, int, float, float4> &cg_qq,
+                   const CellGrid<float, int, float, float4> &cg_lj,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   const CoreKlManager &launcher, double clash_distance = 0.0,
                    double clash_ratio = 0.0);
 /// \}
   

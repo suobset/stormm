@@ -204,28 +204,21 @@ void computeTemperature(ScoreCard *sc, const AtomGraph *ag, bool cnst, int index
 /// \param swap_indices     Vector with indices that have been swapped in a REMD simulation
 ///                         for which the momenta have to be rescaled
 /// \param temp             Vector with the temperature distributions during REMD simulation
-///
-/// \{
 template <typename Tcalc>
 std::vector<llint> initiateMomentaRescale(const PhaseSpaceSynthesis *PsSynthesis, 
                                           const AtomGraphSynthesis *AgSynthesis, 
                                           const ScoreCard *sc, std::vector<int> swap_indices, 
                                           std::vector<double> temp);
-/// \}
 
 /// \brief Initiate the Kinetic Energy Rescale for a given REMD Simulation
 ///
 /// \param PsSynthesis      The given PhaseSpace Synthesis for the current instance
 /// \param AgSynthesis      The given AtomGraph Synthesis for the current instance
 /// \param ScoreCard        Current ScoreCard tracking energies for all particles
-///
-/// \{
 template <typename Tcalc>
 std::vector<llint> initiateKineticEnergyRescale(const PhaseSpaceSynthesis *PsSynthesis, 
                                                 const AtomGraphSynthesis *AgSynthesis, 
                                                 const ScoreCard *sc);
-///\}
-
 
 } // namespace mm
 } // namespace stormm

@@ -177,80 +177,155 @@ Tcalc computeTemperature(const PhaseSpace &ps, const AtomGraph &ag,
 }
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-std::vector<llint> initiateMomentaRescale(const PhaseSpaceSynthesis *PsSynthesis, 
-                                          const AtomGraphSynthesis *AgSynthesis, 
-                                          const ScoreCard *sc, std::vector<int> swap_indices, 
-                                          std::vector<double> temp) {
-  std::vector<llint> rescaledMomenta;
-  const PsSynthesisReader pssr = PsSynthesis->data();
-  const std::vector<AtomGraph*> topologies = AgSynthesis->getSystemTopologyPointer();
-  const int system_count = pssr.system_count;
-  const int* atom_starts = pssr.atom_starts;
-  for(int i = 0; i < system_count; i++){
-    const llint* xvel = &pssr.xvel[atom_starts[i]];
-    const llint* yvel = &pssr.yvel[atom_starts[i]];
-    const llint* zvel = &pssr.zvel[atom_starts[i]];
-    const int* xvel_ovrf = nullptr;
-    const int* yvel_ovrf = nullptr;
-    const int* zvel_ovrf = nullptr;
-    if (pssr.vel_bits >= velocity_scale_nonoverflow_bits){
-    xvel_ovrf = &pssr.xvel_ovrf[atom_starts[i]];
-    yvel_ovrf = &pssr.yvel_ovrf[atom_starts[i]];
-    zvel_ovrf = &pssr.zvel_ovrf[atom_starts[i]];
+std::vector<llint> initiateMomentaRescale(const PhaseSpaceSynthesis *PsSynthesis,
+                                          const AtomGraphSynthesis *AgSynthesis,
+                                          const ScoreCard *sc, std::vector<int> swap_indices,
+                                          std::vector<double> temps, bool flag) {
+	std::vector<llint> rescaledMomenta;
+	const PsSynthesisReader pssr = PsSynthesis->data();
+	const std::vector<AtomGraph*> topologies = AgSynthesis->getSystemTopologyPointer();
+	const int system_count = pssr.system_count;
+	const int* atom_starts = pssr.atom_starts;
+
+	for (int i = 0; i < system_count; i++) {
+		llint* xvel = const_cast<llint*>(&pssr.xvel[atom_starts[i]]);
+		llint* yvel = const_cast<llint*>(&pssr.yvel[atom_starts[i]]);
+		llint* zvel = const_cast<llint*>(&pssr.zvel[atom_starts[i]]);
+		const int* xvel_ovrf = nullptr;
+		const int* yvel_ovrf = nullptr;
+		const int* zvel_ovrf = nullptr;
+
+		if (pssr.vel_bits >= velocity_scale_nonoverflow_bits) {
+			xvel_ovrf = &pssr.xvel_ovrf[atom_starts[i]];
+			yvel_ovrf = &pssr.yvel_ovrf[atom_starts[i]];
+			zvel_ovrf = &pssr.zvel_ovrf[atom_starts[i]];
+		}
+
+		const AtomGraph* top = topologies[pssr.unique_ag_idx[atom_starts[i]]];
+		const ChemicalDetailsKit cdk = top->getChemicalDetailsKit();
+		const int natom = pssr.atom_counts[atom_starts[i]];
+		const int inv_vel_scale = pssr.inv_vel_scale;
+
+		if (flag) {
+			// Even i: rescale xvel, yvel, zvel by sqrt(temps[i + 1] / temps[i])
+			if (i % 2 == 0 && i < system_count - 1) {
+				double scale_factor = sqrt(temps[i + 1] / temps[i]);
+				for (int j = 0; j < natom; ++j) {
+					xvel[j] *= scale_factor;
+					yvel[j] *= scale_factor;
+					zvel[j] *= scale_factor;
+				}
+			}
+			// Odd i: rescale xvel, yvel, zvel by sqrt(temps[i] / temps[i - 1])
+			else if (i % 2 != 0 && i > 0) {
+				double scale_factor = sqrt(temps[i] / temps[i - 1]);
+				for (int j = 0; j < natom; ++j) {
+					xvel[j] *= scale_factor;
+					yvel[j] *= scale_factor;
+					zvel[j] *= scale_factor;
+				}
+			}
+		} else {
+				// Odd i: rescale xvel, yvel, zvel by sqrt(temps[i + 1] / temps[i])
+				if (i % 2 != 0 && i < system_count - 1) {
+					double scale_factor = sqrt(temps[i + 1] / temps[i]);
+					for (int j = 0; j < natom; ++j) {
+						xvel[j] *= scale_factor;
+						yvel[j] *= scale_factor;
+						zvel[j] *= scale_factor;
+					}
+				}
+				// Even i: rescale xvel, yvel, zvel by sqrt(temps[i] / temps[i - 1])
+				else if (i % 2 == 0 && i > 0) {
+					double scale_factor = sqrt(temps[i] / temps[i - 1]);
+					for (int j = 0; j < natom; ++j) {
+						xvel[j] *= scale_factor;
+						yvel[j] *= scale_factor;
+						zvel[j] *= scale_factor;
+					}
+				}
+		}
+
+		// Calculate momenta after rescaling
+		rescaledMomenta.push_back(evalMomenta(xvel, yvel, zvel, xvel_ovrf, yvel_ovrf,
+																					zvel_ovrf, cdk.masses, natom, inv_vel_scale));
     }
-    const AtomGraph* top = topologies[pssr.unique_ag_idx[atom_starts[i]]];
-    const ChemicalDetailsKit cdk = top->getChemicalDetailsKit();
-    const int natom = pssr.atom_counts[atom_starts[i]];
-    const int inv_vel_scale = pssr.inv_vel_scale;
-    rescaledMomenta.push_back(evalMomenta(xvel, yvel, zvel, xvel_ovrf, yvel_ovrf, 
-                                                zvel_ovrf, cdk.masses, natom, inv_vel_scale));
-  }
-  
-  for(int i = 0; i < static_cast<int>(swap_indices.size()); i++) {
-    const llint p1 = rescaledMomenta[swap_indices[i]];
-    const llint p2 = rescaledMomenta[swap_indices[i + 1]];
-    const double t1 = temp[swap_indices[i]];
-    const double t2 = temp[swap_indices[i + 1]];
-    rescaledMomenta[swap_indices[i]] = (std::sqrt(t2/t1) * p1);
-    rescaledMomenta[swap_indices[i + 1]] = (std::sqrt(t1/t2) * p2);
-  }
-  return rescaledMomenta;
+
+    // Perform swaps of momenta as per swap_indices and temperature scaling
+    for (int i = 0; i < static_cast<int>(swap_indices.size()); i += 2) {
+			const llint p1 = rescaledMomenta[swap_indices[i]];
+			const llint p2 = rescaledMomenta[swap_indices[i + 1]];
+			const double t1 = temps[swap_indices[i]];
+			const double t2 = temps[swap_indices[i + 1]];
+
+			rescaledMomenta[swap_indices[i]] = static_cast<llint>(sqrt(t2 / t1) * p1);
+			rescaledMomenta[swap_indices[i + 1]] = static_cast<llint>(sqrt(t1 / t2) * p2);
+    }
+	return rescaledMomenta;
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-std::vector<llint> initiateKineticEnergyRescale(const PhaseSpaceSynthesis *PsSynthesis, 
-                                                const AtomGraphSynthesis *AgSynthesis, 
-                                                const ScoreCard *sc) {
-  std::vector<llint> results;
+std::vector<llint> initiateKineticEnergyRescale(const PhaseSpaceSynthesis *PsSynthesis,
+                                                const AtomGraphSynthesis *AgSynthesis,
+                                                const ScoreCard *sc, std::vector<double> temps,
+                                                bool flag) {
+	std::vector<llint> results;
   const PsSynthesisReader pssr = PsSynthesis->data();
   const std::vector<AtomGraph*> topologies = AgSynthesis->getSystemTopologyPointer();
   const int system_count = pssr.system_count;
   const int* atom_starts = pssr.atom_starts;
-  for(int i = 0; i < system_count; i++){
-    const llint* xvel = &pssr.xvel[atom_starts[i]];
-    const llint* yvel = &pssr.yvel[atom_starts[i]];
-    const llint* zvel = &pssr.zvel[atom_starts[i]];
-    const int* xvel_ovrf = nullptr;
-    const int* yvel_ovrf = nullptr;
-    const int* zvel_ovrf = nullptr;
-    if (pssr.vel_bits >= velocity_scale_nonoverflow_bits){
-    xvel_ovrf = &pssr.xvel_ovrf[atom_starts[i]];
-    yvel_ovrf = &pssr.yvel_ovrf[atom_starts[i]];
-    zvel_ovrf = &pssr.zvel_ovrf[atom_starts[i]];
+
+	for (int i = 0; i < system_count; i++) {
+		const llint* xvel = &pssr.xvel[atom_starts[i]];
+		const llint* yvel = &pssr.yvel[atom_starts[i]];
+		const llint* zvel = &pssr.zvel[atom_starts[i]];
+		const int* xvel_ovrf = nullptr;
+		const int* yvel_ovrf = nullptr;
+		const int* zvel_ovrf = nullptr;
+
+		if (pssr.vel_bits >= velocity_scale_nonoverflow_bits) {
+			xvel_ovrf = &pssr.xvel_ovrf[atom_starts[i]];
+			yvel_ovrf = &pssr.yvel_ovrf[atom_starts[i]];
+			zvel_ovrf = &pssr.zvel_ovrf[atom_starts[i]];
+		}
+
+		const AtomGraph* top = topologies[pssr.unique_ag_idx[atom_starts[i]]];
+		const ChemicalDetailsKit cdk = top->getChemicalDetailsKit();
+		const int natom = pssr.atom_counts[atom_starts[i]];
+		const double inv_vel_scale = pssr.inv_vel_scale;
+
+		double scale_factor = 1.0;
+
+		if (flag) {
+			// Even i: rescale by sqrt(temps[i + 1] / temps[i])
+			if (i % 2 == 0 && i < system_count - 1) {
+				scale_factor = sqrt(temps[i + 1] / temps[i]);
+			}
+			// Odd i: rescale by sqrt(temps[i] / temps[i - 1])
+			else if (i % 2 != 0 && i > 0) {
+				scale_factor = sqrt(temps[i] / temps[i - 1]);
+			}
+		} else {
+				// Odd i: rescale by sqrt(temps[i + 1] / temps[i])
+				if (i % 2 != 0 && i < system_count - 1) {
+					scale_factor = sqrt(temps[i + 1] / temps[i]);
+				}
+				// Even i: rescale by sqrt(temps[i] / temps[i - 1])
+				else if (i % 2 == 0 && i > 0) {
+					scale_factor = sqrt(temps[i] / temps[i - 1]);
+				}
+		}
+
+		// Compute the kinetic energy after rescaling
+		llint result = evalRescaledKineticEnergy(xvel, yvel, zvel, xvel_ovrf, yvel_ovrf, zvel_ovrf,
+																						 cdk.masses, natom, pow(2.0, 32), 
+																						 inv_vel_scale * scale_factor);
+		results.push_back(result);
     }
-    const AtomGraph* top = topologies[pssr.unique_ag_idx[atom_starts[i]]];
-    const ChemicalDetailsKit cdk = top->getChemicalDetailsKit();
-    const int natom = pssr.atom_counts[atom_starts[i]];
-    const double inv_vel_scale = pssr.inv_vel_scale;
-    // Need to discuss this nrg_scale_factor (and how it is taken from scorecard)
-    // This implementation is copied from line 167 of the same file
-    llint result = evalRescaledKineticEnergy(xvel, yvel, zvel, xvel_ovrf, yvel_ovrf, zvel_ovrf,
-                                            cdk.masses, natom, pow(2.0, 32), inv_vel_scale); 
-    results.push_back(result);
-  }
   return results;
 }
+
                       
 } // namespace mm
 } // namespace stormm

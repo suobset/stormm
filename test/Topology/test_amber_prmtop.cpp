@@ -580,7 +580,7 @@ int main(const int argc, const char* argv[]) {
   check(nbrbz_vs, RelationalOperator::EQUAL, 13, "An incorrect number of virtual sites is found "
         "in Amber prmtop file " + brbz.getFileName() + ".", top_check);
   check(tip3p.getResidueIndex(56), RelationalOperator::EQUAL, 18, "The residue index of a "
-        "particular atom was not computed correctly.");
+        "particular atom was not computed correctly.", top_check);
   const int ntrp_atom = trpcage.getAtomCount();
   std::vector<int> ridx_result(ntrp_atom);
   for (int i = 0; i < ntrp_atom; i++) {
@@ -589,10 +589,16 @@ int main(const int argc, const char* argv[]) {
   check(trpcage.getResidueIndex(), RelationalOperator::EQUAL, ridx_result, "A scan of all atoms "
         "in the Trp-cage system (isolated boundary conditions) did not produce complete "
         "agreement when computing residue indices for individual atoms versus taking the "
-        "limit-based result en masse.");
+        "limit-based result en masse.", top_check);
   trpcage.setWaterResidueName("WAT");
   check(trpcage.getWaterResidueName(), RelationalOperator::EQUAL, std::string("WAT "),
         "A topology's water residue name was not updated as expected.");
+  check(trpcage_water.getOrganicAtomCount(), RelationalOperator::EQUAL, 304, "The number of "
+        "organic atoms detected in topology " + getBaseName(trpcage_water.getFileName()) + " does "
+        "not meet expectations.", top_check);
+  check(brbz.getOrganicMoleculeCount(), RelationalOperator::EQUAL, 1, "The number of organic "
+        "molecules detected in topology " + getBaseName(brbz.getFileName()) + " does not meet "
+        "expectations.", top_check);
 
   // Check valence term details
   section(2);
@@ -1176,7 +1182,7 @@ int main(const int argc, const char* argv[]) {
                     "was made to extract a non-existent dihedral term.", top_check);
   CHECK_THROWS_SOFT(double bad_mass = trpcage.getAtomicMass<double>(-5, MassForm::INVERSE),
                     "An invalid index was given to the atomic mass getter function.", top_check);
-
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());  
   if (oe.getVerbosity() == TestVerbosity::FULL) {

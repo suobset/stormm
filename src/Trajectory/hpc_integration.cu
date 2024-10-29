@@ -24,6 +24,7 @@ using synthesis::VwuAbstractMap;
 
 #include "Accelerator/syncwarp.cui"
 #include "Math/rounding.cui"
+#include "Math/vector_formulas.cui"
 #include "Numerics/accumulation.cui"
 
 #define CONSTRAINT_STANDALONE
@@ -32,6 +33,7 @@ using synthesis::VwuAbstractMap;
 #define TCALC double
 #  define SPLIT_FORCE_ACCUMULATION
 #  define TCALC2 double2
+#  define TCALC3 double3
 #  define TCALC4 double4
 #  define SQRT_FUNC sqrt
 #  define ABS_FUNC fabs
@@ -47,15 +49,17 @@ using synthesis::VwuAbstractMap;
 #    undef INTEG_KERNEL_THREAD_COUNT
 #  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2
+#  undef TCALC3
 #  undef TCALC4
 #  undef SQRT_FUNC
 #  undef ABS_FUNC
 #undef TCALC
 
-// Single-precision floating point arithmetic, split accumulation
+// Single-precision floating point arithmetic, split accumulation followed by fused accumulators
 #define TCALC float
 #  define TCALC_IS_SINGLE
 #  define TCALC2 float2
+#  define TCALC3 float3
 #  define TCALC4 float4
 #  define SQRT_FUNC sqrtf
 #  define ABS_FUNC fabsf
@@ -144,6 +148,7 @@ using synthesis::VwuAbstractMap;
 #  undef INTEG_KERNEL_THREAD_COUNT
 #  undef TCALC_IS_SINGLE
 #  undef TCALC2
+#  undef TCALC3
 #  undef TCALC4
 #  undef SQRT_FUNC
 #  undef ABS_FUNC

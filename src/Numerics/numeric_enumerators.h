@@ -30,6 +30,12 @@ enum class AccumulationMethod {
 std::string getEnumerationName(AccumulationMethod input);
 /// \}
 
+/// \brief Translate a human-readable (user input) string into an enumeration for the accumulation
+///        method
+///
+/// \param input  The string to translate
+AccumulationMethod translateAccumulationMethod(const std::string &input);
+  
 } // namespace numerics
 } // namespace stormm
 

@@ -18,12 +18,13 @@ using parse::Citation;
 enum class TopologyKind {
   AMBER,    ///< Amber format, Coulomb's constant C = 332.05221729, van-der Waals screening 2.0,
             ///<   electrostatic screening 1.2
-  CHARMM,   ///< CHARMM PSF format, Coulomb's constant C = 332.063711, van-der Waals screening 1.0,
-            ///<   electrostatic screening 1.0
+  CHARMM,   ///< CHARMM PSF format, Coulomb's constant C = 332.063711, van-der Waals screening
+            ///<   1.0, electrostatic screening 1.0
   GROMACS,  ///< GROMACS format, Coulomb's constant C = 332.063711, van-der Waals screening 1.0,
             ///<   electrostatic screening 1.0
-  OPENMM    ///< OPENMM format, Coulomb's constant C = 332.063711, van-der Waals screening 1.0,
+  OPENMM,   ///< OPENMM format, Coulomb's constant C = 332.063711, van-der Waals screening 1.0,
             ///<   electrostatic screening 1.0
+  UNKNOWN   ///< Detect the topology format based on information found in the file
 };
 
 /// \brief An enumerator to list the various integer attributes of an Amber topology from its
@@ -57,19 +58,6 @@ enum class UnitCellType {
 /// \brief Enumerate the ways to modify an atom's mobility in the toplogy
 enum class MobilitySetting {
   OFF, ON, TOGGLE
-};
-
-/// \brief An enumerator to toggle SHAKE and RATTLE, depending on the integrator at hand.  It's
-///        all bond length constraints.
-enum class ShakeSetting {
-  OFF, ON
-};
-
-/// \brief An enumerator to toggle SETTLE for rigid water molecules (or perhaps other things with
-///        a central atom connected to two other atoms of identical mass connected by bonds of
-///        equal length).
-enum class SettleSetting {
-  OFF, ON
 };
 
 /// \brief An enumerator to toggle free energy perturbations.
@@ -214,8 +202,6 @@ enum class VirtualSiteKind {
 std::string getEnumerationName(TopologyKind input); 
 std::string getEnumerationName(UnitCellType input); 
 std::string getEnumerationName(MobilitySetting input);
-std::string getEnumerationName(ShakeSetting input);
-std::string getEnumerationName(SettleSetting input);
 std::string getEnumerationName(PerturbationSetting input);
 std::string getEnumerationName(SolventCapSetting input);
 std::string getEnumerationName(PolarizationSetting input);

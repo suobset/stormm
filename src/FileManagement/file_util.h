@@ -8,6 +8,7 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "file_enumerators.h"
 
@@ -16,6 +17,7 @@ namespace diskutil {
 
 using constants::ExceptionResponse;
 using parse::TextFile;
+using topology::TopologyKind;
 using trajectory::CoordinateFileKind;
   
 const char default_amber_crd_extension[] = "crd";
@@ -50,6 +52,15 @@ int removeFile(const std::string &filename, ExceptionResponse policy = Exception
 /// \param cfkind  The trajectory file kind
 DataFormat getTrajectoryFormat(CoordinateFileKind cfkind);
 
+/// \brief Read a small number of bytes form the head of a file.  If the file is binary or empty,
+///        an empty result will be returned.
+///
+/// \param file_name  Name of the file to read
+/// \param caller     Name of the calling function
+/// \param nchar      The number of ASCII characters (bytes) to read from the file
+TextFile readFileSample(const std::string &file_name, const std::string &caller,
+                        const size_t nchar);
+  
 /// \brief Detect various coordinate file types.
 ///
 /// Overloaded:
@@ -60,11 +71,23 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind);
 /// \param caller     Name of the calling function (optional)
 /// \param tf         Text of an asci--format file already translated into RAM
 /// \{
+CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
+
 CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
                                             const std::string &caller = std::string(""));
-CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
 /// \}
 
+/// \brief Detect the format of a topology file based on information in its opening lines.
+///        Overloading and descriptions of input parameters follow from detectCoordinateFileKind(),
+///        above.
+/// \{
+TopologyKind detectTopologyKind(const TextFile &tf);
+
+TopologyKind detectTopologyKind(const std::string &file_name,
+                                const std::string &caller = std::string(""));
+/// \}
+
+  
 /// \brief Get the default file extension for a file based on its type.
 ///
 /// \param kind  Format of the file--different enumerators indicate different purposes for the file

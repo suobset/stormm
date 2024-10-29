@@ -38,7 +38,7 @@ using trajectory::CoordinateCycle;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 
-/// \brief Apply RATTLE constraints to bonds in one or more topologies, in fulfillment of the
+/// \brief Apply SHAKE constraints to bonds in one or more topologies, in fulfillment of the
 ///        coordinate update constraints.  This is applied after the Velocity-Verlet positions
 ///        and second half-step velocity update.  The corrections are applied to positions "under
 ///        construction," e.g. the arrays xalt, yalt, and zalt in a PhaseSpace or
@@ -67,37 +67,37 @@ using trajectory::PhaseSpaceWriter;
 /// \param prec  The precision model in which to perform calculations
 /// \{
 template <typename Tcoord, typename Tcalc>
-void rattlePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev, Tcoord* yvel_dev,
-                     Tcoord* zvel_dev, const Tcoord* xref, const Tcoord* yref, const Tcoord* zref,
-                     const ConstraintKit<Tcalc> &cnk, Tcalc dt, Tcalc tol, int max_iter,
-                     RattleMethod style, Tcalc gpos_scale_factor = 1.0,
-                     Tcalc vel_scale_factor = 1.0);
+void shakePositions(Tcoord* xdev, Tcoord* ydev, Tcoord* zdev, Tcoord* xvel_dev, Tcoord* yvel_dev,
+                    Tcoord* zvel_dev, const Tcoord* xref, const Tcoord* yref, const Tcoord* zref,
+                    const ConstraintKit<Tcalc> &cnk, Tcalc dt, Tcalc tol, int max_iter,
+                    RattleMethod style, Tcalc gpos_scale_factor = 1.0,
+                    Tcalc vel_scale_factor = 1.0);
 
 template <typename T>
-void rattlePositions(PhaseSpaceWriter *psw, const ConstraintKit<T> &cnk, T dt, T tol,
-                     int max_iter = default_rattle_max_iter,
-                     RattleMethod style = RattleMethod::SEQUENTIAL);
+void shakePositions(PhaseSpaceWriter *psw, const ConstraintKit<T> &cnk, T dt, T tol,
+                    int max_iter = default_rattle_max_iter,
+                    RattleMethod style = RattleMethod::SEQUENTIAL);
 
-void rattlePositions(PhaseSpace *ps, const AtomGraph *ag, PrecisionModel prec, double dt,
-                     double tol, int max_iter = default_rattle_max_iter,
-                     RattleMethod style = RattleMethod::SEQUENTIAL);
+void shakePositions(PhaseSpace *ps, const AtomGraph *ag, PrecisionModel prec, double dt,
+                    double tol, int max_iter = default_rattle_max_iter,
+                    RattleMethod style = RattleMethod::SEQUENTIAL);
 
-void rattlePositions(PhaseSpace *ps, const AtomGraph &ag, PrecisionModel prec, double dt,
-                     double tol, int max_iter = default_rattle_max_iter,
-                     RattleMethod style = RattleMethod::SEQUENTIAL);
+void shakePositions(PhaseSpace *ps, const AtomGraph &ag, PrecisionModel prec, double dt,
+                    double tol, int max_iter = default_rattle_max_iter,
+                    RattleMethod style = RattleMethod::SEQUENTIAL);
 
 template <typename T, typename T2, typename T4>
-void rattlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
-                     const SyAtomUpdateKit<T, T2, T4> &poly_auk, T dt, T tol,
-                     int max_iter = default_rattle_max_iter);
+void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
+                    const SyAtomUpdateKit<T, T2, T4> &poly_auk, T dt, T tol,
+                    int max_iter = default_rattle_max_iter);
 
-void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
-                     PrecisionModel prec, double dt, double tol,
-                     int max_iter = default_rattle_max_iter);
+void shakePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
+                    PrecisionModel prec, double dt, double tol,
+                    int max_iter = default_rattle_max_iter);
 
-void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
-                     PrecisionModel prec, double dt, double tol,
-                     int max_iter = default_rattle_max_iter);
+void shakePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag,
+                    PrecisionModel prec, double dt, double tol,
+                    int max_iter = default_rattle_max_iter);
 /// \}
 
 /// \brief Apply the RATTLE constraints to bonds in one or more topologies, in fulfillment of the
@@ -106,7 +106,7 @@ void rattlePositions(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 ///        the velocities "under construction", e.g. the arrays vxalt, vyalt, and vzalt in a
 ///        PhaseSpace or PhaseSpaceSynthesis abstract obtained for the original coordinate object's
 ///        current time frame.  Overloads and descriptions of input arguments follow from
-///        rattlePositions(), above.
+///        shakePositions(), above.
 /// \{
 template <typename Tcoord, typename Tcalc>
 void rattleVelocities(Tcoord* xvel_dev, Tcoord* yvel_dev, Tcoord *zvel_dev, const Tcoord* xcrd_ref,
@@ -145,6 +145,6 @@ void rattleVelocities(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &po
 } // namespace structure
 } // namespace stormm
 
-#include "rattle.tpp"
+#include "hub_and_spoke.tpp"
 
 #endif

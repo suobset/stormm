@@ -343,17 +343,21 @@ NamelistEmulator sceneInput(const TextFile &tf, int *start_line, bool *found,
     "Specify the green component of the RGB color spectrum, either as an integer in the range [0, "
     "255] or as a real number in the range [0.0, 1.0].",
     "Specify the blue component of the RGB color spectrum, either as an integer in the range [0, "
-    "255] or as a real number in the range [0.0, 1.0].",
-    "Specify the alpha channel of the RGB color spectrum, either as an integer in the range [0, "
-    "255] or as a real number in the range [0.0, 1.0]. (Zero is completely transparent.)",
+    "255] or as a real number in the range [0.0, 1.0]."
   };
-  const std::vector<NamelistType> color_keys_types(5, NamelistType::STRING);
+  std::vector<std::string> color_keys_ac_help = color_keys_help;
+  color_keys_ac_help.push_back("Specify the alpha channel of the RGB color spectrum, either as an "
+                               "integer in the range [0, 255] or as a real number in the range "
+                               "[0.0, 1.0]. (Zero is completely transparent.)");
+  const std::vector<NamelistType> color_keys_types(4, NamelistType::STRING);
+  const std::vector<NamelistType> color_keys_ac_types(5, NamelistType::STRING);
   const std::vector<std::string> color_keys_defaults = { std::string(""), std::string("255"),
                                                          std::string("255"), std::string("255") };
-  const std::vector<KeyRequirement> color_keys_reqs(5, KeyRequirement::OPTIONAL);
-  t_nml.addKeyword("line_width", NamelistType::REAL);
-  t_nml.addHelp("line_width", "Specify the weight of bonds between atoms of both the receptor and "
-                "ligand.");
+  const std::vector<std::string> color_keys_ac_defaults = { std::string(""), std::string("255"),
+                                                            std::string("255"), std::string("255"),
+                                                            std::string("255") };
+  const std::vector<KeyRequirement> color_keys_reqs(4, KeyRequirement::OPTIONAL);
+  const std::vector<KeyRequirement> color_keys_ac_reqs(5, KeyRequirement::OPTIONAL);
   for (size_t i = 0; i < atom_weights.size(); i++) {
     const std::string kw = atom_weights[i] + "_atom_size";
     t_nml.addKeyword(kw, NamelistType::REAL);
@@ -372,9 +376,9 @@ NamelistEmulator sceneInput(const TextFile &tf, int *start_line, bool *found,
       t_nml.addHelp(molecules[i] + "_highlight", "Specify an atom mask selecting parts of the " +
                     molecules[i] + " for emphasis.");
       t_nml.addKeyword(molecules[i] + "_color", { "color", "-r", "-g", "-b", "-alpha" },
-                       color_keys_types, color_keys_defaults, DefaultIsObligatory::NO,
+                       color_keys_ac_types, color_keys_ac_defaults, DefaultIsObligatory::NO,
                        InputRepeats::NO, "Set the color of the " + molecules[i] + " structure.",
-                       color_keys_help, color_keys_reqs);
+                       color_keys_ac_help, color_keys_ac_reqs);
     }
     for (size_t j = 0; j < atom_weights.size(); j++) {
       const std::string kw = molecules[i] + "_" + atom_weights[j] + "_atom_size";
@@ -390,10 +394,7 @@ NamelistEmulator sceneInput(const TextFile &tf, int *start_line, bool *found,
                    color_keys_types, color_keys_defaults, DefaultIsObligatory::NO,
                    InputRepeats::NO, "Set the color of points added in a scatter plot overlayed "
                    "on the scene.", color_keys_help, color_keys_reqs);
-  const std::vector<NamelistType> border_keys_types = { NamelistType::STRING, NamelistType::STRING,
-                                                        NamelistType::STRING, NamelistType::STRING,
-                                                        NamelistType::STRING, NamelistType::REAL,
-                                                        NamelistType::STRING };
+  const std::vector<NamelistType> border_keys_types(6, NamelistType::STRING);
   const std::vector<std::string> border_keys_defaults = { "grey", "128", "128", "128", "1.5",
                                                           "solid" };
   const std::vector<std::string> border_keys_help = {
@@ -431,10 +432,11 @@ NamelistEmulator sceneInput(const TextFile &tf, int *start_line, bool *found,
                    isosurf_keys_types, isosurf_keys_defaults, DefaultIsObligatory::NO,
                    InputRepeats::YES, "Specify an isosurface of a potential field associated with "
                    "the receptor to display.",
-                   { "Value of the isosurface to display", color_keys_help[0], color_keys_help[1],
-                     color_keys_help[2], color_keys_help[3], color_keys_help[4], "Material to use "
-                     "in creating the isosurface, acceptable values including \"wire\", "
-                     "\"solid\", and \"scaffold\"." }, isosurf_keys_reqs);
+                   { "Value of the isosurface to display", color_keys_ac_help[0],
+                     color_keys_ac_help[1], color_keys_ac_help[2], color_keys_ac_help[3],
+                     color_keys_ac_help[4], "Material to use in creating the isosurface, "
+                     "acceptable values including \"wire\", \"solid\", and \"scaffold\"." },
+                   isosurf_keys_reqs);
   return t_nml;
 }
 

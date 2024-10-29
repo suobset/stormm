@@ -26,20 +26,12 @@ using display::horizontalRule;
 using review::indentText;
 
 //-------------------------------------------------------------------------------------------------
-std::string commandLineAsString(const UserSettings &ui, int width) {
+std::string commandLineAsString(const CommandLineParser &clip, int width) {
   std::string result;
   if (width > 0) {
     result += horizontalRule("//", "", width);
   }
-  const std::vector<std::string> args = ui.getCommandLineArguments();
-  const size_t nargs = args.size();
-  std::string arg_cat;
-  for (size_t i = 0; i < nargs; i++) {
-    arg_cat += args[i];
-    if (i < nargs - 1) {
-      arg_cat += " ";
-    }
-  }
+  const std::string arg_cat = clip.getInputAsString(width);
   result += indentText(arg_cat, 2, width);
   return result;
 }

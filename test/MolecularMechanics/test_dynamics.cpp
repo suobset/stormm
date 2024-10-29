@@ -25,7 +25,7 @@
 #include "Reporting/error_format.h"
 #include "Reporting/summary_file.h"
 #include "Structure/local_arrangement.h"
-#include "Structure/rattle.h"
+#include "Structure/hub_and_spoke.h"
 #include "Structure/virtual_site_handling.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -525,7 +525,18 @@ std::vector<double4> isoenergetic(const Dumbell &bar, const double dt, const int
 // for the next.
 //
 // Arguments:
-//   
+//   psw:           Positions, velocities, and forces, current and future, for the system
+//   sc:            Energy tracking object
+//   tstr:          Abstract of the thermostat for the system
+//   vk:            Parameters governing valence interactions in the system
+//   nbk:           Non-bonded parameters of all atoms
+//   ser:           Abstract of the exclusion mask for systems in isolated boundary conditions
+//   vsk:           Details of virtual site particles and frames
+//   cnk:           Details of all constraint groups
+//   dt:            The time step, in femtoseconds
+//   cnst_tol:      Tolerance for SHAKE and RATTLE convergence
+//   rattle_strat:  The protocol for implementing SHAKE and RATTLE
+//   cdk:           Contains atomic masses of all particles
 //-------------------------------------------------------------------------------------------------
 void mockDynamicsStep(PhaseSpaceWriter *psw, ScoreCard *sc, const ThermostatReader<double> &tstr,
                       const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
@@ -538,7 +549,7 @@ void mockDynamicsStep(PhaseSpaceWriter *psw, ScoreCard *sc, const ThermostatRead
   sc->commit(0);
 
   // Transfer virtual site forces
-  transmitVirtualSiteForces(*psw, vsk);
+  transmitVirtualSiteForces(psw, vsk);
   
   // Advance particle velocities.
   velocityVerletVelocityUpdate(psw, cdk, tstr);
@@ -556,7 +567,7 @@ void mockDynamicsStep(PhaseSpaceWriter *psw, ScoreCard *sc, const ThermostatRead
 
   // Apply positional constraints
   if (cnst_tol > 0.0) {
-    rattlePositions<double>(psw, cnk, dt, cnst_tol, 20, rattle_strat);
+    shakePositions<double>(psw, cnk, dt, cnst_tol, 20, rattle_strat);
   }
 
   // Place virtual sites in the new coordinates

@@ -238,14 +238,40 @@ __global__ void __launch_bounds__(512, 2) kAddUnifiedGbl(llint* result, const fl
 }
 
 //-------------------------------------------------------------------------------------------------
+// This kernel will accumulate values using unified (standard) int632 accumulators.
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(512, 2) kAddUnifiedGbl(int* result, const float scale_factor) {
+  float contrib = (float)(threadIdx.x);
+  float incr = 1.3f;
+  const size_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+  result[pos] = 0;
+  for (int i = 0; i < SMALL_CYCLE_COUNT; i++) {
+    if (contrib > 57.5f) {
+      incr = -1.2f;
+    }
+    else if (contrib < 31.5f) {
+      incr = 1.3f;
+    }
+    contrib += incr;
+    atomicAdd(&result[pos], __float2int_rn(contrib * scale_factor));
+    contrib += incr;
+    atomicAdd(&result[pos], __float2int_rn(contrib * scale_factor));
+    contrib += incr;
+    atomicAdd(&result[pos], __float2int_rn(contrib * scale_factor));
+    contrib += incr;
+    atomicAdd(&result[pos], __float2int_rn(contrib * scale_factor));
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Prime the timings device
   StopWatch timer;
-  timer.addCategory("Split accumulation");
-  timer.addCategory("Unified accumulation");
+  timer.addCategory("Split 2x int32_t accumulation");
+  timer.addCategory("Unified int64_taccumulation");
 
   // Parse command line instructions
   CommandLineParser clip("accumulate", "A benchmarking program to test the performance of split "
@@ -358,6 +384,16 @@ int main(const int argc, const char* argv[]) {
       }
       cudaDeviceSynchronize();
       timer.assignTime(ti_unite);
+    }
+    const int ti_short = timer.addCategory("Simple int32_t accumulation, L2 " +
+                                           std::to_string(bits));
+    for (int n = 0; n < trials; n++) {
+      timer.assignTime(0);
+      for (int i = 0; i < 10; i++) {
+        kAddUnifiedGbl<<<nblocks, nthreads>>>(primary_ptr, scale);
+      }
+      cudaDeviceSynchronize();
+      timer.assignTime(ti_short);
     }
   }
   result_split.download();

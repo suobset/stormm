@@ -32,7 +32,7 @@ using topology::VirtualSiteKit;
 
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
 ///        of __shared__ memory in a block of 256 threads might need to be stretched.
-constexpr int maximum_valence_work_unit_atoms = 544;
+constexpr int maximum_valence_work_unit_atoms = 512;
 constexpr int half_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 2;
 constexpr int quarter_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 4;
 constexpr int eighth_valence_work_unit_atoms = maximum_valence_work_unit_atoms / 8;
@@ -55,7 +55,7 @@ constexpr int max_constraint_group_size = 16;
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
 ///        even for moving any of the atoms at all.  Each valence term is only fully delegated
 ///        once valence work units that evaluate it are responsible for moving all atoms that the
-///        valence term contains.  In order for a work unit to move any aotm, it must evaluate all
+///        valence term contains.  In order for a work unit to move any atom, it must evaluate all
 ///        valence terms that include that atom.
 class ValenceDelegator {
 public:
@@ -1060,11 +1060,11 @@ private:
                                        ///<   work unit is responsible for enforcing (the work
                                        ///<   unit must be responsible for moving all atoms in
                                        ///<   any such constraint group)
-  std::vector<int> sett_group_list;    ///< List of fast rigid water SETTLE groups, indexing
-                                       ///<   into the groups enumerated in the original
-                                       ///<   topology, assigned to this work unit
-  std::vector<int> cnst_group_atoms;   ///< Local indices of atoms in all constrained groups.
-                                       ///<   The bounds of this list, delineating separate groups,
+  std::vector<int> sett_group_list;    ///< List of fast rigid water SETTLE groups, indexing into
+                                       ///<   the groups enumerated in the original topology,
+                                       ///<   assigned to this work unit
+  std::vector<int> cnst_group_atoms;   ///< Local indices of atoms in all constrained groups.  The
+                                       ///<   bounds of this list, delineating separate groups,
                                        ///<   are found in cnst_group_bounds.
   std::vector<int> cnst_group_bounds;  ///< Bounds array for cnst_group_atoms
   std::vector<int> sett_ox_atoms;      ///< Local indices of oxygen atoms in each of this work
@@ -1130,20 +1130,24 @@ private:
 ///                      could be larger if the card is under-filled).  The recommended thread
 ///                      block size is returned through this pointer.
 /// \{
-int calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
+int2 calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
 
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
+int2 calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
 
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
+int2 calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
 
-int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int sm_count,
-                                 ValenceKernelSize *kwidth);
+int2 calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int sm_count,
+                                  ValenceKernelSize *kwidth);
 
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int sm_count,
-                                 ValenceKernelSize *kwidth);
+int2 calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int sm_count,
+                                  ValenceKernelSize *kwidth);
 
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int sm_count,
-                                 ValenceKernelSize *kwidth);
+int2 calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int sm_count,
+                                  ValenceKernelSize *kwidth);
+
+int2 calculateValenceWorkUnitSize(const std::vector<AtomGraph*> &ag_list,
+                                  const std::vector<int> &topology_replicas, const int sm_count,
+                                  ValenceKernelSize *kwidth);
 /// \}
 
 /// \brief Build a series of valence work units to cover a topology.
@@ -1161,11 +1165,13 @@ int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int sm_count,
 /// \{
 std::vector<ValenceWorkUnit>
 buildValenceWorkUnits(const AtomGraph *ag, const RestraintApparatus *ra,
-                      int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
+                      int2 max_atoms_per_vwu = { maximum_valence_work_unit_atoms,
+                                                 maximum_valence_work_unit_atoms });
 
 std::vector<ValenceWorkUnit>
 buildValenceWorkUnits(ValenceDelegator *vdel,
-                      int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
+                      int2 max_atoms_per_vwu = { maximum_valence_work_unit_atoms,
+                                                 maximum_valence_work_unit_atoms });
 /// \}
 
 } // namespace topology

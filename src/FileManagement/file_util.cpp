@@ -3,6 +3,7 @@
 #include "Constants/behavior.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
+#include "Parsing/parsing_enumerators.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 #include "file_util.h"
@@ -12,10 +13,12 @@ namespace stormm {
 namespace diskutil {
 
 using constants::CaseSensitivity;
+using parse::digestText;
 using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::separateText;
 using parse::strcmpCased;
+using parse::strncmpCased;
 using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
@@ -161,6 +164,43 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
 }
 
 //-------------------------------------------------------------------------------------------------
+TextFile readFileSample(const std::string &file_name, const std::string &caller,
+                        const size_t nchar) {
+
+  // Read the first 2kB of the file, if that much exists.  Look for chracters that might indicate
+  // it is a binary file.  If no such characters are found, try to parse it as one of the known
+  // ASCII formats.
+  std::ifstream finp;
+  finp.open(file_name.c_str());
+  if (finp.is_open() == false) {
+    if (caller.size() == 0) {
+      rtErr(file_name + " was not found.", "readFileSample");
+    }
+    else {
+      rtErr(file_name + " was not found when called from " + caller + ".", "readFileSample");
+    }
+  }  
+  const int maxchar = 2048;
+  std::vector<char> buffer(maxchar);
+  int pos = 0;
+  char c;
+  bool is_binary = false;
+  while (pos < maxchar && finp.get(c) && is_binary == false) {
+    is_binary = (is_binary || static_cast<int>(c) < 0);
+    buffer[pos] = c;
+    pos++;
+  }
+  finp.close();
+  const size_t nchar_found = (is_binary) ? 0 : pos;
+  std::string first_part(nchar_found, ' ');
+  for (size_t i = 0; i < nchar_found; i++) {
+    first_part[i] = buffer[i];
+  }
+  const TextFile result(file_name, TextOrigin::RAM, first_part, "readFileSample");
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
   const TextFileReader tfr = tf.data();
 
@@ -239,46 +279,112 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
 //-------------------------------------------------------------------------------------------------
 CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
                                             const std::string &caller) {
-
-  // Read the first 2kB of the file, if that much exists.  Look for chracters that might indicate
-  // it is a binary file.  If no such characters are found, try to parse it as one of the known
-  // ASCII formats.
-  std::ifstream finp;
-  finp.open(file_name.c_str());
-  if (finp.is_open() == false) {
-    if (caller.size() == 0) {
-      rtErr(file_name + " was not found.", "detectCoordinateFileKind");
-    }
-    else {
-      rtErr(file_name + " was not found when called from " + caller + ".",
-            "detectCoordinateFileKind");
-    }
-  }  
-  const int maxchar = 2048;
-  std::vector<char> buffer(maxchar);
-  int pos = 0;
-  char c;
-  bool is_binary = false;
-  while (pos < maxchar && finp.get(c) && is_binary == false) {
-    is_binary = (is_binary || static_cast<int>(c) < 0);
-    buffer[pos] = c;
-    pos++;
-  }
-  finp.close();
-  if (is_binary) {
+  const TextFile tf = readFileSample(file_name, caller, 2048);
+  if (tf.getTextSize() == 0) {
 
     // TBD: Determine the binary format.
     return CoordinateFileKind::UNKNOWN;
   }
-  const size_t nchar = pos;
-  std::string first_part(nchar, ' ');
-  for (size_t i = 0; i < nchar; i++) {
-    first_part[i] = buffer[i];
-  }
-  const TextFile tf(file_name, TextOrigin::RAM, first_part, "detectCoordinateFileKind");
   return detectCoordinateFileKind(tf);
 }
 
+//-------------------------------------------------------------------------------------------------
+TopologyKind detectTopologyKind(const TextFile &tf) {
+  const TextFileReader tfr = tf.data();
+  
+  // Detect the AMBER, CHARMM, or GROMACS formats
+  bool seek_ambr_version = true;
+  bool seek_ambr_pointers = true;
+  bool seek_chrm_version = true;
+  bool seek_chrm_mass = true;
+  bool seek_gmx_dir = true;
+  bool seek_gmx_incl = true;
+  int line_idx = 0;
+  while (line_idx < tfr.line_count && (seek_ambr_version || seek_ambr_pointers) &&
+         (seek_chrm_version || seek_chrm_mass) && (seek_gmx_dir || seek_gmx_incl)) {
+    const std::string ln_digest = digestText(tfr.text, tfr.line_limits[line_idx],
+                                             tfr.line_lengths[line_idx], "[]", 2, "", 0);
+    const std::vector<std::string> ln_contents = separateText(ln_digest);
+    const size_t word_count = ln_contents.size();
+
+    // Check for AMBER hallmarks
+    if (seek_ambr_version && strcmpCased(ln_contents[0], "%version", CaseSensitivity::NO)) {
+      seek_ambr_version = false;
+    }
+    if (seek_ambr_pointers && word_count >= 2 &&
+        strcmpCased(ln_contents[0], "%flag", CaseSensitivity::NO) &&
+        strcmpCased(ln_contents[1], "pointers", CaseSensitivity::NO)) {
+      seek_ambr_pointers = false;
+    }
+
+    // Check for CHARMM hallmarks
+    if (seek_chrm_version) {
+      bool all_integer = true;
+      for (size_t i = 0; i < word_count; i++) {
+        all_integer = (all_integer || verifyContents(ln_contents[i], NumberFormat::INTEGER));
+      }
+      if (all_integer) {
+        seek_chrm_version = false;
+      }
+    }
+    else if (seek_chrm_mass) {
+      if (word_count == 5 && strcmpCased(ln_contents[0], "mass", CaseSensitivity::NO) &&
+          verifyContents(ln_contents[1], NumberFormat::INTEGER) &&
+          verifyContents(ln_contents[2], NumberFormat::INTEGER) == false &&
+          verifyContents(ln_contents[2], NumberFormat::STANDARD_REAL) == false &&
+          verifyContents(ln_contents[2], NumberFormat::SCIENTIFIC) == false &&
+          (verifyContents(ln_contents[3], NumberFormat::STANDARD_REAL) ||
+           verifyContents(ln_contents[3], NumberFormat::SCIENTIFIC))) {
+        seek_chrm_mass = false;
+      }
+    }
+
+    // Check for GROMACS hallmarks
+    if (word_count == 3 && ln_contents[0].length() == 1 && ln_contents[2].length() == 1 &&
+        ln_contents[0][0] == '[' && ln_contents[2][0] == ']') {
+      if (strcmpCased(ln_contents[1], "defaults", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "atoms", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "atomtypes", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "bonds", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "bondtypess", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "angles", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "angletypes", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "dihedrals", CaseSensitivity::NO) ||
+          strcmpCased(ln_contents[1], "dihedraltypes", CaseSensitivity::NO)) {
+        seek_gmx_dir = false;
+      }
+    }
+    else if (word_count >= 2 && ln_contents[0] == "#include") {
+      seek_gmx_incl = false;
+    }
+
+    // Increment the line counter
+    line_idx++;
+  }
+
+  // Determine whether any format can be identified
+  if (seek_ambr_version == false && seek_ambr_pointers == false) {
+    return TopologyKind::AMBER;
+  }
+  if (seek_chrm_version == false && seek_chrm_mass == false) {
+    return TopologyKind::CHARMM;
+  }
+  if (seek_gmx_dir == false && seek_gmx_incl == false) {
+    return TopologyKind::GROMACS;
+  }
+
+  // No other topology formats are recognizable  
+  rtErr("No known topology format was identified in \"" + tf.getFileName() + "\".",
+        "detectTopologyKind");
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+TopologyKind detectTopologyKind(const std::string &file_name, const std::string &caller) {
+  const TextFile tf = readFileSample(file_name, caller, 2048);
+  return detectTopologyKind(tf);
+}
+  
 //-------------------------------------------------------------------------------------------------
 std::string getDefaultFileExtension(const CoordinateFileKind kind) {
   switch (kind) {

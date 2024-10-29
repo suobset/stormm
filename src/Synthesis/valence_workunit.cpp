@@ -6,6 +6,7 @@
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Topology/topology_limits.h"
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
@@ -15,6 +16,7 @@ namespace synthesis {
 using constants::small_block_size;
 using stmath::accumulateBitmask;
 using stmath::DataOrder;
+using stmath::findBin;
 using stmath::locateValue;
 using stmath::maxValue;
 using stmath::prefixSumInPlace;
@@ -23,6 +25,7 @@ using stmath::reduceUniqueValues;
 using stmath::roundUp;
 using stmath::sum;
 using parse::char4ToString;
+using parse::stringToChar4;
 using topology::extractBoundedListEntries;
 using topology::markAffectorAtoms;
 using topology::ChemicalDetailsKit;
@@ -729,9 +732,9 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
   // Pass through the topology, filling out the valence term affector arrays and the virtual site
   // frame atom arrays.
   markAffectorAtoms(&bond_affector_bounds, &bond_affector_list, vk.nbond, vk.bond_i_atoms,
-                    vk.bond_j_atoms);
+                    vk.bond_j_atoms, nullptr, nullptr, nullptr, vk.bond_relevance);
   markAffectorAtoms(&angl_affector_bounds, &angl_affector_list, vk.nangl, vk.angl_i_atoms,
-                    vk.angl_j_atoms, vk.angl_k_atoms);
+                    vk.angl_j_atoms, vk.angl_k_atoms, nullptr, nullptr, vk.angl_relevance);
   markAffectorAtoms(&dihe_affector_bounds, &dihe_affector_list, vk.ndihe, vk.dihe_i_atoms,
                     vk.dihe_j_atoms, vk.dihe_k_atoms, vk.dihe_l_atoms);
   markAffectorAtoms(&ubrd_affector_bounds, &ubrd_affector_list, vk.nubrd, vk.ubrd_i_atoms,
@@ -1332,7 +1335,7 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
     }
   }
 }
-
+  
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeCmapInstructions(const std::vector<int> &parameter_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
@@ -2424,7 +2427,7 @@ void ValenceWorkUnit::logActivities() {
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count) {
+int2 calculateValenceWorkUnitSize(const int* atom_counts, const int system_count) {
 
   // The maximum topology size is relevant--valence work units pertain to one and only one
   // topology due to considerations for importing atoms and accumulating energy.
@@ -2446,22 +2449,22 @@ int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count)
       best_size = vs;
     }
   }
-  return best_size;
+  return { best_size, best_size };
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts) {
+int2 calculateValenceWorkUnitSize(const std::vector<int> &atom_counts) {
   return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size());
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
+int2 calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
   return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size());
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
-                                 const int sm_count, ValenceKernelSize *kwidth) {
+int2 calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
+                                  const int sm_count, ValenceKernelSize *kwidth) {
   int best_size;
   ValenceKernelSize best_layout;
   double best_efficiency = 0.0;
@@ -2546,32 +2549,149 @@ int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
     }
   }
   *kwidth = best_layout;
-  return best_size;
+  return { best_size, best_size };
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int sm_count,
-                                 ValenceKernelSize *kwidth) {
+int2 calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int sm_count,
+                                  ValenceKernelSize *kwidth) {
   return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), sm_count, kwidth);
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int sm_count,
-                                 ValenceKernelSize *kwidth) {
+int2 calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int sm_count,
+                                  ValenceKernelSize *kwidth) {
   return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), sm_count, kwidth);
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 calculateValenceWorkUnitSize(const std::vector<AtomGraph*> &ag_list,
+                                  const std::vector<int> &topology_replicas, const int sm_count,
+                                  ValenceKernelSize *kwidth) {
+  const size_t ntop = ag_list.size();
+  if (ntop == 0) {
+    rtErr("A non-empty list of topologies is required.", "calculateValenceWorkUnitSize");
+  }
+  if (topology_replicas.size() != ntop) {
+    rtErr("One replica count must be provided for each distinct topology (" +
+          std::to_string(topology_replicas.size()) + " counts were provided for " +
+          std::to_string(ntop) + " topologies.", "calculateValenceWorkUnitSize");
+  }
+
+  // Check the status of restraints, including SHAKE / RATTLE and SETTLE
+  const bool use_shake  = ag_list[0]->usesShake();
+  
+  // Check the boundary conditions of the first topology in the list, which will be taken as
+  // representative of the boundary conditions for all topologies.
+  switch (ag_list[0]->getUnitCellType()) {
+  case UnitCellType::NONE:
+    {
+      std::vector<int> atom_counts(sum<int>(topology_replicas));
+      int sys_idx = 0;
+      for (int i = 0; i < ntop; i++) {
+        const int aci = ag_list[i]->getAtomCount();
+        for (int j = 0; j < topology_replicas[i]; j++) {
+          atom_counts[sys_idx] = aci;
+          sys_idx++;
+        }
+      }
+      return calculateValenceWorkUnitSize(atom_counts, sm_count, kwidth);
+    }
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    {
+      const int ntrials = ((maximum_valence_work_unit_atoms - minimum_valence_work_unit_atoms) /
+                           warp_size_int) + 1;
+      std::vector<int> solvent_vwu(ntrials, 0), solute_vwu(ntrials, 0);
+      for (int i = 0; i < ntrials; i++) {
+        for (size_t j = 0; j < ntop; j++) {
+          const int n_water = ag_list[j]->getWaterResidueCount();
+          const int water_size = ag_list[j]->getWaterResidueSize();
+          const int n_solvent_atoms = (n_water * water_size);
+          const int n_solute_atoms = ag_list[j]->getAtomCount() - n_solvent_atoms;
+          
+          // Calculate the number of work units that might contain only rigid water.  Assume that
+          // "other" atoms are mostly ions or things that will not contain many bonded terms, and
+          // that such water and ion groups are somehow contiguous within the topology.  These are
+          // the "solvent" groups.  Solute valence work units are assumed to have overlaps of 12
+          // atoms, as in the overloaded form of this function above, whereas solvent valence work
+          // units are assumed to have no atom overlaps (they will either contain all of one
+          // molecule, or none of it, because the largest molecules are likely to be rigid waters).
+          const int trial_group_size = minimum_valence_work_unit_atoms + (i * warp_size_int);
+          solvent_vwu[i] += ((n_solvent_atoms + trial_group_size - 1) / trial_group_size) *
+                            topology_replicas[j];
+          solute_vwu[i] += ((n_solute_atoms + trial_group_size - 13) / (trial_group_size - 12)) *
+                           topology_replicas[j];
+        }
+      }
+
+      // Kernel width is "XL" for condensed-phase systems in periodic boundary conditions.
+      *kwidth = ValenceKernelSize::XL;
+
+      // There will therefore be two thread blocks, up to two valence work units handled at any
+      // given time, by each SM.  The key, then, is to find the best packing.  Valence work units
+      // that contain dihedral (or worse, CMAP) interactions of any sort will take much longer to
+      // evaluate because there are valence interactions to consider prior to moving the atoms.
+      // Spread these interactions among as many threads as possible.  Meanwhile, monatomic ions
+      // and rigid water molecules, which can be assumed to cover all of the solvent, can be moved
+      // immediately and then constrained as needed.  Pack valence work units with as many of
+      // these interactions as possible in order to devote more threads to valence work units with
+      // organic materials containing complex valence interactions.  Assume that each "solute"
+      // work unit will take at least twice as long to compute as a "solvent" work unit.
+      const int nlanes = sm_count * 2;
+      const double dmax_val_atoms = maximum_valence_work_unit_atoms;
+      int2 best_config = { maximum_valence_work_unit_atoms, maximum_valence_work_unit_atoms };
+      double best_time = 0.0;
+      bool first_iteration = true;
+      for (int i = ntrials - 1; i >= 0; i--) {
+        const double dsol_group_size = minimum_valence_work_unit_atoms + (i * warp_size_int);
+        double soltask_cost = (5.0 * dsol_group_size / dmax_val_atoms) + 2.0;
+        if (use_shake) {
+          soltask_cost += 4.0;
+        }
+
+        // Assume that the GPU will be filled with solute work units until there are no more,
+        // then solvent work units will backfill the card.
+        const int sol_layers = (solute_vwu[i] + nlanes - 1) / nlanes;
+        const int backfill_lanes = (nlanes * sol_layers) - solute_vwu[i];
+        const double sol_time = static_cast<double>(sol_layers) * soltask_cost;
+        for (int j = ntrials - 1; j >= 0; j--) {
+          const double dslv_group_size = minimum_valence_work_unit_atoms + (j * warp_size_int);
+          const double slvtask_cost = 1.5 * (1.0 + static_cast<double>(j > ntrials / 2)) + 2.0;
+          const int backfill_slv_tasks = (backfill_lanes * (soltask_cost / slvtask_cost));
+          const int excess_slv_tasks = solvent_vwu[j] - (backfill_lanes *
+                                                         (soltask_cost / slvtask_cost));
+          const int slv_layers = (excess_slv_tasks > 0) ?
+                                 (excess_slv_tasks + nlanes - 1) / nlanes : 0;
+          const double total_time = sol_time + (static_cast<double>(slv_layers) * slvtask_cost);
+
+          if (total_time <= best_time || first_iteration) {
+            first_iteration = false;
+            best_time = total_time;
+            best_config = { minimum_valence_work_unit_atoms + (i * warp_size_int),
+                            minimum_valence_work_unit_atoms + (j * warp_size_int) };
+          }
+        }
+      }
+      return best_config;
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
-                                                   const int max_atoms_per_vwu) {
+                                                   const int2 max_atoms_per_vwu) {
   ValenceDelegator vdel(ag, ra);
   return buildValenceWorkUnits(&vdel, max_atoms_per_vwu);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
-                                                   const int max_atoms_per_vwu) {
+                                                   const int2 max_atoms_per_vwu) {
   std::vector<ValenceWorkUnit> result;
 
   // Assign one and only one unit to log the moves to each atom, including updating the positions
@@ -2594,12 +2714,24 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   // indefinitely, as only one cycle of force computation (including transmission from a virtual
   // site) can occur before moving atoms.
   const AtomGraph *ag_ptr = vdel->getTopologyPointer();
+  const int water_natom = ag_ptr->getWaterResidueSize();
+  const char4 water_name = stringToChar4(ag_ptr->getWaterResidueName());
+  const ChemicalDetailsKit cdk = ag_ptr->getChemicalDetailsKit();
   const RestraintApparatus *ra_ptr = vdel->getRestraintApparatusPointer();
   std::vector<int> tvwu_coverage(ag_ptr->getAtomCount(), 0);
   while (vdel->getFirstUnassignedAtom() < ag_ptr->getAtomCount()) {
     const int n_units = result.size();
+    const int fua_idx = vdel->getFirstUnassignedAtom();
+    const int fua_mol = cdk.mol_home[fua_idx];
+    const int mol_natom = cdk.mol_limits[fua_mol + 1] - cdk.mol_limits[fua_mol];
+    bool in_solvent = (mol_natom == 1);
+    if (mol_natom == water_natom &&
+        cdk.res_names[ag_ptr->getResidueIndex(fua_idx)] == water_name) {
+      in_solvent = true;
+    }
+    const int next_vwu_atom_capacity = (in_solvent) ? max_atoms_per_vwu.y : max_atoms_per_vwu.x;
     result.emplace_back(vdel, &tvwu_coverage, n_units, vdel->getFirstUnassignedAtom(),
-                        max_atoms_per_vwu);
+                        next_vwu_atom_capacity);
   }
   
   // Loop once more over the update list and construct the atom movement list.  The movement list
