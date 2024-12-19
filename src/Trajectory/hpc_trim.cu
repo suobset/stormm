@@ -56,31 +56,40 @@ kAccumulateCenterOfMassMotion(MotionSweepWriter mosw,
     }
 
     // Center of mass
-    double xcntrb = 0.0;
-    double ycntrb = 0.0;
-    double zcntrb = 0.0;
-    for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
-      const double cfac = poly_psr.inv_gpos_scale * mosw.com_scale * poly_auk.masses[i];
-      if (poly_psr.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-        xcntrb += (double)(poly_psr.xcrd[i]) * cfac;
-        ycntrb += (double)(poly_psr.ycrd[i]) * cfac;
-        zcntrb += (double)(poly_psr.zcrd[i]) * cfac;
+    switch (poly_psr.unit_cell) {
+    case UnitCellType::NONE:
+      {
+        double xcntrb = 0.0;
+        double ycntrb = 0.0;
+        double zcntrb = 0.0;
+        for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
+          const double cfac = poly_psr.inv_gpos_scale * mosw.com_scale * poly_auk.masses[i];
+          if (poly_psr.gpos_bits <= globalpos_scale_nonoverflow_bits) {
+            xcntrb += (double)(poly_psr.xcrd[i]) * cfac;
+            ycntrb += (double)(poly_psr.ycrd[i]) * cfac;
+            zcntrb += (double)(poly_psr.zcrd[i]) * cfac;
+          }
+          else {
+            xcntrb += int95ToDouble(poly_psr.xcrd[i], poly_psr.xcrd_ovrf[i]) * cfac;
+            ycntrb += int95ToDouble(poly_psr.ycrd[i], poly_psr.ycrd_ovrf[i]) * cfac;
+            zcntrb += int95ToDouble(poly_psr.zcrd[i], poly_psr.zcrd_ovrf[i]) * cfac;
+          }
+        }
+        WARP_REDUCE_DOWN(xcntrb);
+        WARP_REDUCE_DOWN(ycntrb);
+        WARP_REDUCE_DOWN(zcntrb);
+        if (lane_idx == 0) {
+          sh_xcom[warp_idx] = xcntrb;
+          sh_ycom[warp_idx] = ycntrb;
+          sh_zcom[warp_idx] = zcntrb;
+        }
       }
-      else {
-        xcntrb += int95ToDouble(poly_psr.xcrd[i], poly_psr.xcrd_ovrf[i]) * cfac;
-        ycntrb += int95ToDouble(poly_psr.ycrd[i], poly_psr.ycrd_ovrf[i]) * cfac;
-        zcntrb += int95ToDouble(poly_psr.zcrd[i], poly_psr.zcrd_ovrf[i]) * cfac;
-      }
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      break;
     }
-    WARP_REDUCE_DOWN(xcntrb);
-    WARP_REDUCE_DOWN(ycntrb);
-    WARP_REDUCE_DOWN(zcntrb);
-    if (lane_idx == 0) {
-      sh_xcom[warp_idx] = xcntrb;
-      sh_ycom[warp_idx] = ycntrb;
-      sh_zcom[warp_idx] = zcntrb;
-    }
-
+    
     // Total momentum accumulation
     double xtm = 0.0;
     double ytm = 0.0;
@@ -112,52 +121,91 @@ kAccumulateCenterOfMassMotion(MotionSweepWriter mosw,
     __syncthreads();
     if (warp_idx == 0) {
       double n_xcntrb, n_xtm;
+      switch (poly_psr.unit_cell) {
+      case UnitCellType::NONE:
+        if (lane_idx < small_block_size / warp_size_int) {
+          n_xcntrb = sh_xcom[lane_idx];
+        }
+        else {
+          n_xcntrb = 0.0;
+        }
+        WARP_REDUCE_DOWN(n_xcntrb);
+        if (lane_idx == 0) {
+          atomicSplit(n_xcntrb, wu.z, mosw.xcom, mosw.xcom_ovrf);
+        }
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        break;
+      }
       if (lane_idx < small_block_size / warp_size_int) {
-        n_xcntrb = sh_xcom[lane_idx];
         n_xtm = sh_xmv[lane_idx];
       }
       else {
-        n_xcntrb = 0.0;
         n_xtm = 0.0;
       }
-      WARP_REDUCE_DOWN(n_xcntrb);
       WARP_REDUCE_DOWN(n_xtm);
       if (lane_idx == 0) {
-        atomicSplit(n_xcntrb, wu.z, mosw.xcom, mosw.xcom_ovrf);
         atomicSplit(n_xtm, wu.z, mosw.xmv, mosw.xmv_ovrf);
       }
     }
     else if (warp_idx == 1) {
       double n_ycntrb, n_ytm;
+      switch (poly_psr.unit_cell) {
+      case UnitCellType::NONE:
+        if (lane_idx < small_block_size / warp_size_int) {
+          n_ycntrb = sh_ycom[lane_idx];
+        }
+        else {
+          n_ycntrb = 0.0;
+        }
+        WARP_REDUCE_DOWN(n_ycntrb);
+        if (lane_idx == 0) {
+          atomicSplit(n_ycntrb, wu.z, mosw.ycom, mosw.ycom_ovrf);
+        }
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        break;
+      }
       if (lane_idx < small_block_size / warp_size_int) {
-        n_ycntrb = sh_ycom[lane_idx];
         n_ytm = sh_ymv[lane_idx];
       }
       else {
-        n_ycntrb = 0.0;
         n_ytm = 0.0;
       }
-      WARP_REDUCE_DOWN(n_ycntrb);
       WARP_REDUCE_DOWN(n_ytm);
       if (lane_idx == 0) {
-        atomicSplit(n_ycntrb, wu.z, mosw.ycom, mosw.ycom_ovrf);
         atomicSplit(n_ytm, wu.z, mosw.ymv, mosw.ymv_ovrf);
       }
     }
     else if (warp_idx == 2) {
       double n_zcntrb, n_ztm;
+      switch (poly_psr.unit_cell) {
+      case UnitCellType::NONE:
+        if (lane_idx < small_block_size / warp_size_int) {
+          n_zcntrb = sh_zcom[lane_idx];
+        }
+        else {
+          n_zcntrb = 0.0;
+        }
+        WARP_REDUCE_DOWN(n_zcntrb);
+        if (lane_idx == 0) {
+          atomicSplit(n_zcntrb, wu.z, mosw.zcom, mosw.zcom_ovrf);
+        }
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        break;
+      }
       if (lane_idx < small_block_size / warp_size_int) {
-        n_zcntrb = sh_zcom[lane_idx];
         n_ztm = sh_zmv[lane_idx];
       }
       else {
-        n_zcntrb = 0.0;
         n_ztm = 0.0;
       }
-      WARP_REDUCE_DOWN(n_zcntrb);
       WARP_REDUCE_DOWN(n_ztm);
       if (lane_idx == 0) {
-        atomicSplit(n_zcntrb, wu.z, mosw.zcom, mosw.zcom_ovrf);
         atomicSplit(n_ztm, wu.z, mosw.zmv, mosw.zmv_ovrf);
       }
     }
@@ -186,37 +234,46 @@ kRemoveCenterOfMassMotion(PsSynthesisWriter poly_psw, const MotionSweepReader mo
     const int4 wu = mosr.work_units[wu_idx];
 
     // Move the system's center of mass to the origin
-    const double com_fac = poly_psw.gpos_scale / (mosr.com_scale * mosr.total_mass[wu.z]);
-    const double com_x = int95ToDouble(mosr.xcom[wu.z], mosr.xcom_ovrf[wu.z]) * com_fac;
-    const double com_y = int95ToDouble(mosr.ycom[wu.z], mosr.ycom_ovrf[wu.z]) * com_fac;
-    const double com_z = int95ToDouble(mosr.zcom[wu.z], mosr.zcom_ovrf[wu.z]) * com_fac;
-    if (poly_psw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-      const llint iadj_x = __double2ll_rn(-com_x);
-      const llint iadj_y = __double2ll_rn(-com_y);
-      const llint iadj_z = __double2ll_rn(-com_z);
-      for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
-        poly_psw.xcrd[i] += iadj_x;
-        poly_psw.ycrd[i] += iadj_y;
-        poly_psw.zcrd[i] += iadj_z;
+    switch (poly_psw.unit_cell) {
+    case UnitCellType::NONE:
+      {
+        const double com_fac = poly_psw.gpos_scale / (mosr.com_scale * mosr.total_mass[wu.z]);
+        const double com_x = int95ToDouble(mosr.xcom[wu.z], mosr.xcom_ovrf[wu.z]) * com_fac;
+        const double com_y = int95ToDouble(mosr.ycom[wu.z], mosr.ycom_ovrf[wu.z]) * com_fac;
+        const double com_z = int95ToDouble(mosr.zcom[wu.z], mosr.zcom_ovrf[wu.z]) * com_fac;
+        if (poly_psw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
+          const llint iadj_x = __double2ll_rn(-com_x);
+          const llint iadj_y = __double2ll_rn(-com_y);
+          const llint iadj_z = __double2ll_rn(-com_z);
+          for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
+            poly_psw.xcrd[i] += iadj_x;
+            poly_psw.ycrd[i] += iadj_y;
+            poly_psw.zcrd[i] += iadj_z;
+          }
+        }
+        else {
+          const int95_t iadj_x = doubleToInt95(-com_x);
+          const int95_t iadj_y = doubleToInt95(-com_y);
+          const int95_t iadj_z = doubleToInt95(-com_z);
+          for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
+            const int95_t inx = splitFPSum(iadj_x, poly_psw.xcrd[i], poly_psw.xcrd_ovrf[i]);
+            const int95_t iny = splitFPSum(iadj_y, poly_psw.ycrd[i], poly_psw.ycrd_ovrf[i]);
+            const int95_t inz = splitFPSum(iadj_z, poly_psw.zcrd[i], poly_psw.zcrd_ovrf[i]);
+            poly_psw.xcrd[i] = inx.x;
+            poly_psw.ycrd[i] = iny.x;
+            poly_psw.zcrd[i] = inz.x;
+            poly_psw.xcrd_ovrf[i] = inx.y;
+            poly_psw.ycrd_ovrf[i] = iny.y;
+            poly_psw.zcrd_ovrf[i] = inz.y;
+          }
+        }
       }
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      break;
     }
-    else {
-      const int95_t iadj_x = doubleToInt95(-com_x);
-      const int95_t iadj_y = doubleToInt95(-com_y);
-      const int95_t iadj_z = doubleToInt95(-com_z);
-      for (int i = wu.x + threadIdx.x; i < wu.y; i += blockDim.x) {
-        const int95_t inx = splitFPSum(iadj_x, poly_psw.xcrd[i], poly_psw.xcrd_ovrf[i]);
-        const int95_t iny = splitFPSum(iadj_y, poly_psw.ycrd[i], poly_psw.ycrd_ovrf[i]);
-        const int95_t inz = splitFPSum(iadj_z, poly_psw.zcrd[i], poly_psw.zcrd_ovrf[i]);
-        poly_psw.xcrd[i] = inx.x;
-        poly_psw.ycrd[i] = iny.x;
-        poly_psw.zcrd[i] = inz.x;
-        poly_psw.xcrd_ovrf[i] = inx.y;
-        poly_psw.ycrd_ovrf[i] = iny.y;
-        poly_psw.zcrd_ovrf[i] = inz.y;
-      }
-    }
-
+    
     // Remove the system's net velocity
     const double mvs_fac = poly_psw.vel_scale / (mosr.mv_scale * mosr.total_mass[wu.z]);
     const double net_xvel = int95ToDouble(mosr.xmv[wu.z], mosr.xmv_ovrf[wu.z]) * mvs_fac;

@@ -3,6 +3,7 @@
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "Topology/atomgraph_constants.h"
+#include "namelist_common.h"
 #include "namelist_element.h"
 #include "nml_dynamics.h"
 
@@ -11,6 +12,7 @@ namespace namelist {
 
 using constants::getEnumerationName;
 using constants::translatePrecisionModel;
+using energy::translateVdwSumMethod;
 using parse::realToString;
 using parse::NumberFormat;
 using parse::strcmpCased;
@@ -27,10 +29,12 @@ DynamicsControls::DynamicsControls(const ExceptionResponse policy_in) :
     total_step_count{default_dynamics_nstlim},
     diagnostic_frequency{default_dynamics_ntpr},
     trajectory_frequency{default_dynamics_ntwx},
+    com_motion_purge_frequency{default_dynamics_nscm},
     time_step{default_dynamics_time_step},
     electrostatic_cutoff{default_electrostatic_cutoff},
     van_der_waals_cutoff{default_van_der_waals_cutoff},
     coulomb{amber_ancient_bioq},
+    vdw_style{VdwSumMethod::CUTOFF},
     elec_14_screening{amber_default_elec14_screen},
     vdw_14_screening{amber_default_vdw14_screen},
     coulomb_set_by_user{false},
@@ -67,15 +71,17 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
 {
   NamelistEmulator t_nml = dynamicsInput(tf, start_line, found_nml, policy, wrap);
   nml_transcript = t_nml;
+
+  // Interpret common keywords
+  addRangedInteractionInterpretation(&electrostatic_cutoff, &van_der_waals_cutoff, &vdw_style,
+                                     t_nml, policy);
+  
+  // Interpret namelist-specific keywords
   t_nml.assignVariable(&total_step_count, "nstlim");
   t_nml.assignVariable(&diagnostic_frequency, "ntpr");
   t_nml.assignVariable(&trajectory_frequency, "ntwx");
-  t_nml.assignVariable(&com_motion_purge_ferquency, "nscm");
+  t_nml.assignVariable(&com_motion_purge_frequency, "nscm");
   t_nml.assignVariable(&time_step, "dt");
-  t_nml.assignVariable(&electrostatic_cutoff, "elec_cut");
-  t_nml.assignVariable(&van_der_waals_cutoff, "vdw_cut");
-  t_nml.assignVariable(&electrostatic_cutoff, "cut");
-  t_nml.assignVariable(&van_der_waals_cutoff, "cut");
   t_nml.assignVariable(&coulomb, "coulomb");
   t_nml.assignVariable(&elec_14_screening, "scee");
   t_nml.assignVariable(&vdw_14_screening, "scnb");
@@ -126,7 +132,6 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
   validateTrajectoryPrintFrequency();
   validateCenterOfMassMotionPurgeFrequency();
   validateTimeStep();
-  validateCutoffs();
   validateRattleTolerance();
   validateRattleIterations();
   validateThermostatKind();
@@ -151,7 +156,7 @@ int DynamicsControls::getTrajectoryPrintFrequency() const {
 
 //-------------------------------------------------------------------------------------------------
 int DynamicsControls::getCenterOfMassMotionPurgeFrequency() const {
-  return com_motion_purge_ferquency;
+  return com_motion_purge_frequency;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -172,6 +177,11 @@ double DynamicsControls::getVanDerWaalsCutoff() const {
 //-------------------------------------------------------------------------------------------------
 double DynamicsControls::getCoulombConstant() const {
   return coulomb;
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwSumMethod DynamicsControls::getVdwSummation() const {
+  return vdw_style;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -339,8 +349,8 @@ void DynamicsControls::setTrajectoryPrintFrequency(const int trajectory_frequenc
 
 //-------------------------------------------------------------------------------------------------
 void
-DynamicsControls::setCenterOfMassMotionPurgeFrequency(const int com_motion_purge_ferquency_in) {
-  com_motion_purge_ferquency = com_motion_purge_ferquency_in;
+DynamicsControls::setCenterOfMassMotionPurgeFrequency(const int com_motion_purge_frequency_in) {
+  com_motion_purge_frequency = com_motion_purge_frequency_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -352,20 +362,27 @@ void DynamicsControls::setTimeStep(const double time_step_in) {
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setElectrostaticCutoff(const double cutoff_in) {
   electrostatic_cutoff = cutoff_in;
-  validateCutoffs();
 }
 
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setVanDerWaalsCutoff(const double cutoff_in) {
   van_der_waals_cutoff = cutoff_in;
-  validateCutoffs();
 }
 
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::setCutoff(const double cutoff_in) {
   electrostatic_cutoff = cutoff_in;
   van_der_waals_cutoff = cutoff_in;
-  validateCutoffs();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setVdwSummation(const std::string &vdw_method_in) {
+  vdw_style = translateVdwSumMethod(vdw_method_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setVdwSummation(const VdwSumMethod vdw_method_in) {
+  vdw_style = vdw_method_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -640,21 +657,21 @@ void DynamicsControls::validateTrajectoryPrintFrequency() {
 
 //-------------------------------------------------------------------------------------------------
 void DynamicsControls::validateCenterOfMassMotionPurgeFrequency() {
-  if (com_motion_purge_ferquency < 0) {
+  if (com_motion_purge_frequency < 0) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("A negative value of the center of mass motion purge frequency (" +
-            std::to_string(com_motion_purge_ferquency) + ") is invalid.", "DynamicsControls",
+            std::to_string(com_motion_purge_frequency) + ") is invalid.", "DynamicsControls",
             "validateCenterOfMassMotionPurgeFrequency");
     case ExceptionResponse::WARN:
       rtWarn("A negative value of the center of mass motion purge frequency (" +
-             std::to_string(com_motion_purge_ferquency) + ") is invalid and will be adjusted to "
+             std::to_string(com_motion_purge_frequency) + ") is invalid and will be adjusted to "
              "zero (no purging).", "DynamicsControls", "validateCenterOfMassMotionPurgeFrequency");
       break;
     case ExceptionResponse::SILENT:
       break;
     }
-    com_motion_purge_ferquency = 0;
+    com_motion_purge_frequency = 0;
   }
 }
 
@@ -678,45 +695,6 @@ void DynamicsControls::validateTimeStep() {
       break;
     }
     time_step = minimum_dynamics_time_step;
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-void DynamicsControls::validateCutoffs() {
-  if (electrostatic_cutoff < minimum_elec_cutoff) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("The electrostatic cutoff (" +
-            realToString(electrostatic_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ") cannot be "
-            "set below a minimum value of " +
-            realToString(minimum_elec_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ".",
-            "DynamicsControls", "validateCutoffs");
-    case ExceptionResponse::WARN:
-      rtErr("The electrostatic cutoff (" +
-            realToString(electrostatic_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ") cannot be "
-            "set below a minimum value of " +
-            realToString(minimum_elec_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + ".  This "
-            "minimum value will be applied.", "DynamicsControls", "validateCutoffs");
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-  if (van_der_waals_cutoff < minimum_vdw_cutoff) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("A van-der Waals cutoff of " +
-            realToString(van_der_waals_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " is too "
-            "short to permit accurate force and energy computations.", "DynamicsControls",
-            "validateCutoffs");
-    case ExceptionResponse::WARN:
-      rtWarn("A van-der Waals cutoff of " +
-             realToString(van_der_waals_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " is too "
-             "short to permit accurate force and energy computations.  The minimum value of " +
-             realToString(minimum_vdw_cutoff, 9, 4, NumberFormat::STANDARD_REAL) + " will be "
-             "applied.", "DynamicsControls", "validateCutoffs");
-    case ExceptionResponse::SILENT:
-      break;
-    }
   }
 }
 
@@ -913,15 +891,15 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   NamelistEmulator t_nml("dynamics", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to propagate dynamics of a molecular system.");
 
+  // Common keyword handling
+  addRangedInteractionControls(&t_nml);
+  
   // Trajectory length and outut keywords
   t_nml.addKeyword("nstlim", NamelistType::INTEGER, std::to_string(default_dynamics_nstlim));
   t_nml.addKeyword("ntpr", NamelistType::INTEGER, std::to_string(default_dynamics_ntpr));
   t_nml.addKeyword("ntwx", NamelistType::INTEGER, std::to_string(default_dynamics_ntwx));
   t_nml.addKeyword("nscm", NamelistType::INTEGER, std::to_string(default_dynamics_nscm));
   t_nml.addKeyword("dt", NamelistType::REAL, std::to_string(default_dynamics_time_step));
-  t_nml.addKeyword("elec_cut", NamelistType::REAL, std::to_string(default_electrostatic_cutoff));
-  t_nml.addKeyword("vdw_cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
-  t_nml.addKeyword("cut", NamelistType::REAL, std::to_string(default_van_der_waals_cutoff));
   t_nml.addKeyword("coulomb", NamelistType::REAL, std::to_string(amber_ancient_bioq));
   t_nml.addKeyword("scee", NamelistType::REAL, std::to_string(amber_default_elec14_screen));
   t_nml.addKeyword("scnb", NamelistType::REAL, std::to_string(amber_default_vdw14_screen));
@@ -981,14 +959,6 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
   t_nml.addHelp("dt", "The time step, in units of femtoseconds");
 
   // Help messages for interaction cutoffs
-  t_nml.addHelp("elec_cut", "The inter-particle distance at which to begin discounting "
-                "electrostatic interactions, in units of Angstroms.  This applies to all methods "
-                "for evaluating the electrostatic potential.");
-  t_nml.addHelp("vdw_cut", "The inter-particle distance at which to begin discounting "
-                "van-der Waals interactions, in units of Angstroms.  This applies to all methods "
-                "for evaluating the van-der Waals potential).");
-  t_nml.addHelp("cut", "The inter-particle distance at which to begin neglecting pairwise, "
-                "particle-particle interactions, in units of Angstroms");
   t_nml.addHelp("coulomb", "Define Coulomb's constant for the simulation, in units of "
                 "kcal/mol-e^2, where e is the charge of a proton (atomic unit of charge).");
   t_nml.addHelp("scee", "The unitless screening factor on electrostatic 1:4 interactions.  To "

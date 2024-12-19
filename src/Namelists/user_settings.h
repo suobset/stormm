@@ -12,6 +12,7 @@
 #include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
+#include "Namelists/nml_pppm.h"
 #include "Namelists/nml_precision.h"
 #include "Namelists/nml_random.h"
 #include "Namelists/nml_receptor.h"
@@ -103,6 +104,9 @@ struct UserSettings {
   /// \brief Detect whether a &conformer namelist was present
   bool getConformerPresence() const;
 
+  /// \brief Detect whether a &pppm namelist was present
+  bool getPPPMPresence() const;
+
   /// \brief Detect whether a &dynamics namelist was present
   bool getDynamicsPresence() const;
 
@@ -136,6 +140,9 @@ struct UserSettings {
   /// \brief Get the block of information associated with the &receptor namelist.
   const ReceptorControls& getReceptorNamelistInfo() const;
 
+  /// \brief Get the block of information associated with the &pppm namelist.
+  const PPPMControls& getPPPMNamelistInfo() const;
+  
   /// \brief Get the block of information associated with the &conformer namelist.
   const DynamicsControls& getDynamicsNamelistInfo() const;
 
@@ -168,6 +175,7 @@ private:
   bool has_precision_nml;       ///< Indicate the presence of a &precision namelist in the input
   bool has_conformer_nml;       ///< Indicate the presence of a &conformer namelist in the input
   bool has_receptor_nml;        ///< Indicate the presence of a &receptor namelist in the input
+  bool has_pppm_nml;            ///< Indicate the presence of a &pppm namelist in the input
   bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
   bool has_remd_nml;            ///< Indicate the presence of a &remd namelist in the input
   bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
@@ -186,6 +194,8 @@ private:
                                     ///<   settings as well as calculation floating point types
   ConformerControls conf_input;     ///< Conformer generation instructions
   ReceptorControls receptor_input;  ///< Grid-based rigid receptor representation instructions
+  PPPMControls pppm_input;          ///< Instructions specific to particle-particle / particle-mesh
+                                    ///<   evaluations of long-ranged potentials
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   RemdControls remd_input;          ///< Replica exchange molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions

@@ -260,17 +260,20 @@ CheckResult check(const double lhs, const RelationalOperator relationship, const
     switch (relationship) {
     case RelationalOperator::EQUAL:
     case RelationalOperator::EQ:
-      if (idec > 0) {
-        error_edit += "Relative comparison of " + realToString(lhs, idec) + " to " +
-                      realToString(rhs.getValue(), idec) + " +/- " +
-                      realToString(rhs.getTol(), idec) + " fails by " +
-                      realToString(100.0 * fabs((lhs - rhs.getValue()) / (rhs.getTol())), idec) +
-                      "%.";
-      }
-      else {
-        error_edit += "Relative comparison of " + realToString(lhs, idec) + " to " +
-                      realToString(rhs.getValue(), idec) + " +/- " +
-                      realToString(rhs.getTol(), idec) + " fails.";
+      {
+        const double threshold = rhs.getTol() * rhs.getValue();
+        if (idec > 0) {
+          error_edit += "Relative comparison of " + realToString(lhs, idec) + " to " +
+                        realToString(rhs.getValue(), idec) + " +/- " +
+                        realToString(threshold, idec) + " fails by " +
+                        realToString((100.0 * fabs((lhs - rhs.getValue()) / threshold)) - 100.0,
+                                     idec) + "%.";
+        }
+        else {
+          error_edit += "Relative comparison of " + realToString(lhs, idec) + " to " +
+                        realToString(rhs.getValue(), idec) + " +/- " +
+                        realToString(threshold, idec) + " fails.";
+        }
       }
       break;
     case RelationalOperator::NOT_EQUAL:

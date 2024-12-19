@@ -10,6 +10,7 @@
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
 #include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Restraints/restraint_util.h"
 #include "Structure/local_arrangement.h"
@@ -27,6 +28,10 @@ namespace stormm {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
+using numerics::operator+=;
+using numerics::operator-=;
+using numerics::operator+;
+using numerics::operator-;
 using stmath::angleVerification;
 using stmath::crossProduct;
 using stmath::matrixMultiply;
@@ -36,6 +41,7 @@ using restraints::computeRestraintMixture;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using restraints::restraintDelta;
+using structure::displacement;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
 using symbols::asymptotic_to_one_f;
@@ -60,6 +66,7 @@ using trajectory::CoordinateSeriesReader;
 using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
+using namespace stormm::numerics;
 
 /// \brief Evaluate the energy and forces dur to a harmonic stretching term (both harmonic bonds
 ///        and Urey-Bradley terms can be evaluated with this function).
@@ -81,12 +88,21 @@ using trajectory::PhaseSpaceWriter;
 /// \param inv_gpos_factor  Inverse positional scaling factor (for signed integer, fixed-precision
 ///                         coordinate representations)
 /// \param force_factor     Force scaling factor for fixed-precision force accumulation
+/// \param xcrd_ovrf        Overflow bits for Cartesian X coordinates of all particles
+/// \param ycrd_ovrf        Overflow bits for Cartesian Y coordinates of all particles
+/// \param zcrd_ovrf        Overflow bits for Cartesian Z coordinates of all particles
+/// \param xfrc_ovrf        Overflow bits for Cartesian X forces acting on all particles
+/// \param yfrc_ovrf        Overflow bits for Cartesian Y forces acting on all particles
+/// \param zfrc_ovrf        Overflow bits for Cartesian Z forces acting on all particles
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Tcalc evalHarmonicStretch(int i_atom, int j_atom, Tcalc stiffness, Tcalc equilibrium,
                           const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                           const double* umat, const double* invu, UnitCellType unit_cell,
                           Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
-                          Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
+                          Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                          const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                          const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr, 
+                          int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate the bond energy contributions based on a topology and a coordinate set.
 ///        These simple routines can serve as a check on much more complex routines involving
@@ -145,11 +161,11 @@ double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReade
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, int system_index = 0);
 
-double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrame &cf,
-                         ScoreCard *ecard, int system_index = 0);
+double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                         int system_index = 0);
 
-double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrame &cf,
-                         ScoreCard *ecard, int system_index = 0);
+double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                         int system_index = 0);
 
 template <typename Tcoord, typename Tcalc>
 double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
@@ -171,7 +187,10 @@ Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcal
                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                        const double* umat, const double* invu, UnitCellType unit_cell,
                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
-                       Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
+                       Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                       const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                       const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr,
+                       int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
 ///        topology and a coordinate set.  These simple routines can serve as a check on much more
@@ -197,8 +216,8 @@ Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcal
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
 /// \param xfrc          Cartesian X forces acting on all particles
-/// \param yfrc          Cartesian X forces acting on all particles
-/// \param zfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian Y forces acting on all particles
+/// \param zfrc          Cartesian Z forces acting on all particles
 /// \param umat          Box space transformation matrix
 /// \param invu          Inverse transformation matrix, fractional coordinates back to real space
 /// \param unit_cell     The unit cell type, i.e. triclinic
@@ -260,7 +279,10 @@ Tcalc evalDihedralTwist(int i_atom, int j_atom, int k_atom, int l_atom, Tcalc am
                         const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                         const double* umat, const double* invu, UnitCellType unit_cell,
                         Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
-                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
+                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                        const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                        const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr,
+                        int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate the proper and improper dihedral energy contributions with a simple routine
 ///        based on a topology and a PhaseSpace object to store forces in double precision.  The
@@ -370,7 +392,10 @@ double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd,
                                 Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                 EvaluateForce eval_force = EvaluateForce::NO,
                                 int system_index = 0, Tcalc inv_gpos_factor = 1.0,
-                                Tcalc force_factor = 1.0);
+                                Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+                                const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+                                int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr,
+                                int* zfrc_ovrf = nullptr);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                 ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
@@ -445,7 +470,10 @@ double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcr
                                    Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                    EvaluateForce eval_force = EvaluateForce::NO,
                                    int system_index = 0, Tcalc inv_gpos_factor = 1.0,
-                                   Tcalc force_factor = 1.0);
+                                   Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+                                   const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+                                   int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr,
+                                   int* zfrc_ovrf = nullptr);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                    ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
@@ -516,7 +544,9 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, int surf
                const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
                const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-               Tcalc force_factor = 1.0);
+               Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+               const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+               int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
   
 /// \brief Evaluate CHARMM CMAP two-dimensional cubic spline potentials.  As with all other
 ///        functions in this library, the results of double-precision accumulation are returned
@@ -620,32 +650,38 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 /// \param eval_vdw_force       Flag to have van-der Waals (Lennard-Jones) forces evaluated
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc>
-Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
-                                     const Tcalc* charges, const int* lj_param_idx,
-                                     const Tcalc* attn14_elec_factors,
-                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
-                                     int ljtab_offset, int n_lj_types, const Tcoord* xcrd,
-                                     const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                                     const double* invu, UnitCellType unit_cell, Tforce* xfrc,
-                                     Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
-                                     EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
-                                     Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
-                                     Tcalc clash_ratio = 0.0);
+Vec2<Tcalc> evalAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
+                                 const Tcalc* charges, const int* lj_param_idx,
+                                 const Tcalc* attn14_elec_factors,
+                                 const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                 const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                 int ljtab_offset, int n_lj_types, const Tcoord* xcrd,
+                                 const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                 const double* invu, UnitCellType unit_cell, Tforce* xfrc,
+                                 Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
+                                 EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
+                                 Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
+                                 Tcalc clash_ratio = 0.0, const int* xcrd_ovrf = nullptr,
+                                 const int* ycrd_ovrf = nullptr,
+                                 const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr,
+                                 int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 
 template <typename Tcoord, typename Tforce, typename Tcalc>
-Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
-                                     const Tcalc* charges, const int* lj_param_idx,
-                                     const Tcalc* attn14_elec_factors,
-                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
-                                     int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
-                                     const Tcoord* zcrd, const double* umat, const double* invu,
-                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, EvaluateForce eval_elec_force,
-                                     EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
-                                     Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
-                                     Tcalc clash_ratio = 0.0);
+Vec2<Tcalc> evalAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
+                                 const Tcalc* charges, const int* lj_param_idx,
+                                 const Tcalc* attn14_elec_factors,
+                                 const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                 const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                 int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
+                                 const Tcoord* zcrd, const double* umat, const double* invu,
+                                 UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                 Tforce* zfrc, EvaluateForce eval_elec_force,
+                                 EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
+                                 Tcalc force_factor = 1.0, Tcalc clash_minimum_distance = 0.0,
+                                 Tcalc clash_ratio = 0.0, const int* xcrd_ovrf = nullptr,
+                                 const int* ycrd_ovrf = nullptr,
+                                 const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr,
+                                 int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 /// \}
   
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
@@ -778,7 +814,10 @@ Tcalc evalPosnRestraint(int p_atom, int step_number, int init_step, int finl_ste
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-                        Tcalc force_factor = 1.0);
+                        Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+                        const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+                        int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr,
+                        int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate distance restraints.  See the descriptions in evalPosnRestraint (above) for
 ///        explanations of each input parameter.  The restraint energy is returned.
@@ -791,7 +830,10 @@ Tcalc evalBondRestraint(int i_atom, int j_atom, int step_number, int init_step, 
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-                        Tcalc force_factor = 1.0);
+                        Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+                        const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+                        int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr,
+                        int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate three-point angle restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
@@ -804,7 +846,10 @@ Tcalc evalAnglRestraint(int i_atom, int j_atom, int k_atom, int step_number, con
                         const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
                         const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                         Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-                        Tcalc force_factor = 1.0);
+                        Tcalc force_factor = 1.0, const int* xcrd_ovrf = nullptr,
+                        const int* ycrd_ovrf = nullptr, const int* zcrd_ovrf = nullptr,
+                        int* xfrc_ovrf = nullptr, int* yfrc_ovrf = nullptr,
+                        int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate four-point dihedral restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
@@ -817,7 +862,10 @@ Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, int step
                         const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                         const double* umat, const double* invu, UnitCellType unit_cell,
                         Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
-                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
+                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0,
+                        const int* xcrd_ovrf = nullptr, const int* ycrd_ovrf = nullptr,
+                        const int* zcrd_ovrf = nullptr, int* xfrc_ovrf = nullptr,
+                        int* yfrc_ovrf = nullptr, int* zfrc_ovrf = nullptr);
 
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
@@ -888,7 +936,7 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
                           const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
                           int system_index = 0, int step_number = 0, int force_scale_bits = 23);
 /// \}
-  
+
 } // namespace energy
 } // namespace stormm
 

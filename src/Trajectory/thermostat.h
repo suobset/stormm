@@ -64,10 +64,10 @@ template <typename T> struct ThermostatWriter {
                    int init_evolution_in, int end_evolution_in, T init_temperature_in,
                    T final_temperature_in, T dt_in, bool csnt_geom_in, T rattle_tol_in,
                    int rattle_iter_in, int andr_cyc_in, T gamma_ln_in, T ln_implicit_in,
-                   T ln_explicit_in, const int4* partition_bounds_in,
-                   const T* init_temperatures_in, const T* final_temperatures_in,
-                   ullint2* state_xy_in, ullint2* state_zw_in, PrecisionModel rng_mode_in,
-                   double* cache_in, float* sp_cache_in);
+                   T ln_explicit_in, bool load_synthesis_forces_in,
+                   const int4* partition_bounds_in, const T* init_temperatures_in,
+                   const T* final_temperatures_in, ullint2* state_xy_in, ullint2* state_zw_in,
+                   PrecisionModel rng_mode_in, double* cache_in, float* sp_cache_in);
 
   /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
   ///        of const member variables.
@@ -113,6 +113,8 @@ template <typename T> struct ThermostatWriter {
                                      ///<   Verlet update after new forces have been computed
   const T ln_explicit;               ///< Explicit Langevin factor, applied in the second velocity
                                      ///<   Verlet update as new coordinates are determined
+  const bool load_synthesis_forces;  ///< If set to TRUE, forces from the synthesis will be loaded
+                                     ///<   when performing the initial velocity update.
   const int4* partition_bounds;      ///< Bounds array on the atoms that this thermostat regulates.
                                      ///<   Also includes the number of degrees of freedom in each
                                      ///<   partition.
@@ -141,10 +143,13 @@ template <typename T> struct ThermostatReader {
                    int init_evolution_in, int end_evolution_in, T init_temperature_in,
                    T final_temperature_in, T dt_in, bool csnt_geom_in, T rattle_tol_in,
                    int rattle_iter_in, int andr_cyc_in, T gamma_ln_in, T ln_implicit_in,
-                   T ln_explicit_in, const int4* partition_bounds_in,
-                   const T* init_temperatures_in, const T* final_temperatures_in,
-                   const ullint2* state_xy_in, const ullint2* state_zw_in,
-                   PrecisionModel rng_mode_in, const double* cache_in, const float* sp_cache_in);
+                   T ln_explicit_in, bool load_synthesis_forces_in,
+                   const int4* partition_bounds_in, const T* init_temperatures_in,
+                   const T* final_temperatures_in, const ullint2* state_xy_in,
+                   const ullint2* state_zw_in, PrecisionModel rng_mode_in, const double* cache_in,
+                   const float* sp_cache_in);
+
+  ThermostatReader(const ThermostatWriter<T> *w);
 
   ThermostatReader(const ThermostatWriter<T> &w);
   /// \}
@@ -192,6 +197,8 @@ template <typename T> struct ThermostatReader {
                                      ///<   Verlet update after new forces have been computed
   const T ln_explicit;               ///< Explicit Langevin factor, applied in the second velocity
                                      ///<   Verlet update as new coordinates are determined
+  const bool load_synthesis_forces;  ///< If set to TRUE, forces from the synthesis will be loaded
+                                     ///<   when performing the initial velocity update.
   const int4* partition_bounds;      ///< Bounds array on the atoms that this thermostat regulates.
                                      ///<   Also includes the number of degrees of freedom in each
                                      ///<   partition.
@@ -493,6 +500,10 @@ public:
   /// \brief Get the number of RATTLE iterations to attempt.
   int getRattleIterations() const;
 
+  /// \brief Get an indication of whether extra forces should be loaded from the synthesis in
+  ///        periodic systems.
+  bool loadSynthesisForces() const;
+  
   /// \brief Get a pointer to the object itself, useful if it has been passed to a function by
   //         const reference.
   const Thermostat* getSelfPointer() const;
@@ -617,6 +628,17 @@ public:
   ///
   /// \param rattle_iterations_in  The number of iterations to permit
   void setRattleIterations(int rattle_iterations_in);
+
+  /// \brief Set the integrator to take prior force computations residing in the
+  ///        PhaseSpaceSynthesis into account.  This will have an effect in the dynamics of
+  ///        periodic systems when particle movement is fused to valence interaction computations.
+  ///        In this situation, by default all prior force computations would be expected to reside
+  ///        in the neighbor list grid (non-bonded forces).  For non-periodic calculations, all
+  ///        prior force computations will be expected to accumulate in the PhaseSpaceSynthesis,
+  ///        meaning that this setting will have no effect.
+  ///
+  /// \param load_synthesis_forces_in  Indicate whether the synthesis forces shuld be loaded
+  void setSynthesisForceLoading(bool load_synthesis_forces_in = true);
   
   /// \brief Validate the initial or final target temperature.
   void validateTemperature(double temperature_in);
@@ -656,7 +678,8 @@ public:
   ///
   /// \param index_start    Starting index in the list of all atoms
   /// \param index_end      Upper bound of atoms for which to cache random numbers
-  /// \param refresh_depth  The depth to which the cache is to be refreshed
+  /// \param refresh_depth  The depth to which the cache is to be refreshed (the default of 0 will
+  ///                       refresh all layers of prepared random numbers)
   void refresh(size_t index_start, size_t index_end, int refresh_depth = 0);
 
 #ifdef STORMM_USE_HPC
@@ -727,6 +750,13 @@ private:
   double rattle_tolerance;          ///< Convergence criterion for RATTLE bond length constraints
   int rattle_iterations;            ///< The maximum number of iterations to use when attempting to
                                     ///<   converge RATTLE constraint groups
+  bool load_synthesis_forces;       ///< Flag to indicate whether forces from the synthesis, as
+                                    ///<   opposed to the neighbor list exclusively, should be
+                                    ///<   loaded when performing particle integration.  This will
+                                    ///<   affect dynamics in periodic boundary conditions but not
+                                    ///<   implicit solvent / isolated boundary conditions.  By
+                                    ///<   default, this is set to FALSE (do not load synthesis
+                                    ///<    forces for systems in periodic boundary conditions).
 
   /// Temperatures to apply from step 0 to the initiation of any requested evolution, across
   ///   various compartments of the simulation.  Different compartments, i.e. systems, or

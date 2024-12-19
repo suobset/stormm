@@ -135,6 +135,7 @@ enum class FFTMode {
                 ///<   and nz.
 };
 
+/// \brief Methods for creating a Hilbert space-filling curve, or variants thereof.
 enum class HilbertCurveMode {
   STRETCH,   ///< A curve will be generated based on a single power of two, then stretched to
              ///<   whatever dimensions are required.
@@ -145,7 +146,25 @@ enum class HilbertCurveMode {
              ///<   thickness one or even a straight line in order to span the space with no
              ///<   invalid volume.
 };
-  
+
+/// \brief Methods for distributing points over the surface of a sphere, with the goal of a uniform
+///        placement.
+enum class SpherePlacement {
+  POLYHEDRON,      ///< Use a regular or semi-regular polyhedron, or a combination of such solids,
+                   ///<   to place the points.  This will only work for certain point counts, those
+                   ///<   that match the number of vertices in the aforementioned polyhedra.  For
+                   ///<   all other point counts this option will defer to the FIBONACCI sphere
+                   ///<   placement.
+  AREA_FIBONACCI,  ///< The canonical Fibonacci sphere method, which uses the highly irrational
+                   ///<   square root of five minus one to spread ribbons of a spiral over the
+                   ///<   surface of the sphere while placing points at otherwise regular intervals
+                   ///<   along the trace.
+  DIST_FIBONACCI,  ///< Use an improved Fibonacci sphere algorithm which optimizes the distance
+                   ///<   between points rather than the area of a Voronoi plot assigned to each
+                   ///<   point.
+  DESERNO          ///< Use Deserno's method to place the points.
+};
+
 /// \brief Get a human-readable string describing an enumeration of the provided type.  Various
 ///        overloads of this function serve enumerators across many libraries.
 ///
@@ -160,6 +179,7 @@ std::string getEnumerationName(BasisFunctions input);
 std::string getEnumerationName(BSplineUnity input);
 std::string getEnumerationName(FFTMode input);
 std::string getEnumerationName(HilbertCurveMode input);
+std::string getEnumerationName(SpherePlacement input);
 /// \}
 
 /// \brief Translate a human-readable string (likely from user input) into one of the modes for

@@ -145,7 +145,7 @@ void CommandLineParser::addStandardAmberInputs(const std::vector<std::string> &c
                          std::string(default_stormm_input_coordinates));
       cli_nml.addHelp("-c", "A primary input coordinates file to use in generating a synthesis "
                       "of systems.  This keyword may be repeated.  Similar file names and, after "
-                      "that, similar numbers of atoms with reasonable bond and angle energies "
+                      "that, similar numbers of atoms with reasonable bond and angle energies, "
                       "will be used to correlate one set of input coordinates with each topology "
                       "if systems are defined on the command line by this route.  For explicit "
                       "control of which topology will describe which coordinate set, use a "
@@ -201,6 +201,11 @@ void CommandLineParser::addStandardAmberInputs(const std::vector<std::string> &c
 void CommandLineParser::addStandardAmberInputs(const char* key_a, const char* key_b,
                                                const char* key_c, const char* key_d) {
   addStandardAmberInputs(vectorOfStrings(key_a, key_b, key_c, key_d));
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addStandardAmberInputs() {
+  addStandardAmberInputs({ "-i", "-O", "-p", "-c", "-o", "-x", "-r", "-ig_seed", "-temp0" });
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -309,6 +314,13 @@ void CommandLineParser::addStandardBenchmarkingInputs(const char* key_a, const c
 }
 
 //-------------------------------------------------------------------------------------------------
+void CommandLineParser::addStandardBenchmarkingInputs() {
+  addStandardBenchmarkingInputs({ "-iter", "-trials", "-replicas", "-precision", "-skip_cpu_check",
+                                  "-cutoff", "-elec_cutoff", "-vdw_cutoff", "-pad", "-eval_nrg",
+                                  "-eval_frc", "-omit_frc", "-fp_bits", "-blur" });
+}
+
+//-------------------------------------------------------------------------------------------------
 void CommandLineParser::addStandardApplicationInputs(const std::vector<std::string> &cli_keys) {
 
   // Shunt some imputs to the Amber loader
@@ -330,11 +342,7 @@ void CommandLineParser::addStandardApplicationInputs(const std::vector<std::stri
   // Parse the remaining inputs
   const size_t nrem = nonamb_keys.size();
   for (size_t i = 0; i < nrem; i++) {
-    if (nonamb_keys[i] == "-x") {
-      cli_nml.addKeyword("-x", NamelistType::STRING, std::string(""));
-      cli_nml.addHelp("-x", "Name (or, base name) of the output trajectory file");
-    }
-    else if (nonamb_keys[i] == "-t") {
+    if (nonamb_keys[i] == "-t") {
       cli_nml.addKeyword("-t", NamelistType::STRING, std::string(""));
       cli_nml.addHelp("-t", "Name of the input transcript file, holding a detailed record of all "
                       "inputs given by the user as well as inputs which were possible with the "
@@ -358,6 +366,9 @@ void CommandLineParser::addStandardApplicationInputs(const std::vector<std::stri
     else if (nonamb_keys[i] == "-except") {
       cli_nml.addKeyword("-except", NamelistType::STRING,
                          getEnumerationName(ExceptionResponse::DIE));
+      cli_nml.addHelp("-except", "Action to take if invalid command-line input is encountered "
+                      "(this may be passed down to other control blocks at the discretion of the "
+                      "program's developer)");
     }
     else {
       switch (policy) {
@@ -383,8 +394,8 @@ void CommandLineParser::addStandardApplicationInputs(const char* key_a, const ch
 
 //-------------------------------------------------------------------------------------------------
 void CommandLineParser::addStandardApplicationInputs() {
-  addStandardApplicationInputs({ "-i", "-ig_seed", "-p", "-c", "-o", "-O", "-x", "-t", "-c_kind",
-                                 "-x_kind", "-r_kind", "-except" });
+  addStandardAmberInputs({ "-i", "-ig_seed", "-p", "-c", "-o", "-O", "-x" });
+  addStandardApplicationInputs({ "-t", "-c_kind", "-x_kind", "-r_kind", "-except" });
 }
 
 //-------------------------------------------------------------------------------------------------

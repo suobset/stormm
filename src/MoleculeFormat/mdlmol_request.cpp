@@ -92,6 +92,7 @@ MdlMolDataRequest::MdlMolDataRequest(const std::string &title_in,
   case StateVariable::ELEC_ONE_FOUR:
   case StateVariable::GENERALIZED_BORN:
   case StateVariable::RESTRAINT:
+  case StateVariable::SURFACE_AREA:
   case StateVariable::KINETIC:
   case StateVariable::PRESSURE:
   case StateVariable::VIRIAL_11:

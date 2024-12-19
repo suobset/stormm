@@ -1,5 +1,6 @@
 #include "copyright.h"
 #include "../../src/Accelerator/gpu_details.h"
+#include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
@@ -24,7 +25,9 @@
 #include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Synthesis/condensate.h"
+#include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/synthesis_abstracts.h"
 #include "../../src/Synthesis/synthesis_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
@@ -71,6 +74,8 @@ using stormm::energy::ScoreCard;
 using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
 using stormm::namelist::DynamicsControls;
+using stormm::numerics::force_scale_nonoverflow_bits;
+using stormm::numerics::globalpos_scale_nonoverflow_bits;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::random::Xoroshiro128pGenerator;
@@ -360,7 +365,7 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPr
 
   // The virtual sites should already be in position as of the time this function is called, but
   // place them again rather than resting on that assumption.
-  placeVirtualSites(ps, ag);
+  placeVirtualSites(ps, ag, ps->getCyclePosition());
   const StaticExclusionMask se(ag);
   ScoreCard sc(1);
   double2 base_qlj;
@@ -423,15 +428,15 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPr
       continue;
     }
     psw.xcrd[i] += fd_perturbation;
-    placeVirtualSites(ps, ag);
+    placeVirtualSites(ps, ag, ps->getCyclePosition());
     const double2 xpos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
     psw.xcrd[i] -= fd_perturbation;
     psw.ycrd[i] += fd_perturbation;
-    placeVirtualSites(ps, ag);
+    placeVirtualSites(ps, ag, ps->getCyclePosition());
     const double2 ypos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
     psw.ycrd[i] -= fd_perturbation;
     psw.zcrd[i] += fd_perturbation;
-    placeVirtualSites(ps, ag);
+    placeVirtualSites(ps, ag, ps->getCyclePosition());
     const double2 zpos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
     psw.zcrd[i] -= fd_perturbation;
     finite_difference_frc[ 3 * i     ] = (base_qlj.x - xpos_qlj.x) / fd_perturbation;
@@ -448,6 +453,162 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPr
         Approx(finite_difference_frc_sample).margin(1.0e-4), "Analytic forces and those computed "
         "by a finite difference scheme do not agree in a system bearing virtual sites of type(s)" +
         vs_type_list + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the mechanics of virtual site manipulation within a synthesis.
+//
+// Arguments:
+//   tsm:       A collection of test systems
+//   uc:        The types of unit cells from the collection of test systems with which to compose
+//              the synthesis
+//   xrs:       Source of random numbers for forces and position perturbations
+//   pos_bits:  The number of bits after the decimal with which to encode particle positions in the
+//              synthesis of systems
+//   frc_bits:  The number of bits after the decimal with which to encode forces in the synthesis
+//   prec:      The precision model in which to perform calculations
+//-------------------------------------------------------------------------------------------------
+void checkVirtualSiteMechanics(const TestSystemManager &tsm, const std::vector<UnitCellType> uc,
+                               Xoshiro256ppGenerator *xrs, const int pos_bits = 36,
+                               const int frc_bits = 36,
+                               const PrecisionModel prec = PrecisionModel::DOUBLE) {
+  const std::vector<int> index_key = tsm.getQualifyingSystems(uc);
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(index_key, 0.0, 81350, pos_bits, 44,
+                                                              frc_bits);
+  PsSynthesisWriter poly_psw = poly_ps.data();
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(uc);
+  const size_t pnatom = poly_ps.getPaddedAtomCount();
+  for (size_t i = 0; i < pnatom; i++) {
+    poly_psw.xalt[i] = poly_psw.xcrd[i];
+    poly_psw.xalt[i] = poly_psw.xcrd[i];
+    poly_psw.xalt[i] = poly_psw.xcrd[i];
+    if (poly_psw.gpos_bits > globalpos_scale_nonoverflow_bits) {
+      poly_psw.xalt_ovrf[i] = poly_psw.xcrd_ovrf[i];
+      poly_psw.xalt_ovrf[i] = poly_psw.xcrd_ovrf[i];
+      poly_psw.xalt_ovrf[i] = poly_psw.xcrd_ovrf[i];
+    }
+  }
+  addRandomNoise(xrs, poly_psw.xfrc, poly_psw.xfrc_ovrf, poly_psw.yfrc, poly_psw.yfrc_ovrf,
+                 poly_psw.zfrc, poly_psw.zfrc_ovrf, pnatom, 5.0, poly_psw.frc_scale);
+  addRandomNoise(xrs, poly_psw.xalt, poly_psw.xalt_ovrf, poly_psw.yalt, poly_psw.yalt_ovrf,
+                 poly_psw.zalt, poly_psw.zalt_ovrf, pnatom, 0.1, poly_psw.gpos_scale);
+
+  // Create a list of PhaseSpace objects with the same states, to perform the virtual site
+  // placement in an alternative data format.
+  std::vector<PhaseSpace> cpu_vec, gpu_vec;
+  cpu_vec.reserve(poly_psw.system_count);
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    cpu_vec.emplace_back(poly_psw.atom_counts[i], HybridFormat::HOST_ONLY);
+    gpu_vec.emplace_back(poly_psw.atom_counts[i], HybridFormat::HOST_ONLY);
+  }
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    coordCopy(&cpu_vec[i], poly_ps, i);
+  }
+  
+  // Transmute forces in the WHITE image of the synthesis and in each individual system.  Place
+  // the virtual sites in the BLACK image of the synthesis and in each individual system.  Set the
+  // test tolerances as appropriate for the arithmetic precision.
+  double frc_tol, pos_tol;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit();
+      SyAtomUpdateKit<double,
+                      double2, double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit();
+      transmitVirtualSiteForces<double, double2, double4>(&poly_psw, poly_vk, poly_auk);
+      placeVirtualSites<double, double2, double4>(&poly_psw, poly_vk, poly_auk);
+      frc_tol = 1.0e-7;
+      pos_tol = 1.0e-8;
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit();
+      SyAtomUpdateKit<float,
+                      float2, float4> poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit();
+      transmitVirtualSiteForces<float, float2, float4>(&poly_psw, poly_vk, poly_auk);
+      placeVirtualSites<float, float2, float4>(&poly_psw, poly_vk, poly_auk);
+      frc_tol = 2.5e-6;
+      pos_tol = 1.0e-7;
+    }
+    break;
+  }
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    PhaseSpaceWriter psw = cpu_vec[i].data();
+    const AtomGraph *ag = poly_ps.getSystemTopologyPointer(i);
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      {
+        const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+        transmitVirtualSiteForces(&psw, vsk);
+        placeVirtualSites<double>(&psw, vsk);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      {
+        const VirtualSiteKit<float> vsk = ag->getSinglePrecisionVirtualSiteKit();
+        transmitVirtualSiteForces(&psw, vsk);
+        placeVirtualSites<float>(&psw, vsk);
+      }
+      break;
+    }
+  }
+
+  // Check the results for virtual sites in the synthesis against the results for virtual sites in
+  // the indivudal systems.
+  const TrajectoryKind tpos = TrajectoryKind::POSITIONS;
+  const TrajectoryKind tfrc = TrajectoryKind::FORCES;
+  const CoordinateCycle cyc_black = CoordinateCycle::BLACK;
+  const std::string prec_msg("Precision model: " + getEnumerationName(prec) + ", global position "
+                             "bits: " + std::to_string(pos_bits) + ", force accumulation bits: " +
+                             std::to_string(frc_bits) + ".  ");
+  for (int i = 0; i < poly_psw.system_count; i++) {
+    const AtomGraph *ag = poly_ps.getSystemTopologyPointer(i);
+    std::string clue("The system is based on topology " + getBaseName(ag->getFileName()) +
+                     ", containing virtual sites of type");
+    const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+    std::vector<bool> coverage(static_cast<size_t>(VirtualSiteKind::NONE), false);
+    for (int j = 0; j < vsk.nsite; j++) {
+      const int jp_idx = vsk.vs_param_idx[j];
+      if (static_cast<VirtualSiteKind>(vsk.vs_types[jp_idx]) != VirtualSiteKind::NONE) {
+        coverage[vsk.vs_types[jp_idx]] = true;
+      }
+    }
+    int ncovered = 0;    
+    for (size_t j = 0; j < coverage.size(); j++) {
+      if (coverage[j]) {
+        ncovered++;
+      }
+    }
+    if (ncovered > 1) {
+      clue += "s";
+    }
+    clue += " ";
+    int nwritten = 0;
+    for (size_t j = 0; j < coverage.size(); j++) {
+      if (coverage[j]) {
+        clue += getEnumerationName(static_cast<VirtualSiteKind>(j));
+        if (nwritten < ncovered - 1) {
+          clue += ", ";
+        }
+        nwritten++;
+      }
+    }
+    clue += ".";
+    coordCopy(&gpu_vec[i], poly_ps, i);
+    const std::vector<double> cpu_frc = cpu_vec[i].getInterlacedCoordinates(tfrc);
+    const std::vector<double> gpu_frc = gpu_vec[i].getInterlacedCoordinates(tfrc);
+    const std::vector<double> cpu_pos = cpu_vec[i].getInterlacedCoordinates(cyc_black, tpos);
+    const std::vector<double> gpu_pos = gpu_vec[i].getInterlacedCoordinates(cyc_black, tpos);
+    check(cpu_frc, RelationalOperator::EQUAL, Approx(gpu_frc).margin(frc_tol), "Transmission of "
+          "virtual site forces obtained for a synthesis of systems did not match that obtained by "
+          "calculation on an individual system for system index " + std::to_string(i) + ".  " +
+          prec_msg + clue, tsm.getTestingStatus());
+    check(cpu_pos, RelationalOperator::EQUAL, Approx(gpu_pos).margin(pos_tol), "Placement of "
+          "virtual sites obtained for a synthesis of systems did not match that obtained by "
+          "calculation on an individual system for system index " + std::to_string(i) + ".  " +
+          prec_msg + clue, tsm.getTestingStatus());
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -798,7 +959,7 @@ void checkRattleFunctionality(const TestSystemManager &tsm, const PrecisionModel
       ntop_with_sett++;
     }
   }
-
+  
   // Extract systems one by one, perturb the relevant atoms, and apply RATTLE.
   for (int i = 0; i < nsys; i++) {
     if (has_cnst[i] == false) {
@@ -811,7 +972,7 @@ void checkRattleFunctionality(const TestSystemManager &tsm, const PrecisionModel
     PhaseSpaceWriter psw_alt = ps.data(CoordinateCycle::BLACK);
     addRandomNoise(xsr, psw.xvel, psw.yvel, psw.zvel, psw.natom, 1.0);
     CoordinateFrame cf(psw.natom);
-
+    
     // There is currently no way to copy one coordinate cycle point's contents to the other in
     // a PhaseSpace object.  Use an intermediary object.
     coordCopy(&cf, ps, TrajectoryKind::POSITIONS, CoordinateCycle::WHITE);
@@ -1115,9 +1276,23 @@ void checkSynthesisRattleC(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceS
                               PrecisionModel::DOUBLE : PrecisionModel::SINGLE;
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
     PhaseSpace ref_ps = raw.exportSystem(i, tier);
+    PhaseSpaceWriter ref_psw = ref_ps.data();
     const AtomGraph *ag_ptr = raw.getSystemTopologyPointer(i);
     shakePositions(&ref_ps, ag_ptr, prec, dt, tol, 30, RattleMethod::CENTER_SUM);
-    PhaseSpaceWriter ref_psw = ref_ps.data();
+    switch (tier) {
+    case HybridTargetLevel::HOST:
+      break;
+#ifdef STORMM_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      {
+        // The GPU geometry constraint kernel also performs virtual site replacement.  The results
+        // in this test will be applied to the BLACK image.
+        const VirtualSiteKit vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
+        placeVirtualSites(&ref_psw, vsk);
+      }
+      break;
+#endif
+    }
     const PhaseSpace test_ps = poly_ps.exportSystem(i, tier);
     
     // Check positions against the CPU results.
@@ -1125,12 +1300,19 @@ void checkSynthesisRattleC(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceS
       ref_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::POSITIONS);
     const std::vector<double> test_xyz =
       test_ps.getInterlacedCoordinates(CoordinateCycle::BLACK, TrajectoryKind::POSITIONS);
+#ifdef STORMM_USE_HPC
+    const std::string engine = (tier == HybridTargetLevel::DEVICE) ? std::string("GPU") :
+                                                                     std::string("CPU");
+#else
+    const std::string engine = std::string("CPU");
+#endif
     check(ref_xyz, RelationalOperator::EQUAL, Approx(test_xyz).margin(chk_tol), "Constrained "
           "positions from " + getEnumerationName(prec) + "-precision arithmetic operating on "
           "coordinates with " + std::to_string(poly_ps.getGlobalPositionBits()) + " bits of "
           "positional precision and " + std::to_string(poly_ps.getVelocityBits()) + " bits of "
-          "velocity precision do not agree with a double-precision standard.  The system topology "
-          "is " + getBaseName(ag_ptr->getFileName()) + ".", do_tests);
+          "velocity precision do not agree with a double-precision CPU standard.  The system "
+          "topology is " + getBaseName(ag_ptr->getFileName()) + ".  Calculations were performed "
+          "on the " + engine + ".", do_tests);
 
     // Test velocities to ensure that the correction to account for positional adjustments was
     // successful.
@@ -1144,7 +1326,8 @@ void checkSynthesisRattleC(const PhaseSpaceSynthesis &poly_ps, const PhaseSpaceS
           std::to_string(poly_ps.getGlobalPositionBits()) + " bits of positional precision and " +
           std::to_string(poly_ps.getVelocityBits()) + " bits of velocity precision do not agree "
           "with a double-precision standard.  The system topology is " +
-          getBaseName(ag_ptr->getFileName()) + ".", do_tests);
+          getBaseName(ag_ptr->getFileName()) + ".  Calculations were performed on the " + engine +
+          ".", do_tests);
   }
 }
 
@@ -1298,7 +1481,6 @@ void checkRattle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
 #else
   const std::vector<HybridTargetLevel> tiers = { HybridTargetLevel::HOST };
 #endif
-  
   // Make a copy of the coordinate synthesis as it has been constructed: reference positions (in
   // the WHITE stage of the time cycle, which it holds as current) set such that the bond lengths
   // are all correct, random reference velocities are based on some state at 273 Kelvin, and there
@@ -1900,17 +2082,17 @@ void checkSettle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
     const int j_hlim = j_llim + poly_psw.atom_counts[i];
     for (int j = j_llim; j < j_hlim; j++) {
       const double xpush = hostInt95ToDouble(poly_psw.xfrc[j], poly_psw.xfrc_ovrf[j]) *
-                           poly_psw.inv_frc_scale_f;
+                           poly_psw.inv_frc_scale;
       const double ypush = hostInt95ToDouble(poly_psw.yfrc[j], poly_psw.yfrc_ovrf[j]) *
-                           poly_psw.inv_frc_scale_f;
+                           poly_psw.inv_frc_scale;
       const double zpush = hostInt95ToDouble(poly_psw.zfrc[j], poly_psw.zfrc_ovrf[j]) *
-                           poly_psw.inv_frc_scale_f;
+                           poly_psw.inv_frc_scale;
       const int95_t xrate = hostInt95Sum(poly_psw.vxalt[j], poly_psw.vxalt_ovrf[j],
-                                         xpush * poly_psw.vel_scale_f);
+                                         xpush * poly_psw.vel_scale);
       const int95_t yrate = hostInt95Sum(poly_psw.vyalt[j], poly_psw.vyalt_ovrf[j],
-                                         ypush * poly_psw.vel_scale_f);
+                                         ypush * poly_psw.vel_scale);
       const int95_t zrate = hostInt95Sum(poly_psw.vzalt[j], poly_psw.vzalt_ovrf[j],
-                                         zpush * poly_psw.vel_scale_f);
+                                         zpush * poly_psw.vel_scale);
       poly_psw.vxalt[j] = xrate.x;
       poly_psw.vyalt[j] = yrate.x;
       poly_psw.vzalt[j] = zrate.x;
@@ -1918,17 +2100,17 @@ void checkSettle(const TestSystemManager &tsm, Xoshiro256ppGenerator *xsr,
       poly_psw.vyalt_ovrf[j] = yrate.y;
       poly_psw.vzalt_ovrf[j] = zrate.y;
       const double xloc = hostInt95ToDouble(poly_psw.xcrd[j], poly_psw.xcrd_ovrf[j]) *
-                          poly_psw.inv_gpos_scale_f;
+                          poly_psw.inv_gpos_scale;
       const double yloc = hostInt95ToDouble(poly_psw.ycrd[j], poly_psw.ycrd_ovrf[j]) *
-                          poly_psw.inv_gpos_scale_f;
+                          poly_psw.inv_gpos_scale;
       const double zloc = hostInt95ToDouble(poly_psw.zcrd[j], poly_psw.zcrd_ovrf[j]) *
-                          poly_psw.inv_gpos_scale_f;
-      const double dxrate = hostInt95ToDouble(xrate) * poly_psw.inv_vel_scale_f;
-      const double dyrate = hostInt95ToDouble(yrate) * poly_psw.inv_vel_scale_f;
-      const double dzrate = hostInt95ToDouble(zrate) * poly_psw.inv_vel_scale_f;
-      const int95_t xupd = hostDoubleToInt95((xloc + dxrate) * poly_psw.gpos_scale_f);
-      const int95_t yupd = hostDoubleToInt95((yloc + dyrate) * poly_psw.gpos_scale_f);
-      const int95_t zupd = hostDoubleToInt95((zloc + dzrate) * poly_psw.gpos_scale_f);
+                          poly_psw.inv_gpos_scale;
+      const double dxrate = hostInt95ToDouble(xrate) * poly_psw.inv_vel_scale;
+      const double dyrate = hostInt95ToDouble(yrate) * poly_psw.inv_vel_scale;
+      const double dzrate = hostInt95ToDouble(zrate) * poly_psw.inv_vel_scale;
+      const int95_t xupd = hostDoubleToInt95((xloc + dxrate) * poly_psw.gpos_scale);
+      const int95_t yupd = hostDoubleToInt95((yloc + dyrate) * poly_psw.gpos_scale);
+      const int95_t zupd = hostDoubleToInt95((zloc + dzrate) * poly_psw.gpos_scale);
       poly_psw.xalt[j] = xupd.x;
       poly_psw.yalt[j] = yupd.x;
       poly_psw.zalt[j] = zupd.x;
@@ -1975,7 +2157,7 @@ int main(const int argc, const char* argv[]) {
   if (oe.getVerbosity() == TestVerbosity::FULL) {
     stormmSplash();
   }
-
+  
   // Prep the GPU
 #ifdef STORMM_USE_HPC
   const HpcConfig gpu_config(ExceptionResponse::WARN);
@@ -2336,7 +2518,7 @@ int main(const int argc, const char* argv[]) {
         "not correctly report its virtual site content.", do_vs_tests);  
   PhaseSpaceWriter brbz_psw = brbz_ps.data();
   scrambleSystemCoordinates(&brbz_ps, brbz_ag, &xsr);
-  placeVirtualSites(&brbz_ps, brbz_ag);
+  placeVirtualSites(&brbz_ps, brbz_ag, brbz_ps.getCyclePosition());
   centerAndReimageSystem(&brbz_ps);
   const std::vector<double3> brbz_answers = { {  0.800000000, -1.000000000,  0.000000000 },
                                               {  0.434257916,  1.000000000,  0.000000000 },
@@ -2357,7 +2539,7 @@ int main(const int argc, const char* argv[]) {
                                       PhaseSpace();
   PhaseSpaceWriter stro_psw = stro_ps.data();
   scrambleSystemCoordinates(&stro_ps, stro_ag, &xsr);
-  placeVirtualSites(&stro_ps, stro_ag);
+  placeVirtualSites(&stro_ps, stro_ag, stro_ps.getCyclePosition());
   centerAndReimageSystem(&stro_ps);
   const std::vector<double3> stro_answers = { {  1.000000000,  0.000000000,  0.000000000 },
                                               {  0.450000000,  1.000000000,  0.000000000 },
@@ -2369,7 +2551,7 @@ int main(const int argc, const char* argv[]) {
                                       PhaseSpace();
   PhaseSpaceWriter symm_psw = symm_ps.data();
   scrambleSystemCoordinates(&symm_ps, symm_ag, &xsr);
-  placeVirtualSites(&symm_ps, symm_ag);
+  placeVirtualSites(&symm_ps, symm_ag, symm_ps.getCyclePosition());
   centerAndReimageSystem(&symm_ps);
   const std::vector<double3> symm_answers = { {  0.500000000,  0.000000000,  2.094395102 },
                                               {  0.500000000,  0.000000000,  2.094395102 },
@@ -2386,7 +2568,7 @@ int main(const int argc, const char* argv[]) {
                                       PhaseSpace();
   PhaseSpaceWriter dgvs_psw = dgvs_ps.data();
   scrambleSystemCoordinates(&dgvs_ps, dgvs_ag, &xsr);
-  placeVirtualSites(&dgvs_ps, dgvs_ag);
+  placeVirtualSites(&dgvs_ps, dgvs_ag, dgvs_ps.getCyclePosition());
   centerAndReimageSystem(&dgvs_ps);
   const std::vector<double3> dgvs_answers = { {  0.333300000,  0.000000000,  0.00000000 },
                                               {  0.333300000,  0.000000000,  0.00000000 },
@@ -2399,6 +2581,20 @@ int main(const int argc, const char* argv[]) {
   checkVirtualSiteForceXfer(&stro_ps, &stro_ag, do_vs_tests);
   checkVirtualSiteForceXfer(&symm_ps, &symm_ag, do_vs_tests);
   checkVirtualSiteForceXfer(&dgvs_ps, &dgvs_ag, do_vs_tests);
+  const std::vector<std::string> vs_collection = { "bromobenzene_vs", "stereo_L1_vs",
+                                                   "symmetry_L1_vs", "drug_example_vs", "tip4p",
+                                                   "ubiquitin", "bromobenzene_vs_iso",
+                                                   "drug_example_vs_iso" };
+  TestSystemManager tsm_vs(base_top_path, "top", vs_collection, base_crd_path, "inpcrd",
+                           vs_collection);
+  const std::vector<std::vector<UnitCellType>> uc_bundles = {
+    { UnitCellType::NONE }, { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC }
+  };
+  for (size_t i = 0; i < uc_bundles.size(); i++) {
+    checkVirtualSiteMechanics(tsm_vs, uc_bundles[i], &xsr, 36, 36, PrecisionModel::DOUBLE);
+    checkVirtualSiteMechanics(tsm_vs, uc_bundles[i], &xsr, 70, 64, PrecisionModel::DOUBLE);
+    checkVirtualSiteMechanics(tsm_vs, uc_bundles[i], &xsr, 28, 24, PrecisionModel::SINGLE);
+  }
 
   // Check restraint applications through RATTLE and SETTLE
   section(5);
@@ -2416,7 +2612,7 @@ int main(const int argc, const char* argv[]) {
   checkRattle(tsm, &xsr, std::vector<UnitCellType>(1, UnitCellType::NONE),
               PrecisionModel::SINGLE, gpu);
   checkSettle(tsm, &xsr, PrecisionModel::DOUBLE, 1.0e-7, 2.1e-5, 4.0e-10);
-  checkSettle(tsm, &xsr, PrecisionModel::SINGLE, 3.0e-6, 5.4e-5, 4.0e-7);
+  checkSettle(tsm, &xsr, PrecisionModel::SINGLE, 5.7e-6, 5.4e-5, 4.0e-7);
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -131,6 +131,22 @@ template <typename Tcalc>
 void imageCoordinates(PhaseSpaceSynthesis *poly_ps, int system_index, ImagingMethod style);
 /// \}
 
+/// \brief Compute the displacement between two particles with positions represented in int95_t
+///        format.  Scale the result to the internal units of Angstroms using a fixed-precision
+///        inverse scaling factor.  While this function calculates in double precision, it does not
+///        do anything that would add precision to the final result, and can therefore be used in
+///        the context of experiments at lower precision so long as its output is immediately
+///        converted ot the relevant arithmetic type, e.g. float.
+///
+/// \param atom_i           The origin atom
+/// \param atom_j           The destination atom: the displacement will be computed for i -> j
+/// \param crd              Fixed-precision particle positions along one Cartesian axis
+/// \param crd_ovrf         Overflow bits for the fixed-precision particle positions
+/// \param inv_gpos_factor  The inverse scaling factor on the fixed-precision positions
+template <typename Tcoord>
+double displacement(int atom_i, int atom_j, const Tcoord* crd, const int* crd_ovrf,
+                    double inv_gpos_factor);
+
 /// \brief Compute the distance between two points in a coordinate set.  All forms of this
 ///        function work with double-precision coordinates on the host.
 ///

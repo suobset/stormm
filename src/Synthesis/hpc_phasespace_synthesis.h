@@ -32,13 +32,21 @@ void systemTransfer(PsSynthesisWriter *destination, PsSynthesisWriter *source,
 /// \brief Launch the eponymous kernel to initialize forces on the GPU in a PhaseSpaceSynthesis
 ///        object.
 ///
+/// Overloaded:
+///   - Provide a specific system for which to initialize forces
+///   - Initialize forces for all systems
+///
 /// \param psyw   Writeable abstract for the PhaseSpaceSynthesis, containing system limits and
 ///               pointers to all coordinates and forces
 /// \param index  Index of the system to initialize; if negative, all systems will be initialized.
 /// \param gpu    Details of the GPU in use
+/// \{
 void psyInitializeForces(PsSynthesisWriter *psyw, int index = -1,
                          const GpuDetails &gpu = null_gpu);
 
+void psyInitializeForces(PsSynthesisWriter *psyw, const GpuDetails &gpu);
+/// \}
+  
 /// \brief Prepare certain buffers in the phase space (specifically, prior coordinates and
 ///        velocities) which would otherwise not be used in energy minimization calculations.
 ///

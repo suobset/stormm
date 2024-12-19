@@ -5,6 +5,7 @@
 #include <vector>
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"

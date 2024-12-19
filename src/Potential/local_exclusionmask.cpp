@@ -3,7 +3,7 @@
 #include "Math/series_ops.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
-#include "Topology/atomgraph_analysis.h"
+#include "Topology/lennard_jones_analysis.h"
 #include "Topology/topology_util.h"
 #include "local_exclusionmask.h"
 

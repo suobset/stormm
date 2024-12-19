@@ -143,6 +143,76 @@ double computeMigrationRate(const double effective_cutoff, const double sigma) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void contributeCellGridForces(PsSynthesisWriter *destw,
+                              const CellGridReader<void, void, void, void> &cgr_v,
+                              const size_t tc_mat, const size_t tc_acc,
+                              const HybridTargetLevel tier, const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    
+    // Restore the type of the cell grid abstract and call the templated CPU routine.
+    if (tc_acc == int_type_index) {
+      if (tc_mat == double_type_index) {
+        const CellGridReader<double, int,
+                             double, double4> cgr = restoreType<double, int,
+                                                                double, double4>(cgr_v);
+        contributeCellGridForces<double, int, double, double4>(destw, cgr);
+      }
+      else if (tc_mat == float_type_index) {
+        const CellGridReader<float, int, float, float4> cgr = restoreType<float, int,
+                                                                          float, float4>(cgr_v);
+        contributeCellGridForces<float, int, float, float4>(destw, cgr);
+      }
+      else if (tc_mat == llint_type_index) {
+        const CellGridReader<llint, int,
+                             llint, longlong4> cgr = restoreType<llint, int,
+                                                                 llint, longlong4>(cgr_v);
+        contributeCellGridForces<llint, int, llint, longlong4>(destw, cgr);
+      }
+      else if (tc_mat == int_type_index) {
+        const CellGridReader<int, int, int, int4> cgr = restoreType<int, int, int, int4>(cgr_v);
+        contributeCellGridForces<int, int, int, int4>(destw, cgr);
+      }
+    }
+    else {
+      if (tc_mat == double_type_index) {
+        const CellGridReader<double, llint,
+                             double, double4> cgr = restoreType<double, llint,
+                                                                double, double4>(cgr_v);
+        contributeCellGridForces<double, llint, double, double4>(destw, cgr);
+      }
+      else if (tc_mat == float_type_index) {
+        const CellGridReader<float, llint, float, float4> cgr = restoreType<float, llint,
+                                                                            float, float4>(cgr_v);
+        contributeCellGridForces<float, llint, float, float4>(destw, cgr);
+      }
+      else if (tc_mat == llint_type_index) {
+        const CellGridReader<llint, llint,
+                             llint, longlong4> cgr = restoreType<llint, llint,
+                                                                 llint, longlong4>(cgr_v);
+        contributeCellGridForces<llint, llint, llint, longlong4>(destw, cgr);
+      }
+      else if (tc_mat == int_type_index) {
+        const CellGridReader<int, llint, int, int4> cgr = restoreType<int, llint,
+                                                                      int, int4>(cgr_v);
+        contributeCellGridForces<int, llint, int, int4>(destw, cgr);
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    if (gpu != null_gpu) {
+      launchCellGridAction(cgr_v, tc_mat, tc_acc, destw, gpu, CellGridAction::XFER_FORCES);
+    }
+    else {
+      rtErr("A valid GPU must be provided.", "CellGrid", "initializeForces");
+    }
+    break;
+#endif
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 int3 optimizeCellConfiguration(const int cell_na, const int cell_nb, const int cell_nc,
                                const int subdivisions) {
   const std::vector<uint> prime_factors = { 2, 3, 5, 7, 11 };

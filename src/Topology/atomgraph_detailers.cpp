@@ -687,44 +687,51 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   }
 
   // Get all of the descriptors.  The current Amber topology has one optional descriptor.
-  const ulint max_descriptors = static_cast<ulint>(TopologyDescriptor::N_VALUES);
+  typedef TopologyDescriptor TD;
+  const ulint max_descriptors = static_cast<ulint>(TD::N_VALUES);
   lstart = scanToFlag(fmem, "POINTERS", &dfmt, TopologyRequirement::ESSENTIAL, lstart);
   std::vector<int> tmp_desc = iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z,
                                                max_descriptors - 1, max_descriptors);
-
+  
   // Assign descriptors to counts of atoms, residues, and other parts of the system
-  atom_count = tmp_desc[0];
-  residue_count = tmp_desc[11];
-  largest_residue_size = tmp_desc[28];
-  implicit_copy_count = (tmp_desc.size() > 31) ? tmp_desc[31] : 0;
+  atom_count = tmp_desc[static_cast<size_t>(TD::ATOM_COUNT)];
+  residue_count = tmp_desc[static_cast<size_t>(TD::RESIDUE_COUNT)];
+  largest_residue_size =
+    tmp_desc[static_cast<size_t>(TD::ATOM_COUNT_LARGEST_RESIDUE)];
+  implicit_copy_count = (tmp_desc.size() >
+                         static_cast<size_t>(TD::PIMD_SLICE_COUNT)) ?
+                        tmp_desc[static_cast<size_t>(TD::PIMD_SLICE_COUNT)] : 0;
 
   // Assign descriptors relevant to the bonded calculation
-  bond_term_with_hydrogen = tmp_desc[2];
-  angl_term_with_hydrogen = tmp_desc[4];
-  dihe_term_with_hydrogen = tmp_desc[6];
-  bond_term_without_hydrogen = tmp_desc[3];
-  angl_term_without_hydrogen = tmp_desc[5];
-  dihe_term_without_hydrogen = tmp_desc[7];
+  bond_term_with_hydrogen = tmp_desc[static_cast<size_t>(TD::BONDS_WITH_HYDROGEN)];
+  angl_term_with_hydrogen =
+    tmp_desc[static_cast<size_t>(TD::ANGLES_WITH_HYDROGEN)];
+  dihe_term_with_hydrogen =
+    tmp_desc[static_cast<size_t>(TD::DIHEDRALS_WITH_HYDROGEN)];
+  bond_term_without_hydrogen =
+    tmp_desc[static_cast<size_t>(TD::BONDS_WITHOUT_HYDROGEN)];
+  angl_term_without_hydrogen = tmp_desc[static_cast<size_t>(TD::ANGLES_WITHOUT_HYDROGEN)];
+  dihe_term_without_hydrogen = tmp_desc[static_cast<size_t>(TD::DIHEDRALS_WITHOUT_HYDROGEN)];
   bond_term_count = bond_term_with_hydrogen + bond_term_without_hydrogen;
   angl_term_count = angl_term_with_hydrogen + angl_term_without_hydrogen;
   dihe_term_count = dihe_term_with_hydrogen + dihe_term_without_hydrogen;
-  bond_parameter_count = tmp_desc[15];
-  angl_parameter_count = tmp_desc[16];
-  dihe_parameter_count = tmp_desc[17];
-  bond_perturbation_term_count = tmp_desc[21];
-  angl_perturbation_term_count = tmp_desc[22];
-  dihe_perturbation_term_count = tmp_desc[23];
-  bonds_in_perturbed_group = tmp_desc[24];
-  angls_in_perturbed_group = tmp_desc[25];
-  dihes_in_perturbed_group = tmp_desc[26];
+  bond_parameter_count = tmp_desc[static_cast<size_t>(TD::BOND_TYPE_COUNT)];
+  angl_parameter_count = tmp_desc[static_cast<size_t>(TD::ANGLE_TYPE_COUNT)];
+  dihe_parameter_count = tmp_desc[static_cast<size_t>(TD::DIHEDRAL_TYPE_COUNT)];
+  bond_perturbation_term_count = tmp_desc[static_cast<size_t>(TD::BOND_PERTURBATIONS)];
+  angl_perturbation_term_count = tmp_desc[static_cast<size_t>(TD::ANGLE_PERTURBATIONS)];
+  dihe_perturbation_term_count = tmp_desc[static_cast<size_t>(TD::DIHEDRAL_PERTURBATIONS)];
+  bonds_in_perturbed_group = tmp_desc[static_cast<size_t>(TD::BONDS_IN_PERTURBED_GROUP)];
+  angls_in_perturbed_group = tmp_desc[static_cast<size_t>(TD::ANGLES_IN_PERTURBED_GROUP)];
+  dihes_in_perturbed_group = tmp_desc[static_cast<size_t>(TD::DIHEDRALS_IN_PERTURBED_GROUP)];
 
   // Assign descriptors relevant to virtual site placement
-  virtual_site_count = tmp_desc[30];
+  virtual_site_count = tmp_desc[static_cast<size_t>(TD::EXTRA_POINT_COUNT)];
 
   // Assign descriptors relevant to the non-bonded calculation
-  lj_type_count = tmp_desc[1];
-  total_exclusions = tmp_desc[10];
-  switch (tmp_desc[27]) {
+  lj_type_count = tmp_desc[static_cast<size_t>(TD::ATOM_TYPE_COUNT)];
+  total_exclusions = tmp_desc[static_cast<size_t>(TD::TOTAL_EXCLUDED_ATOMS)];
+  switch (tmp_desc[static_cast<size_t>(TD::BOX_TYPE_INDEX)]) {
   case 0:
     periodic_box_class = UnitCellType::NONE;
     break;
@@ -735,11 +742,12 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
     periodic_box_class = UnitCellType::TRICLINIC;
     break;
   default:
-    rtErr("The IFBOX field has an invalid value of " + std::to_string(tmp_desc[27]), "AtomGraph");
+    rtErr("The IFBOX field has an invalid value of " +
+          std::to_string(tmp_desc[static_cast<size_t>(TD::BOX_TYPE_INDEX)]), "AtomGraph");
   }
 
   // Assign descriptors relevant to the MD propagation algorithm
-  switch (tmp_desc[20]) {
+  switch (tmp_desc[static_cast<size_t>(TD::PERTURBATION)]) {
   case 0:
     use_perturbation_info = PerturbationSetting::OFF;
     break;
@@ -747,9 +755,10 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
     use_perturbation_info = PerturbationSetting::ON;
     break;
   default:
-    rtErr("The IFPERT field has an invalid value of " + std::to_string(tmp_desc[20]), "AtomGraph");
+    rtErr("The IFPERT field has an invalid value of " +
+          std::to_string(tmp_desc[static_cast<size_t>(TD::PERTURBATION)]), "AtomGraph");
   }
-  switch (tmp_desc[29]) {
+  switch (tmp_desc[static_cast<size_t>(TD::CAP)]) {
   case 0:
     use_solvent_cap_option = SolventCapSetting::OFF;
     break;
@@ -757,17 +766,18 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
     use_solvent_cap_option = SolventCapSetting::ON;
     break;
   default:
-    rtErr("The IFCAP field has an invalid value of " + std::to_string(tmp_desc[29]), "AtomGraph");
+    rtErr("The IFCAP field has an invalid value of " +
+          std::to_string(tmp_desc[static_cast<size_t>(TD::CAP)]), "AtomGraph");
   }
 
   // Assign descriptors pertaining to deprecated or unused information
-  unused_nhparm = tmp_desc[8];
-  unused_nparm = tmp_desc[9];
-  unused_natyp = tmp_desc[18];
-  hbond_10_12_parameter_count = tmp_desc[19];
-  heavy_bonds_plus_constraints = tmp_desc[12];
-  heavy_angls_plus_constraints = tmp_desc[13];
-  heavy_dihes_plus_constraints = tmp_desc[14];
+  unused_nhparm = tmp_desc[static_cast<size_t>(TD::NHPARM_UNUSED)];
+  unused_nparm = tmp_desc[static_cast<size_t>(TD::ADDLES_CREATED)];
+  unused_natyp = tmp_desc[static_cast<size_t>(TD::NATYP_UNUSED)];
+  hbond_10_12_parameter_count = tmp_desc[static_cast<size_t>(TD::NPHB_UNUSED)];
+  heavy_bonds_plus_constraints = tmp_desc[static_cast<size_t>(TD::NBONA_UNUSED)];
+  heavy_angls_plus_constraints = tmp_desc[static_cast<size_t>(TD::NTHETA_UNUSED)];
+  heavy_dihes_plus_constraints = tmp_desc[static_cast<size_t>(TD::NPHIA_UNUSED)];
 
   // Read the force field citations
   lstart = scanToFlag(fmem, "FORCE_FIELD_TYPE", &dfmt, TopologyRequirement::OPTIONAL, lstart);

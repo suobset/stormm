@@ -190,7 +190,7 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
                     const int max_iter) {
   const bool tcalc_is_double = (std::type_index(typeid(T)).hash_code() == double_type_index);
   const T zero = 0.0;
-
+  
   // Allocate arrays to hold the cached data  
   std::vector<int> imported_atom_ids(maximum_valence_work_unit_atoms);
   std::vector<llint> imported_xcrd(maximum_valence_work_unit_atoms);
@@ -269,17 +269,17 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
                                                     poly_psw->zcrd_ovrf[ph_global_idx],
                                                     poly_psw->zcrd[ca_global_idx],
                                                     poly_psw->zcrd_ovrf[ca_global_idx]);
-          dx_ref[lane] = hostInt95ToDouble(idx_ref) * poly_psw->inv_gpos_scale_f;
-          dy_ref[lane] = hostInt95ToDouble(idy_ref) * poly_psw->inv_gpos_scale_f;
-          dz_ref[lane] = hostInt95ToDouble(idz_ref) * poly_psw->inv_gpos_scale_f;
+          dx_ref[lane] = hostInt95ToDouble(idx_ref) * poly_psw->inv_gpos_scale;
+          dy_ref[lane] = hostInt95ToDouble(idy_ref) * poly_psw->inv_gpos_scale;
+          dz_ref[lane] = hostInt95ToDouble(idz_ref) * poly_psw->inv_gpos_scale;
         }
         else {
           const llint idx_ref = poly_psw->xcrd[ph_global_idx] - poly_psw->xcrd[ca_global_idx];
           const llint idy_ref = poly_psw->ycrd[ph_global_idx] - poly_psw->ycrd[ca_global_idx];
           const llint idz_ref = poly_psw->zcrd[ph_global_idx] - poly_psw->zcrd[ca_global_idx];
-          dx_ref[lane] = static_cast<T>(idx_ref) * poly_psw->inv_gpos_scale_f;
-          dy_ref[lane] = static_cast<T>(idy_ref) * poly_psw->inv_gpos_scale_f;
-          dz_ref[lane] = static_cast<T>(idz_ref) * poly_psw->inv_gpos_scale_f;
+          dx_ref[lane] = static_cast<T>(idx_ref) * poly_psw->inv_gpos_scale;
+          dy_ref[lane] = static_cast<T>(idy_ref) * poly_psw->inv_gpos_scale;
+          dz_ref[lane] = static_cast<T>(idz_ref) * poly_psw->inv_gpos_scale;
         }
         ca_invmass[lane]       = poly_auk.inv_masses[ca_global_idx];
         ph_invmass[lane]       = poly_auk.inv_masses[ph_global_idx];
@@ -316,17 +316,17 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
                                                   imported_zcrd_ovrf[peripheral_atom],
                                                   imported_zcrd[central_atom],
                                                   imported_zcrd_ovrf[central_atom]);
-            dx = hostInt95ToDouble(idx) * poly_psw->inv_gpos_scale_f;
-            dy = hostInt95ToDouble(idy) * poly_psw->inv_gpos_scale_f;
-            dz = hostInt95ToDouble(idz) * poly_psw->inv_gpos_scale_f;
+            dx = hostInt95ToDouble(idx) * poly_psw->inv_gpos_scale;
+            dy = hostInt95ToDouble(idy) * poly_psw->inv_gpos_scale;
+            dz = hostInt95ToDouble(idz) * poly_psw->inv_gpos_scale;
           } 
           else {
             dx = static_cast<T>(imported_xcrd[peripheral_atom] - imported_xcrd[central_atom]) *
-                 poly_psw->inv_gpos_scale_f;
+                 poly_psw->inv_gpos_scale;
             dy = static_cast<T>(imported_ycrd[peripheral_atom] - imported_ycrd[central_atom]) *
-                 poly_psw->inv_gpos_scale_f;
+                 poly_psw->inv_gpos_scale;
             dz = static_cast<T>(imported_zcrd[peripheral_atom] - imported_zcrd[central_atom]) *
-                 poly_psw->inv_gpos_scale_f;
+                 poly_psw->inv_gpos_scale;
           }
 
           // Proceed with the RATTLE iteration
@@ -353,9 +353,9 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
             // fixed-point representation.  By the definitions of the constraint groups, this can
             // be done without atomic operations.
             if (tcalc_is_double) {
-              int95_t iph_move_x = hostDoubleToInt95(ph_move_x * poly_psw->gpos_scale_f);
-              int95_t iph_move_y = hostDoubleToInt95(ph_move_y * poly_psw->gpos_scale_f);
-              int95_t iph_move_z = hostDoubleToInt95(ph_move_z * poly_psw->gpos_scale_f);
+              int95_t iph_move_x = hostDoubleToInt95(ph_move_x * poly_psw->gpos_scale);
+              int95_t iph_move_y = hostDoubleToInt95(ph_move_y * poly_psw->gpos_scale);
+              int95_t iph_move_z = hostDoubleToInt95(ph_move_z * poly_psw->gpos_scale);
               iph_move_x = hostSplitFPSum(iph_move_x, imported_xcrd[peripheral_atom],
                                           imported_xcrd_ovrf[peripheral_atom]);
               iph_move_y = hostSplitFPSum(iph_move_y, imported_ycrd[peripheral_atom],
@@ -370,9 +370,9 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
               imported_zcrd_ovrf[peripheral_atom] = iph_move_z.y;
             }
             else {
-              imported_xcrd[peripheral_atom] += llround(ph_move_x * poly_psw->gpos_scale_f);
-              imported_ycrd[peripheral_atom] += llround(ph_move_y * poly_psw->gpos_scale_f);
-              imported_zcrd[peripheral_atom] += llround(ph_move_z * poly_psw->gpos_scale_f);
+              imported_xcrd[peripheral_atom] += llround(ph_move_x * poly_psw->gpos_scale);
+              imported_ycrd[peripheral_atom] += llround(ph_move_y * poly_psw->gpos_scale);
+              imported_zcrd[peripheral_atom] += llround(ph_move_z * poly_psw->gpos_scale);
             }
           }
           else {
@@ -395,14 +395,14 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
             // Check that the constraint is valid.
             if ((tinsr.x & 0xfffff) > 0) {
               if (tcalc_is_double) {
-                ica_move_x[lane] = hostDoubleToInt95(ca_move_x[lane] * poly_psw->gpos_scale_f);
-                ica_move_y[lane] = hostDoubleToInt95(ca_move_y[lane] * poly_psw->gpos_scale_f);
-                ica_move_z[lane] = hostDoubleToInt95(ca_move_z[lane] * poly_psw->gpos_scale_f);
+                ica_move_x[lane] = hostDoubleToInt95(ca_move_x[lane] * poly_psw->gpos_scale);
+                ica_move_y[lane] = hostDoubleToInt95(ca_move_y[lane] * poly_psw->gpos_scale);
+                ica_move_z[lane] = hostDoubleToInt95(ca_move_z[lane] * poly_psw->gpos_scale);
               }
               else {
-                ica_move_x[lane].x = llround(ca_move_x[lane] * poly_psw->gpos_scale_f);
-                ica_move_y[lane].x = llround(ca_move_y[lane] * poly_psw->gpos_scale_f);
-                ica_move_z[lane].x = llround(ca_move_z[lane] * poly_psw->gpos_scale_f);
+                ica_move_x[lane].x = llround(ca_move_x[lane] * poly_psw->gpos_scale);
+                ica_move_y[lane].x = llround(ca_move_y[lane] * poly_psw->gpos_scale);
+                ica_move_z[lane].x = llround(ca_move_z[lane] * poly_psw->gpos_scale);
                 ica_move_x[lane].y = 0;
                 ica_move_y[lane].y = 0;
                 ica_move_z[lane].y = 0;
@@ -501,12 +501,12 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
                                                   imported_zcrd_ovrf[local_idx],
                                                   poly_psw->zalt[global_idx],
                                                   poly_psw->zalt_ovrf[global_idx]);
-          const T mv_x = hostInt95ToDouble(imv_x) * poly_psw->inv_gpos_scale_f;
-          const T mv_y = hostInt95ToDouble(imv_y) * poly_psw->inv_gpos_scale_f;
-          const T mv_z = hostInt95ToDouble(imv_z) * poly_psw->inv_gpos_scale_f;
-          const int95_t vel_xadj = hostDoubleToInt95(mv_x / dt * poly_psw->vel_scale_f);
-          const int95_t vel_yadj = hostDoubleToInt95(mv_y / dt * poly_psw->vel_scale_f);
-          const int95_t vel_zadj = hostDoubleToInt95(mv_z / dt * poly_psw->vel_scale_f);
+          const T mv_x = hostInt95ToDouble(imv_x) * poly_psw->inv_gpos_scale;
+          const T mv_y = hostInt95ToDouble(imv_y) * poly_psw->inv_gpos_scale;
+          const T mv_z = hostInt95ToDouble(imv_z) * poly_psw->inv_gpos_scale;
+          const int95_t vel_xadj = hostDoubleToInt95(mv_x / dt * poly_psw->vel_scale);
+          const int95_t vel_yadj = hostDoubleToInt95(mv_y / dt * poly_psw->vel_scale);
+          const int95_t vel_zadj = hostDoubleToInt95(mv_z / dt * poly_psw->vel_scale);
           const int95_t n_vx = hostSplitFPSum(vel_xadj, poly_psw->vxalt[global_idx],
                                               poly_psw->vxalt_ovrf[global_idx]);
           const int95_t n_vy = hostSplitFPSum(vel_yadj, poly_psw->vyalt[global_idx],
@@ -524,12 +524,12 @@ void shakePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
           const llint imv_x = imported_xcrd[local_idx] - poly_psw->xalt[global_idx];
           const llint imv_y = imported_ycrd[local_idx] - poly_psw->yalt[global_idx];
           const llint imv_z = imported_zcrd[local_idx] - poly_psw->zalt[global_idx];
-          const T mv_x = static_cast<T>(imv_x) * poly_psw->inv_gpos_scale_f;
-          const T mv_y = static_cast<T>(imv_y) * poly_psw->inv_gpos_scale_f;
-          const T mv_z = static_cast<T>(imv_z) * poly_psw->inv_gpos_scale_f;
-          const llint vel_xadj = llround(mv_x / dt * poly_psw->vel_scale_f);
-          const llint vel_yadj = llround(mv_y / dt * poly_psw->vel_scale_f);
-          const llint vel_zadj = llround(mv_z / dt * poly_psw->vel_scale_f);
+          const T mv_x = static_cast<T>(imv_x) * poly_psw->inv_gpos_scale;
+          const T mv_y = static_cast<T>(imv_y) * poly_psw->inv_gpos_scale;
+          const T mv_z = static_cast<T>(imv_z) * poly_psw->inv_gpos_scale;
+          const llint vel_xadj = llround(mv_x / dt * poly_psw->vel_scale);
+          const llint vel_yadj = llround(mv_y / dt * poly_psw->vel_scale);
+          const llint vel_zadj = llround(mv_z / dt * poly_psw->vel_scale);
           poly_psw->vxalt[global_idx] += vel_xadj;
           poly_psw->vyalt[global_idx] += vel_yadj;
           poly_psw->vzalt[global_idx] += vel_zadj;
@@ -694,7 +694,7 @@ void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_v
                       const SyAtomUpdateKit<T, T2, T4> &poly_auk, const T dt, const T tol,
                       const int max_iter) {
   const bool tcalc_is_double = (std::type_index(typeid(T)).hash_code() == double_type_index);
-  const T rtoldt = tol * poly_psw->vel_scale_f / dt;
+  const T rtoldt = tol * poly_psw->vel_scale / dt;
 
   // Allocate arrays to hold the cached data  
   std::vector<int> imported_atom_ids(maximum_valence_work_unit_atoms);
@@ -781,9 +781,9 @@ void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_v
                                                     imported_zcrd_ovrf[peripheral_atom],
                                                     imported_zcrd[central_atom],
                                                     imported_zcrd_ovrf[central_atom]);
-          dx_ref[lane] = hostInt95ToDouble(idx_ref) * poly_psw->inv_gpos_scale_f;
-          dy_ref[lane] = hostInt95ToDouble(idy_ref) * poly_psw->inv_gpos_scale_f;
-          dz_ref[lane] = hostInt95ToDouble(idz_ref) * poly_psw->inv_gpos_scale_f;
+          dx_ref[lane] = hostInt95ToDouble(idx_ref) * poly_psw->inv_gpos_scale;
+          dy_ref[lane] = hostInt95ToDouble(idy_ref) * poly_psw->inv_gpos_scale;
+          dz_ref[lane] = hostInt95ToDouble(idz_ref) * poly_psw->inv_gpos_scale;
           ca_vx[lane] = poly_psw->vxalt[ca_gbl_idx];
           ca_vy[lane] = poly_psw->vyalt[ca_gbl_idx];
           ca_vz[lane] = poly_psw->vzalt[ca_gbl_idx];
@@ -801,9 +801,9 @@ void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_v
           const llint idx_ref = imported_xcrd[peripheral_atom] - imported_xcrd[central_atom];
           const llint idy_ref = imported_ycrd[peripheral_atom] - imported_ycrd[central_atom];
           const llint idz_ref = imported_zcrd[peripheral_atom] - imported_zcrd[central_atom];
-          dx_ref[lane] = static_cast<T>(idx_ref) * poly_psw->inv_gpos_scale_f;
-          dy_ref[lane] = static_cast<T>(idy_ref) * poly_psw->inv_gpos_scale_f;
-          dz_ref[lane] = static_cast<T>(idz_ref) * poly_psw->inv_gpos_scale_f;
+          dx_ref[lane] = static_cast<T>(idx_ref) * poly_psw->inv_gpos_scale;
+          dy_ref[lane] = static_cast<T>(idy_ref) * poly_psw->inv_gpos_scale;
+          dz_ref[lane] = static_cast<T>(idz_ref) * poly_psw->inv_gpos_scale;
           ca_vx[lane] = poly_psw->vxalt[ca_gbl_idx];
           ca_vy[lane] = poly_psw->vyalt[ca_gbl_idx];
           ca_vz[lane] = poly_psw->vzalt[ca_gbl_idx];
@@ -830,18 +830,18 @@ void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_v
           if (tcalc_is_double) {
             dvx = hostInt95ToDouble(hostInt95Subtract(ph_vx[lane], ph_vx_ovrf[lane],
                                                       ca_vx[lane], ca_vx_ovrf[lane])) *
-                  poly_psw->inv_vel_scale_f;
+                  poly_psw->inv_vel_scale;
             dvy = hostInt95ToDouble(hostInt95Subtract(ph_vy[lane], ph_vy_ovrf[lane],
                                                       ca_vy[lane], ca_vy_ovrf[lane])) *
-                  poly_psw->inv_vel_scale_f;
+                  poly_psw->inv_vel_scale;
             dvz = hostInt95ToDouble(hostInt95Subtract(ph_vz[lane], ph_vz_ovrf[lane],
                                                       ca_vz[lane], ca_vz_ovrf[lane])) *
-                  poly_psw->inv_vel_scale_f;
+                  poly_psw->inv_vel_scale;
           }
           else {
-            dvx = static_cast<T>(ph_vx[lane] - ca_vx[lane]) * poly_psw->inv_vel_scale_f;
-            dvy = static_cast<T>(ph_vy[lane] - ca_vy[lane]) * poly_psw->inv_vel_scale_f;
-            dvz = static_cast<T>(ph_vz[lane] - ca_vz[lane]) * poly_psw->inv_vel_scale_f;
+            dvx = static_cast<T>(ph_vx[lane] - ca_vx[lane]) * poly_psw->inv_vel_scale;
+            dvy = static_cast<T>(ph_vy[lane] - ca_vy[lane]) * poly_psw->inv_vel_scale;
+            dvz = static_cast<T>(ph_vz[lane] - ca_vz[lane]) * poly_psw->inv_vel_scale;
           }
           
           // Compute the dot product of the reference displacement and the velocity differential.
@@ -849,9 +849,9 @@ void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_v
           // by the combined inverse masses and the squared distance target.
           const T dot_rv = (dx_ref[lane] * dvx) + (dy_ref[lane] * dvy) + (dz_ref[lane] * dvz);
           const T term = (tcalc_is_double) ?
-                         -1.2  * dot_rv * poly_psw->vel_scale_f /
+                         -1.2  * dot_rv * poly_psw->vel_scale /
                          (combined_invmass[lane] * l2_target[lane]) :
-                         -1.2f * dot_rv * poly_psw->vel_scale_f /
+                         -1.2f * dot_rv * poly_psw->vel_scale /
                          (combined_invmass[lane] * l2_target[lane]);
           if (fabs(term) > rtoldt) {
             converged = false;

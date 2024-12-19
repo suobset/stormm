@@ -169,5 +169,87 @@ VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb,
   return inferCombiningRule(lja.data(), ljb.data(), n_lj_types, policy, seek_prevalent);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<bool> findPairSpecificParticipation(const T* lja, const T* ljb,
+                                                const int lj_type_count,
+                                                const VdwCombiningRule absolute_rule,
+                                                const VdwCombiningRule prevalent_rule) {
+  std::vector<double> sigma(lj_type_count);
+  std::vector<double> epsilon(lj_type_count);
+  for (int i = 0; i < lj_type_count; i++) {
+    const size_t diag_idx = (i * lj_type_count) + i;
+    sigma[i] = sqrt(cbrt(lja[diag_idx] / ljb[diag_idx]));
+    epsilon[i] = 0.25 * ljb[diag_idx] / pow(sigma[i], 6.0);
+  }
+  std::vector<bool> result(lj_type_count, false);
+  switch (absolute_rule) {
+  case VdwCombiningRule::GEOMETRIC:
+  case VdwCombiningRule::LORENTZ_BERTHELOT:
+    break;
+  case VdwCombiningRule::NBFIX:
+    for (int i = 0; i < lj_type_count; i++) {
+      for (int j = 0; j < i; j++) {
+        const double epsilon_ij = sqrt(epsilon[i] * epsilon[j]);
+        double sigma_ij;
+        switch (prevalent_rule) {
+        case VdwCombiningRule::GEOMETRIC:
+          sigma_ij = sqrt(sigma[i] * sigma[j]);
+          break;
+        case VdwCombiningRule::LORENTZ_BERTHELOT:
+          sigma_ij = 0.5 * (sigma[i] + sigma[j]);
+          break;
+        case VdwCombiningRule::NBFIX:
+
+          // If pair-specific parameter combinations are the norm, then mark every atom as having
+          // NBFix terms.
+          result[i] = true;
+          result[j] = true;
+          break;
+        }
+        const double expected_ij_a = 4.0 * epsilon_ij * pow(sigma_ij, 12.0);
+        const double expected_ij_b = 4.0 * epsilon_ij * pow(sigma_ij, 6.0);
+        if (fabs(expected_ij_a - lja[(i * lj_type_count) + j]) > 1.0e-3 ||
+            fabs(expected_ij_b - ljb[(i * lj_type_count) + j]) > 1.0e-5) {
+          result[i] = true;
+          result[j] = true;
+        }
+      }
+      break;
+    }
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<bool> findPairSpecificParticipation(const std::vector<T> &lja,
+                                                const std::vector<T> &ljb,
+                                                const VdwCombiningRule absolute_rule,
+                                                const VdwCombiningRule prevalent_rule) {
+  if (lja.size() != ljb.size()) {
+    rtErr("Lennard-Jones parameter tables must be of the same size (tables of " +
+          std::to_string(lja.size()) + " and " + std::to_string(ljb.size()) + " elements were "
+          "provided.", "findPairSpecificParticipation");
+  }
+  return findPairSpecificParticipation(lja.data(), ljb.data(), lja.size(), absolute_rule,
+                                       prevalent_rule);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<bool> findPairSpecificParticipation(const Hybrid<T> &lja, const Hybrid<T> &ljb,
+                                                const VdwCombiningRule absolute_rule,
+                                                const VdwCombiningRule prevalent_rule) {
+  if (lja.size() != ljb.size()) {
+    rtErr("Lennard-Jones parameter tables must be of the same size (tables of " +
+          std::to_string(lja.size()) + " and " + std::to_string(ljb.size()) + " elements were "
+          "provided.", "findPairSpecificParticipation");
+  }
+  return findPairSpecificParticipation(lja.data(), ljb.data(), lja.size(), absolute_rule,
+                                       prevalent_rule);
+}
+
 } // namespace topology
 } // namespace stormm

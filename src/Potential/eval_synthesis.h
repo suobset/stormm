@@ -6,7 +6,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/vector_ops.h"
-#include "Potential/eval_valence_workunit.h"
+#include "MolecularMechanics/mm_evaluation.h"
 #include "Potential/scorecard.h"
 #include "Potential/static_exclusionmask.h"
 #include "Potential/valence_potential.h"
@@ -20,7 +20,9 @@
 
 namespace stormm {
 namespace energy {
-  
+
+using mm::commitVwuEnergies;
+using mm::evalVwuInitEnergy;
 using stmath::readBitFromMask;
 using synthesis::AtomGraphSynthesis;
 using synthesis::maximum_valence_work_unit_atoms;
@@ -40,60 +42,13 @@ using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
 using synthesis::VwuTask;
 
-/// \brief Carry out the instructions in a single valence work unit, as presented in the topology
-///        synthesis.  This routine is called by various incarnations of the evalSyValenceEnergy()
-///        function.  While any of the local position, velocity, or force data passed into it
-///        could be modified, the calling functions may impose const-ness on the global positions,
-///        velocities, and forces of various particles.
+/// \brief Evaluate the Generalized Born radii for a synthesis of systems following the protocols
+///        of GPU kernels regarding preservation of precision and conversions to and from the
+///        floating point calculation type.
 ///
-/// \param syvk         Consensus tables of valence parameters and instructions
-/// \param syrk         Consensus tables of restraint parameters and instructions  
-/// \param sh_xcrd      Mock data array for locally cached particle X coordinates
-/// \param sh_ycrd      Mock data array for locally cached particle Y coordinates
-/// \param sh_zcrd      Mock data array for locally cached particle Z coordinates
-/// \param sh_xvel      Mock data array for locally cached particle X velocities
-/// \param sh_yvel      Mock data array for locally cached particle Y velocities
-/// \param sh_zvel      Mock data array for locally cached particle Z velocities
-/// \param sh_xfrc      Mock data array for locally accumulating particle X forces
-/// \param sh_yfrc      Mock data array for locally accumulating particle Y forces
-/// \param sh_zfrc      Mock data array for locally accumulating particle Z forces
-/// \param ecard        Energy tracking object
-/// \param vwu_idx      Index of the valence work unit to evaluate, as stored in the topology
-///                     synthesis
-/// \param eval_force   Flag to have forces evaluated
-/// \param activity     Evaluate a particular energy component, or all components
-/// \param purpose      Purpose of the evaluation: to accumulate forces and / or energies, or to
-///                     move particles
-/// \param step_number  Number of the step in the simulation (relevant to restraint applications)
-template <typename Tcalc, typename Tcalc2, typename Tcalc4>
-void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
-                            const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk,
-                            const Tcalc* sh_charges, const int* sh_lj_idx, llint* sh_xcrd,
-                            llint* sh_ycrd, llint* sh_zcrd, llint* sh_xvel, llint* sh_yvel,
-                            llint* sh_zvel, llint* sh_xfrc, llint* sh_yfrc, llint* sh_zfrc,
-                            double inv_gpos_scale, double force_scale, ScoreCard *ecard,
-                            int vwu_idx, EvaluateForce eval_force, VwuTask activity,
-                            VwuGoal purpose, int step_number);
-
-/// \brief Evaluate all work units in an AtomGraphSynthesis (synthesis of topologies).  This
-///        function will allocate mock data arrays to drive synthesisVwuEvaluation() above.
-///
-/// \param syvk         Topology synthesis-based abstract for parameters on valence interactions
-/// \param syrk         Topology synthesis-based abstract for parameters on restraints
-/// \param psyw         Writeable abstract for the coordinate synthesis
-/// \param ecard        Energy tracker object
-/// \param eval_force   Flag to also carry out force evaluation (energy is always evaluated in CPU
-///                     functions)
-/// \param activity     Evaluate a particular energy component, or all components
-/// \param purpose      Purpose of the evaluation: to accumulate forces and / or energies, or to
-///                     move particles
-/// \param step_number  Number of the step in the simulation (relevant to restraint applications)
-template <typename Tcalc, typename Tcalc2, typename Tcalc4>
-void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
-                         const SyAtomUpdateKit<Tcalc, Tcalc2, Tcalc4> syauk,
-                         const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
-                         ScoreCard *ecard, EvaluateForce eval_force, VwuTask activity,
-                         VwuGoal purpose, int step_number);
+/// \param synbk  
+/// \param syse
+/// \param psyw
 
 /// \brief Evaluate the non-bonded energies (and possibly forces) of a synthesis of systems in
 ///        isolated boundary conditions using non-bonded work units composed of tile groups.  These
@@ -101,6 +56,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 ///        process.
 ///
 /// \param synbk            Non-bonded parameters for all atoms in the compilation of systems
+/// \param syse             Abstract of the exclusion masks for all systems
 /// \param psyr             Abstract for the coordinate synthesis
 /// \param ecardw           Energy tracker object writer
 /// \param eval_elec_force  Flag to also carry out force evaluation of electrostatic interactions
@@ -114,12 +70,19 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
 
 /// \brief Evaluate the non-bonded energy with a particular precision level.  This will invoke
 ///        the proper C++ function.
+///
+/// \param poly_ag          Hold non-bonded parameters for all systems in the synthesis
+/// \param poly_se          Holds exclusions mapped for all systems in the synthesis
+/// \param poly_ps          Holds coordinates and force accumulators for the synthesis of systems
+/// \param ecard            Tracking object to collect electrostatic and van-der Waals energies
+/// \param eval_elec_force  Indicate whether to evaluate electrostatic forces
+/// \param evel_vdw_force   Indicate whether to evaluate van-der Waals (Lennard-Jones) forces
 template <typename Tcalc>
 void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
                            const StaticExclusionMaskSynthesis &poly_se,
                            PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
                            EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
-
+  
 } // namespace energy
 } // namespace stormm
 

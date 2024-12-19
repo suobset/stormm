@@ -419,6 +419,40 @@ template <typename T> void computeBoxTransform(const std::vector<T> &dims, std::
 template <typename T>
 void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, const T* invu);
 
+/// \brief Compute the matrix to rotate about a vector.
+///
+/// Overloaded:
+///   - Provided pre-allocated space for the matrix, either a Standard Template Library vector or
+///     a C-style array
+///   - Accept the matrix as the output of the function
+///   - Provide the vector as a three-element array or a tuple
+///
+/// \param v      The vector about which to rotate
+/// \param theta
+/// \param m      The pre-allocated matrix with nine elements
+/// \{
+template <typename T, typename T3>
+void rotationMatrixAboutVector(T v_x, T v_y, T v_z, const T theta, T* m);
+
+template <typename T, typename T3>
+void rotationMatrixAboutVector(const T3 v, const T theta, T* m);
+
+template <typename T, typename T3>
+void rotationMatrixAboutVector(const T3 v, const T theta, std::vector<T> *m);
+
+template <typename T, typename T3>
+std::vector<T> rotationMatrixAboutVector(const T3 v, const T theta);
+
+template <typename T>
+std::vector<T> rotationMatrixAboutVector(const std::vector<T> &v, const T theta);
+
+template <typename T>
+void rotationMatrixAboutVector(const T* v, const T theta, T* m);
+
+template <typename T>
+void rotationMatrixAboutVector(const T* v, const T theta, std::vector<T> *m);
+/// \}
+
 /// \brief Compute the Hessian normal form to obtain the thickness of a unit cell (or mesh element)
 ///        based on its "a", "b", and "c" box vectors.  The thicknesses between planes defined by
 ///        the "b" and "c" vectors (x in an orthorhombic unit cell), "a" and "c" vectors (y in an

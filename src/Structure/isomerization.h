@@ -8,6 +8,7 @@
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "DataTypes/common_types.h"
+#include "Math/matrix_ops.h"
 #include "Math/rounding.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
@@ -25,6 +26,7 @@ using chemistry::IsomerPlan;
 using constants::PrecisionModel;
 using data_types::isSignedIntegralScalarType;
 using numerics::globalpos_scale_nonoverflow_bits;
+using stmath::rotationMatrixAboutVector;
 using stmath::roundUp;
 using synthesis::Condensate;
 using synthesis::CondensateWriter;

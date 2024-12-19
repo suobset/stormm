@@ -82,6 +82,8 @@ std::string getEnumerationName(const StateVariable input) {
     return std::string("GENERALIZED_BORN");
   case StateVariable::RESTRAINT:
     return std::string("RESTRAINT");
+  case StateVariable::SURFACE_AREA:
+    return std::string("SURFACE_AREA");
   case StateVariable::KINETIC:
     return std::string("KINETIC");
   case StateVariable::PRESSURE:
@@ -309,6 +311,17 @@ std::string getEnumerationName(const ValenceKernelSize input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SasaReference input) {
+  switch (input) {
+  case SasaReference::LENNARD_JONES_SIGMA:
+    return std::string("LENNARD_JONES_SIGMA");
+  case SasaReference::BORN_RADII:
+    return std::string("BORN_RADII");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 NonbondedPotential translateNonbondedPotential(const std::string &input) {
   if (strcmpCased(input, std::string("electrostatic"), CaseSensitivity::NO) ||
       strcmpCased(input, std::string("elec"), CaseSensitivity::NO) ||
@@ -425,12 +438,34 @@ PMIStrategy translatePMIStrategy(const std::string &input) {
     return PMIStrategy::TIGHT_PP_HEAVY;
   }
   else if (strcmpCased(input, std::string("no_auto"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("no_automation"), CaseSensitivity::NO) ||
            strcmpCased(input, std::string("none"), CaseSensitivity::NO)) {
     return PMIStrategy::NO_AUTOMATION;
   }
   else {
     rtErr("The input \"" + input + "\" does not have a valid enumeration.",
           "translatePMIStrategy");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwSumMethod translateVdwSumMethod(const std::string &input) {
+  if (strcmpCased(input, std::string("cutoff"), CaseSensitivity::NO) ||
+      strcmpCased(input, std::string("truncation"), CaseSensitivity::NO)) {
+    return VdwSumMethod::CUTOFF;
+  }
+  else if (strcmpCased(input, std::string("smooth"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("cubic"), CaseSensitivity::NO)) {
+    return VdwSumMethod::SMOOTH;
+  }
+  else if (strcmpCased(input, std::string("infinite"), CaseSensitivity::NO) ||
+           strcmpCased(input, std::string("pme"), CaseSensitivity::NO)) {
+    return VdwSumMethod::PME;
+  }
+  else {
+    rtErr("The input \"" + input + "\" does not have a valid enumeration.",
+          "translateVdwSumMethod");
   }
   __builtin_unreachable();
 }

@@ -34,24 +34,6 @@ using namespace stormm::topology;
 using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
-// Display a general help message for this program.
-//-------------------------------------------------------------------------------------------------
-void displayGeneralHelpMessage() {
-  const std::string base_msg =
-    terminalFormat("A program for performing energy minimizations on many structures and then "
-                   "editing parameters for cyclical refinement of force constants based on their "
-                   "structural consequences.\n\n", "ffrefine");
-  const std::string nml_msg =
-    terminalFormat("Applicable namelists (re-run with one of these terms as the command-line "
-                   "argument, IN QUOTES, i.e. \"&files\" or '&files', for further details):\n"
-                   "  - &files\n  - &restraint\n  - &minimize\n  - &report\n", nullptr, nullptr,
-                   0, 2, 2);
-  printf("%s", base_msg.c_str());
-  printf("%s", nml_msg.c_str());
-  printf("\n");
-}
-
-//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
@@ -59,19 +41,15 @@ int main(int argc, const char* argv[]) {
   // Wall time tracking
   StopWatch timer("Timings for ffrefine.stormm");
 
-  // Check for a help message
-  if (detectHelpSignal(argc, argv)) {
-    displayGeneralHelpMessage();
-    return 0;
-  }
-  if (displayNamelistHelp(argc, argv, { "&files", "&restraint", "&minimize", "&report" })) {
-    return 0;
-  }
-
   // Parse the command line
   CommandLineParser clip("ffrefine.stormm", "A program for performing energy minimizations with "
                          "experimental force fields.");
   clip.addStandardApplicationInputs();
+  const std::vector<std::string> my_namelists = { "&files", "&minimize", "&restraint", "&report" };
+  clip.addControlBlocks(my_namelists);
+  if (displayNamelistHelp(argc, argv, my_namelists) && clip.doesProgramExitOnHelp()) {
+    return 0;
+  }
   clip.parseUserInput(argc, argv);
 
   // Read information from the command line and initialize the UserSettings object

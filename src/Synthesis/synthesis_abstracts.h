@@ -99,7 +99,16 @@ template <typename T> struct SyValenceKit {
 ///        evaluation of the systems in an AtomGraphSynthesis.
 template <typename T, typename T2, typename T4> struct SyRestraintKit {
 
-  /// \brief The constructor takes a straight list of arguments for each member variable.
+  /// \brief The constructor takes a straight list of arguments for each member variable.  There
+  ///        are no array sizing constants--all of that is contained within the SyValenceKit (see
+  ///        above, which is also necessary for setting up the work units that will be needed to
+  ///        use information contained in this abstract).  A blank constructor is provided to
+  ///        create an object full of nullptr, so that an empty struct may be supplied as the
+  ///        default variable in certain functions that call for valence interactions on a
+  ///        synthesis of systems but do not include restraints.
+  /// \{
+  explicit SyRestraintKit();
+  
   explicit SyRestraintKit(const int2* rposn_step_bounds_in, const int2* rbond_step_bounds_in,
                           const int2* rangl_step_bounds_in, const int2* rdihe_step_bounds_in,
                           const T2* rposn_init_k_in, const T2* rposn_finl_k_in,
@@ -116,6 +125,7 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
                           const uint2* rangl_insr_in, const uint2* rdihe_insr_in,
                           const uint* rposn_acc_in, const uint* rbond_acc_in,
                           const uint* rangl_acc_in, const uint* rdihe_acc_in);
+  /// \}
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -254,7 +264,8 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   SyAtomUpdateKit(const T* masses_in, const T* inv_masses_in, int largest_group_in,
                   const T4* vs_params_in, const T4* settle_geom_in, const T4* settle_mass_in,
                   const T2* cnst_grp_params_in, const uint2* vste_insr_in,
-                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
+                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in,
+                  const int* free_dof_in, const int* cnst_dof_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -271,7 +282,9 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   const int largest_group;    ///< Number of constrained bonds in the largest hub-and-spoke group
                               ///<   found in any topology
   const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
-                              ///<   dimension parameters in the 
+                              ///<   dimension parameters in the x, y, and z members of the tuple.
+                              ///<   The frame type is stored in the w member as a static_cast
+                              ///<   (not a bitwise reinterpretation).
   const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
                               ///<   SETTLE instructions will indicate which parameter set, and
                               ///<   thus which index of this array to take.  The "x", "y", "z",
@@ -291,6 +304,10 @@ template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
   const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
   const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
                               ///<   for all valence work units
+  const int* free_dof;        ///< The number of degrees of freedom, in each system as a whole,
+                              ///<   when no constraints are applied
+  const int* cnst_dof;        ///< The number of degrees of freedom, in each system as a whole,
+                              ///<   constraints are applied
 };
   
 } // namespace synthesis

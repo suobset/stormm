@@ -4,6 +4,7 @@ build
 .vscode
 .idea
 .DS_Store
+.cache
 
 # Local conda environments
 .conda

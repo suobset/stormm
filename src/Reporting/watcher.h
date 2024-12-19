@@ -243,7 +243,7 @@ public:
   ///        source of jarring forces or sudden movement.
   ///
   /// \param tier  Take the result from CPU host or GPU device memory
-  std::vector<IntegrationStage>
+  std::vector<DynamicsStepStage>
   getLargeForceStages(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the threshold at which the object will report large velocities on atoms.
@@ -270,7 +270,7 @@ public:
   ///        found.
   ///
   /// \param tier  Take the result from CPU host or GPU device memory
-  std::vector<IntegrationStage>
+  std::vector<DynamicsStepStage>
   getHighSpeedStages(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
   /// \brief Get the number of times the RATTLE constraint iteration limit was reached (without the

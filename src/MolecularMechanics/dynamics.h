@@ -6,45 +6,85 @@
 #include "Constants/generalized_born.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "MolecularMechanics/mm_evaluation.h"
+#include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_pppm.h"
+#include "Namelists/nml_precision.h"
+#include "Potential/cellgrid.h"
+#include "Potential/energy_enumerators.h"
+#include "Potential/pme_potential.h"
+#include "Potential/pme_util.h"
+#include "Potential/scorecard.h"
+#include "Potential/local_exclusionmask.h"
 #include "Potential/static_exclusionmask.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Structure/hub_and_spoke.h"
+#include "Structure/settle.h"
 #include "Structure/virtual_site_handling.h"
+#include "Synthesis/phasespace_synthesis.h"
+#include "Synthesis/synthesis_abstracts.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/integration.h"
+#include "Trajectory/motion_sweeper.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/thermostat.h"
+#include "Trajectory/trim.h"
 #include "kinetic.h"
 
 namespace stormm {
 namespace mm {
 
+using energy::CellGrid;
+using energy::CellGridReader;
+using energy::CellGridWriter;
+using energy::contributeCellGridForces;
+using energy::evaluateParticleParticleEnergy;
+using energy::ewaldCoefficient;
+using energy::LocalExclusionMask;
+using energy::LocalExclusionMaskReader;
+using energy::NonbondedTheme;
+using energy::restoreType;
 using energy::ScoreCard;
+using energy::ScoreCardWriter;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
+using energy::VdwSumMethod;
 using namelist::DynamicsControls;
+using namelist::PrecisionControls;
+using namelist::PPPMControls;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using structure::placeVirtualSites;
-using structure::shakePositions;
 using structure::rattleVelocities;
+using structure::settlePositions;
+using structure::settleVelocities;
+using structure::shakePositions;
 using structure::transmitVirtualSiteForces;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisReader;
+using synthesis::PsSynthesisWriter;
+using synthesis::SyAtomUpdateKit;
+using synthesis::SyNonbondedKit;
+using synthesis::SyRestraintKit;
+using synthesis::SyValenceKit;
 using topology::AtomGraph;
 using topology::ConstraintKit;
 using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
 using topology::ValenceKit;
 using topology::VirtualSiteKit;
+using trajectory::MotionSweeper;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
+using trajectory::removeMomentum;
 using trajectory::Thermostat;
+using trajectory::ThermostatReader;
 using trajectory::ThermostatWriter;
 using trajectory::velocityVerletVelocityUpdate;
 using trajectory::velocityVerletCoordinateUpdate;
 using namespace generalized_born_defaults;
   
-/// \brief Run the canonical MD dynamics step for systems in implicit solvent.
+/// \brief Run the canonical MD dynamics step for systems in implicit or explicit solvent.
 ///
 /// \param xcrd                Current positions of particles along the Cartesian X axis
 /// \param ycrd                Current positions of particles along the Cartesian Y axis
@@ -107,6 +147,16 @@ void dynaStep(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const 
               const DynamicsControls &dyncon, int system_index = 0, Tcalc gpos_scale_factor = 1.0,
               Tcalc vel_scale_factor = 1.0, Tcalc frc_scale_factor = 1.0);
 
+template <typename Tcoord, typename Tacc, typename Tcoord4,
+          typename Tcalc, typename Tcalc2, typename Tcalc4>
+void dynaStep(PsSynthesisWriter *poly_psw, CellGridWriter<void, void, void, void> *cgw_v,
+              ScoreCard *sc, ThermostatWriter<Tcalc> *tstw,
+              const SyValenceKit<Tcalc> &poly_vk, const SyNonbondedKit<Tcalc, Tcalc2> &poly_nbk,
+              const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> &poly_rk,
+              const SyAtomUpdateKit<Tcalc, Tcalc2, Tcalc4> &poly_auk,
+              const LocalExclusionMaskReader &lemr, Tcalc cutoff, Tcalc qqew_coeff,
+              VdwSumMethod vdw_sum, int ntpr);
+
 void dynaStep(PhaseSpaceWriter *psw, ScoreCard *sc, const ThermostatWriter<double> &tstr,
               const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
               const ImplicitSolventKit<double> &isk,
@@ -145,7 +195,17 @@ void dynamics(PhaseSpace *ps, Thermostat *heat_bath, ScoreCard *sc, const AtomGr
               const RestraintApparatus &ra, const DynamicsControls &dyncon, int system_index = 0,
               const std::string &trajectory_file_name = std::string(""),
               const std::string &restart_file_name = std::string(""));
+  
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
+void dynamics(PhaseSpaceSynthesis *poly_ps, CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg,
+              ScoreCard *sc, Thermostat *heat_bath, const AtomGraphSynthesis &poly_ag,
+              const LocalExclusionMask &lem, const DynamicsControls &dyncon,
+              const PrecisionControls &preccon, const PPPMControls &pmecon);
 /// \}
+
+
+  
+/// \brief Carry out molecular dynamics in explicit solvent for a specified number of steps.
   
 } // namespace mm
 } // namespace stormm

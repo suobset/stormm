@@ -83,20 +83,20 @@ public:
   std::string getTemperatureDistributionMethod() const;
 
   /// \brief Get the user input Exchange Probability between 2 adjacent replicas
-  double getExchangeProbability();
+  double getExchangeProbability() const;
 
   /// \brief Get the tolerance set between desired exchange probability and predicted probability
-  double getTolerance();
+  double getTolerance() const;
 
   /// \brief Get the user input for Maximum Replicas allowed
   int getMaxReplicas() const;
   
   /// \brief Get the vector of initial temperature targets for all groups of atoms and systems.
   // TODO: Change this to just a double
-  const double getLowTemperature();
+  const double getLowTemperature() const;
 
   /// \brief Get the vector of final temperature targets for all groups of atoms and systems.
-  const double getHighTemperature();
+  const double getHighTemperature() const;
   
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;

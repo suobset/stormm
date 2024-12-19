@@ -18,6 +18,83 @@ using constants::ExceptionResponse;
 using parse::WildCardKind;
 using structure::ApplyConstraints;
 
+/// \brief A class for tracking the correspondence of two parameter sets.  The parameter sets
+///        must be defined as a series of arrays with a 1:1 index mapping among them (i.e. contents
+///        of the kth indices of the first, second, and third arrays define the kth parameter set).
+template <typename T> class ParameterUnion {
+public:
+  
+  /// \brief The constructor takes the parameters for each of two parameter sets one array at a
+  ///        time.
+  ///
+  /// Overloaded:
+  ///   - Provide the inputs as C-style arrays
+  ///   - Provide the inputs as Standard Template Library vectors
+  ///
+  /// \{
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za,
+                          size_t aparam_count_in, const T* comp_xb, const T* comp_yb,
+                          const T* comp_zb, size_t bparam_count_in,
+                          double match_tol = constants::small);
+
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, size_t aparam_count_in,
+                          const T* comp_xb, const T* comp_yb, size_t bparam_count_in,
+                          double match_tol = constants::small);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          const std::vector<T> &comp_za, const std::vector<T> &comp_xb,
+                          const std::vector<T> &comp_yb, const std::vector<T> &comp_zb,
+                          double match_tol = constants::small);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          const std::vector<T> &comp_xb, const std::vector<T> &comp_yb,
+                          double match_tol = constants::small);
+  /// \}
+
+  /// \brief The default copy and move constructors as well as assignment operators are all valid,
+  ///        as there are only Standard Template Library components in the class.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     An existing object placed on the right-hand side of the assignment statement
+  /// \{
+  ParameterUnion(const ParameterUnion &original) = default;
+  ParameterUnion(ParameterUnion &&original) = default;
+  ParameterUnion& operator=(const ParameterUnion &original) = default;
+  ParameterUnion& operator=(ParameterUnion &&original) = default;
+  /// \}
+
+  /// \brief Get the number of input parameters from the first set.
+  size_t getFirstSetParameterCount() const;
+  
+  /// \brief Get the number of input parameters from the second set.
+  size_t getSecondSetParameterCount() const;
+  
+  /// \brief Get the number of unique parameter sets.
+  size_t getUniqueParameterCount() const;
+
+  /// \brief Get the union of one of the parameter components.
+  ///
+  /// \param comp_idx  Index of the component to retrieve.  Acceptable values include 0, 1, or 2.
+  std::vector<T> getUnion(int comp_idx) const;
+
+private:
+
+  size_t aparam_count;               ///< Number of parameters in set A (all expected to be unique)
+  size_t bparam_count;               ///< Number of parameters in set B.  All members of set B are
+                                     ///<   expected to be unique among other members of set B,
+                                     ///<   although they may match members of set A.
+  size_t total_parameters;           ///< The total number of unique parameters in the union
+  std::vector<T> union_parameter_x;  ///< The union of the first components of each parameter set
+  std::vector<T> union_parameter_y;  ///< The union of the second components of each parameter set
+  std::vector<T> union_parameter_z;  ///< The union of the optional third components of each
+                                     ///<   parameter set
+  
+  /// Enumerate which parameters of the unified set the parameters of the second set correspond to.
+  /// The first parameter set has a 1:1 correspondence with the first part of the unified set, i.e.
+  /// parameter index k in the first parameter set is also parameter index k in the unified set.
+  std::vector<int> union_indices_bmap;
+};
+  
 /// \brief Unguarded struct to assemble the basic bond, angle, and dihedral indexing from an Amber
 ///        or other topology file.  All Class I force fields will have, or could have, terms like
 ///        these.  All descriptions follow from the eponymous member variables in an AtomGraph.
@@ -901,5 +978,7 @@ SettleParm getSettleParameters(int ox_idx, int h1_idx, int h2_idx,
 
 } // namespace topology
 } // namespace stormm
+
+#include "atomgraph_refinement.tpp"
 
 #endif

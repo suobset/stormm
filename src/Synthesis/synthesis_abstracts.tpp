@@ -72,6 +72,20 @@ SyRestraintKit<T, T2, T4>::SyRestraintKit(const int2* rposn_step_bounds_in,
 {}
 
 //-------------------------------------------------------------------------------------------------
+template <typename T, typename T2, typename T4>
+SyRestraintKit<T, T2, T4>::SyRestraintKit() :
+    rposn_step_bounds{nullptr}, rbond_step_bounds{nullptr}, rangl_step_bounds{nullptr},
+    rdihe_step_bounds{nullptr}, rposn_init_k{nullptr}, rposn_finl_k{nullptr},
+    rposn_init_r{nullptr}, rposn_finl_r{nullptr}, rposn_init_xy{nullptr}, rposn_init_z{nullptr},
+    rposn_finl_xy{nullptr}, rposn_finl_z{nullptr}, rbond_init_k{nullptr}, rbond_finl_k{nullptr},
+    rbond_init_r{nullptr}, rbond_finl_r{nullptr}, rangl_init_k{nullptr}, rangl_finl_k{nullptr},
+    rangl_init_r{nullptr}, rangl_finl_r{nullptr}, rdihe_init_k{nullptr}, rdihe_finl_k{nullptr},
+    rdihe_init_r{nullptr}, rdihe_finl_r{nullptr}, rposn_insr{nullptr}, rbond_insr{nullptr},
+    rangl_insr{nullptr}, rdihe_insr{nullptr}, rposn_acc{nullptr}, rbond_acc{nullptr},
+    rangl_acc{nullptr}, rdihe_acc{nullptr}
+{}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T, typename T2>
 SyNonbondedKit<T, T2>::SyNonbondedKit(const int nsys_in, const UnitCellType unit_cell_in,
                                       const int nnbwu_in, const int* nbwu_abstracts_in,
@@ -108,11 +122,12 @@ SyAtomUpdateKit<T, T2, T4>::SyAtomUpdateKit(const T* masses_in, const T* inv_mas
                                             const T4* settle_geom_in, const T4* settle_mass_in,
                                             const T2* cnst_grp_params_in,
                                             const uint2* vste_insr_in, const uint2* sett_insr_in,
-                                            const uint2* cnst_insr_in, const uint2* vwu_manip_in) :
+                                            const uint2* cnst_insr_in, const uint2* vwu_manip_in,
+                                            const int* free_dof_in, const int* cnst_dof_in) :
     masses{masses_in}, inv_masses{inv_masses_in}, largest_group{largest_group_in},
     vs_params{vs_params_in}, settle_geom{settle_geom_in}, settle_mass{settle_mass_in},
     cnst_grp_params{cnst_grp_params_in}, vste_insr{vste_insr_in}, sett_insr{sett_insr_in},
-    cnst_insr{cnst_insr_in}, vwu_manip{vwu_manip_in}
+    cnst_insr{cnst_insr_in}, vwu_manip{vwu_manip_in}, free_dof{free_dof_in}, cnst_dof{cnst_dof_in}
 {}
 
 } // namespace synthesis

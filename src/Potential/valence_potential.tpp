@@ -11,13 +11,21 @@ Tcalc evalHarmonicStretch(const int i_atom, const int j_atom, const Tcalc stiffn
                           const Tcoord* zcrd, const double* umat, const double* invu,
                           const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                           const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                          const Tcalc force_factor) {
+                          const Tcalc force_factor, const int* xcrd_ovrf, const int* ycrd_ovrf,
+                          const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
-    dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    dy = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    dz = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      dx = displacement(i_atom, j_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      dy = displacement(i_atom, j_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      dz = displacement(i_atom, j_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      dy = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      dz = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    }
   }
   else {
     dx = xcrd[j_atom] - xcrd[i_atom];
@@ -37,15 +45,43 @@ Tcalc evalHarmonicStretch(const int i_atom, const int j_atom, const Tcalc stiffn
     const Tcalc fmag_dy = fmag * dy;
     const Tcalc fmag_dz = fmag * dz;
     if (isSignedIntegralScalarType<Tforce>()) {
-      const Tforce ifmag_dx = llround(fmag_dx * force_factor);
-      const Tforce ifmag_dy = llround(fmag_dy * force_factor);
-      const Tforce ifmag_dz = llround(fmag_dz * force_factor);
-      xfrc[i_atom] += ifmag_dx;
-      yfrc[i_atom] += ifmag_dy;
-      zfrc[i_atom] += ifmag_dz;
-      xfrc[j_atom] -= ifmag_dx;
-      yfrc[j_atom] -= ifmag_dy;
-      zfrc[j_atom] -= ifmag_dz;
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        const int95_t ixfrc_tmp = hostInt95Sum(xfrc[i_atom], xfrc_ovrf[i_atom],
+                                               fmag_dx * force_factor);
+        const int95_t iyfrc_tmp = hostInt95Sum(yfrc[i_atom], yfrc_ovrf[i_atom],
+                                               fmag_dy * force_factor);
+        const int95_t izfrc_tmp = hostInt95Sum(zfrc[i_atom], zfrc_ovrf[i_atom],
+                                               fmag_dz * force_factor);
+        const int95_t jxfrc_tmp = hostInt95Sum(xfrc[j_atom], xfrc_ovrf[j_atom],
+                                               -fmag_dx * force_factor);
+        const int95_t jyfrc_tmp = hostInt95Sum(yfrc[j_atom], yfrc_ovrf[j_atom],
+                                               -fmag_dy * force_factor);
+        const int95_t jzfrc_tmp = hostInt95Sum(zfrc[j_atom], zfrc_ovrf[j_atom],
+                                               -fmag_dz * force_factor);
+        xfrc[i_atom] = ixfrc_tmp.x;
+        xfrc[j_atom] = jxfrc_tmp.x;
+        yfrc[i_atom] = iyfrc_tmp.x;
+        yfrc[j_atom] = jyfrc_tmp.x;
+        zfrc[i_atom] = izfrc_tmp.x;
+        zfrc[j_atom] = jzfrc_tmp.x;
+        xfrc_ovrf[i_atom] = ixfrc_tmp.y;
+        xfrc_ovrf[j_atom] = jxfrc_tmp.y;
+        yfrc_ovrf[i_atom] = iyfrc_tmp.y;
+        yfrc_ovrf[j_atom] = jyfrc_tmp.y;
+        zfrc_ovrf[i_atom] = izfrc_tmp.y;
+        zfrc_ovrf[j_atom] = jzfrc_tmp.y;
+      }
+      else {
+        const Tforce ifmag_dx = llround(fmag_dx * force_factor);
+        const Tforce ifmag_dy = llround(fmag_dy * force_factor);
+        const Tforce ifmag_dz = llround(fmag_dz * force_factor);
+        xfrc[i_atom] += ifmag_dx;
+        yfrc[i_atom] += ifmag_dy;
+        zfrc[i_atom] += ifmag_dz;
+        xfrc[j_atom] -= ifmag_dx;
+        yfrc[j_atom] -= ifmag_dy;
+        zfrc[j_atom] -= ifmag_dz;
+      }
     }
     else {
       xfrc[i_atom] += fmag_dx;
@@ -136,7 +172,9 @@ Tcalc evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
                        const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
                        Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
-                       const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                       const Tcalc inv_gpos_factor, const Tcalc force_factor, const int* xcrd_ovrf,
+                       const int* ycrd_ovrf, const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf,
+                       int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
@@ -144,12 +182,22 @@ Tcalc evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
   // Compute displacements
   Tcalc ba[3], bc[3];
   if (isSignedIntegralScalarType<Tcoord>()) {
-    ba[0] = static_cast<Tcalc>(xcrd[i_atom] - xcrd[j_atom]) * inv_gpos_factor;
-    ba[1] = static_cast<Tcalc>(ycrd[i_atom] - ycrd[j_atom]) * inv_gpos_factor;
-    ba[2] = static_cast<Tcalc>(zcrd[i_atom] - zcrd[j_atom]) * inv_gpos_factor;
-    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
-    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
-    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      ba[0] = displacement(j_atom, i_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      ba[1] = displacement(j_atom, i_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      ba[2] = displacement(j_atom, i_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      bc[0] = displacement(j_atom, k_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      bc[1] = displacement(j_atom, k_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      bc[2] = displacement(j_atom, k_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      ba[0] = static_cast<Tcalc>(xcrd[i_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      ba[1] = static_cast<Tcalc>(ycrd[i_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      ba[2] = static_cast<Tcalc>(zcrd[i_atom] - zcrd[j_atom]) * inv_gpos_factor;
+      bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+    }
   }
   else {
     ba[0] = xcrd[i_atom] - xcrd[j_atom];
@@ -183,20 +231,40 @@ Tcalc evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
     const Tcalc sqbc = dA / mgbc;
     const Tcalc mbabc = dA * invbabc;
     if (isSignedIntegralScalarType<Tforce>()) {
-      Tforce iadf[3], icdf[3];
-      for (int i = 0; i < 3; i++) {
-        iadf[i] = llround(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) * force_factor);
-        icdf[i] = llround(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) * force_factor);
-      }      
-      xfrc[i_atom] -= iadf[0];
-      yfrc[i_atom] -= iadf[1];
-      zfrc[i_atom] -= iadf[2];
-      xfrc[j_atom] += iadf[0] + icdf[0];
-      yfrc[j_atom] += iadf[1] + icdf[1];
-      zfrc[j_atom] += iadf[2] + icdf[2];
-      xfrc[k_atom] -= icdf[0];
-      yfrc[k_atom] -= icdf[1];
-      zfrc[k_atom] -= icdf[2];
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        int95_t iadf[3], icdf[3];
+        for (int i = 0; i < 3; i++) {
+          iadf[i] = hostDoubleToInt95(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) *
+                                      force_factor);
+          icdf[i] = hostDoubleToInt95(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) *
+                                      force_factor);
+        }
+        hostSplitFPSubtract(&xfrc[i_atom], &xfrc_ovrf[i_atom], iadf[0]);
+        hostSplitFPSubtract(&yfrc[i_atom], &yfrc_ovrf[i_atom], iadf[1]);
+        hostSplitFPSubtract(&zfrc[i_atom], &zfrc_ovrf[i_atom], iadf[2]);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], iadf[0] + icdf[0]);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], iadf[1] + icdf[1]);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], iadf[2] + icdf[2]);
+        hostSplitFPSubtract(&xfrc[k_atom], &xfrc_ovrf[k_atom], icdf[0]);
+        hostSplitFPSubtract(&yfrc[k_atom], &yfrc_ovrf[k_atom], icdf[1]);
+        hostSplitFPSubtract(&zfrc[k_atom], &zfrc_ovrf[k_atom], icdf[2]);
+      }
+      else {
+        Tforce iadf[3], icdf[3];
+        for (int i = 0; i < 3; i++) {
+          iadf[i] = llround(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) * force_factor);
+          icdf[i] = llround(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) * force_factor);
+        }
+        xfrc[i_atom] -= iadf[0];
+        yfrc[i_atom] -= iadf[1];
+        zfrc[i_atom] -= iadf[2];
+        xfrc[j_atom] += iadf[0] + icdf[0];
+        yfrc[j_atom] += iadf[1] + icdf[1];
+        zfrc[j_atom] += iadf[2] + icdf[2];
+        xfrc[k_atom] -= icdf[0];
+        yfrc[k_atom] -= icdf[1];
+        zfrc[k_atom] -= icdf[2];
+      }
     }
     else {
       Tcalc adf[3], cdf[3];
@@ -294,7 +362,8 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                        const Tcalc force_factor) {
+                        const Tcalc force_factor, const int* xcrd_ovrf, const int* ycrd_ovrf,
+                        const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
@@ -302,15 +371,28 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
   // Compute displacements
   Tcalc ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
   if (isSignedIntegralScalarType<Tcoord>()) {
-    ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
-    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
-    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
-    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
-    cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
-    cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
-    cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      ab[0] = displacement(i_atom, j_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      ab[1] = displacement(i_atom, j_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      ab[2] = displacement(i_atom, j_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      bc[0] = displacement(j_atom, k_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      bc[1] = displacement(j_atom, k_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      bc[2] = displacement(j_atom, k_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      cd[0] = displacement(k_atom, l_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      cd[1] = displacement(k_atom, l_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      cd[2] = displacement(k_atom, l_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+      bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+      cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
+      cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
+      cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+    }
   }
   else {
     ab[0] = xcrd[j_atom] - xcrd[i_atom];
@@ -411,27 +493,55 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
     const Tcalc fc2 = cosb * invbc * isinb2;
     const Tcalc fd = -invcd * isinc2;
     if (isSignedIntegralScalarType<Tforce>()) {
-      const Tforce ifrc_ix = llround(crabbc[0] * fa * force_factor);
-      const Tforce ifrc_jx = llround(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) * force_factor);
-      const Tforce ifrc_lx = llround(-fd * crbccd[0] * force_factor);
-      xfrc[i_atom] += ifrc_ix;
-      xfrc[j_atom] += ifrc_jx;
-      xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
-      xfrc[l_atom] += ifrc_lx;
-      const Tforce ifrc_iy = llround(crabbc[1] * fa * force_factor);
-      const Tforce ifrc_jy = llround(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) * force_factor);
-      const Tforce ifrc_ly = llround(-fd * crbccd[1] * force_factor);
-      yfrc[i_atom] += ifrc_iy;
-      yfrc[j_atom] += ifrc_jy;
-      yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
-      yfrc[l_atom] += ifrc_ly;
-      const Tforce ifrc_iz = llround(crabbc[2] * fa * force_factor);
-      const Tforce ifrc_jz = llround(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) * force_factor);
-      const Tforce ifrc_lz = llround(-fd * crbccd[2] * force_factor);
-      zfrc[i_atom] += ifrc_iz;
-      zfrc[j_atom] += ifrc_jz;
-      zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
-      zfrc[l_atom] += ifrc_lz;
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        const int95_t ifrc_ix = hostDoubleToInt95(crabbc[0] * fa * force_factor);
+        const int95_t ifrc_jx = hostDoubleToInt95(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) *
+                                                  force_factor);
+        const int95_t ifrc_lx = hostDoubleToInt95(-fd * crbccd[0] * force_factor);
+        hostSplitFPSum(&xfrc[i_atom], &xfrc_ovrf[i_atom], ifrc_ix);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], ifrc_jx);
+        hostSplitFPSubtract(&xfrc[k_atom], &xfrc_ovrf[k_atom], ifrc_ix + ifrc_jx + ifrc_lx);
+        hostSplitFPSum(&xfrc[l_atom], &xfrc_ovrf[l_atom], ifrc_lx);
+        const int95_t ifrc_iy = hostDoubleToInt95(crabbc[1] * fa * force_factor);
+        const int95_t ifrc_jy = hostDoubleToInt95(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) *
+                                                  force_factor);
+        const int95_t ifrc_ly = hostDoubleToInt95(-fd * crbccd[1] * force_factor);
+        hostSplitFPSum(&yfrc[i_atom], &yfrc_ovrf[i_atom], ifrc_iy);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], ifrc_jy);
+        hostSplitFPSubtract(&yfrc[k_atom], &yfrc_ovrf[k_atom], ifrc_iy + ifrc_jy + ifrc_ly);
+        hostSplitFPSum(&yfrc[l_atom], &yfrc_ovrf[l_atom], ifrc_ly);
+        const int95_t ifrc_iz = hostDoubleToInt95(crabbc[2] * fa * force_factor);
+        const int95_t ifrc_jz = hostDoubleToInt95(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) *
+                                                  force_factor);
+        const int95_t ifrc_lz = hostDoubleToInt95(-fd * crbccd[2] * force_factor);
+        hostSplitFPSum(&zfrc[i_atom], &zfrc_ovrf[i_atom], ifrc_iz);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], ifrc_jz);
+        hostSplitFPSubtract(&zfrc[k_atom], &zfrc_ovrf[k_atom], ifrc_iz + ifrc_jz + ifrc_lz);
+        hostSplitFPSum(&zfrc[l_atom], &zfrc_ovrf[l_atom], ifrc_lz);
+      }
+      else {
+        const Tforce ifrc_ix = llround(crabbc[0] * fa * force_factor);
+        const Tforce ifrc_jx = llround(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) * force_factor);
+        const Tforce ifrc_lx = llround(-fd * crbccd[0] * force_factor);
+        xfrc[i_atom] += ifrc_ix;
+        xfrc[j_atom] += ifrc_jx;
+        xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
+        xfrc[l_atom] += ifrc_lx;
+        const Tforce ifrc_iy = llround(crabbc[1] * fa * force_factor);
+        const Tforce ifrc_jy = llround(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) * force_factor);
+        const Tforce ifrc_ly = llround(-fd * crbccd[1] * force_factor);
+        yfrc[i_atom] += ifrc_iy;
+        yfrc[j_atom] += ifrc_jy;
+        yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
+        yfrc[l_atom] += ifrc_ly;
+        const Tforce ifrc_iz = llround(crabbc[2] * fa * force_factor);
+        const Tforce ifrc_jz = llround(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) * force_factor);
+        const Tforce ifrc_lz = llround(-fd * crbccd[2] * force_factor);
+        zfrc[i_atom] += ifrc_iz;
+        zfrc[j_atom] += ifrc_jz;
+        zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
+        zfrc[l_atom] += ifrc_lz;
+      }
     }
     else {
       const Tforce frc_ix = crabbc[0] * fa;
@@ -551,7 +661,9 @@ double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd,
                                 const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
                                 Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                 const EvaluateForce eval_force, const int system_index,
-                                const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                                int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
 
   // Accumulate the results in two numerical precision models by looping over all terms
   double ubrd_energy = 0.0;
@@ -612,7 +724,10 @@ double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcr
                                    const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
                                    Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                    const EvaluateForce eval_force, const int system_index,
-                                   const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                   const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                                   const int* xcrd_ovrf, const int* ycrd_ovrf,
+                                   const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf,
+                                   int* zfrc_ovrf) {
   double cimp_energy = 0.0;
   llint cimp_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
@@ -628,7 +743,9 @@ double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcr
                                                vk.cimp_keq[param_idx], vk.cimp_phi[param_idx],
                                                1.0, DihedralStyle::HARMONIC, xcrd, ycrd, zcrd,
                                                umat, invu, unit_cell, xfrc, yfrc, zfrc,
-                                               eval_force, inv_gpos_factor, force_factor);
+                                               eval_force, inv_gpos_factor, force_factor,
+                                               xcrd_ovrf, ycrd_ovrf, zcrd_ovrf, xfrc_ovrf,
+                                               yfrc_ovrf, zfrc_ovrf);
     cimp_energy += du;
     cimp_acc += llround(du * nrg_scale_factor);
   }
@@ -675,7 +792,8 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
                const Tcoord* zcrd, const double* umat, const double* invu,
                const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-               const Tcalc force_factor) {
+               const Tcalc force_factor, const int* xcrd_ovrf, const int* ycrd_ovrf,
+               const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
@@ -688,18 +806,34 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     acoef_psi[i] = 0.0;
   }
   if (isSignedIntegralScalarType<Tcoord>()) {
-    ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
-    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
-    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
-    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
-    cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
-    cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
-    cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
-    de[0] = static_cast<Tcalc>(xcrd[m_atom] - xcrd[l_atom]) * inv_gpos_factor;
-    de[1] = static_cast<Tcalc>(ycrd[m_atom] - ycrd[l_atom]) * inv_gpos_factor;
-    de[2] = static_cast<Tcalc>(zcrd[m_atom] - zcrd[l_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      ab[0] = displacement(i_atom, j_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      ab[1] = displacement(i_atom, j_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      ab[2] = displacement(i_atom, j_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      bc[0] = displacement(j_atom, k_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      bc[1] = displacement(j_atom, k_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      bc[2] = displacement(j_atom, k_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      cd[0] = displacement(k_atom, l_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      cd[1] = displacement(k_atom, l_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      cd[2] = displacement(k_atom, l_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      de[0] = displacement(l_atom, m_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      de[1] = displacement(l_atom, m_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      de[2] = displacement(l_atom, m_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+      bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+      cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
+      cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
+      cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+      de[0] = static_cast<Tcalc>(xcrd[m_atom] - xcrd[l_atom]) * inv_gpos_factor;
+      de[1] = static_cast<Tcalc>(ycrd[m_atom] - ycrd[l_atom]) * inv_gpos_factor;
+      de[2] = static_cast<Tcalc>(zcrd[m_atom] - zcrd[l_atom]) * inv_gpos_factor;
+    }
   }
   else {
     ab[0] = xcrd[j_atom] - xcrd[i_atom];
@@ -930,52 +1064,106 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     const Tcalc psi_fd = -invde * psi_isinc2;
 
     if (isSignedIntegralScalarType<Tforce>()) {
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        int95_t ifrc_ix = hostDoubleToInt95(crabbc[0] * phi_fa * force_factor);
+        int95_t ifrc_jx = hostDoubleToInt95(((phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0])) *
+                                            force_factor);
+        int95_t ifrc_lx = hostDoubleToInt95(-phi_fd * crbccd[0] * force_factor);
+        hostSplitFPSum(&xfrc[i_atom], &xfrc_ovrf[i_atom], ifrc_ix);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], ifrc_jx);
+        hostSplitFPSubtract(&xfrc[k_atom], &xfrc_ovrf[k_atom], ifrc_ix + ifrc_jx + ifrc_lx);
+        hostSplitFPSum(&xfrc[l_atom], &xfrc_ovrf[l_atom], ifrc_lx);
+        int95_t ifrc_iy = hostDoubleToInt95(crabbc[1] * phi_fa * force_factor);
+        int95_t ifrc_jy = hostDoubleToInt95(((phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1])) *
+                                            force_factor);
+	int95_t ifrc_ly = hostDoubleToInt95(-phi_fd * crbccd[1] * force_factor);
+        hostSplitFPSum(&yfrc[i_atom], &yfrc_ovrf[i_atom], ifrc_iy);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], ifrc_jy);
+        hostSplitFPSubtract(&yfrc[k_atom], &yfrc_ovrf[k_atom], ifrc_iy + ifrc_jy + ifrc_ly);
+        hostSplitFPSum(&yfrc[l_atom], &yfrc_ovrf[l_atom], ifrc_ly);
+        int95_t ifrc_iz = hostDoubleToInt95(crabbc[2] * phi_fa * force_factor);
+        int95_t ifrc_jz = hostDoubleToInt95(((phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2])) *
+                                            force_factor);
+        int95_t ifrc_lz = hostDoubleToInt95(-phi_fd * crbccd[2] * force_factor);
+        hostSplitFPSum(&zfrc[i_atom], &zfrc_ovrf[i_atom], ifrc_iz);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], ifrc_jz);
+        hostSplitFPSubtract(&zfrc[k_atom], &zfrc_ovrf[k_atom], ifrc_iz + ifrc_jz + ifrc_lz);
+        hostSplitFPSum(&zfrc[l_atom], &zfrc_ovrf[l_atom], ifrc_lz);
 
-      // Accumulate the phi dihedral forces
-      Tforce ifrc_ix = llround(crabbc[0] * phi_fa * force_factor);
-      Tforce ifrc_jx = llround(((phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0])) * force_factor);
-      Tforce ifrc_lx = llround(-phi_fd * crbccd[0] * force_factor);
-      xfrc[i_atom] += ifrc_ix;
-      xfrc[j_atom] += ifrc_jx;
-      xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
-      xfrc[l_atom] += ifrc_lx;
-      Tforce ifrc_iy = llround(crabbc[1] * phi_fa * force_factor);
-      Tforce ifrc_jy = llround(((phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1])) * force_factor);
-      Tforce ifrc_ly = llround(-phi_fd * crbccd[1] * force_factor);
-      yfrc[i_atom] += ifrc_iy;
-      yfrc[j_atom] += ifrc_jy;
-      yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
-      yfrc[l_atom] += ifrc_ly;
-      Tforce ifrc_iz = llround(crabbc[2] * phi_fa * force_factor);
-      Tforce ifrc_jz = llround(((phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2])) * force_factor);
-      Tforce ifrc_lz = llround(-phi_fd * crbccd[2] * force_factor);
-      zfrc[i_atom] += ifrc_iz;
-      zfrc[j_atom] += ifrc_jz;
-      zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
-      zfrc[l_atom] += ifrc_lz;
+        // Accumulate the psi dihedral forces
+        ifrc_jx = hostDoubleToInt95(crbccd[0] * psi_fa * force_factor);
+        int95_t ifrc_kx = hostDoubleToInt95(((psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0])) *
+                                            force_factor);
+        int95_t ifrc_mx = hostDoubleToInt95(-psi_fd * crcdde[0] * force_factor);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], ifrc_jx);
+        hostSplitFPSum(&xfrc[k_atom], &xfrc_ovrf[k_atom], ifrc_kx);
+        hostSplitFPSubtract(&xfrc[l_atom], &xfrc_ovrf[l_atom], ifrc_jx + ifrc_kx + ifrc_mx);
+        hostSplitFPSum(&xfrc[m_atom], &xfrc_ovrf[m_atom], ifrc_mx);
+        ifrc_jy = hostDoubleToInt95(crbccd[1] * psi_fa * force_factor);
+        int95_t ifrc_ky = hostDoubleToInt95(((psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1])) *
+                                            force_factor);
+        int95_t ifrc_my = hostDoubleToInt95(-psi_fd * crcdde[1] * force_factor);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], ifrc_jy);
+        hostSplitFPSum(&yfrc[k_atom], &yfrc_ovrf[k_atom], ifrc_ky);
+        hostSplitFPSubtract(&yfrc[l_atom], &yfrc_ovrf[l_atom], ifrc_jy + ifrc_ky + ifrc_my);
+        hostSplitFPSum(&yfrc[m_atom], &yfrc_ovrf[m_atom], ifrc_my);
+        ifrc_jz = hostDoubleToInt95(crbccd[2] * psi_fa * force_factor);
+        int95_t ifrc_kz = hostDoubleToInt95(((psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2])) *
+                                            force_factor);
+        int95_t ifrc_mz = hostDoubleToInt95(-psi_fd * crcdde[2] * force_factor);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], ifrc_jz);
+        hostSplitFPSum(&zfrc[k_atom], &zfrc_ovrf[k_atom], ifrc_kz);
+        hostSplitFPSubtract(&zfrc[l_atom], &zfrc_ovrf[l_atom], ifrc_jz + ifrc_kz + ifrc_mz);
+        hostSplitFPSum(&zfrc[m_atom], &zfrc_ovrf[m_atom], ifrc_mz);
+      }
+      else {
 
-      // Accumulate the psi dihedral forces
-      ifrc_jx = llround(crbccd[0] * psi_fa * force_factor);
-      Tforce ifrc_kx = llround(((psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0])) * force_factor);
-      Tforce ifrc_mx = llround(-psi_fd * crcdde[0] * force_factor);
-      xfrc[j_atom] += ifrc_jx;
-      xfrc[k_atom] += ifrc_kx;
-      xfrc[l_atom] -= ifrc_jx + ifrc_kx + ifrc_mx;
-      xfrc[m_atom] += ifrc_mx;
-      ifrc_jy = llround(crbccd[1] * psi_fa * force_factor);
-      Tforce ifrc_ky = llround(((psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1])) * force_factor);
-      Tforce ifrc_my = llround(-psi_fd * crcdde[1] * force_factor);
-      yfrc[j_atom] += ifrc_jy;
-      yfrc[k_atom] += ifrc_ky;
-      yfrc[l_atom] -= ifrc_jy + ifrc_ky + ifrc_my;
-      yfrc[m_atom] += ifrc_my;
-      ifrc_jz = llround(crbccd[2] * psi_fa * force_factor);
-      Tforce ifrc_kz = llround(((psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2])) * force_factor);
-      Tforce ifrc_mz = llround(-psi_fd * crcdde[2] * force_factor);
-      zfrc[j_atom] += ifrc_jz;
-      zfrc[k_atom] += ifrc_kz;
-      zfrc[l_atom] -= ifrc_jz + ifrc_kz + ifrc_mz;
-      zfrc[m_atom] += ifrc_mz;
+        // Accumulate the phi dihedral forces
+        Tforce ifrc_ix = llround(crabbc[0] * phi_fa * force_factor);
+        Tforce ifrc_jx = llround(((phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0])) * force_factor);
+        Tforce ifrc_lx = llround(-phi_fd * crbccd[0] * force_factor);
+        xfrc[i_atom] += ifrc_ix;
+        xfrc[j_atom] += ifrc_jx;
+        xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
+        xfrc[l_atom] += ifrc_lx;
+        Tforce ifrc_iy = llround(crabbc[1] * phi_fa * force_factor);
+        Tforce ifrc_jy = llround(((phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1])) * force_factor);
+        Tforce ifrc_ly = llround(-phi_fd * crbccd[1] * force_factor);
+        yfrc[i_atom] += ifrc_iy;
+        yfrc[j_atom] += ifrc_jy;
+        yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
+        yfrc[l_atom] += ifrc_ly;
+        Tforce ifrc_iz = llround(crabbc[2] * phi_fa * force_factor);
+        Tforce ifrc_jz = llround(((phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2])) * force_factor);
+        Tforce ifrc_lz = llround(-phi_fd * crbccd[2] * force_factor);
+        zfrc[i_atom] += ifrc_iz;
+        zfrc[j_atom] += ifrc_jz;
+        zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
+        zfrc[l_atom] += ifrc_lz;
+
+        // Accumulate the psi dihedral forces
+        ifrc_jx = llround(crbccd[0] * psi_fa * force_factor);
+        Tforce ifrc_kx = llround(((psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0])) * force_factor);
+        Tforce ifrc_mx = llround(-psi_fd * crcdde[0] * force_factor);
+        xfrc[j_atom] += ifrc_jx;
+        xfrc[k_atom] += ifrc_kx;
+        xfrc[l_atom] -= ifrc_jx + ifrc_kx + ifrc_mx;
+        xfrc[m_atom] += ifrc_mx;
+        ifrc_jy = llround(crbccd[1] * psi_fa * force_factor);
+        Tforce ifrc_ky = llround(((psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1])) * force_factor);
+        Tforce ifrc_my = llround(-psi_fd * crcdde[1] * force_factor);
+        yfrc[j_atom] += ifrc_jy;
+        yfrc[k_atom] += ifrc_ky;
+        yfrc[l_atom] -= ifrc_jy + ifrc_ky + ifrc_my;
+        yfrc[m_atom] += ifrc_my;
+        ifrc_jz = llround(crbccd[2] * psi_fa * force_factor);
+        Tforce ifrc_kz = llround(((psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2])) * force_factor);
+        Tforce ifrc_mz = llround(-psi_fd * crcdde[2] * force_factor);
+        zfrc[j_atom] += ifrc_jz;
+        zfrc[k_atom] += ifrc_kz;
+        zfrc[l_atom] -= ifrc_jz + ifrc_kz + ifrc_mz;
+        zfrc[m_atom] += ifrc_mz;
+      }
     }
     else {
       
@@ -1097,19 +1285,20 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
-Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
-                                     const Tcalc coulomb_constant, const Tcalc* charges,
-                                     const int* lj_param_idx, const Tcalc* attn14_elec_factors,
-                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
-                                     const int ljtab_offset, const int n_lj_types,
-                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
-                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, const EvaluateForce eval_elec_force,
-                                     const EvaluateForce eval_vdw_force,
-                                     const Tcalc inv_gpos_factor, const Tcalc force_factor,
-                                     const Tcalc clash_distance, const Tcalc clash_ratio) {
+Vec2<Tcalc> evalAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
+                                 const Tcalc coulomb_constant, const Tcalc* charges,
+                                 const int* lj_param_idx, const Tcalc* attn14_elec_factors,
+                                 const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                 const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                 const int ljtab_offset, const int n_lj_types, const Tcoord* xcrd,
+                                 const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                 const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                                 Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_elec_force,
+                                 const EvaluateForce eval_vdw_force, const Tcalc inv_gpos_factor,
+                                 const Tcalc force_factor, const Tcalc clash_distance,
+                                 const Tcalc clash_ratio, const int* xcrd_ovrf,
+                                 const int* ycrd_ovrf, const int* zcrd_ovrf, int* xfrc_ovrf,
+                                 int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_zero  = 0.0;
@@ -1119,9 +1308,16 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   const Tcalc value_two   = 2.0;
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
-    dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    dy = static_cast<Tcalc>(ycrd[l_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    dz = static_cast<Tcalc>(zcrd[l_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      dx = displacement(i_atom, l_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      dy = displacement(i_atom, l_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      dz = displacement(i_atom, l_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      dy = static_cast<Tcalc>(ycrd[l_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      dz = static_cast<Tcalc>(zcrd[l_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    }
   }
   else {
     dx = xcrd[l_atom] - xcrd[i_atom];
@@ -1184,15 +1380,28 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   // Accumulate forces, if their calculation was requested
   if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
     if (isSignedIntegralScalarType<Tforce>()) {
-      const Tforce ifmag_dx = llround(fmag * dx * force_factor);
-      const Tforce ifmag_dy = llround(fmag * dy * force_factor);
-      const Tforce ifmag_dz = llround(fmag * dz * force_factor);
-      xfrc[i_atom] += ifmag_dx;
-      yfrc[i_atom] += ifmag_dy;
-      zfrc[i_atom] += ifmag_dz;
-      xfrc[l_atom] -= ifmag_dx;
-      yfrc[l_atom] -= ifmag_dy;
-      zfrc[l_atom] -= ifmag_dz;
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        const int95_t ifmag_dx = hostDoubleToInt95(fmag * dx * force_factor);
+        const int95_t ifmag_dy = hostDoubleToInt95(fmag * dy * force_factor);
+        const int95_t ifmag_dz = hostDoubleToInt95(fmag * dz * force_factor);
+        hostSplitFPSum(&xfrc[i_atom], &xfrc_ovrf[i_atom], ifmag_dx);
+        hostSplitFPSum(&yfrc[i_atom], &yfrc_ovrf[i_atom], ifmag_dy);
+        hostSplitFPSum(&zfrc[i_atom], &zfrc_ovrf[i_atom], ifmag_dz);
+        hostSplitFPSubtract(&xfrc[l_atom], &xfrc_ovrf[l_atom], ifmag_dx);
+        hostSplitFPSubtract(&yfrc[l_atom], &yfrc_ovrf[l_atom], ifmag_dy);
+        hostSplitFPSubtract(&zfrc[l_atom], &zfrc_ovrf[l_atom], ifmag_dz);
+      }
+      else {
+        const Tforce ifmag_dx = llround(fmag * dx * force_factor);
+        const Tforce ifmag_dy = llround(fmag * dy * force_factor);
+        const Tforce ifmag_dz = llround(fmag * dz * force_factor);
+        xfrc[i_atom] += ifmag_dx;
+        yfrc[i_atom] += ifmag_dy;
+        zfrc[i_atom] += ifmag_dz;
+        xfrc[l_atom] -= ifmag_dx;
+        yfrc[l_atom] -= ifmag_dy;
+        zfrc[l_atom] -= ifmag_dz;
+      }
     }
     else {
       const Tcalc fmag_dx = fmag * dx;
@@ -1211,24 +1420,26 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
-Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
-                                     const Tcalc coulomb_constant, const Tcalc* charges,
-                                     const int* lj_param_idx, const Tcalc* attn14_elec_factors,
-                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
-                                     const int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
-                                     const Tcoord* zcrd, const double* umat, const double* invu,
-                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, const EvaluateForce eval_elec_force,
-                                     const EvaluateForce eval_vdw_force,
-                                     const Tcalc inv_gpos_factor, const Tcalc force_factor,
-                                     const Tcalc clash_distance, const Tcalc clash_ratio) {
-  return evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, coulomb_constant, charges,
-                                  lj_param_idx, attn14_elec_factors, attn14_vdw_factors,
-                                  lja_14_coeff, ljb_14_coeff, lj_14_sigma, 0, n_lj_types, xcrd,
-                                  ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
-                                  eval_elec_force, eval_vdw_force, inv_gpos_factor, force_factor,
-                                  clash_distance, clash_ratio);
+Vec2<Tcalc> evalAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
+                                 const Tcalc coulomb_constant, const Tcalc* charges,
+                                 const int* lj_param_idx, const Tcalc* attn14_elec_factors,
+                                 const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                 const Tcalc* ljb_14_coeff, const Tcalc* lj_14_sigma,
+                                 const int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
+                                 const Tcoord* zcrd, const double* umat, const double* invu,
+                                 const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                 Tforce* zfrc, const EvaluateForce eval_elec_force,
+                                 const EvaluateForce eval_vdw_force, const Tcalc inv_gpos_factor,
+                                 const Tcalc force_factor, const Tcalc clash_distance,
+                                 const Tcalc clash_ratio, const int* xcrd_ovrf,
+                                 const int* ycrd_ovrf, const int* zcrd_ovrf, int* xfrc_ovrf,
+                                 int* yfrc_ovrf, int* zfrc_ovrf) {
+  return evalAttenuated14Pair(i_atom, l_atom, attn_idx, coulomb_constant, charges, lj_param_idx,
+                              attn14_elec_factors, attn14_vdw_factors, lja_14_coeff, ljb_14_coeff,
+                              lj_14_sigma, 0, n_lj_types, xcrd, ycrd, zcrd, umat, invu, unit_cell,
+                              xfrc, yfrc, zfrc, eval_elec_force, eval_vdw_force, inv_gpos_factor,
+                              force_factor, clash_distance, clash_ratio, xcrd_ovrf, ycrd_ovrf,
+                              zcrd_ovrf, xfrc_ovrf, yfrc_ovrf, zfrc_ovrf);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1265,15 +1476,15 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
       continue;
     }
     const Vec2<Tcalc> uc =
-      evaluateAttenuated14Pair<Tcoord, Tforce, Tcalc>(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos],
-                                                      attn_idx, nbk.coulomb_constant, nbk.charge,
-                                                      nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
-                                                      nbk.lja_14_coeff, nbk.ljb_14_coeff,
-                                                      nbk.lj_14_sigma, nbk.n_lj_types, xcrd, ycrd,
-                                                      zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                                      zfrc, eval_elec_force, eval_vdw_force,
-                                                      inv_gpos_factor, force_factor,
-                                                      clash_distance, clash_ratio);
+      evalAttenuated14Pair<Tcoord, Tforce, Tcalc>(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos],
+                                                  attn_idx, nbk.coulomb_constant, nbk.charge,
+                                                  nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
+                                                  nbk.lja_14_coeff, nbk.ljb_14_coeff,
+                                                  nbk.lj_14_sigma, nbk.n_lj_types, xcrd, ycrd,
+                                                  zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                                  zfrc, eval_elec_force, eval_vdw_force,
+                                                  inv_gpos_factor, force_factor,
+                                                  clash_distance, clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);
@@ -1288,15 +1499,15 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit
       continue;
     }
     const Vec2<double> uc =
-      evaluateAttenuated14Pair<Tcoord,
-                               Tforce, Tcalc>(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
-                                              attn_idx, nbk.coulomb_constant, nbk.charge,
-                                              nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
-                                              nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.lj_14_sigma,
-                                              nbk.n_lj_types, xcrd, ycrd, zcrd, umat, invu,
-                                              unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                              eval_vdw_force, inv_gpos_factor, force_factor,
-                                              clash_distance, clash_ratio);
+      evalAttenuated14Pair<Tcoord,
+                           Tforce, Tcalc>(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
+                                          attn_idx, nbk.coulomb_constant, nbk.charge,
+                                          nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
+                                          nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.lj_14_sigma,
+                                          nbk.n_lj_types, xcrd, ycrd, zcrd, umat, invu,
+                                          unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
+                                          eval_vdw_force, inv_gpos_factor, force_factor,
+                                          clash_distance, clash_ratio);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += llround(uc.x * nrg_scale_factor);
@@ -1351,18 +1562,30 @@ Tcalc evalPosnRestraint(const int p_atom, const int step_number, const int init_
                         const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                         const double* umat, const double* invu, const UnitCellType unit_cell,
                         Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
-                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                        const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                        int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
-    dx = (static_cast<Tcalc>(xcrd[p_atom]) * inv_gpos_factor) -
-         ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
-    dy = (static_cast<Tcalc>(ycrd[p_atom]) * inv_gpos_factor) -
-         ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
-    dz = (static_cast<Tcalc>(zcrd[p_atom]) * inv_gpos_factor) -
-         ((mixwt.x * init_z) + (mixwt.y * finl_z));
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      dx = (static_cast<Tcalc>(hostInt95ToDouble(xcrd[p_atom], xcrd_ovrf[p_atom])) *
+            inv_gpos_factor) - ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+      dy = (static_cast<Tcalc>(hostInt95ToDouble(ycrd[p_atom], ycrd_ovrf[p_atom])) *
+            inv_gpos_factor) - ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+      dz = (static_cast<Tcalc>(hostInt95ToDouble(zcrd[p_atom], zcrd_ovrf[p_atom])) *
+            inv_gpos_factor) - ((mixwt.x * init_z) + (mixwt.y * finl_z));
+    }
+    else {
+      dx = (static_cast<Tcalc>(xcrd[p_atom]) * inv_gpos_factor) -
+           ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+      dy = (static_cast<Tcalc>(ycrd[p_atom]) * inv_gpos_factor) -
+           ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+      dz = (static_cast<Tcalc>(zcrd[p_atom]) * inv_gpos_factor) -
+           ((mixwt.x * init_z) + (mixwt.y * finl_z));
+    }
   }
   else {
     dx = xcrd[p_atom] - ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
@@ -1407,9 +1630,19 @@ Tcalc evalPosnRestraint(const int p_atom, const int step_number, const int init_
       const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
                                              2.0f * rst_eval.x * rst_eval.y / dr;
       if (isSignedIntegralScalarType<Tforce>()) {
-        xfrc[p_atom] -= llround(fmag * dx * force_factor);
-        yfrc[p_atom] -= llround(fmag * dy * force_factor);
-        zfrc[p_atom] -= llround(fmag * dz * force_factor);
+        if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+          const int95_t i_dx = hostDoubleToInt95(fmag * dx * force_factor);
+          const int95_t i_dy = hostDoubleToInt95(fmag * dy * force_factor);
+          const int95_t i_dz = hostDoubleToInt95(fmag * dz * force_factor);
+          hostSplitFPSubtract(&xfrc[p_atom], &xfrc_ovrf[p_atom], i_dx);
+          hostSplitFPSubtract(&yfrc[p_atom], &yfrc_ovrf[p_atom], i_dy);
+          hostSplitFPSubtract(&zfrc[p_atom], &zfrc_ovrf[p_atom], i_dz);
+        }
+        else {
+          xfrc[p_atom] -= llround(fmag * dx * force_factor);
+          yfrc[p_atom] -= llround(fmag * dy * force_factor);
+          zfrc[p_atom] -= llround(fmag * dz * force_factor);
+        }
       }
       else {
         xfrc[p_atom] -= fmag * dx;
@@ -1429,15 +1662,24 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const int step_numbe
                         const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                         const double* umat, const double* invu, const UnitCellType unit_cell,
                         Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
-                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor,
+                        const int* xcrd_ovrf, const int* ycrd_ovrf, const int* zcrd_ovrf,
+                        int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
-    dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    dy = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    dz = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      dx = displacement(i_atom, j_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      dy = displacement(i_atom, j_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      dz = displacement(i_atom, j_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      dy = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      dz = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    }
   }
   else {
     dx = xcrd[j_atom] - xcrd[i_atom];
@@ -1457,15 +1699,28 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const int step_numbe
     const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
                                            2.0f * rst_eval.x * rst_eval.y / dr;
     if (isSignedIntegralScalarType<Tforce>()) {
-      const Tforce ifmag_dx = llround(fmag * dx * force_factor);
-      const Tforce ifmag_dy = llround(fmag * dy * force_factor);
-      const Tforce ifmag_dz = llround(fmag * dz * force_factor);
-      xfrc[i_atom] += ifmag_dx;
-      yfrc[i_atom] += ifmag_dy;
-      zfrc[i_atom] += ifmag_dz;
-      xfrc[j_atom] -= ifmag_dx;
-      yfrc[j_atom] -= ifmag_dy;
-      zfrc[j_atom] -= ifmag_dz;
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        const int95_t ifmag_dx = hostDoubleToInt95(fmag * dx * force_factor);
+        const int95_t ifmag_dy = hostDoubleToInt95(fmag * dy * force_factor);
+        const int95_t ifmag_dz = hostDoubleToInt95(fmag * dz * force_factor);
+        hostSplitFPSum(&xfrc[i_atom], &xfrc_ovrf[i_atom], ifmag_dx);
+        hostSplitFPSum(&yfrc[i_atom], &yfrc_ovrf[i_atom], ifmag_dy);
+        hostSplitFPSum(&zfrc[i_atom], &zfrc_ovrf[i_atom], ifmag_dz);
+        hostSplitFPSubtract(&xfrc[j_atom], &xfrc_ovrf[j_atom], ifmag_dx);
+        hostSplitFPSubtract(&yfrc[j_atom], &yfrc_ovrf[j_atom], ifmag_dy);
+        hostSplitFPSubtract(&zfrc[j_atom], &zfrc_ovrf[j_atom], ifmag_dz);
+      }
+      else {
+        const Tforce ifmag_dx = llround(fmag * dx * force_factor);
+        const Tforce ifmag_dy = llround(fmag * dy * force_factor);
+        const Tforce ifmag_dz = llround(fmag * dz * force_factor);
+        xfrc[i_atom] += ifmag_dx;
+        yfrc[i_atom] += ifmag_dy;
+        zfrc[i_atom] += ifmag_dz;
+        xfrc[j_atom] -= ifmag_dx;
+        yfrc[j_atom] -= ifmag_dy;
+        zfrc[j_atom] -= ifmag_dz;
+      }
     }
     else {
       const Tcalc fmag_dx = fmag * dx;
@@ -1491,18 +1746,29 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                        const Tcalc force_factor) {
+                        const Tcalc force_factor, const int* xcrd_ovrf, const int* ycrd_ovrf,
+                        const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
   Tcalc ba[3], bc[3];
   if (isSignedIntegralScalarType<Tcoord>()) {
-    ba[0] = static_cast<Tcalc>(xcrd[i_atom] - xcrd[j_atom]) *inv_gpos_factor;
-    ba[1] = static_cast<Tcalc>(ycrd[i_atom] - ycrd[j_atom]) *inv_gpos_factor;
-    ba[2] = static_cast<Tcalc>(zcrd[i_atom] - zcrd[j_atom]) *inv_gpos_factor;
-    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) *inv_gpos_factor;
-    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) *inv_gpos_factor;
-    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) *inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      ba[0] = displacement(j_atom, i_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      ba[1] = displacement(j_atom, i_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      ba[2] = displacement(j_atom, i_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      bc[0] = displacement(j_atom, k_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      bc[1] = displacement(j_atom, k_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      bc[2] = displacement(j_atom, k_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      ba[0] = static_cast<Tcalc>(xcrd[i_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      ba[1] = static_cast<Tcalc>(ycrd[i_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      ba[2] = static_cast<Tcalc>(zcrd[i_atom] - zcrd[j_atom]) * inv_gpos_factor;
+      bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+    }
   }
   else {
     ba[0] = xcrd[i_atom] - xcrd[j_atom];
@@ -1541,20 +1807,40 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
     const Tcalc sqbc = dA / mgbc;
     const Tcalc mbabc = dA * invbabc;
     if (isSignedIntegralScalarType<Tforce>()) {
-      Tforce iadf[3], icdf[3];
-      for (int i = 0; i < 3; i++) {
-        iadf[i] = llround(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) * force_factor);
-        icdf[i] = llround(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) * force_factor);
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        int95_t iadf[3], icdf[3];
+        for (int i = 0; i < 3; i++) {
+          iadf[i] = hostDoubleToInt95(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) *
+                                      force_factor);
+          icdf[i] = hostDoubleToInt95(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) *
+                                      force_factor);
+        }
+        hostSplitFPSubtract(&xfrc[i_atom], &xfrc_ovrf[i_atom], iadf[0]);
+        hostSplitFPSubtract(&yfrc[i_atom], &yfrc_ovrf[i_atom], iadf[1]);
+        hostSplitFPSubtract(&zfrc[i_atom], &zfrc_ovrf[i_atom], iadf[2]);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], iadf[0] + icdf[0]);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], iadf[1] + icdf[1]);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], iadf[2] + icdf[2]);
+        hostSplitFPSubtract(&xfrc[k_atom], &xfrc_ovrf[k_atom], icdf[0]);
+        hostSplitFPSubtract(&yfrc[k_atom], &yfrc_ovrf[k_atom], icdf[1]);
+        hostSplitFPSubtract(&zfrc[k_atom], &zfrc_ovrf[k_atom], icdf[2]);
       }
-      xfrc[i_atom] -= iadf[0];
-      yfrc[i_atom] -= iadf[1];
-      zfrc[i_atom] -= iadf[2];
-      xfrc[j_atom] += iadf[0] + icdf[0];
-      yfrc[j_atom] += iadf[1] + icdf[1];
-      zfrc[j_atom] += iadf[2] + icdf[2];
-      xfrc[k_atom] -= icdf[0];
-      yfrc[k_atom] -= icdf[1];
-      zfrc[k_atom] -= icdf[2];
+      else {
+        Tforce iadf[3], icdf[3];
+        for (int i = 0; i < 3; i++) {
+          iadf[i] = llround(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) * force_factor);
+          icdf[i] = llround(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) * force_factor);
+        }
+        xfrc[i_atom] -= iadf[0];
+        yfrc[i_atom] -= iadf[1];
+        zfrc[i_atom] -= iadf[2];
+        xfrc[j_atom] += iadf[0] + icdf[0];
+        yfrc[j_atom] += iadf[1] + icdf[1];
+        zfrc[j_atom] += iadf[2] + icdf[2];
+        xfrc[k_atom] -= icdf[0];
+        yfrc[k_atom] -= icdf[1];
+        zfrc[k_atom] -= icdf[2];
+      }
     }
     else {
       Tcalc adf[3], cdf[3];
@@ -1585,21 +1871,35 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                        const Tcalc force_factor) {
+                        const Tcalc force_factor, const int* xcrd_ovrf, const int* ycrd_ovrf,
+                        const int* zcrd_ovrf, int* xfrc_ovrf, int* yfrc_ovrf, int* zfrc_ovrf) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
   Tcalc ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
   if (isSignedIntegralScalarType<Tcoord>()) {
-    ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
-    ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
-    ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
-    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
-    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
-    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
-    cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
-    cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
-    cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr) {
+      ab[0] = displacement(i_atom, j_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      ab[1] = displacement(i_atom, j_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      ab[2] = displacement(i_atom, j_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      bc[0] = displacement(j_atom, k_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      bc[1] = displacement(j_atom, k_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      bc[2] = displacement(j_atom, k_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+      cd[0] = displacement(k_atom, l_atom, xcrd, xcrd_ovrf, inv_gpos_factor);
+      cd[1] = displacement(k_atom, l_atom, ycrd, ycrd_ovrf, inv_gpos_factor);
+      cd[2] = displacement(k_atom, l_atom, zcrd, zcrd_ovrf, inv_gpos_factor);
+    }
+    else {
+      ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+      ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+      ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+      bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+      bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+      bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+      cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
+      cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
+      cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+    }
   }
   else {
     ab[0] = xcrd[j_atom] - xcrd[i_atom];
@@ -1710,27 +2010,55 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
     const Tcalc fc2 = cosb * invbc * isinb2;
     const Tcalc fd = -invcd * isinc2;
     if (isSignedIntegralScalarType<Tforce>()) {
-      const Tforce ifrc_ix = llround(crabbc[0] * fa * force_factor);
-      const Tforce ifrc_jx = llround(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) * force_factor);
-      const Tforce ifrc_lx = llround(-fd * crbccd[0] * force_factor);
-      xfrc[i_atom] += ifrc_ix;
-      xfrc[j_atom] += ifrc_jx;
-      xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
-      xfrc[l_atom] += ifrc_lx;
-      const Tforce ifrc_iy = llround(crabbc[1] * fa * force_factor);
-      const Tforce ifrc_jy = llround(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) * force_factor);
-      const Tforce ifrc_ly = llround(-fd * crbccd[1] * force_factor);
-      yfrc[i_atom] += ifrc_iy;
-      yfrc[j_atom] += ifrc_jy;
-      yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
-      yfrc[l_atom] += ifrc_ly;
-      const Tforce ifrc_iz = llround(crabbc[2] * fa * force_factor);
-      const Tforce ifrc_jz = llround(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) * force_factor);
-      const Tforce ifrc_lz = llround(-fd * crbccd[2] * force_factor);
-      zfrc[i_atom] += ifrc_iz;
-      zfrc[j_atom] += ifrc_jz;
-      zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
-      zfrc[l_atom] += ifrc_lz;
+      if (xfrc_ovrf != nullptr && yfrc_ovrf != nullptr && zfrc_ovrf != nullptr) {
+        const int95_t ifrc_ix = hostDoubleToInt95(crabbc[0] * fa * force_factor);
+        const int95_t ifrc_jx = hostDoubleToInt95(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) *
+                                                  force_factor);
+        const int95_t ifrc_lx = hostDoubleToInt95(-fd * crbccd[0] * force_factor);
+        hostSplitFPSum(&xfrc[i_atom], &xfrc_ovrf[i_atom], ifrc_ix);
+        hostSplitFPSum(&xfrc[j_atom], &xfrc_ovrf[j_atom], ifrc_jx);
+        hostSplitFPSubtract(&xfrc[k_atom], &xfrc_ovrf[k_atom], ifrc_ix + ifrc_jx + ifrc_lx);
+        hostSplitFPSum(&xfrc[l_atom], &xfrc_ovrf[l_atom], ifrc_lx);
+        const int95_t ifrc_iy = hostDoubleToInt95(crabbc[1] * fa * force_factor);
+        const int95_t ifrc_jy = hostDoubleToInt95(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) *
+                                                  force_factor);
+        const int95_t ifrc_ly = hostDoubleToInt95(-fd * crbccd[1] * force_factor);
+        hostSplitFPSum(&yfrc[i_atom], &yfrc_ovrf[i_atom], ifrc_iy);
+        hostSplitFPSum(&yfrc[j_atom], &yfrc_ovrf[j_atom], ifrc_jy);
+        hostSplitFPSubtract(&yfrc[k_atom], &yfrc_ovrf[k_atom], ifrc_iy + ifrc_jy + ifrc_ly);
+        hostSplitFPSum(&yfrc[l_atom], &yfrc_ovrf[l_atom], ifrc_ly);
+        const int95_t ifrc_iz = hostDoubleToInt95(crabbc[2] * fa * force_factor);
+        const int95_t ifrc_jz = hostDoubleToInt95(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) *
+                                                  force_factor);
+        const int95_t ifrc_lz = hostDoubleToInt95(-fd * crbccd[2] * force_factor);
+        hostSplitFPSum(&zfrc[i_atom], &zfrc_ovrf[i_atom], ifrc_iz);
+        hostSplitFPSum(&zfrc[j_atom], &zfrc_ovrf[j_atom], ifrc_jz);
+        hostSplitFPSubtract(&zfrc[k_atom], &zfrc_ovrf[k_atom], ifrc_iz + ifrc_jz + ifrc_lz);
+        hostSplitFPSum(&zfrc[l_atom], &zfrc_ovrf[l_atom], ifrc_lz);
+      }
+      else {
+        const Tforce ifrc_ix = llround(crabbc[0] * fa * force_factor);
+        const Tforce ifrc_jx = llround(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) * force_factor);
+        const Tforce ifrc_lx = llround(-fd * crbccd[0] * force_factor);
+        xfrc[i_atom] += ifrc_ix;
+        xfrc[j_atom] += ifrc_jx;
+        xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
+        xfrc[l_atom] += ifrc_lx;
+        const Tforce ifrc_iy = llround(crabbc[1] * fa * force_factor);
+        const Tforce ifrc_jy = llround(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) * force_factor);
+        const Tforce ifrc_ly = llround(-fd * crbccd[1] * force_factor);
+        yfrc[i_atom] += ifrc_iy;
+        yfrc[j_atom] += ifrc_jy;
+        yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
+        yfrc[l_atom] += ifrc_ly;
+        const Tforce ifrc_iz = llround(crabbc[2] * fa * force_factor);
+        const Tforce ifrc_jz = llround(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) * force_factor);
+        const Tforce ifrc_lz = llround(-fd * crbccd[2] * force_factor);
+        zfrc[i_atom] += ifrc_iz;
+        zfrc[j_atom] += ifrc_jz;
+        zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
+        zfrc[l_atom] += ifrc_lz;
+      }
     }
     else {
       const Tforce frc_ix = crabbc[0] * fa;

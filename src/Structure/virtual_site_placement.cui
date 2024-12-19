@@ -204,7 +204,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC dz = sh_zfrc[frame2_atom] - sh_zfrc[parent_atom];
 #endif
             const TCALC disp_mult = (kind == VirtualSiteKind::FLEX_2) ?
-                                    fr_details.x : fr_details.x * poly_psw.gpos_scale_f /
+                                    fr_details.x : fr_details.x * poly_psw.gpos_scale /
                                                    SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
 #ifdef SPLIT_FORCE_ACCUMULATION
 #  ifdef TCALC_IS_SINGLE
@@ -569,26 +569,26 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
 #  ifdef TCALC_IS_SINGLE
             const int2 vs_x = int63Sum(sh_xfrc[parent_atom], sh_xfrc_overflow[parent_atom],
                                        (fr_details.x * p_f2.x) + (fr_details.y * p_f3.x) +
-                                       (fr_details.z * pf2_x_pf3.x * poly_psw.inv_gpos_scale_f));
+                                       (fr_details.z * pf2_x_pf3.x * poly_psw.inv_gpos_scale));
             const int2 vs_y = int63Sum(sh_yfrc[parent_atom], sh_yfrc_overflow[parent_atom],
                                        (fr_details.x * p_f2.y) + (fr_details.y * p_f3.y) +
-                                       (fr_details.z * pf2_x_pf3.y * poly_psw.inv_gpos_scale_f));
+                                       (fr_details.z * pf2_x_pf3.y * poly_psw.inv_gpos_scale));
             const int2 vs_z = int63Sum(sh_zfrc[parent_atom], sh_zfrc_overflow[parent_atom],
                                        (fr_details.x * p_f2.z) + (fr_details.y * p_f3.z) +
-                                       (fr_details.z * pf2_x_pf3.z * poly_psw.inv_gpos_scale_f));
+                                       (fr_details.z * pf2_x_pf3.z * poly_psw.inv_gpos_scale));
 #  else
             const int95_t vs_x = int95Sum(sh_xfrc[parent_atom], sh_xfrc_overflow[parent_atom],
                                           (fr_details.x * p_f2.x) + (fr_details.y * p_f3.x) +
                                           (fr_details.z * pf2_x_pf3.x *
-                                           poly_psw.inv_gpos_scale_f));
+                                           poly_psw.inv_gpos_scale));
             const int95_t vs_y = int95Sum(sh_yfrc[parent_atom], sh_yfrc_overflow[parent_atom],
                                           (fr_details.x * p_f2.y) + (fr_details.y * p_f3.y) +
                                           (fr_details.z * pf2_x_pf3.y *
-                                           poly_psw.inv_gpos_scale_f));
+                                           poly_psw.inv_gpos_scale));
             const int95_t vs_z = int95Sum(sh_zfrc[parent_atom], sh_zfrc_overflow[parent_atom],
                                           (fr_details.x * p_f2.z) + (fr_details.y * p_f3.z) +
                                           (fr_details.z * pf2_x_pf3.z *
-                                           poly_psw.inv_gpos_scale_f));
+                                           poly_psw.inv_gpos_scale));
 #  endif
             sh_xfrc[vs_atom] = vs_x.x;
             sh_yfrc[vs_atom] = vs_y.x;
@@ -600,15 +600,15 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             sh_xfrc[vs_atom] = sh_xfrc[parent_atom] +
                                LLCONV_FUNC((fr_details.x * p_f2.x) + (fr_details.y * p_f3.x) +
                                            (fr_details.z * pf2_x_pf3.x *
-                                            poly_psw.inv_gpos_scale_f));
+                                            poly_psw.inv_gpos_scale));
             sh_yfrc[vs_atom] = sh_yfrc[parent_atom] +
                                LLCONV_FUNC((fr_details.x * p_f2.y) + (fr_details.y * p_f3.y) +
                                            (fr_details.z * pf2_x_pf3.y *
-                                            poly_psw.inv_gpos_scale_f));
+                                            poly_psw.inv_gpos_scale));
             sh_zfrc[vs_atom] = sh_zfrc[parent_atom] +
                                LLCONV_FUNC((fr_details.x * p_f2.z) + (fr_details.y * p_f3.z) +
                                            (fr_details.z * pf2_x_pf3.z *
-                                            poly_psw.inv_gpos_scale_f));
+                                            poly_psw.inv_gpos_scale));
 #endif
           }
           break;
@@ -703,12 +703,16 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC p_f4y = (TCALC)(sh_yfrc[frame4_atom] - sh_yfrc[parent_atom]);
             const TCALC p_f4z = (TCALC)(sh_zfrc[frame4_atom] - sh_zfrc[parent_atom]);
 #endif
-            const TCALC3 pf3_m_pf2 = { (fr_details.x * p_f3x) - p_f2x,
-                                       (fr_details.x * p_f3y) - p_f2y,
-                                       (fr_details.x * p_f3z) - p_f2z };
-            const TCALC3 pf4_m_pf2 = { (fr_details.y * p_f4x) - p_f2x,
-                                       (fr_details.y * p_f4y) - p_f2y,
-                                       (fr_details.y * p_f4z) - p_f2z };
+            const TCALC3 pf3_m_pf2 = {
+              ((fr_details.x * p_f3x) - p_f2x) * poly_psw.inv_gpos_scale,
+              ((fr_details.x * p_f3y) - p_f2y) * poly_psw.inv_gpos_scale,
+              ((fr_details.x * p_f3z) - p_f2z) * poly_psw.inv_gpos_scale
+            };
+            const TCALC3 pf4_m_pf2 = {
+              ((fr_details.y * p_f4x) - p_f2x) * poly_psw.inv_gpos_scale,
+              ((fr_details.y * p_f4y) - p_f2y) * poly_psw.inv_gpos_scale,
+              ((fr_details.y * p_f4z) - p_f2z) * poly_psw.inv_gpos_scale
+            };
             const TCALC3 p_vs = crossProduct(pf3_m_pf2, pf4_m_pf2);
             const TCALC pvs_factor = fr_details.z * poly_psw.gpos_scale /
                                      SQRT_FUNC((p_vs.x * p_vs.x) + (p_vs.y * p_vs.y) +

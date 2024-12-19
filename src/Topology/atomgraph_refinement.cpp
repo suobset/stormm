@@ -600,7 +600,9 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
               std::to_string(mol_home[iatom]) + " and " + std::to_string(mol_home[jatom]) + ".",
               "ConstraintTable");
       }
-      differential_bonds[mol_home[iatom]] += (atomic_numbers[iatom] != atomic_numbers[jatom]);
+      differential_bonds[mol_home[iatom]] += (atomic_numbers[iatom] != atomic_numbers[jatom] &&
+                                              atomic_numbers[iatom] != 0 &&
+                                              atomic_numbers[jatom] != 0);
     }
     else if (settle_ready_atoms[iatom] && settle_ready_atoms[jatom] == false) {
       rtErr("Inconsistent SETTLE readiness was detected in two bonded atoms.  This should not be "

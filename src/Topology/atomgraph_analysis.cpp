@@ -7,6 +7,7 @@
 #include "atomgraph_abstracts.h"
 #include "atomgraph_analysis.h"
 #include "atomgraph_enumerators.h"
+#include "lennard_jones_analysis.h"
 
 namespace stormm {
 namespace topology {

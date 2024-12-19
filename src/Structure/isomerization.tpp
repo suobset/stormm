@@ -57,18 +57,8 @@ void rotateAboutBond(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int atom_i,
     cos_ra = cosf(rotation_angle);
     sin_ra = sinf(rotation_angle);
   }
-  dx *= invdr;
-  dy *= invdr;
-  dz *= invdr;
-  const std::vector<Tcalc> rmat = { cos_ra + (dx * dx * (value_one - cos_ra)),
-                                    (dy * dx * (value_one - cos_ra)) + (dz * sin_ra),
-                                    (dz * dx * (value_one - cos_ra)) - (dy * sin_ra),
-                                    (dx * dy * (value_one - cos_ra)) - (dz * sin_ra),
-                                    cos_ra + (dy * dy * (value_one - cos_ra)),
-                                    (dz * dy * (value_one - cos_ra)) + (dx * sin_ra),
-                                    (dx * dz * (value_one - cos_ra)) + (dy * sin_ra),
-                                    (dy * dz * (value_one - cos_ra)) - (dx * sin_ra),
-                                    cos_ra + (dz * dz * (value_one - cos_ra)) };
+  std::vector<Tcalc> rmat(9);
+  rotationMatrixAboutVector(dx, dy, dz, rotation_angle, rmat.data());
   
   // Restore the original imaging and location of the bond atoms
   xcrd[atom_j] = center_x;

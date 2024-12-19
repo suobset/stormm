@@ -16,6 +16,7 @@ ThermostatWriter<T>::ThermostatWriter(const ThermostatKind kind_in,
                                       const T rattle_tol_in, const int rattle_iter_in,
                                       const int andr_cyc_in, const T gamma_ln_in,
                                       const T ln_implicit_in, const T ln_explicit_in,
+                                      const bool load_synthesis_forces_in,
                                       const int4* partition_bounds_in,
                                       const T* init_temperatures_in,
                                       const T* final_temperatures_in, ullint2* state_xy_in,
@@ -27,9 +28,10 @@ ThermostatWriter<T>::ThermostatWriter(const ThermostatKind kind_in,
     final_temperature{final_temperature_in}, dt{dt_in}, cnst_geom{cnst_geom_in},
     rattle_tol{rattle_tol_in}, rattle_iter{rattle_iter_in}, andr_cyc{andr_cyc_in},
     gamma_ln{gamma_ln_in}, ln_implicit{ln_implicit_in}, ln_explicit{ln_explicit_in},
-    partition_bounds{partition_bounds_in}, init_temperatures{init_temperatures_in},
-    final_temperatures{final_temperatures_in}, state_xy{state_xy_in}, state_zw{state_zw_in},
-    rng_mode{rng_mode_in}, cache{cache_in}, sp_cache{sp_cache_in}
+    load_synthesis_forces{load_synthesis_forces_in}, partition_bounds{partition_bounds_in},
+    init_temperatures{init_temperatures_in}, final_temperatures{final_temperatures_in},
+    state_xy{state_xy_in}, state_zw{state_zw_in}, rng_mode{rng_mode_in}, cache{cache_in},
+    sp_cache{sp_cache_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -44,6 +46,7 @@ ThermostatReader<T>::ThermostatReader(const ThermostatKind kind_in,
                                       const T rattle_tol_in, const int rattle_iter_in,
                                       const int andr_cyc_in, const T gamma_ln_in,
                                       const T ln_implicit_in, const T ln_explicit_in,
+                                      const bool load_synthesis_forces_in,
                                       const int4* partition_bounds_in,
                                       const T* init_temperatures_in,
                                       const T* final_temperatures_in, const ullint2* state_xy_in,
@@ -55,9 +58,25 @@ ThermostatReader<T>::ThermostatReader(const ThermostatKind kind_in,
     final_temperature{final_temperature_in}, dt{dt_in}, cnst_geom{cnst_geom_in},
     rattle_tol{rattle_tol_in}, rattle_iter{rattle_iter_in}, andr_cyc{andr_cyc_in},
     gamma_ln{gamma_ln_in}, ln_implicit{ln_implicit_in}, ln_explicit{ln_explicit_in},
-    partition_bounds{partition_bounds_in}, init_temperatures{init_temperatures_in},
-    final_temperatures{final_temperatures_in}, state_xy{state_xy_in}, state_zw{state_zw_in},
-    rng_mode{rng_mode_in}, cache{cache_in}, sp_cache{sp_cache_in}
+    load_synthesis_forces{load_synthesis_forces_in}, partition_bounds{partition_bounds_in},
+    init_temperatures{init_temperatures_in}, final_temperatures{final_temperatures_in},
+    state_xy{state_xy_in}, state_zw{state_zw_in}, rng_mode{rng_mode_in}, cache{cache_in},
+    sp_cache{sp_cache_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+ThermostatReader<T>::ThermostatReader(const ThermostatWriter<T> *w) :
+    kind{w->kind}, layout{w->layout}, natom{w->natom}, padded_natom{w->padded_natom},
+    npart{w->npart}, step{w->step}, depth{w->depth}, init_evolution{w->init_evolution},
+    end_evolution{w->end_evolution}, init_temperature{w->init_temperature},
+    final_temperature{w->final_temperature}, dt{w->dt}, cnst_geom{w->cnst_geom},
+    rattle_tol{w->rattle_tol}, rattle_iter{w->rattle_iter}, andr_cyc{w->andr_cyc},
+    gamma_ln{w->gamma_ln}, ln_implicit{w->ln_implicit}, ln_explicit{w->ln_explicit},
+    load_synthesis_forces{w->load_synthesis_forces}, partition_bounds{w->partition_bounds},
+    init_temperatures{w->init_temperatures}, final_temperatures{w->final_temperatures},
+    state_xy{w->state_xy}, state_zw{w->state_zw}, rng_mode{w->rng_mode}, cache{w->cache},
+    sp_cache{w->sp_cache}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -68,7 +87,8 @@ ThermostatReader<T>::ThermostatReader(const ThermostatWriter<T> &w) :
     init_temperature{w.init_temperature}, final_temperature{w.final_temperature}, dt{w.dt},
     cnst_geom{w.cnst_geom}, rattle_tol{w.rattle_tol}, rattle_iter{w.rattle_iter},
     andr_cyc{w.andr_cyc}, gamma_ln{w.gamma_ln}, ln_implicit{w.ln_implicit},
-    ln_explicit{w.ln_explicit}, init_temperatures{w.init_temperatures},
+    ln_explicit{w.ln_explicit}, load_synthesis_forces{w.load_synthesis_forces},
+    partition_bounds{w.partition_bounds}, init_temperatures{w.init_temperatures},
     final_temperatures{w.final_temperatures}, state_xy{w.state_xy}, state_zw{w.state_zw},
     rng_mode{w.rng_mode}, cache{w.cache}, sp_cache{w.sp_cache}
 {}

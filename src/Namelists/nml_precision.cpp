@@ -232,19 +232,18 @@ NamelistEmulator precisionInput(const TextFile &tf, int *start_line, bool *found
   t_nml.addHelp("charge_mesh_bits", "Number of bits after the decimal in fixed-precision "
                 "charge density accumulation on the PME grid.  Charges are accumulated in atomic "
                 "units, with 32 bit signed integer accumulators if the precision model is SINGLE "
-                "or SINGLE_PLUS, or 64 bit signed integer accumulators if the precision model is "
-                "DOUBLE.");
+                "or 64 bit signed integer accumulators if the precision model is DOUBLE.");
   t_nml.addHelp("bond_constraint_tol", "Tolerance to which constrained bonds must meet their "
                 "equilibrium lengths (units of squared Angstroms).  The criterion is for the "
                 "deviation of the squared actual length, in Angstroms, to differ from the squared "
                 "target length of the bond by less than this value.  This may also be specified "
                 "in the &dynamics or &minimize namelists.");
   t_nml.addHelp("valence", "Precision model to use in valence calculations.  Choices include "
-                "'single', 'single_plus', and 'double.'");
+                "SINGLE, FLOAT32_T, DOUBLE, and FLOAT64_T.");
   t_nml.addHelp("nonbonded", "Precision model to use in non-bonded short-ranged calculations.  "
-                "Choices include 'single', 'single_plus', and 'double.'");
+                "Choices include SINGLE, FLOAT32_T, DOUBLE, and FLOAT64_T.");
   t_nml.addHelp("pmegrid", "Precision model to use in mesh-based Particle-Mesh Ewald "
-                "calculations.  Choices include 'single', 'single_plus', and 'double.'");
+                "calculations.  Choices include SINGLE, FLOAT32_T, DOUBLE, and FLOAT64_T.");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

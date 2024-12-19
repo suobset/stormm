@@ -5,15 +5,18 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
+#include "Potential/energy_enumerators.h"
 #include "Structure/structure_enumerators.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "input.h"
+#include "namelist_common.h"
 #include "namelist_emulator.h"
 
 namespace stormm {
 namespace namelist {
 
 using constants::PrecisionModel;
+using energy::VdwSumMethod;
 using parse::WrapTextSearch;
 using structure::ApplyConstraints;
 using structure::RattleMethod;
@@ -34,22 +37,6 @@ constexpr int default_dynamics_nscm = 10000;
   
 /// \brief Default time step for molecular dynamics, in femtoseconds
 constexpr double default_dynamics_time_step = 1.0;
-
-/// \brief The default cutoffs for electrostatic and van-der Waals interactions.  These apply only
-///        in the case of periodic dynamics and will be superceded by information in &pppm
-///        namelists if present in the user input.
-/// \{
-constexpr double default_electrostatic_cutoff = 8.0;
-constexpr double default_van_der_waals_cutoff = 10.0;
-/// \}
-  
-/// \brief The minimum cutoffs for electrostatic and van-der Waals interactions.  These apply only
-///        in the case of periodic dynamics and will be superceded by information in &pppm
-///        namelists if present in the user input.
-/// \{
-constexpr double minimum_elec_cutoff = 0.0;
-constexpr double minimum_vdw_cutoff = 4.5;
-/// \}
 
 /// \brief Default tolerance for RATTLE bond constraints
 constexpr double default_rattle_tolerance = 1.0e-6;
@@ -184,6 +171,9 @@ public:
     
   /// \brief Get the van-der Waals pairwise cutoff in periodic simulations.
   double getVanDerWaalsCutoff() const;
+
+  /// \brief Get the method for computing van-der Waals interactions between particles.
+  VdwSumMethod getVdwSummation() const;
 
   /// \brief Get the value of Coulomb's constant.
   double getCoulombConstant() const;
@@ -329,6 +319,19 @@ public:
   /// \param cutoff_in
   void setCutoff(double cutoff_in);
 
+  /// \brief Set the strategy for evaluating the tails of van-der Waals (Lennard-Jones)
+  ///        interactions.
+  ///
+  /// Overloaded:
+  ///   - Provide a keyword that indicates some value of the enumerator
+  ///   - Provide a value of the enumerator itself
+  ///
+  /// \param vdw_method_in  The input determining how van-der Waals interactions will vanish
+  /// \{
+  void setVdwSummation(const std::string &vdw_method_in);
+  void setVdwSummation(const VdwSumMethod vdw_method_in);
+  /// \}
+  
   /// \brief Set the value of Coulomb's constant.
   ///
   /// \param coulomb_in  Define Coulomb's constant for the simulation
@@ -481,7 +484,7 @@ private:
                                    ///<   and state variable diagnostics
   int trajectory_frequency;        ///< The frequency (step interval) with which to store the
                                    ///<   coordinates of all systems
-  int com_motion_purge_ferquency;  ///< The frequency (step interval) with which to purge the
+  int com_motion_purge_frequency;  ///< The frequency (step interval) with which to purge the
                                    ///<   motion of the center of mass (including, if appropriate,
                                    ///<   rotation about the center of mass)
   double time_step;                ///< Time step to take after each force evaluation
@@ -490,6 +493,8 @@ private:
   double van_der_waals_cutoff;     ///< Cutoff applied to van-der Waals short-ranged interactions
                                    ///<   in periodic simulations
   double coulomb;                  ///< Coulomb's constant may be defined by the user in the input
+  VdwSumMethod vdw_style;          ///< The manner in which van-der Waals interactions will vanish
+                                   ///<   at the cutoff
   double elec_14_screening;        ///< The screening factor on 1:4 non-bonded interactions.  To
                                    ///<   specify that such interactions take place at 5/6 nominal
                                    ///<   strength, provide the value 6/5, 1.2.
@@ -504,8 +509,8 @@ private:
                                    ///<   member function.
   bool vdw_14_set_by_user;         ///< Flag to indicate that the van-der Waals 1:4 screening
       	      	      	      	   ///<   factor was set by the user.  This will also read true if
-      	      	      	      	   ///<   a value is fed in through the setVdw14Screeningt()
-                                   ///<   member function.
+      	      	      	      	   ///<   a value is fed in through the setVdw14Screening() member
+                                   ///<   function.
   std::string constrain_geometry;  ///< Indicate whether SHAKE bond length constraints and SETTLE
                                    ///<   rigid water constraints should be implemented.  This will
                                    ///<   enforce both types of constraints.
@@ -581,9 +586,6 @@ private:
   /// \brief Validate the time step.
   void validateTimeStep();
 
-  /// \brief Validate the short-ranged cutoffs.
-  void validateCutoffs();
-  
   /// \brief Validate the RATTLE tolerance.
   void validateRattleTolerance();
 

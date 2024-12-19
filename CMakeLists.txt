@@ -9,21 +9,16 @@ project(stormm VERSION 0.1)
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 
 #--- Define any options the user can set ---
-
 option(STORMM_BUILD_APPS "Build the apps" ON)
 option(STORMM_BUILD_TESTS "Build the tests" ON)
 option(STORMM_BUILD_BENCHMARKS "Build the benchmarks" ON)
-
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
-
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
 
 #--- Define any global settings / flags ---
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # set the -fPIC flag
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -g")
@@ -34,6 +29,7 @@ if (CMAKE_SHOW_FALLTHROUGH)
 endif()
 set(STORMM_VERSION "0.4")
 
+#--- Contingency for compilation with RDKit ---
 if (STORMM_ENABLE_RDKIT) 
     message("-- RDKit support will be enabled")
 
@@ -42,6 +38,21 @@ if (STORMM_ENABLE_RDKIT)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
 endif()
+
+#--- Functions for detecting a program's availability and version, e.g. gcc version ---
+set(PROGRAM_NAME my_program)
+
+function(${PROGRAM_NAME}_version output_var)
+
+  # Run the command to get the pluginval version
+  execute_process(COMMAND ${PROGRAM_NAME} --version
+                  OUTPUT_VARIABLE ${PROGRAM_NAME}_VERSION_RAW_OUTPUT)
+
+  # Extracts the version from the output of the command run before
+  string(STRIP ${${PROGRAM_NAME}_VERSION_OUTPUT} ${PROGRAM_NAME}_VERSION_OUTPUT)
+
+  set(${output_var} ${${PROGRAM_NAME}_VERSION_OUTPUT} PARENT_SCOPE)
+endfunction()
 
 if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
@@ -53,6 +64,15 @@ if (STORMM_ENABLE_CUDA)
 
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --compiler-options=-O0 -g")
+
+    if (NOT DEFINED CUSTOM_NVCC_THREADS)
+      set(CMAKE_NVCC_THREADS 0)
+    else()
+      set(CMAKE_NVCC_THREADS ${CUSTOM_NVCC_THREADS})
+    endif()
+    
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
+    set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
 
     if (CMAKE_SHOW_FALLTHROUGH)
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wimplicit-fallthrough")

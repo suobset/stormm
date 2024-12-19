@@ -89,12 +89,12 @@ std::string RemdControls::getTemperatureDistributionMethod() const{
 }
 
 //-------------------------------------------------------------------------------------------------
-double RemdControls::getExchangeProbability(){
+double RemdControls::getExchangeProbability() const {
   return exchange_probability;
 }
 
 //-------------------------------------------------------------------------------------------------
-double RemdControls::getTolerance() {
+double RemdControls::getTolerance() const {
   return tolerance;
 }
 
@@ -104,12 +104,12 @@ int RemdControls::getMaxReplicas() const{
 }
 
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getLowTemperature() {
+const double RemdControls::getLowTemperature() const {
   return low_temperature;
 }
 
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getHighTemperature() {
+const double RemdControls::getHighTemperature() const {
   return high_temperature;
 }
 

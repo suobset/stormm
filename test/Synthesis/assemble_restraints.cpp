@@ -31,7 +31,7 @@ RestraintApparatus assembleRestraints(const AtomGraph *ag, const PhaseSpace &ps)
   rlist.reserve((cfr.natom / 8) + 12);
   Xoroshiro128pGenerator xrs(87293);
   int nrst = 0;
-  for (int i = 0; i < cfr.natom; i += cfr.natom / 8) {
+  for (int i = 0; i < cfr.natom; i += cfr.natom /* / 8 */) {
     rlist.emplace_back(i, ag, cfr, 1.1, 1.4, 0.2, 0.6, 0.8, 1.4);
     double3 ts = rlist[nrst].getTargetSite();
     ts.x += 0.25 * (0.5 - xrs.uniformRandomNumber());

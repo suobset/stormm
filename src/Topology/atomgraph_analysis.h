@@ -96,19 +96,14 @@ std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j
 int inferLennardJonesTypeCount(const int length_a, const int length_b,
                                const char* caller = nullptr);
 
-/// \brief Determine the Lennard-Jones combining rule in effect.  The function will accept either
-///        single- or double-precision data, but internally it uses double-precision calculations.
+/// \brief Determine the Lennard-Jones combining rule in effect.  These overloads of the function's
+///        core variants defined in lennard_jones_analysis.h provide a convenient means of getting
+///        the output from topology inputs to the API.
 ///
 /// Overloaded:
-///   - Provide the A and B coefficient arrays by C-style arrays with trusted length
-///   - Provide the A and B coefficient arrays as Standard Template Library vectors
-///   - Provide the A and B coefficient arrays as Hybrid objects
-///   - Provide a topology and extract the Lennard-Jones parameters from it
+///   - Provide the topology by pointer or by const reference
 ///
-/// \param lja             Array of Lennard-Jones A coefficients
-/// \param ljb             Array of Lennard-Jones B coefficients
-/// \param lj_type_count   The number of Lennard-Jones types, indicating the trusted lengths of
-///                        lja and ljb by the number's square
+/// \param ag              The topology of interest
 /// \param policy          Protocol in the event that there are only one (fewer) atom types
 /// \param seek_prevalent  A rare boolean input that, if set to TRUE, will avoid declaring a
 ///                        parameter set "NBFIX" and instead declare it to be "GEOMETRIC" or
@@ -117,21 +112,6 @@ int inferLennardJonesTypeCount(const int length_a, const int length_b,
 ///                        no instances of the other combining rules can describe any off-diagonal
 ///                        interactions in the matrix.
 /// \{
-template <typename T>
-VdwCombiningRule inferCombiningRule(const T* lja, const T* ljb, int lj_type_count,
-                                    ExceptionResponse policy = ExceptionResponse::WARN,
-                                    bool seek_prevalent = false);
-  
-template <typename T>
-VdwCombiningRule inferCombiningRule(const std::vector<T> &lja, const std::vector<T> &ljb,
-                                    ExceptionResponse policy = ExceptionResponse::WARN,
-                                    bool seek_prevalent = false);
-
-template <typename T>
-VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb,
-                                    ExceptionResponse policy = ExceptionResponse::WARN,
-                                    bool seek_prevalent = false);
-
 VdwCombiningRule inferCombiningRule(const AtomGraph *ag,
                                     ExceptionResponse policy = ExceptionResponse::WARN,
                                     bool seek_prevalent = false);
@@ -164,7 +144,5 @@ int getConstrainedDegreesOfFreedom(const AtomGraph &ag, int low_atom_index = 0,
 
 } // namespace topology
 } // namespace stormm
-
-#include "atomgraph_analysis.tpp"
 
 #endif

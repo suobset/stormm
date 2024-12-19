@@ -8,7 +8,6 @@
 #include "DataTypes/stormm_vector_types.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
-#include "atomgraph.h"
 
 namespace stormm {
 namespace topology {
@@ -59,8 +58,8 @@ public:
   ///        Lennard-Jones parameters with arrays to index the original topologies' atoms into the
   ///        unified tables.
   /// \{
-  LennardJonesAnalysis(const AtomGraph *ag_in = nullptr);
-  LennardJonesAnalysis(const AtomGraph &ag_in);
+  LennardJonesAnalysis(const NonbondedKit<double> &nbk,
+                       const std::vector<std::vector<char4>> &atom_type_aliases_in);
   /// \}
 
   /// Composed of Standard Template Library objects with no pointers to repair, the default copy
@@ -113,12 +112,6 @@ public:
   /// \{
   const std::vector<char4>& getLJAliases(int consensus_index) const;
 
-  const std::vector<char4>& getLJAliases(int ag_query_index, int lj_type_index) const;
-
-  const std::vector<char4>& getLJAliases(const AtomGraph *ag_query, int lj_type_index) const;
-
-  const std::vector<char4>& getLJAliases(const AtomGraph &ag_query, int lj_type_index) const;
-
   const std::vector<char4>& getLJAliases(double sigma_query, double epsilon_query,
                                          double tolerance = 1.0e-4) const;
 
@@ -154,28 +147,23 @@ public:
   double2 getLJParameters(const char4 atom_type_query) const;
   /// \}
 
-  /// \brief Add a new topology to the list and expand the internal tables with all unique
-  ///        parameters it may contain, as well as new atom type names for existing parameters.
-  ///        The new topology will be checked to ensure that it does not redefine the parameters
-  ///        associated with known atom type names, or contradict the prevailing combining rules
-  ///        of topologies already incorporated into the tables.
+  /// \brief Add a new set of Lennard-Jones interactions to the list and expand the internal tables
+  ///        with all unique parameters it may contain, as well as new atom type names for existing
+  ///        parameters.  The new topology will be checked to ensure that it does not redefine the
+  ///        parameters associated with known atom type names, or contradict the prevailing
+  ///        combining rules of topologies already incorporated into the tables.
   ///
-  /// Overloaded:
-  ///   - Provide a single new topology by pointer
-  ///   - Provide a single new topology by reference
-  ///   - Provide a series of new topologies, either as a Standard Template Library vector of
-  ///     AtomGraph pointers or as a topology synthesis
-  ///
-  /// \param ag_new_in   The topology to add to the analysis
-  /// \param ag_list_in  A list of topologies to add to the analysis
-  /// \param poly_ag_in  A synthesis of topologies to add to the analysis
-  /// \{
-  void addTopology(const AtomGraph *ag_new_in);
-  void addTopology(const AtomGraph &ag_new_in);
-  void addTopology(const std::vector<AtomGraph*> &ag_list);
-  void addTopology(const AtomGraphSynthesis *poly_ag_in);
-  void addTopology(const AtomGraphSynthesis &poly_ag_in);
-  /// \}
+  /// \param nbk                The non-bonded abstract of the topology responsible for the new
+  ///                           Lennard-Jones parameter set.  While this library is included in
+  ///                           the AtomGraph library itself and therefore cannot reference the
+  ///                           AtomGraph class in any member functions, the abstracts can be
+  ///                           passed in much the same way that other information reduced to its
+  ///                           basic form can be handled by this library.
+  /// \param othr_sigma         Sigma parameters determined for the new Lennard-Jones parameters
+  /// \param othr_epsilon       Epsilon parameters determined for the new Lennard-Jones parameters
+  /// \param othr_type_aliases  Type aliases for the new set of Lennard-Jones parameters
+  void addSet(const NonbondedKit<double> &nbk,
+              const std::vector<std::vector<char4>> &othr_type_aliases);
 
 private:
 
@@ -195,6 +183,11 @@ private:
   /// the list of edits (see below).
   VdwCombiningRule prevalent_rule;
 
+  /// Set as the absolute rule for the combinations of Lennard-Jones parameters.  This will only
+  /// register Lorentz-Berthelot or geometric rules if all parameters in the matrix obey them.
+  /// Otherwise, the rule will be declared NBFIX.
+  VdwCombiningRule absolute_rule;
+  
   /// Sigma parameters for the self-interactions of each type found within any of the topologies
   /// referenced in ag_pointers
   std::vector<double> sigma;
@@ -214,12 +207,6 @@ private:
   /// prevalent_rule above
   std::vector<PairLJInteraction> edits;
 
-  /// Indicate the topologies and Lennard-Jones type indices reflecting the sigma and epsilon
-  /// pairs of Lennard-Jones types from within the consensus tables.  The topology index from
-  /// ag_pointers is given in the "x" member while the Lennard-Jones type index within that
-  /// topology is given in the "y" member.
-  std::vector<int2> ag_index_origins;
-
   /// Bounds array for ag_index_origins above
   std::vector<int> ag_index_origins_bounds;
 
@@ -230,32 +217,79 @@ private:
   /// A map to indicate the Lennard-Jones type index, within the consensus tables, for any
   /// particular atom type name.  The names are converted to uint prior to becoming map keys, to
   /// expedite comparisons and thus lookup.
-  std::map<uint, int> atom_type_interactions;
+  std::map<uint, int> atom_type_map;
   
   /// Maps between the Lennard-Jones interaction indices in each referenced topology and the
   /// consensus parameter tables.  This table should be used when the Lennard-Jones interaction
   /// type index in a specific topology is known (the outer dimension is the number of referenced
   /// topologies), and the goal is to find the index of that type as represented in the consensus
   /// tables.
-  std::vector<std::vector<int>> consensus_index_map;
+  std::vector<std::vector<int>> set_to_consensus_map;
 
   /// Maps between the Lennard-Jones interaction types in the consensus tables and their instances
   /// in each of the referenced topologies.  The "x" member of each tuple indicates the index of
   /// some referenced topology and the "y" member indicates the Lennard-Jones interaction index in
-  /// that topology.
-  std::vector<int2> topology_index_map;
-
-  /// Bounds array for topology_index_map, above
-  std::vector<int> topology_index_map_bounds;
-  
-  /// List of pointers to all topologies grouped under this analysis.  All of these topologies
-  /// must share the same prevalent rule, i.e. one or more could contain NBFix edits, but those
-  /// pair interactions that do appear to obey geometric or Lorentz-Berthelot combining rules
-  /// must share the same such rule in common.
-  std::vector<AtomGraph*> ag_pointers;
+  /// that topology.  The kth list in the array pertains to all instances of the kth consensus
+  /// Lennard-Jones atom type.  Keeping this as a vector of vectors eliminates the need for a
+  /// bounds array and thus makes it more easily extensible with new topologies.
+  std::vector<std::vector<int2>> consensus_to_set_map;
 };
 
+/// \brief Determine the Lennard-Jones combining rule in effect.  The function will accept either
+///        single- or double-precision data, but internally it uses double-precision calculations.
+///
+/// Overloaded:
+///   - Provide the A and B coefficient arrays by C-style arrays with trusted length
+///   - Provide the A and B coefficient arrays as Standard Template Library vectors
+///   - Provide the A and B coefficient arrays as Hybrid objects
+///
+/// \param lja             Array of Lennard-Jones A coefficients
+/// \param ljb             Array of Lennard-Jones B coefficients
+/// \param lj_type_count   The number of Lennard-Jones types, indicating the trusted lengths of
+///                        lja and ljb by the number's square
+/// \param policy          Protocol in the event that there are only one (fewer) atom types
+/// \param seek_prevalent  A rare boolean input that, if set to TRUE, will avoid declaring a
+///                        parameter set "NBFIX" and instead declare it to be "GEOMETRIC" or
+///                        "LORENTZ_BERTHELOT" depending on whether more cases of either combining
+///                        rule can be found.  A parameter set might still be decalred "NBFIX" if
+///                        no instances of the other combining rules can describe any off-diagonal
+///                        interactions in the matrix.
+/// \{
+template <typename T>
+VdwCombiningRule inferCombiningRule(const T* lja, const T* ljb, int lj_type_count,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
+
+template <typename T>
+VdwCombiningRule inferCombiningRule(const std::vector<T> &lja, const std::vector<T> &ljb,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
+
+template <typename T>
+VdwCombiningRule inferCombiningRule(const Hybrid<T> &lja, const Hybrid<T> &ljb,
+                                    ExceptionResponse policy = ExceptionResponse::WARN,
+                                    bool seek_prevalent = false);
+/// \}
+
+/// \brief Locate the Lennard-Jones types where pair-specific combining rules apply.  This will
+///        return a Standard Template Library vector of booleans reading TRUE if the Lennard-Jones
+///        type of each index has pair-specific interactions.  Overloading and descriptions of
+///        input parameters follow from inferCombiningRule(), above.
+/// \{
+template <typename T>
+std::vector<bool> findPairSpecificParticipation(const T* lja, const T* ljb, int lj_type_count);
+
+template <typename T>
+VdwCombiningRule findPairSpecificParticipation(const std::vector<T> &lja,
+                                               const std::vector<T> &ljb);
+
+template <typename T>
+VdwCombiningRule findPairSpecificParticipation(const Hybrid<T> &lja, const Hybrid<T> &ljb);
+/// \}
+  
 } // namespace topology
 } // namespace stormm
+
+#include "lennard_jones_analysis.tpp"
 
 #endif

@@ -113,7 +113,7 @@ public:
                              int sd_cycles_in = default_minimize_ncyc,
                              int max_cycles_in = default_minimize_maxcyc,
                              int nt_warp_multiplicity_in = default_nt_warp_multiplicity,
-                             double electrostaitc_cutoff_in = default_electrostatic_cutoff,
+                             double electrostatic_cutoff_in = default_electrostatic_cutoff,
                              double van_der_waals_cutoff_in = default_van_der_waals_cutoff);
 
   MolecularMechanicsControls(const DynamicsControls &user_input);

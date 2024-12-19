@@ -168,29 +168,30 @@ enum class WaterModel {
 
 /// \brief Enumerate the virtual site types available in Amber.
 enum class VirtualSiteKind {
-  NONE = 0, ///< No frame type
-  FLEX_2,   ///< Flexible two-atom frame: the distance between the virtual site and its parent
-            ///<   atom scales with the distance between the parent atom and frame atom 2
-  FIXED_2,  ///< Fixed distance, two-atom frame: the distance between the virtual site and its
-            ///<   parent atom is fixed regardless of the way the frame stretches
-  FLEX_3,   ///< Flexible three-atom frame: the distance between the virtual site and its parent
-            ///<   atom scales with the distance between the parent atom and frame atoms 2 and 3
-  FIXED_3,  ///< Fixed distance, three-atom frame: the distance between the virtual site and its
-            ///<   parent atom is fixed, along a line between the parent atom and a point between
-            ///<   frame atoms 2 and 3 that does stretch with the distance between those atoms.
-            ///<   Mathematically, this is the equivalent of the FIXED_2 frame expanded to a third
-            ///<   dimension.
-  FAD_3,    ///< Fixed distance, fixed angle three-atom frame: the virtual site is placed at a
-            ///<   a fixed distance from its parent atom, such that the virtual site makes a fixed
-            ///<   angle with its parent atom and frame atom 2, the orientation of the angle being
-            ///<   by the position of frame atom 3.
-  OUT_3,    ///< Out of plane, flexible three-atom frame: the virtual site is placed at a point
-            ///<   determined in the manner of FLEX_3, then moved out of plane by some proportion
-            ///<   of the cross product of the vectors between the parent atom and frame atoms 2
-            ///<   or 3.
-  FIXED_4   ///< Fixed distance, four-atom frame: this places the virtual site at a set distance
-            ///<   from its parent atom, along a vector determined by a cross product of vectors
-            ///<   between frame atoms 2, 3, and 4
+  FLEX_2 = 0, ///< Flexible two-atom frame: the distance between the virtual site and its parent
+              ///<   atom scales with the distance between the parent atom and frame atom 2
+  FIXED_2,    ///< Fixed distance, two-atom frame: the distance between the virtual site and its
+              ///<   parent atom is fixed regardless of the way the frame stretches
+  FLEX_3,     ///< Flexible three-atom frame: the distance between the virtual site and its parent
+              ///<   atom scales with the distance between the parent atom and frame atoms 2 and 3
+  FIXED_3,    ///< Fixed distance, three-atom frame: the distance between the virtual site and its
+              ///<   parent atom is fixed, along a line between the parent atom and a point between
+              ///<   frame atoms 2 and 3 that does stretch with the distance between those atoms.
+              ///<   Mathematically, this is the equivalent of the FIXED_2 frame expanded to a
+              ///<   third dimension.
+  FAD_3,      ///< Fixed distance, fixed angle three-atom frame: the virtual site is placed at a
+              ///<   a fixed distance from its parent atom, such that the virtual site makes a
+              ///<   fixed angle with its parent atom and frame atom 2, the orientation of the
+              ///<   angle being by the position of frame atom 3.
+  OUT_3,      ///< Out of plane, flexible three-atom frame: the virtual site is placed at a point
+              ///<   determined in the manner of FLEX_3, then moved out of plane by some proportion
+              ///<   of the cross product of the vectors between the parent atom and frame atoms 2
+              ///<   or 3.
+  FIXED_4,    ///< Fixed distance, four-atom frame: this places the virtual site at a set distance
+              ///<   from its parent atom, along a vector determined by a cross product of vectors
+              ///<   between frame atoms 2, 3, and 4.
+  NONE        ///< No frame type.  Leave this as the last type in order to get a reading on the
+              ///<   number of unique, nontrivial virtual site frame types.
 };
   
 /// \brief Produce a human-readable string corresponding to the enumeration of interest.  Various

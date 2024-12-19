@@ -3,10 +3,12 @@
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
+#include "../../src/DataTypes/mixed_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/bspline.h"
 #include "../../src/Math/formulas.h"
+#include "../../src/Math/geodesic.h"
 #include "../../src/Math/hilbert_sfc.h"
 #include "../../src/Math/math_enumerators.h"
 #include "../../src/Math/matrix.h"
@@ -32,6 +34,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
+using stormm::CombineIDp;
 using stormm::llint;
 using stormm::ulint;
 using stormm::ullint;
@@ -186,7 +189,7 @@ void solveLinearSystem(const size_t n_equations, const size_t n_unknowns) {
   std::vector<double> xvec_pinv(n_unknowns, 0.0);
   matrixVectorMultiply(amat_pinv, bvec, &xvec_pinv, n_unknowns, n_equations);
   std::vector<double> base_result(n_equations, 0.0);
-  matrixVectorMultiply(amat, base_coefficients, &base_result, n_equations, n_unknowns);
+   matrixVectorMultiply(amat, base_coefficients, &base_result, n_equations, n_unknowns);
   std::vector<double> pinv_result(n_equations, 0.0);
   matrixVectorMultiply(amat, xvec_pinv, &pinv_result, n_equations, n_unknowns);
   const double base_error = relativeRmsError(base_result, bvec);
@@ -1115,6 +1118,12 @@ void testTricubicCorners(const std::vector<double> &invu) {
 //-------------------------------------------------------------------------------------------------
 // Test the efficacy of the FUNCTION_VALUE stencil mode for tricubic interpolation of typical
 // non-bonded potentials on a triclinic mesh element.
+//
+// Arguments:
+//   invu:  Inverse transformation matrix, taking Cartesian coordinates into the fractional space
+//          of the element
+//   tcs:   The tricubic stencil to use, indicating at what points to test the function
+//   xrs:   Source of random numbers
 //-------------------------------------------------------------------------------------------------
 void testCoulombInterpolation(const std::vector<double> &invu, const TricubicStencil &tcs,
                               Xoshiro256ppGenerator *xrs) {
@@ -1301,6 +1310,10 @@ void testCoulombInterpolation(const std::vector<double> &invu, const TricubicSte
 
 //-------------------------------------------------------------------------------------------------
 // Test the sigmoid and sigmoidf functions to verify their returned values and derivatives.
+//
+// Arguments:
+//   crossover:  The point at which the sigmoid function shall cross the X axis
+//   intensity:  The argument t to the exponential, s = e^(t x) / (1 + e^(t x))
 //-------------------------------------------------------------------------------------------------
 void testSigmoid(const double crossover, const double intensity) {
   const int npts = 40;
@@ -1375,6 +1388,15 @@ void testSigmoid(const double crossover, const double intensity) {
 
 //-------------------------------------------------------------------------------------------------
 // Test a specific space-filling curve.
+//
+// Arguments:
+//   xdim:    The number of points (nodes) spanned by the curve along its first dimension
+//   ydim:    Number of points (nodes) spanned by the curve along its second dimension
+//   zdim:    Number of points (nodes) spanned by the curve along its third dimension
+//   method:  The method for constructing the Hilbert (or Hilbert-like) space-filling curve
+//   path_x:  Components of each element in the curve's path along the first dimension
+//   path_y:  Components of each element in the curve's path along the second dimension
+//   path_z:  Components of each element in the curve's path along the third dimension
 //-------------------------------------------------------------------------------------------------
 void checkCurve(const int xdim, const int ydim, const int zdim, const HilbertCurveMode method,
                 const std::vector<int> &path_x, const std::vector<int> &path_y,
@@ -1435,6 +1457,64 @@ void testSpaceFillingCurve() {
                                                3,  2,  2,  3,  3,  3,  2,  2,  2,  2,  3,  3 };
   checkCurve(4, 4, 4, HilbertCurveMode::STRETCH, second_cube_x_ans, second_cube_y_ans,
              second_cube_z_ans);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check all distances between points ditributed over a sphere, make catalogs of the unique
+// values, then check the counts of each distance.
+//
+// Arguments:
+//   points:  The collection of points
+//   counts:  The number of point pairs expected to be found with the shortest point-to-point
+//            distance, the next shortest point-to-point distance, and so on for as many indices
+//            are supplied in the vector
+//   cutoff:  The upper limit of point-to-point distances to consider.  This function can scale as
+//            n^4 in the number of particles N if all point-to-point distances differ by small
+//            amounts.  Limiting the search range helps to keep the effort bounded.
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void checkPointToPointDistances(const std::vector<T> &points, const std::vector<int> &counts,
+                                const double cutoff = 2.01) {
+  const size_t npts = points.size();
+  std::vector<CombineIDp> values;
+  size_t n_values = 0;
+  for (size_t i = 1; i < npts; i++) {
+    for (size_t j = 0; j < i; j++) {
+      const double dx = points[j].x - points[i].x;
+      const double dy = points[j].y - points[i].y;
+      const double dz = points[j].z - points[i].z;
+      const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+      bool found = false;
+      for (size_t k = 0; k < n_values; k++) {
+        if (fabs(r2 - values[k].y) < 1.0e-7) {
+          values[k].x += 1;
+          found = true;
+        }
+      }
+      if (found == false) {
+        values.push_back({ 1, r2 });
+        n_values++;
+      }
+    }
+  }
+  std::sort(values.begin(), values.end(), []( CombineIDp a, CombineIDp b ) { return a.y < b.y; });
+  const size_t ncount = counts.size();
+  for (size_t i = 0; i < ncount; i++) {
+    std::string desc;
+    if (i == 0) {
+      desc.append("the shortest");
+    }
+    else if (i < ncount - 1) {
+      desc.append("an intermediate");
+    }
+    else if (i < ncount) {
+      desc.append("the longest monitored");
+    }
+    check(values[i].x, RelationalOperator::EQUAL, counts[i], "The expected number of values was "
+          "not found at " + desc + " point-to-point distance (" +
+          realToString(sqrt(values[i].y), 6, 4, NumberFormat::STANDARD_REAL) + ") did not meet "
+          "expectations.");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2550,7 +2630,85 @@ int main(const int argc, const char* argv[]) {
   // Check the Hilbert space-filling curve methods
   section(8);
   testSpaceFillingCurve();
-  
+
+  // Check regular geodesics
+  const std::vector<double3> tetrahedron = surfaceDistribution<double, double3>(4);
+  const std::vector<double3> octahedron = surfaceDistribution<double, double3>(6);
+  const std::vector<double3> cube = surfaceDistribution<double, double3>(8);
+  const std::vector<double3> icosahedron = surfaceDistribution<double, double3>(12);
+  const std::vector<double3> trunc_octahedron = surfaceDistribution<double, double3>(24);
+  const std::vector<double3> trunc_icosahedron = surfaceDistribution<double, double3>(60);
+  checkPointToPointDistances(tetrahedron, std::vector<int>(1, 6));
+  checkPointToPointDistances(octahedron, std::vector<int>(1, 12));
+  checkPointToPointDistances(cube, std::vector<int>(1, 12));
+  checkPointToPointDistances(icosahedron, std::vector<int>(1, 30));
+  checkPointToPointDistances(trunc_octahedron, std::vector<int>(1, 36), 0.5);
+  checkPointToPointDistances(trunc_icosahedron, std::vector<int>(1, 90), 0.5);
+  const std::vector<double3> pyramid = surfaceDistribution<double, double3>(5);
+  checkPointToPointDistances(pyramid, { 4, 4 });
+  const std::vector<double3> twin_icosahedron = surfaceDistribution<double, double3>(92);
+  checkPointToPointDistances(twin_icosahedron, { 60, 90, 120 }, 0.25);
+  const std::vector<double3> big_icosahedron = surfaceDistribution<double, double3>(272);
+  checkPointToPointDistances(big_icosahedron, { 60, 60, 60, 120, 240, 120, 120, 30 }, 0.125);
+  int nsph_pts = 1000;
+  std::vector<int> hist_fibn(40, 0), hist_ifibn(40, 0), hist_desr(40, 0);
+  const SpherePlacement fibn_meth = SpherePlacement::AREA_FIBONACCI;
+  const std::vector<double3> fibn = surfaceDistribution<double, double3>(&nsph_pts, fibn_meth);
+  const SpherePlacement ifibn_meth = SpherePlacement::DIST_FIBONACCI;
+  const std::vector<double3> ifibn = surfaceDistribution<double, double3>(&nsph_pts, ifibn_meth);
+  for (int i = 1; i < nsph_pts; i++) {
+    for (int j = 0; j < i; j++) {
+      double dx = fibn[j].x - fibn[i].x;
+      double dy = fibn[j].y - fibn[i].y;
+      double dz = fibn[j].z - fibn[i].z;
+      int ir = sqrt((dx * dx) + (dy * dy) + (dz * dz)) * 200.0;
+      if (ir < 40) {
+        hist_fibn[ir] += 1;
+      }
+      dx = ifibn[j].x - ifibn[i].x;
+      dy = ifibn[j].y - ifibn[i].y;
+      dz = ifibn[j].z - ifibn[i].z;
+      ir = sqrt((dx * dx) + (dy * dy) + (dz * dz)) * 200.0;
+      if (ir < 40) {
+        hist_ifibn[ir] += 1;
+      }
+    }
+  }
+  const SpherePlacement desr_meth = SpherePlacement::DESERNO;
+  const std::vector<double3> desr = surfaceDistribution<double, double3>(&nsph_pts, desr_meth);
+  for (int i = 1; i < nsph_pts; i++) {
+    for (int j = 0; j < i; j++) {
+      const double dx = desr[j].x - desr[i].x;
+      const double dy = desr[j].y - desr[i].y;
+      const double dz = desr[j].z - desr[i].z;
+      const int ir = sqrt((dx * dx) + (dy * dy) + (dz * dz)) * 200.0;
+      if (ir < 40) {
+        hist_desr[ir] += 1;
+      }
+    }
+  }
+  const std::vector<int> hafib_ans = {    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                                          0,   0,   2,   0,   0,   0,   0,   2,   0,   0,
+                                         10, 898, 206, 160, 441, 284, 264, 370, 133,  86,
+                                         82,  76,  66,  74,  70,  70, 285, 168, 156, 132 };
+  const std::vector<int> hdfib_ans = {    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                                          0,   0,   0,   0,   0,   0,   0,   0,   0,   2,
+                                          8, 902, 206, 162, 443, 286, 254, 374, 133,  84,
+                                         80,  80,   66,  74,  66,  72, 289, 172, 144, 134 };
+  const std::vector<int> hdesr_ans = {    0,   0,    0,   0,   0,   0,   0,   0,   0,   0,
+                                          0,   0,    0,   0,   0,   0,   0,   0,   0,   6,
+                                          0,  32, 1442, 284, 200, 172, 172, 132, 148, 116,
+                                        132, 240,  100, 128, 112,  96, 112, 104, 104, 100 };
+  check(desr.size(), RelationalOperator::EQUAL, 998, "The number of points returned by the " +
+        getEnumerationName(SpherePlacement::DESERNO) + " did not meet expectations.\n");
+  check(hist_fibn, RelationalOperator::EQUAL, hafib_ans, "The distribution of point-to-point "
+        "distances found for the canonical Fibonacci sphere did not meet expectations.");
+  check(hist_ifibn, RelationalOperator::EQUAL, hdfib_ans, "The distribution of point-to-point "
+        "distances found for the displacement-optimized Fibonacci sphere did not meet "
+        "expectations.");
+  check(hist_desr, RelationalOperator::EQUAL, hdesr_ans, "The distribution of point-to-point "
+        "distances found for the Deserno sphere did not meet expectations.");
+
   // Print results
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

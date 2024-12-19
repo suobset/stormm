@@ -1534,6 +1534,75 @@ void extractBoxDimensions(T *lx, T *ly, T *lz, T *alpha, T *beta, T *gamma, cons
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+void rotationMatrixAboutVector(const T v_x, const T v_y, const T v_z, const T theta, T* m) {
+  const T value_one = 1.0;
+  T inv_mag, cos_theta, sin_theta;
+  if (std::type_index(typeid(T)).hash_code() == double_type_index) {
+    inv_mag = value_one / sqrt((v_x * v_x) + (v_y * v_y) + (v_z * v_z));
+    cos_theta = cos(theta);
+    sin_theta = sin(theta);
+  }
+  else {
+    inv_mag = value_one / sqrtf((v_x * v_x) + (v_y * v_y) + (v_z * v_z));
+    cos_theta = cosf(theta);
+    sin_theta = sinf(theta);
+  }
+  const T dx = v_x * inv_mag;
+  const T dy = v_y * inv_mag;
+  const T dz = v_z * inv_mag;
+  m[0] = cos_theta + (dx * dx * (value_one - cos_theta));
+  m[1] = (dy * dx * (value_one - cos_theta)) + (dz * sin_theta);
+  m[2] = (dz * dx * (value_one - cos_theta)) - (dy * sin_theta);
+  m[3] = (dx * dy * (value_one - cos_theta)) - (dz * sin_theta);
+  m[4] = cos_theta + (dy * dy * (value_one - cos_theta));
+  m[5] = (dz * dy * (value_one - cos_theta)) + (dx * sin_theta);
+  m[6] = (dx * dz * (value_one - cos_theta)) + (dy * sin_theta);
+  m[7] = (dy * dz * (value_one - cos_theta)) - (dx * sin_theta);
+  m[8] = cos_theta + (dz * dz * (value_one - cos_theta));
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T3>
+void rotationMatrixAboutVector(const T3 v, const T theta, T* m) {
+  rotationMatrixAboutVector(v.x, v.y, v.z, theta, m);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T3>
+void rotationMatrixAboutVector(const T3 v, const T theta, std::vector<T> *m) {
+  rotationMatrixAboutVector(v.x, v.y, v.z, theta, m->data());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T3>
+std::vector<T> rotationMatrixAboutVector(const T3 v, const T theta) {
+  std::vector<T> result(9);
+  rotationMatrixAboutVector(v.x, v.y, v.z, theta, result.data());
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> rotationMatrixAboutVector(const std::vector<T> &v, const T theta) {
+  std::vector<T> result(9);
+  rotationMatrixAboutVector(v[0], v[1], v[2], theta, result.data());
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rotationMatrixAboutVector(const T* v, const T theta, T* m) {
+  rotationMatrixAboutVector(v[0], v[1], v[2], theta, m);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void rotationMatrixAboutVector(const T* v, const T theta, std::vector<T> *m) {
+  rotationMatrixAboutVector(v[0], v[1], v[2], theta, m->data());
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> hessianNormalWidths(const T* invu) {
   T x, y, z;
   hessianNormalWidths(invu, &x, &y, &z);

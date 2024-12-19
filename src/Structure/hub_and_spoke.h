@@ -130,8 +130,9 @@ void rattleVelocities(PhaseSpace *ps, const AtomGraph &ag, PrecisionModel prec, 
                       RattleMethod style = RattleMethod::SEQUENTIAL);
 
 template <typename T, typename T2, typename T4>
-void rattleVelocities(PsSynthesisWriter *poly_psw, const SyAtomUpdateKit<T, T2, T4> &poly_auk,
-                      T dt, T tol, int max_iter = default_rattle_max_iter);
+void rattleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<T> &poly_vk,
+                      const SyAtomUpdateKit<T, T2, T4> &poly_auk, T dt, T tol,
+                      int max_iter = default_rattle_max_iter);
 
 void rattleVelocities(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly_ag,
                       PrecisionModel prec, double dt, double tol,

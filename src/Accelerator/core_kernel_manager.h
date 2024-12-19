@@ -84,6 +84,31 @@ public:
                             AccumulationMethod acc_meth, VwuGoal purpose,
                             ClashResponse collision_handling) const;
 
+  /// \brief Get the block and thread counts for a PME-compatible valence kernel.  All such kernels
+  ///        will take abstracts from one or two neighbor list objects to gather non-bonded forces
+  ///        on particles.  Because particle movement is an inherent feature of these kernels,
+  ///        evaluation of forces due to valence interactions is obligatory.
+  ///
+  /// \param prec                Indicate whether arithmetic is to be performed in either single-
+  ///                            or double-precision floating point numbers
+  /// \param neighbor_prec       Precision of the neighbor list coordinates.  This implies the type
+  ///                            of the fixed-precision primary accumulator, single-precision
+  ///                            corresponding to int32_t and double-precisin corresponding to
+  ///                            int64_t accumulators.  In either case, the neighbor list will have
+  ///                            an int32_t overflow accumulator for each force component.
+  /// \param neighbor_layout     Indicate whether there is a single neighbor list for all such
+  ///                            non-bonded forces or if there are two neighbor lists for
+  ///                            electrostatic and Lennard-Jones forces
+  /// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
+  ///                            whole
+  /// \param acc_meth            The force accumulation method (SPLIT or WHOLE, AUTOMATIC will
+  ///                            produce an error in this context)
+  /// \param collision_handling  Indication of whether clashes are to be dampened
+  int2 getPmeValenceKernelDims(PrecisionModel prec, PrecisionModel neighbor_prec,
+                               NeighborListKind neighbor_layout, EvaluateEnergy eval_nrg,
+                               AccumulationMethod acc_meth,
+                               ClashResponse collision_handling) const;
+  
   /// \brief Get the block and thread counts for a stand-alone velocity constraint kernel.
   ///
   /// \param prec      The precision model for arithmetic to be used in applying constraints
@@ -281,7 +306,20 @@ private:
   ///        function reports numbers based on this functions input information and some further
   ///        analysis.
   ///
+  /// Overloaded:
+  ///   - Catalog a basic valence interaction kernel, which may or may not move particles
+  ///   - Catalog a PME-compatible valence interaction kernel which will reference neighbor lists
+  ///     to obtain non-bonded forces on particles from prior calculations.  All such kernels will
+  ///     move particles.  A valence kernel which only computes forces due to valence interactions
+  ///     and then stores the resulting forces is a basic valence interaction kernel.
+  ///
   /// \param prec                Type of floating point numbers in which the kernel shall work
+  /// \param neighbor_prec       The floating-point representation of the neighbor list
+  ///                            coordinates, particle properties, and prior calculations.  This
+  ///                            also implies the format of the fixed-precision accumulation for
+  ///                            forces in the neighbor list.
+  /// \param neighbor_layout     Indicate whether there are one or two neighbor lists holding the
+  ///                            results of non-bonded force calculations
   /// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
   /// \param eval_nrg            Indication of whether to evaluate the energy of the system as a
   ///                            whole
@@ -291,10 +329,17 @@ private:
   /// \param kwidth              The size selection of the valence kernel, an explicit control over
   ///                            the kernel subdivision
   /// \param kernel_name         [Optional] Name of the kernel in the actual code
+  /// \{
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
                             AccumulationMethod acc_meth, VwuGoal purpose,
                             ClashResponse collision_handling, ValenceKernelSize kwidth,
                             const std::string &kernel_name = std::string(""));
+
+  void catalogValenceKernel(PrecisionModel prec, PrecisionModel neighbor_prec,
+                            NeighborListKind neighbor_layout, EvaluateEnergy eval_nrg,
+                            AccumulationMethod acc_meth, ClashResponse collision_handling,
+                            const std::string &kernel_name = std::string(""));
+  /// \}
 
   /// \brief Set the maximum block size and thread counts for one of the stand-alone trajectory
   ///        integration kernels.  Descriptions of input parameters follow from
@@ -499,13 +544,22 @@ std::string valenceKernelWidthExtension(PrecisionModel prec, ValenceKernelSize k
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
 ///        - { d, f }            Perform calculations in double (d) or float (f) arithmetic
-///        - { e, f, fe }        Compute energies (e), forces (f), or both (ef)
+///        - { ex, fx, fe }      Compute energies (e), forces (f), or both (ef)
 ///        - { s, w }            Accumulate forces in split integers (s) or whole integers (w)
 ///        - { m, a }            Move atoms (m) or accumulate forces or energies (a
 ///        - { cl, nc }          Take no action (cl) in the event of a collision, or implement a
 ///                              soft-core interaction between such particles (nc)
 ///        - { xl, lg, md, sm }  Use an extra large (xl), large (lg), medium (md), or small (sm)
 ///                              kernel thread block
+///        - { pme, pmedual }    Optional extensions for PME_compatible kernels with one or two
+///                              neighbor list grids injecting non-bonded forces
+///        - { d, f }            Take in a neighbor list grid or grids which were computed in
+///                              double (d) or float (f) coordinate precision and arithmetic
+///
+/// Overloaded:
+///   - Take inputs for a "basic" valence interaction kernel
+///   - Take inputs for a "PME compatible" valence interaction kernel, which implies particle
+///     movement, the largest possible work unit size, and up to two neighbor list grids
 ///
 /// \param prec                Type of floating point numbers in which the kernel shall work
 /// \param eval_force          Indication of whether the kernel will evaluate forces on atoms
@@ -516,10 +570,16 @@ std::string valenceKernelWidthExtension(PrecisionModel prec, ValenceKernelSize k
 /// \param purpose             The intended action to take with computed forces
 /// \param collision_handling  Indication of whether to dampen collision effects between particles
 /// \param kwidth              The desired kernel width, from "extra large" to "small"
+/// \{
 std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
                              VwuGoal purpose, ClashResponse collision_handling,
                              ValenceKernelSize kwidth);
+
+std::string valenceKernelKey(PrecisionModel prec, PrecisionModel neighbor_prec,
+                             NeighborListKind neighbor_layout, EvaluateEnergy eval_nrg,
+                             AccumulationMethod acc_meth, ClashResponse collision_handling);
+/// \}
 
 /// \brief Obtain a unique string identifier for one of the integration kernels.  Each identifier
 ///        begins with "intg_" and is then appended with letter codes for different attributes

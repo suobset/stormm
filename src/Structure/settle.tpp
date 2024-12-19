@@ -360,8 +360,8 @@ void settleVelocities(PsSynthesisWriter *poly_psw, const SyValenceKit<Tcalc> &po
                                         local_xcrd.data(), local_ycrd.data(), local_zcrd.data(),
                                         local_xvel.data(), local_yvel.data(), local_zvel.data(),
                                         xcrd_ovrf_ptr, ycrd_ovrf_ptr, zcrd_ovrf_ptr, xvel_ovrf_ptr,
-                                        yvel_ovrf_ptr, zvel_ovrf_ptr, poly_psw->gpos_scale_f,
-                                        poly_psw->vel_scale_f);
+                                        yvel_ovrf_ptr, zvel_ovrf_ptr, poly_psw->gpos_scale,
+                                        poly_psw->vel_scale);
     }
     
     // Return atom velocity information which the work unit is responsible for updating
@@ -393,14 +393,38 @@ template <typename Tcoord, typename Tcalc>
 void updateSettlePVC(const int atm_idx, const Tcalc p_to_v_factor,
                      const Tcalc r_adj, const Tcoord r_ref, const int r_ref_ovrf, Tcoord* r_dev, 
                      int* r_dev_ovrf, Tcoord* v_dev, int* v_dev_ovrf) {
-  const int95_t ir_next = hostInt95Sum(r_ref, r_ref_ovrf, r_adj);
-  const int95_t i_chng = hostSplitFPSubtract(ir_next, r_dev[atm_idx], r_dev_ovrf[atm_idx]);
-  const int95_t dv = hostDoubleToInt95(hostInt95ToDouble(i_chng) * p_to_v_factor);
-  const int95_t iv_next = hostSplitFPSum(dv, v_dev[atm_idx], v_dev_ovrf[atm_idx]);
-  v_dev[atm_idx] = iv_next.x;
-  v_dev_ovrf[atm_idx] = iv_next.y;
-  r_dev[atm_idx] = ir_next.x;
-  r_dev_ovrf[atm_idx] = ir_next.y;
+  if (r_dev_ovrf == nullptr) {
+    const Tcoord ir_next = r_ref + static_cast<Tcoord>(llround(r_adj));
+    const Tcalc d_chng = ir_next - r_dev[atm_idx];
+    if (v_dev_ovrf == nullptr) {
+      const Tcoord dv = llround(d_chng * p_to_v_factor);
+      v_dev[atm_idx] += dv;
+    }
+    else {
+      const int95_t dv = hostDoubleToInt95(d_chng * p_to_v_factor);
+      const int95_t iv_next = hostSplitFPSum(dv, v_dev[atm_idx], v_dev_ovrf[atm_idx]);
+      v_dev[atm_idx] = iv_next.x;
+      v_dev_ovrf[atm_idx] = iv_next.y;
+    }
+    r_dev[atm_idx] = ir_next;
+  }
+  else {
+    const int95_t ir_next = hostInt95Sum(r_ref, r_ref_ovrf, r_adj);
+    const int95_t i_chng = hostSplitFPSubtract(ir_next, r_dev[atm_idx], r_dev_ovrf[atm_idx]);
+    const Tcalc d_chng = hostInt95ToDouble(i_chng);
+    if (v_dev_ovrf == nullptr) {
+      const Tcoord dv = llround(d_chng * p_to_v_factor);
+      v_dev[atm_idx] += dv;
+    }
+    else {
+      const int95_t dv = hostDoubleToInt95(d_chng * p_to_v_factor);
+      const int95_t iv_next = hostSplitFPSum(dv, v_dev[atm_idx], v_dev_ovrf[atm_idx]);
+      v_dev[atm_idx] = iv_next.x;
+      v_dev_ovrf[atm_idx] = iv_next.y;
+    }
+    r_dev[atm_idx] = ir_next.x;
+    r_dev_ovrf[atm_idx] = ir_next.y;
+  }
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -644,65 +668,30 @@ void settleGroupPosition(const int oxy_idx, const int hd1_idx, const int hd2_idx
     // SETTLE to keep particle velocities consistent.  Adjust the velocities with the changes in
     // each particle's position.  This prefactor will reduce clutter in the fixed-precision code.
     const Tcalc p_to_v_factor = vel_scale / (dt * gpos_scale);
-    if (xcrd_ovrf != nullptr && ycrd_ovrf != nullptr && zcrd_ovrf != nullptr &&
-        xalt_ovrf != nullptr && yalt_ovrf != nullptr && zalt_ovrf != nullptr) {
-      updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.x * gpos_scale, xcrd[oxy_idx],
-                      xcrd_ovrf[oxy_idx], xalt, xalt_ovrf, vxalt, vxalt_ovrf);
-      updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.y * gpos_scale, ycrd[oxy_idx],
-                      ycrd_ovrf[oxy_idx], yalt, yalt_ovrf, vyalt, vyalt_ovrf);
-      updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.z * gpos_scale, zcrd[oxy_idx],
-                      zcrd_ovrf[oxy_idx], zalt, zalt_ovrf, vzalt, vzalt_ovrf);
-      updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.x * gpos_scale, xcrd[oxy_idx],
-                      xcrd_ovrf[oxy_idx], xalt, xalt_ovrf, vxalt, vxalt_ovrf);
-      updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.y * gpos_scale, ycrd[oxy_idx],
-                      ycrd_ovrf[oxy_idx], yalt, yalt_ovrf, vyalt, vyalt_ovrf);
-      updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.z * gpos_scale, zcrd[oxy_idx],
-                      zcrd_ovrf[oxy_idx], zalt, zalt_ovrf, vzalt, vzalt_ovrf);
-      updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.x * gpos_scale, xcrd[oxy_idx],
-                      xcrd_ovrf[oxy_idx], xalt, xalt_ovrf, vxalt, vxalt_ovrf);
-      updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.y * gpos_scale, ycrd[oxy_idx],
-                      ycrd_ovrf[oxy_idx], yalt, yalt_ovrf, vyalt, vyalt_ovrf);
-      updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.z * gpos_scale, zcrd[oxy_idx],
-                      zcrd_ovrf[oxy_idx], zalt, zalt_ovrf, vzalt, vzalt_ovrf);
-    }
-    else {
-      const Tcoord nx_oxy = xcrd[oxy_idx] + llround(oxy_adj_crd.x * gpos_scale);
-      const Tcoord ny_oxy = ycrd[oxy_idx] + llround(oxy_adj_crd.y * gpos_scale);
-      const Tcoord nz_oxy = zcrd[oxy_idx] + llround(oxy_adj_crd.z * gpos_scale);
-      const Tcoord nx_hd1 = xcrd[oxy_idx] + llround(hd1_adj_crd.x * gpos_scale);
-      const Tcoord ny_hd1 = ycrd[oxy_idx] + llround(hd1_adj_crd.y * gpos_scale);
-      const Tcoord nz_hd1 = zcrd[oxy_idx] + llround(hd1_adj_crd.z * gpos_scale);
-      const Tcoord nx_hd2 = xcrd[oxy_idx] + llround(hd2_adj_crd.x * gpos_scale);
-      const Tcoord ny_hd2 = ycrd[oxy_idx] + llround(hd2_adj_crd.y * gpos_scale);
-      const Tcoord nz_hd2 = zcrd[oxy_idx] + llround(hd2_adj_crd.z * gpos_scale);
-      const Tcoord dvx_oxy = static_cast<Tcalc>(nx_oxy - xalt[oxy_idx]) * p_to_v_factor;
-      const Tcoord dvy_oxy = static_cast<Tcalc>(ny_oxy - yalt[oxy_idx]) * p_to_v_factor;
-      const Tcoord dvz_oxy = static_cast<Tcalc>(nz_oxy - zalt[oxy_idx]) * p_to_v_factor;
-      const Tcoord dvx_hd1 = static_cast<Tcalc>(nx_hd1 - xalt[hd1_idx]) * p_to_v_factor;
-      const Tcoord dvy_hd1 = static_cast<Tcalc>(ny_hd1 - yalt[hd1_idx]) * p_to_v_factor;
-      const Tcoord dvz_hd1 = static_cast<Tcalc>(nz_hd1 - zalt[hd1_idx]) * p_to_v_factor;
-      const Tcoord dvx_hd2 = static_cast<Tcalc>(nx_hd2 - xalt[hd2_idx]) * p_to_v_factor;
-      const Tcoord dvy_hd2 = static_cast<Tcalc>(ny_hd2 - yalt[hd2_idx]) * p_to_v_factor;
-      const Tcoord dvz_hd2 = static_cast<Tcalc>(nz_hd2 - zalt[hd2_idx]) * p_to_v_factor;
-      vxalt[oxy_idx] += dvx_oxy;
-      vyalt[oxy_idx] += dvy_oxy;
-      vzalt[oxy_idx] += dvz_oxy;
-      vxalt[hd1_idx] += dvx_hd1;
-      vyalt[hd1_idx] += dvy_hd1;
-      vzalt[hd1_idx] += dvz_hd1;
-      vxalt[hd2_idx] += dvx_hd2;
-      vyalt[hd2_idx] += dvy_hd2;
-      vzalt[hd2_idx] += dvz_hd2;
-      xalt[oxy_idx] = nx_oxy;
-      yalt[oxy_idx] = ny_oxy;
-      zalt[oxy_idx] = nz_oxy;
-      xalt[hd1_idx] = nx_hd1;
-      yalt[hd1_idx] = ny_hd1;
-      zalt[hd1_idx] = nz_hd1;
-      xalt[hd2_idx] = nx_hd2;
-      yalt[hd2_idx] = ny_hd2;
-      zalt[hd2_idx] = nz_hd2;
-    }
+    const Tcoord ref_oxy_x = xcrd[oxy_idx];
+    const Tcoord ref_oxy_y = ycrd[oxy_idx];
+    const Tcoord ref_oxy_z = zcrd[oxy_idx];
+    const Tcoord ref_oxy_ovrf_x = (xcrd_ovrf != nullptr) ? xcrd_ovrf[oxy_idx] : 0;
+    const Tcoord ref_oxy_ovrf_y = (ycrd_ovrf != nullptr) ? ycrd_ovrf[oxy_idx] : 0;
+    const Tcoord ref_oxy_ovrf_z = (zcrd_ovrf != nullptr) ? zcrd_ovrf[oxy_idx] : 0;
+    updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.x * gpos_scale, ref_oxy_x, ref_oxy_ovrf_x,
+                    xalt, xalt_ovrf, vxalt, vxalt_ovrf);
+    updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.y * gpos_scale, ref_oxy_y, ref_oxy_ovrf_y,
+                    yalt, yalt_ovrf, vyalt, vyalt_ovrf);
+    updateSettlePVC(oxy_idx, p_to_v_factor, oxy_adj_crd.z * gpos_scale, ref_oxy_z, ref_oxy_ovrf_z,
+                    zalt, zalt_ovrf, vzalt, vzalt_ovrf);
+    updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.x * gpos_scale, ref_oxy_x, ref_oxy_ovrf_x,
+                    xalt, xalt_ovrf, vxalt, vxalt_ovrf);
+    updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.y * gpos_scale, ref_oxy_y, ref_oxy_ovrf_y,
+                    yalt, yalt_ovrf, vyalt, vyalt_ovrf);
+    updateSettlePVC(hd1_idx, p_to_v_factor, hd1_adj_crd.z * gpos_scale, ref_oxy_z, ref_oxy_ovrf_z,
+                    zalt, zalt_ovrf, vzalt, vzalt_ovrf);
+    updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.x * gpos_scale, ref_oxy_x, ref_oxy_ovrf_x,
+                    xalt, xalt_ovrf, vxalt, vxalt_ovrf);
+    updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.y * gpos_scale, ref_oxy_y, ref_oxy_ovrf_y,
+                    yalt, yalt_ovrf, vyalt, vyalt_ovrf);
+    updateSettlePVC(hd2_idx, p_to_v_factor, hd2_adj_crd.z * gpos_scale, ref_oxy_z, ref_oxy_ovrf_z,
+                    zalt, zalt_ovrf, vzalt, vzalt_ovrf);
   }
   else {
     const Tcoord nx_oxy = xcrd[oxy_idx] + oxy_adj_crd.x;
@@ -803,6 +792,8 @@ void settlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<Tcalc> &pol
     local_xalt_ovrf.resize(maximum_valence_work_unit_atoms);
     local_yalt_ovrf.resize(maximum_valence_work_unit_atoms);
     local_zalt_ovrf.resize(maximum_valence_work_unit_atoms);
+  }
+  if (poly_psw->vel_bits > velocity_scale_nonoverflow_bits) {
     local_vxalt_ovrf.resize(maximum_valence_work_unit_atoms);
     local_vyalt_ovrf.resize(maximum_valence_work_unit_atoms);
     local_vzalt_ovrf.resize(maximum_valence_work_unit_atoms);
@@ -838,6 +829,8 @@ void settlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<Tcalc> &pol
         local_xalt_ovrf[jlocal_idx] = poly_psw->xalt_ovrf[jatom];
         local_yalt_ovrf[jlocal_idx] = poly_psw->yalt_ovrf[jatom];
         local_zalt_ovrf[jlocal_idx] = poly_psw->zalt_ovrf[jatom];
+      }
+      if (poly_psw->vel_bits > velocity_scale_nonoverflow_bits) {
         local_vxalt_ovrf[jlocal_idx] = poly_psw->vxalt_ovrf[jatom];
         local_vyalt_ovrf[jlocal_idx] = poly_psw->vyalt_ovrf[jatom];
         local_vzalt_ovrf[jlocal_idx] = poly_psw->vzalt_ovrf[jatom];
@@ -863,8 +856,8 @@ void settlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<Tcalc> &pol
                                                 local_zcrd_ovrf.data(), local_xalt_ovrf.data(),
                                                 local_yalt_ovrf.data(), local_zalt_ovrf.data(),
                                                 local_vxalt_ovrf.data(), local_vyalt_ovrf.data(),
-                                                local_vzalt_ovrf.data(), poly_psw->gpos_scale_f,
-                                                poly_psw->vel_scale_f);
+                                                local_vzalt_ovrf.data(), poly_psw->gpos_scale,
+                                                poly_psw->vel_scale);
     }
     
     // Return atom position information which the work unit is responsible for updating
@@ -888,6 +881,8 @@ void settlePositions(PsSynthesisWriter *poly_psw, const SyValenceKit<Tcalc> &pol
           poly_psw->xalt_ovrf[jatom] = local_xalt_ovrf[jlocal_idx];
           poly_psw->yalt_ovrf[jatom] = local_yalt_ovrf[jlocal_idx];
           poly_psw->zalt_ovrf[jatom] = local_zalt_ovrf[jlocal_idx];
+        }
+        if (poly_psw->vel_bits > velocity_scale_nonoverflow_bits) {
           poly_psw->vxalt_ovrf[jatom] = local_vxalt_ovrf[jlocal_idx];
           poly_psw->vyalt_ovrf[jatom] = local_vyalt_ovrf[jlocal_idx];
           poly_psw->vzalt_ovrf[jatom] = local_vzalt_ovrf[jlocal_idx];

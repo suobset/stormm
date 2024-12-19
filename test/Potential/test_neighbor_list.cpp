@@ -1354,10 +1354,10 @@ void testCellOrigins(const TestSystemManager &tsm, const std::vector<int> &syste
           const int95_t pt_cy = { corg.cy[ruler_m], corg.cy_ovrf[ruler_m] };
           const int95_t pt_cz = { corg.cz[ruler_m], corg.cz_ovrf[ruler_m] };
           const double pt_x = hostInt95ToDouble(hostSplitFPSum(hostSplitFPSum(pt_ax, pt_bx),
-                                                               pt_cx)) * poly_psw.inv_gpos_scale_f;
+                                                               pt_cx)) * poly_psw.inv_gpos_scale;
           const double pt_y = hostInt95ToDouble(hostSplitFPSum(pt_by, pt_cy)) *
-                              poly_psw.inv_gpos_scale_f;
-          const double pt_z = hostInt95ToDouble(pt_cz) * poly_psw.inv_gpos_scale_f;
+                              poly_psw.inv_gpos_scale;
+          const double pt_z = hostInt95ToDouble(pt_cz) * poly_psw.inv_gpos_scale;
           if (fabs(dx - pt_x) > 1.0e-5 || fabs(dy - pt_y) > 1.0e-5 || fabs(dz - pt_z) > 1.0e-5) {
             xfrm_orig.push_back({ dx, dy, dz });
             tabl_orig.push_back({ pt_x, pt_y, pt_z });
@@ -1472,7 +1472,7 @@ void testGpuCellMigration(const TestSystemManager &ions, const int ncopy, const 
   case 1:
     addRandomNoise(xrs, poly_psw.xalt, poly_psw.xalt_ovrf, poly_psw.yalt, poly_psw.yalt_ovrf,
                    poly_psw.zalt, poly_psw.zalt_ovrf, poly_ps.getPaddedAtomCount(), 2.5,
-                   poly_psw.gpos_scale_f);
+                   poly_psw.gpos_scale);
     break;
   case 2:
     for (int i = 0; i < poly_psw.system_count; i++) {
@@ -1482,7 +1482,7 @@ void testGpuCellMigration(const TestSystemManager &ions, const int ncopy, const 
       const double zspan = poly_psw.invu[(i * xfrm_stride) + 8];
       for (int j = llim; j < hlim; j++) {
         const double orig_x = hostInt95ToDouble(poly_psw.xcrd[j], poly_psw.xcrd_ovrf[j]) *
-                              poly_psw.inv_gpos_scale_f;
+                              poly_psw.inv_gpos_scale;
         const double next_x = orig_x + xrs->gaussianRandomNumber();
         const double next_y = yspan * (0.34 + (0.16 * xrs->uniformRandomNumber()));
         const double next_z = zspan * (0.34 + (0.16 * xrs->uniformRandomNumber()));
@@ -1563,13 +1563,13 @@ void testGpuCellMigration(const TestSystemManager &ions, const int ncopy, const 
       const double atom_y =                       (invu[4] * frac_db) + (invu[7] * frac_dc);
       const double atom_z =                                             (invu[8] * frac_dc);
       double sy_da = hostInt95ToDouble(poly_psw.xalt[topl_idx],
-                                       poly_psw.xalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale_f;
+                                       poly_psw.xalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale;
       double sy_db = hostInt95ToDouble(poly_psw.yalt[topl_idx],
-                                       poly_psw.yalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale_f;
+                                       poly_psw.yalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale;
       double sy_dc = hostInt95ToDouble(poly_psw.zalt[topl_idx],
-                                       poly_psw.zalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale_f;
+                                       poly_psw.zalt_ovrf[topl_idx]) * poly_psw.inv_gpos_scale;
       imageCoordinates(&sy_da, &sy_db, &sy_dc, umat, invu, poly_psw.unit_cell,
-                       ImagingMethod::PRIMARY_UNIT_CELL, poly_psw.gpos_scale_f);
+                       ImagingMethod::PRIMARY_UNIT_CELL, poly_psw.gpos_scale);
       syn_x[topl_idx] = sy_da;
       syn_y[topl_idx] = sy_db;
       syn_z[topl_idx] = sy_dc;

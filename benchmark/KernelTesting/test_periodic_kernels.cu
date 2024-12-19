@@ -81,11 +81,11 @@ kScrambleCoordinates(PsSynthesisWriter poly_psw, const CoordinateFrameReader cfr
       const float pert_x = (float)(0.1) * xoroshiro128p_normalf(&state_v) +
                            __ldca(&cfr.xcrd[local_idx]);
       if (poly_psw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-        const llint ipert_x = __float2ll_rn(pert_x * poly_psw.gpos_scale_f);
+        const llint ipert_x = __float2ll_rn(pert_x * poly_psw.gpos_scale);
         __stwt(&poly_psw.xcrd[synth_idx], ipert_x);
       }
       else {
-        const int95_t ipert_x = doubleToInt95(pert_x * poly_psw.gpos_scale_f);
+        const int95_t ipert_x = doubleToInt95(pert_x * poly_psw.gpos_scale);
         __stwt(&poly_psw.xcrd[synth_idx], ipert_x.x);
         __stwt(&poly_psw.xcrd_ovrf[synth_idx], ipert_x.y);
       }
@@ -102,11 +102,11 @@ kScrambleCoordinates(PsSynthesisWriter poly_psw, const CoordinateFrameReader cfr
       const float pert_y = (float)(0.1) * xoroshiro128p_normalf(&state_v) +
                            __ldca(&cfr.ycrd[local_idx]);
       if (poly_psw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-        const llint ipert_y = __float2ll_rn(pert_y * poly_psw.gpos_scale_f);
+        const llint ipert_y = __float2ll_rn(pert_y * poly_psw.gpos_scale);
         __stwt(&poly_psw.ycrd[synth_idx], ipert_y);
       }
       else {
-        const int95_t ipert_y = doubleToInt95(pert_y * poly_psw.gpos_scale_f);
+        const int95_t ipert_y = doubleToInt95(pert_y * poly_psw.gpos_scale);
         __stwt(&poly_psw.ycrd[synth_idx], ipert_y.x);
         __stwt(&poly_psw.ycrd_ovrf[synth_idx], ipert_y.y);
       }
@@ -123,11 +123,11 @@ kScrambleCoordinates(PsSynthesisWriter poly_psw, const CoordinateFrameReader cfr
       const float pert_z = (float)(0.1) * xoroshiro128p_normalf(&state_v) +
                            __ldca(&cfr.zcrd[local_idx]);
       if (poly_psw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-        const llint ipert_z = __float2ll_rn(pert_z * poly_psw.gpos_scale_f);
+        const llint ipert_z = __float2ll_rn(pert_z * poly_psw.gpos_scale);
         __stwt(&poly_psw.zcrd[synth_idx], ipert_z);
       }
       else {
-        const int95_t ipert_z = doubleToInt95(pert_z * poly_psw.gpos_scale_f);
+        const int95_t ipert_z = doubleToInt95(pert_z * poly_psw.gpos_scale);
         __stwt(&poly_psw.zcrd[synth_idx], ipert_z.x);
         __stwt(&poly_psw.zcrd_ovrf[synth_idx], ipert_z.y);
       }

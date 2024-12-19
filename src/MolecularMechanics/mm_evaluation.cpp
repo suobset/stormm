@@ -39,6 +39,38 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 }
 
 //-------------------------------------------------------------------------------------------------
+void evalValeMM(PhaseSpaceSynthesis* poly_ps, ScoreCard* sc, const AtomGraphSynthesis* poly_ag,
+		const EvaluateForce eval_force, const PrecisionModel prec,
+                const double clash_distance, const double clash_ratio) {
+  PsSynthesisWriter poly_psw = poly_ps->data();
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag->getDoublePrecisionValenceKit();
+      const SyAtomUpdateKit<double,
+                            double2,
+                            double4> poly_auk = poly_ag->getDoublePrecisionAtomUpdateKit();
+      const SyRestraintKit<double, double2, double4> empty_rk;
+      evalValeMM<double, double2, double4>(&poly_psw, sc, poly_vk, poly_auk, eval_force,
+                                           VwuTask::ALL_TASKS, clash_distance, clash_ratio, 0,
+                                           empty_rk);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag->getSinglePrecisionValenceKit();
+      const SyAtomUpdateKit<float,
+                            float2, float4> poly_auk = poly_ag->getSinglePrecisionAtomUpdateKit();
+      const SyRestraintKit<float, float2, float4> empty_rk;
+      evalValeMM<float, float2, float4>(&poly_psw, sc, poly_vk, poly_auk, eval_force,
+                                        VwuTask::ALL_TASKS, clash_distance, clash_ratio, 0,
+                                        empty_rk);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk,
                     const RestraintKit<double, double2, double4> &rar,
@@ -89,6 +121,41 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                                psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
                                                psw.zfrc, sc, eval_force, system_index, step, 1.0,
                                                1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalValeRestMM(PhaseSpaceSynthesis* poly_ps, ScoreCard* sc, const AtomGraphSynthesis* poly_ag,
+                    const int step_number, const EvaluateForce eval_force,
+                    const PrecisionModel prec, const double clash_distance,
+                    const double clash_ratio) {
+  PsSynthesisWriter poly_psw = poly_ps->data();
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag->getDoublePrecisionValenceKit();
+      const SyAtomUpdateKit<double,
+                            double2,
+                            double4> poly_auk = poly_ag->getDoublePrecisionAtomUpdateKit();
+      const SyRestraintKit<double,
+                           double2, double4> poly_rk = poly_ag->getDoublePrecisionRestraintKit();
+      evalValeMM<double, double2, double4>(&poly_psw, sc, poly_vk, poly_auk, eval_force,
+                                           VwuTask::ALL_TASKS, clash_distance, clash_ratio,
+                                           step_number, poly_rk);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag->getSinglePrecisionValenceKit();
+      const SyAtomUpdateKit<float,
+                            float2, float4> poly_auk = poly_ag->getSinglePrecisionAtomUpdateKit();
+      const SyRestraintKit<float,
+                           float2, float4> poly_rk = poly_ag->getSinglePrecisionRestraintKit();
+      evalValeMM<float, float2, float4>(&poly_psw, sc, poly_vk, poly_auk, eval_force,
+                                        VwuTask::ALL_TASKS, clash_distance, clash_ratio,
+                                        step_number, poly_rk);
+    }
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -255,6 +322,111 @@ void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                 system_index);
   evalNonbValeRestMM(ps->data(), sc, vk, nbk, ser, ra->dpData(), eval_force, system_index, step,
                      clash_distance, clash_ratio);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid) {
+  switch (activity) {
+  case VwuTask::BOND:
+    ecard->initialize(StateVariable::BOND, sysid);
+    break;
+  case VwuTask::ANGL:
+    ecard->initialize(StateVariable::ANGLE, sysid);
+    break;
+  case VwuTask::DIHE:
+    ecard->initialize(StateVariable::PROPER_DIHEDRAL, sysid);
+    ecard->initialize(StateVariable::IMPROPER_DIHEDRAL, sysid);
+    break;
+  case VwuTask::UBRD:
+    ecard->initialize(StateVariable::UREY_BRADLEY, sysid);
+    break;
+  case VwuTask::CIMP:
+    ecard->initialize(StateVariable::CHARMM_IMPROPER, sysid);
+    break;
+  case VwuTask::CMAP:
+    ecard->initialize(StateVariable::CMAP, sysid);
+    break;
+  case VwuTask::INFR14:
+    ecard->initialize(StateVariable::ELEC_ONE_FOUR, sysid);
+    ecard->initialize(StateVariable::VDW_ONE_FOUR, sysid);
+    break;
+  case VwuTask::RPOSN:
+  case VwuTask::RBOND:
+  case VwuTask::RANGL:
+  case VwuTask::RDIHE:
+    ecard->initialize(StateVariable::RESTRAINT, sysid);
+    break;
+  case VwuTask::SETTLE:
+  case VwuTask::CGROUP:
+  case VwuTask::VSITE:
+  case VwuTask::CDHE:
+  case VwuTask::CBND:
+    break;
+  case VwuTask::ALL_TASKS:
+    ecard->initialize({ StateVariable::BOND, StateVariable::ANGLE, StateVariable::PROPER_DIHEDRAL,
+                        StateVariable::IMPROPER_DIHEDRAL, StateVariable::UREY_BRADLEY,
+                        StateVariable::CHARMM_IMPROPER, StateVariable::CMAP,
+                        StateVariable::ELEC_ONE_FOUR, StateVariable::VDW_ONE_FOUR,
+                        StateVariable::RESTRAINT }, sysid);
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void commitVwuEnergies(const llint bond_acc, const llint angl_acc, const llint dihe_acc,
+                       const llint impr_acc, const llint ubrd_acc, const llint cimp_acc,
+                       const llint cmap_acc, const llint qq14_acc, const llint lj14_acc,
+                       const llint rest_acc, const int sysid, const VwuTask activity,
+                       ScoreCard *ecard) {
+  switch (activity) {
+  case VwuTask::BOND:
+    ecard->add(StateVariable::BOND, bond_acc, sysid);
+    break;
+  case VwuTask::ANGL:
+    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
+    break;
+  case VwuTask::DIHE:
+    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
+    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
+    break;
+  case VwuTask::UBRD:
+    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    break;
+  case VwuTask::CIMP:
+    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
+    break;
+  case VwuTask::CMAP:
+    ecard->add(StateVariable::CMAP, cmap_acc, sysid);
+    break;
+  case VwuTask::INFR14:
+    ecard->add(StateVariable::ELEC_ONE_FOUR, qq14_acc, sysid);
+    ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
+    break;
+  case VwuTask::RPOSN:
+  case VwuTask::RBOND:
+  case VwuTask::RANGL:
+  case VwuTask::RDIHE:
+    ecard->add(StateVariable::RESTRAINT, rest_acc, sysid);
+    break;
+  case VwuTask::SETTLE:
+  case VwuTask::CGROUP:
+  case VwuTask::VSITE:
+  case VwuTask::CDHE:
+  case VwuTask::CBND:
+    break;
+  case VwuTask::ALL_TASKS:
+    ecard->add(StateVariable::BOND, bond_acc, sysid);
+    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
+    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
+    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
+    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
+    ecard->add(StateVariable::CMAP, cimp_acc, sysid);
+    ecard->add(StateVariable::ELEC_ONE_FOUR, qq14_acc, sysid);
+    ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
+    ecard->add(StateVariable::RESTRAINT, cimp_acc, sysid);
+    break;
+  }
 }
 
 } // namespace mm

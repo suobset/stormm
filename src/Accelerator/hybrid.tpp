@@ -1389,7 +1389,7 @@ template <typename T> void Hybrid<T>::deallocate() {
     break;
 #endif
   }
-
+  
   // If no memory is currently allocated, do nothing
   switch (format) {
 #ifdef STORMM_USE_HPC

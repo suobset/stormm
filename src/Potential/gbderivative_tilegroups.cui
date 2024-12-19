@@ -179,18 +179,18 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 #ifdef TCALC_IS_SINGLE
 #  ifdef LARGE_CHIP_CACHE
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, sh_xcrd, sh_tile_xcog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.ycrd, sh_ycrd, sh_tile_ycog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, sh_zcrd, sh_tile_zcog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
 #  else
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
-                              sh_tile_xcog, poly_psw.gpos_scale_f);
+                              sh_tile_xcog, poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
-                              sh_tile_ycog, poly_psw.gpos_scale_f);
+                              sh_tile_ycog, poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 3, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
-                              sh_tile_zcog, poly_psw.gpos_scale_f);
+                              sh_tile_zcog, poly_psw.gpos_scale);
 #  endif
 #else
 #  ifdef LARGE_CHIP_CACHE
@@ -500,13 +500,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 
       // Store results the local force accumulation
 #ifdef SPLIT_FORCE_ACCUMULATION
-      atomicSplit(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, sh_xfrc_overflow);
-      atomicSplit(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
-      atomicSplit(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
+      atomicSplit(t_xfrc * poly_psw.frc_scale, read_idx, sh_xfrc, sh_xfrc_overflow);
+      atomicSplit(t_yfrc * poly_psw.frc_scale, read_idx, sh_yfrc, sh_yfrc_overflow);
+      atomicSplit(t_zfrc * poly_psw.frc_scale, read_idx, sh_zfrc, sh_zfrc_overflow);
 #else
-      atomicAdd((ullint*)&sh_xfrc[read_idx], (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
-      atomicAdd((ullint*)&sh_yfrc[read_idx], (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
-      atomicAdd((ullint*)&sh_zfrc[read_idx], (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_xfrc[read_idx], (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale)));
+      atomicAdd((ullint*)&sh_yfrc[read_idx], (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale)));
+      atomicAdd((ullint*)&sh_zfrc[read_idx], (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale)));
 #endif
 
       // Increment the tile counter

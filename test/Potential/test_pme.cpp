@@ -967,8 +967,8 @@ void finiteDifferenceNeighborListTest(const TestSystemManager &tsm,
   PsSynthesisWriter little_psw = little_systems.data();
   AtomGraphSynthesis little_topologies = tsm.exportAtomGraphSynthesis(little_indices);
   const double pos_incr = pow(2.0, -fd_perturbation_bits);
-  const int95_t p_pert = hostDoubleToInt95(0.5 * pos_incr * little_psw.gpos_scale_f);
-  const int95_t n_pert = hostDoubleToInt95(-pos_incr * little_psw.gpos_scale_f);
+  const int95_t p_pert = hostDoubleToInt95(0.5 * pos_incr * little_psw.gpos_scale);
+  const int95_t n_pert = hostDoubleToInt95(-pos_incr * little_psw.gpos_scale);
   const int95_t z_pert = { 0LL, 0 };
   const std::vector<int95_t> perturbations = { z_pert, z_pert, z_pert, p_pert, z_pert, z_pert,
                                                n_pert, z_pert, z_pert, p_pert, p_pert, z_pert,
@@ -1040,9 +1040,8 @@ void finiteDifferenceNeighborListTest(const TestSystemManager &tsm,
       ScoreCard sc(little_nsys);
       evaluateParticleParticleEnergy<Tcoord, Tacc,
                                      Tcalc, Tcoord4>(&cg, &sc, little_lema, default_pme_cutoff,
-                                                     default_pme_cutoff, ew_coeff, ew_coeff,
-                                                     VdwSumMethod::CUTOFF, EvaluateForce::YES,
-                                                     nbkinds[i]);
+                                                     ew_coeff, VdwSumMethod::CUTOFF,
+                                                     EvaluateForce::YES, nbkinds[i]);
       for (int j = 0; j < little_nsys; j++) {
         
         // Compute the base energy. Record the force on the chosen particle.
@@ -1562,9 +1561,9 @@ void placeIon(PsSynthesisWriter *poly_psw, const int sys_idx, const std::vector<
   const double xpt = (invu[0] * xupt) + (invu[3] * yupt) + (invu[6] * zupt);
   const double ypt = (invu[1] * xupt) + (invu[4] * yupt) + (invu[7] * zupt);
   const double zpt = (invu[2] * xupt) + (invu[5] * yupt) + (invu[8] * zupt);
-  const int95_t ixpt = hostDoubleToInt95(xpt * poly_psw->gpos_scale_f);
-  const int95_t iypt = hostDoubleToInt95(ypt * poly_psw->gpos_scale_f);
-  const int95_t izpt = hostDoubleToInt95(zpt * poly_psw->gpos_scale_f);
+  const int95_t ixpt = hostDoubleToInt95(xpt * poly_psw->gpos_scale);
+  const int95_t iypt = hostDoubleToInt95(ypt * poly_psw->gpos_scale);
+  const int95_t izpt = hostDoubleToInt95(zpt * poly_psw->gpos_scale);
   const int atom_offset = poly_psw->atom_starts[sys_idx];
   poly_psw->xcrd[atom_offset + nplaced] = ixpt.x;
   poly_psw->ycrd[atom_offset + nplaced] = iypt.x;
@@ -1711,12 +1710,13 @@ void arrangeIons(PhaseSpaceSynthesis *poly_ps, const int sys_idx, const std::vec
 //
 // Arguments:
 //   tsm:      The collection of test systems
+//   oe:       The testing environment (for deep testing directives)
 //   testdir:  Location of STORMM test materials, contains the path to STORMM's source code
 //   xrs:      Source of random numbers for testing
 //   gpu:      Details of the GPU to use
 //-------------------------------------------------------------------------------------------------
-void runGpuTests(const TestSystemManager &tsm, const std::string &testdir,
-                 Xoshiro256ppGenerator *xrs, const GpuDetails &gpu) {
+void runGpuTests(const TestSystemManager &tsm, const TestEnvironment &oe,
+                 const std::string &testdir, Xoshiro256ppGenerator *xrs, const GpuDetails &gpu) {
 
   // Create an exemplary namelist
   const std::string dyn_str("&dynamics\n  cut = " + realToString(default_pme_cutoff) + "\n&end\n");
@@ -1773,30 +1773,32 @@ void runGpuTests(const TestSystemManager &tsm, const std::string &testdir,
                             all_prec, all_prec, all_ngbr, all_clash, all_force, all_energy);
 
   // Open the large kinase system and perform additional tests
-  const std::vector<std::string> kinase_str(1, "kinase");
-  const TestSystemManager kinase_tsm(testdir + "Topology", "top", kinase_str,
-                                     testdir + "Trajectory", "inpcrd", kinase_str);
-  const std::vector<double2> kins_tol = { { 2.5e-6, 7.0e-6 }, { 1.1e-3, 2.5e-2 },
-                                          { 4.5e-3, 9.6e-2 }, { 4.5e-3, 9.0e-2 } };
-  pairInteractionKernelLoop(kinase_tsm, gpu, nrg_tab, dyncon, 52889, kins_tol,
-                            RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
-                            all_force, all_energy);
-  dyncon.setCutoff(12.0);
-  PPITable long_reach_nrg_tab(NonbondedTheme::ELECTROSTATIC, BasisFunctions::MIXED_FRACTIONS,
-                              TableIndexing::SQUARED_ARG, dyncon.getElectrostaticCutoff());
-  pairInteractionKernelLoop(kinase_tsm, gpu, long_reach_nrg_tab, dyncon, 52889, kins_tol,
-                            RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
-                            all_force, all_energy);
+  if (oe.doIntensiveTests()) {
+    const std::vector<std::string> kinase_str(1, "kinase");
+    const TestSystemManager kinase_tsm(testdir + "Topology", "top", kinase_str,
+                                       testdir + "Trajectory", "inpcrd", kinase_str);
+    const std::vector<double2> kins_tol = { { 2.5e-6, 7.0e-6 }, { 1.1e-3, 2.5e-2 },
+                                            { 4.5e-3, 9.6e-2 }, { 4.5e-3, 9.0e-2 } };
+    pairInteractionKernelLoop(kinase_tsm, gpu, nrg_tab, dyncon, 52889, kins_tol,
+                              RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
+                              all_force, all_energy);
+    dyncon.setCutoff(12.0);
+    PPITable long_reach_nrg_tab(NonbondedTheme::ELECTROSTATIC, BasisFunctions::MIXED_FRACTIONS,
+                                TableIndexing::SQUARED_ARG, dyncon.getElectrostaticCutoff());
+    pairInteractionKernelLoop(kinase_tsm, gpu, long_reach_nrg_tab, dyncon, 52889, kins_tol,
+                              RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
+                              all_force, all_energy);
 
-  // Open the large DHFR (JAC benchmark) system and perform additional tests
-  const std::vector<std::string> jac_str(1, "jac");
-  const TestSystemManager jac_tsm(testdir + "Topology", "top", jac_str, testdir + "Trajectory",
-                                  "inpcrd", jac_str);
-  pairInteractionKernelLoop(jac_tsm, gpu, long_reach_nrg_tab, dyncon, 23558, kins_tol,
-                            RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
-                            all_force, all_energy);
-  dyncon.setCutoff(default_pme_cutoff);
-
+    // Open the large DHFR (JAC benchmark) system and perform additional tests
+    const std::vector<std::string> jac_str(1, "jac");
+    const TestSystemManager jac_tsm(testdir + "Topology", "top", jac_str, testdir + "Trajectory",
+                                    "inpcrd", jac_str);
+    pairInteractionKernelLoop(jac_tsm, gpu, long_reach_nrg_tab, dyncon, 23558, kins_tol,
+                              RelationalOperator::EQ, 2, all_prec, all_prec, all_ngbr, all_clash,
+                              all_force, all_energy);
+    dyncon.setCutoff(default_pme_cutoff);
+  }
+  
   // Test a group of the protein-in-water systems
   const std::vector<int> ubiq_idx = tsm.getQualifyingSystems(3105, RelationalOperator::EQ);
   const std::vector<int> systems_vec(8, ubiq_idx[0]);
@@ -1805,7 +1807,7 @@ void runGpuTests(const TestSystemManager &tsm, const std::string &testdir,
   for (int i = 0; i < ubiq_poly_ps.getSystemCount(); i++) {
     addRandomNoise(xrs, ubiq_poly_psw.xcrd, ubiq_poly_psw.xcrd_ovrf, ubiq_poly_psw.ycrd,
                    ubiq_poly_psw.ycrd_ovrf, ubiq_poly_psw.zcrd, ubiq_poly_psw.zcrd_ovrf,
-                   ubiq_poly_ps.getAtomCount(i), 0.01, ubiq_poly_psw.gpos_scale_f);
+                   ubiq_poly_ps.getAtomCount(i), 0.01, ubiq_poly_psw.gpos_scale);
   }
   AtomGraphSynthesis ubiq_poly_ag = tsm.exportAtomGraphSynthesis(systems_vec);
   pairInteractionKernelLoop(&ubiq_poly_ps, &ubiq_poly_ag, gpu, nrg_tab, dyncon, ubiq_tol,
@@ -1879,9 +1881,11 @@ void runGpuTests(const TestSystemManager &tsm, const std::string &testdir,
                             all_prec, all_prec, dual_ngbr, all_clash, all_force, all_energy);
   pairInteractionKernelLoop(tsm, gpu, nrg_tab, dyncon, 3105, ubiq_tol, RelationalOperator::EQ, 1,
                             all_prec, all_prec, dual_ngbr, all_clash, all_force, all_energy);
-  pairInteractionKernelLoop(&ubiq_poly_ps, &ubiq_poly_ag, gpu, nrg_tab, dyncon, ubiq_tol,
-                            tsm.getTestingStatus(), 2, all_prec, all_prec, dual_ngbr, all_clash,
-                            all_force, all_energy);
+  if (oe.doIntensiveTests()) {
+    pairInteractionKernelLoop(&ubiq_poly_ps, &ubiq_poly_ag, gpu, nrg_tab, dyncon, ubiq_tol,
+                              tsm.getTestingStatus(), 2, all_prec, all_prec, dual_ngbr, all_clash,
+                              all_force, all_energy);
+  }
 }
 #endif
 
@@ -2160,9 +2164,8 @@ int main(const int argc, const char* argv[]) {
     ScoreCard sc(poly_ps.getSystemCount());
     evaluateParticleParticleEnergy<double, llint,
                                    double, double4>(&cg, &sc, poly_lema, default_pme_cutoff,
-                                                    default_pme_cutoff, ew_coeff, ew_coeff,
-                                                    VdwSumMethod::CUTOFF, EvaluateForce::YES,
-                                                    nbkinds[i]);
+                                                    ew_coeff, VdwSumMethod::CUTOFF,
+                                                    EvaluateForce::YES, nbkinds[i]);
     poly_ps.initializeForces();
     cg.contributeForces();
     const std::vector<double> qq_nrg = sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC);
@@ -2257,7 +2260,7 @@ int main(const int argc, const char* argv[]) {
   
   // Check the HPC kernels
 #ifdef STORMM_USE_HPC
-  runGpuTests(tsm, testdir, &xrs, gpu);
+  runGpuTests(tsm, oe, testdir, &xrs, gpu);
   timer.assignTime(gpu_walltime);
 #endif
 

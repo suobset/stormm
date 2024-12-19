@@ -2,6 +2,7 @@
 #include "Constants/scaling.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
+#include "namelist_common.h"
 #include "namelist_element.h"
 #include "nml_minimize.h"
 
@@ -9,6 +10,7 @@ namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
+using energy::translateVdwSumMethod;
 using parse::NumberFormat;
 using parse::realToString;
 using parse::strcmpCased;
@@ -23,6 +25,7 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in, const Wrap
     produce_checkpoint{true},
     electrostatic_cutoff{default_minimize_cut},
     lennard_jones_cutoff{default_minimize_cut},
+    lj_style{VdwSumMethod::CUTOFF},
     initial_step{default_minimize_dx0},
     convergence_target{default_minimize_drms},
     clash_minimum_distance{default_minimize_clash_r0},
@@ -37,6 +40,12 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
 {
   NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy, wrap);
   nml_transcript = t_nml;
+
+  // Take in common keyword data
+  addRangedInteractionInterpretation(&electrostatic_cutoff, &lennard_jones_cutoff, &lj_style,
+                                     t_nml, policy);
+
+  // Take in namelist-specific keyword data
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   clash_damping_cycles = t_nml.getIntValue("cdcyc");
@@ -44,14 +53,6 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
   const std::string chkp_behavior = t_nml.getStringValue("checkpoint");
   validateCheckpointProduction(chkp_behavior);
   produce_checkpoint = strcmpCased(chkp_behavior, "true");
-  if (t_nml.getKeywordStatus("cut") != InputStatus::MISSING) {
-    electrostatic_cutoff = t_nml.getRealValue("cut");
-    lennard_jones_cutoff = t_nml.getRealValue("cut");
-  }
-  else {
-    electrostatic_cutoff = t_nml.getRealValue("es_cutoff");
-    lennard_jones_cutoff = t_nml.getRealValue("vdw_cutoff");
-  }
   initial_step = t_nml.getRealValue("dx0");
   convergence_target = t_nml.getRealValue("drms");
   clash_minimum_distance = t_nml.getRealValue("clash_r0");
@@ -62,8 +63,6 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
   validateAuxiliaryCycles(&steepest_descent_cycles, default_minimize_ncyc);
   validateAuxiliaryCycles(&clash_damping_cycles, default_minimize_cdcyc);
   validatePrintFrequency();
-  validateElectrostaticCutoff();
-  validateLennardJonesCutoff();
   validateInitialStep();
   validateConvergenceTarget();
 }
@@ -101,6 +100,11 @@ double MinimizeControls::getElectrostaticCutoff() const {
 //-------------------------------------------------------------------------------------------------
 double MinimizeControls::getLennardJonesCutoff() const {
   return lennard_jones_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+VdwSumMethod MinimizeControls::getVdwSummation() const {
+  return lj_style;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -170,15 +174,23 @@ void MinimizeControls::setCheckpointProduction(const bool produce_in) {
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setElectrostaticCutoff(const double cutoff_in) {
   electrostatic_cutoff = cutoff_in;
-  validateElectrostaticCutoff();
 }
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setLennardJonesCutoff(const double cutoff_in) {
   lennard_jones_cutoff = cutoff_in;
-  validateLennardJonesCutoff();
 }
 
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setVdwSummation(const std::string &vdw_method_in) {
+  lj_style = translateVdwSumMethod(vdw_method_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setVdwSummation(const VdwSumMethod vdw_method_in) {
+  lj_style = vdw_method_in;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setInitialStep(const double step_size_in) {
   initial_step = step_size_in;
@@ -281,38 +293,6 @@ void MinimizeControls::validateCheckpointProduction(const std::string &directive
 }
     
 //-------------------------------------------------------------------------------------------------
-void MinimizeControls::validateElectrostaticCutoff() {
-  if (electrostatic_cutoff < 0.0) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-    case ExceptionResponse::WARN:
-      rtWarn("No electrostatic interaction will be computed with a cutoff of " +
-             std::to_string(electrostatic_cutoff) + ".", "MinimizeControls",
-             "validateElectrostaticCutoff");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-void MinimizeControls::validateLennardJonesCutoff() {
-  if (electrostatic_cutoff < 0.0) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-    case ExceptionResponse::WARN:
-      rtWarn("No van-der Waals interaction will be computed with a cutoff of " +
-             std::to_string(lennard_jones_cutoff) + ".", "MinimizeControls",
-             "validateLennardJonesCutoff");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
 void MinimizeControls::validateInitialStep() {
   if (initial_step < constants::verytiny) {
     switch (policy) {
@@ -364,6 +344,11 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
   NamelistEmulator t_nml("minimize", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to carry out energy minimization of a molecular system guided by an "
                          "energy surface based on a force field.");
+
+  // Add common keywords and defaults
+  addRangedInteractionControls(&t_nml);
+
+  // Add namelist-specific keywords
   t_nml.addKeyword(NamelistElement("maxcyc", NamelistType::INTEGER,
                                    std::to_string(default_minimize_maxcyc)));
   t_nml.addKeyword(NamelistElement("ncyc", NamelistType::INTEGER,
@@ -374,11 +359,6 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                    std::to_string(default_minimize_ntpr)));
   t_nml.addKeyword(NamelistElement("checkpoint", NamelistType::STRING,
                                    std::string(default_minimize_checkpoint)));
-  t_nml.addKeyword(NamelistElement("cut", NamelistType::REAL, std::string("MISSING")));
-  t_nml.addKeyword(NamelistElement("es_cutoff", NamelistType::REAL,
-                                   std::to_string(default_minimize_cut)));
-  t_nml.addKeyword(NamelistElement("vdw_cutoff", NamelistType::REAL,
-                                   std::to_string(default_minimize_cut)));
   t_nml.addKeyword(NamelistElement("dx0", NamelistType::REAL,
                                    std::to_string(default_minimize_dx0)));
   t_nml.addKeyword(NamelistElement("drms", NamelistType::REAL,
@@ -397,11 +377,6 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                 "akin to the mdout results in Amber's sander and pmemd programs.  The default "
                 "of " + std::to_string(default_minimize_ntpr) + " suppresses output except at the "
                 "outset of the run.");
-  t_nml.addHelp("cut", "Cutoff to apply to all short-ranged interactions, in units of Angstroms.");
-  t_nml.addHelp("es_cutoff", "Cutoff to apply to electrostatic (short-ranged) interactions, in "
-                "units of Angstroms.");
-  t_nml.addHelp("vdw_cutoff", "Cutoff to apply to Lennard-Jones interactions, in units of "
-                "Angstroms.");
   t_nml.addHelp("dx0", "Magnitude of the initial displacement along the gradient vector, in units "
                 "of Angstroms.  The size of subsequent moves will grow or shrink based on the "
                 "history of success in previous optimizations.");

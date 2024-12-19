@@ -3206,7 +3206,8 @@ AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier
                                   settle_group_geometry.data(tier), settle_group_masses.data(tier),
                                   constraint_group_params.data(tier), vste_instructions.data(tier),
                                   sett_instructions.data(tier), cnst_instructions.data(tier),
-                                  vwu_manipulation_masks.data(tier));
+                                  vwu_manipulation_masks.data(tier), degrees_of_freedom.data(tier),
+                                  cnst_degrees_of_freedom.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3220,7 +3221,9 @@ AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier
                                  sp_settle_group_masses.data(tier),
                                  sp_constraint_group_params.data(tier),
                                  vste_instructions.data(tier), sett_instructions.data(tier),
-                                 cnst_instructions.data(tier), vwu_manipulation_masks.data(tier));
+                                 cnst_instructions.data(tier), vwu_manipulation_masks.data(tier),
+                                 degrees_of_freedom.data(tier),
+                                 cnst_degrees_of_freedom.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------

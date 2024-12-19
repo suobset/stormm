@@ -3,7 +3,7 @@
 
 // Define the block's atom capacity, if this code is not included in another block where it is
 // already defined.  See Structure/valence_potential.cui for more details.
-#ifdef CONSTRAINT_STANDALONE
+#ifdef VERLET_STANDALONE
 #  define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 #  ifdef TCALC_IS_SINGLE
 #    if INTEG_KERNEL_THREAD_COUNT == 64
@@ -20,12 +20,14 @@
 #  endif
 #endif
 
-/// \brief The velocity update kernel will handle import of critical information (atom positions as
-///        were used to compute forces).  Both the standalone kernel and includable code will then
-///        process the development particle velocities to ensure that they are orthogonal to the
-///        displacement along the constrained bonds, to within the tolerance.  The kernel will
-///        finish by updating velocities according to each work unit's responsibilities.
-#ifdef CONSTRAINT_STANDALONE
+/// \brief The coordinate update kernel will handle import of critical information (atom positions
+///        as were used to compute forces as well as the developing positions).  Both the
+///        standalone kernel and includable code will then process the developing positions to
+///        ensure that they meet with the constrained geometries, to within a tolerance or by
+///        whatever analytic solution the arithmetic model will provide.  The kernel will finish
+///        by updating velocities of the particles for which positions were adjusted, according to
+///        each work unit's responsibilities.
+#ifdef VERLET_STANDALONE
 __global__ void __launch_bounds__(INTEG_KERNEL_THREAD_COUNT, INTEG_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
             PsSynthesisWriter poly_psw, const SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk,
@@ -57,9 +59,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
   // Allocate space for storing the reference displacements for SETTLE group working frames.  Such
   // information is best stored in a dedicated array to avoid polluting other atomic coordinate
   // arrays, which may (and, often are) repurposed by other processes.
+#  ifdef PME_COMPATIBLE
   __shared__ llint stash_xref[INTEG_KERNEL_THREAD_COUNT >> 2];
   __shared__ llint stash_yref[INTEG_KERNEL_THREAD_COUNT >> 2];
   __shared__ llint stash_zref[INTEG_KERNEL_THREAD_COUNT >> 2];
+#  endif
 #  ifdef TCALC_IS_SINGLE
   // In single-precision mode, the valence kernel (which can include the core of this code) will
   // allocate arrays for particle positions in its __shared__ partition of L1.  In double-precision
@@ -70,16 +74,18 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
   __shared__ llint sh_ycrd[VALENCE_ATOM_CAPACITY];
   __shared__ llint sh_zcrd[VALENCE_ATOM_CAPACITY];
 #  else
-  __shared__ int stash_xref_ovrf[INTEG_KERNEL_THREAD_COUNT >> 2];
-  __shared__ int stash_yref_ovrf[INTEG_KERNEL_THREAD_COUNT >> 2];
-  __shared__ int stash_zref_ovrf[INTEG_KERNEL_THREAD_COUNT >> 2];
-  __shared__ int sh_atom_ljidx[VALENCE_ATOM_CAPACITY];
+#    ifdef PME_COMPATIBLE
+  __shared__ int stash_xref_overflow[INTEG_KERNEL_THREAD_COUNT >> 2];
+  __shared__ int stash_yref_overflow[INTEG_KERNEL_THREAD_COUNT >> 2];
+  __shared__ int stash_zref_overflow[INTEG_KERNEL_THREAD_COUNT >> 2];
+#    endif
 #  endif
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
   __shared__ volatile int vwu_idx;
   __shared__ volatile TCALC rtoldt;
+  __shared__ volatile uint sh_atom_constrained[(VALENCE_ATOM_CAPACITY + 31) >> 5];
   
   // Each block takes its first valence work unit based on its block index.
   if (threadIdx.x == 0) {
@@ -111,11 +117,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     const int impt_hlim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].y;
     const int impt_count  = impt_hlim - impt_llim;
     const int impt_stride = devcRoundUp(impt_hlim - impt_llim, warp_size_int);
+    if (threadIdx.x < ((VALENCE_ATOM_CAPACITY + 31) >> 5)) {
+      sh_atom_constrained[threadIdx.x] = 0U;
+    }
     int pos = threadIdx.x;
     while (pos < impt_stride) {
       if (pos < impt_count) {
         const size_t global_read_idx = __ldca(&poly_vk.vwu_imports[impt_llim + pos]);
-        const size_t write_idx = pos + EXCL_GMEM_OFFSET;
         const llint x_update = __ldcv(&poly_psw.xalt[global_read_idx]);
 #  ifdef TCALC_IS_SINGLE
         sh_xcrd[pos]     = __ldcv(&poly_psw.xcrd[global_read_idx]);
@@ -126,23 +134,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #    else
         sh_xfrc[pos]          = __ldca(&poly_psw.xalt[global_read_idx]);
 #    endif
-        // Re-initialize the atomic Lennard-Jones parameter array to zero to prepare for marking
-        // whether each particle was subjected to constraints.  This will become relevant for the
-        // final particle velocity adjustment.  Once particles are moved, there is no need to know
-        // their Lennard-Jones parameters anymore.
-        __stwb(&gmem_r.lj_idx[write_idx], 0);
 #  else
+        const size_t write_idx = pos + EXCL_GMEM_OFFSET;
         const int x_update_ovrf = __ldcv(&poly_psw.xalt_ovrf[global_read_idx]);
         __stwb(&gmem_r.xcrd[write_idx], __ldcv(&poly_psw.xcrd[global_read_idx]));
         __stwb(&gmem_r.xcrd_ovrf[write_idx], __ldcv(&poly_psw.xcrd_ovrf[global_read_idx]));
         sh_xfrc[pos]          = x_update;
         sh_xfrc_overflow[pos] = x_update_ovrf;
-
-        // In double-precision mode, the atomic Lennard-Jones parameter array is held in __shared__
-        // memory to best utilize the space (a 64kB allocation must be made for other __shared__
-        // memory arrays and cannot be used for other L1 caching, so putting this array in
-        // __shared__ is essentially free).
-        sh_atom_ljidx[pos] = 0;
 #  endif
       }
       pos += blockDim.x;
@@ -198,21 +196,20 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
     __syncthreads();
-#else  // CONSTRAINT_STANDALONE
+#else  // VERLET_STANDALONE
 
     // The positions update will have placed the developing particle locations in the force arrays
     // in __shared__ memory, where they are most accessible for iterative refinement.  Thread
-    // synchronization will have already been applied.  However, one more organizational step is
+    // synchronization will have already been applied.  Also, one more organizational step is
     // critical: the Lennard-Jones index array, which is no longer needed by the time particles
     // have been moved, must be repurposed to record whether particles are part of a constraint of
     // any sort.  To prepare for this, its elements for each atom were re-initialized to zero.  The
     // elements will be set to one if the corresponding atoms are part of a constraint.
 
-#endif // CONSTRAINT_STANDALONE
-    
+#endif // VERLET_STANDALONE
     pos = ((threadIdx.x >> warp_bits) << warp_bits);
     const int cgrp_lane_idx = (threadIdx.x & warp_bits_mask_int);
-#ifdef CONSTRAINT_STANDALONE
+#ifdef VERLET_STANDALONE
     int vterm_limit = vwu_padded_task_count[(size_t)(VwuAbstractMap::CGROUP)];
 #else
     vterm_limit = vwu_padded_task_count[(size_t)(VwuAbstractMap::CGROUP)];
@@ -235,11 +232,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       if (central_atom != 0 || peripheral_atom != 0) {
 #ifdef TCALC_IS_SINGLE
         dx_ref = (TCALC)(sh_xcrd[peripheral_atom] - sh_xcrd[central_atom]) *
-                 poly_psw.inv_gpos_scale_f;
+                 poly_psw.inv_gpos_scale;
         dy_ref = (TCALC)(sh_ycrd[peripheral_atom] - sh_ycrd[central_atom]) *
-                 poly_psw.inv_gpos_scale_f;
+                 poly_psw.inv_gpos_scale;
         dz_ref = (TCALC)(sh_zcrd[peripheral_atom] - sh_zcrd[central_atom]) *
-                 poly_psw.inv_gpos_scale_f;
+                 poly_psw.inv_gpos_scale;
 #else  // TCALC_IS_SINGLE
         central_atom += EXCL_GMEM_OFFSET;
         peripheral_atom += EXCL_GMEM_OFFSET;
@@ -257,16 +254,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
                                               __ldca(&gmem_r.zcrd_ovrf[central_atom]));
         central_atom -= EXCL_GMEM_OFFSET;
         peripheral_atom -= EXCL_GMEM_OFFSET;
-        dx_ref = splitFPToReal(idx_ref) * poly_psw.inv_gpos_scale_f;
-        dy_ref = splitFPToReal(idy_ref) * poly_psw.inv_gpos_scale_f;
-        dz_ref = splitFPToReal(idz_ref) * poly_psw.inv_gpos_scale_f;
+        dx_ref = splitFPToReal(idx_ref) * poly_psw.inv_gpos_scale;
+        dy_ref = splitFPToReal(idy_ref) * poly_psw.inv_gpos_scale;
+        dz_ref = splitFPToReal(idz_ref) * poly_psw.inv_gpos_scale;
 #endif // TCALC_IS_SINGLE
 
         // Having computed the reference positional delta, the "old" positions of particles are no
         // longer relevant.  Store the positions after the naive update in the "reference"
         // positions array, whether in __shared__ or the thread-block specific cache space.
 #ifdef TCALC_IS_SINGLE
-        __stwb(&gmem_r.lj_idx[peripheral_atom + EXCL_GMEM_OFFSET], 1);
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const llint ph_xcurr_tmp = int63ToLongLong(sh_xfrc[peripheral_atom],
                                                    sh_xfrc_overflow[peripheral_atom]);
@@ -282,8 +278,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         sh_ycrd[peripheral_atom] = sh_yfrc[peripheral_atom];
         sh_zcrd[peripheral_atom] = sh_zfrc[peripheral_atom];
 #  endif
-#else
-        sh_atom_ljidx[peripheral_atom] = 1;
+#else // TCALC_IS_SINGLE
         const size_t ph_write_idx = peripheral_atom + EXCL_GMEM_OFFSET;
         __stwb(&gmem_r.xcrd[ph_write_idx], sh_xfrc[peripheral_atom]);
         __stwb(&gmem_r.ycrd[ph_write_idx], sh_yfrc[peripheral_atom]);
@@ -291,11 +286,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         __stwb(&gmem_r.xcrd_ovrf[ph_write_idx], sh_xfrc_overflow[peripheral_atom]);
         __stwb(&gmem_r.ycrd_ovrf[ph_write_idx], sh_yfrc_overflow[peripheral_atom]);
         __stwb(&gmem_r.zcrd_ovrf[ph_write_idx], sh_zfrc_overflow[peripheral_atom]);
-#endif
+#endif // TCALC_IS_SINGLE
+        const uint ppc_idx  = (peripheral_atom >> 5);
+        const uint ppc_shft = peripheral_atom - (ppc_idx << 5);
+        atomicOr((uint*)&sh_atom_constrained[ppc_idx], (0x1 << ppc_shft));
+
         // The lead thread in each group will log the central atom's position
         if ((threadIdx.x & warp_bits_mask_int) == ((tinsr.x >> 20) & 0xff)) {
 #ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.lj_idx[central_atom + EXCL_GMEM_OFFSET], 1);
 #  ifdef SPLIT_FORCE_ACCUMULATION
           const llint ca_xcurr_tmp = int63ToLongLong(sh_xfrc[central_atom],
                                                      sh_xfrc_overflow[central_atom]);
@@ -311,8 +309,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
           sh_ycrd[central_atom] = sh_yfrc[central_atom];
           sh_zcrd[central_atom] = sh_zfrc[central_atom];
 #  endif
-#else
-          sh_atom_ljidx[central_atom] = 1;
+#else // TCALC_IS_SINGLE
           const size_t ca_write_idx = central_atom + EXCL_GMEM_OFFSET;
           __stwb(&gmem_r.xcrd[ca_write_idx], sh_xfrc[central_atom]);
           __stwb(&gmem_r.ycrd[ca_write_idx], sh_yfrc[central_atom]);
@@ -320,7 +317,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
           __stwb(&gmem_r.xcrd_ovrf[ca_write_idx], sh_xfrc_overflow[central_atom]);
           __stwb(&gmem_r.ycrd_ovrf[ca_write_idx], sh_yfrc_overflow[central_atom]);
           __stwb(&gmem_r.zcrd_ovrf[ca_write_idx], sh_zfrc_overflow[central_atom]);
-#endif
+#endif // TCALC_IS_SINGLE
+          const uint cpc_idx  = (central_atom >> 5);
+          const uint cpc_shft = central_atom - (cpc_idx << 5);
+          atomicOr((uint*)&sh_atom_constrained[cpc_idx], (0x1 << cpc_shft));
         }
       }
       else {
@@ -330,8 +330,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       const size_t ca_gbl_idx = __ldca(&poly_vk.vwu_imports[impt_llim + central_atom]);
       const size_t ph_gbl_idx = __ldca(&poly_vk.vwu_imports[impt_llim + peripheral_atom]);
-      const TCALC ca_invmass = poly_auk.inv_masses[ca_gbl_idx] * poly_psw.gpos_scale_f;
-      const TCALC ph_invmass = poly_auk.inv_masses[ph_gbl_idx] * poly_psw.gpos_scale_f;
+      const TCALC ca_invmass = poly_auk.inv_masses[ca_gbl_idx] * poly_psw.gpos_scale;
+      const TCALC ph_invmass = poly_auk.inv_masses[ph_gbl_idx] * poly_psw.gpos_scale;
       const TCALC cbm_factor = (TCALC)(0.6) / poly_auk.cnst_grp_params[tinsr.y].y;
 
       // "Blank" instructions will be counted as naturally converged, as the positional delta
@@ -359,16 +359,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
                                           sh_zfrc_overflow[peripheral_atom],
                                           sh_zfrc[central_atom], sh_zfrc_overflow[central_atom]);
 #  endif
-        const TCALC dx = splitFPToReal(idx) * poly_psw.inv_gpos_scale_f;
-        const TCALC dy = splitFPToReal(idy) * poly_psw.inv_gpos_scale_f;
-        const TCALC dz = splitFPToReal(idz) * poly_psw.inv_gpos_scale_f;
+        const TCALC dx = splitFPToReal(idx) * poly_psw.inv_gpos_scale;
+        const TCALC dy = splitFPToReal(idy) * poly_psw.inv_gpos_scale;
+        const TCALC dz = splitFPToReal(idz) * poly_psw.inv_gpos_scale;
 #else  // SPLIT_FORCE_ACCUMULATION
         const TCALC dx = (TCALC)(sh_xfrc[peripheral_atom] - sh_xfrc[central_atom]) *
-                         poly_psw.inv_gpos_scale_f;
+                         poly_psw.inv_gpos_scale;
         const TCALC dy = (TCALC)(sh_yfrc[peripheral_atom] - sh_yfrc[central_atom]) *
-                         poly_psw.inv_gpos_scale_f;
+                         poly_psw.inv_gpos_scale;
         const TCALC dz = (TCALC)(sh_zfrc[peripheral_atom] - sh_zfrc[central_atom]) *
-                         poly_psw.inv_gpos_scale_f;
+                         poly_psw.inv_gpos_scale;
 #endif // SPLIT_FORCE_ACCUMULATION
         const TCALC r2 = (dx * dx) + (dy * dy) + (dz * dz);
         const TCALC delta = poly_auk.cnst_grp_params[tinsr.y].x - r2;
@@ -518,7 +518,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     }
 
     // Implement SETTLE position constraints
-//#ifdef PME_COMPATIBLE
+#ifdef PME_COMPATIBLE
     vterm_limit += (vwu_padded_task_count[(size_t)(VwuAbstractMap::SETTLE)] << 2);
     while (pos < vterm_limit) {
       const int task_offset = vwu_map[(size_t)(VwuAbstractMap::SETTLE)].x;
@@ -559,31 +559,41 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       int my_choice = (cgrp_lane_idx & 0x3);
       my_choice -= 3 * (my_choice == 3);
       const int atm_idx = ((tinsr.x >> (10 * my_choice)) & 0x3ff);
-      const int oxy_idx = (tinsr.x & 0x3ff);
-#ifdef TCALC_IS_SINGLE
 
       // Mark the atom as having been constrained, so that its velocity may be updated as
       // appropriate along with SHAKE-constrained atoms.
-      if (tinsr.y != 0xffffffffU) {
-        __stwb(&gmem_r.lj_idx[atm_idx + EXCL_GMEM_OFFSET], 1);
+      if (tinsr.y != 0xffffffffU && (cgrp_lane_idx & 0x3) < 3) {
+        const int pc_idx  = (atm_idx >> 5);
+        const int pc_shft = atm_idx - (pc_idx << 5);
+        atomicOr((uint*)&sh_atom_constrained[pc_idx], (0x1 << pc_shft));
       }
-#  ifdef SPLIT_FORCE_ACCUMULATION
+      const int oxy_idx = (tinsr.x & 0x3ff);
+#  ifdef TCALC_IS_SINGLE
+#    ifdef SPLIT_FORCE_ACCUMULATION
       TCALC3 lpos = {
         (TCALC)(int63ToLongLong(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx]) - sh_xcrd[oxy_idx]),
         (TCALC)(int63ToLongLong(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx]) - sh_ycrd[oxy_idx]),
         (TCALC)(int63ToLongLong(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx]) - sh_zcrd[oxy_idx])
       };
-#  else
+#    else
       TCALC3 lpos = { (TCALC)(sh_xfrc[atm_idx] - sh_xcrd[oxy_idx]),
                       (TCALC)(sh_yfrc[atm_idx] - sh_ycrd[oxy_idx]),
                       (TCALC)(sh_zfrc[atm_idx] - sh_zcrd[oxy_idx]) };      
-#  endif
-#else // TCALC_IS_SINGLE
-      if (tinsr.y != 0xffffffffU) {
-        sh_atom_ljidx[atm_idx] = 1;
-      }
-      TCALC3 lpos;
-#endif // TCALC_IS_SINGLE
+#    endif
+#  else // TCALC_IS_SINGLE
+      const size_t lcl_atm_idx = atm_idx + EXCL_GMEM_OFFSET;
+      const size_t lcl_oxy_idx = oxy_idx + EXCL_GMEM_OFFSET;
+      const int95_t tmp_dx = int95Subtract(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx],
+                                           __ldca(&gmem_r.xcrd[lcl_oxy_idx]),
+                                           __ldca(&gmem_r.xcrd_ovrf[lcl_oxy_idx]));
+      const int95_t tmp_dy = int95Subtract(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx],
+                                           __ldca(&gmem_r.ycrd[lcl_oxy_idx]),
+                                           __ldca(&gmem_r.ycrd_ovrf[lcl_oxy_idx]));
+      const int95_t tmp_dz = int95Subtract(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx],
+                                           __ldca(&gmem_r.zcrd[lcl_oxy_idx]),
+                                           __ldca(&gmem_r.zcrd_ovrf[lcl_oxy_idx]));
+      TCALC3 lpos = { splitFPToReal(tmp_dx), splitFPToReal(tmp_dy), splitFPToReal(tmp_dz) };
+#  endif // TCALC_IS_SINGLE
       const int base_lane = ((cgrp_lane_idx >> 2) << 2);
       TCALC frac_mo, frac_mh;
       if (tinsr.y != 0xffffffffU) {
@@ -595,16 +605,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         frac_mo = (TCALC)(1.0);
         frac_mh = (TCALC)(1.0);
       }
-#ifdef TCALC_IS_SINGLE
       TCALC3 lcom = { (SHFL(lpos.x, base_lane) * frac_mo) +
                       ((SHFL(lpos.x, base_lane + 1) + SHFL(lpos.x, base_lane + 2)) * frac_mh),
                       (SHFL(lpos.y, base_lane) * frac_mo) +
                       ((SHFL(lpos.y, base_lane + 1) + SHFL(lpos.y, base_lane + 2)) * frac_mh),
                       (SHFL(lpos.z, base_lane) * frac_mo) +
                       ((SHFL(lpos.z, base_lane + 1) + SHFL(lpos.z, base_lane + 2)) * frac_mh) };
-#else // TCALC_IS_SINGLE
-      TCALC3 lcom;
-#endif // TCALC_IS_SINGLE
 
       // Move the local coordinates to the center of mass.  Let the first lane add the center of
       // mass to the oxy atom's coordinates so that it may be implicitly accounted for when
@@ -617,7 +623,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       lpos.x -= lcom.x;
       lpos.y -= lcom.y;
       lpos.z -= lcom.z;
-
+      
       // The fourth thread holds the oxygen atom's local coordinates.  While it is a "different
       // take" on the same displacement, any deviation between the values calculated by the first
       // and fourth threads is a well-bounded error.  Compute the oxy => hd2 displacement and
@@ -627,14 +633,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       if (cgrp_lane_idx == base_lane + 3) {
         const int hd1_idx = ((tinsr.x >> 10) & 0x3ff);
         const int hd2_idx = ((tinsr.x >> 20) & 0x3ff);
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
         lpos  = { (TCALC)(sh_xcrd[hd1_idx] - sh_xcrd[oxy_idx]),
                   (TCALC)(sh_ycrd[hd1_idx] - sh_ycrd[oxy_idx]),
                   (TCALC)(sh_zcrd[hd1_idx] - sh_zcrd[oxy_idx]) };
-        cpos  = { (TCALC)(sh_xcrd[hd2_idx] - sh_xcrd[oxy_idx]) * poly_psw.inv_gpos_scale_f,
-                  (TCALC)(sh_ycrd[hd2_idx] - sh_ycrd[oxy_idx]) * poly_psw.inv_gpos_scale_f,
-                  (TCALC)(sh_zcrd[hd2_idx] - sh_zcrd[oxy_idx]) * poly_psw.inv_gpos_scale_f };
-#else
+        cpos  = { (TCALC)(sh_xcrd[hd2_idx] - sh_xcrd[oxy_idx]) * poly_psw.inv_gpos_scale,
+                  (TCALC)(sh_ycrd[hd2_idx] - sh_ycrd[oxy_idx]) * poly_psw.inv_gpos_scale,
+                  (TCALC)(sh_zcrd[hd2_idx] - sh_zcrd[oxy_idx]) * poly_psw.inv_gpos_scale };
+#  else
         const int local_oxy_idx = oxy_idx + EXCL_GMEM_OFFSET;
         const int local_hd1_idx = hd1_idx + EXCL_GMEM_OFFSET;
         const int local_hd2_idx = hd2_idx + EXCL_GMEM_OFFSET;
@@ -654,30 +660,45 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
                                               __ldca(&gmem_r.xcrd_ovrf[local_hd2_idx]),
                                               __ldca(&gmem_r.xcrd[local_oxy_idx]),
                                               __ldca(&gmem_r.xcrd_ovrf[local_oxy_idx]))) *
-                  poly_psw.inv_gpos_scale_f,
+                  poly_psw.inv_gpos_scale,
                   splitFPToReal(int95Subtract(__ldca(&gmem_r.ycrd[local_hd2_idx]),
                                               __ldca(&gmem_r.ycrd_ovrf[local_hd2_idx]),
                                               __ldca(&gmem_r.ycrd[local_oxy_idx]),
                                               __ldca(&gmem_r.ycrd_ovrf[local_oxy_idx]))) *
-                  poly_psw.inv_gpos_scale_f,
+                  poly_psw.inv_gpos_scale,
                   splitFPToReal(int95Subtract(__ldca(&gmem_r.zcrd[local_hd2_idx]),
                                               __ldca(&gmem_r.zcrd_ovrf[local_hd2_idx]),
                                               __ldca(&gmem_r.zcrd[local_oxy_idx]),
                                               __ldca(&gmem_r.zcrd_ovrf[local_oxy_idx]))) *
-                  poly_psw.inv_gpos_scale_f };
-#endif
+                  poly_psw.inv_gpos_scale };
+#  endif
       }
       
       // Synchronize to protect the local coordinate accesses before the oxygen atom's original
       // coordinates are updated with the center of mass.
       SYNCWARP;
       if (cgrp_lane_idx == base_lane && tinsr.y != 0xffffffffU) {
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
         stash_xref[threadIdx.x >> 2] = sh_xcrd[atm_idx] + LLCONV_FUNC(lcom.x);
         stash_yref[threadIdx.x >> 2] = sh_ycrd[atm_idx] + LLCONV_FUNC(lcom.y);
         stash_zref[threadIdx.x >> 2] = sh_zcrd[atm_idx] + LLCONV_FUNC(lcom.z);
-#else // TCALC_IS_SINGLE
-#endif // TCALC_IS_SINGLE
+#  else // TCALC_IS_SINGLE
+        const int95_t tmp_stshx = int95Sum(__ldca(&gmem_r.xcrd[lcl_atm_idx]),
+                                           __ldca(&gmem_r.xcrd_ovrf[lcl_atm_idx]),
+                                           lcom.x);
+        const int95_t tmp_stshy = int95Sum(__ldca(&gmem_r.ycrd[lcl_atm_idx]),
+                                           __ldca(&gmem_r.ycrd_ovrf[lcl_atm_idx]),
+                                           lcom.y);
+        const int95_t tmp_stshz = int95Sum(__ldca(&gmem_r.zcrd[lcl_atm_idx]),
+                                           __ldca(&gmem_r.zcrd_ovrf[lcl_atm_idx]),
+                                           lcom.z);
+        stash_xref[threadIdx.x >> 2] = tmp_stshx.x;
+        stash_yref[threadIdx.x >> 2] = tmp_stshy.x;
+        stash_zref[threadIdx.x >> 2] = tmp_stshz.x;
+        stash_xref_overflow[threadIdx.x >> 2] = tmp_stshx.y;
+        stash_yref_overflow[threadIdx.x >> 2] = tmp_stshy.y;
+        stash_zref_overflow[threadIdx.x >> 2] = tmp_stshz.y;
+#  endif // TCALC_IS_SINGLE
       }
 
       // In the same manner as was done for the hub-and-spoke constraints, substitute the current
@@ -685,29 +706,35 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       // block-wide synchronization, these atoms (which have been marked as part of a constrained
       // group) can have their velocities updated in accord with the extra coordinate movement.
       if (cgrp_lane_idx < base_lane + 3 && tinsr.y != 0xffffffffU) {
-#ifdef TCALC_IS_SINGLE
-#  ifdef SPLIT_FORCE_ACCUMULATION
+#  ifdef TCALC_IS_SINGLE
+#    ifdef SPLIT_FORCE_ACCUMULATION
         const llint xcurr_tmp = int63ToLongLong(sh_xfrc[atm_idx], sh_xfrc_overflow[atm_idx]);
         const llint ycurr_tmp = int63ToLongLong(sh_yfrc[atm_idx], sh_yfrc_overflow[atm_idx]);
         const llint zcurr_tmp = int63ToLongLong(sh_zfrc[atm_idx], sh_zfrc_overflow[atm_idx]);
         sh_xcrd[atm_idx] = xcurr_tmp;
         sh_ycrd[atm_idx] = ycurr_tmp;
         sh_zcrd[atm_idx] = zcurr_tmp;
-#  else
+#    else
         sh_xcrd[atm_idx] = sh_xfrc[atm_idx];
         sh_ycrd[atm_idx] = sh_yfrc[atm_idx];
         sh_zcrd[atm_idx] = sh_zfrc[atm_idx];
-#  endif
-#else // TCALC_IS_SINGLE
-#endif // TCALC_IS_SINGLE
+#    endif
+#  else // TCALC_IS_SINGLE
+        __stwb(&gmem_r.xcrd[lcl_atm_idx], sh_xfrc[atm_idx]);
+        __stwb(&gmem_r.ycrd[lcl_atm_idx], sh_yfrc[atm_idx]);
+        __stwb(&gmem_r.zcrd[lcl_atm_idx], sh_zfrc[atm_idx]);
+        __stwb(&gmem_r.xcrd_ovrf[lcl_atm_idx], sh_xfrc_overflow[atm_idx]);
+        __stwb(&gmem_r.ycrd_ovrf[lcl_atm_idx], sh_yfrc_overflow[atm_idx]);
+        __stwb(&gmem_r.zcrd_ovrf[lcl_atm_idx], sh_zfrc_overflow[atm_idx]);
+#  endif // TCALC_IS_SINGLE
       }
 
       // Synchronize again to protect the stashed reference frame displacement before other
       // threads will access it at the end of the workflow for the SETTLE instruction.
       SYNCWARP;
-      lpos.x *= poly_psw.inv_gpos_scale_f;
-      lpos.y *= poly_psw.inv_gpos_scale_f;
-      lpos.z *= poly_psw.inv_gpos_scale_f;
+      lpos.x *= poly_psw.inv_gpos_scale;
+      lpos.y *= poly_psw.inv_gpos_scale;
+      lpos.z *= poly_psw.inv_gpos_scale;
       prime_v = crossProduct(lpos, cpos);
 
       // The prime k^ vector is now in the fourth lane.  Get it to the third lane with shuffle
@@ -777,15 +804,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       TCALC4 sgeom;
       if (tinsr.y != 0xffffffffU) {
         if (cgrp_lane_idx < base_lane + 3) { 
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
           sh_xfrc[atm_idx] = __float_as_int(prime_v.x);
           sh_yfrc[atm_idx] = __float_as_int(prime_v.y);
           sh_zfrc[atm_idx] = __float_as_int(prime_v.z);
-#else
+#  else
           sh_xfrc[atm_idx] = __double_as_longlong(prime_v.x);
           sh_yfrc[atm_idx] = __double_as_longlong(prime_v.y);
           sh_zfrc[atm_idx] = __double_as_longlong(prime_v.z);
-#endif
+#  endif
         }
         sgeom = poly_auk.settle_geom[tinsr.y];
       }
@@ -858,44 +885,44 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       const int oxy_atm_idx = SHFL(atm_idx, base_lane);
       const int hd1_atm_idx = SHFL(atm_idx, base_lane + 1);
       const int hd2_atm_idx = SHFL(atm_idx, base_lane + 2);
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
       const TCALC3 unprime_i = { __int_as_float(sh_xfrc[oxy_atm_idx]),
                                  __int_as_float(sh_xfrc[hd1_atm_idx]),
                                  __int_as_float(sh_xfrc[hd2_atm_idx]) };
-#else
+#  else
       const TCALC3 unprime_i = { __longlong_as_double(sh_xfrc[oxy_atm_idx]),
                                  __longlong_as_double(sh_xfrc[hd1_atm_idx]),
                                  __longlong_as_double(sh_xfrc[hd2_atm_idx]) };
-#endif
+#  endif
       const TCALC tmp_apx = dot(apos, unprime_i);
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
       const TCALC3 unprime_j = { __int_as_float(sh_yfrc[oxy_atm_idx]),
                                  __int_as_float(sh_yfrc[hd1_atm_idx]),
                                  __int_as_float(sh_yfrc[hd2_atm_idx]) };
-#else
+#  else
       const TCALC3 unprime_j = { __longlong_as_double(sh_yfrc[oxy_atm_idx]),
                                  __longlong_as_double(sh_yfrc[hd1_atm_idx]),
                                  __longlong_as_double(sh_yfrc[hd2_atm_idx]) };
-#endif
+#  endif
       const TCALC tmp_apy = dot(apos, unprime_j);
-#ifdef TCALC_IS_SINGLE
+#  ifdef TCALC_IS_SINGLE
       const TCALC3 unprime_k = { __int_as_float(sh_zfrc[oxy_atm_idx]),
                                  __int_as_float(sh_zfrc[hd1_atm_idx]),
                                  __int_as_float(sh_zfrc[hd2_atm_idx]) };
-#else
+#  else
       const TCALC3 unprime_k = { __longlong_as_double(sh_zfrc[oxy_atm_idx]),
                                  __longlong_as_double(sh_zfrc[hd1_atm_idx]),
                                  __longlong_as_double(sh_zfrc[hd2_atm_idx]) };
-#endif
-      apos.z = dot(apos, unprime_k) * poly_psw.gpos_scale_f;
-      apos.x = tmp_apx * poly_psw.gpos_scale_f;
-      apos.y = tmp_apy * poly_psw.gpos_scale_f;
+#  endif
+      apos.z = dot(apos, unprime_k) * poly_psw.gpos_scale;
+      apos.x = tmp_apx * poly_psw.gpos_scale;
+      apos.y = tmp_apy * poly_psw.gpos_scale;
 
       // Replace the developing coordinates with the constrained system, if the SETTLE group is
       // valid.
       if (tinsr.y != 0xffffffffU && cgrp_lane_idx < base_lane + 3) {
-#ifdef TCALC_IS_SINGLE
-#  ifdef SPLIT_FORCE_ACCUMULATION
+#  ifdef TCALC_IS_SINGLE
+#    ifdef SPLIT_FORCE_ACCUMULATION
         const int2 cns_pos_x = longlongToInt63(stash_xref[threadIdx.x >> 2] + LLCONV_FUNC(apos.x));
         const int2 cns_pos_y = longlongToInt63(stash_yref[threadIdx.x >> 2] + LLCONV_FUNC(apos.y));
         const int2 cns_pos_z = longlongToInt63(stash_zref[threadIdx.x >> 2] + LLCONV_FUNC(apos.z));
@@ -905,33 +932,52 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         sh_xfrc_overflow[atm_idx] = cns_pos_x.y;
         sh_yfrc_overflow[atm_idx] = cns_pos_y.y;
         sh_zfrc_overflow[atm_idx] = cns_pos_z.y;
-#  else
-        sh_xfrc[atm_idx] = sh_xcrd[oxy_atm_idx] + LLCONV_FUNC(apos.x);
-        sh_yfrc[atm_idx] = sh_ycrd[oxy_atm_idx] + LLCONV_FUNC(apos.y);
-        sh_zfrc[atm_idx] = sh_zcrd[oxy_atm_idx] + LLCONV_FUNC(apos.z);
-#  endif
-#else // TCALC_IS_SINGLE
-#endif // TCALC_IS_SINGLE
+#    else
+        sh_xfrc[atm_idx] = stash_xref[threadIdx.x >> 2] + LLCONV_FUNC(apos.x);
+        sh_yfrc[atm_idx] = stash_yref[threadIdx.x >> 2] + LLCONV_FUNC(apos.y);
+        sh_zfrc[atm_idx] = stash_zref[threadIdx.x >> 2] + LLCONV_FUNC(apos.z);
+#    endif
+#  else // TCALC_IS_SINGLE
+        const int95_t tmp_nx = int95Sum(stash_xref[threadIdx.x >> 2],
+                                        stash_xref_overflow[threadIdx.x >> 2],
+                                        apos.x);
+        const int95_t tmp_ny = int95Sum(stash_yref[threadIdx.x >> 2],
+                                        stash_yref_overflow[threadIdx.x >> 2],
+                                        apos.y);
+        const int95_t tmp_nz = int95Sum(stash_zref[threadIdx.x >> 2],
+                                        stash_zref_overflow[threadIdx.x >> 2],
+                                        apos.z);
+        sh_xfrc[atm_idx] = tmp_nx.x;
+        sh_yfrc[atm_idx] = tmp_ny.x;
+        sh_zfrc[atm_idx] = tmp_nz.x;
+        sh_xfrc_overflow[atm_idx] = tmp_nx.y;
+        sh_yfrc_overflow[atm_idx] = tmp_ny.y;
+        sh_zfrc_overflow[atm_idx] = tmp_nz.y;
+#  endif // TCALC_IS_SINGLE
       }
       
       // Increment the instruction counter by a quarter of the block width, to reflect the fact
       // that four threads are working on each SETTLE instruction.
       pos += blockDim.x;
     }
-//#endif // PME_COMPATIBLE
-    
-    // The updated positions are now in the force arrays.  In the context of a more extensive
-    // valence kernel, the positions are in the proper memory space to guide virtual site
-    // placement, if requested, and ultimately to be flushed back to the global positions arrays.
-    // In the context of a standalone kernel, the positions should be returned to arrays in the
-    // coordinate synthesis now.
+#endif // PME_COMPATIBLE
     __syncthreads();
+    
+    // The updated positions are now in the force arrays, the proper memory space to guide virtual
+    // site placement, if requested.
+#ifdef VERLET_STANDALONE
+    if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
+#  include "Structure/virtual_site_placement.cui"
+      __syncthreads();
+    }
+#endif
+
+    // Compute the velocity adjustments due to geometric constraints.  The Lennard-Jones parameter
+    // array has been refilled with information on whether constraints acted on any given atom.
     pos = threadIdx.x;
-    const TCALC cfac = poly_psw.inv_gpos_scale_f * poly_psw.vel_scale_f / tstw.dt;        
+    const TCALC cfac = poly_psw.inv_gpos_scale * poly_psw.vel_scale / tstw.dt;        
     while (pos < impt_count) {
-      const int2 mask_limits =
-        poly_vk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
-                              static_cast<int>(VwuAbstractMap::MANIPULATE)];
+      const int2 mask_limits = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)];
       const int pos_updt_elem = (pos >> 5);
       const int pos_updt_bit  = pos - (pos_updt_elem << 5);
       const uint2 permit = __ldca(&poly_auk.vwu_manip[mask_limits.x + pos_updt_elem]);
@@ -941,43 +987,43 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         // Write the new positions to the appropriate arrays, if this is a stand-alone kernel.
         // Otherwise, wait for possible virtual site placements and write positions at the end
         // of the valence work unit kernel.
-#ifdef CONSTRAINT_STANDALONE
+#ifdef VERLET_STANDALONE
 #  ifdef TCALC_IS_SINGLE
 #    ifdef SPLIT_FORCE_ACCUMULATION
         const llint x_tmp = int63ToLongLong(sh_xfrc[pos], sh_xfrc_overflow[pos]);
         const llint y_tmp = int63ToLongLong(sh_yfrc[pos], sh_yfrc_overflow[pos]);
         const llint z_tmp = int63ToLongLong(sh_zfrc[pos], sh_zfrc_overflow[pos]);
-        __stwb(&poly_psw.xalt[global_idx], x_tmp);
-        __stwb(&poly_psw.yalt[global_idx], y_tmp);
-        __stwb(&poly_psw.zalt[global_idx], z_tmp);
+        __stwt(&poly_psw.xalt[global_idx], x_tmp);
+        __stwt(&poly_psw.yalt[global_idx], y_tmp);
+        __stwt(&poly_psw.zalt[global_idx], z_tmp);
 #    else
-        __stwb(&poly_psw.xalt[global_idx], sh_xfrc[pos]);
-        __stwb(&poly_psw.yalt[global_idx], sh_yfrc[pos]);
-        __stwb(&poly_psw.zalt[global_idx], sh_zfrc[pos]);
+        __stwt(&poly_psw.xalt[global_idx], sh_xfrc[pos]);
+        __stwt(&poly_psw.yalt[global_idx], sh_yfrc[pos]);
+        __stwt(&poly_psw.zalt[global_idx], sh_zfrc[pos]);
 #    endif
 #  else
-        __stwb(&poly_psw.xalt[global_idx], sh_xfrc[pos]);
-        __stwb(&poly_psw.yalt[global_idx], sh_yfrc[pos]);
-        __stwb(&poly_psw.zalt[global_idx], sh_zfrc[pos]);
-        __stwb(&poly_psw.xalt_ovrf[global_idx], sh_xfrc_overflow[pos]);
-        __stwb(&poly_psw.yalt_ovrf[global_idx], sh_yfrc_overflow[pos]);
-        __stwb(&poly_psw.zalt_ovrf[global_idx], sh_zfrc_overflow[pos]);
+        __stwt(&poly_psw.xalt[global_idx], sh_xfrc[pos]);
+        __stwt(&poly_psw.yalt[global_idx], sh_yfrc[pos]);
+        __stwt(&poly_psw.zalt[global_idx], sh_zfrc[pos]);
+        __stwt(&poly_psw.xalt_ovrf[global_idx], sh_xfrc_overflow[pos]);
+        __stwt(&poly_psw.yalt_ovrf[global_idx], sh_yfrc_overflow[pos]);
+        __stwt(&poly_psw.zalt_ovrf[global_idx], sh_zfrc_overflow[pos]);
 #  endif
-#endif
-        // Compute the velocity adjustments due to geometric constraints.  The Lennard-Jones
-        // parameter array has been refilled with information on whether constraints acted on
-        // any given atom.
-        const size_t local_idx = pos + EXCL_GMEM_OFFSET;
+#endif // VERLET_STANDALONE
+        const int pc_idx  = (pos >> 5);
+        const int pc_shft = pos - (pc_idx << 5);
 #ifdef TCALC_IS_SINGLE
-        const bool particle_was_constrained = (__ldca(&gmem_r.lj_idx[local_idx]) == 1);
+#  ifndef VERLET_STANDALONE
+        const size_t local_idx = pos + EXCL_GMEM_OFFSET;
+#  endif
 #else
-        const bool particle_was_constrained = (sh_atom_ljidx[pos] == 1);
+        const size_t local_idx = pos + EXCL_GMEM_OFFSET;
 #endif
         TCALC gc_dx, gc_dy, gc_dz;
-        if (particle_was_constrained) {
+        if (sh_atom_constrained[pc_idx] & (0x1 << pc_shft)) {
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifndef CONSTRAINT_STANDALONE
+#    ifndef VERLET_STANDALONE
           const llint x_tmp = int63ToLongLong(sh_xfrc[pos], sh_xfrc_overflow[pos]);
           const llint y_tmp = int63ToLongLong(sh_yfrc[pos], sh_yfrc_overflow[pos]);
           const llint z_tmp = int63ToLongLong(sh_zfrc[pos], sh_zfrc_overflow[pos]);
@@ -1015,7 +1061,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         // stored in the thread block's private, local resources.  Once adjusted, the velocities
         // will be written back to the global arrays in the coordinate synthesis.
 #ifdef TCALC_IS_SINGLE
-#  ifdef CONSTRAINT_STANDALONE
+#  ifdef VERLET_STANDALONE
         const llint adj_xvel = __ldlu(&poly_psw.vxalt[global_idx]) + LLCONV_FUNC(gc_dx);
         const llint adj_yvel = __ldlu(&poly_psw.vyalt[global_idx]) + LLCONV_FUNC(gc_dy);
         const llint adj_zvel = __ldlu(&poly_psw.vzalt[global_idx]) + LLCONV_FUNC(gc_dz);
@@ -1028,7 +1074,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         __stwt(&poly_psw.vyalt[global_idx], adj_yvel);
         __stwt(&poly_psw.vzalt[global_idx], adj_zvel);
 #else  // TCALC_IS_SINGLE
-#  ifdef CONSTRAINT_STANDALONE
+#  ifdef VERLET_STANDALONE
         const int95_t adj_xvel = int95Sum(__ldcv(&poly_psw.vxalt[global_idx]),
                                           __ldcv(&poly_psw.vxalt_ovrf[global_idx]), gc_dx);
         const int95_t adj_yvel = int95Sum(__ldcv(&poly_psw.vyalt[global_idx]),
@@ -1053,7 +1099,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
-#ifdef CONSTRAINT_STANDALONE
+#ifdef VERLET_STANDALONE
     // Proceed to the next valence work unit.
     __syncthreads();
     if (threadIdx.x == 0) {
@@ -1079,4 +1125,4 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 // cache space.
 #  undef VALENCE_ATOM_CAPACITY
 #  undef EXCL_GMEM_OFFSET
-#endif // CONSTRAINT_STANDALONE
+#endif // VERLET_STANDALONE
