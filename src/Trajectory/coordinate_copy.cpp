@@ -219,7 +219,9 @@ void coordCopy(CoordinateFrameWriter *destination, const PhaseSpaceReader &origi
                           origin.yfrc, origin.zfrc, origin.natom);
         break;
       }
-      break;
+
+      // Return after completing the host-to-host copy case
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -1528,7 +1530,7 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
 #endif
   }
 
-  // Funnel any devicce-related transfers into this code.
+  // Funnel any device-related transfers into this code.
 #ifdef STORMM_USE_HPC
   launchPreparation(sync, destination_tier, origin_tier);
   const int xfrm_w = roundUp(9, warp_size_int);
@@ -2243,7 +2245,9 @@ void coordCopy(CondensateWriter *destination, const int dest_atom_start, const i
         }
         break;
       }
-      break;
+
+      // Once again, return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2601,7 +2605,9 @@ void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
                                    destination_tier, origin_tier);
         }
       }
-      break;
+
+      // Once again, return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2679,7 +2685,9 @@ void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
           }
         }
       }
-      break;
+
+      // Once again, return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2755,7 +2763,9 @@ void coordCopy(CoordinateSeriesWriter<void> *destination, const size_t ct_dest,
           }
         }
       }
-      break;
+
+      // Once again, return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2832,7 +2842,9 @@ void coordCopy(PsSynthesisWriter *destination, const TrajectoryKind kind,
           }
         }
       }
-      break;
+
+      // Once again, return if the coordinate copy is now complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2874,7 +2886,9 @@ void coordCopy(PsSynthesisWriter *destination, const PsSynthesisReader &origin,
                   origin.atom_starts[index_orig], system_pairs[i].x,
                   origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
       }
-      break;
+
+      // Once again, return if the copy is now complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -2977,7 +2991,9 @@ void coordCopy(PsSynthesisWriter *destination, const TrajectoryKind kind,
                   origin, origin.atom_starts[index_orig], system_pairs[i].x,
                   origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
       }
-      break;
+
+      // Return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -3153,7 +3169,9 @@ void coordCopy(CondensateWriter *destination, const CoordinateSeriesReader<void>
           }
         }
       }
-      break;
+
+      // Return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -3192,7 +3210,9 @@ void coordCopy(CondensateWriter *destination, const PsSynthesisReader &origin,
                   origin, origin.atom_starts[index_orig], system_pairs[i].x,
                   origin.atom_counts[index_orig], kind, destination_tier, origin_tier, gpu, sync);
       }
-      break;
+
+      // Return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -3332,7 +3352,9 @@ void coordCopy(CondensateWriter *destination, const CondensateReader &origin,
                   origin, origin.atom_starts[index_orig], system_pairs[i].x,
                   origin.atom_counts[index_orig], destination_tier, origin_tier, gpu, sync);
       }
-      break;
+
+      // Return if the coordinate copy is not complete.
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;

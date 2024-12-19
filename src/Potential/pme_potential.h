@@ -141,27 +141,22 @@ double2 evaluateParticleParticleEnergy(PhaseSpace *ps, const AtomGraph &ag,
                                        EvaluateForce eval_frc = EvaluateForce::YES,
                                        NonbondedTheme theme = NonbondedTheme::ALL);
 
-template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc2, typename Tcalc4>
-void evaluateParticleParticleEnergy(const PhaseSpaceSynthesis &poly_ps,
-                                    CellGridWriter<void, void, void, void> *cgw_v,
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc2, typename Tcoord4>
+void evaluateParticleParticleEnergy(CellGridWriter<void, void, void, void> *cgw_v,
                                     ScoreCardWriter *scw, const PsSynthesisReader &poly_psr,
                                     const SyNonbondedKit<Tcalc, Tcalc2> &poly_nbk,
                                     const LocalExclusionMaskReader &lemr,
-                                    Tcalc elec_cutoff = static_cast<Tcalc>(default_pme_cutoff),
-                                    Tcalc vdw_cutoff = static_cast<Tcalc>(default_pme_cutoff),
-                                    Tcalc qqew_coeff = static_cast<Tcalc>(0.0),
-                                    Tcalc ljew_coeff = static_cast<Tcalc>(0.0),
+                                    Tcalc cutoff = static_cast<Tcalc>(default_pme_cutoff),
+                                    Tcalc ew_coeff = static_cast<Tcalc>(0.0),
                                     VdwSumMethod vdw_sum = VdwSumMethod::CUTOFF,
                                     EvaluateForce eval_frc = EvaluateForce::YES,
                                     NonbondedTheme theme = NonbondedTheme::ALL);
   
-template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc4>
-void evaluateParticleParticleEnergy(CellGrid<Tcoord, Tacc, Tcalc, Tcalc4> *cg, ScoreCard *sc,
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
+void evaluateParticleParticleEnergy(CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg, ScoreCard *sc,
                                     const LocalExclusionMask &lema,
-                                    Tcalc elec_cutoff = static_cast<Tcalc>(default_pme_cutoff),
-                                    Tcalc vdw_cutoff = static_cast<Tcalc>(default_pme_cutoff),
-                                    Tcalc qqew_coeff = static_cast<Tcalc>(0.0),
-                                    Tcalc ljew_coeff = static_cast<Tcalc>(0.0),
+                                    Tcalc cutoff = static_cast<Tcalc>(default_pme_cutoff),
+                                    Tcalc ew_coeff = static_cast<Tcalc>(0.0),
                                     VdwSumMethod vdw_sum = VdwSumMethod::CUTOFF,
                                     EvaluateForce eval_frc = EvaluateForce::YES,
                                     NonbondedTheme theme = NonbondedTheme::ALL);
@@ -226,8 +221,7 @@ double2 basicTileInteractions(const std::vector<Tcalc> &a_xpos, const std::vecto
 ///                    location within the cell grid will be deduced internally.
 template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc2, typename Tcoord4>
 double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> *cgw,
-                                   const PsSynthesisReader &poly_psr,
-                                   int system_idx, int cell_idx,
+                                   const PsSynthesisReader &poly_psr, int system_idx, int cell_idx,
                                    const SyNonbondedKit<Tcalc, Tcalc2> &poly_nbk,
                                    const LocalExclusionMaskReader &lemr, Tcalc elec_cutoff,
                                    Tcalc vdw_cutoff, Tcalc qqew_coeff, Tcalc ljew_coeff,

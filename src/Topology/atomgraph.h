@@ -60,6 +60,7 @@ public:
   ///     from it.  All parameters and terms from the original AtomGraph will be carried over,
   ///     provided that the new AtomGraph contains all of the atoms that each term spans.
   ///     Exclusions from the original AtomGraph will be inferred from the bonding pattern.
+  ///   - Construct an AtomGraph from two existing objects and perhaps multipliers for both
   ///
   /// \param file_name                 Name of the source file
   /// \param policy                    The alert level to raise if a problem is encountered
@@ -71,6 +72,8 @@ public:
   ///                                  other indications
   /// \param charge_rounding_tol       The maximum tolerance at which to initiate charge rounding
   /// \param charge_discretization     Increment with which to discretize charges
+  /// \param ag_a                      The first of two topologies to combine
+  /// \param ag_b                      The second of two topologies to combine
   /// \{
   AtomGraph(const std::string &file_name, ExceptionResponse policy = ExceptionResponse::WARN,
             TopologyKind engine_format = TopologyKind::AMBER);
@@ -83,6 +86,15 @@ public:
             ApplyConstraints use_settle = ApplyConstraints::NO);
 
   AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
+            ExceptionResponse policy = ExceptionResponse::DIE);
+
+  AtomGraph(const AtomGraph &ag_a, int n_a, const AtomGraph &ag_b, int n_b,
+            ExceptionResponse policy = ExceptionResponse::DIE);
+
+  AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b, int n_b,
+            ExceptionResponse policy = ExceptionResponse::DIE);
+
+  AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b,
             ExceptionResponse policy = ExceptionResponse::DIE);
   /// \}
 
@@ -1135,7 +1147,6 @@ public:
                                bool set_phase_angle, char4 type_a, char4 type_b, char4 type_c,
                                char4 type_d, ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
-
   
   /// \brief Set the implicit solvent model.  This will leverage a lot of hard-coded constants
   ///        to fill out some allocated but otherwise blank arrays and impart one particular

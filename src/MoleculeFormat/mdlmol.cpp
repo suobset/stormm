@@ -987,12 +987,13 @@ void MdlMol::addDataItem(const MdlMolDataRequest &ask, const AtomGraph &ag,
           }
         }
         break;
-      case StateVariable::RESTRAINT:
       case StateVariable::VDW:
       case StateVariable::VDW_ONE_FOUR:
       case StateVariable::ELECTROSTATIC:
       case StateVariable::ELEC_ONE_FOUR:
       case StateVariable::GENERALIZED_BORN:
+      case StateVariable::RESTRAINT:
+      case StateVariable::SURFACE_AREA:
       case StateVariable::KINETIC:
       case StateVariable::PRESSURE:
       case StateVariable::VIRIAL_11:

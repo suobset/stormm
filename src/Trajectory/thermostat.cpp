@@ -65,6 +65,7 @@ Thermostat::Thermostat(const ThermostatKind kind_in, const PrecisionModel cache_
     cnst_geometry{translateApplyConstraints(std::string(default_geometry_constraint_behavior))},
     rattle_tolerance{default_rattle_tolerance},
     rattle_iterations{default_rattle_max_iter},
+    load_synthesis_forces{false},
     initial_temperatures{HybridKind::ARRAY, "tstat_init_temp"},
     sp_initial_temperatures{HybridKind::ARRAY, "tstat_init_tempf"},
     final_temperatures{HybridKind::ARRAY, "tstat_final_temp"},
@@ -281,7 +282,7 @@ Thermostat::Thermostat(const AtomGraphSynthesis *poly_ag, const DynamicsControls
 {
   // Create a synthesis cache map and use it to build the thermostat partitions.
   SynthesisCacheMap scmap(sc_origins, sc.getSelfPointer(), poly_ag);
-
+  
   // Create a baseline list of partitions based on the number of systems in the synthesis.  Make a
   // bounds array describing the extent of distinct partitions for each system in the synthesis.
   const int nsys = poly_ag->getSystemCount();
@@ -633,6 +634,11 @@ int Thermostat::getRattleIterations() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool Thermostat::loadSynthesisForces() const {
+  return load_synthesis_forces;
+}
+
+//-------------------------------------------------------------------------------------------------
 const Thermostat* Thermostat::getSelfPointer() const {
   return this;
 }
@@ -646,8 +652,9 @@ const ThermostatReader<double> Thermostat::dpData(const HybridTargetLevel tier) 
                                   (cnst_geometry == ApplyConstraints::YES), rattle_tolerance,
                                   rattle_iterations, andersen_frequency, langevin_frequency,
                                   getLangevinImplicitFactor(), getLangevinExplicitFactor(),
-                                  partitions.data(tier), initial_temperatures.data(tier),
-                                  final_temperatures.data(tier), random_state_vector_xy.data(tier),
+                                  load_synthesis_forces, partitions.data(tier),
+                                  initial_temperatures.data(tier), final_temperatures.data(tier),
+                                  random_state_vector_xy.data(tier),
                                   random_state_vector_zw.data(tier), cache_config,
                                   random_cache.data(tier), sp_random_cache.data(tier));
 }
@@ -661,8 +668,9 @@ ThermostatWriter<double> Thermostat::dpData(const HybridTargetLevel tier) {
                                   (cnst_geometry == ApplyConstraints::YES), rattle_tolerance,
                                   rattle_iterations, andersen_frequency, langevin_frequency,
                                   getLangevinImplicitFactor(), getLangevinExplicitFactor(),
-                                  partitions.data(tier), initial_temperatures.data(tier),
-                                  final_temperatures.data(tier), random_state_vector_xy.data(tier),
+                                  load_synthesis_forces, partitions.data(tier),
+                                  initial_temperatures.data(tier), final_temperatures.data(tier),
+                                  random_state_vector_xy.data(tier),
                                   random_state_vector_zw.data(tier), cache_config,
                                   random_cache.data(tier), sp_random_cache.data(tier));
 }
@@ -676,7 +684,8 @@ const ThermostatReader<float> Thermostat::spData(const HybridTargetLevel tier) c
                                  (cnst_geometry == ApplyConstraints::YES), rattle_tolerance,
                                  rattle_iterations, andersen_frequency, langevin_frequency,
                                  getLangevinImplicitFactor(), getLangevinExplicitFactor(),
-                                 partitions.data(tier), sp_initial_temperatures.data(tier),
+                                 load_synthesis_forces, partitions.data(tier),
+                                 sp_initial_temperatures.data(tier),
                                  sp_final_temperatures.data(tier),
                                  random_state_vector_xy.data(tier),
                                  random_state_vector_zw.data(tier), cache_config,
@@ -692,7 +701,8 @@ ThermostatWriter<float> Thermostat::spData(const HybridTargetLevel tier) {
                                  (cnst_geometry == ApplyConstraints::YES), rattle_tolerance,
                                  rattle_iterations, andersen_frequency, langevin_frequency,
                                  getLangevinImplicitFactor(), getLangevinExplicitFactor(),
-                                 partitions.data(tier), sp_initial_temperatures.data(tier),
+                                 load_synthesis_forces, partitions.data(tier),
+                                 sp_initial_temperatures.data(tier),
                                  sp_final_temperatures.data(tier),
                                  random_state_vector_xy.data(tier),
                                  random_state_vector_zw.data(tier), cache_config,
@@ -842,14 +852,14 @@ void Thermostat::setTemperature(const std::vector<double> &initial_temperatures_
   
   // Reaching this point in the function indicates that there are two vectors of temperatures, of
   // equal size, determining how to lay out the heat baths.  There is a valid array of
-  // compartments, partitions sanning the atom content, but it is not known at this level whether
+  // compartments, partitions spanning the atom content, but it is not known at this level whether
   // those partitions refer to demarcations within one or more systems or strictly to the
   // boundaries between systems.  If they are boundaries between systems (each system has its own
   // distinct heat bath), then a degree of optimization with respect to memory and bandwidth is
   // possible.  However, this must be conveyed prior to the call, by setting the bath_layout to
   // the special "SYSTEMS" enumeration.  Otherwise, the more expensive but completely general
   // "ATOMS" enumeration will be taken.
-  partitions.resize(partitions_in.size());
+  partitions.resize(partition_count);
   int4* part_ptr = partitions.data();
   if (ag_pointer != nullptr) {
     for (int i = 0; i < partition_count; i++) {
@@ -988,6 +998,11 @@ void Thermostat::setRattleTolerance(const double rattle_tolerance_in) {
 //-------------------------------------------------------------------------------------------------
 void Thermostat::setRattleIterations(const int rattle_iterations_in) {
   rattle_iterations = rattle_iterations_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::setSynthesisForceLoading(const bool load_synthesis_forces_in) {
+  load_synthesis_forces = load_synthesis_forces_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1561,7 +1576,7 @@ void velocityKickStart(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *p
                                                &poly_psw.yvel_ovrf[llim],
                                                &poly_psw.zvel_ovrf[llim], &auk_d.masses[llim],
                                                prt_natom, (tstw_d.cnst_geom) ? pinfo.z : pinfo.w,
-                                               pow(2.0, 32), poly_psw.inv_vel_scale_f);
+                                               pow(2.0, 32), poly_psw.inv_vel_scale);
                   const double vscl = sqrt(tstw_d.init_temperatures[i] / tcr);
                   for (size_t j = llim; j < hlim; j++) {
                     const double vxa = hostInt95ToDouble(poly_psw.vxalt[j],
@@ -1591,7 +1606,7 @@ void velocityKickStart(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *p
                                               &poly_psw.zvel[llim], nullptr, nullptr, nullptr,
                                               &auk_f.masses[llim], prt_natom,
                                               (tstw_d.cnst_geom) ? pinfo.z : pinfo.w,
-                                              powf(2.0, 32), poly_psw.inv_vel_scale_f);
+                                              powf(2.0, 32), poly_psw.inv_vel_scale);
                   const float vscl = sqrtf(tstw_f.init_temperatures[i] / tcr);
                   for (size_t j = llim; j < hlim; j++) {
                     poly_psw.vxalt[j] = llround(static_cast<float>(poly_psw.vxalt[j]) * vscl);

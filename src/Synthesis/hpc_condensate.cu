@@ -42,9 +42,9 @@ kCondensateUpdate(CondensateWriter cdw, const PsSynthesisReader poly_psr) {
       cdw.zcrd[i] = zi * poly_psr.inv_gpos_scale;
       break;
     case PrecisionModel::SINGLE:
-      cdw.xcrd_sp[i] = (float)(xi) * poly_psr.inv_gpos_scale_f;
-      cdw.ycrd_sp[i] = (float)(yi) * poly_psr.inv_gpos_scale_f;
-      cdw.zcrd_sp[i] = (float)(zi) * poly_psr.inv_gpos_scale_f;
+      cdw.xcrd_sp[i] = (float)(xi) * poly_psr.inv_gpos_scale;
+      cdw.ycrd_sp[i] = (float)(yi) * poly_psr.inv_gpos_scale;
+      cdw.zcrd_sp[i] = (float)(zi) * poly_psr.inv_gpos_scale;
       break;
     }
   }

@@ -168,7 +168,7 @@ KERNEL_NAME(const PsSynthesisReader poly_psr,
 #else
       const int topl_idx = __ldcv(&cgw.nonimg_atom_idx[i]);
 #endif
-      const float inv_gpos_scl = poly_psr.inv_gpos_scale_f;
+      const float inv_gpos_scl = poly_psr.inv_gpos_scale;
       llint atom_ix, atom_iy, atom_iz;
 #ifdef FINE_COORDINATES
       int atom_ix_ovrf, atom_iy_ovrf, atom_iz_ovrf;

@@ -4,6 +4,7 @@
 #include "Parsing/parse.h"
 #include "Potential/pme_util.h"
 #include "Reporting/error_format.h"
+#include "namelist_common.h"
 #include "namelist_element.h"
 #include "nml_pppm.h"
 
@@ -26,7 +27,8 @@ using parse::realToString;
 PPPMControls::PPPMControls(const ExceptionResponse policy_in, const WrapTextSearch wrap) :
     policy{policy_in}, theme{default_pppm_theme}, order{default_charge_mapping_order},
     ewald_coefficient{0.0}, cutoff{default_pme_cutoff}, dsum_tol{default_dsum_tol},
-    mesh_ticks{default_mesh_ticks}, strat{PMIStrategy::NO_AUTOMATION}, nml_transcript{"pppm"}
+    mesh_ticks{default_mesh_ticks}, strat{PMIStrategy::NO_AUTOMATION},
+    vdw_method{VdwSumMethod::CUTOFF}, nml_transcript{"pppm"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -42,10 +44,11 @@ PPPMControls::PPPMControls(const TextFile &tf, int *start_line, bool *found_nml,
   setTheme(t_nml.getStringValue("theme"));
   t_nml.assignVariable(&order, "order");
   t_nml.assignVariable(&ewald_coefficient, "ew_coeff");
-  t_nml.assignVariable(&cutoff, "cutoff");
+  t_nml.assignVariable(&cutoff, "cut");
   t_nml.assignVariable(&dsum_tol, "dsum_tol");
-  t_nml.assignVariable(&mesh_ticks, "mesk_ticks");
+  t_nml.assignVariable(&mesh_ticks, "mesh_ticks");
   setStrategy(t_nml.getStringValue("accuracy"));
+  setVdwSummation(t_nml.getStringValue("vdw_tail"));
 
   // Immediately apply the new strategy.  A PMIStrategy is only valid when the object is created
   // with this constructor.  The original &pppm namelist will be referenced to see what was or
@@ -178,10 +181,20 @@ void PPPMControls::setStrategy(const std::string &strat_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void PPPMControls::setVdwSummation(const std::string &vdw_method_in) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void PPPMControls::setVdwSummation(const VdwSumMethod vdw_method_in) {
+  vdw_method = vdw_method_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 void PPPMControls::applyStrategy() {
   bool mod_mesh_ticks = (nml_transcript.getKeywordStatus("mesh_ticks") == InputStatus::DEFAULT);
   bool mod_order      = (nml_transcript.getKeywordStatus("order") == InputStatus::DEFAULT);
-  bool mod_cutoff     = (nml_transcript.getKeywordStatus("cutoff") == InputStatus::DEFAULT);
+  bool mod_cutoff     = (nml_transcript.getKeywordStatus("cut") == InputStatus::DEFAULT);
   
   bool cutoff_problem = false;
   switch (strat) {
@@ -576,11 +589,13 @@ NamelistEmulator pppmInput(const TextFile &tf, int *start_line, bool *found,
                 "expression ew_coeff = 0.5 / gss_sigma, and splits a potential of the form 1 / "
                 "(r^n) into a particle-mesh interaction erf(0.5 * r / gss_sigma) / (r^n) and a "
                 "particle-particle interaction erfc(0.5 * r / gss_sigma) / (r^n).");
-  t_nml.addKeyword("cutoff", NamelistType::REAL, std::to_string(default_pme_cutoff));
-  t_nml.addHelp("cutoff", "The particle-particle interaction cutoff, in units of Angstroms.  At "
+  t_nml.addKeyword("cut", NamelistType::REAL, std::to_string(default_pme_cutoff));
+  t_nml.addHelp("cut", "The particle-particle interaction cutoff, in units of Angstroms.  At "
                 "the edge of this cutoff, the interaction between two point particles and two "
                 "spherical Gaussian density distributions will differ by proportion indicated by "
-                "the direct sum tolerance (dsum_tol).");
+                "the direct sum tolerance (dsum_tol).  The type of interaction referred to by "
+                "this cutoff is determined by the \"theme\" keyword.  Specifying a cutoff here "
+                "will override any specifications from another namelist control block.");
   t_nml.addKeyword("dsum_tol", NamelistType::REAL, std::to_string(default_dsum_tol));
   t_nml.addHelp("dsum_tol", "The proportion by which the interaction of two point particles and "
                 "the interaction of two spherical Gaussian distributions (e.g. of charge, of "
@@ -629,6 +644,11 @@ NamelistEmulator pppmInput(const TextFile &tf, int *start_line, bool *found,
                 "pairwise work), and also 'TIGHT_(...)' with extensions for pairwise- or "
                 "FFT-heavy protocols.  The default value of 'NONE / NO_AUTOMATION' will not "
                 "alter any settings aside from user inputs or other existing defaults.");
+  t_nml.addKeyword("vdw_tail", NamelistType::STRING, std::string(default_vdw_cutoff_style));
+  t_nml.addHelp("vdw_tail", "The manner in which van-der Waals interactions vanish at the "
+                "chosen cutoff.  Valid choices include \"cutoff\", \"truncation\", \"smooth\", "
+                "\"cubic\", \"infinite\", or \"pme\".  Only valid when the theme refers to "
+                "van-der Waals interactions.");
   return t_nml;
 }
 

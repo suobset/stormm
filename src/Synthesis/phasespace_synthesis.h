@@ -91,21 +91,21 @@ struct PsSynthesisWriter {
   PsSynthesisWriter(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
                     const int* atom_starts_in, const int* atom_counts_in,
                     const int* common_ag_list_in, const int* common_ag_bounds_in,
-                    const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
-                    double lpos_scale_in, double vel_scale_in, double frc_scale_in,
-                    int gpos_bits_in, int lpos_bits_in, int vel_bits_in, int frc_bits_in,
-                    llint* boxvecs_in, int* boxvec_ovrf_in, double* umat_in, double* invu_in,
-                    double* boxdims_in, llint* alt_boxvecs_in, int* alt_boxvec_ovrf_in,
-                    double* umat_alt_in, double* invu_alt_in, double* alt_boxdims_in,
-                    llint* xcrd_in, llint* ycrd_in, llint* zcrd_in, int* xcrd_ovrf_in,
-                    int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
-                    llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in, int* zvel_ovrf_in,
-                    llint* xfrc_in, llint* yfrc_in, llint* zfrc_in, int* xfrc_ovrf_in,
-                    int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xalt_in, llint* yalt_in,
-                    llint* zalt_in, int* xalt_ovrf_in, int* yalt_ovrf_in, int* zalt_ovrf_in,
-                    llint* vxalt_in, llint* vyalt_in, llint* vzalt_in, int* vxalt_ovrf_in,
-                    int* vyalt_ovrf_in, int* vzalt_ovrf_in, llint* fxalt_in, llint* fyalt_in,
-                    llint* fzalt_in, int* fxalt_ovrf_in, int* fyalt_ovrf_in, int* fzalt_ovrf_in);
+                    const int* unique_ag_idx_in, const int* replica_idx_in, float gpos_scale_in,
+                    float vel_scale_in, float frc_scale_in, int gpos_bits_in, int vel_bits_in,
+                    int frc_bits_in, llint* boxvecs_in, int* boxvec_ovrf_in, double* umat_in,
+                    double* invu_in, double* boxdims_in, llint* alt_boxvecs_in,
+                    int* alt_boxvec_ovrf_in, double* umat_alt_in, double* invu_alt_in,
+                    double* alt_boxdims_in, llint* xcrd_in, llint* ycrd_in, llint* zcrd_in,
+                    int* xcrd_ovrf_in, int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in,
+                    llint* yvel_in, llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in,
+                    int* zvel_ovrf_in, llint* xfrc_in, llint* yfrc_in, llint* zfrc_in,
+                    int* xfrc_ovrf_in, int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xalt_in,
+                    llint* yalt_in, llint* zalt_in, int* xalt_ovrf_in, int* yalt_ovrf_in,
+                    int* zalt_ovrf_in, llint* vxalt_in, llint* vyalt_in, llint* vzalt_in,
+                    int* vxalt_ovrf_in, int* vyalt_ovrf_in, int* vzalt_ovrf_in, llint* fxalt_in,
+                    llint* fyalt_in, llint* fzalt_in, int* fxalt_ovrf_in, int* fyalt_ovrf_in,
+                    int* fzalt_ovrf_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -132,24 +132,13 @@ struct PsSynthesisWriter {
   
   // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
   // arithmetic.
-  const double gpos_scale;       ///< Global position coordinate scaling factor
-  const double lpos_scale;       ///< Local position coordinate scaling factor
-  const double vel_scale;        ///< Velocity coordinate scaling factor
-  const double frc_scale;        ///< Scaling factor for fixed-precision force accumulation
-  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
-  const double inv_lpos_scale;   ///< Inverse local coordinate scaling factor
-  const double inv_vel_scale;    ///< Inverse velocity scaling factor
-  const double inv_frc_scale;    ///< Inverse force scaling factor
-  const float gpos_scale_f;      ///< Global position coordinate scaling factor
-  const float lpos_scale_f;      ///< Local position coordinate scaling factor
-  const float vel_scale_f;       ///< Velocity coordinate scaling factor
-  const float frc_scale_f;       ///< Scaling factor for fixed-precision force accumulation
-  const float inv_gpos_scale_f;  ///< Inverse global coordinate scaling factor
-  const float inv_lpos_scale_f;  ///< Inverse local coordinate scaling factor
-  const float inv_vel_scale_f;   ///< Inverse velocity scaling factor
-  const float inv_frc_scale_f;   ///< Inverse force scaling factor
+  const float gpos_scale;        ///< Global position coordinate scaling factor
+  const float vel_scale;         ///< Velocity coordinate scaling factor
+  const float frc_scale;         ///< Scaling factor for fixed-precision force accumulation
+  const float inv_gpos_scale;    ///< Inverse global coordinate scaling factor
+  const float inv_vel_scale;     ///< Inverse velocity scaling factor
+  const float inv_frc_scale;     ///< Inverse force scaling factor
   const int gpos_bits;           ///< Global position coordinate bits after the decimal
-  const int lpos_bits;           ///< Local position coordinate bits after the decimal
   const int vel_bits;            ///< Velocity coordinate bits after the decimal
   const int frc_bits;            ///< Force component bits after the decimal
 
@@ -217,25 +206,27 @@ struct PsSynthesisReader {
   PsSynthesisReader(int system_count_in, int unique_topology_count_in, UnitCellType unit_cell_in,
                     const int* atom_starts_in, const int* atom_counts_in,
                     const int* common_ag_list_in, const int* common_ag_bounds_in,
-                    const int* unique_ag_idx_in, const int* replica_idx_in, double gpos_scale_in,
-                    double lpos_scale_in, double vel_scale_in, double frc_scale_in,
-                    int gpos_bits_in, int lpos_bits_in, int vel_bits_in, int frc_bits_in,
-                    const llint* boxvecs_in, const int* boxvec_ovrf_in, const double* umat_in,
-                    const double* invu_in, const double* boxdims_in, const llint* alt_boxvecs_in,
-                    const int* alt_boxvec_ovrf_in, const double* umat_alt_in,
-                    const double* invu_alt_in, const double* alt_boxdims_in, const llint* xcrd_in,
-                    const llint* ycrd_in, const llint* zcrd_in, const int* xcrd_ovrf_in,
-                    const int* ycrd_ovrf_in, const int* zcrd_ovrf_in, const llint* xvel_in,
-                    const llint* yvel_in, const llint* zvel_in, const int* xvel_ovrf_in,
-                    const int* yvel_ovrf_in, const int* zvel_ovrf_in, const llint* xfrc_in,
-                    const llint* yfrc_in, const llint* zfrc_in, const int* xfrc_ovrf_in,
-                    const int* yfrc_ovrf_in, const int* zfrc_ovrf_in, const llint* xalt_in,
-                    const llint* yalt_in, const llint* zalt_in, const int* xalt_ovrf_in,
-                    const int* yalt_ovrf_in, const int* zalt_ovrf_in, const llint* vxalt_in,
-                    const llint* vyalt_in, const llint* vzalt_in, const int* vxalt_ovrf_in,
-                    const int* vyalt_ovrf_in, const int* vzalt_ovrf_in, const llint* fxalt_in,
-                    const llint* fyalt_in, const llint* fzalt_in, const int* fxalt_ovrf_in,
-                    const int* fyalt_ovrf_in, const int* fzalt_ovrf_in);
+                    const int* unique_ag_idx_in, const int* replica_idx_in, float gpos_scale_in,
+                    float vel_scale_in, float frc_scale_in, int gpos_bits_in, int vel_bits_in,
+                    int frc_bits_in, const llint* boxvecs_in, const int* boxvec_ovrf_in,
+                    const double* umat_in, const double* invu_in, const double* boxdims_in,
+                    const llint* alt_boxvecs_in, const int* alt_boxvec_ovrf_in,
+                    const double* umat_alt_in, const double* invu_alt_in,
+                    const double* alt_boxdims_in, const llint* xcrd_in, const llint* ycrd_in,
+                    const llint* zcrd_in, const int* xcrd_ovrf_in, const int* ycrd_ovrf_in,
+                    const int* zcrd_ovrf_in, const llint* xvel_in, const llint* yvel_in,
+                    const llint* zvel_in, const int* xvel_ovrf_in, const int* yvel_ovrf_in,
+                    const int* zvel_ovrf_in, const llint* xfrc_in, const llint* yfrc_in,
+                    const llint* zfrc_in, const int* xfrc_ovrf_in, const int* yfrc_ovrf_in,
+                    const int* zfrc_ovrf_in, const llint* xalt_in, const llint* yalt_in,
+                    const llint* zalt_in, const int* xalt_ovrf_in, const int* yalt_ovrf_in,
+                    const int* zalt_ovrf_in, const llint* vxalt_in, const llint* vyalt_in,
+                    const llint* vzalt_in, const int* vxalt_ovrf_in, const int* vyalt_ovrf_in,
+                    const int* vzalt_ovrf_in, const llint* fxalt_in, const llint* fyalt_in,
+                    const llint* fzalt_in, const int* fxalt_ovrf_in, const int* fyalt_ovrf_in,
+                    const int* fzalt_ovrf_in);
+
+  PsSynthesisReader(const PsSynthesisWriter *psyw);
 
   PsSynthesisReader(const PsSynthesisWriter &psyw);
   /// \}
@@ -263,24 +254,13 @@ struct PsSynthesisReader {
 
   // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
   // arithmetic.
-  const double gpos_scale;       ///< Global position coordinate scaling factor
-  const double lpos_scale;       ///< Local position coordinate scaling factor
-  const double vel_scale;        ///< Velocity coordinate scaling factor
-  const double frc_scale;        ///< Scaling factor for fixed-precision force accumulation
-  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
-  const double inv_lpos_scale;   ///< Inverse local coordinate scaling factor
-  const double inv_vel_scale;    ///< Inverse velocity scaling factor
-  const double inv_frc_scale;    ///< Inverse force scaling factor
-  const float gpos_scale_f;      ///< Global position coordinate scaling factor
-  const float lpos_scale_f;      ///< Local position coordinate scaling factor
-  const float vel_scale_f;       ///< Velocity coordinate scaling factor
-  const float frc_scale_f;       ///< Scaling factor for fixed-precision force accumulation
-  const float inv_gpos_scale_f;  ///< Inverse global coordinate scaling factor
-  const float inv_lpos_scale_f;  ///< Inverse local coordinate scaling factor
-  const float inv_vel_scale_f;   ///< Inverse velocity scaling factor
-  const float inv_frc_scale_f;   ///< Inverse force scaling factor
+  const float gpos_scale;        ///< Global position coordinate scaling factor
+  const float vel_scale;         ///< Velocity coordinate scaling factor
+  const float frc_scale;         ///< Scaling factor for fixed-precision force accumulation
+  const float inv_gpos_scale;    ///< Inverse global coordinate scaling factor
+  const float inv_vel_scale;     ///< Inverse velocity scaling factor
+  const float inv_frc_scale;     ///< Inverse force scaling factor
   const int gpos_bits;           ///< Global position coordinate bits after the decimal
-  const int lpos_bits;           ///< Local position coordinate bits after the decimal
   const int vel_bits;            ///< Velocity coordinate bits after the decimal
   const int frc_bits;            ///< Force component bits after the decimal
   
@@ -804,7 +784,7 @@ public:
   ///                     systems will have their forces initialized
   /// \{
 #ifdef STORMM_USE_HPC
-  void initializeForces(CoordinateCycle orientation, const GpuDetails &gpu,
+  void initializeForces(CoordinateCycle orientation, const GpuDetails &gpu = null_gpu,
                         HybridTargetLevel tier = HybridTargetLevel::HOST, int index = -1);
   void initializeForces(const GpuDetails &gpu = null_gpu,
                         HybridTargetLevel tier = HybridTargetLevel::HOST, int index = -1);

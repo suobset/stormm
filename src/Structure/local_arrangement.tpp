@@ -483,6 +483,15 @@ void imageCoordinates(PhaseSpaceSynthesis *poly_ps, const int system_index,
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord>
+double displacement(const int atom_i, const int atom_j, const Tcoord* crd, const int* crd_ovrf,
+                    const double inv_gpos_factor) {
+  const int95_t tmp = hostInt95Subtract(crd[atom_j], crd_ovrf[atom_j], crd[atom_i],
+                                        crd_ovrf[atom_i]);
+  return hostSplitFPToReal(tmp) * inv_gpos_factor;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcalc4, typename Tcalc>
 Tcalc4 distance(const int95_t pti_x, const int95_t pti_y, const int95_t pti_z, const int95_t ptj_x,
                 const int95_t ptj_y, const int95_t ptj_z, const double* umat, const double* invu,

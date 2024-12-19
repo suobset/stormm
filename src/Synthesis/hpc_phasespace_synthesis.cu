@@ -269,6 +269,11 @@ extern void psyInitializeForces(PsSynthesisWriter *psyw, const int index, const 
 }
 
 //-------------------------------------------------------------------------------------------------
+extern void psyInitializeForces(PsSynthesisWriter *psyw, const GpuDetails &gpu) {
+  psyInitializeForces(psyw, -1, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
 kPsyPrimeConjugateGradient(PsSynthesisWriter psyw) {
   const int minpos = threadIdx.x + (blockDim.x * blockIdx.x);
@@ -487,6 +492,7 @@ void psyImportSystemData(llint* x_recv, int* x_recv_ovrf, llint* y_recv, int* y_
                                               z_import, box_xform_in, inverse_xform_in,
                                               box_dimensions_in, system_index, kind,
                                               conversion_factor);
+  cudaDeviceSynchronize();
 }
 
 } // namespace synthesis

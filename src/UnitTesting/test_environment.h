@@ -77,6 +77,9 @@ public:
   /// \brief Check whether the temporary directory is accessible to the program.
   bool getTemporaryDirectoryAccess() const;
 
+  /// \brief Get the directives as to intensive unit test execution.
+  bool doIntensiveTests() const;
+
   /// \brief Get the list of files that this test program has been given responsibility.  It will
   ///        assume that these files are things it created temporarily and that they should be
   ///        removed when the TestEnvironment object falls out of scope.
@@ -166,6 +169,10 @@ private:
   /// Indicator of whether to remove files created during testing and logged by this object
   bool remove_files;
 
+  /// Indicator of whether to perform intense unit tests (not necessary in most circumstances, and
+  /// only certain unit testing programs may have such intensive tests)
+  bool do_intensive_tests;
+  
   /// Indicator of whether to snapshot current results into the saved test files.  Tests can be
   /// run with snapshot deposition turned on, available only via a command-line option to the
   /// specific test program, and this will cause the requested files to be written based on the

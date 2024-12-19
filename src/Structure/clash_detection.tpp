@@ -551,9 +551,9 @@ bool detectClash(const PsSynthesisReader &poly_psr, const int system_index,
     std::vector<float> ycrd(natom);
     std::vector<float> zcrd(natom);
     for (int i = atom_start; i < atom_limit; i++) {
-      xcrd[i - atom_start] = static_cast<float>(poly_psr.xcrd[i]) * poly_psr.inv_gpos_scale_f;
-      ycrd[i - atom_start] = static_cast<float>(poly_psr.ycrd[i]) * poly_psr.inv_gpos_scale_f;
-      zcrd[i - atom_start] = static_cast<float>(poly_psr.zcrd[i]) * poly_psr.inv_gpos_scale_f;
+      xcrd[i - atom_start] = static_cast<float>(poly_psr.xcrd[i]) * poly_psr.inv_gpos_scale;
+      ycrd[i - atom_start] = static_cast<float>(poly_psr.ycrd[i]) * poly_psr.inv_gpos_scale;
+      zcrd[i - atom_start] = static_cast<float>(poly_psr.zcrd[i]) * poly_psr.inv_gpos_scale;
     }
     return detectClash<float, Tcalc>(xcrd.data(), ycrd.data(), zcrd.data(), vk, nbk, mask,
                                      elec_limit, vdw_ratio, 1.0, summary);

@@ -1,0 +1,250 @@
+// -*-c++-*-
+#include "copyright.h"
+
+//-------------------------------------------------------------------------------------------------
+// Compute an angle based on the value of its cosine, with the understanding that a fallback
+// method is appropriate when the angle is too actue for acos to be numerically well-conditioned.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   costheta:   Cosine value of the angle of interest
+//   crabbc:     The first of two vectors decsribing the displacements that determine the angle
+//   crbccd:     The second of two vectors decsribing the displacements that determine the angle
+//   bc:         Vector defining the directionality of the angle
+//   scr:        Second vector defining the directionality of the angle
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ float devcAngleVerification(const float costheta, const float3 crabbc,
+                                                       const float3 crbccd, const float3 bc,
+                                                       const float3 scr) {
+  if (fabsf(costheta) >= near_to_one_f) {
+
+    // The floating-point representation of costheta is numerically ill-conditioned.  Compute the
+    // distance from atom I to the plane of atoms J, K, and L to get the angle by the arcsin of an
+    // extremely acute angle.
+    const float mg_crabbc = 1.0f / sqrtf((crabbc.x * crabbc.x) + (crabbc.y * crabbc.y) +
+                                         (crabbc.z * crabbc.z));
+    const float mg_crbccd = 1.0f / sqrtf((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
+                                         (crbccd.z * crbccd.z));
+    const float nx_abbc = crabbc.x * mg_crabbc;
+    const float ny_abbc = crabbc.y * mg_crabbc;
+    const float nz_abbc = crabbc.z * mg_crabbc;
+    const float nx_bccd = crbccd.x * mg_crbccd;
+    const float ny_bccd = crbccd.y * mg_crbccd;
+    const float nz_bccd = crbccd.z * mg_crbccd;
+    float rdx = nx_bccd - nx_abbc;
+    float rdy = ny_bccd - ny_abbc;
+    float rdz = nz_bccd - nz_abbc;
+    float rs = sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    if (fabsf(rs) > 1.0f) {
+      rdx = nx_bccd + nx_abbc;
+      rdy = ny_bccd + ny_abbc;
+      rdz = nz_bccd + nz_abbc;
+      rs = pi_f - sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    }
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ? rs : -rs;
+  }
+  else {
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ?
+            acosf(costheta) : -acosf(costheta);
+  }
+}
+
+__device__ __forceinline__ double devcAngleVerification(const double costheta,
+                                                        const double3 crabbc, const double3 crbccd,
+                                                        const double3 bc, const double3 scr) {
+  if (fabs(costheta) >= near_to_one_lf) {
+
+    // The double-precision arccosine function is also vulnerable to numerical instability near
+    // zero, so planar dihedral angles can still generate divergent forces on the order of 3.0e-7
+    // kcal/mol-A.  Correct this with a similar strategy to the single-precision case.
+    const double mg_crabbc = 1.0 / sqrt((crabbc.x * crabbc.x) + (crabbc.y * crabbc.y) +
+                                        (crabbc.z * crabbc.z));
+    const double mg_crbccd = 1.0 / sqrt((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
+                                        (crbccd.z * crbccd.z));
+    const double nx_abbc = crabbc.x * mg_crabbc;
+    const double ny_abbc = crabbc.y * mg_crabbc;
+    const double nz_abbc = crabbc.z * mg_crabbc;
+    const double nx_bccd = crbccd.x * mg_crbccd;
+    const double ny_bccd = crbccd.y * mg_crbccd;
+    const double nz_bccd = crbccd.z * mg_crbccd;
+    double rdx = nx_bccd - nx_abbc;
+    double rdy = ny_bccd - ny_abbc;
+    double rdz = nz_bccd - nz_abbc;
+    double rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    if (fabs(rs) > 1.0) {
+      rdx = nx_bccd + nx_abbc;
+      rdy = ny_bccd + ny_abbc;
+      rdz = nz_bccd + nz_abbc;
+      rs = pi - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    }
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0) ? rs : -rs;
+  }
+  else {
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0) ?
+            acos(costheta) : -acos(costheta);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute critical elements of the restraining potential: its difference from the target value
+// that determines some harmonic stiffness penalty, the harmonic penalty stiffness, and the energy
+// contribution.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   init_k   Initial stiffness parameters
+//   final_k  Final stiffness parameters
+//   init_r   Initial displacement parameters
+//   final_r  Final displacement parameters
+//   mixwt    Pre-calculated mixing factor for combining initial and final parameters
+//   dr       The measured value of the restraint coordinate among its participating atoms
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
+                      const double4 final_r, const double2 mixwt, const double dr) {
+  const double r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
+  const double r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
+  const double r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
+  const double r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
+  const double k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
+  const double k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
+  double dl, du, keq;
+  if (dr < r1) {
+    dl = r1 - r2;
+    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
+    keq = k2;
+  }
+  else if (dr < r2) {
+    dl = dr - r2;
+    du = k2 * dl * dl;
+    keq = k2;
+  }
+  else if (dr < r3) {
+    dl = 0.0;
+    du = 0.0;
+    keq = 0.0;
+  }
+  else if (dr < r4) {
+    dl = dr - r3;
+    du = k3 * dl * dl;
+    keq = k3;
+  }
+  else {
+    dl = r4 - r3;
+    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
+    keq = k3;
+  }
+  return { keq, dl, du };
+}
+
+__device__ __forceinline__
+float3 restraintDelta(const float2 init_k, const float2 final_k, const float4 init_r,
+                      const float4 final_r, const float2 mixwt, const float dr) {
+  const float r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
+  const float r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
+  const float r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
+  const float r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
+  const float k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
+  const float k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
+  float dl, du, keq;
+  if (dr < r1) {
+    dl = r1 - r2;
+    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
+    keq = k2;
+  }
+  else if (dr < r2) {
+    dl = dr - r2;
+    du = k2 * dl * dl;
+    keq = k2;
+  }
+  else if (dr < r3) {
+    dl = 0.0;
+    du = 0.0;
+    keq = 0.0;
+  }
+  else if (dr < r4) {
+    dl = dr - r3;
+    du = k3 * dl * dl;
+    keq = k3;
+  }
+  else {
+    dl = r4 - r3;
+    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
+    keq = k3;
+  }
+  return { keq, dl, du };
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute the mixture of end-point values that will determine the actual strength and displacement
+// settings of a flat-bottom bimodal harmonic restraint.  The flag about a RestraintApparatus
+// having time-dependent restraints is mostly for convenience, a way to tell whether there is any
+// time-dependent restraint in the collection at all.  Initial and final settings of the steps for
+// each restraint encode whether there is actual time dependence in the result.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   step_number  The current step number of the simulation (may include energy minimization step
+//                counts)
+//   init_step    The initial step at which the restraint engages
+//   final_step   The final step at which the restraint becomes mature
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+double2 computeRestraintMixtureD(const int step_number, const int init_step,
+                                 const int final_step) {
+  if (step_number < init_step) {
+
+    // If the restraint has not yet engaged, neither its initial or final values have any weight
+    return { (double)(0.0), (double)(0.0) };
+  }
+  else if (init_step == final_step) {
+
+    // The step count is far enough along that the restraint has been engaged, and it is constant.
+    // Only the initial value matters.
+    return { (double)(1.0), (double)(0.0) };
+  }
+  else if (step_number < final_step) {
+    const double wslide = (double)(step_number - init_step) / (double)(final_step - init_step);
+
+    // The difference between the initial and final steps is nonzero.  The mixture is a linear
+    // combination of the two end points.
+    return { (double)(1.0) - wslide, wslide };
+  }
+
+  // The step number has advanced beyond the point at which the restraint is mature.
+  return { (double)(0.0), (double)(1.0) };
+}
+
+__device__ __forceinline__
+float2 computeRestraintMixtureF(const int step_number, const int init_step, const int final_step) {
+  if (step_number < init_step) {
+
+    // If the restraint has not yet engaged, neither its initial or final values have any weight
+    return { (float)(0.0), (float)(0.0) };
+  }
+  else if (init_step == final_step) {
+
+    // The step count is far enough along that the restraint has been engaged, and it is constant.
+    // Only the initial value matters.
+    return { (float)(1.0), (float)(0.0) };
+  }
+  else if (step_number < final_step) {
+    const float wslide = (float)(step_number - init_step) / (float)(final_step - init_step);
+
+    // The difference between the initial and final steps is nonzero.  The mixture is a linear
+    // combination of the two end points.
+    return { (float)(1.0) - wslide, wslide };
+  }
+
+  // The step number has advanced beyond the point at which the restraint is mature.
+  return { (float)(0.0), (float)(1.0) };
+}

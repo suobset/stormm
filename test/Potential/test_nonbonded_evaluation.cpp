@@ -1559,6 +1559,8 @@ int main(const int argc, const char* argv[]) {
           tsc_ave_dev_ans[tsc_idx] = mean(fake_rstr_e[j]);
           tsc_std_dev_ans[tsc_idx] = variance(fake_rstr_e[j], VarianceMethod::STANDARD_DEVIATION);
           break;
+        case StateVariable::SURFACE_AREA:
+          break;
         case StateVariable::KINETIC:
           tsc_ave_dev_ans[tsc_idx] = mean(fake_kine_e[j]);
           tsc_std_dev_ans[tsc_idx] = variance(fake_kine_e[j], VarianceMethod::STANDARD_DEVIATION);
@@ -1632,6 +1634,8 @@ int main(const int argc, const char* argv[]) {
               break;
             case StateVariable::RESTRAINT:
               survey[k] = fake_rstr_e[k][j];
+              break;
+            case StateVariable::SURFACE_AREA:
               break;
             case StateVariable::KINETIC:
               survey[k] = fake_kine_e[k][j];

@@ -1763,102 +1763,21 @@ template <typename T, typename Tacc, typename Tcalc, typename T4>
 void CellGrid<T, Tacc, Tcalc, T4>::contributeForces(PhaseSpaceSynthesis *dest,
                                                     const HybridTargetLevel tier,
                                                     const GpuDetails &gpu) const {
-
-  // Check that the destination synthesis and the internally referenced object have identical
-  // fixed precision force accumulation.
-  if (dest->getForceAccumulationBits() != poly_ps_ptr->getForceAccumulationBits()) {
-    rtErr("The force scaling model in the provided coordinate synthesis does not match that of "
-          "the internally referenced synthesis (" +
-          std::to_string(dest->getForceAccumulationBits()) + " vs. " +
-          std::to_string(poly_ps_ptr->getForceAccumulationBits()) + " bits of unit precision).",
-          "CellGrid", "contributeForces");
-  }
-  const uint image_size = total_cell_count * cell_base_capacity;
-  
-  // The coordinate synthesis will receive forces at its own current cycle position.  Taking the
-  // abstract with no cycle position argument defaults to the PhaseSpaceSynthesis's own setting.
   PsSynthesisWriter destw = dest->data(tier);
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
-      const CellGridReader<T, Tacc, Tcalc, T4> cgr = data(cycle_position);
-      for (int pos = 0; pos < destw.system_count; pos++) {
-        if (destw.atom_counts[pos] != poly_ps_ptr->getAtomCount(pos)) {
-          rtErr("The atom counts for system index " + std::to_string(pos) + " do not match "
-                "between the destination and internally referenced coordinate syntheses (" +
-                std::to_string(destw.atom_counts[pos]) + ", " +
-                std::to_string(poly_ps_ptr->getAtomCount(pos)) + ").", "CellGrid",
-                "contributeForces");
-        }
-        if (destw.atom_starts[pos] != poly_ps_ptr->getAtomOffset(pos)) {
-          rtErr("The atom offsets for system index " + std::to_string(pos) + " do not match "
-                "between the destination and internally referenced coordinate syntheses (" +
-                std::to_string(destw.atom_starts[pos]) + ", " +
-                std::to_string(poly_ps_ptr->getAtomOffset(pos)) + ").", "CellGrid",
-                "contributeForces");
-        }
-        const int hlim = destw.atom_starts[pos] + destw.atom_counts[pos];
-        if (std::type_index(typeid(Tacc)).hash_code() == int_type_index) {
-          for (int i = destw.atom_starts[pos]; i < hlim; i++) {
-            const uint image_idx = cgr.img_atom_idx[i];
-
-            // Atoms from the synthesis that are not represented on the neighbor list grid will
-            // have indices of -1, which becomes UINT_MAX in an unsigned int.
-            if (image_idx < image_size) {
-              const llint nfx = hostInt63ToLongLong(cgr.xfrc[image_idx], cgr.xfrc_ovrf[image_idx]);
-              const llint nfy = hostInt63ToLongLong(cgr.yfrc[image_idx], cgr.yfrc_ovrf[image_idx]);
-              const llint nfz = hostInt63ToLongLong(cgr.zfrc[image_idx], cgr.zfrc_ovrf[image_idx]);
-              if (destw.frc_bits <= force_scale_nonoverflow_bits) {
-                destw.xfrc[i] += nfx;
-                destw.yfrc[i] += nfy;
-                destw.zfrc[i] += nfz;
-              }
-              else {
-                const int95_t snfx = hostInt95Sum(destw.xfrc[i], destw.xfrc_ovrf[i], nfx, 0);
-                const int95_t snfy = hostInt95Sum(destw.yfrc[i], destw.yfrc_ovrf[i], nfy, 0);
-                const int95_t snfz = hostInt95Sum(destw.zfrc[i], destw.zfrc_ovrf[i], nfz, 0);
-                destw.xfrc[i] = snfx.x;
-                destw.yfrc[i] = snfy.x;
-                destw.zfrc[i] = snfz.x;
-                destw.xfrc_ovrf[i] = snfx.y;
-                destw.yfrc_ovrf[i] = snfy.y;
-                destw.zfrc_ovrf[i] = snfz.y;
-              }
-            }
-          }
-        }
-        else {
-          for (int i = destw.atom_starts[pos]; i < hlim; i++) {
-            const uint image_idx = cgr.img_atom_idx[i];
-            if (image_idx < image_size) {
-              const int95_t nfx = hostInt95Sum(destw.xfrc[i], destw.xfrc_ovrf[i],
-                                               cgr.xfrc[image_idx], cgr.xfrc_ovrf[image_idx]);
-              const int95_t nfy = hostInt95Sum(destw.yfrc[i], destw.yfrc_ovrf[i],
-                                               cgr.yfrc[image_idx], cgr.yfrc_ovrf[image_idx]);
-              const int95_t nfz = hostInt95Sum(destw.zfrc[i], destw.zfrc_ovrf[i],
-                                               cgr.zfrc[image_idx], cgr.zfrc_ovrf[image_idx]);
-              destw.xfrc[i] = nfx.x;
-              destw.yfrc[i] = nfy.x;
-              destw.zfrc[i] = nfz.x;
-              destw.xfrc_ovrf[i] = nfx.y;
-              destw.yfrc_ovrf[i] = nfy.y;
-              destw.zfrc_ovrf[i] = nfz.y;
-            }
-          }
-        }
-      }
+      const CellGridReader<T, Tacc, Tcalc, T4> cgr = this->data(cycle_position, tier);
+      contributeCellGridForces(&destw, cgr);
     }
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    if (gpu != null_gpu) {
-      const CellGridReader<void, void, void, void> cgr = templateFreeData(cycle_position, tier);
-      launchCellGridAction(cgr, std::type_index(typeid(T)).hash_code(),
-                           std::type_index(typeid(Tacc)).hash_code(), &destw, gpu,
-                           CellGridAction::XFER_FORCES);
-    }
-    else {
-      rtErr("A valid GPU must be provided.", "CellGrid", "initializeForces");
+    {
+      const CellGridReader<void, void,
+                           void, void> cgr_v = this->templateFreeData(cycle_position, tier);
+      contributeCellGridForces(&destw, cgr_v, std::type_index(typeid(T)).hash_code(),
+                               std::type_index(typeid(Tacc)).hash_code(), tier, gpu);
     }
     break;
 #endif
@@ -1878,227 +1797,8 @@ void CellGrid<T, Tacc, Tcalc, T4>::updatePositions(PhaseSpaceSynthesis *dest,
                                                    const HybridTargetLevel tier,
                                                    const GpuDetails &gpu) {
   CellGridWriter<T, Tacc, Tcalc, T4> cgw = this->data(tier);
-  PsSynthesisWriter destw = dest->data(tier);
-
-  // Allocate space for tracking cell migrations.  The GPU will do this in chip cache on a
-  // chain-by-chain basis.
-  std::vector<int> flux(cgw.total_cell_count, 0);
-  std::vector<uint> fill_counters(cgw.total_cell_count);
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    {
-      const int xfrm_stride = roundUp(9, warp_size_int);
-      for (int sys_idx = 0; sys_idx < destw.system_count; sys_idx++) {
-        const ullint c_lims = cgw.system_cell_grids[sys_idx];
-        const int ncell_a = ((c_lims >> 28) & 0xfff);
-        const int ncell_b = ((c_lims >> 40) & 0xfff);
-        const int ncell_c = (c_lims >> 52);
-        const int cell_start = (c_lims & 0xfffffff);
-        const uint chain_capacity = ncell_a * static_cast<int>(cgw.cell_base_capacity);
-        const uint base_img_idx = static_cast<uint>(cell_start) * cgw.cell_base_capacity;
-        const double dncell_a = ncell_a;
-        const double dncell_b = ncell_b;
-        const double dncell_c = ncell_c;
-
-        // Phase 1: Compute the new particle positions and cell residencies in the CellGrid.  In
-        //          the coordinate synthesis, the new particle positions will be expected to
-        //          already be in the "alternate" arrays of the coordinate synthesis.  Compare to
-        //          the current particle positions and cell residencies.  Record the new local
-        //          positions in the current image (it is an out-of-place sort aligned to the
-        //          "tick-tock" mechanics of the PhaseSpaceSynthesis).  Record the cell migration
-        //          as a relative move in the parallel array of one-byte keys.  This relies on an
-        //          assumption that particles will not move more than one cell in any given time
-        //          step.  On the GPU, this operation can be fused with the valence interactions
-        //          kernel, which may read forces from the CellGrid but does not rely on the local
-        //          particle positions.  Here, each phase is performed on an entire system before
-        //          moving on because it is convenient to do so in serial CPU code, without
-        //          repeating the derivation of the length constants above.
-        const int llim = destw.atom_starts[sys_idx];
-        const int hlim = llim + destw.atom_counts[sys_idx];
-        const double* umat = &destw.umat_alt[xfrm_stride * sys_idx];
-        const T* invu_ptr = &cgw.system_cell_invu[xfrm_stride * sys_idx];
-        for (int i = llim; i < hlim; i++) {
-
-          // Re-image the particle into the primary unit cell.  Find its current neighbor list
-          // cell.
-          double x, y, z;
-          if (destw.gpos_bits <= globalpos_scale_nonoverflow_bits) {
-            x = static_cast<double>(destw.xalt[i]) * destw.inv_gpos_scale;
-            y = static_cast<double>(destw.yalt[i]) * destw.inv_gpos_scale;
-            z = static_cast<double>(destw.zalt[i]) * destw.inv_gpos_scale;
-          }
-          else {
-            x = hostInt95ToDouble(destw.xalt[i], destw.xalt_ovrf[i]) * destw.inv_gpos_scale;
-            y = hostInt95ToDouble(destw.yalt[i], destw.yalt_ovrf[i]) * destw.inv_gpos_scale;
-            z = hostInt95ToDouble(destw.zalt[i], destw.zalt_ovrf[i]) * destw.inv_gpos_scale;
-          }
-          double ximg = (umat[0] * x) + (umat[3] * y) + (umat[6] * z);
-          double yimg =                 (umat[4] * y) + (umat[7] * z);
-          double zimg =                                 (umat[8] * z);
-          ximg -= floor(ximg);
-          yimg -= floor(yimg);
-          zimg -= floor(zimg);
-          ximg *= dncell_a;
-          yimg *= dncell_b;
-          zimg *= dncell_c;
-          const int cell_aidx = ximg;
-          const int cell_bidx = yimg;
-          const int cell_cidx = zimg;
-          ximg -= cell_aidx;
-          yimg -= cell_bidx;
-          zimg -= cell_cidx;
-          const T xn_cell = (invu_ptr[0] * ximg) + (invu_ptr[3] * yimg) + (invu_ptr[6] * zimg);
-          const T yn_cell =                        (invu_ptr[4] * yimg) + (invu_ptr[7] * zimg);
-          const T zn_cell =                                               (invu_ptr[8] * zimg);
-          const uint curr_img_idx = cgw.img_atom_idx[i];
-          T4 xyz_prop = cgw.image[curr_img_idx];
-          xyz_prop.x = xn_cell;
-          xyz_prop.y = yn_cell;
-          xyz_prop.z = zn_cell;
-          cgw.image[curr_img_idx] = xyz_prop;
-          
-          // Look up the particle's index in the current image.  Determine its current cell
-          // position based on this index.  The cell B- and C-axis indices can be obtained by
-          // calculating the current chain residence, while the A-axis index can be obtained by
-          // assuming that the particle moves no more than one cell width from the current
-          // position and testing the limits accordingly.
-          const uint del_img_idx = curr_img_idx - base_img_idx;
-          const int curr_chain_idx = (del_img_idx / chain_capacity);
-          const int curr_cell_c = (curr_chain_idx / ncell_b);
-          const int curr_cell_b = curr_chain_idx - (curr_cell_c * ncell_b);
-          int curr_cell_a = cell_aidx;
-          int cell_guess = cell_start + (curr_chain_idx * ncell_a) + curr_cell_a;
-          uint2 test_limits = cgw.cell_limits[cell_guess];
-          if (curr_img_idx > test_limits.x) {
-            int guess_del_idx = static_cast<int>(curr_img_idx - test_limits.x) -
-                                static_cast<int>(test_limits.y >> 16);
-            while (guess_del_idx >= 0) {
-              curr_cell_a++;
-              cell_guess++;
-              test_limits = cgw.cell_limits[cell_guess];
-              guess_del_idx -= static_cast<int>(test_limits.y >> 16);
-            }
-          }
-          else {
-
-            // If the current cell grid index is equal to the lower bound of a particular cell's
-            // holdings, then it would appear the correct cell has been found.  However, this is
-            // only true if the cell has holdings at all.  Otherwise, advance to the next cell that
-            // does have a nonzero particle population.
-            while ((test_limits.y >> 16) == 0U) {
-              curr_cell_a++;
-              cell_guess++;
-              test_limits = cgw.cell_limits[cell_guess];
-            }
-
-            // Otherwise, the current cell is too far along in the chain.  The first cell that
-            // has a lower bound not less than the current cell grid image index will have a
-            // nonzero particle population and be the current home cell.
-            while (curr_img_idx < test_limits.x) {
-              curr_cell_a--;
-              cell_guess--;
-              test_limits = cgw.cell_limits[cell_guess];
-            }
-          }
-          curr_cell_a += ((curr_cell_a < 0) - (curr_cell_a >= ncell_a)) * ncell_a;
-          
-          // Compute the atom migration and construct the atom's migration key.  If the key is
-          // nonzero, mark the flux arrays to show that the atom is transiting from its original
-          // cell into a new one.
-          int migration_a = cell_aidx - curr_cell_a;
-          int migration_b = cell_bidx - curr_cell_b;
-          int migration_c = cell_cidx - curr_cell_c;
-          if (abs(migration_a) > 1) {
-            migration_a = (migration_a < 0) - (migration_a > 0);
-          }
-          if (abs(migration_b) > 1) {
-            migration_b = (migration_b < 0) - (migration_b > 0);
-          }
-          if (abs(migration_c) > 1) {
-            migration_c = (migration_c < 0) - (migration_c > 0);
-          }
-          const int mig_key =  (migration_a < 0)       + ((migration_a > 0) << 1) +
-                              ((migration_b < 0) << 2) + ((migration_b > 0) << 3) +
-                              ((migration_c < 0) << 4) + ((migration_c > 0) << 5);
-          cgw.migration_keys[curr_img_idx] = static_cast<uchar>(mig_key);
-          if (mig_key != 0) {
-            flux[cell_start +
-                 (((curr_cell_c * ncell_b) + curr_cell_b) * ncell_a) + curr_cell_a] -= 1;
-            flux[cell_start + (((cell_cidx * ncell_b) + cell_bidx) * ncell_a) + cell_aidx] += 1;
-          }
-        }
-
-        // Phase 2: Compute the new cell indexing boundaries.  This will populate the next cell
-        //          limits array, first in terms of the total number of particles in each cell and
-        //          then by prefix sums over each chain.  This will require a new kernel launch on
-        //          the GPU, as the total numbers of atoms in each cell cannot be known until all
-        //          particles' moves and new positions are computed.
-        for (int k = 0; k < ncell_c; k++) {
-          for (int j = 0; j < ncell_b; j++) {
-            size_t cell_idx = cell_start + (((k * ncell_b) + j) * ncell_a);
-            uint img_running_idx = cgw.cell_limits[cell_idx].x;
-            for (int i = 0; i < ncell_a; i++) {
-              const uint2 ccli = cgw.cell_limits[cell_idx];
-              const uint next_particle_count = (ccli.y >> 16) + flux[cell_idx];
-              const uint sysid = (ccli.y & 0xffff);
-              cgw.cell_limits_alt[cell_idx] = { img_running_idx,
-                                                (sysid | (next_particle_count << 16)) };
-              fill_counters[cell_idx] = img_running_idx;
-              img_running_idx += next_particle_count;
-              flux[cell_idx] = 0;
-              cell_idx++;
-            }
-          }
-        }
-
-        // Phase 3: Populate the new cells for the next image.  On the GPU, this will be
-        //          accomplished by devoting one warp to each cell, looping over particles in the
-        //          cognate cell of the original image.  Particles that do not move between cells
-        //          (the majority of all cases) will get their positions in the new image based on
-        //          a warp-wide reduction of all non-migrating particles in a warp vote.  The
-        //          complete set of all non-migrating particles for the warp's batch will get
-        //          their new indices based on a single atomicAdd() operation carried out by the
-        //          first lane.  Next, migrating particles will be placed in their new cells based
-        //          on indices found with atomicAdd() operations carried out by individual threads.
-        //          This also requires a new kernel launch on the GPU.
-        for (int k = 0; k < ncell_c; k++) {
-          for (int j = 0; j < ncell_b; j++) {
-            size_t cell_idx = cell_start + (((k * ncell_b) + j) * ncell_a);
-            for (int i = 0; i < ncell_a; i++) {
-              const uint2 ccli = cgw.cell_limits[cell_idx];
-              const uint natom = (ccli.y >> 16);
-              for (uint m = 0; m < natom; m++) {
-                const uint curr_img_idx = ccli.x + m;
-                const T4 xyz_prop = cgw.image[curr_img_idx];
-                const int nonimg_idx = cgw.nonimg_atom_idx[curr_img_idx];
-                const int mig_key = static_cast<int>(cgw.migration_keys[curr_img_idx]);
-                int cell_maidx = i -  (mig_key &  0x1)       + ((mig_key &  0x2) >> 1);
-                int cell_mbidx = j - ((mig_key &  0x4) >> 2) + ((mig_key &  0x8) >> 3);
-                int cell_mcidx = k - ((mig_key & 0x10) >> 4) + ((mig_key & 0x20) >> 5);
-                cell_maidx += ((cell_maidx < 0) - (cell_maidx >= ncell_a)) * ncell_a;
-                cell_mbidx += ((cell_mbidx < 0) - (cell_mbidx >= ncell_b)) * ncell_b;
-                cell_mcidx += ((cell_mcidx < 0) - (cell_mcidx >= ncell_c)) * ncell_c;
-                const uint next_cell_idx = cell_start +
-                                           (((cell_mcidx * ncell_b) + cell_mbidx) * ncell_a) +
-                                           cell_maidx;
-                const uint next_img_idx = fill_counters[next_cell_idx];
-                cgw.image_alt[next_img_idx] = xyz_prop;
-                cgw.img_atom_idx_alt[nonimg_idx] = next_img_idx;
-                cgw.nonimg_atom_idx_alt[next_img_idx] = nonimg_idx;
-                fill_counters[next_cell_idx] = next_img_idx + 1;
-              }
-              cell_idx++;
-            }
-          }
-        }
-      }
-    }
-    break;
-#ifdef STORMM_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    break;
-#endif
-  }
+  const PsSynthesisReader destr = dest->data(tier);
+  migrate(&cgw, destr, tier, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2793,6 +2493,202 @@ void CellGrid<T, Tacc, Tcalc, T4>::prepareCullingField() {
 #endif
 
 //-------------------------------------------------------------------------------------------------
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+void migrate(CellGridWriter<T, Tacc, Tcalc, T4> *cgw, const PsSynthesisReader &destr,
+             const HybridTargetLevel tier, const GpuDetails &gpu) {
+  
+  // Allocate space for tracking cell migrations.  The GPU will do this in chip cache on a
+  // chain-by-chain basis.
+  std::vector<int> flux(cgw->total_cell_count, 0);
+  std::vector<uint> fill_counters(cgw->total_cell_count);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const int xfrm_stride = roundUp(9, warp_size_int);
+      for (int sys_idx = 0; sys_idx < destr.system_count; sys_idx++) {
+        const ullint c_lims = cgw->system_cell_grids[sys_idx];
+        const int ncell_a = ((c_lims >> 28) & 0xfff);
+        const int ncell_b = ((c_lims >> 40) & 0xfff);
+        const int ncell_c = (c_lims >> 52);
+        const int cell_start = (c_lims & 0xfffffff);
+        const uint chain_capacity = ncell_a * static_cast<int>(cgw->cell_base_capacity);
+        const uint base_img_idx = static_cast<uint>(cell_start) * cgw->cell_base_capacity;
+        const double dncell_a = ncell_a;
+        const double dncell_b = ncell_b;
+        const double dncell_c = ncell_c;
+        
+        // Phase 1: Compute the new particle positions and cell residencies in the CellGrid.  In
+        //          the coordinate synthesis, the new particle positions will be expected to
+        //          already be in the "alternate" arrays of the coordinate synthesis.  Compare to
+        //          the current particle positions and cell residencies.  Record the new local
+        //          positions in the current image (it is an out-of-place sort aligned to the
+        //          "tick-tock" mechanics of the PhaseSpaceSynthesis).  Record the cell migration
+        //          as a relative move in the parallel array of one-byte keys.  This relies on an
+        //          assumption that particles will not move more than one cell in any given time
+        //          step.  On the GPU, this operation can be fused with the valence interactions
+        //          kernel, which may read forces from the CellGrid but does not rely on the local
+        //          particle positions.  Here, each phase is performed on an entire system before
+        //          moving on because it is convenient to do so in serial CPU code, without
+        //          repeating the derivation of the length constants above.
+        const int llim = destr.atom_starts[sys_idx];
+        const int hlim = llim + destr.atom_counts[sys_idx];
+        const double* umat = &destr.umat_alt[xfrm_stride * sys_idx];
+        const T* invu_ptr = &cgw->system_cell_invu[xfrm_stride * sys_idx];
+        for (int i = llim; i < hlim; i++) {
+
+          // Re-image the particle into the primary unit cell.  Find its current neighbor list
+          // cell.
+          double x, y, z;
+          if (destr.gpos_bits <= globalpos_scale_nonoverflow_bits) {
+            x = static_cast<double>(destr.xalt[i]) * destr.inv_gpos_scale;
+            y = static_cast<double>(destr.yalt[i]) * destr.inv_gpos_scale;
+            z = static_cast<double>(destr.zalt[i]) * destr.inv_gpos_scale;
+          }
+          else {
+            x = hostInt95ToDouble(destr.xalt[i], destr.xalt_ovrf[i]) * destr.inv_gpos_scale;
+            y = hostInt95ToDouble(destr.yalt[i], destr.yalt_ovrf[i]) * destr.inv_gpos_scale;
+            z = hostInt95ToDouble(destr.zalt[i], destr.zalt_ovrf[i]) * destr.inv_gpos_scale;
+          }
+          double ximg = (umat[0] * x) + (umat[3] * y) + (umat[6] * z);
+          double yimg =                 (umat[4] * y) + (umat[7] * z);
+          double zimg =                                 (umat[8] * z);
+          ximg -= floor(ximg);
+          yimg -= floor(yimg);
+          zimg -= floor(zimg);
+          ximg *= dncell_a;
+          yimg *= dncell_b;
+          zimg *= dncell_c;
+          const int cell_aidx = ximg;
+          const int cell_bidx = yimg;
+          const int cell_cidx = zimg;
+          ximg -= cell_aidx;
+          yimg -= cell_bidx;
+          zimg -= cell_cidx;
+          const T xn_cell = (invu_ptr[0] * ximg) + (invu_ptr[3] * yimg) + (invu_ptr[6] * zimg);
+          const T yn_cell =                        (invu_ptr[4] * yimg) + (invu_ptr[7] * zimg);
+          const T zn_cell =                                               (invu_ptr[8] * zimg);
+          const uint curr_img_idx = cgw->img_atom_idx[i];
+          T4 xyz_prop = cgw->image[curr_img_idx];
+          xyz_prop.x = xn_cell;
+          xyz_prop.y = yn_cell;
+          xyz_prop.z = zn_cell;
+          cgw->image[curr_img_idx] = xyz_prop;
+          
+          // Look up the particle's index in the current image.  Determine its current cell
+          // position based on this index.  The cell B- and C-axis indices can be obtained by
+          // calculating the current chain residence, while the A-axis index can be obtained by
+          // assuming that the particle moves no more than one cell width from the current
+          // position and testing the limits accordingly.
+          const uint del_img_idx = curr_img_idx - base_img_idx;
+          const int curr_chain_idx = (del_img_idx / chain_capacity);
+          const int curr_cell_c = (curr_chain_idx / ncell_b);
+          const int curr_cell_b = curr_chain_idx - (curr_cell_c * ncell_b);
+          int curr_cell_a = cgw->img_atom_chn_cell[curr_img_idx];
+          
+          // Compute the atom migration and construct the atom's migration key.  If the key is
+          // nonzero, mark the flux arrays to show that the atom is transiting from its original
+          // cell into a new one.
+          int migration_a = cell_aidx - curr_cell_a;
+          int migration_b = cell_bidx - curr_cell_b;
+          int migration_c = cell_cidx - curr_cell_c;
+          if (abs(migration_a) > 1) {
+            migration_a = (migration_a < 0) - (migration_a > 0);
+          }
+          if (abs(migration_b) > 1) {
+            migration_b = (migration_b < 0) - (migration_b > 0);
+          }
+          if (abs(migration_c) > 1) {
+            migration_c = (migration_c < 0) - (migration_c > 0);
+          }
+          const int mig_key =  (migration_a < 0)       + ((migration_a > 0) << 1) +
+                              ((migration_b < 0) << 2) + ((migration_b > 0) << 3) +
+                              ((migration_c < 0) << 4) + ((migration_c > 0) << 5);
+          cgw->migration_keys[curr_img_idx] = static_cast<uchar>(mig_key);
+          if (mig_key != 0) {
+            const size_t curr_cell_idx = cell_start + curr_cell_a +
+                                         (((curr_cell_c * ncell_b) + curr_cell_b) * ncell_a);
+            const size_t next_cell_idx = cell_start + cell_aidx +
+                                         (((cell_cidx * ncell_b) + cell_bidx) * ncell_a);
+            flux[curr_cell_idx] -= 1;
+            flux[next_cell_idx] += 1;
+          }
+        }
+
+        // Phase 2: Compute the new cell indexing boundaries.  This will populate the next cell
+        //          limits array, first in terms of the total number of particles in each cell and
+        //          then by prefix sums over each chain.  This will require a new kernel launch on
+        //          the GPU, as the total numbers of atoms in each cell cannot be known until all
+        //          particles' moves and new positions are computed.
+        for (int k = 0; k < ncell_c; k++) {
+          for (int j = 0; j < ncell_b; j++) {
+            size_t cell_idx = cell_start + (((k * ncell_b) + j) * ncell_a);
+            uint img_running_idx = cgw->cell_limits[cell_idx].x;
+            for (int i = 0; i < ncell_a; i++) {
+              const uint2 ccli = cgw->cell_limits[cell_idx];
+              const uint next_particle_count = (ccli.y >> 16) + flux[cell_idx];
+              const uint sysid = (ccli.y & 0xffff);
+              cgw->cell_limits_alt[cell_idx] = { img_running_idx,
+                                                (sysid | (next_particle_count << 16)) };
+              fill_counters[cell_idx] = img_running_idx;
+              img_running_idx += next_particle_count;
+              flux[cell_idx] = 0;
+              cell_idx++;
+            }
+          }
+        }
+
+        // Phase 3: Populate the new cells for the next image.  On the GPU, this will be
+        //          accomplished by devoting one warp to each cell, looping over particles in the
+        //          cognate cell of the original image.  Particles that do not move between cells
+        //          (the majority of all cases) will get their positions in the new image based on
+        //          a warp-wide reduction of all non-migrating particles in a warp vote.  The
+        //          complete set of all non-migrating particles for the warp's batch will get
+        //          their new indices based on a single atomicAdd() operation carried out by the
+        //          first lane.  Next, migrating particles will be placed in their new cells based
+        //          on indices found with atomicAdd() operations carried out by individual threads.
+        //          This also requires a new kernel launch on the GPU.
+        for (int k = 0; k < ncell_c; k++) {
+          for (int j = 0; j < ncell_b; j++) {
+            size_t cell_idx = cell_start + (((k * ncell_b) + j) * ncell_a);
+            for (int i = 0; i < ncell_a; i++) {
+              const uint2 ccli = cgw->cell_limits[cell_idx];
+              const uint natom = (ccli.y >> 16);
+              for (uint m = 0; m < natom; m++) {
+                const uint curr_img_idx = ccli.x + m;
+                const T4 xyz_prop = cgw->image[curr_img_idx];
+                const int nonimg_idx = cgw->nonimg_atom_idx[curr_img_idx];
+                const int mig_key = static_cast<int>(cgw->migration_keys[curr_img_idx]);
+                int cell_maidx = i -  (mig_key &  0x1)       + ((mig_key &  0x2) >> 1);
+                int cell_mbidx = j - ((mig_key &  0x4) >> 2) + ((mig_key &  0x8) >> 3);
+                int cell_mcidx = k - ((mig_key & 0x10) >> 4) + ((mig_key & 0x20) >> 5);
+                cell_maidx += ((cell_maidx < 0) - (cell_maidx >= ncell_a)) * ncell_a;
+                cell_mbidx += ((cell_mbidx < 0) - (cell_mbidx >= ncell_b)) * ncell_b;
+                cell_mcidx += ((cell_mcidx < 0) - (cell_mcidx >= ncell_c)) * ncell_c;
+                const uint next_cell_idx = cell_start +
+                                           (((cell_mcidx * ncell_b) + cell_mbidx) * ncell_a) +
+                                           cell_maidx;
+                const uint next_img_idx = fill_counters[next_cell_idx];
+                cgw->image_alt[next_img_idx] = xyz_prop;
+                cgw->img_atom_idx_alt[nonimg_idx] = next_img_idx;
+                cgw->nonimg_atom_idx_alt[next_img_idx] = nonimg_idx;
+                cgw->img_atom_chn_cell_alt[next_img_idx] = cell_maidx;
+                fill_counters[next_cell_idx] = next_img_idx + 1;
+              }
+              cell_idx++;
+            }
+          }
+        }
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tsrc, typename Tcalc, typename Tcalc2>
 Tcalc sourceMagnitude(const NonbondedTheme requested_property, const NonbondedTheme cg_content,
                       const Tsrc q, const bool q_is_real, const int sysid,
@@ -3122,6 +3018,73 @@ restoreType(const CellGridReader<void, void, void, void> &rasa) {
                                    reinterpret_cast<const Tacc*>(rasa.yfrc),
                                    reinterpret_cast<const Tacc*>(rasa.zfrc), rasa.xfrc_ovrf,
                                    rasa.yfrc_ovrf, rasa.zfrc_ovrf);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+void contributeCellGridForces(PsSynthesisWriter *destw,
+                              const CellGridReader<T, Tacc, Tcalc, T4> &cgr) {
+
+  // Check that the destination synthesis and the internally referenced object have identical
+  // fixed precision force accumulation.
+  if (fabs((destw->frc_scale * cgr.inv_frc_scale) - 1.0) > 1.0e-6) {
+    rtErr("The force scaling model in the provided coordinate synthesis does not match that of "
+          "the internally referenced synthesis (" + std::to_string(destw->frc_bits) + " vs. " +
+          std::to_string(static_cast<int>(round(-log2(cgr.inv_frc_scale)))) +
+          " bits of unit precision).", "CellGrid", "contributeForces");
+  }
+  const uint image_size = cgr.total_cell_count * cgr.cell_base_capacity;
+  for (int pos = 0; pos < destw->system_count; pos++) {
+    const int hlim = destw->atom_starts[pos] + destw->atom_counts[pos];
+    if (std::type_index(typeid(Tacc)).hash_code() == int_type_index) {
+      for (int i = destw->atom_starts[pos]; i < hlim; i++) {
+        const uint image_idx = cgr.img_atom_idx[i];
+
+        // Atoms from the synthesis that are not represented on the neighbor list grid will
+        // have indices of -1, which becomes UINT_MAX in an unsigned int.
+        if (image_idx < image_size) {
+          const llint nfx = hostInt63ToLongLong(cgr.xfrc[image_idx], cgr.xfrc_ovrf[image_idx]);
+          const llint nfy = hostInt63ToLongLong(cgr.yfrc[image_idx], cgr.yfrc_ovrf[image_idx]);
+          const llint nfz = hostInt63ToLongLong(cgr.zfrc[image_idx], cgr.zfrc_ovrf[image_idx]);
+          if (destw->frc_bits <= force_scale_nonoverflow_bits) {
+            destw->xfrc[i] += nfx;
+            destw->yfrc[i] += nfy;
+            destw->zfrc[i] += nfz;
+          }
+          else {
+            const int95_t snfx = hostInt95Sum(destw->xfrc[i], destw->xfrc_ovrf[i], nfx, 0);
+            const int95_t snfy = hostInt95Sum(destw->yfrc[i], destw->yfrc_ovrf[i], nfy, 0);
+            const int95_t snfz = hostInt95Sum(destw->zfrc[i], destw->zfrc_ovrf[i], nfz, 0);
+            destw->xfrc[i] = snfx.x;
+            destw->yfrc[i] = snfy.x;
+            destw->zfrc[i] = snfz.x;
+            destw->xfrc_ovrf[i] = snfx.y;
+            destw->yfrc_ovrf[i] = snfy.y;
+            destw->zfrc_ovrf[i] = snfz.y;
+          }
+        }
+      }
+    }
+    else {
+      for (int i = destw->atom_starts[pos]; i < hlim; i++) {
+        const uint image_idx = cgr.img_atom_idx[i];
+        if (image_idx < image_size) {
+          const int95_t nfx = hostInt95Sum(destw->xfrc[i], destw->xfrc_ovrf[i],
+                                           cgr.xfrc[image_idx], cgr.xfrc_ovrf[image_idx]);
+          const int95_t nfy = hostInt95Sum(destw->yfrc[i], destw->yfrc_ovrf[i],
+                                           cgr.yfrc[image_idx], cgr.yfrc_ovrf[image_idx]);
+          const int95_t nfz = hostInt95Sum(destw->zfrc[i], destw->zfrc_ovrf[i],
+                                           cgr.zfrc[image_idx], cgr.zfrc_ovrf[image_idx]);
+          destw->xfrc[i] = nfx.x;
+          destw->yfrc[i] = nfy.x;
+          destw->zfrc[i] = nfz.x;
+          destw->xfrc_ovrf[i] = nfx.y;
+          destw->yfrc_ovrf[i] = nfy.y;
+          destw->zfrc_ovrf[i] = nfz.y;
+        }
+      }
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

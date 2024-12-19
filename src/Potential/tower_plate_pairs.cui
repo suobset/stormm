@@ -20,6 +20,8 @@
 #    define PMENB_THREAD_COUNT 416
 #  elif (PMENB_WARPS_PER_BLOCK ==  12)
 #    define PMENB_THREAD_COUNT 384
+#  elif (PMENB_WARPS_PER_BLOCK ==  10)
+#    define PMENB_THREAD_COUNT 320
 #  endif
 #  if (__CUDA_ARCH__ >= 750 && __CUDA_ARCH__ < 800 && PMENB_THREAD_COUNT > 512)
 #    undef PMENB_THREAD_COUNT

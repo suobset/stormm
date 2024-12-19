@@ -41,7 +41,7 @@ void removeMomentum(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int* xcrd_ovrf, in
                     int* yvel_ovrf, int* zvel_ovrf, const Tmass* masses,
                     const UnitCellType unit_cell, const int natom, const Tcalc gpos_scale,
                     const Tcalc vel_scale, const ExceptionResponse policy) {
-
+  
   // Avoid dividing by zero.  Return immediately if there are no particles.
   if (natom == 0) {
     return;
@@ -105,15 +105,9 @@ void removeMomentum(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int* xcrd_ovrf, in
       const int95_t idvy = hostDoubleToInt95(momy * vel_scale);
       const int95_t idvz = hostDoubleToInt95(momz * vel_scale);
       for (int i = 0; i < natom; i++) {
-        const int95_t vx_update = hostInt95Subtract(xvel[i], xvel_ovrf[i], idvx.x, idvx.y);
-        const int95_t vy_update = hostInt95Subtract(yvel[i], yvel_ovrf[i], idvy.x, idvy.y);
-        const int95_t vz_update = hostInt95Subtract(zvel[i], zvel_ovrf[i], idvz.x, idvz.y);
-        xvel[i] = vx_update.x;
-        yvel[i] = vy_update.x;
-        zvel[i] = vz_update.x;
-        xvel_ovrf[i] = vx_update.y;
-        yvel_ovrf[i] = vy_update.y;
-        zvel_ovrf[i] = vz_update.y;
+        hostSplitFPSubtract(&xvel[i], &xvel_ovrf[i], idvx);
+        hostSplitFPSubtract(&yvel[i], &yvel_ovrf[i], idvy);
+        hostSplitFPSubtract(&zvel[i], &zvel_ovrf[i], idvz);
       }
     }
     else {

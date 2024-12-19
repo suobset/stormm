@@ -27,8 +27,8 @@
 #include "Synthesis/synthesis_abstracts.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
-#include "Topology/atomgraph_analysis.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Topology/lennard_jones_analysis.h"
 #include "Topology/topology_util.h"
 #include "Trajectory/coordinate_copy.h"
 #include "Trajectory/coordinateframe.h"
@@ -1067,7 +1067,14 @@ private:
   /// Particles are assumed to move no further than one cell width (at least half the relevant
   /// non-bonded cutoff) in a single time step.  Each 8-bit unsigned char represents a packed
   /// bitstring which can be queried to determine whether movement in any direction has occurred.
-  /// The low two bits indicate whether the 
+  /// The low two bits indicate whether the particle moves negatively (first bit) or positively
+  /// (second bit) in its cell index along the unit cell A axis.  The third bit indicates whether
+  /// the particle moves one cell index lower along the B axis, while the fourth bit indicates
+  /// whether the particle moves one cell index higher along the B axis.  The fifth and sixth bits
+  /// indicate movement along the C axis.  In all cases, a 0 means that the particle did not move
+  /// in the stated direction while 1 means that it did.  It is therefore expected that each pair
+  /// of bits will contain a pair of zeros for no movement and a 01 or 10 if the particle moved in
+  /// either direction.  A reading of 11 is nonsensical.
   Hybrid<uchar> cell_migrations;
 
   /// Counters must be kept in order to track atoms that "wander" a long distance (more than one
@@ -1292,6 +1299,11 @@ private:
   void prepareWorkGroups();
 };
 
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+void migrate(CellGridWriter<T, Tacc, Tcalc, T4> *cgw, const PsSynthesisReader &destr,
+             const HybridTargetLevel tier = HybridTargetLevel::HOST,
+             const GpuDetails &gpu = null_gpu);
+  
 /// \brief Translate the fourth member of a CellGrid's image tuple for a specific particle into an
 ///        amount of density for the particle to spread onto the grid.
 ///
@@ -1342,6 +1354,32 @@ const CellGridReader<T, Tacc, Tcalc, T4>
 restoreType(const CellGridReader<void, void, void, void> &rasa);
 /// \}
 
+/// \brief Free function to contribute forces from a cell grid to a coordinate synthesis, given the
+///        abstracts of each and an indication of whether the abstracts are valid on the CPU host
+///        or the GPU device.  Note that the reader has pointers to forces for only one stage in
+///        the neighbor list cell grid's coordinate cycle.
+///
+/// \param destw   Abstract of the coordinate synthesis, modified and returned
+/// \param cgr_v   Abstract of the neighbor list cell grid (read-only, template-free for
+///                compatibility with HPC code units)
+/// \param tc_mat  Encoded data type of the transformation matrices, and hence coordinates, of the
+///                cell grid
+/// \param tc_acc  Encoded data type of the primary force accumulators in the cell grid
+/// \param tier    Indicates whether pointers are valid on the CPU host or the GPU device
+/// \param gpu     Details of the GPU that will carry out the transfer (must be a significant,
+///                non-null GPU in order to carry out the transfor at the GPU level)
+/// \{
+template <typename T, typename Tacc, typename Tcalc, typename T4>
+void contributeCellGridForces(PsSynthesisWriter *destw,
+                              const CellGridReader<T, Tacc, Tcalc, T4> &cgr);
+
+void contributeCellGridForces(PsSynthesisWriter *destw,
+                              const CellGridReader<void, void, void, void> &cgr_v, size_t tc_mat,
+                              size_t tc_acc,
+                              const HybridTargetLevel tier = HybridTargetLevel::HOST,
+                              const GpuDetails &gpu = null_gpu);
+/// \}
+  
 /// \brief Compute the spatial decomposition cell in which a particle belongs, and re-image the
 ///        particle's coordinates as appropriate.  This follows a great deal of the functionality
 ///        of the imageCoordinates() function in local_arrangement.h, but intercepts the

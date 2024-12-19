@@ -22,46 +22,43 @@ PairLJInteraction::PairLJInteraction(const char4 type_a_in, const char4 type_b_i
 {}
 
 //-------------------------------------------------------------------------------------------------
-LennardJonesAnalysis::LennardJonesAnalysis(const AtomGraph *ag_in) :
-    lj_type_count{0}, atom_type_count{0}, prevalent_rule{VdwCombiningRule::NBFIX},
-    sigma{}, epsilon{}, lja_coeff{}, ljb_coeff{}, edits{}, ag_index_origins{},
-    ag_index_origins_bounds{}, atom_type_aliases{}, atom_type_interactions{},
-    consensus_index_map{}, topology_index_map{}, topology_index_map_bounds{},
-    ag_pointers{1, const_cast<AtomGraph*>(ag_in)}
+LennardJonesAnalysis::
+LennardJonesAnalysis(const NonbondedKit<double> &nbk,
+                     const std::vector<std::vector<char4>> &atom_type_aliases_in) :
+    lj_type_count{nbk.n_lj_types},
+    atom_type_count{0}, prevalent_rule{}, absolute_rule{}, sigma{},
+    epsilon{}, lja_coeff{}, ljb_coeff{}, edits{},
+    atom_type_aliases{atom_type_aliases_in},
+    atom_type_map{}, set_to_consensus_map{}, consensus_to_set_map{}
 {
-  // Reset the object to reflect holding zero topologies if the input was a null pointer
-  if (ag_pointers[0] == nullptr) {
-    ag_pointers.resize(0);
-    return;
+  // Factor out the sigma and epsilon parameters
+  sigma.resize(nbk.n_lj_types);
+  epsilon.resize(nbk.n_lj_types);
+  for (int i = 0; i < lj_type_count; i++) {
+    const size_t diag_idx = (i * nbk.n_lj_types) + i;
+    sigma[i] = sqrt(cbrt(nbk.lja_coeff[diag_idx] / nbk.ljb_coeff[diag_idx]));
+    epsilon[i] = 0.25 * nbk.ljb_coeff[diag_idx] / pow(sigma[i], 6.0);
   }
 
   // Group the atom types involved in each Lennard-Jones interaction
-  const NonbondedKit<double> nbk = ag_in->getDoublePrecisionNonbondedKit();
-  lj_type_count = nbk.n_lj_types;
-  atom_type_aliases = ag_in->getAtomTypeNameTable();
-  atom_type_count = 0;
   for (int i = 0; i < nbk.n_lj_types; i++) {
     const int n_type_names = static_cast<int>(atom_type_aliases[i].size());
     atom_type_count += n_type_names;
     for (int j = 0; j < n_type_names; j++) {
-      std::map<uint, int>::iterator it =
-        atom_type_interactions.find(char4ToUint(atom_type_aliases[i][j]));
-      if (it != atom_type_interactions.end()) {
+      std::map<uint, int>::iterator it = atom_type_map.find(char4ToUint(atom_type_aliases[i][j]));
+      if (it != atom_type_map.end()) {
         rtErr("Atom type " + char4ToString(atom_type_aliases[i][j]) + " controls multiple "
               "Lennard-Jones parameter sets in the consensus tables.", "LennardJonesAnalysis");
       }
-      atom_type_interactions[char4ToUint(atom_type_aliases[i][j])] = i;
+      atom_type_map[char4ToUint(atom_type_aliases[i][j])] = i;
     }
   }
-  
-  // Compute the most prevalent Lennard-Jones rule.
-  prevalent_rule = inferCombiningRule(ag_in, ExceptionResponse::SILENT, true);
-
-  // Extract the sigma and epsilon parameters for the first topology.
-  sigma   = ag_in->getLennardJonesSigma<double>();
-  epsilon = ag_in->getLennardJonesEpsilon<double>();
 
   // Extract the Lennard-Jones A and B coefficients directly from the first topology.
+  prevalent_rule = inferCombiningRule<double>(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types,
+                                              ExceptionResponse::DIE, true);
+  absolute_rule = inferCombiningRule<double>(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types,
+                                              ExceptionResponse::DIE, false);
   const size_t nlj_squared = nbk.n_lj_types * nbk.n_lj_types;
   lja_coeff.resize(nlj_squared);
   ljb_coeff.resize(nlj_squared);
@@ -112,31 +109,21 @@ LennardJonesAnalysis::LennardJonesAnalysis(const AtomGraph *ag_in) :
   }
 
   // Set the origins of each Lennard-Jones type index in the original topology.
-  ag_index_origins.resize(nbk.n_lj_types);
-  ag_index_origins_bounds.resize(nbk.n_lj_types + 1);
-  ag_index_origins_bounds[0] = 0;
+  set_to_consensus_map.resize(1);
+  set_to_consensus_map[0].resize(nbk.n_lj_types);
   for (int i = 0; i < nbk.n_lj_types; i++) {
-    ag_index_origins[i] = { 0, i };
-    ag_index_origins_bounds[i + 1] = i + 1;
+    set_to_consensus_map[0][i] = i;
   }
   
-  // Initialize the consensus map
-  consensus_index_map.resize(1);
-  consensus_index_map[0].resize(nbk.n_lj_types);
-  topology_index_map.resize(nbk.n_lj_types);
-  topology_index_map_bounds.resize(nbk.n_lj_types + 1);
-  topology_index_map_bounds[0] = 0;
+  // Initialize the consensus map, an explanation of which Lennard-Jones type index in the
+  // consensus tables each Lennard-Jones index in one of the included topologies references,
+  // and a reciprocal lookup for which Lennard-Jones indices in one exemplary topology 
+  consensus_to_set_map.resize(nbk.n_lj_types);
   for (int i = 0; i < nbk.n_lj_types; i++) {
-    consensus_index_map[0][i] = i;
-    topology_index_map[i] = { 0, i };
-    topology_index_map_bounds[i + 1] = i + 1;
+    consensus_to_set_map[i].resize(1);
+    consensus_to_set_map[i][0] = { 0, i };
   }
 }
-
-//-------------------------------------------------------------------------------------------------
-LennardJonesAnalysis::LennardJonesAnalysis(const AtomGraph &ag_in) :
-    LennardJonesAnalysis(ag_in.getSelfPointer())
-{}
 
 //-------------------------------------------------------------------------------------------------
 int LennardJonesAnalysis::getLJTypeCount() const {
@@ -161,40 +148,6 @@ const std::vector<char4>& LennardJonesAnalysis::getLJAliases(const int consensus
           "LennardJonesAnalysis", "getLJAliases");
   }
   return atom_type_aliases[consensus_index];
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<char4>& LennardJonesAnalysis::getLJAliases(const int ag_query_index,
-                                                             const int lj_type_index) const {
-  if (ag_query_index < 0 || ag_query_index >= static_cast<int>(ag_pointers.size())) {
-    rtErr("Topology index " + std::to_string(ag_query_index) + " is invalid for a list of " +
-          std::to_string(ag_pointers.size()) + " referenced topologies.", "LennardJonesAnalysis",
-          "getLJAliases");
-  }
-  if (lj_type_index < 0 || lj_type_index >= ag_pointers[ag_query_index]->getLJTypeCount()) {
-    rtErr("Lennard-Jones interaction index " + std::to_string(lj_type_index) + " is invalid for "
-          "topology " + ag_pointers[ag_query_index]->getFileName() + ", with " +
-          std::to_string(ag_pointers[ag_query_index]->getLJTypeCount()) + ".",
-          "LennardJonesAnalysis", "getLJAliases");
-  }
-  return atom_type_aliases[consensus_index_map[ag_query_index][lj_type_index]];
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<char4>& LennardJonesAnalysis::getLJAliases(const AtomGraph *ag_query,
-                                                             const int lj_type_index) const {
-  const int ag_query_index = matchTopology(ag_query, ag_pointers);
-  if (ag_query_index == static_cast<int>(ag_pointers.size())) {
-    rtErr("No topology originating in " + ag_query->getFileName() + " was found in the list of "
-          "referenced AtomGraph objects.", "LennardJonesAnalysis", "getLJAliases");
-  }
-  return getLJAliases(ag_query_index, lj_type_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<char4>& LennardJonesAnalysis::getLJAliases(const AtomGraph &ag_query,
-                                                             const int lj_type_index) const {
-  return getLJAliases(ag_query.getSelfPointer(), lj_type_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -271,23 +224,38 @@ double2 LennardJonesAnalysis::getLJParameters(const char4 atom_type_query) const
 }
 
 //-------------------------------------------------------------------------------------------------
-void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
-  const std::vector<std::vector<char4>> othr_atyp_aliases = ag_new_in->getAtomTypeNameTable();
+void LennardJonesAnalysis::addSet(const NonbondedKit<double> &nbk,
+                                  const std::vector<std::vector<char4>> &othr_type_aliases) {
 
+  // Obtain sigma and epsilon parameters for the new set.
+  std::vector<double> othr_sigma(nbk.n_lj_types);
+  std::vector<double> othr_epsilon(nbk.n_lj_types);
+  for (int i = 0; i < lj_type_count; i++) {
+    const size_t diag_idx = (i * nbk.n_lj_types) + i;
+    othr_sigma[i] = sqrt(cbrt(nbk.lja_coeff[diag_idx] / nbk.ljb_coeff[diag_idx]));
+    othr_epsilon[i] = 0.25 * nbk.ljb_coeff[diag_idx] / pow(othr_sigma[i], 6.0);
+  }
+
+  // Obtain a table of which atoms in the current table have pair-specific combining rules.
+  const std::vector<bool> base_has_nbfix_terms =
+    findPairSpecificParticipation(lja_coeff.data(), ljb_coeff.data(), lj_type_count, absolute_rule,
+                                  prevalent_rule);
+  const std::vector<bool> othr_has_nbfix_terms =
+    findPairSpecificParticipation(nbk.lja_coeff, nbk.ljb_coeff, nbk.n_lj_types, absolute_rule,
+                                  prevalent_rule);
+  
   // Check for overlap in the atom types.  Make a list of all atom type names that are found in
   // both topologies, look up their indices, and check how they interact in each case.
-  const std::vector<double> othr_sigma   = ag_new_in->getLennardJonesSigma<double>();
-  const std::vector<double> othr_epsilon = ag_new_in->getLennardJonesEpsilon<double>();
-  const NonbondedKit<double> nbk = ag_new_in->getDoublePrecisionNonbondedKit();
   std::vector<int> existing_ljt, othr_ljt;
+  std::vector<int> ljt_correspondence(nbk.n_lj_types, -1);
   std::vector<bool> unique_types(nbk.n_lj_types, true);
   for (int i = 0; i < nbk.n_lj_types; i++) {
-    const int jlim = othr_atyp_aliases.size();
+    const int jlim = othr_type_aliases.size();
     int lj_type_footprint = -1;
     for (int j = 0; j < jlim; j++) {
-      std::map<uint, int>::iterator it =
-        atom_type_interactions.find(char4ToUint(othr_atyp_aliases[i][j]));
-      if (it != atom_type_interactions.end()) {
+      std::map<uint, int>::iterator it = atom_type_map.find(char4ToUint(othr_type_aliases[i][j]));
+      if (it != atom_type_map.end()) {
+        const int guess_lj_type = it->second;
         unique_types[i] = false;
 
         // An atom type representing the new topology's ith Lennard-Jones type is represented in
@@ -303,8 +271,8 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
         }
         else if (current_table_ljidx != lj_type_footprint) {
           std::string i_alias_list, cfoot_alias_list, ccurr_alias_list;
-          for (size_t k = 0; k < othr_atyp_aliases[i].size(); k++) {
-            i_alias_list += char4ToString(othr_atyp_aliases[i][k]) + " ";
+          for (size_t k = 0; k < othr_type_aliases[i].size(); k++) {
+            i_alias_list += char4ToString(othr_type_aliases[i][k]) + " ";
           }
           for (size_t k = 0; k < atom_type_aliases[lj_type_footprint].size(); k++) {
             cfoot_alias_list += char4ToString(atom_type_aliases[lj_type_footprint][k]) + " ";
@@ -312,11 +280,27 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
           for (size_t k = 0; k < atom_type_aliases[current_table_ljidx].size(); k++) {
             ccurr_alias_list += char4ToString(atom_type_aliases[current_table_ljidx][k]) + " ";
           }
-          rtErr(char4ToString(othr_atyp_aliases[i][j]) + " should map to the same consensus "
+          rtErr(char4ToString(othr_type_aliases[i][j]) + " should map to the same consensus "
                 "Lennard-Jones type as other atom types in its group [ " + i_alias_list +
                 "].  Instead it maps to [ " + cfoot_alias_list + "] as well as [ " +
                 ccurr_alias_list + "], and possibly the Lennard-Jones interactions of other "
                 "groups in the consensus tables.", "LennardJonesAnalysis", "addTopology");
+        }
+      }
+    }
+    if (unique_types[i]) {
+
+      // If the atom type was not found, check that there are no pair-specific combinations of the
+      // incoming Lennard-Jones type within its own topology.  Such a finding would enforce type
+      // uniqueness.  If not, then check that the Lennard-Jones parameters are indeed unique and
+      // that no existing pair-specific parameters might confound the equivalence.
+      if (othr_has_nbfix_terms[i] == false) {
+        for (int j = 0; j < lj_type_count; j++) {
+          if (fabs(sigma[j] - othr_sigma[i]) <= 1.0e-6 &&
+              fabs(epsilon[j] - othr_epsilon[i]) <= 1.0e-6 && base_has_nbfix_terms[j]) {
+            unique_types[i] = false;
+            ljt_correspondence[i] = j;
+          }
         }
       }
     }
@@ -337,13 +321,13 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
       const double lja_othr = nbk.lja_coeff[(othr_ljt_j * nbk.n_lj_types) + othr_ljt_i];
       const double ljb_othr = nbk.ljb_coeff[(othr_ljt_j * nbk.n_lj_types) + othr_ljt_i];
       if (lja_exst < constants::tiny) {
-        if (fabs(lja_exst - lja_othr) >= 1.0e-5) {
+        if (fabs(lja_exst - lja_othr) >= 1.0e-3) {
           std::string exst_type_list_i("[ "), exst_type_list_j("[ ");
           for (size_t k = 0; k < atom_type_aliases[exst_ljt_i].size(); k++) {
             const char4 exst_atyp = atom_type_aliases[exst_ljt_i][k];
             bool found = false;
-            for (size_t m = 0; m < othr_atyp_aliases[othr_ljt_i].size(); m++) {
-              found = (found || exst_atyp == othr_atyp_aliases[othr_ljt_i][m]);
+            for (size_t m = 0; m < othr_type_aliases[othr_ljt_i].size(); m++) {
+              found = (found || exst_atyp == othr_type_aliases[othr_ljt_i][m]);
             }
             if (found == false) {
               exst_type_list_i += char4ToString(exst_atyp) + " ";
@@ -352,8 +336,8 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
           for (size_t k = 0; k < atom_type_aliases[exst_ljt_j].size(); k++) {
             const char4 exst_atyp = atom_type_aliases[exst_ljt_j][k];
             bool found = false;
-            for (size_t m = 0; m < othr_atyp_aliases[othr_ljt_j].size(); m++) {
-              found = (found || exst_atyp == othr_atyp_aliases[othr_ljt_j][m]);
+            for (size_t m = 0; m < othr_type_aliases[othr_ljt_j].size(); m++) {
+              found = (found || exst_atyp == othr_type_aliases[othr_ljt_j][m]);
             }
             if (found == false) {
               exst_type_list_j += char4ToString(exst_atyp) + " ";
@@ -362,9 +346,8 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
           exst_type_list_i += "]";
           exst_type_list_j += "]";
           rtErr("Atom types " + exst_type_list_i + " and " + exst_type_list_j + "interact with "
-                "different properties in the consensus tables than they do in the topology found "
-                "in file " + ag_new_in->getFileName() + ".", "LennardJonesAnalysis",
-                "addTopology");
+                "different properties in the consensus tables than they do in the new set.",
+                "LennardJonesAnalysis", "addTopology");
         }
       }
     }
@@ -373,28 +356,26 @@ void LennardJonesAnalysis::addTopology(const AtomGraph *ag_new_in) {
   // Having survived the type comparisons, the combination procedure should now isolate the
   // new types and create new tables.
 
-}
-
-//-------------------------------------------------------------------------------------------------
-void LennardJonesAnalysis::addTopology(const AtomGraph &ag_new_in) {
-  addTopology(ag_new_in.getSelfPointer());
-}
-
-//-------------------------------------------------------------------------------------------------
-void LennardJonesAnalysis::addTopology(const std::vector<AtomGraph*> &ag_list_in) {
-  for (size_t i = 0; i < ag_list_in.size(); i++) {
-    addTopology(ag_list_in[i]);
+  // CHECK
+  printf("Lennard Jones Types to atom types:\n");
+  for (int i = 0; i < nbk.n_lj_types; i++) {
+    printf("  %2d : ", i);
+    for (size_t j = 0; j < othr_type_aliases[i].size(); j++) {
+      const char4 tmp_atyp = othr_type_aliases[i][j];
+      printf(" %c%c%c%c", tmp_atyp.x, tmp_atyp.y, tmp_atyp.z, tmp_atyp.w);
+    }
+    printf("\n");
   }
-}
+  // END CHECK
 
-//-------------------------------------------------------------------------------------------------
-void LennardJonesAnalysis::addTopology(const AtomGraphSynthesis *poly_ag_in) {
-  addTopology(poly_ag_in->getUniqueTopologies());
-}
+  // CHECK
+  printf("Uniqueness of added types: ");
+  for (int i = 0; i < nbk.n_lj_types; i++) {
+    printf(" %c", unique_types[i] ? 'T' : 'F');
+  }
+  printf("\n");
+  // END CHECK
 
-//-------------------------------------------------------------------------------------------------
-void LennardJonesAnalysis::addTopology(const AtomGraphSynthesis &poly_ag_in) {
-  addTopology(poly_ag_in.getUniqueTopologies());
 }
 
 } // namespace topology

@@ -1,5 +1,6 @@
 #include "copyright.h"
 #include "Math/vector_ops.h"
+#include "MolecularMechanics/mm_evaluation.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "eval_valence_workunit.h"
 #include "valence_potential.h"
@@ -7,110 +8,13 @@
 namespace stormm {
 namespace energy {
 
+using mm::commitVwuEnergies;
+using mm::evalVwuInitEnergy;
 using stmath::crossProduct;
 using stmath::readBitFromMask;
 using topology::TorsionKind;
 using trajectory::PhaseSpaceReader;
 using trajectory::PhaseSpaceWriter;
-
-//-------------------------------------------------------------------------------------------------
-void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid) {
-  switch (activity) {
-  case VwuTask::BOND:
-    ecard->initialize(StateVariable::BOND, sysid);
-    break;
-  case VwuTask::ANGL:
-    ecard->initialize(StateVariable::ANGLE, sysid);
-    break;
-  case VwuTask::DIHE:
-    ecard->initialize(StateVariable::PROPER_DIHEDRAL, sysid);
-    ecard->initialize(StateVariable::IMPROPER_DIHEDRAL, sysid);
-    break;
-  case VwuTask::UBRD:
-    ecard->initialize(StateVariable::UREY_BRADLEY, sysid);
-    break;
-  case VwuTask::CIMP:
-    ecard->initialize(StateVariable::CHARMM_IMPROPER, sysid);
-    break;
-  case VwuTask::CMAP:
-    ecard->initialize(StateVariable::CMAP, sysid);
-    break;
-  case VwuTask::INFR14:
-    ecard->initialize(StateVariable::ELEC_ONE_FOUR, sysid);
-    ecard->initialize(StateVariable::VDW_ONE_FOUR, sysid);
-    break;
-  case VwuTask::RPOSN:
-  case VwuTask::RBOND:
-  case VwuTask::RANGL:
-  case VwuTask::RDIHE:
-    ecard->initialize(StateVariable::RESTRAINT, sysid);
-    break;
-  case VwuTask::SETTLE:
-  case VwuTask::CGROUP:
-  case VwuTask::VSITE:
-  case VwuTask::CDHE:
-  case VwuTask::CBND:
-    break;
-  case VwuTask::ALL_TASKS:
-    ecard->initialize({ StateVariable::BOND, StateVariable::ANGLE, StateVariable::PROPER_DIHEDRAL,
-                        StateVariable::IMPROPER_DIHEDRAL, StateVariable::UREY_BRADLEY,
-                        StateVariable::CHARMM_IMPROPER }, sysid);
-    break;
-  }  
-}
-
-//-------------------------------------------------------------------------------------------------
-void commitVwuEnergies(const llint bond_acc, const llint angl_acc, const llint dihe_acc,
-                       const llint impr_acc, const llint ubrd_acc, const llint cimp_acc,
-                       const llint cmap_acc, const llint qq14_acc, const llint lj14_acc,
-                       const llint rest_acc, const int sysid, const VwuTask activity,
-                       ScoreCard *ecard) {
-  switch (activity) {
-  case VwuTask::BOND:
-    ecard->add(StateVariable::BOND, bond_acc, sysid);
-    break;
-  case VwuTask::ANGL:
-    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
-    break;
-  case VwuTask::DIHE:
-    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
-    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
-    break;
-  case VwuTask::UBRD:
-    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
-    break;
-  case VwuTask::CIMP:
-    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
-    break;
-  case VwuTask::CMAP:
-    ecard->add(StateVariable::CMAP, cmap_acc, sysid);
-    break;
-  case VwuTask::INFR14:
-    ecard->add(StateVariable::ELEC_ONE_FOUR, qq14_acc, sysid);
-    ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
-    break;
-  case VwuTask::RPOSN:
-  case VwuTask::RBOND:
-  case VwuTask::RANGL:
-  case VwuTask::RDIHE:
-    ecard->add(StateVariable::RESTRAINT, rest_acc, sysid);
-    break;
-  case VwuTask::SETTLE:
-  case VwuTask::CGROUP:
-  case VwuTask::VSITE:
-  case VwuTask::CDHE:
-  case VwuTask::CBND:
-    break;
-  case VwuTask::ALL_TASKS:
-    ecard->add(StateVariable::BOND, bond_acc, sysid);
-    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
-    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
-    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
-    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
-    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
-    break;
-  }
-}
 
 //-------------------------------------------------------------------------------------------------
 void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
@@ -252,11 +156,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
         }
         if (attn_idx > 0) {
           const Vec2<double> uc =
-            evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
-                                     sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
-                                     nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
-                                     sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                     sh_xfrc, sh_yfrc, sh_zfrc, eval_force, eval_force);
+            evalAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
+                                 sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
+                                 nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
+                                 sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                 sh_xfrc, sh_yfrc, sh_zfrc, eval_force, eval_force);
           if (log_term) {
             qq14_acc += llround(uc.x * nrg_scale_factor);
             lj14_acc += llround(uc.y * nrg_scale_factor);
@@ -461,11 +365,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
         continue;
       }
       const Vec2<double> uc =
-        evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
-                                 sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
-                                 nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
-                                 sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                 sh_yfrc, sh_zfrc, eval_force, eval_force);
+        evalAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
+                             sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
+                             nbk.ljb_14_coeff, nbk.lj_14_sigma, nbk.n_lj_types, sh_xcrd,
+                             sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                             sh_yfrc, sh_zfrc, eval_force, eval_force);
       if (log_term) {
         qq14_acc += llround(uc.x * nrg_scale_factor);
         lj14_acc += llround(uc.y * nrg_scale_factor);

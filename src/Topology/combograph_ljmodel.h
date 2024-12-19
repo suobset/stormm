@@ -74,7 +74,7 @@ public:
 
   /// \brief Get the combining rule effective in one of the secondary topologies.
   ///
-  /// \param index  The secondarry topology of interest (the ith secondary topology takes part in
+  /// \param index  The secondary topology of interest (the ith secondary topology takes part in
   ///               the ith combination with the primary topology)
   VdwCombiningRule getSecondaryTopologyRule(int index) const;
 

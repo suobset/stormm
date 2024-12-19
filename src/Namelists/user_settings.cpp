@@ -33,10 +33,12 @@ UserSettings::UserSettings(const CommandLineParser &clip,
     policy{ExceptionResponse::DIE}, print_policy{default_file_writing_directive},
     has_files_nml{false}, has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
     has_precision_nml{false}, has_conformer_nml{false}, has_receptor_nml{false},
-    has_dynamics_nml{false}, has_remd_nml{false}, has_ffmorph_nml{false}, has_report_nml{false},
-    restraint_nml_count{0}, input_file{std::string(default_conformer_input_file)},
+    has_pppm_nml{false}, has_dynamics_nml{false}, has_remd_nml{false}, has_ffmorph_nml{false},
+    has_report_nml{false}, restraint_nml_count{0},
+    input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{},
-    receptor_input{}, dyna_input{}, remd_input{}, ffmod_input{}, diagnostic_input{}, rstr_inputs{}
+    receptor_input{}, pppm_input{}, dyna_input{}, remd_input{}, ffmod_input{}, diagnostic_input{},
+    rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -130,7 +132,9 @@ UserSettings::UserSettings(const CommandLineParser &clip,
   conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
   start_line = 0;
   receptor_input = ReceptorControls(inp_tf, &start_line, &has_receptor_nml, policy);
-  start_line = 0;  
+  start_line = 0;
+  pppm_input = PPPMControls(inp_tf, &start_line, &has_pppm_nml, policy);
+  start_line = 0;
   dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
   start_line = 0;
   remd_input = RemdControls(inp_tf, &start_line, &has_remd_nml, policy);
@@ -215,6 +219,11 @@ bool UserSettings::getConformerPresence() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool UserSettings::getPPPMPresence() const {
+  return has_pppm_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool UserSettings::getDynamicsPresence() const {
   return has_dynamics_nml;
 }
@@ -267,6 +276,11 @@ const ConformerControls& UserSettings::getConformerNamelistInfo() const {
 //-------------------------------------------------------------------------------------------------
 const ReceptorControls& UserSettings::getReceptorNamelistInfo() const {
   return receptor_input;
+}
+
+//-------------------------------------------------------------------------------------------------
+const PPPMControls& UserSettings::getPPPMNamelistInfo() const {
+  return pppm_input;
 }
 
 //-------------------------------------------------------------------------------------------------

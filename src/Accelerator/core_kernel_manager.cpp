@@ -127,7 +127,9 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE, clash_policy[i],
                          valence_kernel_width, "kfsValenceForceEnergyAccumulation" + i_ext);
-    
+#if 0
+    catalogValenceKernel(
+#endif
     // Non-bonded kernel entries
     const std::vector<ImplicitSolventModel> is_models = { ImplicitSolventModel::NONE,
                                                           ImplicitSolventModel::HCT_GB,
@@ -199,16 +201,11 @@ CoreKlManager::CoreKlManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
   }
 
   // Stand-alone integration kernel entries
-#if 0
   const std::vector<IntegrationStage> time_step_parts = { IntegrationStage::VELOCITY_ADVANCE,
                                                           IntegrationStage::VELOCITY_CONSTRAINT,
                                                           IntegrationStage::POSITION_ADVANCE,
                                                           IntegrationStage::GEOMETRY_CONSTRAINT };
   const std::vector<std::string> time_step_abbrevs = { "VelAdv", "VelCnst", "PosAdv", "GeomCnst" };
-#endif
-  const std::vector<IntegrationStage> time_step_parts = { IntegrationStage::VELOCITY_CONSTRAINT,
-                                                          IntegrationStage::GEOMETRY_CONSTRAINT };
-  const std::vector<std::string> time_step_abbrevs = { "VelCnst", "GeomCnst" };
   for (size_t i = 0; i < time_step_parts.size(); i++) {
     catalogIntegrationKernel(PrecisionModel::DOUBLE, AccumulationMethod::SPLIT,
                              valence_kernel_width, time_step_parts[i],
@@ -461,6 +458,36 @@ void CoreKlManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
     break;
   }
   k_dictionary[k_key] = KernelFormat(attr, 2 * block_mult, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoreKlManager::catalogValenceKernel(const PrecisionModel prec,
+                                         const PrecisionModel neighbor_prec,
+                                         const NeighborListKind neighbor_layout,
+                                         const EvaluateEnergy eval_nrg,
+                                         const AccumulationMethod acc_meth,
+                                         const ClashResponse collision_handling,
+                                         const std::string &kernel_name) {
+  const std::string k_key = valenceKernelKey(prec, neighbor_prec, neighbor_layout, eval_nrg,
+                                             acc_meth, collision_handling);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
+          "CoreKlManager", "catalogValenceKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, EvaluateForce::YES,
+                                                                 eval_nrg, acc_meth,
+                                                                 VwuGoal::MOVE_PARTICLES,
+                                                                 collision_handling,
+                                                                 ValenceKernelSize::XL, true,
+                                                                 neighbor_prec, neighbor_layout);
+  k_dictionary[k_key] = KernelFormat(attr, 2, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -807,6 +834,23 @@ int2 CoreKlManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
                                          const ClashResponse collision_handling) const {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose,
                                              collision_handling, valence_kernel_width);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Valence kernel identifier " + k_key + " was not found in the kernel map.",
+          "CoreKlManager", "getValenceKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 CoreKlManager::getPmeValenceKernelDims(const PrecisionModel prec,
+                                            const PrecisionModel neighbor_prec,
+                                            const NeighborListKind neighbor_layout,
+                                            const EvaluateEnergy eval_nrg,
+                                            const AccumulationMethod acc_meth,
+                                            const ClashResponse collision_handling) const {
+  const std::string k_key = valenceKernelKey(prec, EvaluateForce::YES, eval_nrg, acc_meth,
+                                             VwuGoal::MOVE_PARTICLES, collision_handling,
+                                             ValenceKernelSize::XL);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " was not found in the kernel map.",
           "CoreKlManager", "getValenceKernelDims");
@@ -1284,6 +1328,34 @@ std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval
     break;
   }
   k_key += valenceKernelWidthExtension(prec, kwidth);
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string valenceKernelKey(const PrecisionModel prec, const PrecisionModel neighbor_prec,
+                             const NeighborListKind neighbor_layout, const EvaluateEnergy eval_nrg,
+                             const AccumulationMethod acc_meth,
+                             const ClashResponse collision_handling) {
+  std::string k_key = valenceKernelKey(prec, EvaluateForce::YES, eval_nrg, acc_meth,
+                                       VwuGoal::MOVE_PARTICLES, collision_handling,
+                                       ValenceKernelSize::XL);
+  k_key += "_pme";
+  switch (neighbor_layout) {
+  case NeighborListKind::DUAL:
+    k_key += "dual_";
+    break;
+  case NeighborListKind::MONO:
+    k_key += "_";
+    break;
+  }
+  switch (neighbor_prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
   return k_key;
 }
 

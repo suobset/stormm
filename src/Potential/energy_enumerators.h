@@ -49,6 +49,8 @@ enum class StateVariable {
   ELEC_ONE_FOUR,          ///< Electrostatic energy from 1-4 attenuated interactions
   GENERALIZED_BORN,       ///< Generalized Born (implicit solvent) energy
   RESTRAINT,              ///< Energy due to flat-bottom bimodal harmonic potential restraints
+  SURFACE_AREA,           ///< Total surface area of a molecule, which can be scaled by some factor
+                          ///<   to arrive at an energy contribution
   KINETIC,                ///< Energy due to particle motion
   PRESSURE,               ///< System pressure (only computed if virials are accumulated)
   VIRIAL_11,              ///< Virial tensor (1,1) element
@@ -227,6 +229,12 @@ enum class ValenceKernelSize {
   MD,      ///< Launch the kernel with a medium block size, up to 128 threads per block.
   SM       ///< Launch the kernel with the smallest possible block size of 64 threads per block.
 };
+
+/// \brief Enumerate the different sources for atomic radii in a SASA calculation.
+enum class SasaReference {
+  LENNARD_JONES_SIGMA,  ///< Obtain atomic radii from Lennard-Jones self interaction sigma values
+  BORN_RADII            ///< Obtain atomic radii from Generalized Born parameters
+};
   
 /// \brief Get a human-readable name for the enumerations detailed above.
 ///
@@ -251,6 +259,7 @@ std::string getEnumerationName(PMIStrategy input);
 std::string getEnumerationName(NeighborListKind input);
 std::string getEnumerationName(TinyBoxPresence input);
 std::string getEnumerationName(ValenceKernelSize input);
+std::string getEnumerationName(SasaReference input);
 /// \}
 
 /// \brief Produce a potential enumeration based on a selection of recognized input strings.
@@ -273,7 +282,13 @@ EnergySample translateEnergySample(const std::string &input);
 ///
 /// \param input  The string describing the accuracy level
 PMIStrategy translatePMIStrategy(const std::string &input);
-  
+
+/// \brief Produce an enumerated form for the tail of the van-der Waals potential based on a
+///        user- or developer-provided input string.
+///
+/// \param input  The string describing the van-der Waals closure
+VdwSumMethod translateVdwSumMethod(const std::string &input);
+
 } // namespace energy
 } // namespace stormm
 

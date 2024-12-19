@@ -85,6 +85,7 @@ public:
   /// Overloaded:
   ///   - Provide a vector of many Amber input keys
   ///   - Provide a single key or a handful of keys (for developers who forget their { } braces)
+  ///   - Load all standard Amber inputs
   ///
   /// \param cli_keys  The list of keywords, each of which must match a recognized Amber command
   ///                  line input keyword from one of the major engines
@@ -96,6 +97,7 @@ public:
   void addStandardAmberInputs(const std::vector<std::string> &cli_keys);
   void addStandardAmberInputs(const char* key_a, const char* key_b = nullptr,
                               const char* key_c = nullptr, const char* key_d = nullptr);
+  void addStandardAmberInputs();
   /// \}
 
   /// \brief Impart some common benchmarking keywords to the command line interface.  Overloading
@@ -104,14 +106,11 @@ public:
   void addStandardBenchmarkingInputs(const std::vector<std::string> &cli_keys);
   void addStandardBenchmarkingInputs(const char* key_a, const char* key_b = nullptr,
                                      const char* key_c = nullptr, const char* key_d = nullptr);  
+  void addStandardBenchmarkingInputs();
   /// \}
 
   /// \brief Impart some common application command line arguments to the interface.  Overloading
-  ///        and descriptions of input parameters follow from addStandardAmberInputs(), above, in
-  ///        addition to:
-  ///
-  /// Overloaded:
-  ///   - Load all standard application command line arguments
+  ///        and descriptions of input parameters follow from addStandardAmberInputs(), above.
   /// \{
   void addStandardApplicationInputs(const std::vector<std::string> &cli_keys);
   void addStandardApplicationInputs(const char* key_a, const char* key_b = nullptr,

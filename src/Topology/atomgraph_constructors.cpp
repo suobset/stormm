@@ -357,6 +357,7 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
   case TopologyKind::CHARMM:
   case TopologyKind::GROMACS:
   case TopologyKind::OPENMM:
+  case TopologyKind::UNKNOWN:
     rtErr("Construction from non-Amber format files is not yet implemented.", "AtomGraph");
   }
 }

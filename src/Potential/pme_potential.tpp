@@ -15,7 +15,7 @@ double2 cellToCellInteractions(PhaseSpaceWriter *psw, const std::vector<int> &ce
                                const Tcalc vdw_cutoff, const Tcalc qqew_coeff,
                                const Tcalc ljew_cutoff, const VdwSumMethod vdw_sum,
                                const EvaluateForce eval_frc, const NonbondedTheme theme) {
-
+  
   // Initialize the energy (always returned) and determine the nature of the calculation.
   const bool tcalc_is_double = std::type_index(typeid(Tcalc)).hash_code();
   const Tcalc value_zero = 0.0;
@@ -189,7 +189,7 @@ double2 cellToCellInteractions(PhaseSpaceWriter *psw, const std::vector<int> &ce
       }
     }
   }
-
+  
   // Return the accumulated energy as a tuple of double-precision values
   return result;
 }
@@ -278,6 +278,104 @@ double2 evaluateParticleParticleEnergy(PhaseSpaceWriter *psw, const NonbondedKit
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc2, typename Tcoord4>
+void evaluateParticleParticleEnergy(CellGridWriter<void, void, void, void> *cgw_v,
+                                    ScoreCardWriter *scw, const PsSynthesisReader &poly_psr,
+                                    const SyNonbondedKit<Tcalc, Tcalc2> &poly_nbk,
+                                    const LocalExclusionMaskReader &lemr,
+                                    const Tcalc cutoff, const Tcalc ew_coeff,
+                                    const VdwSumMethod vdw_sum, const EvaluateForce eval_frc,
+                                    const NonbondedTheme theme) {
+
+  // Restore the type of the CellGrid abstract.
+  CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> cgw = restoreType<Tcoord, Tacc,
+                                                                 Tcalc, Tcoord4>(cgw_v);
+
+  // Check that the requested type of calculation is feasible with the supplied CellGrid.
+  switch (cgw.theme) {
+  case NonbondedTheme::ELECTROSTATIC:
+  case NonbondedTheme::VAN_DER_WAALS:
+    if (theme != cgw.theme) {
+      rtErr("Calculation of " + getEnumerationName(theme) + " is not possible with a CellGrid "
+            "object containing " + getEnumerationName(cgw.theme) + " particle information",
+            "evaluateParticleParticleEnergy");
+    }
+    break;
+  case NonbondedTheme::ALL:
+    break;
+  }
+  
+  // Loop over all systems in the associated synthesis.  For each system, loop over the cells in
+  // the system and, based on the size of the cell grid, determine the neighbors to import and
+  // calculate pair interactions.  Each cell is at leat half the non-bonded cutoff between any two
+  // opposing faces, implying that interactions must be computed among 63 pairs of cells (including
+  // the self-interaction of each cell with itself).
+  for (int sys_idx = 0; sys_idx < cgw.system_count; sys_idx++) {
+    double2 result = { 0.0, 0.0 };
+    const ullint footprint = cgw.system_cell_grids[sys_idx];
+    const int ncell_a = ((footprint >> 28) & 0xfff);
+    const int ncell_b = ((footprint >> 40) & 0xfff);
+    const int ncell_c = ((footprint >> 52) & 0xfff);
+    const int cell_count = ncell_a * ncell_b * ncell_c;
+    for (int i = 0; i < cell_count; i++) {
+      const double2 tmp_e = towerPlatePairInteractions(&cgw, poly_psr, sys_idx, i, poly_nbk,
+                                                       lemr, cutoff, cutoff, ew_coeff,
+                                                       ew_coeff, vdw_sum, eval_frc, theme);
+      result.x += tmp_e.x;
+      result.y += tmp_e.y;
+    }
+    bool add_elec = true;
+    bool add_vdw = true;
+    switch (theme) {
+    case NonbondedTheme::ELECTROSTATIC:
+      add_vdw = false;
+      break;
+    case NonbondedTheme::VAN_DER_WAALS:
+      add_elec = false;
+      break;
+    case NonbondedTheme::ALL:
+      break;
+    }
+    if (add_elec) {
+      add(scw, StateVariable::ELECTROSTATIC, llround(result.x * scw->nrg_scale_lf), sys_idx);
+    }
+    if (add_vdw) {
+      add(scw, StateVariable::VDW, llround(result.y * scw->nrg_scale_lf), sys_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
+void evaluateParticleParticleEnergy(CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg, ScoreCard *sc,
+                                    const LocalExclusionMask &lema, const Tcalc cutoff,
+                                    const Tcalc ew_coeff, const VdwSumMethod vdw_sum,
+                                    const EvaluateForce eval_frc, const NonbondedTheme theme) {
+  const PhaseSpaceSynthesis *poly_ps = cg->getCoordinateSynthesisPointer();
+  const AtomGraphSynthesis *poly_ag = cg->getTopologySynthesisPointer();
+  CellGridWriter<void, void, void, void> cgw_v = cg->templateFreeData();
+  ScoreCardWriter scw = sc->data();
+  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
+    evaluateParticleParticleEnergy<Tcoord,
+                                   Tacc,
+                                   double,
+                                   double2,
+                                   Tcoord4>(&cgw_v, &scw, poly_ps->data(),
+                                            poly_ag->getDoublePrecisionNonbondedKit(), lema.data(),
+                                            cutoff, ew_coeff, vdw_sum, eval_frc, theme);
+  }
+  else {
+    evaluateParticleParticleEnergy<Tcoord,
+                                   Tacc,
+                                   float,
+                                   float2,
+                                   Tcoord4>(&cgw_v, &scw, poly_ps->data(),
+                                            poly_ag->getSinglePrecisionNonbondedKit(), lema.data(),
+                                            cutoff, ew_coeff, vdw_sum, eval_frc, theme);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -475,7 +573,7 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
   const Tcalc qq_bfac = 2.0 * qqew_coeff / sqrt(symbols::pi);
   const int sys_ljidx_offset = poly_nbk.ljabc_offsets[system_idx];
   const int nsys_lj_types = poly_nbk.n_lj_types[system_idx];
-
+  
   // The tower is organized along the unit cell C axis, to maximize the coalescence of data along
   // the A axis for the larger number of cells in the plate.  Develop a list of the atom limits
   // for the tower and plate.  The final task is to calculate the interactions of the plate's
@@ -557,7 +655,7 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
   const Tcalc tw_xshft = cgw->system_cell_invu[(system_idx * warp_size_int) + 6];
   const Tcalc tw_yshft = cgw->system_cell_invu[(system_idx * warp_size_int) + 7];
   const Tcalc tw_zshft = cgw->system_cell_invu[(system_idx * warp_size_int) + 8];
-
+  
   // Compute interactions between the tower and the plate.
   while (tw_base < ntower) {
 
@@ -606,10 +704,8 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
     }
     
     // To apply a "trivial rejection" test, based on whether atoms in the plate might be anywhere
-    // within range of some atom in the tower group, does not appear to be worthwile--it could
-    // save perhaps 15-20% of the particles at what could be an even greater cost in terms of
-    // additional evaluations and threads waiting, all the while increasing the complexity of the
-    // code.
+    // within range of some atom in the tower group, can likely be done on the GPU, but on the CPU
+    // the goal is simplicity.
     int pl_base = 0;
     const Tcalc pli_xshft = cgw->system_cell_invu[(system_idx * warp_size_int) + 0];
     const Tcalc pli_yshft = cgw->system_cell_invu[(system_idx * warp_size_int) + 1];
@@ -677,7 +773,7 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
     }
     tw_base += tw_batch;
   }
-
+  
   // Compute interactions within the home cell, always the third cell of the tower.
   std::vector<Tcalc> cr_xpos(warp_size_int), cr_ypos(warp_size_int), cr_zpos(warp_size_int);
   std::vector<Tcalc> xc_xpos(warp_size_int), xc_ypos(warp_size_int), xc_zpos(warp_size_int);
@@ -688,12 +784,10 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
   const int ncore = (tower_atoms[2].y >> 16);
   int cr_base = 0;
   while (cr_base < ncore) {
-    const int cr_batch = (ncore - cr_base > warp_size_int) ? warp_size_int : ncore - cr_base;
+    const int cr_batch = std::min(ncore - cr_base, warp_size_int);
     for (int i = 0; i < cr_batch; i++) {
       core_img_idx[i] = tower_atoms[2].x + cr_base + i;
       core_topl_idx[i] = cgw->nonimg_atom_idx[core_img_idx[i]];
-      xcore_img_idx[i] = core_img_idx[i];
-      xcore_topl_idx[i] = core_topl_idx[i];
       const Tcoord4 cr_xyzq = cgw->image[core_img_idx[i]];
       if (tcoord_is_real) {
         cr_xpos[i] = cr_xyzq.x;
@@ -705,15 +799,12 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
         cr_ypos[i] = static_cast<Tcalc>(cr_xyzq.y) * cgw->inv_lpos_scale;
         cr_zpos[i] = static_cast<Tcalc>(cr_xyzq.z) * cgw->inv_lpos_scale;
       }
-      xc_xpos[i] = cr_xpos[i];
-      xc_ypos[i] = cr_ypos[i];
-      xc_zpos[i] = cr_zpos[i];
       switch (theme) {
       case NonbondedTheme::ELECTROSTATIC:
       case NonbondedTheme::ALL:
-        xcore_atom_q[i] = sourceMagnitude(NonbondedTheme::ELECTROSTATIC, cgw->theme, cr_xyzq.w,
-                                          tcoord_is_real, system_idx, poly_nbk);
-        core_atom_q[i] = xcore_atom_q[i] * poly_nbk.coulomb;
+        core_atom_q[i] = sourceMagnitude(NonbondedTheme::ELECTROSTATIC, cgw->theme, cr_xyzq.w,
+                                         tcoord_is_real, system_idx, poly_nbk);
+        core_atom_q[i] *= poly_nbk.coulomb;
         break;
       case NonbondedTheme::VAN_DER_WAALS:
         break;
@@ -721,30 +812,17 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
       switch (theme) {
       case NonbondedTheme::VAN_DER_WAALS:
       case NonbondedTheme::ALL:
-        xcore_atom_ljidx[i] = sourceIndex(NonbondedTheme::VAN_DER_WAALS, cgw->theme, cr_xyzq.w,
-                                          tcoord_is_real);
-        core_atom_ljidx[i] = (xcore_atom_ljidx[i] * nsys_lj_types) + sys_ljidx_offset;
+        core_atom_ljidx[i] = sourceIndex(NonbondedTheme::VAN_DER_WAALS, cgw->theme, cr_xyzq.w,
+                                         tcoord_is_real);
+        core_atom_ljidx[i] = (core_atom_ljidx[i] * nsys_lj_types) + sys_ljidx_offset;
         break;
       case NonbondedTheme::ELECTROSTATIC:
         break;
       }
     }
-
-    // The first tile in this line will be self-interacting.
-    double2 tmp_e = basicTileInteractions(cr_xpos, cr_ypos, cr_zpos, xc_xpos, xc_ypos, xc_zpos,
-                                          core_atom_q, xcore_atom_q, core_atom_ljidx,
-                                          xcore_atom_ljidx, core_topl_idx, xcore_topl_idx,
-                                          core_img_idx, xcore_img_idx, system_idx, cr_batch,
-                                          cr_batch, true, small_box, cgw, poly_psr, poly_nbk, lemr,
-                                          elec_cutsq, vdw_cutsq, qqew_coeff, ljew_coeff, vdw_sum,
-                                          eval_frc, theme);
-    result.x += tmp_e.x;
-    result.y += tmp_e.y;
-
-    // Subsequent tiles will not be self-interacting.
-    int xc_base = cr_batch;
-    while (xc_base < ncore) {
-      const int xc_batch = (ncore - xc_base > warp_size_int) ? warp_size_int : ncore - xc_base;
+    int xc_base = 0;
+    while (xc_base < cr_base + cr_batch) {
+      const int xc_batch = std::min(cr_base + cr_batch - xc_base, warp_size_int);
       for (int i = 0; i < xc_batch; i++) {
         xcore_img_idx[i] = tower_atoms[2].x + xc_base + i;
         xcore_topl_idx[i] = cgw->nonimg_atom_idx[xcore_img_idx[i]];
@@ -778,12 +856,15 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
           break;
         }
       }
-      tmp_e = basicTileInteractions(cr_xpos, cr_ypos, cr_zpos, xc_xpos, xc_ypos, xc_zpos,
-                                    core_atom_q, xcore_atom_q, core_atom_ljidx, xcore_atom_ljidx,
-                                    core_topl_idx, xcore_topl_idx, core_img_idx, xcore_img_idx,
-                                    system_idx, cr_batch, xc_batch, false, small_box, cgw,
-                                    poly_psr, poly_nbk, lemr, elec_cutsq, vdw_cutsq, qqew_coeff,
-                                    ljew_coeff, vdw_sum, eval_frc, theme);
+    
+      // The last tile in this line will be self-interacting.  Other tiles will not be.
+      double2 tmp_e = basicTileInteractions(cr_xpos, cr_ypos, cr_zpos, xc_xpos, xc_ypos, xc_zpos,
+                                            core_atom_q, xcore_atom_q, core_atom_ljidx,
+                                            xcore_atom_ljidx, core_topl_idx, xcore_topl_idx,
+                                            core_img_idx, xcore_img_idx, system_idx, cr_batch,
+                                            xc_batch, (cr_base == xc_base), small_box, cgw,
+                                            poly_psr, poly_nbk, lemr, elec_cutsq, vdw_cutsq,
+                                            qqew_coeff, ljew_coeff, vdw_sum, eval_frc, theme);
       result.x += tmp_e.x;
       result.y += tmp_e.y;
       xc_base += xc_batch;
@@ -895,109 +976,6 @@ double2 towerPlatePairInteractions(CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> 
     cr_base += cr_batch;
   }
   return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcalc2, typename Tcoord4>
-void evaluateParticleParticleEnergy(const PhaseSpaceSynthesis &poly_ps,
-                                    CellGridWriter<void, void, void, void> *cgw_v,
-                                    ScoreCardWriter *scw, const PsSynthesisReader &poly_psr,
-                                    const SyNonbondedKit<Tcalc, Tcalc2> &poly_nbk,
-                                    const LocalExclusionMaskReader &lemr,
-                                    const Tcalc elec_cutoff, const Tcalc vdw_cutoff,
-                                    const Tcalc qqew_coeff, const Tcalc ljew_coeff,
-                                    const VdwSumMethod vdw_sum, const EvaluateForce eval_frc,
-                                    const NonbondedTheme theme) {
-
-  // Restore the type of the CellGrid abstract.
-  CellGridWriter<Tcoord, Tacc, Tcalc, Tcoord4> cgw = restoreType<Tcoord, Tacc,
-                                                                 Tcalc, Tcoord4>(cgw_v);
-
-  // Check that the requested type of calculation is feasible with the supplied CellGrid.
-  switch (cgw.theme) {
-  case NonbondedTheme::ELECTROSTATIC:
-  case NonbondedTheme::VAN_DER_WAALS:
-    if (theme != cgw.theme) {
-      rtErr("Calculation of " + getEnumerationName(theme) + " is not possible with a CellGrid "
-            "object containing " + getEnumerationName(cgw.theme) + " particle information",
-            "evaluateParticleParticleEnergy");
-    }
-    break;
-  case NonbondedTheme::ALL:
-    break;
-  }
-  
-  // Loop over all systems in the associated synthesis.  For each system, loop over the cells in
-  // the system and, based on the size of the cell grid, determine the neighbors to import and
-  // calculate pair interactions.  Each cell is at leat half the non-bonded cutoff between any two
-  // opposing faces, implying that interactions must be computed among 63 pairs of cells (including
-  // the self-interaction of each cell with itself).
-  for (int sys_idx = 0; sys_idx < cgw.system_count; sys_idx++) {
-    double2 result = { 0.0, 0.0 };
-    const ullint footprint = cgw.system_cell_grids[sys_idx];
-    const int ncell_a = ((footprint >> 28) & 0xfff);
-    const int ncell_b = ((footprint >> 40) & 0xfff);
-    const int ncell_c = ((footprint >> 52) & 0xfff);
-    const int cell_count = ncell_a * ncell_b * ncell_c;
-    for (int i = 0; i < cell_count; i++) {
-      const double2 tmp_e = towerPlatePairInteractions(&cgw, poly_ps.data(), sys_idx, i, poly_nbk,
-                                                       lemr, elec_cutoff, vdw_cutoff, qqew_coeff,
-                                                       ljew_coeff, vdw_sum, eval_frc, theme);
-      result.x += tmp_e.x;
-      result.y += tmp_e.y;
-    }
-    bool add_elec = true;
-    bool add_vdw = true;
-    switch (theme) {
-    case NonbondedTheme::ELECTROSTATIC:
-      add_vdw = false;
-      break;
-    case NonbondedTheme::VAN_DER_WAALS:
-      add_elec = false;
-      break;
-    case NonbondedTheme::ALL:
-      break;
-    }
-    if (add_elec) {
-      add(scw, StateVariable::ELECTROSTATIC, llround(result.x * scw->nrg_scale_lf), sys_idx);
-    }
-    if (add_vdw) {
-      add(scw, StateVariable::VDW, llround(result.y * scw->nrg_scale_lf), sys_idx);
-    }
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tacc, typename Tcalc, typename Tcoord4>
-void evaluateParticleParticleEnergy(CellGrid<Tcoord, Tacc, Tcalc, Tcoord4> *cg, ScoreCard *sc,
-                                    const LocalExclusionMask &lema, const Tcalc elec_cutoff,
-                                    const Tcalc vdw_cutoff, const Tcalc qqew_coeff,
-                                    const Tcalc ljew_coeff, const VdwSumMethod vdw_sum,
-                                    const EvaluateForce eval_frc, const NonbondedTheme theme) {
-  const PhaseSpaceSynthesis *poly_ps = cg->getCoordinateSynthesisPointer();
-  const AtomGraphSynthesis *poly_ag = cg->getTopologySynthesisPointer();
-  CellGridWriter<void, void, void, void> cgw_v = cg->templateFreeData();
-  ScoreCardWriter scw = sc->data();
-  if (std::type_index(typeid(Tcalc)).hash_code() == double_type_index) {
-    evaluateParticleParticleEnergy<Tcoord,
-                                   Tacc,
-                                   double,
-                                   double2,
-                                   Tcoord4>(*poly_ps, &cgw_v, &scw, poly_ps->data(),
-                                            poly_ag->getDoublePrecisionNonbondedKit(), lema.data(),
-                                            elec_cutoff, vdw_cutoff, qqew_coeff, ljew_coeff,
-                                            vdw_sum, eval_frc, theme);
-  }
-  else {
-    evaluateParticleParticleEnergy<Tcoord,
-                                   Tacc,
-                                   float,
-                                   float2,
-                                   Tcoord4>(*poly_ps, &cgw_v, &scw, poly_ps->data(),
-                                            poly_ag->getSinglePrecisionNonbondedKit(), lema.data(),
-                                            elec_cutoff, vdw_cutoff, qqew_coeff, ljew_coeff,
-                                            vdw_sum, eval_frc, theme);
-  }
 }
 
 } // namespace energy

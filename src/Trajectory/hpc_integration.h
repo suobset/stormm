@@ -13,6 +13,7 @@
 #include "MolecularMechanics/mm_controls.h"
 #include "Numerics/numeric_enumerators.h"
 #include "Potential/cacheresource.h"
+#include "Potential/cellgrid.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
@@ -26,6 +27,8 @@ using card::CoreKlManager;
 using constants::PrecisionModel;
 using energy::CacheResource;
 using energy::CacheResourceKit;
+using energy::CellGrid;
+using energy::CellGridReader;
 using energy::ValenceKernelSize;
 using mm::MolecularMechanicsControls;
 using mm::MMControlKit;
@@ -39,20 +42,38 @@ using synthesis::SyValenceKit;
 /// \brief Query the launch parameters and other attributes of one of the stand-alone integration
 ///        kernels.
 ///
-/// \param prec      The precision with which arithmetic operations will be carried out.  This also
-///                  affects the extent of coordinate representations processed by the kernel.
-/// \param acc_meth  The accumulation method for forces in related valence kernels.  Each kernel's
-///                  core lines of code are designed to be absracted as an included file inside the
-///                  main valence kernels with metching kernel sizes, accumulation methods, and
-///                  calculation precision.  The stand-alone kernels may utilize the force arrays
-///                  of the valence kernel to buffer critical data, and must therefore emulate the
-///                  methods of the valence kernels.
-/// \param kwidth    Conveys the size of each work unit that the kernel must be prepared to handle
-/// \param process   The process to carrry out, e.g. constrain velocities
-cudaFuncAttributes queryIntegrationKernelRequirements(PrecisionModel prec,
+/// Overloaded:
+///   - Provide parameters for implicit solvent dynamics (systems in isolated boundary conditions)
+///   - Provide parameters for explicit solvent dynamics (systems in periodic boundary conditions)
+///
+/// \param calc_prec      The precision with which arithmetic operations will be carried out.  This
+///                       also affects the extent of coordinate representations processed by the
+///                       kernel.
+/// \param neighbor_prec  Precision of the neighbor list, and the implied detail of its force
+///                       accumulators
+/// \param unit_cell      The type of unit cell for all systems in consideration
+/// \param acc_meth       The accumulation method for forces in related valence kernels.  Each
+///                       kernel's core lines of code are designed to be absracted as an included
+///                       file inside the main valence kernels with metching kernel sizes,
+///                       accumulation methods, and calculation precision.  The stand-alone kernels
+///                       may utilize the force arrays of the valence kernel to buffer critical
+///                       data, and must therefore emulate the methods of the valence kernels.
+/// \param kwidth         Conveys the size of each work unit that the kernel must be prepared to
+///                       handle
+/// \param process        The process to carrry out, e.g. constrain velocities
+/// \{
+cudaFuncAttributes queryIntegrationKernelRequirements(PrecisionModel calc_prec,
+                                                      PrecisionModel neighbor_prec,
+                                                      UnitCellType unit_cell,
                                                       AccumulationMethod acc_meth,
                                                       ValenceKernelSize kwidth,
                                                       IntegrationStage process);
+
+cudaFuncAttributes queryIntegrationKernelRequirements(PrecisionModel calc_prec,
+                                                      AccumulationMethod acc_meth,
+                                                      ValenceKernelSize kwidth,
+                                                      IntegrationStage process);
+/// \}
 
 /// \brief Launch a stand-alone kernel to carry out one of several processes in the integration
 ///        time step.
@@ -98,8 +119,106 @@ void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<floa
                               AccumulationMethod acc_meth, ValenceKernelSize kwidth,
                               IntegrationStage process);
 
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *tb_resw,
+                              MMControlKit<double> *ctrl,
+                              const CellGridReader<double, llint, double, double4> &cgr,
+                              const SyValenceKit<double> &poly_vk,
+                              const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                              const ThermostatWriter<double> &tstw, const int2 lp,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *tb_resw,
+                              MMControlKit<double> *ctrl,
+                              const CellGridReader<float, int, float, float4> &cgr,
+                              const SyValenceKit<double> &poly_vk,
+                              const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                              const ThermostatWriter<double> &tstw, const int2 lp,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *tb_resw,
+                              MMControlKit<double> *ctrl,
+                              const CellGridReader<double, llint, double, double4> &cgr_qq,
+                              const CellGridReader<double, llint, double, double4> &cgr_lj,
+                              const SyValenceKit<double> &poly_vk,
+                              const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                              const ThermostatWriter<double> &tstw, const int2 lp,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *tb_resw,
+                              MMControlKit<double> *ctrl,
+                              const CellGridReader<float, int, float, float4> &cgr_qq,
+                              const CellGridReader<float, int, float, float4> &cgr_lj,
+                              const SyValenceKit<double> &poly_vk,
+                              const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                              const ThermostatWriter<double> &tstw, const int2 lp,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *tb_resw,
+                              MMControlKit<float> *ctrl,
+                              const CellGridReader<double, llint, double, double4> &cgr,
+                              const SyValenceKit<float> &poly_vk,
+                              const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                              const ThermostatWriter<float> &tstw, const int2 lp,
+                              AccumulationMethod acc_meth, IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *tb_resw,
+                              MMControlKit<float> *ctrl,
+                              const CellGridReader<float, int, float, float4> &cgr,
+                              const SyValenceKit<float> &poly_vk,
+                              const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                              const ThermostatWriter<float> &tstw, const int2 lp,
+                              AccumulationMethod acc_meth, IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *tb_resw,
+                              MMControlKit<float> *ctrl,
+                              const CellGridReader<double, llint, double, double4> &cgr_qq,
+                              const CellGridReader<double, llint, double, double4> &cgr_lj,
+                              const SyValenceKit<float> &poly_vk,
+                              const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                              const ThermostatWriter<float> &tstw, const int2 lp,
+                              AccumulationMethod acc_meth, IntegrationStage process);
+
+void launchIntegrationProcess(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *tb_resw,
+                              MMControlKit<float> *ctrl,
+                              const CellGridReader<float, int, float, float4> &cgr_qq,
+                              const CellGridReader<float, int, float, float4> &cgr_lj,
+                              const SyValenceKit<float> &poly_vk,
+                              const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                              const ThermostatWriter<float> &tstw, const int2 lp,
+                              AccumulationMethod acc_meth, IntegrationStage process);
+
 void launchIntegrationProcess(PhaseSpaceSynthesis *poly_ps, CacheResource *tb_res, Thermostat *tst,
                               MolecularMechanicsControls *mmctrl,
+                              const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher,
+                              PrecisionModel prec, AccumulationMethod acc_meth,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PhaseSpaceSynthesis *poly_ps, CacheResource *tb_res, Thermostat *tst,
+                              MolecularMechanicsControls *mmctrl,
+                              const CellGrid<double, llint, double, double4> &cg,
+                              const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher,
+                              PrecisionModel prec, AccumulationMethod acc_meth,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PhaseSpaceSynthesis *poly_ps, CacheResource *tb_res, Thermostat *tst,
+                              MolecularMechanicsControls *mmctrl,
+                              const CellGrid<float, int, float, float4> &cg,
+                              const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher,
+                              PrecisionModel prec, AccumulationMethod acc_meth,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PhaseSpaceSynthesis *poly_ps, CacheResource *tb_res, Thermostat *tst,
+                              MolecularMechanicsControls *mmctrl,
+                              const CellGrid<double, llint, double, double4> &cg_qq,
+                              const CellGrid<double, llint, double, double4> &cg_lj,
+                              const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher,
+                              PrecisionModel prec, AccumulationMethod acc_meth,
+                              IntegrationStage process);
+
+void launchIntegrationProcess(PhaseSpaceSynthesis *poly_ps, CacheResource *tb_res, Thermostat *tst,
+                              MolecularMechanicsControls *mmctrl,
+                              const CellGrid<float, int, float, float4> &cg_qq,
+                              const CellGrid<float, int, float, float4> &cg_lj,
                               const AtomGraphSynthesis &poly_ag, const CoreKlManager &launcher,
                               PrecisionModel prec, AccumulationMethod acc_meth,
                               IntegrationStage process);

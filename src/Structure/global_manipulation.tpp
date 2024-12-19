@@ -426,16 +426,43 @@ void translateCoordinates(PsSynthesisWriter *poly_psw, const int system_index,
   placeVirtualSites<double, Tcalc>(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr,
                                    UnitCellType::NONE, vsk);
   for (int i = 0; i < vsk.nsite; i++) {
-    const int vs_idx = vsk.vs_atoms[i];
-    const int95_t xvs_new = hostDoubleToInt95(cfw.xcrd[vs_idx] * poly_psw->gpos_scale);
-    const int95_t yvs_new = hostDoubleToInt95(cfw.ycrd[vs_idx] * poly_psw->gpos_scale);
-    const int95_t zvs_new = hostDoubleToInt95(cfw.zcrd[vs_idx] * poly_psw->gpos_scale);
-    poly_psw->xcrd[i]      = xvs_new.x;
-    poly_psw->xcrd_ovrf[i] = xvs_new.y;
-    poly_psw->ycrd[i]      = yvs_new.x;
-    poly_psw->ycrd_ovrf[i] = yvs_new.y;
-    poly_psw->zcrd[i]      = zvs_new.x;
-    poly_psw->zcrd_ovrf[i] = zvs_new.y;
+    bool frame_moved;
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
+    case VirtualSiteKind::NONE:
+      frame_moved = false;
+      break;
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      frame_moved = ((vsk.frame1_idx[i] >= llim && vsk.frame1_idx[i] < hlim) ||
+                     (vsk.frame2_idx[i] >= llim && vsk.frame2_idx[i] < hlim));
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      frame_moved = ((vsk.frame1_idx[i] >= llim && vsk.frame1_idx[i] < hlim) ||
+                     (vsk.frame2_idx[i] >= llim && vsk.frame2_idx[i] < hlim) ||
+                     (vsk.frame3_idx[i] >= llim && vsk.frame3_idx[i] < hlim));
+      break;
+    case VirtualSiteKind::FIXED_4:
+      frame_moved = ((vsk.frame1_idx[i] >= llim && vsk.frame1_idx[i] < hlim) ||
+                     (vsk.frame2_idx[i] >= llim && vsk.frame2_idx[i] < hlim) ||
+                     (vsk.frame3_idx[i] >= llim && vsk.frame3_idx[i] < hlim) ||
+                     (vsk.frame4_idx[i] >= llim && vsk.frame4_idx[i] < hlim));
+      break;
+    }
+    if (frame_moved) {
+      const int vs_idx = vsk.vs_atoms[i];
+      const int95_t xvs_new = hostDoubleToInt95(cfw.xcrd[vs_idx] * poly_psw->gpos_scale);
+      const int95_t yvs_new = hostDoubleToInt95(cfw.ycrd[vs_idx] * poly_psw->gpos_scale);
+      const int95_t zvs_new = hostDoubleToInt95(cfw.zcrd[vs_idx] * poly_psw->gpos_scale);
+      poly_psw->xcrd[i]      = xvs_new.x;
+      poly_psw->xcrd_ovrf[i] = xvs_new.y;
+      poly_psw->ycrd[i]      = yvs_new.x;
+      poly_psw->ycrd_ovrf[i] = yvs_new.y;
+      poly_psw->zcrd[i]      = zvs_new.x;
+      poly_psw->zcrd_ovrf[i] = zvs_new.y;
+    }
   }
 }
 

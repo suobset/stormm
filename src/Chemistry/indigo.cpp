@@ -160,6 +160,72 @@ std::vector<int> indigoFormalChargeScores() {
   result[IndigoFormalChargeKey(35,  6)] =  951383;
   result[IndigoFormalChargeKey(35,  7)] = 1321067;
 
+  // Lithium
+  result[IndigoFormalChargeKey( 3, -1)] =  900000;
+  result[IndigoFormalChargeKey( 3,  0)] =   50000;
+  result[IndigoFormalChargeKey( 3,  1)] = -900000;
+  result[IndigoFormalChargeKey( 3,  2)] =   50000;
+  result[IndigoFormalChargeKey( 3,  3)] =  150000;
+  result[IndigoFormalChargeKey( 3,  4)] =  250000;
+  result[IndigoFormalChargeKey( 3,  5)] =  350000;
+  result[IndigoFormalChargeKey( 3,  6)] =  450000;
+  result[IndigoFormalChargeKey( 3,  7)] =  550000;
+
+  // Sodium
+  result[IndigoFormalChargeKey(11, -1)] =  900000;
+  result[IndigoFormalChargeKey(11,  0)] =   50000;
+  result[IndigoFormalChargeKey(11,  1)] = -900000;
+  result[IndigoFormalChargeKey(11,  2)] =   50000;
+  result[IndigoFormalChargeKey(11,  3)] =  150000;
+  result[IndigoFormalChargeKey(11,  4)] =  250000;
+  result[IndigoFormalChargeKey(11,  5)] =  350000;
+  result[IndigoFormalChargeKey(11,  6)] =  450000;
+  result[IndigoFormalChargeKey(11,  7)] =  550000;
+
+  // Potassium
+  result[IndigoFormalChargeKey(19, -1)] =  900000;
+  result[IndigoFormalChargeKey(19,  0)] =   50000;
+  result[IndigoFormalChargeKey(19,  1)] = -900000;
+  result[IndigoFormalChargeKey(19,  2)] =   50000;
+  result[IndigoFormalChargeKey(19,  3)] =  150000;
+  result[IndigoFormalChargeKey(19,  4)] =  250000;
+  result[IndigoFormalChargeKey(19,  5)] =  350000;
+  result[IndigoFormalChargeKey(19,  6)] =  450000;
+  result[IndigoFormalChargeKey(19,  7)] =  550000;
+
+  // Helium
+  result[IndigoFormalChargeKey( 2, -1)] =  200000;
+  result[IndigoFormalChargeKey( 2,  0)] =  -50000;
+  result[IndigoFormalChargeKey( 2,  1)] =   50000;
+  result[IndigoFormalChargeKey( 2,  2)] =  150000;
+  result[IndigoFormalChargeKey( 2,  3)] =  250000;
+  result[IndigoFormalChargeKey( 2,  4)] =  350000;
+  result[IndigoFormalChargeKey( 2,  5)] =  450000;
+  result[IndigoFormalChargeKey( 2,  6)] =  550000;
+  result[IndigoFormalChargeKey( 2,  7)] =  650000;
+
+  // Neon
+  result[IndigoFormalChargeKey(10, -1)] =  200000;
+  result[IndigoFormalChargeKey(10,  0)] =  -50000;
+  result[IndigoFormalChargeKey(10,  1)] =   50000;
+  result[IndigoFormalChargeKey(10,  2)] =  150000;
+  result[IndigoFormalChargeKey(10,  3)] =  250000;
+  result[IndigoFormalChargeKey(10,  4)] =  350000;
+  result[IndigoFormalChargeKey(10,  5)] =  450000;
+  result[IndigoFormalChargeKey(10,  6)] =  550000;
+  result[IndigoFormalChargeKey(10,  7)] =  650000;
+
+  // Argon
+  result[IndigoFormalChargeKey(18, -1)] =  200000;
+  result[IndigoFormalChargeKey(18,  0)] =  -50000;
+  result[IndigoFormalChargeKey(18,  1)] =   50000;
+  result[IndigoFormalChargeKey(18,  2)] =  150000;
+  result[IndigoFormalChargeKey(18,  3)] =  250000;
+  result[IndigoFormalChargeKey(18,  4)] =  350000;
+  result[IndigoFormalChargeKey(18,  5)] =  450000;
+  result[IndigoFormalChargeKey(18,  6)] =  550000;
+  result[IndigoFormalChargeKey(18,  7)] =  650000;
+
   return result;
 }
 
@@ -320,6 +386,14 @@ std::vector<int> indigoBondOrderScores() {
   // Phosphorus, triple bonds
   result[IndigoBondOrderKey(15, 15, 2)] =  -16750;
 
+  // Alkali metals and noble gases, single bonds (these are dummy values)
+  result[IndigoBondOrderKey( 3,  3, 1)] =       0;
+  result[IndigoBondOrderKey(11, 11, 1)] =       0;
+  result[IndigoBondOrderKey(19, 19, 1)] =       0;
+  result[IndigoBondOrderKey( 2,  2, 1)] =       0;
+  result[IndigoBondOrderKey(10, 10, 1)] =       0;
+  result[IndigoBondOrderKey(18, 18, 1)] =       0;
+  
   return result;
 }
 
@@ -406,110 +480,171 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
     case 35:
       fc_value = 3;
       break;
+    case 3:
+    case 11:
+    case 19:
+
+      // Alkali metals will have a formal charge of +1 outside of extreme circumstances
+      fc_value = 1;
+      break;
+    case 2:
+    case 10:
+    case 18:
+
+      // Noble gases will have a formal charge of 0 outside extremem circumstances
+      fc_value = 0;
+      break;
     default:
       {
         const char2 esymb = elemental_symbols[z_number];
-        rtErr("Element " + std::to_string(esymb.x) + std::to_string(esymb.y) + " is not covered "
+        rtErr("Element " + std::string(1, esymb.x) + std::string(1, esymb.y) + " is not covered "
               "by the Indigo scoring function.", "IndigoAtomCenter");
       }
     }
 
     // Shift the formal charge state to a number in the range [0, 16) with 8 being neutral
-    states.push_back(computeState(fc_value, bond_orders));
-    scores.push_back(computeScore(states[0], atom_scores, bond_scores));
+    if (bond_count == 0) {
+
+      // Monatomic ions or noble gases without any bonds to other atoms will be assigned their
+      // expected formal charges.
+      states.push_back(computeState(fc_value, std::vector<uint>(1, 1)));
+      scores.push_back(computeScore(states[0], atom_scores, bond_scores));
+    }
+    else {
+      states.push_back(computeState(fc_value, bond_orders));
+      scores.push_back(computeScore(states[0], atom_scores, bond_scores));
+    }
   }
   else {
 
-    // Deal with possible new states by incrementing each and every bond up to order 3.  Many of
-    // these attempts will fail right away because they make too many increments to the bond order,
-    // but they can be culled quickly.  This will take (3^bond_count) attempts, but that number is
-    // well bounded by chemical features of any atom.
-    std::vector<uint> trial_bond_orders(bond_count, 1);
-    const uint trial_limit = maximum_bond_order * bond_count;
-    uint trial_sum = sum<uint>(trial_bond_orders);
-    do {
+    // Shift the formal charge state to a number in the range [0, 16) with 8 being neutral
+    if (bond_count == 0) {
+
+      // Monatomic ions or noble gases without any bonds to other atoms will be assigned their
+      // expected formal charges.
+      int fc_value;
+      switch(z_number) {
+      case 3:
+      case 11:
+      case 19:
+        fc_value = 1;
+      case 9:
+      case 17:
+      case 35:
+        fc_value = -1;
+      default:
+        fc_value = 0;
+      }
+      states.push_back(computeState(fc_value, std::vector<uint>(1, 1)));
+      scores.push_back(computeScore(states[0], atom_scores, bond_scores));
+    }
+    else {
+
+      // Deal with possible new states by incrementing each and every bond up to order 3.  Many of
+      // these attempts will fail right away because they make too many increments to the bond
+      // order, but they can be culled quickly.  This will take (3^bond_count) attempts, but that
+      // number is well bounded by chemical features of any atom.
+      std::vector<uint> trial_bond_orders(bond_count, 1);
+      const uint trial_limit = maximum_bond_order * bond_count;
+      uint trial_sum = sum<uint>(trial_bond_orders);
+      do {
       
-      // Test the new state
-      const int free_pairs = (valence_electrons - (2 * static_cast<int>(trial_sum))) / 2;
-      if (free_pairs >= 0) {
-        int fc_value;
-        switch(z_number) {
-        case 1:
-          rtErr("Element H cannot have a non-neutral formal charge state, or anything other than "
-                "one single bond connecting it to other atoms.", "IndigoAtomCenter");
-          break;
-        case 6:
-          fc_value = -free_pairs;
-          break;
-        case 7:
-          fc_value = 1 - free_pairs;
-          break;
-        case 8:
-          fc_value = 2 - free_pairs;
-          break;
-        case 9:
-        case 17:
-        case 35:
-          fc_value = 3 - free_pairs;
-          break;
-        case 15:
-          if (bond_count >= 3) {
-
-            // The target valence electron population is ten
+        // Test the new state
+        const int free_pairs = (valence_electrons - (2 * static_cast<int>(trial_sum))) / 2;
+        if (free_pairs >= 0) {
+          int fc_value;
+          switch(z_number) {
+          case 1:
+            rtErr("Element H cannot have a non-neutral formal charge state, or anything other "
+                  "than one single bond connecting it to other atoms.", "IndigoAtomCenter");
+            break;
+          case 6:
             fc_value = -free_pairs;
-          }
-          else {
-
-            // The target valence electron population is eight
+            break;
+          case 7:
             fc_value = 1 - free_pairs;
-          }
-          break;
-        case 16:
-          if (bond_count >= 3) {
-
-            // The target valence electron population is twelve
-            fc_value = -free_pairs;
-          }
-          else {
-
-            // The target valence electron population is eight
+            break;
+          case 8:
             fc_value = 2 - free_pairs;
-          }
-          break;
-        default:
-          {
-            const char2 esymb = elemental_symbols[z_number];
-            rtErr("Element " + std::to_string(esymb.x) + std::to_string(esymb.y) + " is not "
-                  "covered by the Indigo scoring function.", "IndigoAtomCenter");
-          }
-        }
+            break;
+          case 9:
+          case 17:
+          case 35:
+            fc_value = 3 - free_pairs;
+            break;
+          case 15:
+            if (bond_count >= 3) {
 
-        // Compute the new state and add it (with its score) to the list if it is unique
-        const uint new_state = computeState(fc_value, trial_bond_orders);
-        bool not_found = true;
-        const size_t state_count = states.size();
-        for (size_t i = 0; i < state_count; i++) {
-          not_found = (not_found && new_state != states[i]);
-        }
-        if (not_found) {
-          states.push_back(new_state);
-          scores.push_back(computeScore(new_state, atom_scores, bond_scores));
-        }
-      }
-      
-      // Increment the vector of bond upgrades
-      trial_bond_orders[0] += 1;
-      for (int i = 0; i < bond_count; i++) {
-        if (trial_bond_orders[i] > maximum_bond_order) {
-          trial_bond_orders[i] = 1;
-          if (i < bond_count - 1) {
-            trial_bond_orders[i + 1] += 1;
+              // The target valence electron population is ten
+              fc_value = -free_pairs;
+            }
+            else {
+
+              // The target valence electron population is eight
+              fc_value = 1 - free_pairs;
+            }
+            break;
+          case 16:
+            if (bond_count >= 3) {
+
+              // The target valence electron population is twelve
+              fc_value = -free_pairs;
+            }
+            else {
+
+              // The target valence electron population is eight
+              fc_value = 2 - free_pairs;
+            }
+            break;
+          case 3:
+          case 11:
+          case 19:
+
+            // Alkali metals will have a formal charge of +1 outside of extreme circumstances
+            fc_value = 1;
+            break;
+          case 2:
+          case 10:
+          case 18:
+
+            // Noble gases will have a formal charge of 0 outside extremem circumstances
+            fc_value = 0;
+            break;
+          default:
+            {
+              const char2 esymb = elemental_symbols[z_number];
+              rtErr("Element " + std::string(1, esymb.x) + std::string(1, esymb.y) + " is not "
+                    "covered by the Indigo scoring function.", "IndigoAtomCenter");
+            }
+          }
+
+          // Compute the new state and add it (with its score) to the list if it is unique
+          const uint new_state = computeState(fc_value, trial_bond_orders);
+          bool not_found = true;
+          const size_t state_count = states.size();
+          for (size_t i = 0; i < state_count; i++) {
+            not_found = (not_found && new_state != states[i]);
+          }
+          if (not_found) {
+            states.push_back(new_state);
+            scores.push_back(computeScore(new_state, atom_scores, bond_scores));
           }
         }
-      }
-      trial_sum = sum<uint>(trial_bond_orders);
-    } while (trial_sum < trial_limit);
-    possible_states = states.size();
+      
+        // Increment the vector of bond upgrades
+        trial_bond_orders[0] += 1;
+        for (int i = 0; i < bond_count; i++) {
+          if (trial_bond_orders[i] > maximum_bond_order) {
+            trial_bond_orders[i] = 1;
+            if (i < bond_count - 1) {
+              trial_bond_orders[i + 1] += 1;
+            }
+          }
+        }
+        trial_sum = sum<uint>(trial_bond_orders);
+      } while (trial_sum < trial_limit);
+      possible_states = states.size();
+    }
   }
 }
 
@@ -1134,8 +1269,9 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     if (iznum == 0) {
       continue;
     }
-    if (iznum == 1  || iznum == 6  || iznum == 7  || iznum == 8  || iznum == 9  || iznum == 15  ||
-        iznum == 16 || iznum == 17 || iznum == 35) {
+    if (iznum ==  1 || iznum ==  2 || iznum ==  3 || iznum ==  6 || iznum ==  7 || iznum ==  8 ||
+        iznum ==  9 || iznum == 10 || iznum == 11 || iznum == 15 || iznum == 16 || iznum == 17 ||
+        iznum == 19 || iznum == 35) {
       ag_atom_idx_map[i] = j;
       real_atom_map.push_back(i);
 
@@ -1150,7 +1286,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       const char2 esymb = elemental_symbols[iznum];
       const int res_index = ag_pointer->getResidueIndex(i);
       const int res_number = ag_pointer->getResidueNumber(i);
-      rtErr("Element " + std::to_string(esymb.x) + std::to_string(esymb.y) + " is not coevered "
+      rtErr("Element " + std::string(1, esymb.x) + std::string(1, esymb.y) + " is not covered "
             "by the Indigo scoring function.  Atom " + char4ToString(ag_pointer->getAtomName(i)) +
             " in residue " + char4ToString(ag_pointer->getResidueName(res_index)) + " " +
             std::to_string(res_number) + " of topology " + ag_pointer->getFileName() +

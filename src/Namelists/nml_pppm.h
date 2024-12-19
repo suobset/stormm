@@ -18,6 +18,7 @@ using constants::ExceptionResponse;
 using energy::default_mesh_ticks;
 using energy::maximum_cell_width;
 using energy::NonbondedTheme;
+using energy::VdwSumMethod;
 using energy::PMIStrategy;
 using parse::TextFile;
 using parse::WrapTextSearch;
@@ -91,6 +92,9 @@ public:
   ///        contents of an object of this class.
   PMIStrategy getStrategy() const;
 
+  /// \brief Get the method for computing van-der Waals interactions between particles.
+  VdwSumMethod getVdwSummation() const;
+  
   /// \brief Set the non-bonded potential type.
   ///
   /// Overloaded:
@@ -134,6 +138,19 @@ public:
   void setStrategy(const std::string &strat_in);
   /// \}
 
+  /// \brief Set the strategy for evaluating the tails of van-der Waals (Lennard-Jones)
+  ///        interactions.
+  ///
+  /// Overloaded:
+  ///   - Provide a keyword that indicates some value of the enumerator
+  ///   - Provide a value of the enumerator itself
+  ///
+  /// \param vdw_method_in  The input determining how van-der Waals interactions will vanish
+  /// \{
+  void setVdwSummation(const std::string &vdw_method_in);
+  void setVdwSummation(const VdwSumMethod vdw_method_in);
+  /// \}
+
   /// \brief Apply the current strategy, to the extent possible, for filling in missing parameters
   ///        from the &pppm namelist in the interest of obtaining a particular level of accuracy.
   void applyStrategy();
@@ -165,7 +182,7 @@ private:
   double dsum_tol;           ///< The "direct sum tolerance", a measure of the ratio of the
                              ///<   difference in the interaction of two spherical Gaussian charges
                              ///<   and that of two point charges when separated by the cutoff.
-  double mesh_ticks;         ///< The number of particle-mesh interaction grid points spanning the
+  int mesh_ticks;            ///< The number of particle-mesh interaction grid points spanning the
                              ///<   spatial decomposition cell in all directions.  This is not
                              ///<   equivalent to nfft in Amber codes, the length of each size of
                              ///<   the particle-mesh interaction grid.  In STORMM, the density /
@@ -177,6 +194,9 @@ private:
                              ///<   can suggest settings for the number of mesh ticks, cutoff,
                              ///<   and direct sum tolerance as needed to fill in different
                              ///<   settings.
+  VdwSumMethod vdw_method;   ///< Define the way that van-der Waals interactions will vanish,
+                             ///<   whether by truncation, a smooth transition, or a decay over
+                             ///<   infinite space.
   
   /// Store a deep copy of the original namelist emulator as read from the input file.
   NamelistEmulator nml_transcript;

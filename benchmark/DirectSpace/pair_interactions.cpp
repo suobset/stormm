@@ -1045,7 +1045,7 @@ int main (const int argc, const char* argv[]) {
     const size_t aoff = host_psw.atom_starts[i];
     addRandomNoise(&xrs, &host_psw.xcrd[aoff], &host_psw.xcrd_ovrf[aoff], &host_psw.ycrd[aoff],
                    &host_psw.ycrd_ovrf[aoff], &host_psw.zcrd[aoff], &host_psw.zcrd_ovrf[aoff],
-                   host_psw.atom_counts[i], 0.01, host_psw.gpos_scale_f);
+                   host_psw.atom_counts[i], 0.01, host_psw.gpos_scale);
   }
   AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(std::vector<int>(n_replicas, 0));
   ScoreCard sc(poly_ps.getSystemCount(), 1, 32);

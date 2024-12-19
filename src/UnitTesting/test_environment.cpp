@@ -44,6 +44,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[], CommandLine
     files_created{},
     directories_created{},
     remove_files{true},
+    do_intensive_tests{true},
     snapshot_behavior{SnapshotOperation::COMPARE},
     display_time{false}
 {
@@ -68,6 +69,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[], CommandLine
   t_nml->addHelp("-snapshot", "Specify to rebuild snapshot files when remaking test cases");
   t_nml->addKeyword("-timings", NamelistType::BOOLEAN);
   t_nml->addHelp("-timings", "Request timings data from the tests");
+  t_nml->addKeyword("-intensive", NamelistType::BOOLEAN);
+  t_nml->addHelp("-intensive", "Trigger intensive unit tests for certain programs");
   if (clip != nullptr) {
     user_mods.coordinateWithPartner(clip);
   }
@@ -86,6 +89,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[], CommandLine
   bool cli_dir = (t_nml->getKeywordStatus("-tmpdir") == InputStatus::USER_SPECIFIED);
   bool cli_ohm = (t_nml->getKeywordStatus("-stormmhome") == InputStatus::USER_SPECIFIED);
   bool cli_osc = (t_nml->getKeywordStatus("-stormmsrc") == InputStatus::USER_SPECIFIED);
+  do_intensive_tests = t_nml->getBoolValue("-intensive");
   
   // Seek environment variables, if there are no command-line arguments to supersede them
   const char* vbs_char = std::getenv("STORMM_VERBOSE");
@@ -363,6 +367,11 @@ std::string TestEnvironment::getTemporaryDirectoryPath() const {
 //-------------------------------------------------------------------------------------------------
 bool TestEnvironment::getTemporaryDirectoryAccess() const {
   return tmpdir_writeable;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool TestEnvironment::doIntensiveTests() const {
+  return do_intensive_tests;
 }
 
 //-------------------------------------------------------------------------------------------------

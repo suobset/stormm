@@ -832,9 +832,41 @@ void extendTopologyList(std::vector<AtomGraph> *list, const std::string &fname,
 ///        cache.  This will also check the cache for consistent boundary conditions on all
 ///        systems.
 ///
-/// \param sc  The cache of systems built from user input
+/// Overloaded:
+///   - Assume that the synthesis is a straight listing of all systems in the cache, and build the
+//      masks appropriately
+///   - Provide a listing of systems in the cache for which to compose the synthesis of masks.
+///     Indices of cached systems may be specified repeatedly, allowing for the function to produce
+///     an exclusion mask object for arbitrary numbers of replicas of any or all systems in the
+///     cache
+///   - Provide a coordinate or topology synthesis for which to develop exclusion masks
+/// 
+/// \param sc                     The cache of systems built from user input
+/// \param cached_system_indices  List of system indices within the cache from which to build the
+///                               static mask synthesis.  This permits the function to tailor masks
+///                               to an arbitrary synthesis built from the system cache.
+/// \param poly_ps                The coordinate synthesis for which to develop masks.  Topologies
+///                               referenced by this synthesis must be present in the system cache
+///                               sc.
+/// \{
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const std::vector<int> &cached_system_indices);
+
 StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc);
-  
+
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const PhaseSpaceSynthesis *poly_ps);
+
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const PhaseSpaceSynthesis &poly_ps);
+
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const AtomGraphSynthesis *poly_ps);
+
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const AtomGraphSynthesis &poly_ps);
+/// \}
+
 } // namespace synthesis
 } // namespace stormm
 

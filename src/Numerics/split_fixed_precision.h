@@ -352,7 +352,15 @@ void hostInt95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
                        const Hybrid<int> &overflow_x, const Hybrid<llint> &primary_y,
                        const Hybrid<int> &overflow_y, const Hybrid<llint> &primary_z,
                        const Hybrid<int> &overflow_z, double descale = 1.0);
+
+double hostSplitFPToReal(const int95_t isfp);
+
+float hostSplitFPToReal(const int2 isfp);
 /// \}
+
+double hostSplitFPToReal(const int95_t isfp);
+
+float hostSplitFPToReal(const int2 isfp);
 
 /// \brief Accumulate floating point numbers into fixed-precision representations with two
 ///        integers.
@@ -386,6 +394,7 @@ void hostSplitAccumulation(const double fval, llint *primary, int *overflow);
 /// Overloaded:
 ///   - Accumulate int95_t with its various components
 ///   - Accumulate int63_t (int2) with its various components
+///   - Return the sum of a + b or modify a with result of a + b
 ///
 /// \param a      The first of the two value pairs
 /// \param b      The second of the two value pairs
@@ -407,6 +416,10 @@ int2 hostSplitFPSum(const int2 a, float breal);
 int95_t hostSplitFPSum(const int95_t a, llint b_x, int b_y);
 
 int2 hostSplitFPSum(const int2 a, int b_x, int b_y);
+
+template <typename T> void hostSplitFPSum(T *a_x, int *a_y, const int95_t b);
+
+template <typename T> void hostSplitFPSum(T *a_x, int *a_y, const int2 b);
 
 int95_t hostInt95Sum(llint a_x, int a_y, llint b_x, int b_y);
 
@@ -433,6 +446,10 @@ int2 hostSplitFPSubtract(const int2 a, float breal);
 int95_t hostSplitFPSubtract(const int95_t a, llint b_x, int b_y);
 
 int2 hostSplitFPSubtract(const int2 a, int b_x, int b_y);
+
+template <typename T> void hostSplitFPSubtract(T *a_x, int *a_y, const int95_t b);
+
+template <typename T> void hostSplitFPSubtract(T *a_x, int *a_y, const int2 b);
 
 int95_t hostInt95Subtract(llint a_x, int a_y, llint b_x, int b_y);
 
@@ -527,9 +544,20 @@ void fixedPrecisionGrid(Hybrid<llint> *primary, Hybrid<int> *overflow, const int
 void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
                         const int95_t increment, const size_t grid_size);
 /// \}
-  
+
+/// \brief Overload the addition and subtraction operators, plus the compounded assignment
+///        operators.
+/// \{
+int95_t operator+=(const int95_t lhs, const int95_t rhs);
+int95_t operator-=(const int95_t lhs, const int95_t rhs);
+int95_t operator+(const int95_t lhs, const int95_t rhs);
+int95_t operator-(const int95_t lhs, const int95_t rhs);
+/// \}
+
 } // namespace numerics
 } // namespace stormm
+
+#include "split_fixed_precision.tpp"
 
 // Make basic arithmetic functions native to the stormm namespace
 namespace stormm {
@@ -541,10 +569,15 @@ namespace stormm {
   using numerics::hostSplitAccumulation;
   using numerics::hostSplitFPSubtract;
   using numerics::hostSplitFPSum;
+  using numerics::hostSplitFPToReal;
   using numerics::hostInt95Subtract;
   using numerics::hostInt95Sum;
   using numerics::hostInt63Subtract;
   using numerics::hostInt63Sum;
+  using numerics::operator+=;
+  using numerics::operator-=;
+  using numerics::operator+;
+  using numerics::operator-;
   using numerics::max_int_accumulation;
   using numerics::max_int_accumulation_f;
   using numerics::max_int_accumulation_ll;

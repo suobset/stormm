@@ -494,7 +494,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       }      
     }
   } while (name_collision);
-
+  
   // Loop back over the systems (now representing all entries, including the paired free topologies
   // and coordinate sets).  If the topology has already been read, don't read it again.  Read
   // coordinates (and perhaps velocities, if available) into phase space objects.
@@ -678,7 +678,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       }
     }
   }
-  
+    
   // Collect examples of all systems, taking the first system in the list to use each topology
   // as the example of coordinates for that topology.
   topology_count = topology_cache.size();
@@ -689,7 +689,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       example_indices[top_idx] = i;
     }
   }
-
+  
   // Make a list of all the systems making use of each topology, plus a bounds list to navigate it
   topology_cases.resize(system_count);
   topology_case_bounds.resize(topology_count + 1, 0);
@@ -1966,7 +1966,8 @@ void extendTopologyList(std::vector<AtomGraph> *list, const std::string &fname,
 }
 
 //-------------------------------------------------------------------------------------------------
-StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc) {
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const std::vector<int> &cached_system_indices) {
 
   // Loop over all unique topologies in the cache.  Check for isolated boundary conditions.
   const int ntop = sc.getTopologyCount();
@@ -1984,7 +1985,7 @@ StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc) {
     }
   }
   if (has_isolated_bc && has_periodic_bc == false) {
-    const int nsys = sc.getSystemCount();
+    const int nsys = cached_system_indices.size();
     std::vector<StaticExclusionMask*> sev(ntop);
     std::vector<int> tp_idx(nsys);
     for (int i = 0; i < sc.getTopologyCount(); i++) {
@@ -2003,10 +2004,59 @@ StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc) {
           "simulations.", "createMaskSynthesis");
   }
   else {
+
+    // Create an empty exclusion mask synthesis and return this instead.
     StaticExclusionMaskSynthesis result;
     return result;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc) {
+  const std::vector<int> system_indices = incrementingSeries(0, sc.getSystemCount());
+  return createMaskSynthesis(sc, system_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const PhaseSpaceSynthesis *poly_ps) {
+  const int nsys = poly_ps->getSystemCount();
+  const int ntop = sc.getTopologyCount();
+  std::vector<int> system_indices(nsys);
+  for (int i = 0; i < nsys; i++) {
+    
+    // Find an example system from the cache that uses the topology.  The topology index will be
+    // immediately recovered from the system index in the call to the function's overloaded variant
+    // below, but this permits other developers to supply indices referencing systems as opposed to
+    // the more cryptic list of unique topologies that find their way into the system cache.
+    system_indices[i] = sc.getFirstMatchingSystemIndex(poly_ps->getSystemTopologyPointer(i));
+  }
+  return createMaskSynthesis(sc, system_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const PhaseSpaceSynthesis &poly_ps) {
+  return createMaskSynthesis(sc, poly_ps.getSelfPointer());
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const AtomGraphSynthesis *poly_ag) {
+  const int nsys = poly_ag->getSystemCount();
+  const int ntop = sc.getTopologyCount();
+  std::vector<int> system_indices(nsys);
+  for (int i = 0; i < nsys; i++) {
+    system_indices[i] = sc.getFirstMatchingSystemIndex(poly_ag->getSystemTopologyPointer(i));
+  }
+  return createMaskSynthesis(sc, system_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis createMaskSynthesis(const SystemCache &sc,
+                                                 const AtomGraphSynthesis &poly_ag) {
+  return createMaskSynthesis(sc, poly_ag.getSelfPointer());
 }
 
 } // namespace synthesis

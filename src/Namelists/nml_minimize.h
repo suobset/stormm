@@ -5,12 +5,15 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
+#include "Potential/energy_enumerators.h"
 #include "input.h"
+#include "namelist_common.h"
 #include "namelist_emulator.h"
 
 namespace stormm {
 namespace namelist {
 
+using energy::VdwSumMethod;
 using parse::WrapTextSearch;
 
 /// \brief Default values for energy minimization
@@ -84,6 +87,9 @@ public:
   
   /// \brief Get the Lennard-Jones cutoff.
   double getLennardJonesCutoff() const;
+
+  /// \brief Get the manner in which the van-der Waals (Lennard-Jones) function vanishes.
+  VdwSumMethod getVdwSummation() const;
   
   /// \brief Get the initial step length.
   double getInitialStep() const;
@@ -142,6 +148,19 @@ public:
   
   /// \brief Set the Lennard-Jones cutoff
   void setLennardJonesCutoff(double cutoff_in);
+
+  /// \brief Set the strategy for evaluating the tails of van-der Waals (Lennard-Jones)
+  ///        interactions.
+  ///
+  /// Overloaded:
+  ///   - Provide a keyword that indicates some value of the enumerator
+  ///   - Provide a value of the enumerator itself
+  ///
+  /// \param vdw_method_in  The input determining how van-der Waals interactions will vanish
+  /// \{
+  void setVdwSummation(const std::string &vdw_method_in);
+  void setVdwSummation(const VdwSumMethod vdw_method_in);
+  /// \}
   
   /// \brief Set the initial step length.
   ///
@@ -183,6 +202,8 @@ private:
                                   ///<   all gas-phase Coulombic electrostatics in a non-periodic
                                   ///<   system.  Units of Angstroms (A).
   double lennard_jones_cutoff;    ///< Cutoff for van-der Waals interactions, in Angstroms (A).
+  VdwSumMethod lj_style;          ///< Manner in which Lennard-Jones (van-der Waals) interactions
+                                  ///<   will vanish at the cutoff
   double initial_step;            ///< Magnitude of the initial displacement along the gradient
                                   ///<   vector.  The size of subsequent moves will grow or shrink
                                   ///<   based on the history of success in previous optimizations.
@@ -217,12 +238,6 @@ private:
   ///
   /// \param directive  The command given for whether to write a checkpoint file
   void validateCheckpointProduction(const std::string &directive) const;
-  
-  /// \brief Validate the electrostatic cutoff.
-  void validateElectrostaticCutoff();
-
-  /// \brief Validate the Lennard-Jones cutoff.
-  void validateLennardJonesCutoff();
   
   /// \brief Validate the initial step size.
   void validateInitialStep();

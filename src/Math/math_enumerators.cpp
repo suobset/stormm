@@ -157,6 +157,21 @@ std::string getEnumerationName(const HilbertCurveMode input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const SpherePlacement input) {
+  switch (input) {
+  case SpherePlacement::POLYHEDRON:
+    return std::string("POLYHEDRON");
+  case SpherePlacement::AREA_FIBONACCI:
+    return std::string("AREA_FIBONACCI");
+  case SpherePlacement::DIST_FIBONACCI:
+    return std::string("DIST_FIBONACCI");
+  case SpherePlacement::DESERNO:
+    return std::string("DESERNO");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 FFTMode translateFFTMode(const std::string &input) {
   if (strcmpCased(input, std::string("in_place"), CaseSensitivity::NO) ||
       strcmpCased(input, std::string("in-place"), CaseSensitivity::NO) ||

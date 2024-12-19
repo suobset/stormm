@@ -25,6 +25,7 @@ using energy::CellGrid;
 using energy::CellGridReader;
 using numerics::force_scale_nonoverflow_bits;
 using numerics::velocity_scale_nonoverflow_bits;
+using numerics::globalpos_scale_nonoverflow_bits;
 using symbols::boltzmann_constant;
 using symbols::boltzmann_constant_f;
 using symbols::kcal_to_gafs;

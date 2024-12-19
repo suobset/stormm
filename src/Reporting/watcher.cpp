@@ -315,7 +315,7 @@ std::vector<int> Watcher::getLargeForceSteps(const HybridTargetLevel tier) const
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<IntegrationStage> Watcher::getLargeForceStages(const HybridTargetLevel tier) const {
+std::vector<DynamicsStepStage> Watcher::getLargeForceStages(const HybridTargetLevel tier) const {
   const int count = getLargeForceCount(tier);
   std::vector<int> ires;
   switch (tier) {
@@ -328,9 +328,9 @@ std::vector<IntegrationStage> Watcher::getLargeForceStages(const HybridTargetLev
     break;
 #endif
   }
-  std::vector<IntegrationStage> result(count);
+  std::vector<DynamicsStepStage> result(count);
   for (int i = 0; i < count; i++) {
-    result[i] = static_cast<IntegrationStage>(ires[i]);
+    result[i] = static_cast<DynamicsStepStage>(ires[i]);
   }
   return result;
 }
@@ -382,7 +382,7 @@ std::vector<int> Watcher::getHighSpeedSteps(const HybridTargetLevel tier) const 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<IntegrationStage> Watcher::getHighSpeedStages(const HybridTargetLevel tier) const {
+std::vector<DynamicsStepStage> Watcher::getHighSpeedStages(const HybridTargetLevel tier) const {
   const int count = getHighSpeedCount(tier);
   std::vector<int> ires;
   switch (tier) {
@@ -395,9 +395,9 @@ std::vector<IntegrationStage> Watcher::getHighSpeedStages(const HybridTargetLeve
     break;
 #endif
   }
-  std::vector<IntegrationStage> result(count);
+  std::vector<DynamicsStepStage> result(count);
   for (int i = 0; i < count; i++) {
-    result[i] = static_cast<IntegrationStage>(ires[i]);
+    result[i] = static_cast<DynamicsStepStage>(ires[i]);
   }
   return result;
 }

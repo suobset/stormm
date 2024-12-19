@@ -70,11 +70,59 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
 /// \param kwidth              Indication of the desired thread block size in the kernel
 /// \{
 #ifdef STORMM_USE_CUDA
-cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
-                                                  EvaluateEnergy eval_nrg,
-                                                  AccumulationMethod acc_meth, VwuGoal purpose,
-                                                  ClashResponse collision_handling,
-                                                  ValenceKernelSize kwidth);
+cudaFuncAttributes
+queryValenceKernelRequirementsXL(EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                 AccumulationMethod acc_meth, VwuGoal purpose,
+                                 ClashResponse collision_handling);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsLG(EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                 AccumulationMethod acc_meth, VwuGoal purpose,
+                                 ClashResponse collision_handling);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsMD(EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                 AccumulationMethod acc_meth, VwuGoal purpose,
+                                 ClashResponse collision_handling);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsSM(EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                 AccumulationMethod acc_meth, VwuGoal purpose,
+                                 ClashResponse collision_handling);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsD(EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                VwuGoal purpose, ClashResponse collision_handling);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsFPME(EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                                   ClashResponse collision_handling, PrecisionModel neighbor_prec);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsFPMEDual(EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                                       ClashResponse collision_handling,
+                                       PrecisionModel neighbor_prec);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsDPME(EvaluateEnergy eval_nrg, ClashResponse collision_handling,
+                                   PrecisionModel neighbor_prec);
+
+cudaFuncAttributes
+queryValenceKernelRequirementsDPMEDual(EvaluateEnergy eval_nrg, ClashResponse collision_handling,
+                                       PrecisionModel neighbor_prec);
+
+cudaFuncAttributes
+queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
+                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                               VwuGoal purpose, ClashResponse collision_handling,
+                               ValenceKernelSize kwidth, bool pme_compatible = false,
+                               PrecisionModel neighbor_prec = PrecisionModel::SINGLE,
+                               NeighborListKind neighbor_layout = NeighborListKind::MONO);
+
+cudaFuncAttributes
+queryPmeValenceKernelRequirements(PrecisionModel prec, PrecisionModel neighbor_prec,
+                                  EvaluateForce eval_frc, EvaluateEnergy eval_nrg,
+                                  AccumulationMethod acc_meth, ClashResponse clash_handling);
 #endif
 /// \}
 
@@ -124,6 +172,42 @@ void launchValence(const SyValenceKit<double> &poly_vk,
                    CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt,
                    double clash_distance = 0.0, double clash_ratio = 0.0);
+
+void launchValenceXL(const SyValenceKit<float> &poly_vk,
+                     const SyRestraintKit<float, float2, float4> &poly_rk,
+                     MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                     const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                     ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                     const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValenceLG(const SyValenceKit<float> &poly_vk,
+                     const SyRestraintKit<float, float2, float4> &poly_rk,
+                     MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                     const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                     ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                     const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValenceMD(const SyValenceKit<float> &poly_vk,
+                     const SyRestraintKit<float, float2, float4> &poly_rk,
+                     MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                     const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                     ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                     const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
+
+void launchValenceSM(const SyValenceKit<float> &poly_vk,
+                     const SyRestraintKit<float, float2, float4> &poly_rk,
+                     MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                     const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                     ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                     const int2 bt, float clash_distance = 0.0, float clash_ratio = 0.0);
 
 void launchValence(const SyValenceKit<float> &poly_vk,
                    const SyRestraintKit<float, float2, float4> &poly_rk,
@@ -187,8 +271,8 @@ void launchValence(const SyValenceKit<double> &poly_vk,
 
 void launchValence(const SyValenceKit<double> &poly_vk,
                    const SyRestraintKit<double, double2, double4> &poly_rk,
-                   const CellGridReader<float, llint, float, float4> &cgr_qq,
-                   const CellGridReader<float, llint, float, float4> &cgr_lj,
+                   const CellGridReader<float, int, float, float4> &cgr_qq,
+                   const CellGridReader<float, int, float, float4> &cgr_lj,
                    MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
                    const SyAtomUpdateKit<double, double2, double4> &poly_auk,
                    ThermostatWriter<double> *tstw, ScoreCardWriter *scw,

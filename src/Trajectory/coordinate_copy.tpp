@@ -404,7 +404,9 @@ void coordCopy(CoordinateSeries<T> *destination, const int frame_dest,
     switch (origin_tier) {
     case HybridTargetLevel::HOST:
       destination->importFrame(origin, frame_dest);
-      break;
+
+      // Return immediately after completing the host-to-host copy
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -651,7 +653,9 @@ void coordCopy(CoordinateSeriesWriter<Tdest> *destination, const size_t frame_de
                                       &origin.xcrd[orig_atom_start], &origin.ycrd[orig_atom_start],
                                       &origin.zcrd[orig_atom_start], origin.gpos_scale,
                                       origin.natom);
-      break;
+
+      // Return immediately after competing the host-to-host copy
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -777,7 +781,9 @@ void coordCopy(CoordinateSeriesWriter<T> *destination, const size_t frame_dest,
                           origin.frc_scale, natom);
         break;
       }
-      break;
+
+      // Return immediately after completing the host-to-host copy
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -1101,7 +1107,9 @@ void coordCopy(PsSynthesisWriter *destination, const int dest_atom_start, const 
                           origin.gpos_scale, origin.natom);
         break;
       }
-      break;
+
+      // Return immediately after completing the host-to-host copy
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;
@@ -1272,7 +1280,9 @@ void coordCopy(CondensateWriter *destination, const size_t dest_atom_start, cons
                           origin.gpos_scale, origin.natom);
         break;
       }
-      break;
+
+      // Return immediately after completing the host-to-host copy
+      return;
 #ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       break;

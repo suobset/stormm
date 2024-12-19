@@ -1,4 +1,5 @@
 #include <vector>
+#include "copyright.h"
 #  include "../../../src/Accelerator/gpu_details.h"
 #ifdef STORMM_USE_HPC
 #  include "../../../src/Accelerator/core_kernel_manager.h"
@@ -10,16 +11,21 @@
 #  include "../../../src/MolecularMechanics/minimization.h"
 #endif
 #include "../../../src/Chemistry/chemistry_enumerators.h"
+#include "../../../src/DataTypes/common_types.h"
+#include "../../../src/DataTypes/stormm_vector_types.h"
 #include "../../../src/Math/vector_ops.h"
 #include "../../../src/MolecularMechanics/minimization.h"
 #include "../../../src/Namelists/input_transcript.h"
 #include "../../../src/Namelists/nml_dynamics.h"
 #include "../../../src/Namelists/nml_minimize.h"
+#include "../../../src/Namelists/nml_pppm.h"
 #include "../../../src/Namelists/nml_precision.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_remd.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Potential/energy_enumerators.h"
+#include "../../../src/Potential/local_exclusionmask.h"
+#include "../../../src/Potential/static_exclusionmask.h"
 #include "../../../src/Reporting/error_format.h"
 #include "../../../src/Reporting/help_messages.h"
 #include "../../../src/Reporting/present_energy.h"
@@ -38,6 +44,7 @@
 
 using namespace stormm::card;
 using namespace stormm::chemistry;
+using namespace stormm::data_types;
 using namespace stormm::display;
 using namespace stormm::energy;
 using namespace stormm::mm;
@@ -85,10 +92,9 @@ int main(int argc, const char* argv[]) {
   // Parse the command line
   CommandLineParser clip("dynamics.stormm", "The principal molecular dynamics engine in STORMM.");
   clip.addStandardApplicationInputs();
-  const std::vector<std::string> my_namelists = {
-    "&files", "&dynamics", "&remd", "&restraint", "&solvent", "&random", "&minimize", "&report",
-    "&precision"
-  };
+  const std::vector<std::string> my_namelists = { "&files", "&minimize", "&dynamics", "&remd",
+                                                  "&restraint", "&solvent", "&random", "&report",
+                                                  "&precision" };
   clip.addControlBlocks(my_namelists);
   if (displayNamelistHelp(argc, argv, my_namelists) && clip.doesProgramExitOnHelp()) {
     return 0;
@@ -106,22 +112,40 @@ int main(int argc, const char* argv[]) {
   // Prepare a synthesis of systems from the user input.
   const std::vector<AtomGraph*> agv = sc.getTopologyPointer();
 
+  // Preview the implicit solvent model.
+  NeckGeneralizedBornTable ngb_tab;
+  if (ui.getSolventPresence()) {
+    const SolventControls& isvcon = ui.getSolventNamelistInfo();
+    for (int i = 0; i < sc.getTopologyCount(); i++) {
+      AtomGraph *ag = sc.getTopologyPointer(i);
+      ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
+    }
+  }
+
   // Create the synthesis of systems, including exclusion masks and non-bonded work units as
   // necessary.
-  const int system_count = sc.getSystemCount();
+  int system_count = sc.getSystemCount();
   const PrecisionControls& preccon = ui.getPrecisionNamelistInfo();
   const DynamicsControls& dyncon = ui.getDynamicsNamelistInfo();
+  const PPPMControls& pmecon = ui.getPPPMNamelistInfo();
   const ThermostatKind tstat_choice = dyncon.getThermostatKind();
   PhaseSpaceSynthesis poly_ps = sc.exportCoordinateSynthesis(preccon.getGlobalPosScalingBits(),
                                                              preccon.getVelocityScalingBits(),
                                                              preccon.getForceScalingBits());
   AtomGraphSynthesis poly_ag = sc.exportTopologySynthesis(gpu, ui.getExceptionBehavior());
-  StaticExclusionMaskSynthesis poly_se = createMaskSynthesis(sc);
-  SynthesisCacheMap scmap(incrementingSeries(0, poly_ps.getSystemCount()), &sc, &poly_ag,
+  if (ui.getSolventPresence()) {
+    const SolventControls& isvcon = ui.getSolventNamelistInfo();
+    poly_ag.setImplicitSolventModel(isvcon.getImplicitSolventModel(), ngb_tab,
+                                    isvcon.getPBRadiiSet(), isvcon.getExternalDielectric(),
+                                    isvcon.getSaltConcentration(), ui.getExceptionBehavior());
+  }
+  StaticExclusionMaskSynthesis poly_se = createMaskSynthesis(sc, poly_ag);
+  LocalExclusionMask lem(poly_ag);
+  SynthesisCacheMap scmap(incrementingSeries(0, poly_ag.getSystemCount()), &sc, &poly_ag,
                           &poly_ps);
 
   // Initialization of trajectories for a given REMD process. 
-  if(ui.getRemdPresence()) {
+  if (ui.getRemdPresence()) {
     RemdControls remdcon = ui.getRemdNamelistInfo();
     int total_swap_count = remdcon.getTotalSwapCount();
     std::string remd_type = remdcon.getRemdType();
@@ -133,17 +157,13 @@ int main(int argc, const char* argv[]) {
     int max_replicas = remdcon.getMaxReplicas();
     double low_temperature = remdcon.getLowTemperature();
     double high_temperature = remdcon.getHighTemperature();
-
     ExchangeNexus remd_a( system_count, total_swap_count, remd_type, frequency_swaps_count,
                           swap_storage, temp_distribution, exchange_probability, tolerance,
                           max_replicas, low_temperature, high_temperature);
 
     remd_a.setAtomGraphSynthesis(&poly_ag);
-    
     std::vector<double> t_replicas = remd_a.getTempDistribution();
-
     std::vector<int> remd_top(t_replicas.size());
-
     for(int i = 0; i < remd_top.size(); ++i){
       remd_top[i] = 0;
     }
@@ -153,12 +173,6 @@ int main(int argc, const char* argv[]) {
   // Set the progress bar to system_count
   ProgressBar progress_bar;
   progress_bar.initialize(system_count);
-  // Preview the implicit solvent model.
-  const SolventControls& isvcon = ui.getSolventNamelistInfo();
-  NeckGeneralizedBornTable ngb_tab;
-  poly_ag.setImplicitSolventModel(isvcon.getImplicitSolventModel(), ngb_tab,
-                                  isvcon.getPBRadiiSet(), isvcon.getExternalDielectric(),
-                                  isvcon.getSaltConcentration(), ui.getExceptionBehavior());
   timer.assignTime(gen_setup_tm);
 
   // Perform minimizations as requested.
@@ -172,6 +186,7 @@ int main(int argc, const char* argv[]) {
         // implicit solvent models.  However, the non-bonded work units for minimizations in such
         // a case are not the same as those for dynamics.
         InitializationTask ism_prep;
+        const SolventControls& isvcon = ui.getSolventNamelistInfo();
         switch (isvcon.getImplicitSolventModel()) {
         case ImplicitSolventModel::NONE:
           ism_prep = InitializationTask::GENERAL_MINIMIZATION;
@@ -189,8 +204,7 @@ int main(int argc, const char* argv[]) {
       break;
     case UnitCellType::ORTHORHOMBIC:
     case UnitCellType::TRICLINIC:
-      rtErr("Minimization and dynamics are not yet operational for periodic boundary conditions.",
-            "main");
+      rtErr("Minimization is not yet operational for periodic boundary conditions.", "main");
     }
 
     // Upload data to prepare for energy minimizations
@@ -214,28 +228,32 @@ int main(int argc, const char* argv[]) {
 #else
     std::vector<ScoreCard> all_mme;
     all_mme.reserve(system_count);
+
     // Print out the stage for progress bar, reset bar
     std::cout << "Minimization" << std::endl;
     progress_bar.reset();
-    for (int i = 0; i < system_count; i++) {
-      progress_bar.update(); // Update progress bar.
-      PhaseSpace ps = poly_ps.exportSystem(i);
-      AtomGraph *ag = sc.getSystemTopologyPointer(i);
-      ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
-      const RestraintApparatus& ra = sc.getRestraints(i);
-      switch(ps.getUnitCellType()) {
-      case UnitCellType::NONE:
+
+    switch (poly_ps.getUnitCellType()) {
+    case UnitCellType::NONE:
+    
+      // Loop over all systems 
+      for (int i = 0; i < system_count; i++) {
+        progress_bar.update();
+        const int icache_top = scmap.getTopologyCacheIndex(i);
+        PhaseSpace ps = poly_ps.exportSystem(i);
+        AtomGraph *ag = sc.getTopologyPointer(icache_top);
+        const RestraintApparatus& ra = sc.getRestraints(i);
         all_mme.emplace_back(minimize(&ps, *ag, ra, sc.getSystemStaticMask(i), mincon));
-        timer.assignTime(min_run_tm);
-        break;
-      case UnitCellType::ORTHORHOMBIC:
-      case UnitCellType::TRICLINIC:
-        rtErr("Minimization and dynamics are not yet operational for periodic boundary "
-              "conditions.", "main");
+        poly_ps.importSystem(ps, i);
       }
-      poly_ps.importSystem(ps, i);
+      timer.assignTime(min_run_tm);
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      rtErr("Minimization is not yet operational for periodic boundary conditions.", "main");
     }
-    // After end of loop, endl for the rest of the program to print correctly
+    
+    // Terminate the progress bar's line for the rest of the program to print correctly
     std::cout << std::endl;
 #endif
     // Print restart files from energy minimization
@@ -259,6 +277,25 @@ int main(int argc, const char* argv[]) {
   Thermostat tst(poly_ag, mod_dyncon, sc, incrementingSeries(0, sc.getSystemCount()), gpu);
   velocityKickStart(&poly_ps, poly_ag, &tst, mod_dyncon, preccon.getValenceMethod(),
                     EnforceExactTemperature::YES);
+#ifndef STORMM_USE_HPC
+  // In order to perform CPU-based dynamics on systems in implicit solvent, thermostats
+  // must be created for each system and persist throughout the entire simulation.  If
+  // thermostats are created anew for each epoch of the replica exchange, they would need
+  // to be initiated with different random seeds each time.  The most efficient way is to
+  // create these thermostats once and let them keep charging forward.
+  std::vector<Thermostat> tst_vec;
+  tst_vec.reserve(system_count);
+  for (int i = 0; i < system_count; i++) {
+    const AtomGraph* ag = poly_ps.getSystemTopologyPointer(i);
+    tst_vec.emplace_back(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
+                         dyncon.getThermostatEvolutionStart(),
+                         dyncon.getThermostatEvolutionEnd(), PrecisionModel::SINGLE,
+                         dyncon.getThermostatSeed() + i);
+    tst_vec.back().setGeometryConstraints(dyncon.constrainGeometry());
+    tst_vec.back().setRattleTolerance(dyncon.getRattleTolerance());
+    tst_vec.back().setRattleIterations(dyncon.getRattleIterations());
+  }
+#endif
   
   // Run dynamics
   if (ui.getDynamicsPresence()) {
@@ -271,6 +308,7 @@ int main(int argc, const char* argv[]) {
         // implicit solvent models.  However, the non-bonded work units for minimizations in such
         // a case are not the same as those for dynamics.
         InitializationTask ism_prep;
+        const SolventControls& isvcon = ui.getSolventNamelistInfo();
         switch (isvcon.getImplicitSolventModel()) {
         case ImplicitSolventModel::NONE:
           switch (dyncon.getThermostatKind()) {
@@ -337,17 +375,17 @@ int main(int argc, const char* argv[]) {
     const int ntpr  = dyncon.getDiagnosticPrintFrequency();
     ScoreCard edyn(system_count, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
     if (ui.getRemdPresence()) {
-      RemdControls remdcon = ui.getRemdNamelistInfo();
-      int total_swap_count = remdcon.getTotalSwapCount();
-      std::string remd_type = remdcon.getRemdType();
-      int nstep = remdcon.getFrequencyOfSwaps();
-      std::string swap_storage = remdcon.getSwapStore();
-      std::string temp_distribution = remdcon.getTemperatureDistributionMethod();
-      double exchange_probability = remdcon.getExchangeProbability();
-      double tolerance = remdcon.getTolerance();
-      int max_replicas = remdcon.getMaxReplicas();
-      double low_temperature = remdcon.getLowTemperature();
-      double high_temperature = remdcon.getHighTemperature();
+      const RemdControls& remdcon = ui.getRemdNamelistInfo();
+      const int total_swap_count = remdcon.getTotalSwapCount();
+      const std::string remd_type = remdcon.getRemdType();
+      const int nstep = remdcon.getFrequencyOfSwaps();
+      const std::string swap_storage = remdcon.getSwapStore();
+      const std::string temp_distribution = remdcon.getTemperatureDistributionMethod();
+      const double exchange_probability = remdcon.getExchangeProbability();
+      const double tolerance = remdcon.getTolerance();
+      const int max_replicas = remdcon.getMaxReplicas();
+      const double low_temperature = remdcon.getLowTemperature();
+      const double high_temperature = remdcon.getHighTemperature();
       const int ntpr = dyncon.getDiagnosticPrintFrequency();
 
       ExchangeNexus remd_a(system_count, total_swap_count, remd_type, nstep,
@@ -358,58 +396,54 @@ int main(int argc, const char* argv[]) {
       edyn = ScoreCard(system_count, ((nstep + ntpr - 1) / ntpr) + 1,
                        preccon.getEnergyScalingBits());
 
-      bool flag = false;
       // Initialize progress bars for REMD
       ProgressBar remd_progress;
       remd_progress.initialize(remdcon.getTotalSwapCount());
       progress_bar.reset();
       progress_bar.setIterations(system_count);
-
       std::cout << "Starting REMD process..." << std::endl;
+      
+      // As elsewhere, branch based on the type of boundary conditions
+      switch (poly_ps.getUnitCellType()) {
+      case UnitCellType::NONE:
+        {
+          // REMD outer loop for swap attempts
+          for (int epoch = 0; epoch < remdcon.getTotalSwapCount(); epoch++) {
 
-      // REMD outer loop for swap attempts
-      for (int x = 0; x < remdcon.getTotalSwapCount(); ++x) {
-        remd_progress.update(); // Update REMD progress bar
+            // Update REMD progress bar
+            remd_progress.update();
 
-        // Inner loop over each system replica
-        for (int i = 0; i < system_count; i++) {
-          // Update progress bar for dynamics within each replica
-          progress_bar.update();
+            // Inner loop over each system replica
+            for (int i = 0; i < system_count; i++) {
 
-          // Export system state
-          PhaseSpace ps = poly_ps.exportSystem(i);
-          AtomGraph* ag = sc.getSystemTopologyPointer(i);
-          Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
-                          dyncon.getThermostatEvolutionStart(),
-                          dyncon.getThermostatEvolutionEnd());
-          itst.setGeometryConstraints(dyncon.constrainGeometry());
-          itst.setRattleTolerance(dyncon.getRattleTolerance());
-          itst.setRattleIterations(dyncon.getRattleIterations());
+              // The topology index which the system is based on must be obtained from the
+              // synthesis cache map.
+              const int icache_top = scmap.getTopologyCacheIndex(i);
+              
+              // Update progress bar for dynamics within each replica
+              progress_bar.update();
 
-          if (!ui.getMinimizePresence()) {
-            ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
-          }
-
-          const RestraintApparatus& ra = sc.getRestraints(i);
-          timer.assignTime(dyn_setup_tm);
-
-          // Run dynamics with the current replica
-          ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
-          switch (ps.getUnitCellType()) {
-            case UnitCellType::NONE:
-              dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(i), ra, dyncon, 0);
+              // Export system state
+              PhaseSpace ps = poly_ps.exportSystem(i);
+              const AtomGraph* ag = poly_ag.getSystemTopologyPointer(i);
+              const RestraintApparatus *ra = poly_ag.getSystemRestraintPointer(i);
+              timer.assignTime(dyn_setup_tm);
+              ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
+              dynamics(&ps, &tst_vec[i], &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(icache_top),
+                       *ra, dyncon, 0);
               timer.assignTime(dyn_run_tm);
-              break;
-            case UnitCellType::ORTHORHOMBIC:
-            case UnitCellType::TRICLINIC:
-              rtErr("Minimization and dynamics are not yet operational for periodic boundary "
-                    "conditions.", "main");
-              break;
-          }
 
-          // Import dynamics data into the main scorecard
-          edyn.importCard(iedyn, i, 0);
+              // Import dynamics data into the main scorecard
+              edyn.importCard(iedyn, i, 0);
+            }
+          }
         }
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        rtErr("Replica Exchange molecular dynamics is not yet operational for periodic boundary "
+              "conditions.", "main");
+        break;
       }
     }
     else {
@@ -420,37 +454,61 @@ int main(int argc, const char* argv[]) {
       progress_bar.setIterations(system_count);
       std::cout << "Dynamics" << std::endl;
 
-      for (int i = 0; i < system_count; i++) {
-        
-        // Update progress bar at the beginning of the loop
-        progress_bar.update();
-        PhaseSpace ps = poly_ps.exportSystem(i);
-        AtomGraph *ag = sc.getSystemTopologyPointer(i);
-        Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
-                        dyncon.getThermostatEvolutionStart(), dyncon.getThermostatEvolutionEnd());
-        itst.setGeometryConstraints(dyncon.constrainGeometry());
-        itst.setRattleTolerance(dyncon.getRattleTolerance());
-        itst.setRattleIterations(dyncon.getRattleIterations());
+      switch (poly_ps.getUnitCellType()) {
+      case UnitCellType::NONE:
+        {
+          for (int i = 0; i < system_count; i++) {
 
-        // Set the implicit solvent model here if it has not been done already.
-        if (ui.getMinimizePresence() == false) {
-          ag->setImplicitSolventModel(isvcon.getImplicitSolventModel());
+            // The topology index which the system is based on must be obtained from the
+            // synthesis cache map.
+            const int icache_top = scmap.getTopologyCacheIndex(i);
+        
+            // Update progress bar at the beginning of the loop
+            progress_bar.update();
+
+            // Unpack the individual system for CPU calculations.
+            PhaseSpace ps = poly_ps.exportSystem(i);
+            const AtomGraph *ag = poly_ps.getSystemTopologyPointer(i);
+            Thermostat itst(ag->getAtomCount(), dyncon.getThermostatKind(), 298.15, 298.15,
+                            dyncon.getThermostatEvolutionStart(),
+                            dyncon.getThermostatEvolutionEnd());
+            itst.setGeometryConstraints(dyncon.constrainGeometry());
+            itst.setRattleTolerance(dyncon.getRattleTolerance());
+            itst.setRattleIterations(dyncon.getRattleIterations());
+            const RestraintApparatus& ra = sc.getRestraints(i);
+            timer.assignTime(dyn_setup_tm);
+            ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
+            dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(icache_top), ra,
+                     dyncon, 0);
+            timer.assignTime(dyn_run_tm);
+            edyn.importCard(iedyn, i, 0);
+          }
         }
-        const RestraintApparatus& ra = sc.getRestraints(i);
-        timer.assignTime(dyn_setup_tm);
-        ScoreCard iedyn(1, ((nstep + ntpr - 1) / ntpr) + 1, preccon.getEnergyScalingBits());
-        switch(ps.getUnitCellType()) {
-        case UnitCellType::NONE:
-          dynamics(&ps, &itst, &iedyn, *ag, ngb_tab, sc.getSystemStaticMask(i), ra, dyncon, 0);
-          timer.assignTime(dyn_run_tm);
+        break;
+      case UnitCellType::ORTHORHOMBIC:
+      case UnitCellType::TRICLINIC:
+        switch (preccon.getNonbondedMethod()) {
+        case PrecisionModel::DOUBLE:
+          {
+            CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag,
+                                                        dyncon.getVanDerWaalsCutoff(), 0.02, 4,
+                                                        NonbondedTheme::ALL);
+            dynamics<double, llint, double, double4>(&poly_ps, &cg, &edyn, &tst, poly_ag, lem,
+                                                     dyncon, preccon, pmecon);
+          }
           break;
-        case UnitCellType::ORTHORHOMBIC:
-        case UnitCellType::TRICLINIC:
-          rtErr("Minimization and dynamics are not yet operational for periodic boundary "
-                "conditions.", "main");
+        case PrecisionModel::SINGLE:
+          {
+            CellGrid<float, int, float, float4> cg(poly_ps, poly_ag,
+                                                   dyncon.getVanDerWaalsCutoff(), 0.02, 4,
+                                                   NonbondedTheme::ALL);
+            dynamics<float, int, float, float4>(&poly_ps, &cg, &edyn, &tst, poly_ag, lem, dyncon,
+                                                preccon, pmecon);
+          }
+          break;
         }
-        edyn.importCard(iedyn, i, 0);
       }
+
       // At the end of the progress bar, endl for the rest of the program
       std::cout << std::endl;
     }
@@ -476,6 +534,7 @@ int main(int argc, const char* argv[]) {
     std::cout << std::endl;
     timer.assignTime(output_tm);
   }
+
   // Summarize the results
   timer.assignTime(output_tm);
   timer.printResults();

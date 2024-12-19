@@ -8,7 +8,14 @@ using trajectory::PhaseSpaceReader;
 using symbols::boltzmann_constant;
   
 //-------------------------------------------------------------------------------------------------
-void evalKineticEnergy(const PhaseSpaceWriter psw, ScoreCard *sc, const ChemicalDetailsKit &cdk,
+void evalKineticEnergy(const PhaseSpaceWriter *psw, ScoreCard *sc, const ChemicalDetailsKit &cdk,
+                       const int system_index) {
+  evalKineticEnergy<double, double>(psw->vxalt, psw->vyalt, psw->vzalt, sc, cdk, system_index,
+                                    1.0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalKineticEnergy(const PhaseSpaceWriter &psw, ScoreCard *sc, const ChemicalDetailsKit &cdk,
                        const int system_index) {
   evalKineticEnergy<double, double>(psw.vxalt, psw.vyalt, psw.vzalt, sc, cdk, system_index, 1.0);
 }
@@ -92,11 +99,12 @@ double computeTemperature(const PhaseSpaceSynthesis *poly_ps, const AtomGraphSyn
                             double2,
                             double4> poly_auk = poly_ag->getDoublePrecisionAtomUpdateKit();
       return computeTemperature<llint,
+                                double,
                                 double>(&poly_psr.xvel[start_idx], &poly_psr.yvel[start_idx],
                                         &poly_psr.zvel[start_idx], &poly_psr.xvel_ovrf[start_idx],
                                         &poly_psr.yvel_ovrf[start_idx],
                                         &poly_psr.zvel_ovrf[start_idx], poly_auk.masses,
-                                        poly_psr.atom_counts[system_index], ndof, pow(2.0, 32),
+                                        poly_psr.atom_counts[system_index], ndof, pow(2.0, 36),
                                         poly_psr.inv_vel_scale);
     }
     break;
@@ -105,10 +113,11 @@ double computeTemperature(const PhaseSpaceSynthesis *poly_ps, const AtomGraphSyn
       const SyAtomUpdateKit<float,
                             float2, float4> poly_auk = poly_ag->getSinglePrecisionAtomUpdateKit();
       return computeTemperature<llint,
-                                float>(&poly_psr.xvel[start_idx], &poly_psr.yvel[start_idx],
+                                float,
+                                double>(&poly_psr.xvel[start_idx], &poly_psr.yvel[start_idx],
                                        &poly_psr.zvel[start_idx], nullptr, nullptr, nullptr,
                                        poly_auk.masses, poly_psr.atom_counts[system_index], ndof,
-                                       pow(2.0, 32), poly_psr.inv_vel_scale);
+                                       pow(2.0, 36), poly_psr.inv_vel_scale);
     }
     break;
   }

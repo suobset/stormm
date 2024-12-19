@@ -41,6 +41,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
   __shared__ int sh_yfrc_overflow[VALENCE_ATOM_CAPACITY];
   __shared__ int sh_zfrc_overflow[VALENCE_ATOM_CAPACITY];
 #  endif
+  __shared__ volatile uint sh_vs_mask[(VALENCE_ATOM_CAPACITY + 31) >> 5];
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
@@ -63,6 +64,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
       vwu_task_count[threadIdx.x] = vwu_map[threadIdx.x].y - vwu_map[threadIdx.x].x;
       vwu_padded_task_count[threadIdx.x] = devcRoundUp(vwu_task_count[threadIdx.x], warp_size_int);
     }
+    if (threadIdx.x < ((VALENCE_ATOM_CAPACITY + 31) >> 5)) {
+      sh_vs_mask[threadIdx.x] = 0U;
+    }
     __syncthreads();
 
     // Skip if this work unit involves no virtual sites.
@@ -84,14 +88,14 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
     while (pos < import_stride) {
       if (pos < import_count) {
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
-        sh_xfrc[pos] = __ldcv(&poly_psw.xfrc[read_idx]);
+        sh_xfrc[pos] = 0LL;
 #  ifdef TCALC_IS_SINGLE
         sh_xcrd[pos] = __ldcv(&poly_psw.xcrd[read_idx]);
 #  else
         const size_t write_idx = EXCL_GMEM_OFFSET + pos;
         __stwb(&gmem_r.xcrd[write_idx], __ldcv(&poly_psw.xcrd[read_idx]));
         __stwb(&gmem_r.xcrd_ovrf[write_idx], __ldcv(&poly_psw.xcrd_ovrf[read_idx]));
-        sh_xfrc_overflow[pos] = __ldcv(&poly_psw.xfrc_ovrf[read_idx]);
+        sh_xfrc_overflow[pos] = 0;
 #  endif
       }
       pos += blockDim.x;
@@ -100,14 +104,14 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
       const int rel_pos = pos - import_stride;
       if (rel_pos < import_count) {
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        sh_yfrc[rel_pos] = __ldcv(&poly_psw.yfrc[read_idx]);
+        sh_yfrc[rel_pos] = 0LL;
 #  ifdef TCALC_IS_SINGLE
         sh_ycrd[rel_pos] = __ldcv(&poly_psw.ycrd[read_idx]);
 #  else
         const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
         __stwb(&gmem_r.ycrd[write_idx], __ldcv(&poly_psw.ycrd[read_idx]));
         __stwb(&gmem_r.ycrd_ovrf[write_idx], __ldcv(&poly_psw.ycrd_ovrf[read_idx]));
-        sh_yfrc_overflow[rel_pos] = __ldcv(&poly_psw.yfrc_ovrf[read_idx]);
+        sh_yfrc_overflow[rel_pos] = 0;
 #  endif
       }
       pos += blockDim.x;
@@ -116,21 +120,22 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
       const int rel_pos = pos - (2 * import_stride);
       if (rel_pos < import_count) {
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        sh_zfrc[rel_pos] = __ldcv(&poly_psw.zfrc[read_idx]);
+        sh_zfrc[rel_pos] = 0LL;
 #  ifdef TCALC_IS_SINGLE
         sh_zcrd[rel_pos] = __ldcv(&poly_psw.zcrd[read_idx]);
 #  else
         const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
         __stwb(&gmem_r.zcrd[write_idx], __ldcv(&poly_psw.zcrd[read_idx]));
         __stwb(&gmem_r.zcrd_ovrf[write_idx], __ldcv(&poly_psw.zcrd_ovrf[read_idx]));
-        sh_zfrc_overflow[rel_pos] = __ldcv(&poly_psw.zfrc_ovrf[read_idx]);
+        sh_zfrc_overflow[rel_pos] = 0;
 #  endif
       }
       pos += blockDim.x;
     }
     __syncthreads();
+    const int manip_llim = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
     int vterm_limit;
-#endif
+#endif // VSITE_STANDALONE
 
     // Similar to the process with valence interaction terms, loop over all virtual site frames.
     pos = threadIdx.x;
@@ -147,7 +152,38 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const int fr_param_idx = ((tinsr.y >> 20) & 0xfff);
         const TCALC4 fr_details = poly_auk.vs_params[fr_param_idx];
         const VirtualSiteKind kind = static_cast<VirtualSiteKind>(fr_details.w);
+#ifdef VSITE_STANDALONE
+        // In standalone mode, all forces on particles were initialized to zero so that forces
+        // distributed from virtual sites can be added atomically to the global accumulators and
+        // avoid race conditions if two work units import the same frame atoms that are affected
+        // by virtual sites in their respective task lists. (Multiple work units will not be given
+        // authority to handle the same virtual site and commit its results to global memory, but
+        // there might be a situation where frame atoms for those virtual sites are shared between
+        // multiple work units.) Read the forces for this work unit's assigned virtual site now.
+        // It may be the case that multiple work units deal with transmitting forces for this
+        // virtual site as part of some larger atom movement and constraint assignment, and in a
+        // case like this there could be a race condition.  Therefore, for the limited scope of
+        // force transmission, leave the forces on this virtual site as zero if the virtual site
+        // is within the work unit's global update authority.
+        const int manip_segment = (vs_atom >> 5);
+        const int manip_bitpos  = (vs_atom & 0x1f);
+        const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
+        if ((manip_mask.y >> manip_bitpos) & 0x1) {
+          atomicOr((uint*)&sh_vs_mask[manip_segment], (0x1 << manip_bitpos));
+          const size_t read_idx = __ldca(&poly_vk.vwu_imports[import_llim + vs_atom]);
+          sh_xfrc[vs_atom] = __ldca(&poly_psw.xfrc[read_idx]);
+          sh_yfrc[vs_atom] = __ldca(&poly_psw.yfrc[read_idx]);
+          sh_zfrc[vs_atom] = __ldca(&poly_psw.zfrc[read_idx]);
 
+          // If VSITE_STANDALONE is defined, there is no SPLIT_FORCE_ACCUMULATION.  All
+          // single-precision force accumulators will be 64-bit integers.
+#  ifndef TCALC_IS_SINGLE
+          sh_xfrc_overflow[vs_atom] = __ldca(&poly_psw.xfrc_ovrf[read_idx]);
+          sh_yfrc_overflow[vs_atom] = __ldca(&poly_psw.yfrc_ovrf[read_idx]);
+          sh_zfrc_overflow[vs_atom] = __ldca(&poly_psw.zfrc_ovrf[read_idx]);
+#  endif
+        }
+#endif
         // The parent (first) and second frame atoms' locations must be read for any frame
         switch (kind) {
         case VirtualSiteKind::FLEX_2:
@@ -228,11 +264,11 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
                                   (TCALC)(frame2_z - parent_z) };
             const TCALC3 p_vs = { (TCALC)(sh_xcrd[vs_atom_cpos] - parent_x) *
-                                  poly_psw.inv_gpos_scale_f,
+                                  poly_psw.inv_gpos_scale,
                                   (TCALC)(sh_ycrd[vs_atom_cpos] - parent_y) *
-                                  poly_psw.inv_gpos_scale_f,
+                                  poly_psw.inv_gpos_scale,
                                   (TCALC)(sh_zcrd[vs_atom_cpos] - parent_z) *
-                                  poly_psw.inv_gpos_scale_f };
+                                  poly_psw.inv_gpos_scale };
 #else
             const size_t vs_atom_cpos = vs_atom + EXCL_GMEM_OFFSET;
             const size_t parent_atom_cpos = parent_atom + EXCL_GMEM_OFFSET;
@@ -257,16 +293,16 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC3 p_vs = {
               int95SubtractToDouble(__ldca(&gmem_r.xcrd[vs_atom_cpos]),
                                     __ldca(&gmem_r.xcrd_ovrf[vs_atom_cpos]),
-                                    parent_x, parent_x_ovrf) * poly_psw.inv_gpos_scale_f,
+                                    parent_x, parent_x_ovrf) * poly_psw.inv_gpos_scale,
               int95SubtractToDouble(__ldca(&gmem_r.ycrd[vs_atom_cpos]),
                                     __ldca(&gmem_r.ycrd_ovrf[vs_atom_cpos]),
-                                    parent_y, parent_y_ovrf) * poly_psw.inv_gpos_scale_f,
+                                    parent_y, parent_y_ovrf) * poly_psw.inv_gpos_scale,
               int95SubtractToDouble(__ldca(&gmem_r.zcrd[vs_atom_cpos]),
                                     __ldca(&gmem_r.zcrd_ovrf[vs_atom_cpos]),
-                                    parent_z, parent_z_ovrf) * poly_psw.inv_gpos_scale_f
+                                    parent_z, parent_z_ovrf) * poly_psw.inv_gpos_scale
             };
 #endif
-            const TCALC invr_p_f2 = fr_details.x * poly_psw.gpos_scale_f /
+            const TCALC invr_p_f2 = fr_details.x * poly_psw.gpos_scale /
                                     SQRT_FUNC((p_f2.x * p_f2.x) + (p_f2.y * p_f2.y) +
                                               (p_f2.z * p_f2.z));
 #ifdef TCALC_IS_SINGLE
@@ -447,9 +483,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const llint vsite_z  = sh_zcrd[vs_atom_cpos];
             const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x), (TCALC)(frame3_y - frame2_y),
                                    (TCALC)(frame3_z - frame2_z) };
-            const TCALC3 p_vs = { (TCALC)(vsite_x - parent_x) * poly_psw.inv_gpos_scale_f,
-                                  (TCALC)(vsite_y - parent_y) * poly_psw.inv_gpos_scale_f,
-                                  (TCALC)(vsite_z - parent_z) * poly_psw.inv_gpos_scale_f };
+            const TCALC3 p_vs = { (TCALC)(vsite_x - parent_x) * poly_psw.inv_gpos_scale,
+                                  (TCALC)(vsite_y - parent_y) * poly_psw.inv_gpos_scale,
+                                  (TCALC)(vsite_z - parent_z) * poly_psw.inv_gpos_scale };
             const TCALC3 p_mid = { (TCALC)(frame2_x - parent_x) + (fr_details.y * f2_f3.x),
                                    (TCALC)(frame2_y - parent_y) + (fr_details.y * f2_f3.y),
                                    (TCALC)(frame2_z - parent_z) + (fr_details.y * f2_f3.z) };
@@ -497,12 +533,12 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
                                    int95SubtractToDouble(frame3_z, frame3_z_ovrf,
                                                          frame2_z, frame2_z_ovrf) };
             const TCALC3 p_vs = { int95SubtractToDouble(vsite_x, vsite_x_ovrf, parent_x,
-                                                        parent_x_ovrf) * poly_psw.inv_gpos_scale_f,
+                                                        parent_x_ovrf) * poly_psw.inv_gpos_scale,
                                   int95SubtractToDouble(vsite_y, vsite_y_ovrf, parent_y,
-                                                        parent_y_ovrf) * poly_psw.inv_gpos_scale_f,
+                                                        parent_y_ovrf) * poly_psw.inv_gpos_scale,
                                   int95SubtractToDouble(vsite_z, vsite_z_ovrf, parent_z,
                                                         parent_z_ovrf) *
-                                  poly_psw.inv_gpos_scale_f };
+                                  poly_psw.inv_gpos_scale };
             const TCALC3 p_mid = { int95SubtractToDouble(frame2_x, frame2_x_ovrf,
                                                          parent_x, parent_x_ovrf) +
                                    (fr_details.y * f2_f3.x),
@@ -517,7 +553,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
                                     int95ToDouble(sh_zfrc[vs_atom], sh_zfrc_overflow[vs_atom]) };
 #endif
             const TCALC3 vs_frc_proj = project(vs_frc, p_vs);
-            const TCALC invr_p_mid = poly_psw.gpos_scale_f / SQRT_FUNC((p_mid.x * p_mid.x) +
+            const TCALC invr_p_mid = poly_psw.gpos_scale / SQRT_FUNC((p_mid.x * p_mid.x) +
                                                                        (p_mid.y * p_mid.y) +
                                                                        (p_mid.z * p_mid.z));
             const TCALC xpart = invr_p_mid * fr_details.x * (vs_frc.x - vs_frc_proj.x);
@@ -613,12 +649,12 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const llint frame3_x = sh_xcrd[frame3_atom_cpos];
             const llint frame3_y = sh_ycrd[frame3_atom_cpos];
             const llint frame3_z = sh_zcrd[frame3_atom_cpos];
-            const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x) * poly_psw.inv_gpos_scale_f,
-                                  (TCALC)(frame2_y - parent_y) * poly_psw.inv_gpos_scale_f,
-                                  (TCALC)(frame2_z - parent_z) * poly_psw.inv_gpos_scale_f };
-            const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x) * poly_psw.inv_gpos_scale_f,
-                                   (TCALC)(frame3_y - frame2_y) * poly_psw.inv_gpos_scale_f,
-                                   (TCALC)(frame3_z - frame2_z) * poly_psw.inv_gpos_scale_f };
+            const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x) * poly_psw.inv_gpos_scale,
+                                  (TCALC)(frame2_y - parent_y) * poly_psw.inv_gpos_scale,
+                                  (TCALC)(frame2_z - parent_z) * poly_psw.inv_gpos_scale };
+            const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x) * poly_psw.inv_gpos_scale,
+                                   (TCALC)(frame3_y - frame2_y) * poly_psw.inv_gpos_scale,
+                                   (TCALC)(frame3_z - frame2_z) * poly_psw.inv_gpos_scale };
 #  ifdef SPLIT_FORCE_ACCUMULATION
             const TCALC3 vs_frc = { int63ToFloat(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom]),
                                     int63ToFloat(sh_yfrc[vs_atom], sh_yfrc_overflow[vs_atom]),
@@ -650,21 +686,21 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const int frame3_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame3_atom_cpos]);
             const int frame3_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame3_atom_cpos]);
             const TCALC3 p_f2 = { int95SubtractToDouble(frame2_x, frame2_x_ovrf, parent_x,
-                                                        parent_x_ovrf) * poly_psw.inv_gpos_scale_f,
+                                                        parent_x_ovrf) * poly_psw.inv_gpos_scale,
                                   int95SubtractToDouble(frame2_y, frame2_y_ovrf, parent_y,
-                                                        parent_y_ovrf) * poly_psw.inv_gpos_scale_f,
+                                                        parent_y_ovrf) * poly_psw.inv_gpos_scale,
                                   int95SubtractToDouble(frame2_z, frame2_z_ovrf, parent_z,
                                                         parent_z_ovrf) *
-                                  poly_psw.inv_gpos_scale_f };
+                                  poly_psw.inv_gpos_scale };
             const TCALC3 f2_f3 = { int95SubtractToDouble(frame3_x, frame3_x_ovrf, frame2_x,
                                                          frame2_x_ovrf) *
-                                   poly_psw.inv_gpos_scale_f,
+                                   poly_psw.inv_gpos_scale,
                                    int95SubtractToDouble(frame3_y, frame3_y_ovrf, frame2_y,
                                                          frame2_y_ovrf) *
-                                   poly_psw.inv_gpos_scale_f,
+                                   poly_psw.inv_gpos_scale,
                                    int95SubtractToDouble(frame3_z, frame3_z_ovrf, frame2_z,
                                                          frame2_z_ovrf) *
-                                   poly_psw.inv_gpos_scale_f };
+                                   poly_psw.inv_gpos_scale };
             const TCALC3 vs_frc = { int95ToDouble(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom]),
                                     int95ToDouble(sh_yfrc[vs_atom], sh_yfrc_overflow[vs_atom]),
                                     int95ToDouble(sh_zfrc[vs_atom], sh_zfrc_overflow[vs_atom]) };
@@ -952,8 +988,8 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
           {
             const int frame3_atom = (tinsr.y & 0x3ff);
             const int frame4_atom = ((tinsr.y >> 10) & 0x3ff);
-            const TCALC d1_factor = fr_details.x * poly_psw.inv_gpos_scale_f;
-            const TCALC d2_factor = fr_details.y * poly_psw.inv_gpos_scale_f;
+            const TCALC d1_factor = fr_details.x * poly_psw.inv_gpos_scale;
+            const TCALC d2_factor = fr_details.y * poly_psw.inv_gpos_scale;
 #ifdef TCALC_IS_SINGLE
             const size_t parent_atom_cpos = parent_atom;
             const size_t frame2_atom_cpos = frame2_atom;
@@ -971,9 +1007,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const llint frame4_x = sh_xcrd[frame4_atom_cpos];
             const llint frame4_y = sh_ycrd[frame4_atom_cpos];
             const llint frame4_z = sh_zcrd[frame4_atom_cpos];
-            const TCALC p_f2x = (TCALC)(frame2_x - parent_x) * poly_psw.inv_gpos_scale_f;
-            const TCALC p_f2y = (TCALC)(frame2_y - parent_y) * poly_psw.inv_gpos_scale_f;
-            const TCALC p_f2z = (TCALC)(frame2_z - parent_z) * poly_psw.inv_gpos_scale_f;
+            const TCALC p_f2x = (TCALC)(frame2_x - parent_x) * poly_psw.inv_gpos_scale;
+            const TCALC p_f2y = (TCALC)(frame2_y - parent_y) * poly_psw.inv_gpos_scale;
+            const TCALC p_f2z = (TCALC)(frame2_z - parent_z) * poly_psw.inv_gpos_scale;
             const TCALC3 rj_f3 = { (d1_factor * (TCALC)(frame3_x - parent_x)) - p_f2x,
                                    (d1_factor * (TCALC)(frame3_y - parent_y)) - p_f2y,
                                    (d1_factor * (TCALC)(frame3_z - parent_z)) - p_f2z };
@@ -1018,11 +1054,11 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const int frame4_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame4_atom_cpos]);
             const int frame4_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame4_atom_cpos]);
             const TCALC p_f2x = int95SubtractToDouble(frame2_x, frame2_x_ovrf, parent_x,
-                                                      parent_x_ovrf) * poly_psw.inv_gpos_scale_f;
+                                                      parent_x_ovrf) * poly_psw.inv_gpos_scale;
             const TCALC p_f2y = int95SubtractToDouble(frame2_y, frame2_y_ovrf, parent_y,
-                                                      parent_y_ovrf) * poly_psw.inv_gpos_scale_f;
+                                                      parent_y_ovrf) * poly_psw.inv_gpos_scale;
             const TCALC p_f2z = int95SubtractToDouble(frame2_z, frame2_z_ovrf, parent_z,
-                                                      parent_z_ovrf) * poly_psw.inv_gpos_scale_f;
+                                                      parent_z_ovrf) * poly_psw.inv_gpos_scale;
             const TCALC3 rj_f3 = {
               (d1_factor * int95SubtractToDouble(frame3_x, frame3_x_ovrf,
                                                  parent_x, parent_x_ovrf)) - p_f2x,
@@ -1211,58 +1247,42 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
     __syncthreads();
 
 #ifdef VSITE_STANDALONE
-    // Write forces back to global memory accumulators.  No atomics are needed for the standalone
-    // kernel, as the work units are assigned atoms for which they will be computing all required
-    // interactions (the atomic operations were done on forces in __shared__ memory within the
-    // thread block).  No further synchronization is needed, as nothing depends on the work unit
-    // index until after the following synchronization.
+    // Write forces back to global memory accumulators.  The goal is now to contribute all forces
+    // accumulated on any atoms involved in this routine, as they might contain pieces of forces
+    // transmitted from virtual sites that this routine dealt with.  The forces on virtual sites
+    // themselves will be zeroed in the global arrays, if this work unit is responsible for
+    // updating the virtual site.
     pos = threadIdx.x;
-    const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
     const int import_count_ii  = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].y -
                                  vwu_map[(size_t)(VwuAbstractMap::IMPORT)].x;
     const int import_stride_ii = devcRoundUp(import_hlim - import_llim, warp_size_int);
     while (pos < import_stride_ii) {
       if (pos < import_count_ii) {
-        const int manip_segment = (pos >> warp_bits);
-        const int manip_bitpos  = (pos & warp_bits_mask_int);
-        const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
-        if ((manip_mask.y >> manip_bitpos) & 0x1) {
-          const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
-          __stwb(&poly_psw.xfrc[write_idx], sh_xfrc[pos]);
+        const int manip_segment = (pos >> 5);
+        const int manip_bitpos  = (pos & 0x1f);
+        const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
+        if ((sh_vs_mask[manip_segment] >> manip_bitpos) & 0x1) {
+          __stwt(&poly_psw.xfrc[write_idx], 0LL);
+          __stwt(&poly_psw.yfrc[write_idx], 0LL);
+          __stwt(&poly_psw.zfrc[write_idx], 0LL);
 #  ifndef TCALC_IS_SINGLE
-          __stwb(&poly_psw.xfrc_ovrf[write_idx], sh_xfrc_overflow[pos]);
+          __stwt(&poly_psw.xfrc_ovrf[write_idx], 0);
+          __stwt(&poly_psw.yfrc_ovrf[write_idx], 0);
+          __stwt(&poly_psw.zfrc_ovrf[write_idx], 0);
 #  endif
         }
-      }
-      pos += blockDim.x;
-    }
-    while (pos < 2 * import_stride_ii) {
-      const int rel_pos = pos - import_stride_ii;
-      if (rel_pos < import_count_ii) {
-        const int manip_segment = (rel_pos >> warp_bits);
-        const int manip_bitpos  = (rel_pos & warp_bits_mask_int);
-        const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
-        if ((manip_mask.y >> manip_bitpos) & 0x1) {
-          const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-          __stwb(&poly_psw.yfrc[write_idx], sh_yfrc[rel_pos]);
-#  ifndef TCALC_IS_SINGLE
-          __stwb(&poly_psw.yfrc_ovrf[write_idx], sh_yfrc_overflow[rel_pos]);
-#  endif
-        }
-      }
-      pos += blockDim.x;
-    }
-    while (pos < 3 * import_stride_ii) {
-      const int rel_pos = pos - (2 * import_stride_ii);
-      if (rel_pos < import_count_ii) {
-        const int manip_segment = (rel_pos >> warp_bits);
-        const int manip_bitpos  = (rel_pos & warp_bits_mask_int);
-        const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
-        if ((manip_mask.y >> manip_bitpos) & 0x1) {
-          const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-          __stwb(&poly_psw.zfrc[write_idx], sh_zfrc[rel_pos]);
-#  ifndef TCALC_IS_SINGLE
-          __stwb(&poly_psw.zfrc_ovrf[write_idx], sh_zfrc_overflow[rel_pos]);
+        else {
+#  ifdef TCALC_IS_SINGLE
+          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], sh_xfrc[pos]);
+          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], sh_yfrc[pos]);
+          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], sh_zfrc[pos]);
+#  else
+          atomicSplit(sh_xfrc[pos], sh_xfrc_overflow[pos], write_idx, poly_psw.xfrc,
+                      poly_psw.xfrc_ovrf);
+          atomicSplit(sh_yfrc[pos], sh_yfrc_overflow[pos], write_idx, poly_psw.yfrc,
+                      poly_psw.yfrc_ovrf);
+          atomicSplit(sh_zfrc[pos], sh_zfrc_overflow[pos], write_idx, poly_psw.zfrc,
+                      poly_psw.zfrc_ovrf);
 #  endif
         }
       }

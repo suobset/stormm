@@ -16,10 +16,12 @@
 #include "MolecularMechanics/minimization.h"
 #include "MolecularMechanics/mm_evaluation.h"
 #include "Namelists/nml_minimize.h"
+#include "Namelists/nml_dynamics.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Parsing/parsing_enumerators.h"
 #include "Potential/energy_enumerators.h"
+#include "Potential/pme_util.h"
 #include "Potential/scorecard.h"
 #include "Random/random.h"
 #include "Reporting/error_format.h"
@@ -631,7 +633,7 @@ double mdTrial(PhaseSpace *ps, const AtomGraph &ag, const int nstep, const doubl
 
   // Adjust the virtual sites to the exact coordinates (do not trust the original file, which may
   // not have a very high precision format).
-  placeVirtualSites(psw, vsk);
+  placeVirtualSites(&psw, vsk, false);
 
   // Iterate through all requested dynamics steps
   double pe = 0.0;
@@ -1018,6 +1020,84 @@ void testMotionSweeper(const TestSystemManager &tsm, Xoshiro256ppGenerator *xrs,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run tests of periodic dynamics.
+//
+// Arguments:
+//   tsm:  Collection of tests systems, all expected to hold periodic boundary conditions
+//-------------------------------------------------------------------------------------------------
+void runPeriodicTests(const TestSystemManager &tsm, const std::vector<double> &mean_ans,
+                      const std::vector<double> &vari_ans,
+                      const PrecisionModel val_prec = PrecisionModel::DOUBLE,
+                      const PrecisionModel nb_prec = PrecisionModel::DOUBLE,
+                      const double cutoff = default_pme_cutoff, const int nstep = 8,
+                      const double dt = 1.0, const int gpos_bits = 36, const int vel_bits = 52,
+                      const int frc_bits = 38) {
+  const std::vector<UnitCellType> pbcs = { UnitCellType::ORTHORHOMBIC, UnitCellType::TRICLINIC };
+  const std::vector<int> pbcs_idx = tsm.getQualifyingSystems(pbcs);
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(pbcs_idx, 0.0, 71385, gpos_bits,
+                                                              vel_bits, frc_bits);
+  if (mean_ans.size() != vari_ans.size() || mean_ans.size() != poly_ps.getSystemCount()) {
+    rtErr("The answer vectors must be of the same size and contain one answer for each system "
+          "(currently " + std::to_string(mean_ans.size()) + " and " +
+          std::to_string(vari_ans.size()) + " answers for " +
+          std::to_string(poly_ps.getSystemCount()) + " systems).", "runPeriodicTests");
+  }
+  ScoreCard sc(poly_ps.getSystemCount(), nstep, 32);
+  PrecisionControls preccon;
+  preccon.setValenceMethod(val_prec);
+  preccon.setNonbondedMethod(nb_prec);
+  DynamicsControls dyncon;
+  dyncon.setStepCount(nstep);
+  dyncon.setDiagnosticPrintFrequency(1);
+  dyncon.setTimeStep(dt);
+  dyncon.setCutoff(cutoff);
+  dyncon.setCenterOfMassMotionPurgeFrequency(50);
+  PPPMControls pmecon;
+  pmecon.setCutoff(cutoff);
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(pbcs);
+  Thermostat tst(poly_ag, ThermostatKind::NONE);
+  tst.setGeometryConstraints(ApplyConstraints::YES);
+  tst.setRattleTolerance(1.0e-7);
+  tst.setTimeStep(dyncon.getTimeStep());
+  const LocalExclusionMask lem(poly_ag);
+  switch (nb_prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      CellGrid<double, llint, double, double4> cg(poly_ps, poly_ag, cutoff, 0.02, 4,
+                                                  NonbondedTheme::ALL);
+      dynamics<double, llint, double, double4>(&poly_ps, &cg, &sc, &tst, poly_ag, lem, dyncon,
+                                               preccon, pmecon);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      CellGrid<float, llint, float, float4> cg(poly_ps, poly_ag, cutoff, 0.02, 4,
+                                               NonbondedTheme::ALL);
+      dynamics<float, llint, float, float4>(&poly_ps, &cg, &sc, &tst, poly_ag, lem, dyncon,
+                                            preccon, pmecon);
+    }
+    break;
+  }
+  sc.computeTotalEnergy();
+  for (size_t i = 0; i < mean_ans.size(); i++) {
+    std::vector<double> etot = sc.reportHistory(StateVariable::TOTAL_ENERGY, i);
+    for (int j = 0; j < nstep - 4; j++) {
+      etot[j] = etot[j + 4];
+    }
+    etot.resize(nstep - 4);
+    check(mean<double>(etot), RelationalOperator::EQUAL,
+          Approx(mean_ans[i], ComparisonType::RELATIVE, 2.0e-3), "The mean total energy of a "
+          "system based on topology " +
+          getBaseName(poly_ps.getSystemTopologyPointer(i)->getFileName()) + " does not meet "
+          "expectations.", TestPriority::NON_CRITICAL);
+    check(variance(etot, VarianceMethod::STANDARD_DEVIATION), RelationalOperator::LESS_THAN,
+          2.0 * vari_ans[i], "The standard deviation of total energy of a system based on "
+          "topology " + getBaseName(poly_ps.getSystemTopologyPointer(i)->getFileName()) +
+          " does not meet expectations.");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1036,6 +1116,12 @@ int main(const int argc, const char* argv[]) {
   const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
   const Hybrid<int> array_to_trigger_gpu_mapping(1);
 #endif
+
+  // Orient the program for accessing test cases
+  const char osc = osSeparator();
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+
   // Section 1: Test a harmonic spring with weights on either end.
   section("Weighted harmonic spring");
 
@@ -1050,7 +1136,7 @@ int main(const int argc, const char* argv[]) {
 
   // Section 5: Test the Andersen thermostat
   section("Andersen thermostat");
-  
+
   // Create the harmonic spring connecting two point masses, a 19.0 kcal/mol-A^2 spring with
   // equilibrium length connecting masses of 1.6 and 2.7 Daltons.  Simulate it for 1000 steps in
   // the isoenergetic ensemble.
@@ -1096,9 +1182,6 @@ int main(const int argc, const char* argv[]) {
   const std::vector<std::string> mols = { "drug_example_iso", "bromobenzene_vs_iso", "hydrogenate",
                                           "drug_example_vs_iso", "med_1", "unsaturated_ring",
                                           "trpcage" };
-  const char osc = osSeparator();
-  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   TestSystemManager tsm(base_top_name, "top", mols, base_crd_name, "inpcrd", mols);
 
   // Create some simple systems and test momentum removal.
@@ -1499,7 +1582,55 @@ int main(const int argc, const char* argv[]) {
   check(pearson(totl_md_ave, ref_totl_md_ave), RelationalOperator::EQUAL,
         Approx(1.0).margin(1.6e-2), "The total energies maintained by conservative MD protocols "
         "applied to a variety of small systems should align with reference values.", do_snps);
+  
+  // Evaluate dynamics in periodic systems
+  int ntest = 0;
+  const std::vector<std::string> pbc_mols = { "bromobenzene", "bromobenzene_vs", "tamavidin",
+                                              "tip3p", "tip4p", "ubiquitin" };
+  TestSystemManager tsm_pbc(base_top_name, "top", pbc_mols, base_crd_name, "inpcrd", pbc_mols);
+  const int gpos_bits_min = globalpos_scale_nonoverflow_bits - 2;
+  const int gpos_bits_max = globalpos_scale_nonoverflow_bits + 28;
+  const int vel_bits_min  = velocity_scale_nonoverflow_bits - 2;
+  const int vel_bits_max  = velocity_scale_nonoverflow_bits + 22;
+  const int frc_bits_min  = force_scale_nonoverflow_bits - 2;
+  const int frc_bits_max  = force_scale_nonoverflow_bits + 28;
 
+  const std::vector<std::vector<double>> mean_ans = {
+    { 13.9254, 25.4616, 9715.2099, 13561.7312, 22233.0937, 78807.9275 },
+    { 13.9254, 25.4616, 9713.3244, 13561.7321, 22233.1399, 78803.1825 },
+    { 13.9254, 25.4616, 9713.9030, 13561.7357, 22233.0544, 78804.3141 },
+    { 13.9254, 25.4616, 9713.5436, 13561.7255, 22233.1193, 78804.9454 },
+    { 13.9254, 25.4616, 9715.9646, 13561.7711, 22233.0103, 78808.0412 },
+    { 13.9254, 25.4616, 9715.2201, 13561.8136, 22233.0575, 78803.7279 },
+    { 13.9254, 25.4616, 9717.2669, 13561.7414, 22233.0867, 78805.6910 },
+    { 13.9254, 25.4616, 9715.4200, 13561.7710, 22233.0863, 78804.9550 }
+  };
+  const std::vector<std::vector<double>> std_ans = {
+    {  0.0001,  0.0004,  6.4351,  0.0799,  0.1205,  4.3182 },
+    {  0.0001,  0.0004,  5.6508,  0.1027,  0.1201,  5.7423 },
+    {  0.0001,  0.0004,  6.0844,  0.0828,  0.1268,  4.7352 },
+    {  0.0001,  0.0004,  5.9942,  0.0808,  0.1110,  3.9101 },
+    {  0.0001,  0.0004,  5.2968,  0.0791,  0.1344,  4.3747 },
+    {  0.0001,  0.0004,  5.0563,  0.0814,  0.1246,  4.3633 },
+    {  0.0001,  0.0004,  6.0208,  0.0689,  0.1217,  3.7408 },
+    {  0.0001,  0.0004,  5.1209,  0.0694,  0.1090,  4.2950 }
+  };
+  for (int gpos_bits = gpos_bits_min; gpos_bits <= gpos_bits_max; gpos_bits += 30) {
+    for (int vel_bits = vel_bits_min; vel_bits <= vel_bits_max; vel_bits += 24) {
+      for (int frc_bits = frc_bits_min; frc_bits <= frc_bits_max; frc_bits += 30) {
+        if (ntest > 0 && oe.doIntensiveTests() == false) {
+          continue;
+        }
+        runPeriodicTests(tsm_pbc, mean_ans[ntest], std_ans[ntest], PrecisionModel::DOUBLE,
+                         PrecisionModel::DOUBLE, 9.0, 132, 0.25, gpos_bits, vel_bits, frc_bits);
+        ntest++;
+      }
+    }
+  }
+  runPeriodicTests(tsm_pbc, { 14.5022, 26.3922, 10444.5478, 14512.8358, 23741.4449, 84008.4254 },
+                   {  0.0001,  0.0015,  5.1219,  0.1121,  0.1483,  4.5384 },
+                   PrecisionModel::DOUBLE, PrecisionModel::DOUBLE, 8.5, 132, 0.50);
+  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

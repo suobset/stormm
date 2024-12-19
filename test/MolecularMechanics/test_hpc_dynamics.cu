@@ -293,6 +293,49 @@ void checkRigidWater(const std::string &base_crd_name, const std::string &base_t
 }
 
 //-------------------------------------------------------------------------------------------------
+// Test each stage of the integration using the individual kernels.  This process involves many
+// more memory "round trips" than a single, fused kernel, but permits greater flexibility to reach
+// in at each stage and make modifications or collect metrics like the kinetic energy.
+//
+// Arguments:
+//   tsm:   A collection of test systems
+//   bcs:   Boundary conditions of systems to pluck from the test collection
+//   prec:  The precision in which to calculate particle movement and constraints
+//   gpu:   Details of the GPU that will perform the calculations
+//-------------------------------------------------------------------------------------------------
+void piecewiseIntegrationTests(const TestSystemManager &tsm, const std::vector<UnitCellType> &bcs,
+                               const PrecisionModel prec, const GpuDetails &gpu) {
+
+  // Find all systems in isolated boundary conditions, then in periodic boundary conditions.
+  PhaseSpaceSynthesis poly_ps = tsm.exportPhaseSpaceSynthesis(bcs);
+  AtomGraphSynthesis poly_ag = tsm.exportAtomGraphSynthesis(bcs);
+  const std::vector<int> all_members = incrementingSeries<int>(0, poly_ag.getSystemCount());
+  StaticExclusionMaskSynthesis poly_se(poly_ag.getSystemTopologyPointer(), all_members);
+  poly_ag.loadNonbondedWorkUnits(poly_se, InitializationTask::NONE, 0, gpu);
+  const CoreKlManager launcher(gpu, poly_ag);
+
+  // Upload the relevant components
+  poly_ps.upload();
+  poly_ag.upload();
+  poly_se.upload();
+
+  // Create some semblance of "nonbonded" forces.  This bifurcates the integration along boundary
+  // condition types, implicit versus explicit solvent dynamics.
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    {
+      
+    }
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    {
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -384,7 +427,20 @@ int main(const int argc, const char* argv[]) {
   // Check dynamics of a small system involving periodic boundary conditions and constraints.
   checkRigidWater(base_crd_name, base_top_name, PrecisionModel::SINGLE);
   checkRigidWater(base_crd_name, base_top_name, PrecisionModel::DOUBLE);
-  
+
+  // Check the integration of equations of motion, one kernel at a time and in fused segments
+#ifdef STORMM_USE_HPC
+  const std::vector<std::string> pbc_mols = { "tip3p", "tip4p", "tamavidin", "trpcage_in_water" };
+  TestSystemManager pbc_tsm(base_top_name, "top", pbc_mols, base_crd_name, "inpcrd", pbc_mols);
+  const std::vector<UnitCellType> iso_bcs = { UnitCellType::NONE };
+  const std::vector<UnitCellType> img_bcs = { UnitCellType::ORTHORHOMBIC,
+                                              UnitCellType::TRICLINIC };
+  piecewiseIntegrationTests(tsm, iso_bcs, PrecisionModel::DOUBLE, gpu);
+  piecewiseIntegrationTests(tsm, iso_bcs, PrecisionModel::SINGLE, gpu);
+  piecewiseIntegrationTests(pbc_tsm, img_bcs, PrecisionModel::DOUBLE, gpu);
+  piecewiseIntegrationTests(pbc_tsm, img_bcs, PrecisionModel::SINGLE, gpu);
+#endif
+
   // Display timings and test results
   if (oe.getDisplayTimingsOrder()) {
     timer.printResults();

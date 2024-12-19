@@ -70,11 +70,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
     pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, sh_tile_xcog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, sh_ycrd, sh_tile_ycog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
     pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, sh_zcrd, sh_tile_zcog,
-                              poly_psw.gpos_scale_f);
+                              poly_psw.gpos_scale);
 #else
     pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, sh_xcrd, poly_psw.xcrd_ovrf,
                               sh_xcrd_overflow, sh_tile_xcog, poly_psw.gpos_scale);

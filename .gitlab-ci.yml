@@ -10,7 +10,7 @@ test:
 
   script:
 
-    - apt update && apt upgrade -y
+    - apt update -y
     - apt install wget -y
     - apt install python3-pip -y
     - apt install git -y
@@ -42,7 +42,8 @@ test:
             -DCMAKE_PREFIX_PATH=${CI_PROJECT_DIR}/.conda/
             -DSTORMM_ENABLE_TEST_COVERAGE=YES 
             -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy
-            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" ..
+            -DCUSTOM_NVCC_THREADS=8
+            -DCUSTOM_GPU_ARCH="75" ..
     - make -j
     - make test -j
     - gcovr --xml-pretty --exclude-unreachable-branches --gcov-ignore-parse-errors --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}

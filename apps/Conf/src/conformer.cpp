@@ -1,3 +1,4 @@
+#include "../../../src/copyright.h"
 #include "../../../src/Accelerator/hpc_config.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/FileManagement/file_listing.h"
@@ -14,6 +15,7 @@
 #endif
 #include "../../../src/MoleculeFormat/mdlmol.h"
 #include "../../../src/Namelists/input_transcript.h"
+#include "../../../src/Namelists/nml_files.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/nml_precision.h"
 #include "../../../src/Namelists/nml_random.h"
@@ -77,8 +79,8 @@ int main(int argc, const char* argv[]) {
   // Parse the command line
   CommandLineParser clip("conformer.stormm", "A program for exploring conformations of ligands.");
   clip.addStandardApplicationInputs();
-  const std::vector<std::string> my_namelists = { "&files", "&conformer", "&restraint",
-                                                  "&solvent", "&random", "&minimize", "&report",
+  const std::vector<std::string> my_namelists = { "&files", "&conformer", "&minimize",
+                                                  "&restraint", "&solvent", "&random", "&report",
                                                   "&precision" };
   clip.addControlBlocks(my_namelists);
   if (displayNamelistHelp(argc, argv, my_namelists) && clip.doesProgramExitOnHelp()) {
@@ -87,7 +89,7 @@ int main(int argc, const char* argv[]) {
   clip.parseUserInput(argc, argv);
   
   // Read information from the command line and initialize the UserSettings object
-  UserSettings ui(clip, { "-pe", "-ce", "-rg" });
+  const UserSettings ui(clip, { "-pe", "-ce", "-rg" });
   
   // Get details of the GPU to use
 #ifdef STORMM_USE_HPC

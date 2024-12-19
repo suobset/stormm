@@ -176,10 +176,22 @@ int main(const int argc, const char* argv[]) {
   nml_b.addKeyword(NamelistElement("broadcast", { "seasons", "network", "neilsen" },
                                      { NamelistType::INTEGER, NamelistType::STRING,
                                        NamelistType::REAL }, { "33", "Fox", "4.7" }));
+  nml_b.addKeyword("have_remote", NamelistType::BOOLEAN);
+  nml_b.addHelp("have_remote", "Stipulate that the guy on the couch has a remote for the TV.");
   CHECK_THROWS(nml_b.addKeyword(NamelistElement("height", NamelistType::REAL, "5' 11\"")),
                "A REAL keyword was added to a namelist with a STRING value default.");
   CHECK_THROWS(nml_b.addKeyword(NamelistElement("show", NamelistType::REAL, "706.24")),
                "A keyword was added to a namelist with the same name as an existing keyword.");
+  check(nml_b.getBoolValue("have_remote") == false, "A BOOL keyword in a namelist was not "
+        "initialized to the proper value of FALSE.");
+  check(nml_b.getIntValue("parking"), RelationalOperator::EQUAL, 45, "The default value of an "
+        "INTEGER-type keyword was not transcribed correctly.");
+  nml_b.setDefaultValue("parking", std::to_string(68));
+  check(nml_b.getIntValue("parking"), RelationalOperator::EQUAL, 68, "The default value of an "
+        "INTEGER-type keyword was not modified as expected.");
+  nml_b.setDefaultValue("badge", realToString(53.71, 9, 4, NumberFormat::STANDARD_REAL));
+  check(nml_b.getRealValue("badge"), RelationalOperator::EQUAL, 53.71, "The default value of a "
+        "REAL-type keyword was not modified as expected.");
 
   // Try reading a namelist from an example file
   section(2);

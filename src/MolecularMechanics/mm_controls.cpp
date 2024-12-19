@@ -349,8 +349,12 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
   // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
   const int2 vwu_lp = launcher.getValenceKernelDims(valence_prec, eval_frc, eval_nrg,
                                                     AccumulationMethod::SPLIT, purpose, softcore);
+  const int2 vadv_lp = launcher.getIntegrationKernelDims(valence_prec, AccumulationMethod::SPLIT,
+                                                         IntegrationStage::VELOCITY_ADVANCE);
   const int2 vcns_lp = launcher.getIntegrationKernelDims(valence_prec, AccumulationMethod::SPLIT,
                                                          IntegrationStage::VELOCITY_CONSTRAINT);
+  const int2 padv_lp = launcher.getIntegrationKernelDims(valence_prec, AccumulationMethod::SPLIT,
+                                                         IntegrationStage::POSITION_ADVANCE);
   const int2 gcns_lp = launcher.getIntegrationKernelDims(valence_prec, AccumulationMethod::SPLIT,
                                                          IntegrationStage::GEOMETRY_CONSTRAINT);
   switch (poly_ag.getUnitCellType()) {
@@ -399,14 +403,18 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const CoreKlManager &laun
                                                        ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
   const int vwu_block_count  = vwu_lp.x;
+  const int vadv_block_count = vadv_lp.x;
   const int vcns_block_count = vcns_lp.x;
+  const int padv_block_count = padv_lp.x;
   const int gcns_block_count = gcns_lp.x;
   const int gtwu_block_count = rdwu_lp.x;
   const int scwu_block_count = rdwu_lp.x;
   const int rdwu_block_count = rdwu_lp.x;
   for (int i = 0; i < twice_warp_size_int; i++) {
     vwu_progress.putHost(vwu_block_count, i);
+    velocity_update_progress.putHost(vadv_block_count, i);
     velocity_constraint_progress.putHost(vcns_block_count, i);
+    position_update_progress.putHost(padv_block_count, i);
     geometry_constraint_progress.putHost(gcns_block_count, i);
     gather_wu_progress.putHost(gtwu_block_count, i);
     scatter_wu_progress.putHost(scwu_block_count, i);

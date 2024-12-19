@@ -60,23 +60,23 @@ std::string getEnumerationName(const OutputSyntax input) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getEnumerationName(const IntegrationStage input) {
+std::string getEnumerationName(const DynamicsStepStage input) {
   switch (input) {
-  case IntegrationStage::BEGIN:
+  case DynamicsStepStage::BEGIN:
     return std::string("BEGIN");
-  case IntegrationStage::NONBONDED_FORCE:
+  case DynamicsStepStage::NONBONDED_FORCE:
     return std::string("NONBONDED_FORCE");
-  case IntegrationStage::ADDED_FORCE:
+  case DynamicsStepStage::ADDED_FORCE:
     return std::string("ADDED_FORCE");
-  case IntegrationStage::BONDED_FORCE:
+  case DynamicsStepStage::BONDED_FORCE:
     return std::string("BONDED_FORCE");
-  case IntegrationStage::VELOCITY_UPDATE:
+  case DynamicsStepStage::VELOCITY_UPDATE:
     return std::string("VELOCITY_UPDATE");
-  case IntegrationStage::RATTLE:
+  case DynamicsStepStage::RATTLE:
     return std::string("RATTLE");
-  case IntegrationStage::COORDINATE_UPDATE:
+  case DynamicsStepStage::COORDINATE_UPDATE:
     return std::string("COORDINATE_UPDATE");
-  case IntegrationStage::SHAKE:
+  case DynamicsStepStage::SHAKE:
     return std::string("SHAKE");
   }
   __builtin_unreachable();
@@ -243,42 +243,42 @@ OutputScope translateOutputScope(const std::string &input) {
 }
 
 //-------------------------------------------------------------------------------------------------
-IntegrationStage translateIntegrationStage(const std::string &input) {
+DynamicsStepStage translateDynamicsStepStage(const std::string &input) {
   if (strcmpCased(input, "begin", CaseSensitivity::NO) ||
       strcmpCased(input, "init", CaseSensitivity::NO)) {
-    return IntegrationStage::BEGIN;
+    return DynamicsStepStage::BEGIN;
   }
   else if (strcmpCased(input, "nonbonded_force", CaseSensitivity::NO) ||
            strcmpCased(input, "nonbonded", CaseSensitivity::NO)) {
-    return IntegrationStage::NONBONDED_FORCE;
+    return DynamicsStepStage::NONBONDED_FORCE;
   }
   else if (strcmpCased(input, "added_force", CaseSensitivity::NO) ||
            strcmpCased(input, "added", CaseSensitivity::NO)) {
-    return IntegrationStage::ADDED_FORCE;
+    return DynamicsStepStage::ADDED_FORCE;
   }
   else if (strcmpCased(input, "bonded_force", CaseSensitivity::NO) ||
            strcmpCased(input, "bonded", CaseSensitivity::NO)) {
-    return IntegrationStage::BONDED_FORCE;
+    return DynamicsStepStage::BONDED_FORCE;
   }
   else if (strcmpCased(input, "velocity_update", CaseSensitivity::NO) ||
            strcmpCased(input, "velocity", CaseSensitivity::NO)) {
-    return IntegrationStage::VELOCITY_UPDATE;
+    return DynamicsStepStage::VELOCITY_UPDATE;
   }
   else if (strcmpCased(input, "rattle", CaseSensitivity::NO) ||
            strcmpCased(input, "velocity_constraint", CaseSensitivity::NO)) {
-    return IntegrationStage::RATTLE;
+    return DynamicsStepStage::RATTLE;
   }
   else if (strcmpCased(input, "coordinate_update", CaseSensitivity::NO) ||
            strcmpCased(input, "coordinate", CaseSensitivity::NO)) {
-    return IntegrationStage::COORDINATE_UPDATE;
+    return DynamicsStepStage::COORDINATE_UPDATE;
   }
   else if (strcmpCased(input, "shake", CaseSensitivity::NO) ||
            strcmpCased(input, "coordinate_constraint", CaseSensitivity::NO)) {
-    return IntegrationStage::SHAKE;
+    return DynamicsStepStage::SHAKE;
   }
   else {
-    rtErr("No IntegrationStage enumeration matches \"" + input + "\".",
-          "translateIntegrationStage");
+    rtErr("No DynamicsStepStage enumeration matches \"" + input + "\".",
+          "translateDynamicsStepStage");
   }
   __builtin_unreachable();
 }

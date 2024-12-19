@@ -57,7 +57,7 @@ enum class OutputSyntax {
 };
 
 /// \brief List the critical points in the molecular dynamics time step.
-enum class IntegrationStage {
+enum class DynamicsStepStage {
   BEGIN,              ///< Point reached prior to non-bonded force calculations (this is the
                       ///<   beginning of the step, but for practical purposes in a repeating MD
                       ///<   cycle this will conincide with the SHAKE or COORDINATE_UPDATE time
@@ -166,7 +166,7 @@ constexpr int maximum_roman_numeral = 25;
 /// \{
 std::string getEnumerationName(OutputScope input);
 std::string getEnumerationName(OutputSyntax input);
-std::string getEnumerationName(IntegrationStage input);
+std::string getEnumerationName(DynamicsStepStage input);
 std::string getEnumerationName(GridFileSyntax input);
 std::string getEnumerationName(SectionComponent input);
 std::string getEnumerationName(ListEnumeration input);

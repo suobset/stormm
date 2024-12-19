@@ -80,8 +80,8 @@ void removeMomentum(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly
                                        &host_poly_psw.yvel_ovrf[sysi_offset],
                                        &host_poly_psw.zvel_ovrf[sysi_offset],
                                        &poly_auk.masses[sysi_offset], poly_ag->getUnitCellType(),
-                                       host_poly_psw.atom_counts[i], host_poly_psw.gpos_scale_f,
-                                       host_poly_psw.vel_scale_f, policy);
+                                       host_poly_psw.atom_counts[i], host_poly_psw.gpos_scale,
+                                       host_poly_psw.vel_scale, policy);
       }
     }
     break;
@@ -99,8 +99,8 @@ void removeMomentum(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis *poly
                                      &host_poly_psw.yvel[sysi_offset],
                                      &host_poly_psw.zvel[sysi_offset], nullptr, nullptr, nullptr,
                                      &poly_auk.masses[sysi_offset], poly_ag->getUnitCellType(),
-                                     host_poly_psw.atom_counts[i], host_poly_psw.gpos_scale_f,
-                                     host_poly_psw.vel_scale_f, policy);
+                                     host_poly_psw.atom_counts[i], host_poly_psw.gpos_scale,
+                                     host_poly_psw.vel_scale, policy);
       }
     }
     break;
@@ -136,24 +136,43 @@ void removeMomentum(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly
                         double2, double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit();
   if (gpu == null_gpu) {
     PsSynthesisWriter poly_psw = poly_ps->data();
-    MotionSweepWriter mosw = mos->data();
     const PsSynthesisReader poly_psr(poly_psw);
-    const MotionSweepReader mosr(mosw);
-    accumulateCenterOfMassMotion(&mosw, poly_auk, poly_psr);
-    removeCenterOfMassMotion(&poly_psw, mosr);
-    accumulateAngularMomentum(&mosw, poly_auk, poly_psr);
-    removeAngularMomentum(&poly_psw, mosr, gpu, policy);
+    switch (poly_psw.unit_cell) {
+    case UnitCellType::NONE:
+      {
+        MotionSweepWriter mosw = mos->data();
+        const MotionSweepReader mosr(mosw);
+        accumulateCenterOfMassMotion(&mosw, poly_auk, poly_psr);
+        removeCenterOfMassMotion(&poly_psw, mosr);
+        accumulateAngularMomentum(&mosw, poly_auk, poly_psr);
+        removeAngularMomentum(&poly_psw, mosr, gpu, policy);
+      }
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      removeMomentum(poly_ps, poly_ag.getSelfPointer(), PrecisionModel::DOUBLE, policy);
+      break;
+    }
   }
 #ifdef STORMM_USE_HPC
   else {
     PsSynthesisWriter poly_psw = poly_ps->data(HybridTargetLevel::DEVICE);
-    MotionSweepWriter mosw = mos->data(HybridTargetLevel::DEVICE);
     const PsSynthesisReader poly_psr(poly_psw);
+    MotionSweepWriter mosw = mos->data(HybridTargetLevel::DEVICE);
     const MotionSweepReader mosr(mosw);
     accumulateCenterOfMassMotion(&mosw, poly_auk, poly_psr, gpu);
     removeCenterOfMassMotion(&poly_psw, mosr, gpu);
-    accumulateAngularMomentum(&mosw, poly_auk, poly_psr, gpu);
-    removeAngularMomentum(&poly_psw, mosr, gpu, policy);
+    switch (poly_psw.unit_cell) {
+    case UnitCellType::NONE:
+      {
+        accumulateAngularMomentum(&mosw, poly_auk, poly_psr, gpu);
+        removeAngularMomentum(&poly_psw, mosr, gpu, policy);
+      }
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      break;
+    }
   }
 #endif
 }

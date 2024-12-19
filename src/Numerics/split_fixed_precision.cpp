@@ -705,6 +705,16 @@ void hostInt95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y,
 }
 
 //-------------------------------------------------------------------------------------------------
+double hostSplitFPToReal(const int95_t isfp) {
+  return (static_cast<double>(isfp.y) * max_llint_accumulation) + static_cast<double>(isfp.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+float hostSplitFPToReal(const int2 isfp) {
+  return (static_cast<float>(isfp.y) * max_int_accumulation_f) + static_cast<float>(isfp.x);
+}
+
+//-------------------------------------------------------------------------------------------------
 void hostSplitAccumulation(const double dval, llint *primary, int *overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
@@ -1038,6 +1048,26 @@ void fixedPrecisionGrid(llint *primary, int *overflow, const int95_t origin,
     overflow[i] = marker.y;
     marker = hostSplitFPSum(marker, increment);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t operator+=(const int95_t lhs, const int95_t rhs) {
+  return hostSplitFPSum(lhs, rhs);
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t operator-=(const int95_t lhs, const int95_t rhs) {
+  return hostSplitFPSubtract(lhs, rhs);
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t operator+(const int95_t lhs, const int95_t rhs) {
+  return hostSplitFPSum(lhs, rhs);
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t operator-(const int95_t lhs, const int95_t rhs) {
+  return hostSplitFPSubtract(lhs, rhs);
 }
   
 } // namespace numerics
