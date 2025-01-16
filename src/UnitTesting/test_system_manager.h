@@ -197,7 +197,7 @@ public:
   ///
   /// \param index  The system of interest
   /// \{
-  PhaseSpace& viewCoordinates(int index);
+  const PhaseSpace& viewCoordinates(int index);
   const std::vector<PhaseSpace>& viewCoordinates();
   /// \}
 

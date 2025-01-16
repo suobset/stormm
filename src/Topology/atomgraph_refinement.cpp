@@ -6,12 +6,14 @@
 #include "Chemistry/znumber.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
+#include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Math/matrix_ops.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
+#include "amber_prmtop_util.h"
 #include "atomgraph_refinement.h"
 
 namespace stormm {
@@ -20,6 +22,7 @@ namespace topology {
 using chemistry::massToZNumber;
 using card::HybridTargetLevel;
 using stmath::crossProduct;
+using stmath::incrementingSeries;
 using stmath::magnitude;
 using stmath::matrixMultiply;
 using stmath::maxValue;
@@ -36,15 +39,225 @@ using symbols::tetrahedral_angle;
 using testing::Approx;
 
 //-------------------------------------------------------------------------------------------------
+CmapSurfaceUnion::CmapSurfaceUnion() :
+  surface_count{0}, surface_values{}, surface_dims{}, surface_bounds{}, set_to_consensus_map{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CmapSurfaceUnion::CmapSurfaceUnion(const double* surf_a, const int* dim_a, const int nmap_a,
+                                   const double* surf_b, const int* dim_b, const int nmap_b,
+                                   const double match_tol) :
+    CmapSurfaceUnion()
+{
+  // Deal with the special cases of either topology having no CMAP terms (this will be common)
+  if (nmap_a == 0) {
+    if (nmap_b == 0) {
+      return;
+    }
+    else {
+      populateByOneSet(surf_b, dim_b, nmap_b);
+    }
+  }
+  
+  // Include all surfaces from the first set, assuming them to all be unique
+  populateByOneSet(surf_a, dim_a, nmap_a);
+
+  // Bail out if there are no CMAP terms in the second set
+  if (nmap_b > 0) {
+    addSet(surf_b, dim_b, nmap_b, match_tol);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+CmapSurfaceUnion::CmapSurfaceUnion(const std::vector<double> &surf_a,
+                                   const std::vector<int> &dim_a,
+                                   const std::vector<double> &surf_b,
+                                   const std::vector<int> &dim_b, const double match_tol) :
+    CmapSurfaceUnion(surf_a.data(), dim_a.data(), dim_a.size(), surf_b.data(), dim_b.data(),
+                     dim_b.size(), match_tol)
+{}
+
+//-------------------------------------------------------------------------------------------------
+CmapSurfaceUnion::CmapSurfaceUnion(const double* surf_a, const int* dim_a, const int nmap_a) :
+    CmapSurfaceUnion(surf_a, dim_a, nmap_a, nullptr, nullptr, 0, constants::small)
+{}
+  
+//-------------------------------------------------------------------------------------------------
+CmapSurfaceUnion::CmapSurfaceUnion(const std::vector<double> &surf_a,
+                                   const std::vector<int> &dim_a) :
+    CmapSurfaceUnion(surf_a.data(), dim_a.data(), dim_a.size(), nullptr,
+                     nullptr, 0, constants::small)
+{}
+
+//-------------------------------------------------------------------------------------------------
+int CmapSurfaceUnion::getUniqueSurfaceCount() const {
+  return surface_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int CmapSurfaceUnion::getContributingTopologyCount() const {
+  return set_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> CmapSurfaceUnion::getCmapSurface(int surf_index) const {
+  validateParameterIndex(surf_index, "getCmapSurface");
+  const size_t llim = surface_bounds[surf_index];
+  const size_t hlim = surface_bounds[surf_index + 1];
+  std::vector<double> result(hlim - llim);
+  for (size_t i = llim; i < hlim; i++) {
+    result[i - llim] = surface_values[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<double>& CmapSurfaceUnion::getAllSurfaces() const {
+  return surface_values;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& CmapSurfaceUnion::getSurfaceDimensions() const {
+  return surface_dims;
+}
+
+//-------------------------------------------------------------------------------------------------
+int CmapSurfaceUnion::getSurfaceDimensions(int surf_index) const {
+  validateParameterIndex(surf_index, "getSurfaceDimensions");
+  return surface_dims[surf_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& CmapSurfaceUnion::getCorrespondence(const int set_index) const {
+  validateSetIndex(set_index, "getCorrespondence");
+  return set_to_consensus_map[set_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int CmapSurfaceUnion::getCorrespondence(const int set_index, const int surf_index) const {
+  validateSetIndex(set_index, "getCorrespondence");
+  if (surf_index < 0 || surf_index >= set_to_consensus_map[set_index].size()) {
+    rtErr("Set index " + std::to_string(set_index) + " has no parameter with index " +
+          std::to_string(surf_index) + " (it has " +
+          std::to_string(set_to_consensus_map[set_index].size()) + " CMAP parameters in all).",
+          "CmapSurfaceUnion", "getCorrespondence");
+  }
+  return set_to_consensus_map[set_index][surf_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+void CmapSurfaceUnion::addSet(const double* surf_v, const int* dim_v, const int nmap,
+                              const double match_tol) {
+
+  // Return immediately if there is no data
+  if (nmap == 0) {
+    return;
+  }
+  
+  // For each surface in the second set, loop over all prior surfaces to try and find a match.
+  std::vector<int> b_bounds(nmap + 1);
+  int sq_prfx = 0;
+  for (int i = 0; i < nmap; i++) {
+    b_bounds[i] = sq_prfx;
+    sq_prfx += dim_v[i] * dim_v[i];
+  }
+  b_bounds[nmap] = sq_prfx;
+  std::vector<bool> unique(nmap, false);
+  std::vector<int> correspondence(nmap, -1);
+  for (int i = 0; i < nmap; i++) {
+    bool match_found = false;
+    int j = 0;
+    const int db_sq = dim_v[i] * dim_v[i];
+    const int bo = b_bounds[i];
+    while (j < surface_count && match_found == false) {
+      if (surface_dims[j] == dim_v[i]) {
+        match_found = true;
+        const int ao = surface_bounds[j];
+        for (int k = 0; k < db_sq; k++) {
+          match_found = (match_found &&
+                         fabs(surface_values[ao + k] - surf_v[bo + k]) < constants::small);
+        }
+      }
+      if (match_found) {
+        correspondence[i] = j;
+      }
+      else {
+        j++;
+      }
+    }
+    if (match_found == false) {
+      surface_dims.push_back(dim_v[i]);
+      unique[i] = true;
+    }
+  }
+  const int next_surf_count = surface_dims.size();
+  sq_prfx = surface_bounds[surface_count];
+  surface_bounds.reserve(next_surf_count + 1);
+  for (int i = surface_count; i < next_surf_count; i++) {
+    sq_prfx += surface_dims[i] * surface_dims[i];
+    surface_bounds.push_back(sq_prfx);
+  }
+  surface_values.reserve(sq_prfx);
+  for (int i = 0; i < nmap; i++) {
+    if (unique[i]) {
+      const int nval = dim_v[i] * dim_v[i];
+      const int offset = b_bounds[i];
+      for (int j = 0; j < nval; j++) {
+        surface_values.push_back(surf_v[offset + j]);
+      }
+      correspondence[i] = surface_count;
+      surface_count += 1;
+    }
+  }
+  set_count += 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+void CmapSurfaceUnion::populateByOneSet(const double* surf_v, const int* dim_v, const int nmap) {
+  surface_count = nmap;
+  set_count = 1;
+  surface_dims.resize(surface_count);
+  surface_bounds.resize(surface_count + 1);
+  int sq_prfx = 0;
+  set_to_consensus_map.push_back(incrementingSeries(0, nmap));
+  for (int i = 0; i < nmap; i++) {
+    surface_dims[i] = dim_v[i];
+    surface_bounds[i] = sq_prfx;
+    sq_prfx += dim_v[i] * dim_v[i];
+  }
+  surface_bounds[nmap] = sq_prfx;
+  surface_values.resize(sq_prfx);
+  for (int i = 0; i < sq_prfx; i++) {
+    surface_values[i] = surf_v[i];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void CmapSurfaceUnion::validateParameterIndex(const int surf_index, const char* caller) const {
+  if (surf_index < 0 || surf_index >= surface_count) {
+    rtErr("Surface index " + std::to_string(surf_index) + " is invalid for a collection of " +
+          std::to_string(surface_count) + " CMAPs.", "CmapSurfaceUnion", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void CmapSurfaceUnion::validateSetIndex(const int set_index, const char* caller) const {
+  if (set_index < 0 || set_index >= set_count) {
+    rtErr("Parameter set (topology) index " + std::to_string(set_index) + " is invalid for a "
+          "collection of " + std::to_string(set_count) + " CMAPs.", "CmapSurfaceUnion", caller);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 BasicValenceTable::BasicValenceTable() :
-    total_bonds{0}, total_angls{0}, total_dihes{0},
-    bond_i_atoms{}, bond_j_atoms{}, bond_param_idx{}, angl_i_atoms{}, angl_j_atoms{},
-    angl_k_atoms{}, angl_param_idx{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{},
-    dihe_l_atoms{}, dihe_param_idx{}, bond_mods{}, angl_mods{}, dihe_mods{}, bond_assigned_atoms{},
-    bond_assigned_index{}, bond_assigned_terms{}, bond_assigned_bounds{}, angl_assigned_atoms{},
-    angl_assigned_index{}, angl_assigned_terms{}, angl_assigned_bounds{}, dihe_assigned_atoms{},
-    dihe_assigned_index{}, dihe_assigned_terms{}, dihe_assigned_bounds{}, bond_assigned_mods{},
-    angl_assigned_mods{}, dihe_assigned_mods{}, bond_relevance{}, angl_relevance{}
+    total_bonds{0}, total_angls{0}, total_dihes{0}, bond_i_atoms{}, bond_j_atoms{},
+    bond_param_idx{}, angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{}, angl_param_idx{},
+    dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{}, dihe_param_idx{}, bond_mods{},
+    angl_mods{}, dihe_mods{}, bond_assigned_atoms{}, bond_assigned_index{}, bond_assigned_terms{},
+    bond_assigned_bounds{}, angl_assigned_atoms{}, angl_assigned_index{}, angl_assigned_terms{},
+    angl_assigned_bounds{}, dihe_assigned_atoms{}, dihe_assigned_index{}, dihe_assigned_terms{},
+    dihe_assigned_bounds{}, bond_assigned_mods{}, angl_assigned_mods{}, dihe_assigned_mods{},
+    bond_relevance{}, angl_relevance{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -61,7 +274,10 @@ BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
                                      const std::vector<int> &dihe_j_atoms_in,
                                      const std::vector<int> &dihe_k_atoms_in,
                                      const std::vector<int> &dihe_l_atoms_in,
-                                     const std::vector<int> &dihe_param_idx_in) :
+                                     const std::vector<int> &dihe_param_idx_in,
+                                     const std::vector<char4> &bond_mods_in,
+                                     const std::vector<char4> &angl_mods_in,
+                                     const std::vector<char4> &dihe_mods_in) :
     BasicValenceTable()
 {
   total_bonds = nbond_in;
@@ -103,33 +319,37 @@ BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
   bool angls_provided = false;
   bool dihes_provided = false;
   if (bond_i_atoms.size() == nbond_in && bond_j_atoms.size() == nbond_in &&
-      bond_param_idx_in.size() == nbond_in) {
+      bond_param_idx_in.size() == nbond_in && bond_mods_in.size() == nbond_in) {
     for (int pos = 0; pos < nbond_in; pos++) {
       bond_i_atoms[pos] = bond_i_atoms_in[pos];
       bond_j_atoms[pos] = bond_j_atoms_in[pos];
       bond_param_idx[pos] = bond_param_idx_in[pos];
+      bond_mods[pos] = bond_mods_in[pos];
     }
     bonds_provided = true;
   }
   if (angl_i_atoms.size() == nangl_in && angl_j_atoms.size() == nangl_in &&
-      angl_k_atoms.size() == nangl_in && angl_param_idx_in.size() == nangl_in) {
+      angl_k_atoms.size() == nangl_in && angl_param_idx_in.size() == nangl_in &&
+      angl_mods_in.size() == nangl_in) {
     for (int pos = 0; pos < nangl_in; pos++) {
       angl_i_atoms[pos] = angl_i_atoms_in[pos];
       angl_j_atoms[pos] = angl_j_atoms_in[pos];
       angl_k_atoms[pos] = angl_k_atoms_in[pos];
       angl_param_idx[pos] = angl_param_idx_in[pos];
+      angl_mods[pos] = angl_mods_in[pos];
     }
     angls_provided = true;
   }
   if (dihe_i_atoms.size() == ndihe_in && dihe_j_atoms.size() == ndihe_in &&
       dihe_k_atoms.size() == ndihe_in && dihe_l_atoms.size() == ndihe_in &&
-      dihe_param_idx_in.size() == ndihe_in) {
+      dihe_param_idx_in.size() == ndihe_in && dihe_mods_in.size() == ndihe_in) {
     for (int pos = 0; pos < ndihe_in; pos++) {
       dihe_i_atoms[pos] = dihe_i_atoms_in[pos];
       dihe_j_atoms[pos] = dihe_j_atoms_in[pos];
       dihe_k_atoms[pos] = dihe_k_atoms_in[pos];
       dihe_l_atoms[pos] = dihe_l_atoms_in[pos];
       dihe_param_idx[pos] = dihe_param_idx_in[pos];
+      dihe_mods[pos] = dihe_mods_in[pos];
     }
     dihes_provided = true;
   }
@@ -479,6 +699,30 @@ VirtualSiteTable::VirtualSiteTable(const int natom_in, const int vs_count_in) :
   frame_dim1.resize(vs_count_in);
   frame_dim2.resize(vs_count_in);
   frame_dim3.resize(vs_count_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteTable::VirtualSiteTable(const int natom_in, const std::vector<int> &vs_atoms_in,
+                                   const std::vector<int> &frame_types_in,
+                                   const std::vector<int> &frame1_atoms_in,
+                                   const std::vector<int> &frame2_atoms_in,
+                                   const std::vector<int> &frame3_atoms_in,
+                                   const std::vector<int> &frame4_atoms_in,
+                                   const std::vector<int> &param_idx_in,
+                                   const std::vector<double> &frame_dim1_in,
+                                   const std::vector<double> &frame_dim2_in,
+                                   const std::vector<double> &frame_dim3_in) :
+    vs_count{static_cast<int>(vs_atoms_in.size())},
+    vs_numbers{std::vector<int>(natom_in, -1)},
+    vs_atoms{vs_atoms_in}, frame_types{frame_types_in}, frame1_atoms{frame1_atoms_in},
+    frame2_atoms{frame2_atoms_in}, frame3_atoms{frame3_atoms_in}, frame4_atoms{frame4_atoms_in},
+    param_idx{param_idx_in}, frame_dim1{frame_dim1_in}, frame_dim2{frame_dim2_in},
+    frame_dim3{frame_dim3_in}
+{
+  // Fill in the array mapping particles to virtual site indices
+  for (int i = 0; i < vs_count; i++) {
+    vs_numbers[vs_atoms[i]] = i;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -950,7 +1194,8 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
                               std::vector<double> *lj_14_b_values,
                               std::vector<double> *lj_14_c_values, 
                               std::vector<double> *hb_a_values, std::vector<double> *hb_b_values,
-                              int n_lj_types, const std::vector<int> &nb_param_index) {
+                              std::vector<double> *hb_c_values, int n_lj_types,
+                              const std::vector<int> &nb_param_index) {
 
   // Resize the Lennard-Jones arrays, then get data pointers
   const int n2_types = n_lj_types * n_lj_types;
@@ -962,6 +1207,7 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
   lj_14_c_values->resize(n2_types, 0.0);
   hb_a_values->resize(n2_types, 0.0);
   hb_b_values->resize(n2_types, 0.0);
+  hb_c_values->resize(n2_types, 0.0);
   double* lja_ptr = lj_a_values->data();
   double* ljb_ptr = lj_b_values->data();
   double* ljc_ptr = lj_c_values->data();
@@ -969,7 +1215,8 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
   double* ljb_14_ptr = lj_14_b_values->data();
   double* ljc_14_ptr = lj_14_c_values->data();
   double* hba_ptr = hb_a_values->data();
-  double* hbb_ptr = hb_a_values->data();
+  double* hbb_ptr = hb_b_values->data();
+  double* hbc_ptr = hb_c_values->data();
   std::vector<double> lj_a_tmp(n2_types);
   std::vector<double> lj_b_tmp(n2_types);
   std::vector<double> lj_c_tmp(n2_types);
@@ -978,6 +1225,7 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
   std::vector<double> lj_14_c_tmp(n2_types);
   std::vector<double> hb_a_tmp(n2_types);
   std::vector<double> hb_b_tmp(n2_types);
+  std::vector<double> hb_c_tmp(n2_types);
   for (int i = 0; i < n_lj_types; i++) {
     for (int j = 0; j <= i; j++) {
       const int nb_lkp = nb_param_index[(n_lj_types * i) + j];
@@ -996,10 +1244,12 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
         lj_14_c_tmp[(n_lj_types * j) + i] = ljc_14_ptr[nb_lkp];
       }
       else {
-        hb_a_tmp[(n_lj_types * i) + j] = hba_ptr[-nb_lkp];
-        hb_a_tmp[(n_lj_types * j) + i] = hba_ptr[-nb_lkp];
-        hb_b_tmp[(n_lj_types * i) + j] = hbb_ptr[-nb_lkp];
-        hb_b_tmp[(n_lj_types * j) + i] = hbb_ptr[-nb_lkp];
+        hb_a_tmp[(n_lj_types * i) + j] = 0.0;
+        hb_a_tmp[(n_lj_types * j) + i] = 0.0;
+        hb_b_tmp[(n_lj_types * i) + j] = 0.0;
+        hb_b_tmp[(n_lj_types * j) + i] = 0.0;
+        hb_c_tmp[(n_lj_types * i) + j] = default_hydrogen_bond_cutoff;
+        hb_c_tmp[(n_lj_types * j) + i] = default_hydrogen_bond_cutoff;
       }
     }
   }
@@ -1014,6 +1264,7 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
     ljc_14_ptr[i] = lj_14_c_tmp[i];
     hba_ptr[i] = hb_a_tmp[i];
     hbb_ptr[i] = hb_b_tmp[i];
+    hbc_ptr[i] = hb_c_tmp[i];
   }
 }
 
@@ -1269,24 +1520,24 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
   // The indexing for CHARMM force field terms does not contain pre-computations like the basic
   // valence term indexing in an Amber topology.  All elements are Fortran-indexed.
   for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    mvt.ubrd_i_atoms[pos] =   tmp_ub_atoms[3*pos    ] - 1;
-    mvt.ubrd_k_atoms[pos] =   tmp_ub_atoms[3*pos + 1] - 1;
-    mvt.ubrd_param_idx[pos] = tmp_ub_atoms[3*pos + 2] - 1;
+    mvt.ubrd_i_atoms[pos] =   tmp_ub_atoms[(3 * pos)    ] - 1;
+    mvt.ubrd_k_atoms[pos] =   tmp_ub_atoms[(3 * pos) + 1] - 1;
+    mvt.ubrd_param_idx[pos] = tmp_ub_atoms[(3 * pos) + 2] - 1;
   }
   for (int pos = 0; pos < mvt.total_impropers; pos++) {
-    mvt.impr_i_atoms[pos]   = tmp_charmm_impr_atoms[5*pos    ] - 1;
-    mvt.impr_j_atoms[pos]   = tmp_charmm_impr_atoms[5*pos + 1] - 1;
-    mvt.impr_k_atoms[pos]   = tmp_charmm_impr_atoms[5*pos + 2] - 1;
-    mvt.impr_l_atoms[pos]   = tmp_charmm_impr_atoms[5*pos + 3] - 1;
-    mvt.impr_param_idx[pos] = tmp_charmm_impr_atoms[5*pos + 4] - 1;
+    mvt.impr_i_atoms[pos]   = tmp_charmm_impr_atoms[(5 * pos)    ] - 1;
+    mvt.impr_j_atoms[pos]   = tmp_charmm_impr_atoms[(5 * pos) + 1] - 1;
+    mvt.impr_k_atoms[pos]   = tmp_charmm_impr_atoms[(5 * pos) + 2] - 1;
+    mvt.impr_l_atoms[pos]   = tmp_charmm_impr_atoms[(5 * pos) + 3] - 1;
+    mvt.impr_param_idx[pos] = tmp_charmm_impr_atoms[(5 * pos) + 4] - 1;
   }
   for (int pos = 0; pos < mvt.total_cmaps; pos++) {
-    mvt.cmap_i_atoms[pos]   = tmp_cmap_atoms[6*pos    ] - 1;
-    mvt.cmap_j_atoms[pos]   = tmp_cmap_atoms[6*pos + 1] - 1;
-    mvt.cmap_k_atoms[pos]   = tmp_cmap_atoms[6*pos + 2] - 1;
-    mvt.cmap_l_atoms[pos]   = tmp_cmap_atoms[6*pos + 3] - 1;
-    mvt.cmap_m_atoms[pos]   = tmp_cmap_atoms[6*pos + 4] - 1;
-    mvt.cmap_param_idx[pos] = tmp_cmap_atoms[6*pos + 5] - 1;
+    mvt.cmap_i_atoms[pos]   = tmp_cmap_atoms[(6 * pos)    ] - 1;
+    mvt.cmap_j_atoms[pos]   = tmp_cmap_atoms[(6 * pos) + 1] - 1;
+    mvt.cmap_k_atoms[pos]   = tmp_cmap_atoms[(6 * pos) + 2] - 1;
+    mvt.cmap_l_atoms[pos]   = tmp_cmap_atoms[(6 * pos) + 3] - 1;
+    mvt.cmap_m_atoms[pos]   = tmp_cmap_atoms[(6 * pos) + 4] - 1;
+    mvt.cmap_param_idx[pos] = tmp_cmap_atoms[(6 * pos) + 5] - 1;
   }
 
   // Assign terms to each atom
@@ -2832,7 +3083,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
     dihe_participation_bounds[i] = dihe_participation_bounds[i - 1];
   }
   dihe_participation_bounds[0] = 0;
-
+  
   // Loop over all atoms, find its 1:4 interactions, and, if the 1:4 interaction goes to an
   // atom of greater index (to avoid double-counting), figure out which dihedral might be able
   // to cover it.
@@ -2852,17 +3103,17 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
             (bvt.dihe_l_atoms[dihe_index] == i && bvt.dihe_i_atoms[dihe_index] == jatom)) {
           const TorsionKind trkind = static_cast<TorsionKind>(bvt.dihe_mods[dihe_index].w);
           if (trkind == TorsionKind::PROPER) {
-
+            
             // If this 1:4 interaction is already covered by a dihedral, handle the exception
             if (found) {
               switch (policy) {
               case ExceptionResponse::DIE:
-                rtErr("A 1:4 attenuated interaction between atoms with indices " +
-                      std::to_string(i + 1) + " and " + std::to_string(jatom + 1) + " is covered "
+                rtErr("A 1:4 attenuated interaction between atoms with C-order array indices " +
+                      std::to_string(i) + " and " + std::to_string(jatom) + " is covered "
                       "by more than one dihedral.", "checkDihedral14Coverage");
               case ExceptionResponse::WARN:
-                rtWarn("A 1:4 attenuated interaction between atoms with indices " +
-                       std::to_string(i + 1) + " and " + std::to_string(jatom + 1) + " is covered "
+                rtWarn("A 1:4 attenuated interaction between atoms with C-order array indices " +
+                       std::to_string(i) + " and " + std::to_string(jatom) + " is covered "
                        "by more than one dihedral.", "checkDihedral14Coverage");
                 break;
               case ExceptionResponse::SILENT:

@@ -55,6 +55,26 @@ enum class UnitCellType {
   NONE = 0, ORTHORHOMBIC, TRICLINIC
 };
 
+/// \brief Some useful molecule classifications
+enum class MoleculeKind {
+  BIOPOLYMER,       ///< Proteins and nucleic acids will fall under this category, if multiple
+                    ///<   residues can be identified of specific names
+  SMALL_ORGANIC,    ///< Organic solvents as well as small molecule ligands up to 60 atoms will
+                    ///<   fall under this category
+  LARGE_ORGANIC,    ///< Organic molecules with 60 or more total real atoms will fall under this
+                    ///<   category.  This is what macrocycles will fall under.
+  ORGANIC_POLYMER,  ///< If the molecule contains more than five residues and is organic, it will
+                    ///<   fall under this category
+  MINERAL,          ///< Inorganic species containing eight or more atoms, plus silicon or any
+                    ///<   metals will fall under this
+  POLYATOMIC_ION,   ///< Molecules with more than one atom but less than eight and a net charge
+  MONATOMIC_ION,    ///< Molecules with only one real atom and a nonzero net charge
+  WATER,            ///< The only real atoms are osygen and two hydrogens
+  OTHER             ///< All other molecules will fall under this category.  This enumeration
+                    ///<   should remain last to be used as a guide for the total number of
+                    ///<   distinctions among molecules in the enum class.
+};
+  
 /// \brief Enumerate the ways to modify an atom's mobility in the toplogy
 enum class MobilitySetting {
   OFF, ON, TOGGLE
@@ -202,6 +222,7 @@ enum class VirtualSiteKind {
 /// \{
 std::string getEnumerationName(TopologyKind input); 
 std::string getEnumerationName(UnitCellType input); 
+std::string getEnumerationName(MoleculeKind input); 
 std::string getEnumerationName(MobilitySetting input);
 std::string getEnumerationName(PerturbationSetting input);
 std::string getEnumerationName(SolventCapSetting input);

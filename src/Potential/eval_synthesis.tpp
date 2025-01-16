@@ -8,9 +8,10 @@ namespace energy {
 template <typename Tcalc, typename Tcalc2>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
                                const SeMaskSynthesisReader syse,
-                               PsSynthesisWriter psyw, ScoreCard *ecard,
-                               const EvaluateForce eval_elec_force,
-                               const EvaluateForce eval_vdw_force) {
+                               PsSynthesisWriter *psyw, ScoreCard *ecard,
+                               const NonbondedTask task, const EvaluateForce eval_elec_force,
+                               const EvaluateForce eval_vdw_force,
+                               const Tcalc clash_minimum_distance, const Tcalc clash_ratio) {
 
   // Critical indexing and offsets for each work unit
   std::vector<int> sh_nbwu_abstract(tile_groups_wu_abstract_length);
@@ -65,7 +66,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
   const bool do_either_force = (do_elec_force || do_vdw_force);
   
   // Initialize the appropriate energy terms in all systems
-  for (int i = 0; i < psyw.system_count; i++) {
+  for (int i = 0; i < psyw->system_count; i++) {
     ecard->initialize(StateVariable::ELECTROSTATIC, i);
     ecard->initialize(StateVariable::VDW, i);
   }
@@ -77,7 +78,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
   for (int nbwu_idx = 0; nbwu_idx < synbk.nnbwu; nbwu_idx++) {
 
     // Import the abstract.
-    for (int pos = 0; pos < 48; pos++) {
+    for (int pos = 0; pos < tile_groups_wu_abstract_length; pos++) {
       sh_nbwu_abstract[pos] = synbk.nbwu_abstracts[(tile_groups_wu_abstract_length * nbwu_idx) +
                                                    pos];
     }
@@ -113,18 +114,18 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
       for (int i = 0; i < tside_count; i++) {
         const size_t localpos = (tile_length * pos) + i;
         const size_t synthpos = atom_start_idx + i;
-        lc_xcrd[localpos]    = psyw.xcrd[synthpos];
-        lc_ycrd[localpos]    = psyw.ycrd[synthpos];
-        lc_zcrd[localpos]    = psyw.zcrd[synthpos];
-        if (psyw.gpos_bits > globalpos_scale_nonoverflow_bits) {
-          lc_xcrd_overflow[localpos] = psyw.xcrd_ovrf[synthpos];
-          lc_ycrd_overflow[localpos] = psyw.ycrd_ovrf[synthpos];
-          lc_zcrd_overflow[localpos] = psyw.zcrd_ovrf[synthpos];
+        lc_xcrd[localpos]    = psyw->xcrd[synthpos];
+        lc_ycrd[localpos]    = psyw->ycrd[synthpos];
+        lc_zcrd[localpos]    = psyw->zcrd[synthpos];
+        if (psyw->gpos_bits > globalpos_scale_nonoverflow_bits) {
+          lc_xcrd_overflow[localpos] = psyw->xcrd_ovrf[synthpos];
+          lc_ycrd_overflow[localpos] = psyw->ycrd_ovrf[synthpos];
+          lc_zcrd_overflow[localpos] = psyw->zcrd_ovrf[synthpos];
         }
         sh_xfrc[localpos]    = 0LL;
         sh_yfrc[localpos]    = 0LL;
         sh_zfrc[localpos]    = 0LL;
-        if (psyw.frc_bits > force_scale_nonoverflow_bits) {
+        if (psyw->frc_bits > force_scale_nonoverflow_bits) {
           sh_xfrc_overflow[localpos] = 0;
           sh_yfrc_overflow[localpos] = 0;
           sh_zfrc_overflow[localpos] = 0;
@@ -142,7 +143,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
         lc_lj_idx[localpos]  = synbk.lj_idx[synthpos];
 
         // Center of geometry computation--coordinates are not scaled to real units at this stage
-        if (psyw.gpos_bits > globalpos_scale_nonoverflow_bits) {
+        if (psyw->gpos_bits > globalpos_scale_nonoverflow_bits) {
           x_cog += hostInt95ToDouble(lc_xcrd[localpos], lc_xcrd_overflow[localpos]);
           y_cog += hostInt95ToDouble(lc_ycrd[localpos], lc_ycrd_overflow[localpos]);
           z_cog += hostInt95ToDouble(lc_zcrd[localpos], lc_zcrd_overflow[localpos]);
@@ -186,7 +187,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
                            inv_tile_pts;
       const Tcalc tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
                            inv_tile_pts;
-      if (psyw.gpos_bits > globalpos_scale_nonoverflow_bits) {
+      if (psyw->gpos_bits > globalpos_scale_nonoverflow_bits) {
         const int95_t x_center = hostDoubleToInt95(tx_cog);
         const int95_t y_center = hostDoubleToInt95(ty_cog);
         const int95_t z_center = hostDoubleToInt95(tz_cog);
@@ -203,9 +204,9 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
                                                     y_center.x, y_center.y);
           const int95_t iz_absc = hostInt95Subtract(lc_zcrd[ilabsc], lc_zcrd_overflow[ilabsc],
                                                     z_center.x, z_center.y);
-          reg_xcrd[i]   = hostInt95ToDouble(ix_absc) * psyw.inv_gpos_scale;
-          reg_ycrd[i]   = hostInt95ToDouble(iy_absc) * psyw.inv_gpos_scale;
-          reg_zcrd[i]   = hostInt95ToDouble(iz_absc) * psyw.inv_gpos_scale;
+          reg_xcrd[i]   = hostInt95ToDouble(ix_absc) * psyw->inv_gpos_scale;
+          reg_ycrd[i]   = hostInt95ToDouble(iy_absc) * psyw->inv_gpos_scale;
+          reg_zcrd[i]   = hostInt95ToDouble(iz_absc) * psyw->inv_gpos_scale;
           reg_lj_idx[i] = lc_lj_idx[ilabsc];
           reg_charge[i] = lc_charge[ilabsc];
           const int95_t ix_ordi = hostInt95Subtract(lc_xcrd[ilordi], lc_xcrd_overflow[ilordi],
@@ -214,9 +215,9 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
                                                     y_center.x, y_center.y);
           const int95_t iz_ordi = hostInt95Subtract(lc_zcrd[ilordi], lc_zcrd_overflow[ilordi],
                                                     z_center.x, z_center.y);
-          reg_xcrd[iplust] = hostInt95ToDouble(ix_ordi) * psyw.inv_gpos_scale;
-          reg_ycrd[iplust] = hostInt95ToDouble(iy_ordi) * psyw.inv_gpos_scale;
-          reg_zcrd[iplust] = hostInt95ToDouble(iz_ordi) * psyw.inv_gpos_scale;
+          reg_xcrd[iplust] = hostInt95ToDouble(ix_ordi) * psyw->inv_gpos_scale;
+          reg_ycrd[iplust] = hostInt95ToDouble(iy_ordi) * psyw->inv_gpos_scale;
+          reg_zcrd[iplust] = hostInt95ToDouble(iz_ordi) * psyw->inv_gpos_scale;
           reg_lj_idx[iplust] = lc_lj_idx[ilordi];
           reg_charge[iplust] = lc_charge[ilordi];
         }
@@ -232,181 +233,220 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
           const size_t ilabsc = i + local_absc_start;
           const size_t ilordi = i + local_ordi_start;
           const size_t iplust = i + tile_length;
-          reg_xcrd[i]   = static_cast<Tcalc>(lc_xcrd[ilabsc] - x_center) * psyw.inv_gpos_scale;
-          reg_ycrd[i]   = static_cast<Tcalc>(lc_ycrd[ilabsc] - y_center) * psyw.inv_gpos_scale;
-          reg_zcrd[i]   = static_cast<Tcalc>(lc_zcrd[ilabsc] - z_center) * psyw.inv_gpos_scale;
+          reg_xcrd[i]   = static_cast<Tcalc>(lc_xcrd[ilabsc] - x_center) * psyw->inv_gpos_scale;
+          reg_ycrd[i]   = static_cast<Tcalc>(lc_ycrd[ilabsc] - y_center) * psyw->inv_gpos_scale;
+          reg_zcrd[i]   = static_cast<Tcalc>(lc_zcrd[ilabsc] - z_center) * psyw->inv_gpos_scale;
           reg_lj_idx[i] = lc_lj_idx[ilabsc];
           reg_charge[i] = lc_charge[ilabsc];
-          reg_xcrd[iplust] = static_cast<Tcalc>(lc_xcrd[ilordi] - x_center) * psyw.inv_gpos_scale;
-          reg_ycrd[iplust] = static_cast<Tcalc>(lc_ycrd[ilordi] - y_center) * psyw.inv_gpos_scale;
-          reg_zcrd[iplust] = static_cast<Tcalc>(lc_zcrd[ilordi] - z_center) * psyw.inv_gpos_scale;
+          reg_xcrd[iplust] = static_cast<Tcalc>(lc_xcrd[ilordi] - x_center) * psyw->inv_gpos_scale;
+          reg_ycrd[iplust] = static_cast<Tcalc>(lc_ycrd[ilordi] - y_center) * psyw->inv_gpos_scale;
+          reg_zcrd[iplust] = static_cast<Tcalc>(lc_zcrd[ilordi] - z_center) * psyw->inv_gpos_scale;
           reg_lj_idx[iplust] = lc_lj_idx[ilordi];
           reg_charge[iplust] = lc_charge[ilordi];
         }
       }
-      for (int i = 0; i < 2 * tile_length; i++) {
-        reg_xfrc[i] = 0.0;
-        reg_yfrc[i] = 0.0;
-        reg_zfrc[i] = 0.0;
+
+      // Initialize forces, if appropriate
+      switch (task) {
+      case NonbondedTask::PME_PARTICLE_PARTICLE:
+      case NonbondedTask::MESH_TO_PARTICLE:
+      case NonbondedTask::GB_PARTICLE_PARTICLE:
+      case NonbondedTask::GB_RADII_DERIVATIVES:
+        for (int i = 0; i < 2 * tile_length; i++) {
+          reg_xfrc[i] = 0.0;
+          reg_yfrc[i] = 0.0;
+          reg_zfrc[i] = 0.0;
+        }
+        break;
+      case NonbondedTask::CONVOLUTION:
+      case NonbondedTask::PARTICLE_TO_MESH:
+      case NonbondedTask::GB_RADII:
+        break;
       }
 
       // Scan over the entire tile--if the tile runs past the end of the system's atoms, there
       // will be a solid mask of excluded interactions.
-      const int nljt = sh_n_lj_types[absc_import_idx];
-      const int lj_offset = sh_ljabc_offsets[absc_import_idx];
-      Tcalc elec_nrg = 0.0;
-      Tcalc vdw_nrg  = 0.0;
-      for (int i = 0; i < tile_length; i++) {
-        const uint i_mask = reg_excl[i];
-        const Tcalc xi = reg_xcrd[i];
-        const Tcalc yi = reg_ycrd[i];
-        const Tcalc zi = reg_zcrd[i];
-        const Tcalc qi = reg_charge[i];
-        const int ilj_idx = (nljt * reg_lj_idx[i]) + lj_offset;
-        for (int j = tile_length; j < 2 * tile_length; j++) {
-          if ((i_mask >> (j - tile_length)) & 0x1) {
-            continue;
-          }
-          const Tcalc dx       = reg_xcrd[j] - xi;
-          const Tcalc dy       = reg_ycrd[j] - yi;
-          const Tcalc dz       = reg_zcrd[j] - zi;
-          const Tcalc dr       = (tcalc_is_double) ?  sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
-                                                     sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-          const Tcalc invr     = value_one / dr;
-          const Tcalc invr2    = invr * invr;
-          const Tcalc invr4    = invr2 * invr2;
-          const Tcalc qqij     = reg_charge[j] * qi;
-          const int   ij_ljidx = reg_lj_idx[j] + ilj_idx;
-          const Tcalc2 ljab    = synbk.ljab_coeff[ij_ljidx];
+      switch (task) {
+      case NonbondedTask::PME_PARTICLE_PARTICLE:
+      case NonbondedTask::PARTICLE_TO_MESH:
+      case NonbondedTask::CONVOLUTION:
+      case NonbondedTask::MESH_TO_PARTICLE:
+        break;
+      case NonbondedTask::GB_PARTICLE_PARTICLE:
+        {
+          const int nljt = sh_n_lj_types[absc_import_idx];
+          const int lj_offset = sh_ljabc_offsets[absc_import_idx];
+          Tcalc elec_nrg = 0.0;
+          Tcalc vdw_nrg  = 0.0;
+          for (int i = 0; i < tile_length; i++) {
+            const uint i_mask = reg_excl[i];
+            const Tcalc xi = reg_xcrd[i];
+            const Tcalc yi = reg_ycrd[i];
+            const Tcalc zi = reg_zcrd[i];
+            const Tcalc qi = reg_charge[i];
+            const int ilj_idx = (nljt * reg_lj_idx[i]) + lj_offset;
 
-          // Log the energy.  This is obligatory on the CPU, but the GPU may or may not do it.
-          elec_nrg += qqij * invr;
-          vdw_nrg  += ((ljab.x * invr4 * invr2) - ljab.y) * invr4 * invr2;
-          
-          // Compute the forces and contribute them to accumulators.
-          if (do_either_force) {
-            Tcalc fmag = (do_elec_force) ? -qqij * invr * invr2 : 0.0;
-            if (do_vdw_force) {
-              if (tcalc_is_double) {
-                fmag += ((6.0 * ljab.y) - (12.0 * ljab.x * invr2 * invr4)) * invr4 * invr4;
+            // For particle-particle eletrostatic and van-der Waals interactions, all interactions
+            // of on-diagonal tiles (where the sending and receiving atoms are one and the same)
+            // are marked excluded for j >= i.
+            for (int j = tile_length; j < 2 * tile_length; j++) {
+              if ((i_mask >> (j - tile_length)) & 0x1) {
+                continue;
               }
-              else {
-                fmag += ((6.0f * ljab.y) - (12.0f * ljab.x * invr2 * invr4)) * invr4 * invr4;
+              const Tcalc dx       = reg_xcrd[j] - xi;
+              const Tcalc dy       = reg_ycrd[j] - yi;
+              const Tcalc dz       = reg_zcrd[j] - zi;
+              const Tcalc dr       = (tcalc_is_double) ?  sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                                          sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+              const Tcalc invr     = value_one / dr;
+              const Tcalc invr2    = invr * invr;
+              const Tcalc invr4    = invr2 * invr2;
+              const Tcalc qqij     = reg_charge[j] * qi;
+              const int   ij_ljidx = reg_lj_idx[j] + ilj_idx;
+              const Tcalc2 ljab    = synbk.ljab_coeff[ij_ljidx];
+
+              // Log the energy.  This is obligatory on the CPU, but the GPU may or may not do it.
+              elec_nrg += qqij * invr;
+              vdw_nrg  += ((ljab.x * invr4 * invr2) - ljab.y) * invr4 * invr2;
+          
+              // Compute the forces and contribute them to accumulators.
+              if (do_either_force) {
+                Tcalc fmag = (do_elec_force) ? -qqij * invr * invr2 : 0.0;
+                if (do_vdw_force) {
+                  if (tcalc_is_double) {
+                    fmag += ((6.0 * ljab.y) - (12.0 * ljab.x * invr2 * invr4)) * invr4 * invr4;
+                  }
+                  else {
+                    fmag += ((6.0f * ljab.y) - (12.0f * ljab.x * invr2 * invr4)) * invr4 * invr4;
+                  }
+                }
+                const Tcalc fmag_dx = fmag * dx;
+                const Tcalc fmag_dy = fmag * dy;
+                const Tcalc fmag_dz = fmag * dz;
+                reg_xfrc[i] += fmag_dx;
+                reg_yfrc[i] += fmag_dy;
+                reg_zfrc[i] += fmag_dz;
+                reg_xfrc[j] -= fmag_dx;
+                reg_yfrc[j] -= fmag_dy;
+                reg_zfrc[j] -= fmag_dz;
               }
             }
-            const Tcalc fmag_dx = fmag * dx;
-            const Tcalc fmag_dy = fmag * dy;
-            const Tcalc fmag_dz = fmag * dz;
-            reg_xfrc[i] += fmag_dx;
-            reg_yfrc[i] += fmag_dy;
-            reg_zfrc[i] += fmag_dz;
-            reg_xfrc[j] -= fmag_dx;
-            reg_yfrc[j] -= fmag_dy;
-            reg_zfrc[j] -= fmag_dz;
           }
-        }
-      }
 
-      // There is no need to test whether each work unit is responsible for accumulating the
-      // energy computed in a tile.  However, each tile will need to contribute its result to
-      // the energy accumulator for a particular system, due to the fact that work units can
-      // contain tiles from different systems.
-      const llint elec_acc = llround(elec_nrg * nrg_scale_factor);
-      ecard->add(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
-      const llint vdw_acc  = llround(vdw_nrg * nrg_scale_factor);
-      ecard->add(StateVariable::VDW, vdw_acc, system_idx);
-      if (do_either_force) {
-        for (int i = 0; i < tile_length; i++) {
-          const size_t ilabsc = i + local_absc_start;
-          const size_t ilordi = i + local_ordi_start;
-          const size_t iplust = i + tile_length;
-          if (psyw.frc_bits > force_scale_nonoverflow_bits) {
-            const int95_t nfx = hostInt95Sum(sh_xfrc[ilabsc], sh_xfrc_overflow[ilabsc],
-                                             reg_xfrc[i] * psyw.frc_scale);
-            const int95_t nfy = hostInt95Sum(sh_yfrc[ilabsc], sh_yfrc_overflow[ilabsc],
-                                             reg_yfrc[i] * psyw.frc_scale);
-            const int95_t nfz = hostInt95Sum(sh_zfrc[ilabsc], sh_zfrc_overflow[ilabsc],
-                                             reg_zfrc[i] * psyw.frc_scale);
-            sh_xfrc[ilabsc] = nfx.x;
-            sh_yfrc[ilabsc] = nfy.x;
-            sh_zfrc[ilabsc] = nfz.x;
-            sh_xfrc_overflow[ilabsc] = nfx.y;
-            sh_yfrc_overflow[ilabsc] = nfy.y;
-            sh_zfrc_overflow[ilabsc] = nfz.y;
-            const int95_t pfx = hostInt95Sum(sh_xfrc[ilordi], sh_xfrc_overflow[ilordi],
-                                             reg_xfrc[iplust] * psyw.frc_scale);
-            const int95_t pfy = hostInt95Sum(sh_yfrc[ilordi], sh_yfrc_overflow[ilordi],
-                                             reg_yfrc[iplust] * psyw.frc_scale);
-            const int95_t pfz = hostInt95Sum(sh_zfrc[ilordi], sh_zfrc_overflow[ilordi],
-                                             reg_zfrc[iplust] * psyw.frc_scale);
-            sh_xfrc[ilordi] = pfx.x;
-            sh_yfrc[ilordi] = pfy.x;
-            sh_zfrc[ilordi] = pfz.x;
-            sh_xfrc_overflow[ilordi] = pfx.y;
-            sh_yfrc_overflow[ilordi] = pfy.y;
-            sh_zfrc_overflow[ilordi] = pfz.y;
-          }
-          else {
-            sh_xfrc[ilabsc] += llround(reg_xfrc[i] * psyw.frc_scale);
-            sh_yfrc[ilabsc] += llround(reg_yfrc[i] * psyw.frc_scale);
-            sh_zfrc[ilabsc] += llround(reg_zfrc[i] * psyw.frc_scale);
-            sh_xfrc[ilordi] += llround(reg_xfrc[iplust] * psyw.frc_scale);
-            sh_yfrc[ilordi] += llround(reg_yfrc[iplust] * psyw.frc_scale);
-            sh_zfrc[ilordi] += llround(reg_zfrc[iplust] * psyw.frc_scale);
+          // There is no need to test whether each work unit is responsible for accumulating the
+          // energy computed in a tile.  However, each tile will need to contribute its result to
+          // the energy accumulator for a particular system, due to the fact that work units can
+          // contain tiles from different systems.
+          const llint elec_acc = llround(elec_nrg * nrg_scale_factor);
+          ecard->add(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
+          const llint vdw_acc  = llround(vdw_nrg * nrg_scale_factor);
+          ecard->add(StateVariable::VDW, vdw_acc, system_idx);
+        }
+        break;
+      case NonbondedTask::GB_RADII_DERIVATIVES:
+        break;
+      case NonbondedTask::GB_RADII:
+        break;
+      }
+      
+      // Store forces computed in the tile in local accumulators.  This mirrors what will happen on
+      // the GPU as forces stored in floating point numbers in registers will be converted back to
+      // fixed-precision and contributed to __shared__ arrays at the end of the cycle.
+      switch (task) {
+      case NonbondedTask::PME_PARTICLE_PARTICLE:
+      case NonbondedTask::MESH_TO_PARTICLE:
+      case NonbondedTask::GB_PARTICLE_PARTICLE:
+      case NonbondedTask::GB_RADII_DERIVATIVES:
+        if (do_either_force) {
+          for (int i = 0; i < tile_length; i++) {
+            const size_t ilabsc = i + local_absc_start;
+            const size_t ilordi = i + local_ordi_start;
+            const size_t iplust = i + tile_length;
+            if (psyw->frc_bits > force_scale_nonoverflow_bits) {
+              const int95_t nfx = hostInt95Sum(sh_xfrc[ilabsc], sh_xfrc_overflow[ilabsc],
+                                               reg_xfrc[i] * psyw->frc_scale);
+              const int95_t nfy = hostInt95Sum(sh_yfrc[ilabsc], sh_yfrc_overflow[ilabsc],
+                                               reg_yfrc[i] * psyw->frc_scale);
+              const int95_t nfz = hostInt95Sum(sh_zfrc[ilabsc], sh_zfrc_overflow[ilabsc],
+                                               reg_zfrc[i] * psyw->frc_scale);
+              sh_xfrc[ilabsc] = nfx.x;
+              sh_yfrc[ilabsc] = nfy.x;
+              sh_zfrc[ilabsc] = nfz.x;
+              sh_xfrc_overflow[ilabsc] = nfx.y;
+              sh_yfrc_overflow[ilabsc] = nfy.y;
+              sh_zfrc_overflow[ilabsc] = nfz.y;
+              const int95_t pfx = hostInt95Sum(sh_xfrc[ilordi], sh_xfrc_overflow[ilordi],
+                                               reg_xfrc[iplust] * psyw->frc_scale);
+              const int95_t pfy = hostInt95Sum(sh_yfrc[ilordi], sh_yfrc_overflow[ilordi],
+                                               reg_yfrc[iplust] * psyw->frc_scale);
+              const int95_t pfz = hostInt95Sum(sh_zfrc[ilordi], sh_zfrc_overflow[ilordi],
+                                               reg_zfrc[iplust] * psyw->frc_scale);
+              sh_xfrc[ilordi] = pfx.x;
+              sh_yfrc[ilordi] = pfy.x;
+              sh_zfrc[ilordi] = pfz.x;
+              sh_xfrc_overflow[ilordi] = pfx.y;
+              sh_yfrc_overflow[ilordi] = pfy.y;
+              sh_zfrc_overflow[ilordi] = pfz.y;
+            }
+            else {
+              sh_xfrc[ilabsc] += llround(reg_xfrc[i] * psyw->frc_scale);
+              sh_yfrc[ilabsc] += llround(reg_yfrc[i] * psyw->frc_scale);
+              sh_zfrc[ilabsc] += llround(reg_zfrc[i] * psyw->frc_scale);
+              sh_xfrc[ilordi] += llround(reg_xfrc[iplust] * psyw->frc_scale);
+              sh_yfrc[ilordi] += llround(reg_yfrc[iplust] * psyw->frc_scale);
+              sh_zfrc[ilordi] += llround(reg_zfrc[iplust] * psyw->frc_scale);
+            }
           }
         }
+        break;
+      case NonbondedTask::PARTICLE_TO_MESH:
+      case NonbondedTask::CONVOLUTION:
+      case NonbondedTask::GB_RADII:
+        break;
       }
     }
 
     // Contribute local force accumulators back to global
-    for (int pos = 0; pos < ntile_sides; pos++) {
-      const int atom_start_idx = sh_nbwu_abstract[pos + 1];
-      const int key_idx        = pos / 4;
-      const int key_pos        = pos - (key_idx * 4);
-      const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
-      for (int i = 0; i < tside_count; i++) {
-        const size_t localpos = (tile_length * pos) + i;
-        const size_t synthpos = atom_start_idx + i;
-        if (psyw.frc_bits > force_scale_nonoverflow_bits) {
-          const int95_t nfx = hostInt95Sum(psyw.xfrc[synthpos], psyw.xfrc_ovrf[synthpos],
-                                           sh_xfrc[localpos], sh_xfrc_overflow[localpos]);
-          const int95_t nfy = hostInt95Sum(psyw.yfrc[synthpos], psyw.yfrc_ovrf[synthpos],
-                                           sh_yfrc[localpos], sh_yfrc_overflow[localpos]);
-          const int95_t nfz = hostInt95Sum(psyw.zfrc[synthpos], psyw.zfrc_ovrf[synthpos],
-                                           sh_zfrc[localpos], sh_zfrc_overflow[localpos]);
-          psyw.xfrc[synthpos] = nfx.x;
-          psyw.yfrc[synthpos] = nfy.x;
-          psyw.zfrc[synthpos] = nfz.x;
-          psyw.xfrc_ovrf[synthpos] = nfx.y;
-          psyw.yfrc_ovrf[synthpos] = nfy.y;
-          psyw.zfrc_ovrf[synthpos] = nfz.y;
-        }
-        else {
-          psyw.xfrc[synthpos] += sh_xfrc[localpos];
-          psyw.yfrc[synthpos] += sh_yfrc[localpos];
-          psyw.zfrc[synthpos] += sh_zfrc[localpos];
+    switch (task) {
+    case NonbondedTask::PME_PARTICLE_PARTICLE:
+    case NonbondedTask::MESH_TO_PARTICLE:
+    case NonbondedTask::GB_PARTICLE_PARTICLE:
+    case NonbondedTask::GB_RADII_DERIVATIVES:
+      for (int pos = 0; pos < ntile_sides; pos++) {
+        const int atom_start_idx = sh_nbwu_abstract[pos + 1];
+        const int key_idx        = pos / 4;
+        const int key_pos        = pos - (key_idx * 4);
+        const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+        for (int i = 0; i < tside_count; i++) {
+          const size_t localpos = (tile_length * pos) + i;
+          const size_t synthpos = atom_start_idx + i;
+          if (psyw->frc_bits > force_scale_nonoverflow_bits) {
+            const int95_t nfx = hostInt95Sum(psyw->xfrc[synthpos], psyw->xfrc_ovrf[synthpos],
+                                             sh_xfrc[localpos], sh_xfrc_overflow[localpos]);
+            const int95_t nfy = hostInt95Sum(psyw->yfrc[synthpos], psyw->yfrc_ovrf[synthpos],
+                                             sh_yfrc[localpos], sh_yfrc_overflow[localpos]);
+            const int95_t nfz = hostInt95Sum(psyw->zfrc[synthpos], psyw->zfrc_ovrf[synthpos],
+                                             sh_zfrc[localpos], sh_zfrc_overflow[localpos]);
+            psyw->xfrc[synthpos] = nfx.x;
+            psyw->yfrc[synthpos] = nfy.x;
+            psyw->zfrc[synthpos] = nfz.x;
+            psyw->xfrc_ovrf[synthpos] = nfx.y;
+            psyw->yfrc_ovrf[synthpos] = nfy.y;
+            psyw->zfrc_ovrf[synthpos] = nfz.y;
+          }
+          else {
+            psyw->xfrc[synthpos] += sh_xfrc[localpos];
+            psyw->yfrc[synthpos] += sh_yfrc[localpos];
+            psyw->zfrc[synthpos] += sh_zfrc[localpos];
+          }
         }
       }
+      break;
+    case NonbondedTask::PARTICLE_TO_MESH:
+    case NonbondedTask::CONVOLUTION:
+    case NonbondedTask::GB_RADII:
+      break;
     }
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
-template <typename Tcalc>
-void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
-                           const StaticExclusionMaskSynthesis &poly_se,
-                           PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
-                           const EvaluateForce eval_elec_force,
-                           const EvaluateForce eval_vdw_force) {
-  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
-  const bool tcalc_is_double = (tcalc_ct == double_type_index);
-  if (tcalc_is_double) {
-    evalSyNonbondedTileGroups(poly_ag.getDoublePrecisionNonbondedKit(), poly_se.data(),
-                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force);
-  }
-  else {
-    evalSyNonbondedTileGroups(poly_ag.getSinglePrecisionNonbondedKit(), poly_se.data(),
-                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force);
   }
 }
 

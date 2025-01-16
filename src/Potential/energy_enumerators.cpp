@@ -136,6 +136,27 @@ std::string getEnumerationName(const NonbondedPotential input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const NonbondedTask input) {
+  switch (input) {
+  case NonbondedTask::PME_PARTICLE_PARTICLE:
+    return std::string("PME_PARTICLE_PARTICLE");
+  case NonbondedTask::PARTICLE_TO_MESH:
+    return std::string("PARTICLE_TO_MESH");
+  case NonbondedTask::CONVOLUTION:
+    return std::string("CONVOLUTION");
+  case NonbondedTask::MESH_TO_PARTICLE:
+    return std::string("MESH_TO_PARTICLE");
+  case NonbondedTask::GB_PARTICLE_PARTICLE:
+    return std::string("GB_PARTICLE_PARTICLE");
+  case NonbondedTask::GB_RADII:
+    return std::string("GB_RADII");
+  case NonbondedTask::GB_RADII_DERIVATIVES:
+    return std::string("GB_RADII_DERIVATIVES");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const NonbondedTheme input) {
   switch (input) {
   case NonbondedTheme::ELECTROSTATIC:

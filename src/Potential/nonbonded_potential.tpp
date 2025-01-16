@@ -54,7 +54,7 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
       // Access the supertile's map index: if zero, there are no exclusions to worry about
       const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
-
+      
       // The outer loops can proceed until the branch about exclusions
       for (int ti = 0; ti < ni_tiles; ti++) {
         const int ni_atoms = std::min(stni_atoms - (ti * tile_length), tile_length);
@@ -202,7 +202,7 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                   const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                   vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
-
+                  
                   // Evaluate the force, if requested
                   if (eval_elec_force == EvaluateForce::YES ||
                       eval_vdw_force == EvaluateForce::YES) {

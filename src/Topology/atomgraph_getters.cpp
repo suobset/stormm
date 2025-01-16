@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <climits>
 #include "copyright.h"
+#include "Chemistry/residue_dictionary.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
@@ -12,6 +13,8 @@ namespace stormm {
 namespace topology {
 
 using card::HybridTargetLevel;
+using chemistry::isAminoAcid;
+using chemistry::isNucleicAcid;
 using stmath::findBin;
 using stmath::locateValue;
 using stmath::reduceUniqueValues;
@@ -43,6 +46,98 @@ int AtomGraph::getMoleculeCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+MoleculeKind AtomGraph::getMoleculeKind(int mol_index) const {
+  const int* molcon_ptr = molecule_contents.data();
+  const int* znum_ptr = atomic_numbers.data();
+  const int* mol_lims_ptr = molecule_limits.data();
+  const int* res_lims_ptr = residue_limits.data();
+  const char4* res_names_ptr = residue_names.data();
+  const int start_limit = mol_lims_ptr[mol_index];
+  const int end_limit = mol_lims_ptr[mol_index + 1];
+  int n_real = 0;
+  int n_carbon = 0;
+  int n_hydrogen = 0;
+  int n_oxygen = 0;
+  int n_metal = 0;
+  std::vector<bool> residue_identified(end_limit - start_limit, false);
+  for (int i = start_limit; i < end_limit; i++) {
+    const int atom_idx = molcon_ptr[i];
+    n_real += (znum_ptr[atom_idx] > 0);
+    n_carbon += (znum_ptr[atom_idx] == 6);
+    n_hydrogen += (znum_ptr[atom_idx] == 1);
+    n_oxygen += (znum_ptr[atom_idx] == 8);
+    n_metal += (znum_ptr[atom_idx] == 14 || znum_ptr[atom_idx] >= 21);
+  }
+  if (n_real >= 8) {
+
+    // The molecule is large enough to be something organic, even a biomolecule or mineral
+    int current_residx = -1;
+    int n_biopolymer_res = 0;
+    int n_total_res = 0;
+    for (int i = start_limit; i < end_limit; i++) {
+      const int atom_idx = molcon_ptr[i];
+      const int res_idx = getResidueIndex(atom_idx);
+      if (res_idx != current_residx) {
+        if (isAminoAcid(res_names_ptr[res_idx]) || isNucleicAcid(res_names_ptr[res_idx])) {
+          n_biopolymer_res++;
+        }
+        current_residx = res_idx;
+        n_total_res++;
+      }
+    }
+
+    // Is it a biomolecule?  If not, is it organic?
+    if (n_biopolymer_res >= 5) {
+      return MoleculeKind::BIOPOLYMER;
+    }
+    else if (n_total_res >= 5) {
+      return MoleculeKind::ORGANIC_POLYMER;
+    }
+    else if (n_carbon >= 1) {
+    
+      // Is it a small or large organic molecule?
+      return (n_real >= 60) ? MoleculeKind::LARGE_ORGANIC : MoleculeKind::SMALL_ORGANIC;
+    }
+    else if (n_metal >= 2) {
+      return MoleculeKind::MINERAL;
+    }
+    else {
+      return MoleculeKind::OTHER;
+    }
+  } 
+  else {
+    
+    // Scan the molecule, taking note of the net charge.
+    const double* q_ptr = atomic_charges.data();
+    double net_charge = 0.0;
+    for (int i = start_limit; i < end_limit; i++) {
+      const int atom_idx = molcon_ptr[i];
+      n_real += (znum_ptr[atom_idx] > 0);
+      net_charge += q_ptr[atom_idx];
+    }
+
+    // Is it water?
+    if (n_real == 3 && n_hydrogen == 2 && n_oxygen == 1) {
+      return MoleculeKind::WATER;
+    }
+    
+    // Is it an ion?
+    if (fabs(net_charge) >= 0.95) {
+      if (n_real == 1) {
+        return MoleculeKind::MONATOMIC_ION;
+      }
+      else {
+        return MoleculeKind::POLYATOMIC_ION;
+      }
+    }
+    else {
+      return MoleculeKind::OTHER;
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraph::getOrganicMoleculeCount() const {
   const int* molcon_ptr = molecule_contents.data();
   const int* znum_ptr = atomic_numbers.data();
@@ -58,8 +153,6 @@ int AtomGraph::getOrganicMoleculeCount() const {
       bool needs_carbon = true;
       int j = start_limit;
       while ((nreal < 8 || needs_carbon) && j < end_limit) {
-        
-        // 2: At least one hydrogen and one carbon atom
         const int jatom_idx = molcon_ptr[j];
         nreal += (znum_ptr[jatom_idx] > 0);
         needs_carbon = (needs_carbon && znum_ptr[jatom_idx] != 6);

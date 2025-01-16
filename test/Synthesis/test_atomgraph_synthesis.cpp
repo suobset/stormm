@@ -274,8 +274,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   // Non-bonded interactions
   if (do_nonbonded == EvaluateNonbonded::YES) {
     poly_ps->initializeForces();
-    evalSyNonbondedEnergy<double>(poly_ag, syse, poly_ps, &sc, EvaluateForce::YES,
-                                  EvaluateForce::YES);
+    evalSyNonbondedEnergy(poly_ag, syse, poly_ps, &sc, NonbondedTask::GB_PARTICLE_PARTICLE,
+                          PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateForce::YES);
   }
 }
 

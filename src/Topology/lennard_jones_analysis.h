@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include "copyright.h"
+#include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -12,9 +13,10 @@
 namespace stormm {
 namespace topology {
 
+using constants::ExceptionResponse;
 using energy::VdwCombiningRule;
 using synthesis::AtomGraphSynthesis;
-
+  
 /// \brief A struct to encode two atom types and the Lennard-Jones parameters by which they
 ///        interact.
 struct PairLJInteraction {
@@ -25,7 +27,7 @@ public:
   /// \{
   PairLJInteraction(const char4 type_a_in = { ' ', ' ', ' ', ' ' },
                     const char4 type_b_in = { ' ', ' ', ' ', ' ' }, double lja_in = 0.0,
-                    double ljb_in = 0.0);
+                    double ljb_in = 0.0, double lja_14_in = 0.0, double ljb_14_in = 0.0);
 
   /// \brief The default copy and move constructions as well as assignment operators are valid,
   ///        making this object easy to manipulate.
@@ -40,10 +42,12 @@ public:
   /// \}
 
   // All member variables are public.
-  char4 type_a;  ///< Atom type of the first atom in the pair
-  char4 type_b;  ///< Atom type of the second atom in the pair
-  double lja;    ///< Lennard-Jones A coefficient for the interaction, as in U = A/r^12 - B/r^6
-  double ljb;    ///< Lennard-Jones B coefficient for the interaction
+  char4 type_a;   ///< Atom type of the first atom in the pair
+  char4 type_b;   ///< Atom type of the second atom in the pair
+  double lja;     ///< Lennard-Jones A coefficient for the interaction, as in U = A/r^12 - B/r^6
+  double ljb;     ///< Lennard-Jones B coefficient for the interaction
+  double lja_14;  ///< Lennard-Jones A coefficient for 1:4 interactions
+  double ljb_14;  ///< Lennard-Jones B coefficient for 1:4 interactions
 };
   
 /// \brief A class to sort and hold details of a topology's Lennard-Jones interactions.  The
@@ -74,7 +78,7 @@ public:
   LennardJonesAnalysis& operator=(const LennardJonesAnalysis &original) = default;
   LennardJonesAnalysis& operator=(LennardJonesAnalysis &&original) = default;
   /// \}
-
+  
   /// \brief Get the number of Lennard-Jones indices, the number of distinct Lennard Jones
   ///        parameter sets which are needed to describe all interactions.
   int getLJTypeCount() const;
@@ -83,6 +87,10 @@ public:
   ///        parameters.
   int getAtomTypeCount() const;
 
+  /// \brief Get the number of Lennard-Jones parameter sets that the analysis has compiled within
+  ///        its data members.
+  int getSetCount() const;
+  
   /// \brief Get the most prevalent Lennard-Jones rule, as judged by the formula that fits the
   ///        most combinations of distinct sigma and epsilon parameters.
   VdwCombiningRule getMostPrevalentCombiningRule() const;
@@ -115,7 +123,8 @@ public:
   const std::vector<char4>& getLJAliases(double sigma_query, double epsilon_query,
                                          double tolerance = 1.0e-4) const;
 
-  const std::vector<char4>& getLJAliases(const char4 atom_type_query) const;
+  const std::vector<char4>& getLJAliases(const char4 atom_type_query,
+                                         ExceptionResponse policy = ExceptionResponse::DIE) const;
   /// \}  
 
   /// \brief Get the Lennard-Jones self interaction sigma for a particular interaction index from
@@ -125,12 +134,22 @@ public:
   ///                         this is if the analysis includes more than one topology, but it can
   ///                         still be useful to have an accessor that accepts this sort of input.
   double getLJSigma(int consensus_index) const;
-  
+
+  /// \brief Get the Lennard-Jones 1:4 non-bonded self interaction sigma for a particular
+  ///        interaction index from within the consensus tables.  Descriptions of input parameters
+  ///        follow from getLJSigma(), above.
+  double getLJ14Sigma(int consensus_index) const;
+
   /// \brief Get the Lennard-Jones self interaction epsilon for a particular interaction index from
   ///        within the consensus tables.
   ///
   /// \param consensus_index  The interaction type index of interest
   double getLJEpsilon(int consensus_index) const;
+
+  /// \brief Get the Lennard-Jones 1:4 non-bonded self interaction epsilon for a particular
+  ///        interaction index from within the consensus tables.  Descriptions of input parameters
+  ///        follow from getLJEpsilon(), above.
+  double getLJ14Epsilon(int consensus_index) const;
 
   /// \brief Get the Lennard-Jones sigma and epsilon parameters for the self interaction of a
   ///        specific interaction index within the consensus tables or atom type name.  The sigma
@@ -141,12 +160,65 @@ public:
   ///   - Specify the index from within the consensus tables
   ///   - Specify one of the names of an atom type alias bearing the parameters of interest
   ///
-  /// \param consensus_index
+  /// \param consensus_index  The index of the Lennard-Jones type in the consensus set
+  /// \param atom_type_query  The letter code of the atom type to find within all atom type names,
+  ///                         leading to a particular Lennard-Jones type
+  /// \param policy           Course of action to take if bad input is encountered
   /// \{
   double2 getLJParameters(int consensus_index) const;
-  double2 getLJParameters(const char4 atom_type_query) const;
+  double2 getLJParameters(const char4 atom_type_query,
+                          ExceptionResponse policy = ExceptionResponse::DIE) const;
   /// \}
 
+  /// \brief Get the Lennard-Jones sigma and epsilon parameters for 1:4 self interactions of a
+  ///        specific interaction index within the consensus tables or atom type name.  The sigma
+  ///        parameter appears in the "x" member of the result and the epsilon parameter in the
+  ///        "y" member.  Overloading and descriptions of input parameters follow from
+  ///        getLJParameters(), above.
+  /// \{
+  double2 getLJ14Parameters(int consensus_index) const;
+  double2 getLJ14Parameters(const char4 atom_type_query,
+                            ExceptionResponse policy = ExceptionResponse::DIE) const;
+  /// \}
+
+  /// \brief Get the Lennard-Jones A and B coefficients for the general non-bonded interaction of
+  ///        two Lennard-Jones atom types.  Overloading and descriptions of input parameters follow
+  ///        from getLJParameters(), above.
+  ///
+  double3 getLJCoefficients(int index_i, int index_j) const;
+  double3 getLJCoefficients(const char4 atype_i, const char4 atype_j,
+                            ExceptionResponse policy = ExceptionResponse::DIE) const;
+  /// \}
+
+  /// \brief Get the Lennard-Jones A and B coefficients for the 1:4 non-bonded interaction of two
+  ///        Lennard-Jones atom types.  Overloading and descriptions of input parameters follow
+  ///        from getLJParameters(), above.
+  ///
+  double3 getLJ14Coefficients(int index_i, int index_j) const;
+  double3 getLJ14Coefficients(const char4 atype_i, const char4 atype_j,
+                              ExceptionResponse policy = ExceptionResponse::DIE) const;
+  /// \}
+
+  /// \brief Obtain the Lennard-Jones type correspondence for an indexed Lennard-Jones type in one
+  ///        of the underlying sets.
+  ///
+  /// \param set_index   The underlying set of interest
+  /// \param type_index  The Lennard-Jones atom type index as presented in the underlying set
+  int getCorrespondence(int set_index, int type_index) const;
+  
+  /// \brief Obtain the Lennard-Jones type correspondence for one of the underlying sets.  This
+  ///        can be used to reconfigure the Lennard-Jones type indices of a topology to fit within
+  ///        the consensus set.
+  ///
+  /// \param  set_index  The set of interest
+  const std::vector<int>& getSetCorrespondence(int set_index) const;
+
+  /// \brief Get the input sets and Lennard-Jones types to which one of the consensus Lennard-Jones
+  ///        types maps.
+  ///
+  /// \param consensus_index  The consensus Lennard-Jones atom type
+  const std::vector<int2>& getInputInstances(int consensus_index) const;
+  
   /// \brief Add a new set of Lennard-Jones interactions to the list and expand the internal tables
   ///        with all unique parameters it may contain, as well as new atom type names for existing
   ///        parameters.  The new topology will be checked to ensure that it does not redefine the
@@ -175,6 +247,9 @@ private:
   /// types, making atom_type_count >= lj_type_count.
   int atom_type_count;
 
+  /// The total number of sets that the analysis has taken in
+  int set_count;
+  
   /// Set as the most common combining rule (goemetric or Lorentz-Berthelot) that is apparent in
   /// the first topology used to contruct the object.  Even if the Lennard-Jones parameters of the
   /// topology technically fall under the NBFIX enumeration, there will likely be a rule which
@@ -192,15 +267,27 @@ private:
   /// referenced in ag_pointers
   std::vector<double> sigma;
 
+  /// Sigma parameters for the 1:4 self-interactions of each atom type found within any of the
+  /// topologies referenced in ag_pointers
+  std::vector<double> sigma_14;
+
   /// Epsilon parameters for the self-interactions of each type found within any of the topologies
   /// referenced in ag_pointers
   std::vector<double> epsilon;
+
+  /// Epsilon parameters for the 1:4 self-interactions of each type found within any of the
+  /// topologies referenced in ag_pointers
+  std::vector<double> epsilon_14;
 
   /// The mixed parameters for consensus tables, taken directly from the referenced topologies if
   /// possible or constructed using the prevailing mixing rule.
   /// \{
   std::vector<double> lja_coeff;
   std::vector<double> ljb_coeff;
+  std::vector<double> ljc_coeff;
+  std::vector<double> lja_14_coeff;
+  std::vector<double> ljb_14_coeff;
+  std::vector<double> ljc_14_coeff;
   /// \}
 
   /// List of all NBFix pair-specifc interactions that break the standard combining rule found in
@@ -217,7 +304,7 @@ private:
   /// A map to indicate the Lennard-Jones type index, within the consensus tables, for any
   /// particular atom type name.  The names are converted to uint prior to becoming map keys, to
   /// expedite comparisons and thus lookup.
-  std::map<uint, int> atom_type_map;
+  std::map<uint, std::vector<int>> atom_type_map;
   
   /// Maps between the Lennard-Jones interaction indices in each referenced topology and the
   /// consensus parameter tables.  This table should be used when the Lennard-Jones interaction
@@ -233,8 +320,38 @@ private:
   /// Lennard-Jones atom type.  Keeping this as a vector of vectors eliminates the need for a
   /// bounds array and thus makes it more easily extensible with new topologies.
   std::vector<std::vector<int2>> consensus_to_set_map;
+
+  /// \brief Check that a requested index into the consensus tables is reasonable.
+  ///
+  /// \param ljt_query  The Lennard-Jones type index requested
+  void validateConsensusIndexQuery(int ljt_query) const;
+
+  /// \brief Confirm that a named atom type leads to unambiguous Lennard-Jones parameters.
+  ///
+  /// \param atom_type_query  The atom type of interest
+  /// \param policy           Course of action in the event that the type leads to ambiguous
+  ///                         parameters
+  /// \param caller           Name of the calling function (for backtracing purposes)
+  void confirmDistinctType(const char4 atom_type_query,
+                           const ExceptionResponse policy = ExceptionResponse::DIE,
+                           const char* caller = nullptr) const;
 };
 
+/// \brief Utility function for concatenating all atom types in a list into a human-readable
+///        string, most useful for error reporting.
+///
+/// \param atyp_list  The list of atom types to express
+std::string listAtomTypesAsString(const std::vector<char4> &atyp_list);
+
+/// \brief Compute the number of Lennard-Jones atom types given two vectors of a particular length,
+///        assuming them to be square matrices of the A and B coefficients.
+///
+/// \param length_a  The number of values in the matrix of A coefficients
+/// \param length_b  The number of values in the matrix of B coefficients
+/// \param caller    Name of the calling function
+int inferLennardJonesTypeCount(const int length_a, const int length_b,
+                               const char* caller = nullptr);
+  
 /// \brief Determine the Lennard-Jones combining rule in effect.  The function will accept either
 ///        single- or double-precision data, but internally it uses double-precision calculations.
 ///

@@ -33,7 +33,7 @@ constexpr int free_number_format = -32788;
 /// \param lhs  The string to extend
 /// \param rhs  The char tuple to add
 std::string operator+(const std::string &lhs, const char4 rhs);
-
+  
 /// \brief Convert a character tuple to a string.  This is slightly faster than creating an empty
 ///        string and then using the += operator.  As above, the x, y, z, and w components of the
 ///        character tuple will continue to extend the string unless a null character is reached.
@@ -111,6 +111,7 @@ bool verifyContents(const TextFileReader &tfr, int line, int start_pos, int leng
 ///
 /// Overloaded:
 ///   - Convert a single character
+///   - Convert a character tuple
 ///   - Convert a C++ string
 ///   - Convert a C-style string (given a limit), in place
 ///   - Convert a constant C-style string, returning a C++ string
@@ -120,7 +121,10 @@ bool verifyContents(const TextFileReader &tfr, int line, int start_pos, int leng
 /// \param n_char  The number of characters to convert in the C-style string (trusted that the
 ///                string has this many characters)
 /// \{
-char uppercase(const char tc);
+char uppercase(char tc);
+char2 uppercase(const char2 tc);
+char3 uppercase(const char3 tc);
+char4 uppercase(const char4 tc);
 std::string uppercase(const std::string &ts);
 void uppercase(char* tcs, size_t n_char = 0);
 std::string uppercase(const char* tcs);
@@ -131,6 +135,7 @@ std::string uppercase(const char* tcs);
 ///
 /// Overloaded:
 ///   - Convert a single character
+///   - Convert a character tuple
 ///   - Convert a C++ string
 ///   - Convert a C-style string (given a limit), in place
 ///   - Convert a constant C-style string, returning a C++ string
@@ -140,7 +145,10 @@ std::string uppercase(const char* tcs);
 /// \param n_char  The number of characters to convert in the C-style string (trusted that the
 ///                string has this many characters)
 /// \{
-char lowercase(const char tc);
+char lowercase(char tc);
+char2 lowercase(const char2 tc);
+char3 lowercase(const char3 tc);
+char4 lowercase(const char4 tc);
 std::string lowercase(const std::string &ts);
 void lowercase(char* tcs, size_t n_char = 0);
 std::string lowercase(const char* tcs);

@@ -15,6 +15,92 @@ option(STORMM_BUILD_BENCHMARKS "Build the benchmarks" ON)
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
+option(STORMM_INCLUDE_POCKETFFT "Enable PocketFFT support" ON)
+
+#--- Include ExternalProject module for PocketFFT ---
+include(ExternalProject)
+
+# --- PocketFFT Integration ---
+if (STORMM_INCLUDE_POCKETFFT)
+    message("-- Including PocketFFT as part of the build process")
+
+    # Define the ExternalProject
+    ExternalProject_Add(
+        PocketFFTProject
+        GIT_REPOSITORY https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git
+        GIT_TAG master
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+        LOG_DOWNLOAD ON
+        SOURCE_DIR ${CMAKE_BINARY_DIR}/third_party/pocketfft
+    )
+
+    # Define the PocketFFT library target
+    add_library(PocketFFT STATIC IMPORTED GLOBAL)
+
+    # Set the source directory
+    ExternalProject_Get_Property(PocketFFTProject SOURCE_DIR)
+    set(PocketFFT_SOURCE_DIR ${SOURCE_DIR})
+
+    # Ensure the lib directory exists
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+    # Platform-specific settings
+    if(APPLE)
+        execute_process(
+            COMMAND xcrun --sdk macosx --show-sdk-path
+            OUTPUT_VARIABLE SDKROOT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        set(PLATFORM_FLAGS "-isysroot${SDKROOT}")
+    else()
+        # Linux needs explicit system include paths
+        set(PLATFORM_FLAGS "-I/usr/include")
+    endif()
+
+    # Create a custom command to compile PocketFFT
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
+        # First compile to object file
+        COMMAND ${CMAKE_C_COMPILER}
+                -std=c99
+                -O2
+                ${PLATFORM_FLAGS}
+                -c ${PocketFFT_SOURCE_DIR}/pocketfft.c
+                -o ${CMAKE_BINARY_DIR}/pocketfft.o
+        # Then create static library
+        COMMAND ${CMAKE_AR} rcs ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a ${CMAKE_BINARY_DIR}/pocketfft.o
+        # On Linux, we need to run ranlib after creating the archive
+        COMMAND $<$<NOT:$<PLATFORM_ID:Darwin>>:${CMAKE_RANLIB}> $<$<NOT:$<PLATFORM_ID:Darwin>>:${CMAKE_BINARY_DIR}/lib/libPocketFFT.a>
+        DEPENDS PocketFFTProject
+        WORKING_DIRECTORY ${PocketFFT_SOURCE_DIR}
+        COMMENT "Building PocketFFT library"
+        VERBATIM
+    )
+
+    # Use the compiled library
+    add_custom_target(PocketFFTBuild ALL
+        DEPENDS ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
+    )
+
+    set_target_properties(PocketFFT PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
+    )
+
+    # Add include directories for users of the library
+    target_include_directories(PocketFFT
+        INTERFACE
+            ${PocketFFT_SOURCE_DIR}
+    )
+
+    # Link math library for users of PocketFFT
+    target_link_libraries(PocketFFT INTERFACE m)
+
+    # Install rules
+    install(FILES ${PocketFFT_SOURCE_DIR}/pocketfft.h DESTINATION include)
+    install(FILES ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a DESTINATION lib)
+endif()
 
 #--- Define any global settings / flags ---
 set(CMAKE_CXX_STANDARD 17)
@@ -30,7 +116,7 @@ endif()
 set(STORMM_VERSION "0.4")
 
 #--- Contingency for compilation with RDKit ---
-if (STORMM_ENABLE_RDKIT) 
+if (STORMM_ENABLE_RDKIT)
     message("-- RDKit support will be enabled")
 
     find_package(RDKit REQUIRED)
@@ -70,7 +156,7 @@ if (STORMM_ENABLE_CUDA)
     else()
       set(CMAKE_NVCC_THREADS ${CUSTOM_NVCC_THREADS})
     endif()
-    
+
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
 
@@ -80,7 +166,7 @@ if (STORMM_ENABLE_CUDA)
     if (CMAKE_SHOW_PTXAS)
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=\"-v\"")
     endif()
-      
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
 
     if (NOT DEFINED CUSTOM_GPU_ARCH)
@@ -109,7 +195,7 @@ endif()
 
 find_package(Git)
 
-if(GIT_EXECUTABLE)
+if (GIT_EXECUTABLE)
     execute_process(
         COMMAND ${GIT_EXECUTABLE} describe --tags --dirty
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -121,14 +207,14 @@ if(GIT_EXECUTABLE)
     endif()
 endif()
 
-if(NOT DEFINED STORMM_VERSION)
+if (NOT DEFINED STORMM_VERSION)
     set(STORMM_VERSION 0+unknown)
     message(WARNING "Could not find STORMM_VERSION using git... using default version \"${STORMM_VERSION}\".")
 endif()
 
 configure_file(
-        "${CMAKE_SOURCE_DIR}/src/version.h.in" 
-        "${CMAKE_BINARY_DIR}/version.h" 
+        "${CMAKE_SOURCE_DIR}/src/version.h.in"
+        "${CMAKE_BINARY_DIR}/version.h"
         @ONLY)
 
 # --- Define any source files ---
@@ -137,6 +223,11 @@ configure_file(
 ## incremental build system, and it may also include any extra source files in the tree that you
 ## may not want to have included... but is still a very widely used pattern to avoid the need to
 ## manually list all files associated with the library making it much easier to use and maintain.
+if (STORMM_BUILD_POCKETFFT)
+    file(GLOB_RECURSE POCKETFFT_C_FILES   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/pocketfft/*.c")
+    file(GLOB_RECURSE POCKETFFT_CPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/pocketfft/*.cpp")
+endif()
+file(GLOB_RECURSE STORMM_C_FILES   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
 file(GLOB_RECURSE STORMM_CPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 file(GLOB_RECURSE STORMM_TPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.tpp")
 file(GLOB_RECURSE STORMM_HPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.h")
@@ -146,8 +237,7 @@ file(GLOB_RECURSE STORMM_CUDA_HEADERS        CONFIGURE_DEPENDS "${CMAKE_SOURCE_D
 file(GLOB_RECURSE STORMM_CUDA_INCLUDED_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cui")
 
 # --- Define the library ---
-
-add_library(${PROJECT_NAME} SHARED ${STORMM_CPP_FILES} ${STORMM_TPP_FILES})
+add_library(${PROJECT_NAME} SHARED ${STORMM_C_FILES} ${STORMM_CPP_FILES} ${STORMM_TPP_FILES})
 
 target_include_directories(${PROJECT_NAME}
         PUBLIC
@@ -162,6 +252,11 @@ endif()
 
 if (STORMM_ENABLE_RDKIT)
     target_link_libraries(${PROJECT_NAME} RDKit::SmilesParse)
+endif()
+
+if (STORMM_BUILD_POCKETFFT)
+    target_sources(${PROJECT_NAME} PRIVATE ${POCKETFFT_C_FILES} ${POCKETFFT_CPP_FILES})
+    target_link_libraries(${PROJECT_NAME} ${})
 endif()
 
 # --- Create an installable target ---
@@ -182,7 +277,7 @@ install(TARGETS ${PROJECT_NAME}
 install(EXPORT ${PROJECT_NAME_UPPER}Targets
         FILE   ${PROJECT_NAME_UPPER}Targets.cmake
         NAMESPACE STORMM::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})        
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
 #--- Build the tests ---
 if (STORMM_BUILD_TESTS)
@@ -198,4 +293,4 @@ endif()
 #--- Build the benchmarks ---
 if (STORMM_BUILD_BENCHMARKS)
     add_subdirectory(benchmark)
-endif()  
+endif()

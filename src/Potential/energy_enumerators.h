@@ -86,6 +86,24 @@ enum class NonbondedPotential {
                   ///<   width of some probe sphere representing heavy atoms in the ligand
 };
 
+/// \brief Enumerate the various elements of a non-bonded energy calculation, including GB radii
+///        computations for implicit solvent calculations and particle-mesh interactions for
+///        periodic, condensed-phase calculations.
+enum class NonbondedTask {
+  PME_PARTICLE_PARTICLE, ///< Perform particle-to-particle calculations in a periodic simulation
+                         ///<   setting.  
+  PARTICLE_TO_MESH,      ///< Perform particle-to-mesh calculations, mapping particle density to
+                         ///<   a mesh spanning the periodic simulation unit cell.
+  CONVOLUTION,           ///< Perform the convolution to spread the influence of density at each
+                         ///<   mesh point to all others in the periodic unit cell.
+  MESH_TO_PARTICLE,      ///< Map the energy of the convolved mesh back to particles in the unit
+                         ///<   cell.
+  GB_PARTICLE_PARTICLE,  ///< Perform particle-to-particle calculations in an implicit solvent
+                         ///<   simulation setting.
+  GB_RADII,              ///< Compute the Generalized Born radii on all particles
+  GB_RADII_DERIVATIVES   ///< Compute the derivates of Generalized Born radii on all particles
+};
+  
 /// \brief Enumerate the specific kinds of non-bonded potentials.  This is typically used in the
 ///        context of a neighbor list, decribing what potential the neighbors are relevant to.
 enum class NonbondedTheme {
@@ -246,6 +264,7 @@ std::string getEnumerationName(EvaluateVirial input);
 std::string getEnumerationName(DihedralStyle input);
 std::string getEnumerationName(StateVariable input);
 std::string getEnumerationName(NonbondedPotential input);
+std::string getEnumerationName(NonbondedTask input);
 std::string getEnumerationName(NonbondedTheme input);
 std::string getEnumerationName(DecomposablePotential input);
 std::string getEnumerationName(VdwCombiningRule input);
