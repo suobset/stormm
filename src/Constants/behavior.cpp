@@ -10,15 +10,17 @@ using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 ExceptionResponse translateExceptionResponse(const std::string &policy) {
-  if (strcmpCased(policy, std::string("die")) || strcmpCased(policy, std::string("abort"))) {
+  if (strcmpCased(policy, std::string("die"), CaseSensitivity::NO) ||
+      strcmpCased(policy, std::string("abort"), CaseSensitivity::NO)) {
     return ExceptionResponse::DIE;
   }
-  else if (strcmpCased(policy, std::string("warn")) || strcmpCased(policy, std::string("alert")) ||
-           strcmpCased(policy, std::string("advise"))) {
+  else if (strcmpCased(policy, std::string("warn"), CaseSensitivity::NO) ||
+           strcmpCased(policy, std::string("alert"), CaseSensitivity::NO) ||
+           strcmpCased(policy, std::string("advise"), CaseSensitivity::NO)) {
     return ExceptionResponse::WARN;
   }
-  else if (strcmpCased(policy, std::string("none")) ||
-           strcmpCased(policy, std::string("silent"))) {
+  else if (strcmpCased(policy, std::string("none"), CaseSensitivity::NO) ||
+           strcmpCased(policy, std::string("silent"), CaseSensitivity::NO)) {
     return ExceptionResponse::SILENT;
   }
   __builtin_unreachable();

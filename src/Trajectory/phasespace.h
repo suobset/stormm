@@ -148,6 +148,7 @@ public:
   ///   - Constructors for coordinate sets read from trajectory or restart files, with the option
   ///     of a specific frame number (if unspecified, the first frame is read).  A topology may
   ///     also be specified to check the atom count and sanity of the coordinates presented.
+  ///   - Constructors for combining PhaseSpace objects from multiple existing objects
   ///
   /// \param file_name     Name of the file from which to obtain coordinates
   /// \param file_kind     The type of coordinate-containing input file
@@ -165,6 +166,15 @@ public:
   PhaseSpace(const std::string &file_name_in, const AtomGraph &ag,
              CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
              int frame_number = 0, HybridFormat format_in = default_hpc_format);
+
+  PhaseSpace(const std::vector<PhaseSpace*> &input_crd, const std::vector<AtomGraph*> &input_top,
+             const std::vector<int> &counts);
+
+  PhaseSpace(const PhaseSpace *ps_a, const AtomGraph *ag_a, const PhaseSpace *ps_b,
+             const AtomGraph *ag_b);
+
+  PhaseSpace(const PhaseSpace &ps_a, const AtomGraph &ag_a, const PhaseSpace &ps_b,
+             const AtomGraph &ag_b);
   /// \}
 
   /// \brief The copy constructor handles assignment of internal POINTER-kind Hybrid objects.

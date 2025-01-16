@@ -2709,6 +2709,8 @@ int main(const int argc, const char* argv[]) {
   check(hist_desr, RelationalOperator::EQUAL, hdesr_ans, "The distribution of point-to-point "
         "distances found for the Deserno sphere did not meet expectations.");
 
+  // Check Fast Fourier Transforms with the PocketFFT library
+  
   // Print results
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

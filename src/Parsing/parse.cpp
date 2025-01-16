@@ -251,6 +251,21 @@ char uppercase(const char tc) {
 }
 
 //-------------------------------------------------------------------------------------------------
+char2 uppercase(const char2 tc) {
+  return { uppercase(tc.x), uppercase(tc.y) };
+}
+
+//-------------------------------------------------------------------------------------------------
+char3 uppercase(const char3 tc) {
+  return { uppercase(tc.x), uppercase(tc.y), uppercase(tc.z) };
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 uppercase(const char4 tc) {
+  return { uppercase(tc.x), uppercase(tc.y), uppercase(tc.z), uppercase(tc.w) };
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string uppercase(const std::string &ts) {
   std::string result = ts;
   const size_t n_char = ts.size();
@@ -284,6 +299,21 @@ std::string uppercase(const char* tcs) {
 //-------------------------------------------------------------------------------------------------
 char lowercase(const char tc) {
   return tc + (tc >= 65 && tc <= 90) * 32;
+}
+
+//-------------------------------------------------------------------------------------------------
+char2 lowercase(const char2 tc) {
+  return { lowercase(tc.x), lowercase(tc.y) };
+}
+
+//-------------------------------------------------------------------------------------------------
+char3 lowercase(const char3 tc) {
+  return { lowercase(tc.x), lowercase(tc.y), lowercase(tc.z) };
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 lowercase(const char4 tc) {
+  return { lowercase(tc.x), lowercase(tc.y), lowercase(tc.z), lowercase(tc.w) };
 }
 
 //-------------------------------------------------------------------------------------------------

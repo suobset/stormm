@@ -12,6 +12,7 @@
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 #include "atomgraph_abstracts.h"
+#include "lennard_jones_analysis.h"
 
 namespace stormm {
 namespace topology {
@@ -86,15 +87,6 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
 std::vector<int> selectRotatingAtoms(const AtomGraph &ag, int atom_i, int atom_j);
 std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j);
 /// \}
-
-/// \brief Compute the number of Lennard-Jones atom types given two vectors of a particular length,
-///        assuming them to be square matrices of the A and B coefficients.
-///
-/// \param length_a  The number of values in the matrix of A coefficients
-/// \param length_b  The number of values in the matrix of B coefficients
-/// \param caller    Name of the calling function
-int inferLennardJonesTypeCount(const int length_a, const int length_b,
-                               const char* caller = nullptr);
 
 /// \brief Determine the Lennard-Jones combining rule in effect.  These overloads of the function's
 ///        core variants defined in lennard_jones_analysis.h provide a convenient means of getting

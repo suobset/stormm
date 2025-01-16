@@ -120,7 +120,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                          2 * roundUp(angl_parameter_count, warp_size_int) +
                          3 * roundUp(dihe_parameter_count, warp_size_int) +
                          3 * roundUp(virtual_site_count, warp_size_int) +
-                        10 * roundUp(lj_type_count * lj_type_count, warp_size_int) +
+                        11 * roundUp(lj_type_count * lj_type_count, warp_size_int) +
                          2 * roundUp(lj_type_count, warp_size_int) +
                          roundUp(charge_type_count,  warp_size_int) +
                          2 * roundUp(attenuated_14_type_count, warp_size_int) +
@@ -1073,8 +1073,8 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   }
   expandLennardJonesTables(&tmp_lj_a_values, &tmp_lj_b_values, &tmp_lj_c_values,
                            &tmp_lj_14_a_values, &tmp_lj_14_b_values, &tmp_lj_14_c_values,
-                           &tmp_hbond_a_values, &tmp_hbond_b_values, lj_type_count,
-                           tmp_nonbonded_parameter_index);
+                           &tmp_hbond_a_values, &tmp_hbond_b_values, &tmp_hbond_cutoffs,
+                           lj_type_count, tmp_nonbonded_parameter_index);
 
   // Read the atom type names
   lstart = scanToFlag(fmem, "AMBER_ATOM_TYPE", &dfmt, TopologyRequirement::ESSENTIAL, lstart);

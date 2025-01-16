@@ -461,7 +461,7 @@ AtomGraph TestSystemManager::exportAtomGraph(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace& TestSystemManager::viewCoordinates(const int index) {
+const PhaseSpace& TestSystemManager::viewCoordinates(const int index) {
   checkIndexing(index, "viewCoordinates");
   return all_coordinates[index];
 }

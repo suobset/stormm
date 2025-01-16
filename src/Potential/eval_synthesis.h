@@ -55,21 +55,30 @@ using synthesis::VwuTask;
 ///        smaller forms of the all-to-all non-bonded work units enumerate all of the tiles they
 ///        process.
 ///
-/// \param synbk            Non-bonded parameters for all atoms in the compilation of systems
-/// \param syse             Abstract of the exclusion masks for all systems
-/// \param psyr             Abstract for the coordinate synthesis
-/// \param ecardw           Energy tracker object writer
-/// \param eval_elec_force  Flag to also carry out force evaluation of electrostatic interactions
-///                         (energy is always evaluated in CPU functions)
-/// \param eval_vdw_force   Flag to also carry out force evaluation of van-der Waals interactions
+/// \param synbk                   Non-bonded parameters for all atoms in the compilation of
+///                                systems
+/// \param syse                    Abstract of the exclusion masks for all systems
+/// \param psyr                    Abstract for the coordinate synthesis
+/// \param ecardw                  Energy tracker object writer
+/// \param eval_elec_force         Flag to also carry out force evaluation of electrostatic
+///                                interactions (energy is always evaluated in CPU functions)
+/// \param eval_vdw_force          Flag to also carry out force evaluation of van-der Waals
+///                                interactions
+/// \param clash_minimum_distance  The minimum distance at which two particles will interact via
+///                                the standard, and not a softened, potential
+/// \param clash_ratio             The minimum ratio of interparticle distance to Lennard-Jones
+///                                pairwise parameter at which two particles will interact via the
+///                                standard, and not a softened, potential
 template <typename Tcalc, typename Tcalc2>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
                                const SeMaskSynthesisReader syse, PsSynthesisWriter *psyw,
-                               ScoreCard *ecard, EvaluateForce eval_elec_force,
-                               EvaluateForce eval_vdw_force);
+                               ScoreCard *ecard, NonbondedTask task, EvaluateForce eval_elec_force,
+                               EvaluateForce eval_vdw_force, Tcalc clash_minimum_distance = 0.0,
+                               Tcalc clash_ratio = 0.0);
 
 /// \brief Evaluate the non-bonded energy with a particular precision level.  This will invoke
-///        the proper C++ function.
+///        the proper C++ function.  Descriptions of input parameters follow from
+///        evalSynNonbondedTileGroups(), above, in addition to:
 ///
 /// \param poly_ag          Hold non-bonded parameters for all systems in the synthesis
 /// \param poly_se          Holds exclusions mapped for all systems in the synthesis
@@ -77,11 +86,14 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
 /// \param ecard            Tracking object to collect electrostatic and van-der Waals energies
 /// \param eval_elec_force  Indicate whether to evaluate electrostatic forces
 /// \param evel_vdw_force   Indicate whether to evaluate van-der Waals (Lennard-Jones) forces
-template <typename Tcalc>
 void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
                            const StaticExclusionMaskSynthesis &poly_se,
                            PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
-                           EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
+                           NonbondedTask task,
+                           PrecisionModel prec = PrecisionModel::DOUBLE,
+                           EvaluateForce eval_elec_force = EvaluateForce::YES,
+                           EvaluateForce eval_vdw_force = EvaluateForce::YES,
+                           double clash_minimum_distance = 0.0, double clash_ratio = 0.0);
   
 } // namespace energy
 } // namespace stormm

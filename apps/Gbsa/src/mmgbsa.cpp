@@ -92,7 +92,7 @@ int main(int argc, const char* argv[]) {
           ((cli_top) ? std::string("input_coordinates") : std::string("topology")) + " was not.",
           "mmgbsa");
   }
-  
+
   // Load all of the systems
   SystemCache sysche(ficon, policy, MapRotatableGroups::NO, prnt_protocol, &master_timer);
 

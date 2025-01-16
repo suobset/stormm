@@ -22,6 +22,11 @@ using parse::NumberFormat;
 constexpr double amber_charge_scaling = 18.2223;
 constexpr double inv_amber_charge_scaling = 1.0 / amber_charge_scaling;
 
+/// \brief The default hydrogen bonding cutoff distance.  This enriches some unused functionality
+///        in the Amber format and is a placeholder for possible future development.  The distance
+///        is expressed in units of Angstroms.
+constexpr double default_hydrogen_bond_cutoff = 3.0;
+  
 /// \brief Function for parsing a format string out of an Amber-format topology.  The exact format
 ///        of a given section may differ from that in the published standard (see
 ///        http://ambermd.org/FileFormats.php), so the details must be parsed at runtime.

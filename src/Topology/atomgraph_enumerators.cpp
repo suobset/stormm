@@ -185,6 +185,31 @@ std::string getEnumerationName(const UnitCellType input) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MoleculeKind input) {
+  switch (input) {
+  case MoleculeKind::BIOPOLYMER:
+    return std::string("BIOPOLYMER");
+  case MoleculeKind::SMALL_ORGANIC:
+    return std::string("SMALL_ORGANIC");
+  case MoleculeKind::LARGE_ORGANIC:
+    return std::string("LARGE_ORGANIC");
+  case MoleculeKind::ORGANIC_POLYMER:
+    return std::string("ORGANIC_POLYMER");
+  case MoleculeKind::MINERAL:
+    return std::string("MINERAL");
+  case MoleculeKind::MONATOMIC_ION:
+    return std::string("MONATOMIC_ION");
+  case MoleculeKind::POLYATOMIC_ION:
+    return std::string("POLYATOMIC_ION");
+  case MoleculeKind::WATER:
+    return std::string("WATER");
+  case MoleculeKind::OTHER:
+    return std::string("OTHER");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const MobilitySetting input) {
   switch (input) {
   case MobilitySetting::OFF:

@@ -10,6 +10,7 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Namelists/test_namelists.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_clustering.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_math.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_external_math.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_numerics.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_amber_prmtop.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_topology_mods.cpp
@@ -63,6 +64,12 @@ foreach (STORMM_TEST_SOURCE ${STORMM_TEST_SOURCES})
 
     add_executable(${STORMM_TEST_NAME} ${STORMM_TEST_SOURCE})
     target_link_libraries(${STORMM_TEST_NAME} ${PROJECT_NAME})
+
+    # Add PocketFFT dependency and linking for all test targets
+    if(STORMM_INCLUDE_POCKETFFT)
+        add_dependencies(${STORMM_TEST_NAME} PocketFFTBuild)
+        target_link_libraries(${STORMM_TEST_NAME} PocketFFT)
+    endif()
 
     if(STORMM_TEST_NAME STREQUAL "test_atomgraph_synthesis" OR
        STORMM_TEST_NAME STREQUAL "test_hpc_synthesis")

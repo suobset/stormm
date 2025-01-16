@@ -29,7 +29,8 @@ using diskutil::getDrivePathType;
 using diskutil::getTrajectoryFormat;
 using parse::TextFile;
 using stmath::roundUp;
-
+using topology::ChemicalDetailsKit;
+  
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceWriter::PhaseSpaceWriter(const int natom_in, const UnitCellType unit_cell_in,
                                    double* xcrd_in, double* ycrd_in, double* zcrd_in,
@@ -241,6 +242,89 @@ PhaseSpace::PhaseSpace(const PhaseSpace &original, const HybridFormat format_in)
   allocate();
   deepCopy(&storage, original.storage);
 }
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace::PhaseSpace(const std::vector<PhaseSpace*> &input_crd,
+                       const std::vector<AtomGraph*> &input_top,
+                       const std::vector<int> &counts) :
+  PhaseSpace(0,
+             (input_crd.size() > 0) ? input_crd[0]->getUnitCellType() : UnitCellType::NONE,
+             (input_crd.size() > 0) ? input_crd[0]->getFormat() : HybridFormat::HOST_ONLY)
+{
+  const size_t nsys = input_crd.size();
+  if (nsys == 0) {
+    rtWarn("Fusion was requested for an empty list of existing objects.  An object with space for "
+           "zero atoms will be created.", "PhaseSpace");
+  }
+  for (size_t i = 0; i < nsys; i++) {
+    if (input_crd[i]->getAtomCount() != input_top[i]->getAtomCount()) {
+      rtErr("Input topologies and coordinates must have the same numbers of atoms.  Input "
+            "topology index " + std::to_string(i) + " has " +
+            std::to_string(input_top[i]->getAtomCount()) + " atoms, whereas the coordinates "
+            "have " + std::to_string(input_crd[i]->getAtomCount()) + ".", "PhaseSpace");
+    }
+    atom_count += input_crd[i]->getAtomCount() * counts[i];
+  }
+  allocate();
+
+  // Copy the coordinates from the original systems.  If more than one copy of any system is
+  // included in the combined structure, there will be overlapping atoms.  In such a case, the
+  // developer is charged with later manipulating the coordinates to prevent any clashes.
+  const std::vector<int2> molecule_order = findMoleculeOrder(input_top, counts);
+  const int nmol = molecule_order.size();
+  std::vector<ChemicalDetailsKit> cdk_v;
+  std::vector<PhaseSpaceWriter> psw_v;
+  cdk_v.reserve(nsys);
+  psw_v.reserve(nsys);
+  for (int i = 0; i < nsys; i++) {
+    cdk_v.push_back(input_top[i]->getChemicalDetailsKit());
+    psw_v.push_back(input_crd[i]->data());
+  }
+  PhaseSpaceWriter selfw = this->data();
+  int atmcon = 0;
+  for (int i = 0; i < nmol; i++) {
+    const int sys_orig = molecule_order[i].x;
+    const int mol_llim = cdk_v[sys_orig].mol_limits[molecule_order[i].y];
+    const int mol_hlim = cdk_v[sys_orig].mol_limits[molecule_order[i].y + 1];
+    for (int j = mol_llim; j < mol_hlim; j++) {
+      const int inp_atm_idx = cdk_v[sys_orig].mol_contents[j];
+      selfw.xcrd[atmcon]  = psw_v[sys_orig].xcrd[inp_atm_idx];
+      selfw.ycrd[atmcon]  = psw_v[sys_orig].ycrd[inp_atm_idx];
+      selfw.zcrd[atmcon]  = psw_v[sys_orig].zcrd[inp_atm_idx];
+      selfw.xvel[atmcon]  = psw_v[sys_orig].xvel[inp_atm_idx];
+      selfw.yvel[atmcon]  = psw_v[sys_orig].yvel[inp_atm_idx];
+      selfw.zvel[atmcon]  = psw_v[sys_orig].zvel[inp_atm_idx];
+      selfw.xfrc[atmcon]  = psw_v[sys_orig].xfrc[inp_atm_idx];
+      selfw.yfrc[atmcon]  = psw_v[sys_orig].yfrc[inp_atm_idx];
+      selfw.zfrc[atmcon]  = psw_v[sys_orig].zfrc[inp_atm_idx];
+      selfw.xalt[atmcon]  = psw_v[sys_orig].xalt[inp_atm_idx];
+      selfw.yalt[atmcon]  = psw_v[sys_orig].yalt[inp_atm_idx];
+      selfw.zalt[atmcon]  = psw_v[sys_orig].zalt[inp_atm_idx];
+      selfw.vxalt[atmcon] = psw_v[sys_orig].vxalt[inp_atm_idx];
+      selfw.vyalt[atmcon] = psw_v[sys_orig].vyalt[inp_atm_idx];
+      selfw.vzalt[atmcon] = psw_v[sys_orig].vzalt[inp_atm_idx];
+      selfw.fxalt[atmcon] = psw_v[sys_orig].fxalt[inp_atm_idx];
+      selfw.fyalt[atmcon] = psw_v[sys_orig].fyalt[inp_atm_idx];
+      selfw.fzalt[atmcon] = psw_v[sys_orig].fzalt[inp_atm_idx];
+      atmcon++;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace::PhaseSpace(const PhaseSpace *ps_a, const AtomGraph *ag_a, const PhaseSpace *ps_b,
+                       const AtomGraph *ag_b) :
+    PhaseSpace({ const_cast<PhaseSpace*>(ps_a), const_cast<PhaseSpace*>(ps_b) },
+               { const_cast<AtomGraph*>(ag_a), const_cast<AtomGraph*>(ag_b) },
+              std::vector<int>(2, 1))
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace::PhaseSpace(const PhaseSpace &ps_a, const AtomGraph &ag_a, const PhaseSpace &ps_b,
+                       const AtomGraph &ag_b) :
+    PhaseSpace(ps_a.getSelfPointer(), ag_a.getSelfPointer(), ps_b.getSelfPointer(),
+               ag_b.getSelfPointer())
+{}
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpace& PhaseSpace::operator=(const PhaseSpace &other) {

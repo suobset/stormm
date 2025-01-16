@@ -7,6 +7,8 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Math/series_ops.h"
+#include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "Structure/structure_enumerators.h"
 #include "atomgraph_enumerators.h"
@@ -16,6 +18,8 @@ namespace topology {
 
 using constants::ExceptionResponse;
 using parse::WildCardKind;
+using stmath::minValue;
+using stmath::incrementingSeries;
 using structure::ApplyConstraints;
 
 /// \brief A class for tracking the correspondence of two parameter sets.  The parameter sets
@@ -31,14 +35,48 @@ public:
   ///   - Provide the inputs as C-style arrays
   ///   - Provide the inputs as Standard Template Library vectors
   ///
+  /// \param comp_xa       The first component of parameters in the first set
+  /// \param comp_ya       The first (required) component of parameters in the first set
+  /// \param comp_za       The third (optional) component of parameters in the first set
+  /// \param aparam_count  The number of parameters in the first set
+  /// \param comp_xb       The first component of parameters in the second set
+  /// \param comp_yb       The second (required) component of parameters in the second set
+  /// \param comp_zb       The third (optional) component of parameters in the second set
+  /// \param bparam_count  The number of parameters in the second set
+  /// \param match_tol     Tolernace by which to declare two parameters match
   /// \{
-  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za,
-                          size_t aparam_count_in, const T* comp_xb, const T* comp_yb,
-                          const T* comp_zb, size_t bparam_count_in,
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za, const T* comp_wa,
+                          const T* comp_va, int aparam_count, const T* comp_xb, const T* comp_yb,
+                          const T* comp_zb, const T* comp_wb, const T* comp_vb, int bparam_count,
                           double match_tol = constants::small);
 
-  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, size_t aparam_count_in,
-                          const T* comp_xb, const T* comp_yb, size_t bparam_count_in,
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za,
+                          int aparam_count_in, const T* comp_xb, const T* comp_yb,
+                          const T* comp_zb, int bparam_count_in,
+                          double match_tol = constants::small);
+
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, int aparam_count_in,
+                          const T* comp_xb, const T* comp_yb, int bparam_count_in,
+                          double match_tol = constants::small);
+
+  explicit ParameterUnion(const T* comp_xa, int aparam_count_in, const T* comp_xb,
+                          int bparam_count_in, double match_tol = constants::small);
+
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za, const T* comp_wa,
+                          const T* comp_va, int aparam_count_in);
+
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za,
+                          int aparam_count_in);
+
+  explicit ParameterUnion(const T* comp_xa, const T* comp_ya, int aparam_count_in);
+
+  explicit ParameterUnion(const T* comp_xa, int aparam_count_in);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          const std::vector<T> &comp_za, const std::vector<T> &comp_wa,
+                          const std::vector<T> &comp_va, const std::vector<T> &comp_xb,
+                          const std::vector<T> &comp_yb, const std::vector<T> &comp_zb,
+                          const std::vector<T> &comp_wb, const std::vector<T> &comp_vb,
                           double match_tol = constants::small);
 
   explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
@@ -49,6 +87,20 @@ public:
   explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
                           const std::vector<T> &comp_xb, const std::vector<T> &comp_yb,
                           double match_tol = constants::small);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          double match_tol);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          const std::vector<T> &comp_za, const std::vector<T> &comp_wa,
+                          const std::vector<T> &comp_va);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya,
+                          const std::vector<T> &comp_za);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa, const std::vector<T> &comp_ya);
+
+  explicit ParameterUnion(const std::vector<T> &comp_xa);
   /// \}
 
   /// \brief The default copy and move constructors as well as assignment operators are all valid,
@@ -63,36 +115,244 @@ public:
   ParameterUnion& operator=(ParameterUnion &&original) = default;
   /// \}
 
-  /// \brief Get the number of input parameters from the first set.
-  size_t getFirstSetParameterCount() const;
-  
-  /// \brief Get the number of input parameters from the second set.
-  size_t getSecondSetParameterCount() const;
+  /// \brief Get the number of parameters in one of the input sets.
+  ///
+  /// \param set_index  The index of the set of interest.  There is no other description, such as
+  ///                   which topology the set came from, stored within the object.  This object
+  ///                   serves some constructors of the AtomGraph class, and therefore cannot
+  ///                   include things for which it is a dependency.
+  int getInputSetParameterCount(int set_index) const;
   
   /// \brief Get the number of unique parameter sets.
-  size_t getUniqueParameterCount() const;
+  int getUniqueParameterCount() const;
 
   /// \brief Get the union of one of the parameter components.
   ///
   /// \param comp_idx  Index of the component to retrieve.  Acceptable values include 0, 1, or 2.
   std::vector<T> getUnion(int comp_idx) const;
 
-private:
+  /// \brief Get the correspondence between the input parameter sets and the consensus tables
+  ///        within the object.
+  ///
+  /// Overloaded:
+  ///   - Provide the input set index (alone) to obtain a list of correspondences for every
+  ///     parameter in the input set
+  ///   - Provide the input set index as well as the index of a parameter within that set to
+  ///     obtain a specific parameter's place in the consensus tables
+  ///
+  /// \param set_index    Index of the input parameter set
+  /// \param param_index  The index of a particular parameter within the set
+  /// \{
+  const std::vector<int>& getCorrespondence(int set_index) const;
+  int getCorrespondence(int set_index, int param_index) const;
+  /// \}
 
-  size_t aparam_count;               ///< Number of parameters in set A (all expected to be unique)
-  size_t bparam_count;               ///< Number of parameters in set B.  All members of set B are
-                                     ///<   expected to be unique among other members of set B,
-                                     ///<   although they may match members of set A.
-  size_t total_parameters;           ///< The total number of unique parameters in the union
+  /// \brief Add a set of parameters to the existing union.
+  ///
+  /// Overloaded:
+  ///   - Provide C-style arrays with a trusted length
+  ///   - Provide Standard Template Library vectors for the input
+  ///   
+  ///
+  /// \param comp_x  The first component of the parameter set to include
+  /// \param comp_y  The (required) second component of the parameter set to include
+  /// \param comp_z  The (optional) third component of the parameter set to include
+  /// \param nparm   The trusted length of comp_x, comp_y, and comp_z
+  /// \param tol     The tolerance for declaring a new parameter to match an existing one
+  /// \{
+  void addSet(const T* comp_x, const T* comp_y, const T* comp_z, const T* comp_w, const T* comp_v,
+              int nparm, double tol = constants::small);
+
+  void addSet(const T* comp_x, const T* comp_y, const T* comp_z, int nparm,
+              double tol = constants::small);
+
+  void addSet(const T* comp_x, const T* comp_y, int nparm, double tol = constants::small);
+
+  void addSet(const T* comp_x, int nparm, double tol = constants::small);
+
+  void addSet(const std::vector<T> &comp_x, const std::vector<T> &comp_y,
+              const std::vector<T> &comp_z, const std::vector<T> &comp_w,
+              const std::vector<T> &comp_v, double tol = constants::small);
+
+  void addSet(const std::vector<T> &comp_x, const std::vector<T> &comp_y,
+              const std::vector<T> &comp_z, double tol = constants::small);
+
+  void addSet(const std::vector<T> &comp_x, const std::vector<T> &comp_y,
+              double tol = constants::small);
+  /// \}
+  
+private:
+  int total_parameters;              ///< The total number of unique parameters in the union
+  int component_count;               ///< The number of components in each parameter
+  int set_count;                     ///< The number of input sets processed by the objectcd
   std::vector<T> union_parameter_x;  ///< The union of the first components of each parameter set
   std::vector<T> union_parameter_y;  ///< The union of the second components of each parameter set
   std::vector<T> union_parameter_z;  ///< The union of the optional third components of each
                                      ///<   parameter set
+  std::vector<T> union_parameter_w;  ///< The union of the optional fourth components of each
+                                     ///<   parameter set
+  std::vector<T> union_parameter_v;  ///< The union of the optional fifth components of each
+                                     ///<   parameter set
   
-  /// Enumerate which parameters of the unified set the parameters of the second set correspond to.
+  /// Enumerate which parameters of the unified set the parameters of each input set correspond to.
   /// The first parameter set has a 1:1 correspondence with the first part of the unified set, i.e.
   /// parameter index k in the first parameter set is also parameter index k in the unified set.
-  std::vector<int> union_indices_bmap;
+  std::vector<std::vector<int>> set_to_consensus_map;
+
+  /// \brief Validate the index of a requested input set.
+  ///
+  /// \param set_index  The index of the set of interest
+  /// \param caller     Name of the calling function, for error tracing purposes
+  void validateSetIndex(int set_index, const char* caller = nullptr) const;
+};
+
+/// \brief A class to merge two sets of CMAP surfaces.  While the AtomGraphSynthesis has a means
+///        for doing this, it is more advanced and fits in the context of a different data
+///        structure.  Similar ideas will be applied in the limited case of finding the union of
+///        two parameter sets.
+class CmapSurfaceUnion {
+public:
+  
+  /// \brief Rather than take ValenceKit abstracts and introduce a dependency on
+  ///        atomgraph_abstracts.h, the constructor cherry-picks the relevant details from each
+  ///        valence interaction abstract of the two topologies.
+  ///
+  /// Overloaded:
+  ///   - Initialize an empty object
+  ///   - Provide the data as raw, C-style arrays
+  ///   - Provide the data as Standard Template Library vectors
+  ///
+  /// \param surf_a     Concatenated array of CMAP surface values for the first topology
+  /// \param dim_a      Dimensions of the CMAP surfaces for the first topology (all surfaces are
+  ///                   assumed to be square grids).  Summing the squares of the elements of dim_a,
+  ///                   as is done internally, provides a prefix sum indicating the bounds of each
+  ///                   unique CMAP surface.
+  /// \param nmap_a     The number of distinct CMAP surfaces in the first topology, the trusted
+  ///                   length of dim_a
+  /// \param surf_b     Concatenated array of CMAP surface values for the second topology
+  /// \param dim_b      Dimensions of the CMAP surfaces for the second topology
+  /// \param nmap_b     The number of distinct CMAP surfaces in the second topology
+  /// \param match_tol  The tolerance for declaring that the values at two points of different
+  ///                   CMAPs are identical.  All points on both surfaces must align to within this
+  ///                   tolerance in order for the surfaces to be considered a match.
+  /// \{
+  CmapSurfaceUnion();
+
+  CmapSurfaceUnion(const double* surf_a, const int* dim_a, int nmap_a, const double* surf_b,
+                   const int* dim_b, int nmap_b, double match_tol = constants::small);
+
+  CmapSurfaceUnion(const double* surf_a, const int* dim_a, int nmap_a);
+
+  CmapSurfaceUnion(const std::vector<double> &surf_a, const std::vector<int> &dim_a,
+                   const std::vector<double> &surf_b, const std::vector<int> &dim_b,
+                   double match_tol = constants::small);
+
+  CmapSurfaceUnion(const std::vector<double> &surf_a, const std::vector<int> &dim_a);
+  /// \}
+
+  /// \brief With only Standard Template Library elements for arrays and scalar member variables
+  ///        otherwise, the default copy and move constructors as well as the copy and move
+  ///        assignment operators will be adequate.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     Another object placed on the right hand side of an assignment statement
+  /// \{
+  CmapSurfaceUnion(const CmapSurfaceUnion &orig) = default;
+  CmapSurfaceUnion(CmapSurfaceUnion &&orig) = default;
+  CmapSurfaceUnion& operator=(const CmapSurfaceUnion &orig) = default;
+  CmapSurfaceUnion& operator=(CmapSurfaceUnion &&orig) = default;
+  /// \}
+
+  /// \brief Get the number of unique CMAP surfaces.
+  int getUniqueSurfaceCount() const;
+
+  /// \brief Get the number of contributing topologies.
+  int getContributingTopologyCount() const;
+  
+  /// \brief Get a CMAP surface based on its index in the consensus parameter set.
+  ///
+  /// \param surf_index  The index of the surface of interest, with a count beginning at zero
+  std::vector<double> getCmapSurface(int surf_index) const;
+
+  /// \brief Get a vector of all surfaces in the union.
+  const std::vector<double>& getAllSurfaces() const;
+
+  /// \brief Get the dimension of one or all surfaces in the consensus parameter set.  Each CMAP
+  ///        surface is assumed to be a square grid.
+  ///
+  /// Overloaded:
+  ///   - Get all surface dimensions by providing no argument
+  ///   - Get a specific CMAP's dimension by specifying a parameter index
+  ///
+  /// \param surf_index  The index of the CMAP surface of interest
+  /// \{
+  const std::vector<int>& getSurfaceDimensions() const;
+  int getSurfaceDimensions(int surf_index) const;
+  /// \}
+
+  /// \brief Access the CMAP surface parameter index correspondence for a particular input set
+  ///        (input sets will, for most purposes, be specific topologies).
+  ///
+  /// Overloaded:
+  ///   - Provide the CMAP index within the topology of interest to get its index in the consensus
+  ///   - Provide only an indication of the topology to get the mapping for all of its CMAP
+  ///     parameters onto the consensus table
+  ///
+  /// \param set_index   Index of the topology of interest
+  /// \param surf_index  Index of the surface of interest within its native topology
+  /// \{
+  const std::vector<int>& getCorrespondence(int set_index) const;
+  int getCorrespondence(int set_index, int surf_index) const;
+  /// \}
+  
+  /// \brief Add another set of CMAP terms to the union.
+  ///
+  /// \param surf_v  The CMAP surface values with which to populate the object, concatenated
+  /// \param dims_v  The dimensions of each surface
+  /// \param nmap    The number of distinct CMAP surfaces
+  /// \param tol     The tolerance for declaring that the values at two points of different CMAPs
+  ///                are identical.  All points on both surfaces must align to within this
+  ///                tolerance in order for the surfaces to be considered a match.
+  void addSet(const double* surf_v, const int* dim_v, int nmap, double tol = constants::small);
+  
+private:
+
+  int surface_count;                   ///< The number of unique surfaces in the union of two sets
+  int set_count;                       ///< The number of sets covered by the consensus
+  std::vector<double> surface_values;  ///< Values of the parameters for each CMAP surface,
+                                       ///<   concatenated without padding
+  std::vector<int> surface_dims;       ///< Dimensions of each surface (all CMAPs are assumed to
+                                       ///<   be square)
+  std::vector<int> surface_bounds;     ///< Bounds array on surface_values, above, setting the
+                                       ///<   start and stop points for each column-major surface
+                                       ///<   matrix.  This is a prefix sum over the squares of
+                                       ///<   values in surface_dims.
+
+  /// Enumerate which surfaces of the unified list the CMAP surfaces of each set correspond to.
+  /// The first parameter set has a 1:1 correspondence with the first part of the unified set, as
+  /// as the case in the unions of other parameters.
+  std::vector<std::vector<int>> set_to_consensus_map;
+
+  /// \brief Populate the object based exclusively on one topology's set of CMAP terms.  This can
+  ///        be executed in preparation for expanding the set with the other topology's set of
+  ///        CMAP terms.
+  ///
+  /// \param surf_v  The CMAP surface values with which to populate the object, concatenated
+  /// \param dims_v  The dimensions of each surface
+  /// \param nmap   The number of dinstinct CMAP surfaces
+  void populateByOneSet(const double* surf_v, const int* dim_v, int nmap);
+
+  /// \brief Validate the index of a CMAP parameter surface in the consensus set.
+  ///
+  /// \param surf_index  Index of the surface of interest
+  /// \param caller      Name of the calling function (for error tracing purposes)
+  void validateParameterIndex(int surf_index, const char* caller) const;
+
+  /// \brief Validate the index of a parameter set comprised by the consensus tables.
+  ///
+  /// \param set_index  Index of the input parameter set (topology) of interest
+  /// \param caller     Name of the calling function (for error tracing purposes)
+  void validateSetIndex(int set_index, const char* caller) const;
 };
   
 /// \brief Unguarded struct to assemble the basic bond, angle, and dihedral indexing from an Amber
@@ -128,7 +388,10 @@ public:
                     const std::vector<int> &dihe_j_atoms_in = {},
                     const std::vector<int> &dihe_k_atoms_in = {},
                     const std::vector<int> &dihe_l_atoms_in = {},
-                    const std::vector<int> &dihe_param_idx_in = {});
+                    const std::vector<int> &dihe_param_idx_in = {},
+                    const std::vector<char4> &bond_mods_in = {},
+                    const std::vector<char4> &angl_mods_in = {},
+                    const std::vector<char4> &dihe_mods_in = {});
   /// \}
 
   /// \brief Detail the relevance of each bond or angle in the system.  Bonds involving virtual
@@ -363,8 +626,18 @@ struct VirtualSiteTable {
   /// \param vs_count_in  The number of virtual sites in the system (for bounds arrays)
   /// \{
   VirtualSiteTable();
+
   VirtualSiteTable(int natom_in, int vs_count_in);
-  /// \}
+
+  VirtualSiteTable(int natom_in, const std::vector<int> &vs_atoms_in,
+                   const std::vector<int> &frame_types_in, const std::vector<int> &frame1_atoms_in,
+                   const std::vector<int> &frame2_atoms_in,
+                   const std::vector<int> &frame3_atoms_in,
+                   const std::vector<int> &frame4_atoms_in,const std::vector<int> &param_idx_in,
+                   const std::vector<double> &frame_dim1_in,
+                   const std::vector<double> &frame_dim2_in,
+                   const std::vector<double> &frame_dim3_in);
+/// \}
 
   int vs_count;                     ///< Number of virtual sites found, a check on the topology
   std::vector<int> vs_numbers;      ///< An array covering all atoms in the topology and stating
@@ -583,7 +856,7 @@ void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_param
                    std::vector<int> *tmp_charge_indices, int *charge_parameter_count,
                    double rounding_tol, double precision,
                    const std::string &filename = std::string(""));
-
+  
 /// \brief Expand the Lennard-Jones tables based on the non-bonded parameter indices, switching to
 ///        larger tables that store nearly twice the original data but can be accessed without
 ///        referencing the non-bonded parameter indices (only the Lennard-Jones indices of each
@@ -597,6 +870,7 @@ void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_param
 /// \param lj_14_c_values  Lennard-Jones 1:4 C coefficients (expanded and returned)
 /// \param hb_a_values     Hydrogen bonding 10-12 A coefficients (expanded and returned)
 /// \param hb_b_values     Hydrogen bonding 10-12 B coefficients (expanded and returned)
+/// \param hb_c_values     Hydrogen bonding cutoff limits (expanded and returned)
 /// \param n_lj_types      The number of Lennard-Jones types
 /// \param nb_param_index  The non-bonded parameter indices (this table can be accessed by rows
 ///                        and columns indexed by a pair of atoms' Lennard-Jones parameter indices)
@@ -606,7 +880,8 @@ void expandLennardJonesTables(std::vector<double> *lj_a_values, std::vector<doub
                               std::vector<double> *lj_14_b_values,
                               std::vector<double> *lj_14_c_values,
                               std::vector<double> *hb_a_values, std::vector<double> *hb_b_values,
-                              int n_lj_types, const std::vector<int> &nb_param_index);
+                              std::vector<double> *hb_c_values, int n_lj_types,
+                              const std::vector<int> &nb_param_index);
   
 /// \brief Process the exclusions recorded from an Amber topology.  See the CondensedExclusion
 ///        helper struct for a description of how the file format can contain confusing information

@@ -88,6 +88,9 @@ public:
   AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
             ExceptionResponse policy = ExceptionResponse::DIE);
 
+  AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> &counts,
+            ExceptionResponse policy = ExceptionResponse::DIE);
+
   AtomGraph(const AtomGraph &ag_a, int n_a, const AtomGraph &ag_b, int n_b,
             ExceptionResponse policy = ExceptionResponse::DIE);
 
@@ -160,6 +163,11 @@ public:
 
   /// \brief Get the number of separate molecules in the system
   int getMoleculeCount() const;
+
+  /// \brief Get the kind of a specific molecule wihtin the topology.
+  ///
+  /// \param mol_index  The index of the molecule of interesta
+  MoleculeKind getMoleculeKind(int mol_index) const;
   
   /// \brief Get the number of organic molecules in the system, based on the criteria of greater
   ///        than or equal to eight total real atoms and at least one carbon atom.
@@ -233,7 +241,7 @@ public:
   int2 getResidueLimits(int index) const;
   /// \}
 
-  /// \brief  Get the index (topology index, not naturaWl / structure-informed residue number) of a
+  /// \brief  Get the index (topology index, not natural / structure-informed residue number) of a
   ///         particular residue.
   ///
   /// Overloaded:
@@ -1288,11 +1296,12 @@ private:
                                               ///<   a_idx are given by
                                               ///<   [3 * charmm_impr_assigned_bounds[a_idx] ...
                                               ///<    3 * charmm_impr_assigned_bounds[a_idx + 1])
-  Hybrid<int> charmm_impr_assigned_index;     ///< Parameter indices from Urey-Bradley terms
+  Hybrid<int> charmm_impr_assigned_index;     ///< Parameter indices from CHARMM improper terms
                                               ///<   controlled by each atom.  The parameter
-                                              ///<   indices controlled by atom a_idx are given by
-                                              ///< [charmm_impr_assigned_bounds[a_idx] ...
-                                              ///<  charmm_impr_assigned_bounds[a_idx + 1])
+                                              ///<   indices for terms controlled by atom a_idx
+                                              ///<   are given by
+                                              ///<   [charmm_impr_assigned_bounds[a_idx] ...
+                                              ///<    charmm_impr_assigned_bounds[a_idx + 1])
   Hybrid<int> charmm_impr_assigned_terms;     ///< Indices of CHARMM improper terms which each atom
                                               ///<   commands
   Hybrid<int> charmm_impr_assigned_bounds;    ///< Bounds arrays for atom-controlled CHARMM
@@ -1799,6 +1808,18 @@ private:
   /// of topologies used in STORMM's production calculations.
   friend class AtomGraphStage;
 };
+
+/// \brief When topologies are read from files, the order of molecules is trusted.  However, when
+///        two or more topologies are combined, the order of molecules matters.  This function will
+///        determine an order for molecules in the combined system.
+///
+/// \param agv      List of topologies for all input systems
+/// \param counts   The numbers of copies of each system entering into the combined product
+/// \param origins  A lookup table for the origins of each molecule in the combined topology (if
+///                 not nullptr, this array will be sized as appropriate and filled)
+std::vector<int2> findMoleculeOrder(const std::vector<AtomGraph*> &agv,
+                                    const std::vector<int> &counts,
+                                    std::vector<int2> *origins = nullptr);
 
 } // namespace topology
 } // namespace stormm
