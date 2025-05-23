@@ -160,6 +160,17 @@ std::vector<int> indigoFormalChargeScores() {
   result[IndigoFormalChargeKey(35,  6)] =  951383;
   result[IndigoFormalChargeKey(35,  7)] = 1321067;
 
+  // Iodine (copied from Bromine for completeness in the force field)
+  result[IndigoFormalChargeKey(53, -1)] =  -12263;
+  result[IndigoFormalChargeKey(53,  0)] =       0;
+  result[IndigoFormalChargeKey(53,  1)] =   42725;
+  result[IndigoFormalChargeKey(53,  2)] =  120276;
+  result[IndigoFormalChargeKey(53,  3)] =  249427;
+  result[IndigoFormalChargeKey(53,  4)] =  420793;
+  result[IndigoFormalChargeKey(53,  5)] =  636814;
+  result[IndigoFormalChargeKey(53,  6)] =  951383;
+  result[IndigoFormalChargeKey(53,  7)] = 1321067;
+
   // Lithium
   result[IndigoFormalChargeKey( 3, -1)] =  900000;
   result[IndigoFormalChargeKey( 3,  0)] =   50000;
@@ -255,6 +266,25 @@ std::vector<int> indigoBondOrderScores() {
   result[IndigoBondOrderKey(16, 35, 1)] =   -8366;
   result[IndigoBondOrderKey(35,  6, 1)] =  -11532;
   result[IndigoBondOrderKey( 6, 35, 1)] =  -11532;
+
+  // Iodine, single bonds
+  result[IndigoBondOrderKey(53, 53, 1)] =   -7253;
+  result[IndigoBondOrderKey(53, 17, 1)] =   -7827;
+  result[IndigoBondOrderKey(17, 53, 1)] =   -7827;
+  result[IndigoBondOrderKey(53,  9, 1)] =   -9073;
+  result[IndigoBondOrderKey( 9, 53, 1)] =   -9073;
+  result[IndigoBondOrderKey(53,  1, 1)] =  -14372;
+  result[IndigoBondOrderKey( 1, 53, 1)] =  -14372;
+  result[IndigoBondOrderKey(53,  7, 1)] =   -8401;
+  result[IndigoBondOrderKey( 7, 53, 1)] =   -8401;
+  result[IndigoBondOrderKey(53,  8, 1)] =   -7888;
+  result[IndigoBondOrderKey( 8, 53, 1)] =   -7888;
+  result[IndigoBondOrderKey(53, 15, 1)] =  -10189;
+  result[IndigoBondOrderKey(15, 53, 1)] =  -10189;
+  result[IndigoBondOrderKey(53, 16, 1)] =   -8366;
+  result[IndigoBondOrderKey(16, 53, 1)] =   -8366;
+  result[IndigoBondOrderKey(53,  6, 1)] =  -11532;
+  result[IndigoBondOrderKey( 6, 53, 1)] =  -11532;
 
   // Carbon, single bonds
   result[IndigoBondOrderKey( 6,  6, 1)] =  -15022;
@@ -478,6 +508,7 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
     case 9:
     case 17:
     case 35:
+    case 53:
       fc_value = 3;
       break;
     case 3:
@@ -531,6 +562,7 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
       case 9:
       case 17:
       case 35:
+      case 53:
         fc_value = -1;
       default:
         fc_value = 0;
@@ -570,6 +602,7 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
           case 9:
           case 17:
           case 35:
+          case 53:
             fc_value = 3 - free_pairs;
             break;
           case 15:
@@ -729,7 +762,6 @@ int IndigoAtomCenter::getPartner(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 int IndigoAtomCenter::findPartnerIndex(const int partner_atom_number) const {
-  
   for (int i = 0; i < bond_count; i++) {
     if (partner_atoms[i] == partner_atom_number) {
       return i;
@@ -918,7 +950,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
       }
     }
   }
-  
+
   // Create a vector to run through all states of the fragment.  Accumulate results in
   // preliminary arrays before commiting them to the actual object.
   std::vector<int> prelim_net_charges;
@@ -1025,7 +1057,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     }
 
     // Increment the state of the final participating atom, until all of its states are
-    // exhausted.  If the final atom has been incremented past its avaiable states, reduce the
+    // exhausted.  If the final atom has been incremented past its available states, reduce the
     // number of participating atoms by one.  Increment the state of the final participating atom
     // (which was once the next-to-last participating atom).  The next round will determine
     // whether the fragment state is viable, and roll forward again with a new attempt to add
@@ -1092,6 +1124,16 @@ std::vector<int2> IndigoFragment::getState(const int state_index) const {
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+int IndigoFragment::getGlobalCenter(const int center_index) const {
+  if (center_index < 0 || center_index >= center_count) {
+    rtErr("Atom center index " + std::to_string(center_index) + " is invalid for a fragment " +
+          "with " + std::to_string(center_count) + " centers.", "IndigoFragment",
+          "getCenterZNumber");
+  }
+  return centers_list[center_index];
+}
+  
 //-------------------------------------------------------------------------------------------------
 int IndigoFragment::getCharge(const int state_index) const {
   return net_charges[state_index];
@@ -1265,15 +1307,16 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   std::vector<int> ag_atom_idx_map(cdk.natom, -1);
   int j = 0;
   for (int i = mol_limits.x; i < mol_limits.y; i++) {
-    const int iznum = cdk.z_numbers[i];
+    const int iatom = cdk.mol_contents[i];
+    const int iznum = cdk.z_numbers[iatom];
     if (iznum == 0) {
       continue;
     }
     if (iznum ==  1 || iznum ==  2 || iznum ==  3 || iznum ==  6 || iznum ==  7 || iznum ==  8 ||
         iznum ==  9 || iznum == 10 || iznum == 11 || iznum == 15 || iznum == 16 || iznum == 17 ||
-        iznum == 19 || iznum == 35) {
-      ag_atom_idx_map[i] = j;
-      real_atom_map.push_back(i);
+        iznum == 19 || iznum == 35 || iznum == 53) {
+      ag_atom_idx_map[iatom] = j;
+      real_atom_map.push_back(iatom);
 
       // Push a guess as to the valence electron count onto the array for now.  Phosphorus and
       // sulfur atoms with sufficient coordination will have to be updated once the bonding
@@ -1284,11 +1327,12 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
     else {
       const char2 esymb = elemental_symbols[iznum];
-      const int res_index = ag_pointer->getResidueIndex(i);
-      const int res_number = ag_pointer->getResidueNumber(i);
+      const int res_index = ag_pointer->getResidueIndex(iatom);
+      const int res_number = ag_pointer->getResidueNumber(iatom);
       rtErr("Element " + std::string(1, esymb.x) + std::string(1, esymb.y) + " is not covered "
-            "by the Indigo scoring function.  Atom " + char4ToString(ag_pointer->getAtomName(i)) +
-            " in residue " + char4ToString(ag_pointer->getResidueName(res_index)) + " " +
+            "by the Indigo scoring function.  Atom " +
+            char4ToString(ag_pointer->getAtomName(iatom)) + " in residue " +
+            char4ToString(ag_pointer->getResidueName(res_index)) + " " +
             std::to_string(res_number) + " of topology " + ag_pointer->getFileName() +
             " cannot be treated with Indigo.", "IndigoAtomCenter");
     }
@@ -1301,7 +1345,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // Get the net charge of the molecule in question
   net_charge = static_cast<int>(round(sum<double>(ag_in->getPartialCharge<double>(mol_limits.x,
                                                                                   mol_limits.y))));
-
+  
   // Make a map of the bonds.  Filter down to bonds that are within the relevant atoms.  Record,
   // for each atom in this system, how many bonds it makes to other atoms.
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
@@ -1326,8 +1370,9 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   
   // Take this opportunity to identify phosphorus and sulfur with sufficient coordination
   for (int i = mol_limits.x; i < mol_limits.y; i++) {
-    const int iznum = cdk.z_numbers[i];
-    const int it_index = ag_atom_idx_map[i];
+    const int iatom = cdk.mol_contents[i];
+    const int iznum = cdk.z_numbers[iatom];
+    const int it_index = ag_atom_idx_map[iatom];
     if (it_index == -1) {
       continue;
     }
@@ -1398,13 +1443,14 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   
   // Create the atom centers array
   for (int i = mol_limits.x; i < mol_limits.y; i++) {
-    const int it_index = ag_atom_idx_map[i];
+    const int iatom = cdk.mol_contents[i];
+    const int it_index = ag_atom_idx_map[iatom];
     if (it_index == -1) {
       continue;
     }
     const int llim = atom_connect_bounds[it_index];
     const int hlim = atom_connect_bounds[it_index + 1];
-    atom_centers.push_back(IndigoAtomCenter(it_index, cdk.z_numbers[i], hlim - llim,
+    atom_centers.push_back(IndigoAtomCenter(it_index, cdk.z_numbers[iatom], hlim - llim,
                                             valence_electrons[it_index],
                                             std::vector<int>(atom_relevant_bonds.begin() + llim,
                                                              atom_relevant_bonds.begin() + hlim),
@@ -1500,8 +1546,11 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
             [](int2 a, int2 b) { return a.x < b.x; });  
   
   // Compute the charge of all fixed atom centers
-  int target_charge = round(sum<double>(ag_pointer->getPartialCharge<double>(mol_limits.x,
-                                                                             mol_limits.y)));
+  double mol_qsum = 0.0;
+  for (int i = mol_limits.x; i < mol_limits.y; i++) {
+    mol_qsum += ag_pointer->getPartialCharge<double>(cdk.mol_contents[i]);
+  }
+  int target_charge = round(mol_qsum);
   int baseline_charge = 0;
   for (int i = 0; i < atom_count; i++) {
     if (atom_centers[i].getStateCount() == 1) {
@@ -1532,7 +1581,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       mutable_fragments[i].cullHigherEnergyStatesByCharge(frag_q_states[j]);
     }
   }
-
+  
   // Prepare a guardrail, a pair of bounds indicating the maximum and minimum current charge
   // that the previously included fragments must have in order to reach the correct total charge
   // on the molecule.
@@ -1637,12 +1686,33 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   std::vector<int> best_settings(fragment_count, 0);
   int frags_participating = 0;
   if (fragment_count > 0) {
+    int frag_iter = 0;
     do {
+
+      // If there have been too many iterations, cull states that are well above the baseline for
+      // each fragment.  This is intended to relieve combinatorial explosions in some proteins, but
+      // may affect other biopoloymers.
+      if (frag_iter > 20000) {
+
+        for (int i = 0; i < fragment_count; i++) {
+          double frag_min_e = e_options[options_bounds[i]]; 
+          for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
+            if (! fragments_culled[j]) {
+              frag_min_e = std::min(frag_min_e, e_options[j]);
+            }
+          }
+          for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+            if (! fragments_culled[j] && e_options[j] > frag_min_e + 5000.0) {
+              fragments_culled[j] = true;
+            }
+          }
+        }
+      }
       
       // The net charge of the fragments determines viability at this point--the running sum
       // must stay within the guardrails.
       int acc_charge = 0;      
-      for (size_t i = 0; i < frags_participating; i++) {
+      for (int i = 0; i < frags_participating; i++) {
         acc_charge += q_options[options_bounds[i] + frag_settings[i]];
       }
       if (frags_participating == 0 || (acc_charge >= q_guardrail[frags_participating].x &&
@@ -1793,6 +1863,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
           frag_settings[last_participant] += 1;
         }
       }
+      frag_iter++;
     } while (frag_settings[0] < max_frag_settings[0]);
   }
   
@@ -2126,6 +2197,7 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
   case 9:
   case 17:
   case 35:
+  case 53:
     acc_fe_ptr[ac_idx] += (8.0 - valence_e) * probability;
     break;
   case 15:

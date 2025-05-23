@@ -221,7 +221,10 @@ void ReportControls::setOutputSyntax(const OutputSyntax report_layout_in) {
 
 //-------------------------------------------------------------------------------------------------
 void ReportControls::setOutputSyntax(const std::string &report_layout_in) {
-  if (strcmpCased(report_layout_in, "matplotlib", CaseSensitivity::NO) ||
+  if (strcmpCased(report_layout_in, "json", CaseSensitivity::NO)) {
+    report_layout = OutputSyntax::JSON;
+  }
+  else if (strcmpCased(report_layout_in, "matplotlib", CaseSensitivity::NO) ||
       strcmpCased(report_layout_in, "mat_plot_lib", CaseSensitivity::NO)) {
     report_layout = OutputSyntax::MATPLOTLIB;
   }
@@ -500,9 +503,16 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
            strcmpCased(inpstr, "nearelectrostatic", noc)) {
     result.push_back(StateVariable::ELEC_ONE_FOUR);
   }
-  else if (strcmpCased(inpstr, "gb", noc) || strcmpCased(inpstr, "generalized_born", noc) ||
-           strcmpCased(inpstr, "solvent", noc) || strcmpCased(inpstr, "generalizedborn", noc)) {
+  else if (strcmpCased(inpstr, "solvent", noc)) {
     result.push_back(StateVariable::GENERALIZED_BORN);
+    result.push_back(StateVariable::SURFACE_AREA);
+  }
+  else if (strcmpCased(inpstr, "gb", noc) || strcmpCased(inpstr, "generalized_born", noc) ||
+           strcmpCased(inpstr, "generalizedborn", noc)) {
+    result.push_back(StateVariable::GENERALIZED_BORN);
+  }
+  else if (strcmpCased(inpstr, "sasa", noc) || strcmpCased(inpstr, "surface_area", noc)) {
+    result.push_back(StateVariable::SURFACE_AREA);
   }
   else if (strcmpCased(inpstr, "restraint", noc) || strcmpCased(inpstr, "nmr", noc)) {
     result.push_back(StateVariable::RESTRAINT);
@@ -522,12 +532,12 @@ std::vector<StateVariable> ReportControls::translateEnergyComponent(const std::s
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr(inpstr + " was not recognized as a molecular mechanics energy component valid "
-            "for focused reporting.  Providing no input in this section will have all molecular "
-            "mechanics terms be reported.", "ReportControls", "setReportedQuantities");
+            "for focused reporting.  Providing no input in this section will have "
+            "program-specific effects.", "ReportControls", "setReportedQuantities");
     case ExceptionResponse::WARN:
       rtWarn(inpstr + " was not recognized as a molecular mechanics energy component valid "
-             "for focused reporting.  Providing no input in this section will have all molecular "
-             "mechanics terms be reported.  The present input will be ignored.", "ReportControls",
+             "for focused reporting.  Providing no input in this section will have "
+             "program-specific effects.  The present input will be ignored.", "ReportControls",
              "setReportedQuantities");
       break;
     case ExceptionResponse::SILENT:
@@ -936,9 +946,9 @@ NamelistEmulator reportInput(const TextFile &tf, int *start_line, bool *found,
                 "energy components.  This keyword allows a user to select specific components for "
                 "printing, to help focus the output and reduce file sizes.  Acceptable arguments "
                 "include: BOND, ANGLE, TORSION / DIHEDRAL, PROPER_DIHEDRAL, IMPROPER_DIHEDRAL, "
-                "CMAP, VDW / LJ, ELEC / ELECTROSTATIC, GB / SOLVENT, and NMR / RESTRAINT.  "
-                "Various plurals or omissions of underscores may also be recognized, and the "
-                "arguments are not case sensitive.");
+                "CMAP, VDW / LJ, ELEC / ELECTROSTATIC, GENERALIZED_BORN / GB, SURFACE_AREA / "
+                "SASA, and NMR / RESTRAINT.  Various plurals or omissions of underscores may also "
+                "be recognized, and the arguments are not case sensitive.");
   t_nml.addHelp("state", "If unspecified, the overall temperature will be printed in degrees "
                 "Kelvin.  If applicable and \"state\" is unspecified, volume and overall pressure "
                 "will be printed.  A user may also opt to print temperatures of specific regions "

@@ -747,6 +747,469 @@ Map1234::Map1234(const int natom_in, const int nb11_count_in, const int nb12_cou
 }
 
 //-------------------------------------------------------------------------------------------------
+void Map1234::addExclusions(const std::vector<int3> &plus_excl, const ExceptionResponse policy) {
+  if (plus_excl.size() == 0) {
+    return;
+  }
+
+  // Check that each exclusion does not yet exist in the set.  If it does, look to the policy for
+  // the proper response.
+  const size_t nexcl = plus_excl.size();
+  std::vector<bool> valid(nexcl, false);
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    const int i_atom = plus_excl[pos].x;
+    const int j_atom = plus_excl[pos].y;
+    bool found = false;
+    int found_order = 0;
+    for (int i = nb11_excl_bounds[i_atom]; i < nb11_excl_bounds[i_atom + 1]; i++) {
+      if (nb11_excl_list[i] == j_atom) {
+        found = true;
+        found_order = 1;
+      }
+    }
+    for (int i = nb12_excl_bounds[i_atom]; i < nb12_excl_bounds[i_atom + 1]; i++) {
+      if (nb12_excl_list[i] == j_atom) {
+        found = true;
+        found_order = 2;
+      }
+    }
+    for (int i = nb13_excl_bounds[i_atom]; i < nb13_excl_bounds[i_atom + 1]; i++) {
+      if (nb13_excl_list[i] == j_atom) {
+        found = true;
+        found_order = 3;
+      }
+    }
+    for (int i = nb14_excl_bounds[i_atom]; i < nb14_excl_bounds[i_atom + 1]; i++) {
+      if (nb14_excl_list[i] == j_atom) {
+        found = true;
+        found_order = 4;
+      }
+    }
+    if (found) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("An exclusion of order " + std::to_string(plus_excl[pos].z) + " between atoms " +
+              std::to_string(i_atom) + " and " + std::to_string(j_atom) + " already exists in "
+              "the topology.  It is of order " + std::to_string(found_order) + ".", "Map1234",
+              "addExclusions");
+      case ExceptionResponse::WARN:
+        rtWarn("An exclusion of order " + std::to_string(plus_excl[pos].z) + " between atoms " +
+               std::to_string(i_atom) + " and " + std::to_string(j_atom) + " already exists in "
+               "the topology.  It is of order " + std::to_string(found_order) + ".  This "
+               "addition will have no effect.", "Map1234", "addExclusions");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+    else {
+      valid[pos] = true;
+    }
+  }
+
+  // Count the number of exclusions to include in each category.
+  int n11_add = 0;
+  int n12_add = 0;
+  int n13_add = 0;
+  int n14_add = 0;
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    if (valid[pos]) {
+      switch (plus_excl[pos].z) {
+      case 1:
+        n11_add++;
+        break;
+      case 2:
+        n12_add++;
+        break;
+      case 3:
+        n13_add++;
+        break;
+      case 4:
+        n14_add++;
+        break;
+      default:
+
+        // An invalid categorization is always an error.
+        rtErr("The valid exclusion categories are 1 (1:1 \"self\" exclusions), 2 (1:2 \"bonded\" "
+              "exclusions), 3 (1:3 \"angle\" exclusions), or 4 (1:4 non-bonded interactions).  A "
+              "value of " + std::to_string(plus_excl[pos].z) + " is invalid.", "Map1234",
+              "removeExclusions");
+        break;
+      }
+    }
+  }
+
+  // Resize the arrays as necessary.
+  nb11_excl_list.resize(nb11_excl_list.size() + (2 * n11_add));
+  nb12_excl_list.resize(nb12_excl_list.size() + (2 * n12_add));
+  nb13_excl_list.resize(nb13_excl_list.size() + (2 * n13_add));
+  nb14_excl_list.resize(nb14_excl_list.size() + (2 * n14_add));
+
+  // Update the bounds.
+  const int natom = nb11_excl_bounds.size() - 1;
+  std::vector<int> tmp_nb11_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb12_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb13_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb14_bounds(natom + 1, 0);
+  for (int i = 0; i < natom; i++) {
+    tmp_nb11_bounds[i] = nb11_excl_bounds[i + 1] - nb11_excl_bounds[i];
+    tmp_nb12_bounds[i] = nb12_excl_bounds[i + 1] - nb12_excl_bounds[i];
+    tmp_nb13_bounds[i] = nb13_excl_bounds[i + 1] - nb13_excl_bounds[i];
+    tmp_nb14_bounds[i] = nb14_excl_bounds[i + 1] - nb14_excl_bounds[i];
+  }
+  std::vector<int> add_11_counters = tmp_nb11_bounds;
+  std::vector<int> add_12_counters = tmp_nb12_bounds;
+  std::vector<int> add_13_counters = tmp_nb13_bounds;
+  std::vector<int> add_14_counters = tmp_nb14_bounds;
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    if (valid[pos]) {
+      const int i_atom = plus_excl[pos].x;
+      const int j_atom = plus_excl[pos].y;
+      switch (plus_excl[pos].z) {
+      case 1:
+        tmp_nb11_bounds[i_atom] += 1;
+        tmp_nb11_bounds[j_atom] += 1;
+        break;
+      case 2:
+        tmp_nb12_bounds[i_atom] += 1;
+        tmp_nb12_bounds[j_atom] += 1;
+        break;
+      case 3:
+        tmp_nb13_bounds[i_atom] += 1;
+        tmp_nb13_bounds[j_atom] += 1;
+        break;
+      case 4:
+        tmp_nb14_bounds[i_atom] += 1;
+        tmp_nb14_bounds[j_atom] += 1;
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  prefixSumInPlace(&tmp_nb11_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb12_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb13_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb14_bounds, PrefixSumType::EXCLUSIVE);
+  
+  // Update the exclusions and bounds arrays.
+  for (int i = natom - 1; i >= 0; i--) {
+    const int base_nb11_i = nb11_excl_bounds[i];
+    for (int j = nb11_excl_bounds[i + 1] - 1; j >= base_nb11_i; j--) {
+      const int jadv = j - base_nb11_i;
+      nb11_excl_list[tmp_nb11_bounds[i] + jadv] = nb11_excl_list[j];
+    }
+    const int base_nb12_i = nb12_excl_bounds[i];
+    for (int j = nb12_excl_bounds[i + 1] - 1; j >= base_nb12_i; j--) {
+      const int jadv = j - base_nb12_i;
+      nb12_excl_list[tmp_nb12_bounds[i] + jadv] = nb12_excl_list[j];
+    }
+    const int base_nb13_i = nb13_excl_bounds[i];
+    for (int j = nb13_excl_bounds[i + 1] - 1; j >= base_nb13_i; j--) {
+      const int jadv = j - base_nb13_i;
+      nb13_excl_list[tmp_nb13_bounds[i] + jadv] = nb13_excl_list[j];
+    }
+    const int base_nb14_i = nb14_excl_bounds[i];
+    for (int j = nb14_excl_bounds[i + 1] - 1; j >= base_nb14_i; j--) {
+      const int jadv = j - base_nb14_i;
+      nb14_excl_list[tmp_nb14_bounds[i] + jadv] = nb14_excl_list[j];
+    }
+  }
+
+  // Insert the new exclusions.
+  for (size_t i = 0; i < nexcl; i++) {
+    const int atom_a = plus_excl[i].x;
+    const int atom_b = plus_excl[i].y;
+    switch (plus_excl[i].z) {
+    case 1:
+      {
+        const int offset_a = add_11_counters[atom_a];
+        const int offset_b = add_11_counters[atom_b];
+        nb11_excl_list[tmp_nb11_bounds[atom_a] + offset_a] = atom_b;
+        nb11_excl_list[tmp_nb11_bounds[atom_b] + offset_b] = atom_a;
+        add_11_counters[atom_a] = offset_a + 1;
+        add_11_counters[atom_b] = offset_b + 1;
+      }
+      break;
+    case 2:
+      {
+        const int offset_a = add_12_counters[atom_a];
+        const int offset_b = add_12_counters[atom_b];
+        nb12_excl_list[tmp_nb12_bounds[atom_a] + offset_a] = atom_b;
+        nb12_excl_list[tmp_nb12_bounds[atom_b] + offset_b] = atom_a;
+        add_12_counters[atom_a] = offset_a + 1;
+        add_12_counters[atom_b] = offset_b + 1;
+      }
+      break;
+    case 3:
+      {
+        const int offset_a = add_13_counters[atom_a];
+        const int offset_b = add_13_counters[atom_b];
+        nb13_excl_list[tmp_nb13_bounds[atom_a] + offset_a] = atom_b;
+        nb13_excl_list[tmp_nb13_bounds[atom_b] + offset_b] = atom_a;
+        add_13_counters[atom_a] = offset_a + 1;
+        add_13_counters[atom_b] = offset_b + 1;
+      }
+      break;
+    case 4:
+      {
+        const int offset_a = add_14_counters[atom_a];
+        const int offset_b = add_14_counters[atom_b];
+        nb14_excl_list[tmp_nb14_bounds[atom_a] + offset_a] = atom_b;
+        nb14_excl_list[tmp_nb14_bounds[atom_b] + offset_b] = atom_a;
+        add_14_counters[atom_a] = offset_a + 1;
+        add_14_counters[atom_b] = offset_b + 1;
+      }
+      break;
+    default:
+
+      // This error is trapped above.
+      break;
+    }
+  }
+
+  // Replace the bounds arrays.
+  nb11_excl_bounds = tmp_nb11_bounds;
+  nb12_excl_bounds = tmp_nb12_bounds;
+  nb13_excl_bounds = tmp_nb13_bounds;
+  nb14_excl_bounds = tmp_nb14_bounds;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Map1234::addExclusions(const std::vector<int2> &plus_excl, const ExceptionResponse policy) {
+  const size_t nexcl = plus_excl.size();
+  std::vector<int3> tmp_pexcl(nexcl);
+  for (size_t i = 0; i < nexcl; i++) {
+    tmp_pexcl[i].x = plus_excl[i].x;
+    tmp_pexcl[i].y = plus_excl[i].y;
+    tmp_pexcl[i].z = 2;
+  }
+  addExclusions(tmp_pexcl, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+void Map1234::removeExclusions(const std::vector<int3> &minus_excl,
+                               const ExceptionResponse policy) {
+  if (minus_excl.size() == 0) {
+    return;
+  }
+
+  // Check that each exclusion exists in the set.  If not, look to the policy for the response.
+  const size_t nexcl = minus_excl.size();
+  std::vector<bool> valid(nexcl, false);
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    const int i_atom = minus_excl[pos].x;
+    const int j_atom = minus_excl[pos].y;
+    bool found = false;
+    for (int i = nb11_excl_bounds[i_atom]; i < nb11_excl_bounds[i_atom + 1]; i++) {
+      found = (found || nb11_excl_list[i] == j_atom);
+    }
+    for (int i = nb12_excl_bounds[i_atom]; i < nb12_excl_bounds[i_atom + 1]; i++) {
+      found = (found || nb12_excl_list[i] == j_atom);
+    }
+    for (int i = nb13_excl_bounds[i_atom]; i < nb13_excl_bounds[i_atom + 1]; i++) {
+      found = (found || nb13_excl_list[i] == j_atom);
+    }
+    for (int i = nb14_excl_bounds[i_atom]; i < nb14_excl_bounds[i_atom + 1]; i++) {
+      found = (found || nb14_excl_list[i] == j_atom);
+    }
+    if (found) {
+      valid[pos] = true;
+    }
+    else {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("An exclusion between atoms " + std::to_string(i_atom) + " and " +
+              std::to_string(j_atom) + " does not exist in the topology.", "Map1234",
+              "removeExclusions");
+      case ExceptionResponse::WARN:
+        rtWarn("An exclusion between atoms " + std::to_string(i_atom) + " and " +
+               std::to_string(j_atom) + " does not exist in the topology.  This addition will "
+               "have no effect.", "Map1234", "removeExclusions");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
+  }
+
+  // Count the number of exclusions to include in each category.  Mark whether each existing
+  // exclusion will remain at the end of the culling.
+  int n11_rem = 0;
+  int n12_rem = 0;
+  int n13_rem = 0;
+  int n14_rem = 0;
+  const int natom = nb11_excl_bounds.size() - 1;
+  std::vector<bool> nb11_persists(nb11_excl_bounds[natom], true);
+  std::vector<bool> nb12_persists(nb12_excl_bounds[natom], true);
+  std::vector<bool> nb13_persists(nb13_excl_bounds[natom], true);
+  std::vector<bool> nb14_persists(nb14_excl_bounds[natom], true);
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    if (valid[pos]) {
+      const int i_atom = minus_excl[pos].x;
+      const int j_atom = minus_excl[pos].y;
+      switch (minus_excl[pos].z) {
+      case 1:
+        for (int i = nb11_excl_bounds[i_atom]; i < nb11_excl_bounds[i_atom]; i++) {
+          if (nb11_excl_list[i] == j_atom) {
+            nb11_persists[i] = false;
+          }
+        }
+        for (int j = nb11_excl_bounds[j_atom]; j < nb11_excl_bounds[j_atom]; j++) {
+          if (nb11_excl_list[j] == i_atom) {
+            nb11_persists[j] = false;
+          }
+        }
+        n11_rem++;
+        break;
+      case 2:
+        for (int i = nb12_excl_bounds[i_atom]; i < nb12_excl_bounds[i_atom]; i++) {
+          if (nb12_excl_list[i] == j_atom) {
+            nb12_persists[i] = false;
+          }
+        }
+        for (int j = nb12_excl_bounds[j_atom]; j < nb12_excl_bounds[j_atom]; j++) {
+          if (nb12_excl_list[j] == i_atom) {
+            nb12_persists[j] = false;
+          }
+        }
+        n12_rem++;
+        break;
+      case 3:
+        for (int i = nb13_excl_bounds[i_atom]; i < nb13_excl_bounds[i_atom]; i++) {
+          if (nb13_excl_list[i] == j_atom) {
+            nb13_persists[i] = false;
+          }
+        }
+        for (int j = nb13_excl_bounds[j_atom]; j < nb13_excl_bounds[j_atom]; j++) {
+          if (nb13_excl_list[j] == i_atom) {
+            nb13_persists[j] = false;
+          }
+        }
+        n13_rem++;
+        break;
+      case 4:
+        for (int i = nb14_excl_bounds[i_atom]; i < nb14_excl_bounds[i_atom]; i++) {
+          if (nb14_excl_list[i] == j_atom) {
+            nb14_persists[i] = false;
+          }
+        }
+        for (int j = nb14_excl_bounds[j_atom]; j < nb14_excl_bounds[j_atom]; j++) {
+          if (nb14_excl_list[j] == i_atom) {
+            nb14_persists[j] = false;
+          }
+        }
+        n14_rem++;
+        break;
+      default:
+
+        // An invalid categorization is always an error.
+        rtErr("The valid exclusion categories are 1 (1:1 \"self\" exclusions), 2 (1:2 \"bonded\" "
+              "exclusions), 3 (1:3 \"angle\" exclusions), or 4 (1:4 non-bonded interactions).  A "
+              "value of " + std::to_string(minus_excl[pos].z) + " is invalid.", "Map1234",
+              "removeExclusions");
+        break;
+      }
+    }
+  }
+
+  // Update the bounds.
+  std::vector<int> tmp_nb11_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb12_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb13_bounds(natom + 1, 0);
+  std::vector<int> tmp_nb14_bounds(natom + 1, 0);
+  for (int i = 0; i < natom; i++) {
+    tmp_nb11_bounds[i] = nb11_excl_bounds[i + 1] - nb11_excl_bounds[i];
+    tmp_nb12_bounds[i] = nb12_excl_bounds[i + 1] - nb12_excl_bounds[i];
+    tmp_nb13_bounds[i] = nb13_excl_bounds[i + 1] - nb13_excl_bounds[i];
+    tmp_nb14_bounds[i] = nb14_excl_bounds[i + 1] - nb14_excl_bounds[i];
+  }
+  for (size_t pos = 0; pos < nexcl; pos++) {
+    if (valid[pos]) {
+      const int i_atom = minus_excl[pos].x;
+      const int j_atom = minus_excl[pos].y;
+      switch (minus_excl[pos].z) {
+      case 1:
+        tmp_nb11_bounds[i_atom] -= 1;
+        tmp_nb11_bounds[j_atom] -= 1;
+        break;
+      case 2:
+        tmp_nb12_bounds[i_atom] -= 1;
+        tmp_nb12_bounds[j_atom] -= 1;
+        break;
+      case 3:
+        tmp_nb13_bounds[i_atom] -= 1;
+        tmp_nb13_bounds[j_atom] -= 1;
+        break;
+      case 4:
+        tmp_nb14_bounds[i_atom] -= 1;
+        tmp_nb14_bounds[j_atom] -= 1;
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  prefixSumInPlace(&tmp_nb11_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb12_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb13_bounds, PrefixSumType::EXCLUSIVE);
+  prefixSumInPlace(&tmp_nb14_bounds, PrefixSumType::EXCLUSIVE);
+
+  // Update the exclusions and bounds arrays.
+  int iadv = 0;
+  for (int i = 0; i < nb11_excl_bounds[natom]; i++) {
+    if (nb11_persists[i]) {
+      nb11_excl_list[iadv] = nb11_excl_list[i];
+      iadv++;
+    }
+  }
+  iadv = 0;
+  for (int i = 0; i < nb12_excl_bounds[natom]; i++) {
+    if (nb12_persists[i]) {
+      nb12_excl_list[iadv] = nb12_excl_list[i];
+      iadv++;
+    }
+  }
+  iadv = 0;
+  for (int i = 0; i < nb13_excl_bounds[natom]; i++) {
+    if (nb13_persists[i]) {
+      nb13_excl_list[iadv] = nb13_excl_list[i];
+      iadv++;
+    }
+  }
+  iadv = 0;
+  for (int i = 0; i < nb14_excl_bounds[natom]; i++) {
+    if (nb14_persists[i]) {
+      nb14_excl_list[iadv] = nb14_excl_list[i];
+      iadv++;
+    }
+  }
+  nb11_excl_bounds = tmp_nb11_bounds;
+  nb12_excl_bounds = tmp_nb12_bounds;
+  nb13_excl_bounds = tmp_nb13_bounds;
+  nb14_excl_bounds = tmp_nb14_bounds;
+
+  // Shrink the arrays of exclusions.
+  nb11_excl_list.resize(nb11_excl_list.size() - (2 * n11_rem));
+  nb12_excl_list.resize(nb12_excl_list.size() - (2 * n12_rem));
+  nb13_excl_list.resize(nb13_excl_list.size() - (2 * n13_rem));
+  nb14_excl_list.resize(nb14_excl_list.size() - (2 * n14_rem));
+}
+
+//-------------------------------------------------------------------------------------------------
+void Map1234::removeExclusions(const std::vector<int2> &minus_excl,
+                               const ExceptionResponse policy) {
+  const size_t nexcl = minus_excl.size();
+  std::vector<int3> tmp_mexcl(nexcl);
+  for (size_t i = 0; i < nexcl; i++) {
+    tmp_mexcl[i].x = minus_excl[i].x;
+    tmp_mexcl[i].y = minus_excl[i].y;
+    tmp_mexcl[i].z = 2;
+  }
+  removeExclusions(tmp_mexcl, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
 CmapAccessories::CmapAccessories() :
     phi_derivatives{}, psi_derivatives{}, phi_psi_derivatives{}, patch_matrix_bounds{},
     patch_matrix_form{}
@@ -1162,6 +1625,8 @@ void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_param
     discretized_charges[i] = llround(qdata[i] / charge_discretization);
   }
   std::vector<bool> found(natom, false);
+  tmp_charge_indices->resize(natom);
+  tmp_charge_parameters->resize(natom);
   int* tq_idx_ptr = tmp_charge_indices->data();
   double* tq_param_ptr = tmp_charge_parameters->data();
   int n_unique = 0;
@@ -1571,7 +2036,7 @@ AttenuationParameterSet condenseScreeningFactors(const BasicValenceTable &bvt,
           "sets (" + std::to_string(ndihe_param) + ").  No remedy is available.",
           "condenseScreeningFactors");
   }
-
+  
   // Count the number of unique screening factor pairs.  Make the (0.0, 0.0) pair an integral,
   // obligatory part of the set.  If there were no screening factors provided in the topology,
   // add the defaults to the set of parameter pairs and have all parameters point there.
@@ -1611,7 +2076,7 @@ AttenuationParameterSet condenseScreeningFactors(const BasicValenceTable &bvt,
     set_map.resize(ndihe_param, 1);
     attn_parm.total_14_sets += 1;
   }
-
+  
   // Map all dihedrals to the correct scaling factors, using both their modifiers (to detect
   // dihedrals that do not control a 1:4 interaction between their I and L atoms) and their
   // parameter indices (to reference against the map created above).
@@ -2459,7 +2924,6 @@ Map1234 mapExclusions(const int atom_count, const std::vector<int> &vs_particles
                       result.nb13_excl_bounds);
   result.nb14_excl_list.resize(result.nb14_excl_bounds[atom_count]);
   result.nb14_excl_list.shrink_to_fit();
-
   return result;
 }
 
@@ -2731,9 +3195,15 @@ std::vector<int> traceBondedPatterns(const Map1234 &all_nb_excl) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void mapMolecules(const int atom_count, int *molecule_count, const Map1234 &all_nb_excl,
-                  std::vector<int> *molecule_membership, std::vector<int> *molecule_limits,
-                  std::vector<int> *molecule_contents) {
+void mapMolecules(const int atom_count, int *molecule_count, int *residue_count,
+                  const Map1234 &all_nb_excl, std::vector<int> *molecule_membership,
+                  std::vector<int> *molecule_limits, std::vector<int> *molecule_contents,
+                  std::vector<int> *residue_limits, std::vector<char4> *residue_names) {
+  if (residue_names->size() != *residue_count) {
+    rtErr("The number of residues (" + std::to_string(*residue_count) + ") does not match the "
+          "number of provided residue names (" +std::to_string(residue_names->size()) + ").",
+          "mapMolecules");
+  }
   *molecule_membership = traceBondedPatterns(all_nb_excl);
   const int local_molecule_count = stmath::maxValue(*molecule_membership) + 1;
   molecule_limits->resize(local_molecule_count + 1, 0);
@@ -2755,6 +3225,82 @@ void mapMolecules(const int atom_count, int *molecule_count, const Map1234 &all_
   }
   tml_data[0] = 0;
   *molecule_count = local_molecule_count;
+
+  // Molecule boundaries take precedence over residue boundaries.  A residue cannot span two
+  // molecules.
+  if (*residue_count == 0 || atom_count == 0) {
+    return;
+  }
+  const int* rlim_ptr = residue_limits->data();
+  const char4* rname_ptr = residue_names->data();
+  const int* mmem_ptr = molecule_membership->data();
+  std::vector<int> upd_residue_limits(1, 0);
+  std::vector<char4> upd_residue_names(1, residue_names->at(0));
+  if (molecule_membership->size() == 0) {
+    return;
+  }
+  int curr_mol = mmem_ptr[0];
+  int curr_res_old = 0;
+  int curr_res_new = 0;
+  char4 ph_name = { 'A', 'A', 'A', ' ' };
+  for (int i = 1; i < atom_count; i++) {
+    
+    // Form a new residue if the old residue limits turn over.
+    if (i == rlim_ptr[curr_res_old + 1]) {
+      upd_residue_limits.push_back(i);
+      upd_residue_names.push_back(rname_ptr[curr_res_old + 1]);
+      curr_res_old++;
+      curr_res_new++;
+      if (mmem_ptr[i] != curr_mol) {
+        curr_mol = mmem_ptr[i];
+      }
+      continue;
+    }
+
+    // Form a new residue if the molecule changes
+    if (mmem_ptr[i] != curr_mol) {
+      curr_mol = mmem_ptr[i];
+      upd_residue_limits.push_back(i);
+
+      // If the molecule turnover coincides with a residue turnover in the original ordering, push
+      // the next residue in the old list.  Otherwise, fill in with the placeholder residue name
+      // and then increment it for when another unique placeholder might be needed.  At most 26^3
+      // placeholder residue names are available, but this limitation should never be tested by a
+      // well-crafted topology (placeholder residues should not be necessary at all).
+      if (i == rlim_ptr[curr_res_old + 1]) {
+        upd_residue_names.push_back(rname_ptr[curr_res_old + 1]);
+        curr_res_old++;
+      }
+      else {
+        upd_residue_names.push_back(ph_name);
+        ph_name.z += 1;
+        if (ph_name.z > 'Z') {
+          ph_name.z = 'A';
+          ph_name.y += 1;
+          if (ph_name.y > 'Z') {
+            ph_name.y = 'A';
+            ph_name.x += 1;
+          }
+        }
+      }
+      curr_res_new++;
+    }
+  }
+  upd_residue_limits.push_back(atom_count);
+
+  // Update the residue limits and names arrays
+  const int nres = upd_residue_limits.size() - 1;
+  *residue_count = nres;
+  residue_limits->resize(nres + 1);
+  residue_names->resize(nres);
+  int* rev_rlim_ptr = residue_limits->data();
+  char4* rev_rname_ptr = residue_names->data();
+  for (int i = 0; i < nres + 1; i++) {
+    rev_rlim_ptr[i] = upd_residue_limits[i];
+  }
+  for (int i = 0; i < nres; i++) {
+    rev_rname_ptr[i] = upd_residue_names[i];
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3070,7 +3616,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
     dihe_participation_bounds[bvt.dihe_l_atoms[pos]] += 1;
   }
   prefixSumInPlace(&dihe_participation_bounds, PrefixSumType::EXCLUSIVE,
-                          "checkDihedral14Coverage");
+                   "checkDihedral14Coverage");
   for (int pos = 0; pos < bvt.total_dihes; pos++) {
     const int i_atom = bvt.dihe_i_atoms[pos];
     const int l_atom = bvt.dihe_l_atoms[pos];
@@ -3093,7 +3639,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
       if (jatom < i) {
         continue;
       }
-
+      
       // The 1:4 interaction of atoms i and jatom should be covered by some dihedral, ideally.
       // Seek that dihedral out by looking through the lists of dihedrals for either atom.
       bool found = false;
@@ -3124,7 +3670,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
           }
         }
       }
-
+      
       // If the 1:4 interaction was not found to be covered by some dihedral, it will not get
       // picked up as part of the loop over dihedrals.  Some additional, explicit 1:4 interaction
       // with accompanying Lennard-Jones and electrostatic scaling will have to be prepared.  To
@@ -3136,10 +3682,8 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
 
         // Initialize the interaction to have zero scaling factors.  If nothing is found to
         // inform the interaction otherwise, these coefficients will remain at zero.
-        int3 atp;
-        atp.x = i;
-        atp.y = jatom;
-
+        int3 atp = { i, jatom, 0 };
+        
         // If this interaction involves a virtual site or pair of virtual sites, check for
         // dihedrals affecting the parent atom or atoms
         if (atomic_numbers[i] == 0 || atomic_numbers[jatom] == 0) {
@@ -3158,18 +3702,18 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
               if (trkind == TorsionKind::PROPER) {
 
                 // This dihedral becomes the latest candidate to supply the attenuated interaction
-                // parameters for this exclusion.  If there are more than one dihedral which
+                // parameters for this exclusion.  If there are more than one dihedrals which
                 // could supply parameters, this case would have been trapped above.  If the
                 // policy to to merely warn, or even be silent, then this 1:4 term will likewise
                 // take parameters from the last encountered dihedral that could do the job.
                 found = true;
                 const int dihe_param_idx = bvt.dihe_param_idx[dihe_index];
-                atp.z = attn_parm.dihe14_parameter_indices[dihe_param_idx];
+                atp.z = attn_parm.dihe14_parameter_indices[dihe_index];
               }
             }
           }
         }
-
+        
         // Commit this result to the list
         result.push_back(atp);
       }

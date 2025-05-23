@@ -149,6 +149,8 @@ std::string getEnumerationName(const TableContentKind input) {
     return std::string("REAL");
   case TableContentKind::STRING:
     return std::string("STRING");
+  case TableContentKind::OPEN_STRING:
+    return std::string("OPEN_STRING");
   }
   __builtin_unreachable();
 }

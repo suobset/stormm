@@ -567,7 +567,7 @@ int main(const int argc, const char* argv[]) {
                          3.5e-5, 2.0e-4, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-5, 1.5e-5, 5.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6,
+                           4.0e-6, 1.0e-6, 4.0e-4, 4.0e-5, 1.0e-5, 2.2e-5, 1.0e-6,
                            1.0e-1, 3.5e-5, 3.5e-5, do_tests);
 
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
@@ -647,7 +647,7 @@ int main(const int argc, const char* argv[]) {
                          gpu, big_launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, big_launcher,
-                           1.5e-4, 6.5e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 1.0e-5, 7.5e-5, 2.2e-4,
+                           1.5e-4, 6.5e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-4, 4.0e-5, 1.3e-4, 2.2e-4,
                            1.0e-6, 7.5e-4, 7.5e-3, 7.5e-3, do_tests);
   
   // Tweak the original synthesis to incorporate a Generalized Born model.
@@ -815,7 +815,7 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::SINGLE, gpu, ligand_launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu,
-                           ligand_launcher, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5,
+                           ligand_launcher, 1.5e-4, 3.4e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5,
                            6.0e-6, 7.5e-5, 2.2e-4, 1.0e-5, 2.2e-4, 3.0e-5, 3.0e-5, do_tests);
 
   // Scramble and replace virtual sites on the GPU

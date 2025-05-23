@@ -26,6 +26,7 @@ const char default_amber_ascii_rst_extension[] = "rst";
 const char default_amber_netcdf_extension[] = "cdf";
 const char default_amber_netcdf_rst_extension[] = "rcdf";
 const char default_sd_file_extension[] = "sdf";
+const char default_pdb_file_extension[] = "pdb";
 
 /// \brief Open a file for output writing.  This encapsulates error messages in the event that
 ///        the file cannot be opened as expected.

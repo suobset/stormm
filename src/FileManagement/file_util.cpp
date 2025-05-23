@@ -151,6 +151,7 @@ DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_ASCII_RST:
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
     return DataFormat::ASCII;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -400,6 +401,8 @@ std::string getDefaultFileExtension(const CoordinateFileKind kind) {
     return std::string(default_amber_netcdf_rst_extension);
   case CoordinateFileKind::SDF:
     return std::string(default_sd_file_extension);
+  case CoordinateFileKind::PDB:
+    return std::string(default_pdb_file_extension);
   case CoordinateFileKind::UNKNOWN:
     rtErr("No default extension is available for files of " + getEnumerationName(kind) + " type.",
           "getDefaultFileExtension");
@@ -430,6 +433,9 @@ CoordinateFileKind inferCoordinateFileKind(const std::string &file_name) {
   }
   else if (strcmpCased(after, std::string(default_sd_file_extension), CaseSensitivity::NO)) {
     return CoordinateFileKind::SDF;
+  }
+  else if (strcmpCased(after, std::string(default_pdb_file_extension), CaseSensitivity::NO)) {
+    return CoordinateFileKind::PDB;
   }
   else {
     return CoordinateFileKind::UNKNOWN;

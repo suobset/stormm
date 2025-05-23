@@ -20,6 +20,7 @@ namespace stormm {
 namespace chemistry {
   
 using card::HybridKind;
+using constants::ExceptionResponse;
 using constants::PrecisionModel;
 using diskutil::getBaseName;
 using stmath::accumulateBitmask;
@@ -170,7 +171,8 @@ IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
                        const int pivot_atom_in, const std::vector<int> &moving_atoms_in,
                        const AtomGraph* ag_pointer_in) :
     motion{motion_in}, chiral_plan{chiral_plan_in}, root_atom{root_atom_in},
-    pivot_atom{pivot_atom_in}, root_handle{-1}, pivot_handle{-1}, moving_atoms{moving_atoms_in},
+    pivot_atom{pivot_atom_in}, root_handle{-1}, pivot_handle{-1}, rotating_real_atom_count{0},
+    moving_atoms{moving_atoms_in}, mass_of_rotators{0.0},
     ag_pointer{const_cast<AtomGraph*>(ag_pointer_in)}
 {
   switch (motion) {
@@ -204,6 +206,11 @@ IsomerPlan::IsomerPlan(const ConformationEdit motion_in,
     break;
   case ConformationEdit::CHIRAL_INVERSION:
     break;
+  }
+  const int n_moving = moving_atoms.size();
+  for (int i = 0; i < n_moving; i++) {
+    mass_of_rotators += ag_pointer->getAtomicMass<double>(moving_atoms[i]);
+    rotating_real_atom_count += (ag_pointer->getAtomicNumber(moving_atoms[i]) > 0);
   }
 }
 
@@ -262,6 +269,16 @@ int IsomerPlan::getPivotHandle() const {
 //-------------------------------------------------------------------------------------------------
 int IsomerPlan::getMovingAtomCount() const {
   return moving_atoms.size();
+}
+
+//-------------------------------------------------------------------------------------------------
+int IsomerPlan::getRealMovingAtomCount() const {
+  return rotating_real_atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+double IsomerPlan::getMovingAtomWeight() const {
+  return mass_of_rotators;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -716,7 +733,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
 
 //-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::analyzeTopology(const MapRotatableGroups map_groups_in) {
-
+  
   // Set up the StopWatch and obtain indices of the relevant timing bins
   int chemfe_misc_timing, ring_trace_timing, aromatic_group_timing, lewis_timing;
   int chiral_center_timing;
@@ -802,7 +819,7 @@ void ChemicalFeatures::analyzeTopology(const MapRotatableGroups map_groups_in) {
   hbond_donor_count = tmp_hydrogen_bond_donors.size();
   hbond_acceptor_count = tmp_hydrogen_bond_acceptors.size();
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
-  
+
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = detailChiralCenters(nbk, vk, cdk);
   chiral_center_count = tmp_chiral_centers.size();
@@ -836,7 +853,7 @@ void ChemicalFeatures::analyzeTopology(const MapRotatableGroups map_groups_in) {
   ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, ic, warp_size_zu);
   ic = chiral_inversion_methods.putHost(&int_data, tmp_chiral_inversion_methods, ic, warp_size_zu);
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
-  
+
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
   switch (map_groups_in) {
@@ -2242,8 +2259,15 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
     // pivot atom is closest to the atoms that will move), then vice-versa.  List the atoms such
     // that the smallest number of atoms will move as a consequence of rotation about the bond.
     // Store the rotating atoms.
-    const std::vector<int> ifirst = selectRotatingAtoms(ag_pointer, atom_i, atom_j);
-    const std::vector<int> jfirst = selectRotatingAtoms(ag_pointer, atom_j, atom_i);
+    const std::vector<int> ifirst = selectRotatingAtoms(ag_pointer, atom_i, atom_j,
+                                                        ExceptionResponse::SILENT);
+    const std::vector<int> jfirst = selectRotatingAtoms(ag_pointer, atom_j, atom_i,
+                                                        ExceptionResponse::SILENT);
+    if (ifirst.size() == 0 && jfirst.size() == 0) {
+
+      // Bail out if there is no rotatable group to consider.
+      continue;
+    }
     bool i_is_fixed = false;
     bool j_is_fixed = false;
     const int n_iatom = ifirst.size();

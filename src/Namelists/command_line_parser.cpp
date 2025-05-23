@@ -71,7 +71,8 @@ CommandLineParser::CommandLineParser(const std::string &program_name_in,
     control_blocks{},
     coordinations{},
     excluded_keys{},
-    noted_imports{noted_imports_in}
+    noted_imports{noted_imports_in},
+    custom_namelists{}
 {
   const std::string help_msg("List command line arguments with descriptions.");
   cli_nml.addKeyword("--help", NamelistType::BOOLEAN);
@@ -504,6 +505,14 @@ void CommandLineParser::parseUserInput(const int argc, const char* argv[]) {
               all_blk.push_back(t_nml.getHelp());
             }
           }
+          for (size_t j = 0; j < custom_namelists.size(); j++) {
+            if (strcmpCased(control_blocks[i], custom_namelists[j].getTitle(),
+                            CaseSensitivity::YES)) {
+              const NamelistEmulator t_nml = custom_namelists[j].invoke(mock_tf, &start_line,
+                                                                        &found);
+              all_blk.push_back(t_nml.getHelp());
+            }
+          }
         }
         ReportTable tab_of_nml(all_blk, { "Namelist", "Description" }, std::string(""),
                                console_width, { JustifyText::LEFT, JustifyText::LEFT }, true);
@@ -612,6 +621,12 @@ void CommandLineParser::addControlBlocks(const std::vector<std::string> &list) {
       control_blocks[i] = "&" + control_blocks[i];
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void CommandLineParser::addCustomNamelists(const std::vector<NamelistToken> &custom_namelists_in) {
+  custom_namelists.insert(custom_namelists.end(), custom_namelists_in.begin(),
+                          custom_namelists_in.end());
 }
 
 } // namespace namelist

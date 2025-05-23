@@ -37,7 +37,7 @@ constexpr int maximum_bond_order = 3;
 constexpr int bond_order_range   = maximum_bond_order + 1;
   
 /// \brief Indigo is only geared to handle elements through Bromine at present
-constexpr int maximum_indigo_atomic_number = 35;
+constexpr int maximum_indigo_atomic_number = 53;
 constexpr int indigo_atomic_number_range   = maximum_indigo_atomic_number + 1;
   
 /// \brief Create an unsigned int key for an atomic formal charge.  These numbers are taken from
@@ -231,6 +231,11 @@ public:
   /// \param state_index  Index of the fragment state in question
   std::vector<int2> getState(int state_index) const;
 
+  /// \brief Get the index of a center in the fragment within the molecule system as a whole.
+  ///
+  /// \param center_index  Index of the center of interest
+  int getGlobalCenter(int center_index) const;
+  
   /// \brief Get the charge of this fragment in a particular state.  There total charges were
   ///        compute when the object was constructed, hence no further references to a master list
   ///        of atom centers and their individual states is necessary.

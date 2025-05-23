@@ -1,3 +1,15 @@
+# STORMM Build System Configuration
+#
+# This CMakeLists.txt orchestrates the build process for STORMM, handling both CPU and GPU components.
+# The build is structured in phases to optimize memory usage:
+# 1. CPU components are compiled first as object files
+# 2. After CPU compilation completes, memory is freed before GPU compilation begins
+# 3. Finally, all components are linked into the final library
+#
+# A simple 'make -j' will automatically handle these phases in the correct order.
+# The build system will display messages when each phase completes, indicating when
+# memory can be freed.
+
 cmake_minimum_required(VERSION 3.18)
 
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -16,90 +28,127 @@ option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
 option(STORMM_INCLUDE_POCKETFFT "Enable PocketFFT support" ON)
-
-#--- Include ExternalProject module for PocketFFT ---
-include(ExternalProject)
+option(STORMM_INCLUDE_NETCDF "Enable NetCDF Support" OFF)
+option(STORMM_IGNORE_RAM_LIMITS "Ignore RAM limits" ON)
 
 # --- PocketFFT Integration ---
+include(ExternalProject)
 if (STORMM_INCLUDE_POCKETFFT)
     message("-- Including PocketFFT as part of the build process")
 
-    # Define the ExternalProject
-    ExternalProject_Add(
-        PocketFFTProject
-        GIT_REPOSITORY https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git
-        GIT_TAG master
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-        LOG_DOWNLOAD ON
-        SOURCE_DIR ${CMAKE_BINARY_DIR}/third_party/pocketfft
+    # Define the PocketFFT INTERFACE library target
+    add_library(PocketFFT INTERFACE)
+
+    # Set include directory for PocketFFT
+    target_include_directories(PocketFFT INTERFACE
+        ${CMAKE_BINARY_DIR}/third_party/pocketfft
     )
 
-    # Define the PocketFFT library target
-    add_library(PocketFFT STATIC IMPORTED GLOBAL)
-
-    # Set the source directory
-    ExternalProject_Get_Property(PocketFFTProject SOURCE_DIR)
-    set(PocketFFT_SOURCE_DIR ${SOURCE_DIR})
-
-    # Ensure the lib directory exists
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-
-    # Platform-specific settings
-    if(APPLE)
+    # Fetch the source if not already downloaded
+    set(PocketFFT_SOURCE_DIR ${CMAKE_BINARY_DIR}/third_party/pocketfft)
+    if (NOT EXISTS ${PocketFFT_SOURCE_DIR})
+        message("-- Cloning PocketFFT repository")
         execute_process(
-            COMMAND xcrun --sdk macosx --show-sdk-path
-            OUTPUT_VARIABLE SDKROOT
-            OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND git clone --branch cpp --depth 1 https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git ${PocketFFT_SOURCE_DIR}
+            RESULT_VARIABLE GIT_CLONE_RESULT
         )
-        set(PLATFORM_FLAGS "-isysroot${SDKROOT}")
-    else()
-        # Linux needs explicit system include paths
-        set(PLATFORM_FLAGS "-I/usr/include")
+        if (NOT GIT_CLONE_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to clone PocketFFT repository.")
+        endif()
     endif()
 
-    # Create a custom command to compile PocketFFT
-    add_custom_command(
-        OUTPUT ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
-        # First compile to object file
-        COMMAND ${CMAKE_C_COMPILER}
-                -std=c99
-                -O2
-                ${PLATFORM_FLAGS}
-                -c ${PocketFFT_SOURCE_DIR}/pocketfft.c
-                -o ${CMAKE_BINARY_DIR}/pocketfft.o
-        # Then create static library
-        COMMAND ${CMAKE_AR} rcs ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a ${CMAKE_BINARY_DIR}/pocketfft.o
-        # On Linux, we need to run ranlib after creating the archive
-        COMMAND $<$<NOT:$<PLATFORM_ID:Darwin>>:${CMAKE_RANLIB}> $<$<NOT:$<PLATFORM_ID:Darwin>>:${CMAKE_BINARY_DIR}/lib/libPocketFFT.a>
-        DEPENDS PocketFFTProject
-        WORKING_DIRECTORY ${PocketFFT_SOURCE_DIR}
-        COMMENT "Building PocketFFT library"
-        VERBATIM
-    )
-
-    # Use the compiled library
+    # Create a dummy build target for PocketFFT
     add_custom_target(PocketFFTBuild ALL
-        DEPENDS ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
+        COMMENT "PocketFFT is a header-only library; no build steps required."
     )
 
-    set_target_properties(PocketFFT PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a
-    )
-
-    # Add include directories for users of the library
-    target_include_directories(PocketFFT
-        INTERFACE
-            ${PocketFFT_SOURCE_DIR}
-    )
+    # Add dependency between PocketFFTBuild and the PocketFFT library
+    add_dependencies(PocketFFTBuild PocketFFT)
 
     # Link math library for users of PocketFFT
     target_link_libraries(PocketFFT INTERFACE m)
 
     # Install rules
-    install(FILES ${PocketFFT_SOURCE_DIR}/pocketfft.h DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/lib/libPocketFFT.a DESTINATION lib)
+    install(DIRECTORY ${PocketFFT_SOURCE_DIR}/
+        DESTINATION include/pocketfft
+        FILES_MATCHING PATTERN "*.h"
+    )
+endif()
+
+# --- NetCDF + HDF5 Integration ---
+if (STORMM_INCLUDE_NETCDF)
+    message("-- Including HDF5 and NetCDF as part of the build process")
+
+    # Set installation directories
+    set(THIRD_PARTY_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party)
+    set(HDF5_INSTALL_DIR ${THIRD_PARTY_INSTALL_DIR}/hdf5/install)
+    set(NETCDF_INSTALL_DIR ${THIRD_PARTY_INSTALL_DIR}/netcdf)
+    set(NETCDF_C_INSTALL_DIR ${NETCDF_INSTALL_DIR}/install)
+    set(NETCDF_CXX_INSTALL_DIR ${NETCDF_INSTALL_DIR}/install-cxx)
+
+    # --- Install HDF5 ---
+    ExternalProject_Add(
+        HDF5
+        GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
+        GIT_TAG hdf5-1_14_3
+        GIT_PROGRESS 1
+        GIT_SHALLOW 1
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=${HDF5_INSTALL_DIR}
+            -DBUILD_SHARED_LIBS=ON
+            -DHDF5_BUILD_HL_LIB=ON
+            -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
+            -DHDF5_BUILD_CPP_LIB=ON
+            -DHDF5_BUILD_TOOLS=OFF
+            -DHDF5_BUILD_EXAMPLES=OFF
+            -DHDF5_BUILD_JAVA=OFF
+            -DHDF5_BUILD_FORTRAN=OFF
+            -DHDF5_BUILD_UTILS=OFF
+            -DHDF5_ENABLE_PARALLEL=OFF
+            -DHDF5_ENABLE_THREADSAFE=OFF
+            -DHDF5_ENABLE_DIRECT_VFD=ON
+            -DHDF5_ENABLE_EMBEDDED_LIBINFO=ON
+        BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
+        INSTALL_COMMAND ${CMAKE_COMMAND} --install .
+    )
+
+    # Set include and library paths
+    set(HDF5_INCLUDE_DIR ${HDF5_INSTALL_DIR}/include)
+    set(HDF5_LIBRARY ${HDF5_INSTALL_DIR}/lib/libhdf5${CMAKE_SHARED_LIBRARY_SUFFIX})
+
+    # --- Install NetCDF-C (Requires HDF5) ---
+    ExternalProject_Add(
+        NetCDFC
+        GIT_REPOSITORY https://github.com/Unidata/netcdf-c.git
+        GIT_TAG main
+        GIT_PROGRESS 1
+        DEPENDS HDF5
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=${NETCDF_C_INSTALL_DIR}
+            -DBUILD_SHARED_LIBS=ON
+            -DNETCDF_ENABLE_HDF5=ON
+            -DNETCDF_ENABLE_DAP=OFF
+            -DNETCDF_ENABLE_TESTS=OFF
+            -DHDF5_ROOT=${HDF5_INSTALL_DIR}
+        BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
+        INSTALL_COMMAND ${CMAKE_COMMAND} --install .
+    )
+
+    # Set include and library paths
+    set(NETCDF_C_INCLUDE_DIR ${NETCDF_C_INSTALL_DIR}/include)
+    set(NETCDF_C_LIBRARY ${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX})
+
+endif()
+
+
+# --- RDKit Integration ---
+if (STORMM_ENABLE_RDKIT)
+    message("-- RDKit support will be enabled")
+
+    find_package(RDKit REQUIRED)
+
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
 endif()
 
 #--- Define any global settings / flags ---
@@ -114,16 +163,6 @@ if (CMAKE_SHOW_FALLTHROUGH)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -Wimplicit-fallthrough")
 endif()
 set(STORMM_VERSION "0.4")
-
-#--- Contingency for compilation with RDKit ---
-if (STORMM_ENABLE_RDKIT)
-    message("-- RDKit support will be enabled")
-
-    find_package(RDKit REQUIRED)
-
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_RDKIT -DSTORMM_USE_RDKIT")
-endif()
 
 #--- Functions for detecting a program's availability and version, e.g. gcc version ---
 set(PROGRAM_NAME my_program)
@@ -140,6 +179,66 @@ function(${PROGRAM_NAME}_version output_var)
   set(${output_var} ${${PROGRAM_NAME}_VERSION_OUTPUT} PARENT_SCOPE)
 endfunction()
 
+# Create the memory check script
+file(WRITE ${CMAKE_BINARY_DIR}/check_memory.cmake
+"if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Linux\")
+    execute_process(
+        COMMAND grep MemTotal /proc/meminfo
+        OUTPUT_VARIABLE TOTAL_MEM_KB
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND grep MemAvailable /proc/meminfo
+        OUTPUT_VARIABLE AVAILABLE_MEM_KB
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    string(REGEX REPLACE \"[^0-9]\" \"\" TOTAL_MEM_KB \"\${TOTAL_MEM_KB}\")
+    string(REGEX REPLACE \"[^0-9]\" \"\" AVAILABLE_MEM_KB \"\${AVAILABLE_MEM_KB}\")
+    
+    math(EXPR USED_PERCENT \"100 - (\${AVAILABLE_MEM_KB} * 100 / \${TOTAL_MEM_KB})\")
+    
+    if(USED_PERCENT GREATER 70)
+        message(WARNING \"System memory usage is at \${USED_PERCENT}% (above 70% threshold)\")
+        message(STATUS \"Available memory: \${AVAILABLE_MEM_KB}KB of \${TOTAL_MEM_KB}KB total\")
+        message(FATAL_ERROR \"Memory usage too high. Please free up memory or use -DSTORMM_IGNORE_RAM_LIMITS=ON to override\")
+    else()
+        message(STATUS \"Memory usage at \${USED_PERCENT}% - proceeding with compilation\")
+    endif()
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\")
+    execute_process(
+        COMMAND sh -c \"vm_stat | grep 'Pages free:' | awk '{print \$3}'\"
+        OUTPUT_VARIABLE FREE_PAGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND sh -c \"vm_stat | grep 'Pages inactive:' | awk '{print \$3}'\"
+        OUTPUT_VARIABLE INACTIVE_PAGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND sysctl -n hw.memsize
+        OUTPUT_VARIABLE TOTAL_MEM_B
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    string(REGEX REPLACE \"[^0-9]\" \"\" FREE_PAGES \"\${FREE_PAGES}\")
+    string(REGEX REPLACE \"[^0-9]\" \"\" INACTIVE_PAGES \"\${INACTIVE_PAGES}\")
+    
+    math(EXPR AVAILABLE_MEM_B \"(\${FREE_PAGES} + \${INACTIVE_PAGES}) * 4096\")
+    math(EXPR AVAILABLE_PERCENT \"(\${AVAILABLE_MEM_B} * 100 / \${TOTAL_MEM_B})\")
+    
+    if(AVAILABLE_PERCENT GREATER 70)
+        message(WARNING \"System memory availability is at \${AVAILABLE_PERCENT}% (above 70% threshold)\")
+        message(STATUS \"Available memory: \${AVAILABLE_MEM_B} bytes of \${TOTAL_MEM_B} bytes total\")
+        message(FATAL_ERROR \"Memory availability too low. Please free up memory or use -DSTORMM_IGNORE_RAM_LIMITS=ON to override\")
+    else()
+        message(STATUS \"Memory availability at \${AVAILABLE_PERCENT}% - proceeding with compilation\")
+        message(STATUS \"Available memory: \${AVAILABLE_MEM_B} bytes of \${TOTAL_MEM_B} bytes total\")
+    endif()
+endif()
+")
+
 if (STORMM_ENABLE_CUDA)
     message("-- CUDA support will be enabled")
 
@@ -148,17 +247,55 @@ if (STORMM_ENABLE_CUDA)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
+    # Enable split compilation to reduce memory usage
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
     set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --compiler-options=-O0 -g")
 
-    if (NOT DEFINED CUSTOM_NVCC_THREADS)
-      set(CMAKE_NVCC_THREADS 0)
+    # Detect GPU architecture using nvidia-smi
+    execute_process(
+        COMMAND nvidia-smi --query-gpu=compute_cap --format=csv,noheader,nounits
+        OUTPUT_VARIABLE GPU_COMPUTE_CAP_RAW
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE NVIDIA_SMI_RESULT
+    )
+    if (NOT DEFINED CUSTOM_GPU_ARCH)
+      if (NVIDIA_SMI_RESULT EQUAL 0 AND GPU_COMPUTE_CAP_RAW)
+            # Split the output into a list based on newlines
+            string(REPLACE "\n" ";" GPU_COMPUTE_CAP_LIST "${GPU_COMPUTE_CAP_RAW}")
+            # Create a list to store processed architectures
+            set(ARCH_LIST "")
+
+            # Process each compute capability and remove .
+            foreach(CAP IN LISTS GPU_COMPUTE_CAP_LIST)
+                  string(REPLACE "." "" GPU_ARCH "${CAP}")
+                  list(APPEND ARCH_LIST ${GPU_ARCH})
+            endforeach()
+
+            list(REMOVE_DUPLICATES ARCH_LIST)
+
+            # Set the architectures in the CMake variable
+            set(CMAKE_CUDA_ARCHITECTURES ${ARCH_LIST})
+            message("-- Detected GPU Architecture(s): ${GPU_COMPUTE_CAP_RAW} (compute_${ARCH_LIST})")
+        else()
+            # Fallback to default if detection fails
+            set(CMAKE_CUDA_ARCHITECTURES "52")
+            message("-- Could not detect GPU architecture, defaulting to compute capability 5.2")
+            message("   Set CUSTOM_GPU_ARCH if you need a different architecture")
+        endif()
     else()
-      set(CMAKE_NVCC_THREADS ${CUSTOM_NVCC_THREADS})
+        set(CMAKE_CUDA_ARCHITECTURES "${CUSTOM_GPU_ARCH}")
+        message("-- Using user-specified GPU architecture: compute_${CUSTOM_GPU_ARCH}")
     endif()
 
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
-    set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --split-compile=0 --threads ${CMAKE_NVCC_THREADS}")
+    if (NOT DEFINED CUSTOM_NVCC_THREADS)
+        set(CMAKE_NVCC_THREADS 1)
+    else()
+        set(CMAKE_NVCC_THREADS ${CUSTOM_NVCC_THREADS})
+    endif()
+
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --threads ${CMAKE_NVCC_THREADS}")
+    set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} --threads ${CMAKE_NVCC_THREADS}")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math")
 
     if (CMAKE_SHOW_FALLTHROUGH)
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wimplicit-fallthrough")
@@ -166,14 +303,8 @@ if (STORMM_ENABLE_CUDA)
     if (CMAKE_SHOW_PTXAS)
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=\"-v\"")
     endif()
-
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
-
-    if (NOT DEFINED CUSTOM_GPU_ARCH)
-        set(CMAKE_CUDA_ARCHITECTURES "52;60;61;70;75;80;86;89")
-    else()
-        set(CMAKE_CUDA_ARCHITECTURES "${CUSTOM_GPU_ARCH}")
-    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_HPC -DSTORMM_USE_CUDA")
 
     find_package(CUDAToolkit REQUIRED)
     set(STORMM_CUDA_LIBS CUDA::curand CUDA::cublas CUDA::cusolver CUDA::cudart CUDA::nvml CUDA::cufft)
@@ -189,10 +320,6 @@ if (STORMM_ENABLE_TEST_COVERAGE)
 endif()
 
 # --- Create a version file ---
-
-## We pull the version information directly from Git tags, so that automating releases is much
-## easier.
-
 find_package(Git)
 
 if (GIT_EXECUTABLE)
@@ -217,67 +344,140 @@ configure_file(
         "${CMAKE_BINARY_DIR}/version.h"
         @ONLY)
 
-# --- Define any source files ---
+# --- Source Collection and Build Phases ---
+# First define all sources, separating CPU and GPU code for phased compilation.
+# This separation enables memory optimization by allowing CPU compilation to
+# complete and free memory before GPU compilation begins.
 
-## Using GLOB is not considered a 'best practice' as new files aren't always detected by CMake's
-## incremental build system, and it may also include any extra source files in the tree that you
-## may not want to have included... but is still a very widely used pattern to avoid the need to
-## manually list all files associated with the library making it much easier to use and maintain.
-if (STORMM_BUILD_POCKETFFT)
-    file(GLOB_RECURSE POCKETFFT_C_FILES   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/pocketfft/*.c")
-    file(GLOB_RECURSE POCKETFFT_CPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/pocketfft/*.cpp")
+# Source file collection
+# Using CONFIGURE_DEPENDS tells CMake to check for new/removed source files
+file(GLOB_RECURSE STORMM_CPU_SOURCES
+    CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.c"    # C source files
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"  # C++ source files
+    "${CMAKE_SOURCE_DIR}/src/*.tpp"  # Template implementations
+)
+
+# Collect GPU sources if CUDA is enabled
+if(STORMM_ENABLE_CUDA)
+    file(GLOB_RECURSE STORMM_CUDA_SOURCES
+        CONFIGURE_DEPENDS
+        "${CMAKE_SOURCE_DIR}/src/*.cu"   # CUDA source files
+        "${CMAKE_SOURCE_DIR}/src/*.cuh"  # CUDA headers
+        "${CMAKE_SOURCE_DIR}/src/*.cui"  # CUDA inline implementations
+    )
 endif()
-file(GLOB_RECURSE STORMM_C_FILES   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
-file(GLOB_RECURSE STORMM_CPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
-file(GLOB_RECURSE STORMM_TPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.tpp")
-file(GLOB_RECURSE STORMM_HPP_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.h")
 
-file(GLOB_RECURSE STORMM_CUDA_FILES          CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cu")
-file(GLOB_RECURSE STORMM_CUDA_HEADERS        CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cuh")
-file(GLOB_RECURSE STORMM_CUDA_INCLUDED_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cui")
+# --- CPU Compilation Phase ---
+# Create object library for CPU sources to compile them independently.
+# Using object libraries allows us to:
+# 1. Compile CPU code first and completely
+# 2. Free memory after CPU compilation
+# 3. Reuse the compiled objects in the final library
+add_library(${PROJECT_NAME}_cpu_objects OBJECT ${STORMM_CPU_SOURCES})
+target_include_directories(${PROJECT_NAME}_cpu_objects
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
 
-# --- Define the library ---
-add_library(${PROJECT_NAME} SHARED ${STORMM_C_FILES} ${STORMM_CPP_FILES} ${STORMM_TPP_FILES})
+if(STORMM_ENABLE_RDKIT)
+    target_link_libraries(${PROJECT_NAME}_cpu_objects PUBLIC RDKit::SmilesParse)
+endif()
 
-target_include_directories(${PROJECT_NAME}
+# Mark CPU compilation completion
+# This target serves as a checkpoint between CPU and GPU compilation phases
+add_custom_target(${PROJECT_NAME}_cpu_complete
+    DEPENDS ${PROJECT_NAME}_cpu_objects
+    COMMAND ${CMAKE_COMMAND} -E echo "CPU compilation complete. Memory can be freed."
+)
+
+# Modify the memory check targets to only run if RAM limits aren't ignored
+if(NOT STORMM_IGNORE_RAM_LIMITS)
+    add_custom_target(${PROJECT_NAME}_check_memory_cpu
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/check_memory.cmake
+    )
+    add_dependencies(${PROJECT_NAME}_cpu_objects ${PROJECT_NAME}_check_memory_cpu)
+
+    if(STORMM_ENABLE_CUDA)
+        add_custom_target(${PROJECT_NAME}_check_memory_gpu
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/check_memory.cmake
+        )
+        add_dependencies(${PROJECT_NAME}_cuda_objects ${PROJECT_NAME}_check_memory_gpu)
+    endif()
+endif()
+
+# --- Main Library Target ---
+# This will contain both CPU and GPU components when fully linked
+add_library(${PROJECT_NAME} SHARED)
+
+# --- GPU Compilation Phase ---
+if(STORMM_ENABLE_CUDA)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+    # Create CUDA object library
+    # This compilation only starts after CPU phase is complete
+    add_library(${PROJECT_NAME}_cuda_objects OBJECT ${STORMM_CUDA_SOURCES})
+    target_include_directories(${PROJECT_NAME}_cuda_objects
         PUBLIC
+        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+    )
 
-if (STORMM_ENABLE_CUDA)
-    target_sources(${PROJECT_NAME} PRIVATE ${STORMM_CUDA_FILES} ${STORMM_CUDA_HEADERS} ${STORMM_CUDA_INCLUDED_FILES})
-    target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-    target_link_libraries(${PROJECT_NAME} ${STORMM_CUDA_LIBS})
+    # Ensure GPU compilation waits for CPU completion
+    # This dependency makes 'make -j' compile CPU first, then GPU
+    add_dependencies(${PROJECT_NAME}_cuda_objects ${PROJECT_NAME}_cpu_complete)
+
+    # Mark GPU compilation completion
+    add_custom_target(${PROJECT_NAME}_cuda_complete
+        DEPENDS ${PROJECT_NAME}_cuda_objects
+        COMMAND ${CMAKE_COMMAND} -E echo "CUDA compilation complete. Memory can be freed."
+    )
+
+    # Combine all objects into final library
+    target_sources(${PROJECT_NAME}
+        PRIVATE
+        $<TARGET_OBJECTS:${PROJECT_NAME}_cpu_objects>
+        $<TARGET_OBJECTS:${PROJECT_NAME}_cuda_objects>
+    )
+
+    # Ensure final linking waits for all compilation
+    add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_cuda_complete)
+
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${STORMM_CUDA_LIBS})
+else()
+    # CPU-only build
+    target_sources(${PROJECT_NAME}
+        PRIVATE
+        $<TARGET_OBJECTS:${PROJECT_NAME}_cpu_objects>
+    )
+    add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_cpu_complete)
 endif()
 
-if (STORMM_ENABLE_RDKIT)
-    target_link_libraries(${PROJECT_NAME} RDKit::SmilesParse)
+# Add include directories to main library
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+if(STORMM_ENABLE_CUDA)
+    target_include_directories(${PROJECT_NAME}
+        PUBLIC
+        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    )
 endif()
 
-if (STORMM_BUILD_POCKETFFT)
-    target_sources(${PROJECT_NAME} PRIVATE ${POCKETFFT_C_FILES} ${POCKETFFT_CPP_FILES})
-    target_link_libraries(${PROJECT_NAME} ${})
-endif()
-
-# --- Create an installable target ---
-
-include(GNUInstallDirs)   # Define 'sensible' defaults for installation directories on UNIX
-
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
-        DESTINATION "include/${PROJECT_NAME}"
-        FILES_MATCHING PATTERN "*.h")
-
+# Installation rules
 install(TARGETS ${PROJECT_NAME}
-        EXPORT  ${PROJECT_NAME_UPPER}Targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        BUNDLE  DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-install(EXPORT ${PROJECT_NAME_UPPER}Targets
-        FILE   ${PROJECT_NAME_UPPER}Targets.cmake
-        NAMESPACE STORMM::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+    EXPORT ${PROJECT_NAME_UPPER}Targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
 #--- Build the tests ---
 if (STORMM_BUILD_TESTS)

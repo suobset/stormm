@@ -377,11 +377,27 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                 "akin to the mdout results in Amber's sander and pmemd programs.  The default "
                 "of " + std::to_string(default_minimize_ntpr) + " suppresses output except at the "
                 "outset of the run.");
+  t_nml.addHelp("checkpoint", "Set to 'true' to activate checkpointing in the minimization "
+                "process.  Otherwise, the restart file specified for the system in a &files "
+                "namelist or on the command line will hold the result at the end of the "
+                "minimization run.");
   t_nml.addHelp("dx0", "Magnitude of the initial displacement along the gradient vector, in units "
                 "of Angstroms.  The size of subsequent moves will grow or shrink based on the "
                 "history of success in previous optimizations.");
   t_nml.addHelp("drms", "Convergence criterion for the minimization, based on the root mean "
                 "squared value of the Cartesian forces on all particles.  Units of kcal/mol-A.");
+  t_nml.addHelp("clash_r0", "Minimum distance, in Angstroms, by which two particles to be "
+                "separated to interact using the standard electrostatic potential during "
+                "\"cooldown\" cycles specified by the cdcyc keyword.  If the distance between two "
+                "particles is less than this distance, the interaction between them will be "
+                "scored according to a modified potential that is continuous with the standard "
+                "potential at the transition point but does not diverge as the distance "
+                "approaches zero.");
+  t_nml.addHelp("clash_vdw_ratio", "Minimium distance, as a proportion of the Lennard-Jones "
+                "sigma pair parameter, at which two particles will interact via the standard "
+                "Lennard-Jones potential during \"cooldown\" cycles (see cdcyc).  If the distance "
+                "between two particles is any less, they will interact via a softened potential "
+                "that does not diverge as the separation approaches zero.");
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.

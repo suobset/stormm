@@ -270,6 +270,44 @@ const std::string& ReportTable::getValue(const size_t row_index, const size_t co
 std::string ReportTable::printTable(const OutputSyntax style, const int width,
                                     const int data_row_start, const int data_row_end) const {
 
+  // Printing a .json table follows different rules than other formats.  For .json files, produce
+  // the table (a nested array) and then return.
+  std::string result;
+  switch (style) {
+  case OutputSyntax::JSON:
+    result = std::string(1, '\"') + variable_name + "_headings\" : [\n";
+    for (int i = 0; i < column_count; i++) {
+      result += "\"" + column_headings[i];
+      result += (i < column_count - 1) ? "\", " : " ";
+    }
+    result += "\n]\n \"" + variable_name + " : [\n";
+    for (int i = 0; i < column_count; i++) {
+      result += "  [ ";
+      switch (data_kind) {
+      case TableContentKind::INTEGER:
+      case TableContentKind::REAL:
+        for (int j = 0; j < data_row_count; j++) {
+          result += rendered_data[(i * data_row_count) + j];
+          result += (i < column_count - 1) ? "\", " : " ";
+        }
+        break;
+      case TableContentKind::STRING:
+      case TableContentKind::OPEN_STRING:
+        for (int j = 0; j < data_row_count; j++) {
+          result += "\"" + rendered_data[(i * data_row_count) + j] + "\"";
+          result += (i < column_count - 1) ? "\", " : " ";
+        }
+        break;
+      }
+      result += "]\n";
+    }
+    return result;
+  case OutputSyntax::MATRIX_PKG:
+  case OutputSyntax::MATPLOTLIB:
+  case OutputSyntax::STANDALONE:
+    break;
+  }
+  
   // Determine the width with which to print the table.
   const int actual_width = (width < 0) ? format_width : width;
   
@@ -301,18 +339,20 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
   
   // Loop over all columns until the entire table has been printed.  Print in multiple stages if
   // not all lines can fit side-by-side in the output format.
-  std::string result, hstack_line, hstack_declaration;
+  std::string hstack_line, hstack_declaration;
   const size_t est_line = sum<int>(column_widths) + (2 * column_widths.size()) + 1;
   size_t est_chars;
   switch (style) {
+  case OutputSyntax::JSON:
+    break;
   case OutputSyntax::MATPLOTLIB:
-    est_chars= static_cast<size_t>(header_row_count + 4 +
-                                   (actual_row_end - data_row_start)) * (est_line + 5);
+    est_chars = static_cast<size_t>(header_row_count + 4 +
+                                    (actual_row_end - data_row_start)) * (est_line + 5);
     break;
   case OutputSyntax::MATRIX_PKG:
   case OutputSyntax::STANDALONE:
-    est_chars= static_cast<size_t>(header_row_count + 3 +
-                                   (actual_row_end - data_row_start)) * est_line;
+    est_chars = static_cast<size_t>(header_row_count + 3 +
+                                    (actual_row_end - data_row_start)) * est_line;
     break;
   }
   result.reserve(est_chars);
@@ -323,6 +363,8 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
     bool first_in_set = true;
     int eol_chars;
     switch (style) {
+    case OutputSyntax::JSON:
+      break;
     case OutputSyntax::MATPLOTLIB:
       eol_chars = 3;
       break;
@@ -343,6 +385,7 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
     // the table, as it will not be displayed elsewhere.
     if (set_start == 0) {
       switch (style) {
+      case OutputSyntax::JSON:
       case OutputSyntax::MATPLOTLIB:
       case OutputSyntax::MATRIX_PKG:
         break;
@@ -354,6 +397,7 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
     for (int i = 0; i < header_row_count; i++) {
       for (int j = set_start; j < set_end; j++) {
         switch (style) {
+        case OutputSyntax::JSON:
         case OutputSyntax::MATPLOTLIB:
           result += (j == set_start) ? mpl_comment_block : space_block;
           result += column_headings[(j * header_row_count) + i];
@@ -369,6 +413,8 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
     }
     for (int i = set_start; i < set_end; i++) {
       switch (style) {
+      case OutputSyntax::JSON:
+        break;
       case OutputSyntax::MATPLOTLIB:
         result += (i == set_start) ? mpl_comment_block : space_block;
         break;
@@ -388,38 +434,12 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
     case TableContentKind::REAL:
       
       // Print the variable name
-      switch (style) {
-      case OutputSyntax::MATPLOTLIB:
-        if (set_start == 0 && set_end == column_count) {
-          result += variable_name + " = np.array([\n";
-        }
-        else {
-          result += variable_name + "_" + std::to_string(set_start + 1) + "_" +
-                    std::to_string(set_end) + " = np.array([\n";
-        }
-        break;
-      case OutputSyntax::MATRIX_PKG:
-        if (set_start == 0 && set_end == column_count) {
-          result += variable_name + " = [\n";
-        }
-        else {
-
-          // Pre-allocate to optimize script performance in the report file
-          if (set_start == 0) {
-            result += variable_name + " = zeros(" +
-                      std::to_string(actual_row_end - data_row_start) + ", " +
-                      std::to_string(column_count) + ");\n";
-          }
-          result += variable_name + "(:, " + std::to_string(set_start + 1) + ":" +
-                    std::to_string(set_end) + ") = [\n";
-        }
-        break;
-      case OutputSyntax::STANDALONE:
-        break;
-      }
+      result += formatVariableName(style, set_start, set_end, data_row_start, actual_row_end);
 
       // Print the data
       switch (style) {
+      case OutputSyntax::JSON:
+        break;
       case OutputSyntax::MATPLOTLIB:
         for (int i = data_row_start; i < actual_row_end; i++) {
           for (int j = set_start; j < set_end; j++) {
@@ -442,39 +462,33 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
       }
 
       // Print the closure
-      switch (style) {
-      case OutputSyntax::MATPLOTLIB:
-        result += "]) " + comment_block + variable_name + "\n";
-        if (set_start != 0 || set_end != column_count) {
-          if (hstack_line.size() == 0) {
-            hstack_declaration = variable_name + " = np.hstack((";
-          }
-          else {
-            hstack_line += ", ";
-          }
-          hstack_line += variable_name + "_" + std::to_string(set_start + 1) + "_" +
-                         std::to_string(set_end);
-        }
-        break;
-      case OutputSyntax::MATRIX_PKG:
-        result += "]; " + comment_block + variable_name + "\n";
-        break;
-      case OutputSyntax::STANDALONE:
-        break;
-      }
-      if (set_end < column_count) {
-        result += comment_block + carriage_return;
-      }
+      result += formatClosure(style, comment_block, carriage_return, &hstack_line,
+                              &hstack_declaration, set_start, set_end);
       break;
     case TableContentKind::STRING:
+    case TableContentKind::OPEN_STRING:
+      if (data_kind == TableContentKind::OPEN_STRING) {
 
-      // Print the data behind comment characters
+        // Print the variable name for an open string table.  Otherwise, matrix algebra packages as
+        // well as NumPy are not prepared to interpret raw string output in a matrix.
+        result += formatVariableName(style, set_start, set_end, data_row_start, actual_row_end);
+      }
       for (int i = data_row_start; i < actual_row_end; i++) {
         for (int j = set_start; j < set_end; j++) {
-          result += (j == set_start) ? comment_block : space_block;
+
+          // Print the data behind comment characters unless the format is explicitly open
+          result += (j == set_start &&
+                     data_kind == TableContentKind::STRING) ? comment_block : space_block;
           result += rendered_data[(j * data_row_count) + i];
         }
         result += carriage_return;
+      }
+      if (data_kind == TableContentKind::OPEN_STRING) {
+
+        // Print a variable closure for a table of open strings (i.e. subject to interpretation as
+        // numbers).
+        result += formatClosure(style, comment_block, carriage_return, &hstack_line,
+                                &hstack_declaration, set_start, set_end);
       }
       break;
     }
@@ -483,6 +497,8 @@ std::string ReportTable::printTable(const OutputSyntax style, const int width,
   // Some format options require horizontal stacking of the arrays for different clusters of
   // matrix columns.
   switch (style) {
+  case OutputSyntax::JSON:
+    break;
   case OutputSyntax::MATPLOTLIB:
     if (hstack_line.size() > 0) {
       hstack_line += " ))";
@@ -517,6 +533,19 @@ void ReportTable::printTable(const std::string &file_name, const PrintSituation 
 //-------------------------------------------------------------------------------------------------
 void ReportTable::setVariableName(const std::string &variable_name_in) {
   variable_name = variable_name_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ReportTable::unprotectContent() {
+  switch (data_kind) {
+  case TableContentKind::INTEGER:
+  case TableContentKind::REAL:
+  case TableContentKind::OPEN_STRING:
+    break;
+  case TableContentKind::STRING:
+    data_kind = TableContentKind::OPEN_STRING;
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -638,6 +667,79 @@ std::vector<std::string> ReportTable::dataAsStrings(const std::vector<char4> &da
     result[i] = char4ToString(data_in[i]);
   }
 
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string ReportTable::formatVariableName(const OutputSyntax style, const int set_start,
+                                            const int set_end, const int data_row_start,
+                                            const int actual_row_end) const {
+  std::string result;
+  switch (style) {
+  case OutputSyntax::JSON:
+    break;
+  case OutputSyntax::MATPLOTLIB:
+    if (set_start == 0 && set_end == column_count) {
+      result = variable_name + " = np.array([\n";
+    }
+    else {
+      result = variable_name + "_" + std::to_string(set_start + 1) + "_" +
+               std::to_string(set_end) + " = np.array([\n";
+    }
+    break;
+  case OutputSyntax::MATRIX_PKG:
+    if (set_start == 0 && set_end == column_count) {
+      result = variable_name + " = [\n";
+    }
+    else {
+
+      // Pre-allocate to optimize script performance in the report file
+      if (set_start == 0) {
+        result = variable_name + " = zeros(" +
+                 std::to_string(actual_row_end - data_row_start) + ", " +
+                 std::to_string(column_count) + ");\n";
+      }
+      result += variable_name + "(:, " + std::to_string(set_start + 1) + ":" +
+                std::to_string(set_end) + ") = [\n";
+    }
+    break;
+  case OutputSyntax::STANDALONE:
+    break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string ReportTable::formatClosure(const OutputSyntax style, const std::string &comment_block,
+                                       const std::string &carriage_return,
+                                       std::string *hstack_line, std::string *hstack_declaration,
+                                       const int set_start, const int set_end) const {
+  std::string result;
+  switch (style) {
+  case OutputSyntax::JSON:
+    break;
+  case OutputSyntax::MATPLOTLIB:
+    result += "]) " + comment_block + variable_name + "\n";
+    if (set_start != 0 || set_end != column_count) {
+      if (hstack_line->size() == 0) {
+        *hstack_declaration = variable_name + " = np.hstack((";
+      }
+      else {
+        *hstack_line += ", ";
+      }
+      *hstack_line += variable_name + "_" + std::to_string(set_start + 1) + "_" +
+                      std::to_string(set_end);
+    }
+    break;
+  case OutputSyntax::MATRIX_PKG:
+    result += "]; " + comment_block + variable_name + "\n";
+    break;
+  case OutputSyntax::STANDALONE:
+    break;
+  }
+  if (set_end < column_count) {
+    result += comment_block + carriage_return;
+  }
   return result;
 }
 

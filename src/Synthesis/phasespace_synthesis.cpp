@@ -3263,10 +3263,14 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       actual_expectation = PrintSituation::OPEN_NEW;
     }
     break;
+  case CoordinateFileKind::PDB:
   case CoordinateFileKind::SDF:
-    rtErr("Some information needed to print an SD file is not present in a this object alone.  "
-          "The program must use the writeFrame() method and pass this object to one of its "
-          "overloads.", "PhaseSpaceSynthesis", "printTrajectory");
+    {
+      const std::string needed_fi = (output_kind == CoordinateFileKind::PDB) ? "a PDB" : "an SD";
+      rtErr("Some information needed to print " + needed_fi + " file is not present in a this "
+            "object alone.  The program must use the writeFrame() method and pass this object to "
+            "one of its overloads.", "PhaseSpaceSynthesis", "printTrajectory");
+    }
     break;
   case CoordinateFileKind::UNKNOWN:
     rtErr("Printing request for unknown file type.", "PhaseSpaceSynthesis", "printTrajectory");
@@ -3306,6 +3310,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_INPCRD:
     case CoordinateFileKind::SDF:
+    case CoordinateFileKind::PDB:
     case CoordinateFileKind::UNKNOWN:
       break;
     case CoordinateFileKind::AMBER_ASCII_RST:
@@ -3377,6 +3382,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     case CoordinateFileKind::AMBER_NETCDF_RST:
       break;
     case CoordinateFileKind::SDF:
+    case CoordinateFileKind::PDB:
       break;
     case CoordinateFileKind::UNKNOWN:
       break;
@@ -3394,6 +3400,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
   case CoordinateFileKind::UNKNOWN:
     break;
   }

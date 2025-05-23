@@ -52,7 +52,7 @@ constexpr char default_conf_rotation_snap[]       = "10.0";
 constexpr char default_conf_cis_trans_snap[]      = "5.0";
 /// \}
 
-/// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
+/// \brief Class to encapsulate the data that can be extracted from the &conformer namelist.
 class ConformerControls {
 public:
 

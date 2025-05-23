@@ -36,8 +36,9 @@ bool matchBondingPattern(const AtomGraph *ag, const std::vector<double> &formal_
   if (mol_ab != cdk.mol_home[atom_b]) {
     rtErr("Atom indices " + std::to_string(atom_a) + " and " + std::to_string(atom_b) +
           " reside in molecules " + std::to_string(cdk.mol_home[atom_a]) + " and " +
-          std::to_string(cdk.mol_home[atom_b]) + ", respectively.  Bonding patterns can only "
-          "match for atoms in the same molecule.", "matchBondingPatterns");
+          std::to_string(cdk.mol_home[atom_b]) + ", respectively.  The topology in question is " +
+          ag->getFileName() + ".  Bonding patterns can only match for atoms in the same molecule.",
+          "matchBondingPatterns");
   }
   
   // Get the non-bonded abstract to track connectivity in the topology

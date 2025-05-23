@@ -2,6 +2,8 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include <ctime>
+#include <unistd.h>
 #include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Math/series_ops.h"
@@ -15,8 +17,6 @@ namespace topology {
 using card::HybridTargetLevel;
 using card::HybridKind;
 using diskutil::detectTopologyKind;
-using stmath::getSubsetIndexPattern;
-using stmath::extractIndexedValues;
 using stmath::prefixSumInPlace;
 using stmath::PrefixSumType;
 using stmath::sum;
@@ -181,8 +181,9 @@ AtomGraph::AtomGraph() :
     sp_virtual_site_frame_dim3{HybridKind::POINTER, "tp_vsdim3_sp"},
 
     // Relevant information for the non-bonded calculation
-    charge_type_count{0}, lj_type_count{0}, total_exclusions{0}, attenuated_14_type_count{0},
-    inferred_14_attenuations{0}, periodic_box_class{UnitCellType::NONE},
+    charge_type_count{0}, lj_type_count{0}, has_14_lennard_jones_data{false}, total_exclusions{0},
+    attenuated_14_type_count{0}, inferred_14_attenuations{0},
+    periodic_box_class{UnitCellType::NONE},
     gb_style{ImplicitSolventModel::NONE}, dielectric_constant{1.0}, salt_concentration{0.0},
     coulomb_constant{amber_ancient_bioq}, pb_radii_set{""},
     charge_indices{HybridKind::POINTER, "tp_qidx"},
@@ -287,6 +288,7 @@ AtomGraph::AtomGraph() :
     hbond_a_values{HybridKind::POINTER, "tp_sola"},
     hbond_b_values{HybridKind::POINTER, "tp_solb"},
     hbond_cutoffs{HybridKind::POINTER, "tp_hbcut"},
+    atomic_polarizabilities{HybridKind::POINTER, "tp_polarizability"},
     tree_symbols{HybridKind::POINTER, "tp_symbl"},
 
     // Hybrid data structures (actual arrays)
@@ -360,397 +362,6 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
   case TopologyKind::UNKNOWN:
     rtErr("Construction from non-Amber format files is not yet implemented.", "AtomGraph");
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
-                     const ExceptionResponse policy) :
-    AtomGraph()
-{
-  // Sort the subset in ascending order
-  std::vector<int> local_subset(atom_subset);
-  std::sort(local_subset.begin(), local_subset.end(), [](int a, int b) { return a < b; });
-  
-  // The number of atoms is the first thing that can be known.  Load all properties of atoms.
-  const int nsubset = local_subset.size();
-  int nskip = 0;
-  for (int i = 0; i < nsubset; i++) {
-    if (local_subset[i] < 0 || local_subset[i] >= original.atom_count) {
-      switch (policy) {
-      case ExceptionResponse::DIE:
-        rtErr("Subset index " + std::to_string(i) + ", for atom " +
-              std::to_string(local_subset[i]) + ", is invalid for a topology containing " +
-              std::to_string(original.atom_count) + " atoms.", "AtomGraph");
-      case ExceptionResponse::WARN:
-        rtWarn("Subset index " + std::to_string(i) + ", for atom " +
-               std::to_string(local_subset[i]) + ", is invalid for a topology containing " +
-               std::to_string(original.atom_count) + " atoms.  This entry will be skipped",
-               "AtomGraph");
-        nskip++;
-        break;
-      case ExceptionResponse::SILENT:
-        nskip++;
-        break;
-      }
-    }
-  }
-  atom_count = nsubset - nskip;
-  if (atom_count == 0) {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("No valid atoms were found in the subset of " + std::to_string(nsubset) + ", applied "
-            "to topology " + original.source + " with " + std::to_string(original.atom_count) +
-            " atoms.", "AtomGraph");
-    case ExceptionResponse::WARN:
-      rtWarn("No valid atoms were found in the subset of " + std::to_string(nsubset) + ", applied "
-             "to topology " + original.source + " with " + std::to_string(original.atom_count) +
-             " atoms.  An empty object will be returned.", "AtomGraph");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
-    }
-  }
-
-  // Get the relevant abstracts to help with pointers
-  const ChemicalDetailsKit orig_cdk         = original.getChemicalDetailsKit();
-  const NonbondedKit<double> orig_nbk       = original.getDoublePrecisionNonbondedKit();
-  const ValenceKit<double> orig_vk          = original.getDoublePrecisionValenceKit();
-  const ImplicitSolventKit<double> orig_isk = original.getDoublePrecisionImplicitSolventKit();
-
-  // Check for virtual sites whose frames are not completely represented in the subset.  Die, or
-  // reject the virtual sites if their frames are incomplete, depending on the fault tolerance
-  // setting.
-  bool vs_in_ascending_order  = true;
-  bool vs_in_descending_order = true;
-  const int* vs_indices = original.virtual_site_atoms.data();
-  for (int i = 0; i < original.virtual_site_count - 1; i++) {
-    vs_in_ascending_order  = (vs_in_ascending_order  && vs_indices[i] < vs_indices[i + 1]);
-    vs_in_descending_order = (vs_in_descending_order && vs_indices[i] > vs_indices[i + 1]);
-  }
-  for (int i = 0; i < nsubset; i++) {
-    if (orig_cdk.z_numbers[local_subset[i]] > 0) {
-      continue;
-    }
-
-    // This atom is a virtual site.  Make sure that the frame is completely represented.
-    
-  }
-  
-  // Prepare a table of residue indices for the original topology
-  const std::vector<int> base_residue_indices = original.getResidueIndex();
-  std::vector<int> tmp_residue_index(atom_count);
-
-  // Prepare a mask of atoms in the subset, based on the original topology.  The mask is set to
-  // -1 to indicate that an atom is not in the subset, and >= 0 to indicate the atom's index in
-  // the subset, hence its index in the new topology.
-  std::vector<int> subset_mask(original.atom_count, -1);
-  
-  // Allocate and tabulate all properties of atoms.
-  std::vector<int> tmp_atom_struc_numbers(atom_count);
-  std::vector<int> tmp_residue_numbers(atom_count);
-  std::vector<int> tmp_atomic_numbers(atom_count);
-  std::vector<int> tmp_molecule_membership(atom_count);
-  std::vector<int> tmp_mobile_atoms(atom_count);
-  std::vector<int> tmp_molecule_contents(atom_count);
-  std::vector<int> tmp_lennard_jones_indices(atom_count);
-  std::vector<int> tmp_neck_gb_indices(atom_count);
-  std::vector<int> tmp_tree_joining_info(atom_count);
-  std::vector<int> tmp_last_rotator_info(atom_count);
-  std::vector<double> tmp_charges(atom_count);
-  std::vector<double> tmp_masses(atom_count);
-  std::vector<double> tmp_atomic_pb_radii(atom_count);
-  std::vector<double> tmp_gb_screening_factors(atom_count);
-  std::vector<char4> tmp_atom_names(atom_count);
-  std::vector<char4> tmp_atom_types(atom_count);
-  std::vector<char4> tmp_residue_names(atom_count);
-  std::vector<char4> tmp_tree_symbols(atom_count);
-  int j = 0;
-  for (int i = 0; i < nsubset; i++) {
-    const int orig_idx = local_subset[i];
-    if (orig_idx < 0 || orig_idx >= original.atom_count) {
-      continue;
-    }
-    tmp_atom_struc_numbers[j] = orig_cdk.atom_numbers[orig_idx];
-    tmp_residue_numbers[j] = orig_cdk.res_numbers[orig_idx];
-    tmp_atomic_numbers[j] = orig_cdk.z_numbers[orig_idx];
-    tmp_molecule_membership[j] = orig_cdk.mol_home[orig_idx];
-    tmp_mobile_atoms[j] = original.mobile_atoms.readHost(orig_idx);
-    tmp_molecule_contents[j] = orig_cdk.mol_contents[orig_idx];
-    tmp_lennard_jones_indices[j] = orig_nbk.lj_idx[orig_idx];
-    tmp_neck_gb_indices[j] = orig_isk.neck_gb_idx[orig_idx];
-    tmp_tree_joining_info[j] = original.tree_joining_info.readHost(orig_idx);
-    tmp_last_rotator_info[j] = original.last_rotator_info.readHost(orig_idx);
-    tmp_charges[j] = orig_nbk.charge[orig_idx];
-    tmp_masses[j] = original.atomic_masses.readHost(orig_idx);
-    tmp_atomic_pb_radii[j] = orig_isk.pb_radii[orig_idx];
-    tmp_gb_screening_factors[j] = orig_isk.gb_screen[orig_idx];
-    tmp_atom_names[j] = orig_cdk.atom_names[orig_idx];
-    tmp_atom_types[j] = orig_cdk.atom_types[orig_idx];
-    tmp_residue_names[j] = orig_cdk.res_names[orig_idx];
-    tmp_tree_symbols[j] = original.tree_symbols.readHost(orig_idx);
-    tmp_residue_index[j] = base_residue_indices[orig_idx];
-    subset_mask[orig_idx] = j;
-    virtual_site_count += (orig_cdk.z_numbers[orig_idx] == 0);
-    j++;
-  }
-
-  // Allocate and tabulate residue and molecule-level information.  Adjust the residue indices
-  // to fit a pattern appropriate to the subset and prepare molecule-specific information.
-  int min_resid = tmp_residue_index[0];
-  int max_resid = tmp_residue_index[0];
-  int min_molid = tmp_molecule_membership[0];
-  int max_molid = tmp_molecule_membership[0];
-  for (int i = 0; i < atom_count; i++) {
-    min_resid = std::min(tmp_residue_index[i], min_resid);
-    max_resid = std::max(tmp_residue_index[i], max_resid);
-    min_molid = std::min(tmp_molecule_membership[i], min_molid);
-    max_molid = std::max(tmp_molecule_membership[i], max_molid);
-  }
-  std::vector<int> res_found(max_resid - min_resid + 1, 0);
-  std::vector<int> mol_found(max_molid - min_molid + 1, 0);
-  for (int i = 0; i < atom_count; i++) {
-    res_found[tmp_residue_index[i] - min_resid] = 1;
-    mol_found[tmp_molecule_membership[i] - min_molid] = 1;
-  }
-  int n_unique_res = 0;
-  for (int i = min_resid; i <= max_resid; i++) {
-    if (res_found[i - min_resid] == 1) {
-      res_found[i - min_resid] = n_unique_res;
-      n_unique_res++;
-    }
-  }
-  int n_unique_mol = 0;
-  for (int i = min_molid; i <= max_molid; i++) {
-    if (mol_found[i - min_molid] == 1) {
-      mol_found[i - min_molid] = n_unique_mol;
-      n_unique_mol++;
-    }
-  }
-  for (int i = 0; i < atom_count; i++) {
-    tmp_residue_index[i] = res_found[tmp_residue_index[i] - min_resid];
-    tmp_molecule_membership[i] = mol_found[tmp_molecule_membership[i] - min_molid];
-  }
-
-  // Scan the original topology for each force field term and add the terms to the new topology
-  // if all atoms are present in the subset.
-  bond_term_count = 0;
-  for (int pos = 0; pos < orig_vk.nbond; pos++) {
-    if (subset_mask[orig_vk.bond_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.bond_j_atoms[pos]] >= 0) {
-      bond_term_count++;
-    }
-  }
-  angl_term_count = 0;
-  for (int pos = 0; pos < orig_vk.nangl; pos++) {
-    if (subset_mask[orig_vk.angl_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.angl_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.angl_k_atoms[pos]] >= 0) {
-      angl_term_count++;
-    }
-  }
-  dihe_term_count = 0;
-  for (int pos = 0; pos < orig_vk.ndihe; pos++) {
-    if (subset_mask[orig_vk.dihe_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_l_atoms[pos]] >= 0) {
-      dihe_term_count++;
-    }
-  }
-  urey_bradley_term_count = 0;
-  for (int pos = 0; pos < orig_vk.nubrd; pos++) {
-    if (subset_mask[orig_vk.ubrd_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.ubrd_k_atoms[pos]] >= 0) {
-      urey_bradley_term_count++;
-    }
-  }
-  charmm_impr_term_count = 0;
-  for (int pos = 0; pos < orig_vk.ncimp; pos++) {
-    if (subset_mask[orig_vk.cimp_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_l_atoms[pos]] >= 0) {
-      charmm_impr_term_count++;
-    }
-  }
-  cmap_term_count = 0;
-  for (int pos = 0; pos < orig_vk.ncmap; pos++) {
-    if (subset_mask[orig_vk.cmap_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_l_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_m_atoms[pos]] >= 0) {
-      cmap_term_count++;
-    }
-  }
-
-  // Compose the basic valence table and the CHARMM valence table.  Initially, the terms in the
-  // new topology's holding arrays will bear the parameter indices of the old topology.  This
-  // data will be used, in turn, to create the filtered parameter tables for the new topology
-  // before updating the indexing tables.
-  BasicValenceTable bvt(atom_count, bond_term_count, angl_term_count, dihe_term_count);
-  int new_bond_counter = 0;
-  for (int pos = 0; pos < orig_vk.nbond; pos++) {
-    if (subset_mask[orig_vk.bond_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.bond_j_atoms[pos]] >= 0) {
-      bvt.bond_i_atoms[new_bond_counter]    = subset_mask[orig_vk.bond_i_atoms[pos]];
-      bvt.bond_j_atoms[new_bond_counter]    = subset_mask[orig_vk.bond_j_atoms[pos]];
-      bvt.bond_param_idx[new_bond_counter]  = orig_vk.bond_param_idx[pos];
-      bvt.bond_mods[new_bond_counter] = orig_vk.bond_modifiers[pos];
-      new_bond_counter++;
-    }
-  }
-  int new_angl_counter = 0;
-  for (int pos = 0; pos < orig_vk.nangl; pos++) {
-    if (subset_mask[orig_vk.angl_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.angl_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.angl_k_atoms[pos]] >= 0) {
-      bvt.angl_i_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_i_atoms[pos]];
-      bvt.angl_j_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_j_atoms[pos]];
-      bvt.angl_k_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_k_atoms[pos]];
-      bvt.angl_param_idx[new_angl_counter]  = orig_vk.angl_param_idx[pos];
-      bvt.angl_mods[new_angl_counter] = orig_vk.angl_modifiers[pos];
-      new_angl_counter++;
-    }
-  }
-  int new_dihe_counter = 0;
-  for (int pos = 0; pos < orig_vk.ndihe; pos++) {
-    if (subset_mask[orig_vk.dihe_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.dihe_l_atoms[pos]] >= 0) {
-      bvt.dihe_i_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_i_atoms[pos]];
-      bvt.dihe_j_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_j_atoms[pos]];
-      bvt.dihe_k_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_k_atoms[pos]];
-      bvt.dihe_l_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_l_atoms[pos]];
-      bvt.dihe_param_idx[new_dihe_counter]  = orig_vk.dihe_param_idx[pos];
-      bvt.dihe_mods[new_dihe_counter] = orig_vk.dihe_modifiers[pos];
-      new_dihe_counter++;
-    }
-  }
-
-  // Create parameter tables for the basic valence terms, condensed for the new topology
-  const std::vector<int> bond_correspondence = getSubsetIndexPattern(bvt.bond_param_idx,
-                                                                     &bond_parameter_count);
-  const std::vector<int> angl_correspondence = getSubsetIndexPattern(bvt.angl_param_idx,
-                                                                     &angl_parameter_count);
-  const std::vector<int> dihe_correspondence = getSubsetIndexPattern(bvt.dihe_param_idx,
-                                                                     &dihe_parameter_count);
-  std::vector<double> tmp_bond_stiffnesses = extractIndexedValues(original.bond_stiffnesses,
-                                                                  bond_correspondence,
-                                                                  bond_parameter_count);
-  std::vector<double> tmp_bond_equilibria = extractIndexedValues(original.bond_equilibria,
-                                                                 bond_correspondence,
-                                                                 bond_parameter_count);
-  std::vector<double> tmp_angl_stiffnesses = extractIndexedValues(original.angl_stiffnesses,
-                                                                  angl_correspondence,
-                                                                  angl_parameter_count);
-  std::vector<double> tmp_angl_equilibria = extractIndexedValues(original.angl_equilibria,
-                                                                 angl_correspondence,
-                                                                 angl_parameter_count);
-  std::vector<double> tmp_dihe_amplitudes = extractIndexedValues(original.dihe_amplitudes,
-                                                                 dihe_correspondence,
-                                                                 dihe_parameter_count);
-  std::vector<double> tmp_dihe_periodicities = extractIndexedValues(original.dihe_periodicities,
-                                                                    dihe_correspondence,
-                                                                    dihe_parameter_count);
-  std::vector<double> tmp_dihe_phase_angles = extractIndexedValues(original.dihe_phase_angles,
-                                                                    dihe_correspondence,
-                                                                    dihe_parameter_count);
-
-  // Finish up the basic valence parameter detailing with the atom assignments
-  bvt.makeAtomAssignments();
-  
-  CharmmValenceTable mvt(atom_count, urey_bradley_term_count, charmm_impr_term_count,
-                         cmap_term_count);
-  int new_ubrd_counter = 0;
-  for (int pos = 0; pos < orig_vk.nubrd; pos++) {
-    if (subset_mask[orig_vk.ubrd_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.ubrd_k_atoms[pos]] >= 0) {
-      mvt.ubrd_i_atoms[new_ubrd_counter] = subset_mask[orig_vk.ubrd_i_atoms[pos]];
-      mvt.ubrd_k_atoms[new_ubrd_counter] = subset_mask[orig_vk.ubrd_k_atoms[pos]];
-      mvt.ubrd_param_idx[new_ubrd_counter] = orig_vk.ubrd_param_idx[pos];
-      new_ubrd_counter++;
-    }
-  }
-  int new_cimp_counter = 0;
-  for (int pos = 0; pos < orig_vk.ncimp; pos++) {
-    if (subset_mask[orig_vk.cimp_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cimp_l_atoms[pos]] >= 0) {
-      mvt.impr_i_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_i_atoms[pos]];
-      mvt.impr_j_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_j_atoms[pos]];
-      mvt.impr_k_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_k_atoms[pos]];
-      mvt.impr_l_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_l_atoms[pos]];
-      mvt.impr_param_idx[new_cimp_counter] = orig_vk.cimp_param_idx[pos];
-      new_cimp_counter++;
-    }
-  }
-  int new_cmap_counter = 0;
-  for (int pos = 0; pos < orig_vk.ncmap; pos++) {
-    if (subset_mask[orig_vk.cmap_i_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_j_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_k_atoms[pos]] >= 0 &&
-        subset_mask[orig_vk.cmap_l_atoms[pos]] >= 0) {
-      mvt.cmap_i_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_i_atoms[pos]];
-      mvt.cmap_j_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_j_atoms[pos]];
-      mvt.cmap_k_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_k_atoms[pos]];
-      mvt.cmap_l_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_l_atoms[pos]];
-      mvt.cmap_m_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_m_atoms[pos]];
-      mvt.cmap_param_idx[new_cmap_counter] = orig_vk.cmap_surf_idx[pos];
-      new_cmap_counter++;
-    }
-  }
-
-  // Make parameter tables for CHARMM force field terms
-  const std::vector<int> ubrd_correspondence =
-    getSubsetIndexPattern(mvt.ubrd_param_idx, &urey_bradley_parameter_count);
-  const std::vector<int> cimp_correspondence =
-    getSubsetIndexPattern(mvt.impr_param_idx, &charmm_impr_parameter_count);
-  const std::vector<int> cmap_correspondence =
-    getSubsetIndexPattern(mvt.cmap_param_idx, &cmap_surface_count);
-  const std::vector<double> tmp_urey_bradley_stiffnesses =
-    extractIndexedValues(original.urey_bradley_stiffnesses, ubrd_correspondence,
-                         urey_bradley_parameter_count);
-  const std::vector<double> tmp_urey_bradley_equilibria =
-    extractIndexedValues(original.urey_bradley_equilibria, ubrd_correspondence,
-                         urey_bradley_parameter_count);
-  const std::vector<double> tmp_charmm_impr_stiffnesses =
-    extractIndexedValues(original.charmm_impr_stiffnesses, cimp_correspondence,
-                         charmm_impr_parameter_count);
-  const std::vector<double> tmp_charmm_impr_phase_angles =
-    extractIndexedValues(original.charmm_impr_phase_angles, cimp_correspondence,
-                         charmm_impr_parameter_count);
-  const int nscan = cmap_correspondence.size();
-  std::vector<int> cmap_offsets(cmap_surface_count + 1, 0);
-  for (int i = 0; i < nscan; i++){
-    if (cmap_correspondence[i] >= 0) {
-      cmap_offsets[cmap_correspondence[i]] = orig_vk.cmap_dim[i] * orig_vk.cmap_dim[i];
-    }
-  }
-  prefixSumInPlace(&cmap_offsets, PrefixSumType::EXCLUSIVE, "AtomGraph");
-  const int cmap_alloc_size = cmap_offsets[cmap_surface_count];
-  std::vector<double> tmp_cmap_surfaces(cmap_alloc_size);
-  for (int i = 0; i < nscan; i++) {
-    if (cmap_correspondence[i] >= 0) {
-      const int write_pos = cmap_offsets[cmap_correspondence[i]];
-      const int read_pos = orig_vk.cmap_surf_bounds[i];
-      const int map_element_count = orig_vk.cmap_dim[i] * orig_vk.cmap_dim[i];
-      for (int j = 0; j < map_element_count; j++) {
-        tmp_cmap_surfaces[write_pos + j] = orig_vk.cmap_surf[read_pos + j];
-      }
-    }
-  }
-
-  // Finish up CHARMM parameter indexing with the atom assignments
-  mvt.makeAtomAssignments();
-
-  // Collect virtual sites.  Any virtual sites from the original topology will have to come with
-  // their frame atoms, but a complete set of frame atoms in the new topology does not carry a
-  // requirement that the virtual site also be included.  The net charge of the subset topology
-  // is the thing most likely to be affected, and it will not be required to be integral.
-  VirtualSiteTable vs_table(atom_count, virtual_site_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -985,6 +596,7 @@ void AtomGraph::rebasePointers() {
   hbond_a_values.swapTarget(&double_data);
   hbond_b_values.swapTarget(&double_data);
   hbond_cutoffs.swapTarget(&double_data);
+  atomic_polarizabilities.swapTarget(&double_data);
   tree_symbols.swapTarget(&char4_data);
 }
 
@@ -1183,6 +795,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     // Relevant information for the non-bonded calculation
     charge_type_count{original.charge_type_count},
     lj_type_count{original.lj_type_count},
+    has_14_lennard_jones_data{original.has_14_lennard_jones_data},
     total_exclusions{original.total_exclusions},
     attenuated_14_type_count{original.attenuated_14_type_count},
     inferred_14_attenuations{original.inferred_14_attenuations},
@@ -1306,6 +919,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     hbond_a_values{original.hbond_a_values},
     hbond_b_values{original.hbond_b_values},
     hbond_cutoffs{original.hbond_cutoffs},
+    atomic_polarizabilities{original.atomic_polarizabilities},
     tree_symbols{original.tree_symbols},
 
     // Copy Hybrid data
@@ -1530,6 +1144,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   // Copy relevant information for the non-bonded calculation
   charge_type_count = other.charge_type_count;
   lj_type_count = other.lj_type_count;
+  has_14_lennard_jones_data = other.has_14_lennard_jones_data;
   total_exclusions = other.total_exclusions;
   attenuated_14_type_count = other.attenuated_14_type_count;
   inferred_14_attenuations = other.inferred_14_attenuations;
@@ -1653,6 +1268,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   hbond_a_values = other.hbond_a_values;
   hbond_b_values = other.hbond_b_values;
   hbond_cutoffs = other.hbond_cutoffs;
+  atomic_polarizabilities = other.atomic_polarizabilities;
   tree_symbols = other.tree_symbols;
 
   // Copy Hybrid data structures
@@ -1861,6 +1477,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     // Move information relevant to the non-bonded calculation
     charge_type_count{original.charge_type_count},
     lj_type_count{original.lj_type_count},
+    has_14_lennard_jones_data{original.has_14_lennard_jones_data},
     total_exclusions{original.total_exclusions},
     attenuated_14_type_count{original.attenuated_14_type_count},
     inferred_14_attenuations{original.inferred_14_attenuations},
@@ -1984,6 +1601,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     hbond_a_values{std::move(original.hbond_a_values)},
     hbond_b_values{std::move(original.hbond_b_values)},
     hbond_cutoffs{std::move(original.hbond_cutoffs)},
+    atomic_polarizabilities{std::move(original.atomic_polarizabilities)},
     tree_symbols{std::move(original.tree_symbols)},
 
     // Move the Hybrid data storage arrays
@@ -2202,6 +1820,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   // Copy or move information relevant to the non-bonded calculation
   charge_type_count = other.charge_type_count;
   lj_type_count = other.lj_type_count;
+  has_14_lennard_jones_data = other.has_14_lennard_jones_data;
   total_exclusions = other.total_exclusions;
   attenuated_14_type_count = other.attenuated_14_type_count;
   inferred_14_attenuations = other.inferred_14_attenuations;
@@ -2325,6 +1944,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   hbond_a_values = std::move(other.hbond_a_values);
   hbond_b_values = std::move(other.hbond_b_values);
   hbond_cutoffs = std::move(other.hbond_cutoffs);
+  atomic_polarizabilities = std::move(other.atomic_polarizabilities);
   tree_symbols = std::move(other.tree_symbols);
 
   // Move the Hybrid data storage arrays

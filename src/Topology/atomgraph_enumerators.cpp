@@ -210,6 +210,19 @@ std::string getEnumerationName(const MoleculeKind input) {
 }
   
 //-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(const MoleculeOrdering input) {
+  switch (input) {
+  case MoleculeOrdering::RETAIN_ORDER:
+    return std::string("RETAIN_ORDER");
+  case MoleculeOrdering::WATER_LAST:
+    return std::string("WATER_LAST");
+  case MoleculeOrdering::REORDER_ALL:
+    return std::string("REORDER_ALL");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getEnumerationName(const MobilitySetting input) {
   switch (input) {
   case MobilitySetting::OFF:
@@ -341,9 +354,9 @@ std::string getEnumerationName(const ImplicitSolventModel input) {
   case ImplicitSolventModel::OBC_GB_II:
     return std::string("Onufriev / Bashford / Case Generalized Born (model II)");
   case ImplicitSolventModel::NECK_GB:
-    return std::string("Mogan \"Neck\" Generalized Born (model I)");
+    return std::string("Mongan \"Neck\" Generalized Born (model I)");
   case ImplicitSolventModel::NECK_GB_II:
-    return std::string("Mogan \"Neck\" Generalized Born (model II)");
+    return std::string("Mongan \"Neck\" Generalized Born (model II)");
   }
   __builtin_unreachable();
 }

@@ -211,6 +211,12 @@ public:
   /// \brief Get the number of moving atoms.
   int getMovingAtomCount() const;
 
+  /// \brief Get the number of real moving atoms.
+  int getRealMovingAtomCount() const;
+
+  /// \brief Get the total mass of moving atoms.
+  double getMovingAtomWeight() const;
+  
   /// \brief Get the index of an individual moving atom from within this plan.
   ///
   /// \param index  Index of the atom of interest within the plan (the topological index of the
@@ -244,8 +250,12 @@ private:
                                         ///<   Only relevant in the case of a rotatable or
                                         ///<   cis-trans bond, set to -1 for chiral centers.
   int pivot_handle;                     ///< The most significan atom connected to the pivot atom
+  int rotating_real_atom_count;         ///< The number of real atoms in the rotating group.  This
+                                        ///<   excludes the root and pivot atoms, and any virtual
+                                        ///<   sites in the rotating atom list.
   std::vector<int> moving_atoms;        ///< List of all atoms that turn as a consequence of
                                         ///<   twisting about the rotatable bond axis
+  double mass_of_rotators;              ///< The combined mass of all rotating atoms, in Daltons
   AtomGraph *ag_pointer;                ///< Pointer to the AtomGraph object to which this
                                         ///<   isomerization applies
 };

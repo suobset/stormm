@@ -24,6 +24,7 @@ constexpr double default_solvent_rgbmax = 1000.0;
 constexpr double default_solvent_intdiel = 1.0;
 constexpr double default_solvent_extdiel = 78.5;
 constexpr double default_solvent_saltcon = 0.0;
+constexpr double default_surface_area_energy = 0.0;
 constexpr char default_solvent_pbradii[] = "none";
 /// \}
 
@@ -61,28 +62,31 @@ public:
   SolventControls& operator=(SolventControls &&original) = default;
   /// \}
 
-  /// \brief Get the type of implicit solvent (some flavor of Generalized Born)
+  /// \brief Get the type of implicit solvent (some flavor of Generalized Born).
   ImplicitSolventModel getImplicitSolventModel() const;
 
-  /// \brief Get the Born radius calculation cutoff
+  /// \brief Get the Born radius calculation cutoff.
   double getBornRadiiCutoff() const;
 
-  /// \brief Get the internal dielectric constant
+  /// \brief Get the internal dielectric constant.
   double getInternalDielectric() const;
 
-  /// \brief Get the external dielectric constant
+  /// \brief Get the external dielectric constant.
   double getExternalDielectric() const;
 
-  /// \brief Get the salt concentration
+  /// \brief Get the salt concentration.
   double getSaltConcentration() const;
 
-  /// \brief Get the Poisson-Boltzmann radii set
+  /// \brief Get the Poisson-Boltzmann radii set.
   AtomicRadiusSet getPBRadiiSet() const;
+
+  /// \brief Get the surface area scaling factor, in units of kcal/mol per square Angstrom.
+  double getSurfaceAreaScalingFactor() const;
 
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;
   
-  /// \brief Set the implicit solvent model
+  /// \brief Set the implicit solvent model.
   ///
   /// Overloaded:
   ///   - Take the integer code for the implicit solvent model (and apply validation)
@@ -99,12 +103,12 @@ public:
   /// \param rgbmax_in  The Born radius calculation cutoff of choice
   void setBornRadiiCutoff(double rgbmax_in);
 
-  /// \brief Set the internal dielectric
+  /// \brief Set the internal dielectric.
   ///
   /// \param idiel_in  The internal dielectric to apply
   void setInternalDielectric(double idiel_in);
   
-  /// \brief Set the external dielectric
+  /// \brief Set the external dielectric.
   ///
   /// \param ediel_in  The external dielectric to apply
   void setExternalDielectric(double ediel_in);
@@ -115,7 +119,7 @@ public:
   /// \param saltcon_in  The concentration to set
   void setSaltConcentration(double saltcon_in);
 
-  /// \brief Choose the Poisson-Boltzmann radii set
+  /// \brief Choose the Poisson-Boltzmann radii set.
   ///
   /// Overloaded:
   ///   - Use string input (and translate the string, checking for validity)
@@ -126,6 +130,12 @@ public:
   void choosePBRadiiSet(const std::string &pbrad_in);
   void choosePBRadiiSet(AtomicRadiusSet pbrad_in);
   /// \}
+
+  /// \brief Set the surface area scaling factor.  Any value is accepted, even negative values, as
+  ///        it may be favorable, in some solvents, for a molecule to have more surface area.
+  ///
+  /// \param sa_scaling_in  The scaling factor, in units of kcal/mol per square Angstrom
+  void setSurfaceAreaScalingFactor(double sa_scaling_in);
   
 private:
   ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
@@ -148,6 +158,8 @@ private:
   AtomicRadiusSet pb_radii;       ///< Defines the Poisson-Boltzmann radii set (and baseline GB
                                   ///<   radii).  Acceptable values in the input include "Bondi",
                                   ///<   "Amber6", "mBondi", "mBond2", "mBondi3", or "none".
+  double sa_scaling;              ///< The scaling factor to be applied to computed surface areas
+                                  ///<   of molecules, in units of kcal/mol per square Angstrom
 
   /// Store a deep copy of the original namelist emulator as read from the input file.
   NamelistEmulator nml_transcript;

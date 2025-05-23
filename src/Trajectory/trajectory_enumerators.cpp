@@ -28,6 +28,8 @@ std::string getCoordinateFileKindDescription(const CoordinateFileKind cfkind) {
     return std::string("Amber NetCDF binary restart");
   case CoordinateFileKind::SDF:
     return std::string("MDL MOL / SDF");
+  case CoordinateFileKind::PDB:
+    return std::string("Protein Data Bank");
   case CoordinateFileKind::UNKNOWN:
     return std::string("Unknown coordinate file format");
   }
@@ -49,6 +51,8 @@ std::string getEnumerationName(const CoordinateFileKind cfkind) {
     return std::string("AMBER_NETCDF_RST");
   case CoordinateFileKind::SDF:
     return std::string("SDF");
+  case CoordinateFileKind::PDB:
+    return std::string("PDB");
   case CoordinateFileKind::UNKNOWN:
     return std::string("UNKNOWN");
   }

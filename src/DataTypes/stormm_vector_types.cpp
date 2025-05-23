@@ -229,6 +229,82 @@ bool operator!=(const ullint4 lhs, const ullint4 rhs) {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool operator<(const char2 lhs, const char2 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, ' ', ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, ' ', ' ' };
+  return (char4ToUint(lhs4) < char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator<=(const char2 lhs, const char2 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, ' ', ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, ' ', ' ' };
+  return (char4ToUint(lhs4) <= char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator>(const char2 lhs, const char2 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, ' ', ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, ' ', ' ' };
+  return (char4ToUint(lhs4) > char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator>=(const char2 lhs, const char2 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, ' ', ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, ' ', ' ' };
+  return (char4ToUint(lhs4) >= char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator==(const char2 lhs, const char2 rhs) {
+  return (lhs.x == rhs.x && lhs.y == rhs.y);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator!=(const char2 lhs, const char2 rhs) {
+  return (lhs.x != rhs.x || lhs.y != rhs.y);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator<(const char3 lhs, const char3 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, lhs.z, ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, rhs.z, ' ' };
+  return (char4ToUint(lhs4) < char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator<=(const char3 lhs, const char3 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, lhs.z, ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, rhs.z, ' ' };
+  return (char4ToUint(lhs4) <= char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator>(const char3 lhs, const char3 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, lhs.z, ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, rhs.z, ' ' };
+  return (char4ToUint(lhs4) > char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator>=(const char3 lhs, const char3 rhs) {
+  const char4 lhs4 = { lhs.x, lhs.y, lhs.z, ' ' };
+  const char4 rhs4 = { rhs.x, rhs.y, rhs.z, ' ' };
+  return (char4ToUint(lhs4) >= char4ToUint(rhs4));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator==(const char3 lhs, const char3 rhs) {
+  return (lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool operator!=(const char3 lhs, const char3 rhs) {
+  return (lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z);
+}
+
+//-------------------------------------------------------------------------------------------------
 bool operator<(const char4 lhs, const char4 rhs) {
   return (char4ToUint(lhs) < char4ToUint(rhs));
 }

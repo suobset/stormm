@@ -3,8 +3,8 @@
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
-#include "vector_report.h"
 #include "approx.h"
+#include "vector_report.h"
 
 namespace stormm {
 namespace testing {
@@ -15,6 +15,8 @@ using stmath::meanUnsignedError;
 using stmath::pearson;
 using stmath::variance;
 using stmath::VarianceMethod;
+using parse::NumberFormat;
+using parse::PolyNumeric;
 using parse::realDecimalPlaces;
 using parse::realToString;
 
@@ -167,6 +169,30 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
   case NumberFormat::CHAR4:
     rtErr("Vector analysis method not yet implemented.", "vectorAlignmentReport");
     break;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+  std::string listItemsAsString(const std::vector<std::string> &list, const size_t maximum_items,
+                              const bool spread) {
+  std::string result;
+  const size_t n_display = std::min(maximum_items, list.size());
+  if (n_display == maximum_items) {
+    for (size_t i = 0; i < n_display; i++) {
+      result += list[i] + listSeparator(i, n_display);
+    }
+  }
+  else {
+    if (spread) {
+      double prog = 0.0;
+      const double frac	= static_cast<double>(list.size()) / static_cast<double>(n_display);
+      for (int i = 0; i < n_display; i++) {
+        const size_t idx =	static_cast<size_t>(prog);
+	result += list[idx] + listSeparator(i, n_display);
+        prog +=	frac;
+      }
+    }
   }
   return result;
 }

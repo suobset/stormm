@@ -9,6 +9,7 @@
 #include "FileManagement/file_enumerators.h"
 #include "Namelists/command_line_parser.h"
 #include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_emulate.h"
 #include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
@@ -115,6 +116,9 @@ struct UserSettings {
   
   /// \brief Detect whether an &ffmorph namelist was present
   bool getFFMorphPresence() const;
+
+  /// \brief Detect whether an &emulator namelist was present
+  bool getEmulatorPresence() const;
   
   /// \brief Detect whether a &report namelist was present
   bool getReportPresence() const;
@@ -152,6 +156,9 @@ struct UserSettings {
   /// \brief Get force field hyperparameter optimization controls through the &ffmorph namelist.
   const FFMorphControls& getFFMorphNamelistInfo() const;
 
+  /// \brief Get non-bonded emulation potential controls through the &emulator namelist.
+  const EmulatorControls& getEmulatorNamelistInfo() const;
+  
   /// \brief Get the user-specified diagnostics report features.
   const ReportControls& getReportNamelistInfo() const;
   
@@ -179,6 +186,7 @@ private:
   bool has_dynamics_nml;        ///< Indicate the presence of a &dynamics namelist in the input
   bool has_remd_nml;            ///< Indicate the presence of a &remd namelist in the input
   bool has_ffmorph_nml;         ///< Indicate the presence of an &ffmorph namelist in the input
+  bool has_emulator_nml;        ///< Indicate the presence of an &emulator namelist in the input
   bool has_report_nml;          ///< Indicate the presence of a &report namelist in the input
   int restraint_nml_count;      ///< Number of &restraint namelists found in the input
   
@@ -199,6 +207,7 @@ private:
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
   RemdControls remd_input;          ///< Replica exchange molecular dynamics instructions
   FFMorphControls ffmod_input;      ///< Force field modification instructions
+  EmulatorControls emul_input;      ///< Non-bonded potential emulation and fitting
   ReportControls diagnostic_input;  ///< Diagnostics report file details and layout
   
   /// There can be many restraint controls sections in the input.  This vector holds them all.

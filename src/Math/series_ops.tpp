@@ -25,13 +25,16 @@ template <typename T> std::vector<T> extractIndexedValues(const T* original_valu
                                                           const size_t values_length,
                                                           const std::vector<int> reduced_indices,
                                                           const int reduced_length) {
+  if (values_length == 0 || reduced_length == 0) {
+    return std::vector<T>();
+  }
   const int actual_length = (reduced_length == 0) ? maxValue(reduced_indices) : reduced_length;
   const size_t ridx_size = reduced_indices.size();
   if (values_length < ridx_size) {
     rtErr("The array of original values is smaller than the number of unique indices.",
           "extractIndexedValues");    
   }
-  std::vector<T> result;
+  std::vector<T> result(actual_length);
   for (size_t i = 0; i < ridx_size; i++) {
     if (reduced_indices[i] >= 0) {
       result[reduced_indices[i]] = original_values[i];
