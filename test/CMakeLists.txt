@@ -10,11 +10,11 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/Namelists/test_namelists.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_clustering.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_math.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_external_math.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_numerics.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_amber_prmtop.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Topology/test_topology_mods.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_amber_coordinates.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_coordinate_graft.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_coordinate_swap.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Trajectory/test_coordinate_formats.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Chemistry/test_chemical_features.cpp
@@ -39,11 +39,14 @@ set(STORMM_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/MolecularMechanics/test_minimization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/MoleculeFormat/test_molecule_formats.cpp)
 
-if (STORMM_ENABLE_RDKIT)
+if (STORMM_INCLUDE_POCKETFFT)
+    list(APPEND STORMM_TEST_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/Math/test_external_math.cpp)
+endif()
 
+if (STORMM_ENABLE_RDKIT)
     list(APPEND STORMM_TEST_SOURCES
             ${CMAKE_CURRENT_SOURCE_DIR}/RDKit/test_rdkit.cpp)
-
 endif()
 
 if(STORMM_ENABLE_CUDA)
@@ -69,6 +72,11 @@ foreach (STORMM_TEST_SOURCE ${STORMM_TEST_SOURCES})
     if(STORMM_INCLUDE_POCKETFFT)
         add_dependencies(${STORMM_TEST_NAME} PocketFFTBuild)
         target_link_libraries(${STORMM_TEST_NAME} PocketFFT)
+    endif()
+
+    # Add NetCDF dependency if enabled
+    if(STORMM_INCLUDE_NETCDF)
+        add_dependencies(${STORMM_TEST_NAME} NetCDFC)
     endif()
 
     if(STORMM_TEST_NAME STREQUAL "test_atomgraph_synthesis" OR

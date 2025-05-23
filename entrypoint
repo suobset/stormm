@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+if [ $# -lt 1 ]; then
+  echo "Usage: stormm {mmgbsa|dynamics|ffrefine|conformer} <args...>"
+  exit 1
+fi
+
+APP="$1"
+shift
+
+case "$APP" in
+  mmgbsa)
+    exec /app/stormmbuild/apps/Gbsa/mmgbsa.stormm.cuda "$@"
+    ;;
+  dynamics)
+    exec /app/stormmbuild/apps/Dyna/dynamics.stormm.cuda "$@"
+    ;;
+  ffrefine)
+    exec /app/stormmbuild/apps/Ffrn/ffrefine.stormm.cuda "$@"
+    ;;
+  conformer)
+    exec /app/stormmbuild/apps/Conf/conformer.stormm.cuda "$@"
+    ;;
+  *)
+    echo "Usage: stormm {mmgbsa|dynamics|ffrefine|conformer} <args...>"
+    exit 1
+    ;;
+esac 

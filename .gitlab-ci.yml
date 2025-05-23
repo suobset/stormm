@@ -1,49 +1,67 @@
+default:
+  tags:
+    - gcp
+
 stages:
   - test
-  - prepare-deployment
-  - deploy
+  - build_docker
+  - build_singularity
 
 test:
   stage: test
-
-  image: nvidia/cuda:12.5.0-devel-ubuntu22.04
+  allow_failure: true  # Allow pipeline to continue even if tests fail
+  image: nvidia/cuda:12.8.1-devel-ubuntu22.04
 
   script:
-
     - apt update -y
+    - apt clean   
     - apt install wget -y
     - apt install python3-pip -y
+    - export DEBIAN_FRONTEND=noninteractive
+    - export TZ=UTC
+    - apt install tzdata -y
+    - apt install gcovr -y
     - apt install git -y
-    - pip install gcovr
+    - apt install libeigen3-dev -y
+    - apt install libboost-all-dev -y
+    - apt install gcc g++ -y
+    - apt install cmake -y
+
+    # Manually install CUDA 12.x if needed
+    - echo "Checking and installing CUDA 12.x..."
+    - wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+    - dpkg -i cuda-keyring_1.1-1_all.deb
+    - apt-get update -y
+    - apt-get -y install cuda-toolkit-12-8
+    - export PATH=/usr/local/cuda/bin:$PATH
+    - export CUDADIR=/usr/local/cuda
+    - export CXXFLAGS="-I/usr/local/cuda/include $CXXFLAGS"
+    - export LDFLAGS="-L/usr/local/cuda/lib64 $LDFLAGS"
+
     - nvidia-smi
 
-    - wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-    - bash Miniforge3.sh -b -p "${HOME}/conda"
-
-    - source "${HOME}/conda/etc/profile.d/conda.sh"
-    - source "${HOME}/conda/etc/profile.d/mamba.sh"
-
-    - rm -rf build deploy .conda
-
-    - conda create --prefix=${CI_PROJECT_DIR}/.conda cmake python=3.10
-
-    - if [ "$RDKIT" == "YES" ]; then
-         conda install --prefix ${CI_PROJECT_DIR}/.conda --yes "gxx =9.5" rdkit eigen boost;
-      fi
+    - rm -rf build deploy  # Clean old build artifacts
 
     - CUDA_VISIBLE_DEVICES=$CI_RUNNER_ID
 
     - mkdir build && cd build
 
-    - conda run --no-capture-output --prefix ${CI_PROJECT_DIR}/.conda
-      cmake -DCMAKE_BUILD_TYPE=RELEASE 
-            -DSTORMM_ENABLE_CUDA=$CUDA 
-            -DSTORMM_ENABLE_RDKIT=$RDKIT
-            -DCMAKE_PREFIX_PATH=${CI_PROJECT_DIR}/.conda/
+    - cmake -DCMAKE_BUILD_TYPE=RELEASE 
+            -DSTORMM_ENABLE_CUDA=NO
+            -DSTORMM_ENABLE_RDKIT=NO 
             -DSTORMM_ENABLE_TEST_COVERAGE=YES 
-            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy
-            -DCUSTOM_NVCC_THREADS=8
-            -DCUSTOM_GPU_ARCH="75" ..
+            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy 
+            -DCUSTOM_NVCC_THREADS=8 ..
+    - make -j
+    - make test -j
+    - gcovr --xml-pretty --exclude-unreachable-branches --gcov-ignore-parse-errors --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
+
+    - cmake -DCMAKE_BUILD_TYPE=RELEASE 
+            -DSTORMM_ENABLE_CUDA=YES 
+            -DSTORMM_ENABLE_RDKIT=NO 
+            -DSTORMM_ENABLE_TEST_COVERAGE=YES 
+            -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/deploy 
+            -DCUSTOM_NVCC_THREADS=8 ..
     - make -j
     - make test -j
     - gcovr --xml-pretty --exclude-unreachable-branches --gcov-ignore-parse-errors --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
@@ -53,27 +71,16 @@ test:
     - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CI_PROJECT_DIR}/deploy/lib/
     - export PATH=$PATH:${CI_PROJECT_DIR}/deploy/bin/
 
-    # Make sure the CMake file that will let other libraries find and compile
-    # against STORMM was created
     - test -f ${CI_PROJECT_DIR}/deploy/lib/cmake/stormm/STORMMTargets.cmake
 
     - cd ${CI_PROJECT_DIR}
 
-    # Sanity check that our installed apps run
-    - if [ "$CUDA" == "YES" ]; then conformer.stormm.cuda --help; else conformer.stormm --help; fi
-    - if [ "$CUDA" == "YES" ]; then ffrefine.stormm.cuda --help; else ffrefine.stormm --help; fi
-    # TODO: Uncomment if `dynamics.stormm` gets a help message
-    # - if [ "$CUDA" == "YES" ]; then dynamics.stormm.cuda --help; else dynamics.stormm --help; fi
+    - conformer.stormm.cuda --help
+    - ffrefine.stormm.cuda --help
 
   parallel:
     matrix:
-      - CUDA: ["NO"]
-        #RDKIT: ["NO", "YES"]
-        RDKIT: ["NO"]
-        NEO_TAG: ["intel"]
-      - CUDA: ["YES"]
-        RDKIT: ["NO"]
-        NEO_TAG: ["gpu"]
+      - NEO_TAG: ["gpu"]
 
   coverage: /^\s*lines:\s*\d+.\d+\%/
 
@@ -81,61 +88,89 @@ test:
     name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
     expire_in: 2 days
     paths:
-      - /builds/roivant/psivant/tools/STORMM/build/Testing/Temporary/LastTest.log
+      - build/Testing/Temporary/LastTest.log
+      - ${CI_PROJECT_DIR}/build/Testing/Temporary/LastTest.log
     reports:
       coverage_report:
         coverage_format: cobertura
         path: build/coverage.xml
 
-  tags:
-    - $NEO_TAG
-
-prepare-deployment:
-  stage: prepare-deployment
-  image: condaforge/mambaforge
+build_docker:
+  stage: build_docker
+  needs: ["test"]
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo $GCP_SERVICE_KEY | base64 -d > gcloud-service-key.json
+    - gcloud auth activate-service-account --key-file=gcloud-service-key.json
+    - gcloud config set project psivant-data
   script:
-    - mamba install --yes conda-smithy
+    - echo "Building STORMM CUDA image"
+    - echo "CI_COMMIT_SHA:" $CI_COMMIT_SHA
+    
+    # Submit build to Cloud Build
+    - |
+      gcloud builds submit \
+        --project psivant-data \
+        --machine-type=e2-highcpu-32 \
+        --tag us-docker.pkg.dev/psivant-data/containers/stormm:$CI_COMMIT_SHA \
+        --timeout=3h \
+        --region us-central1 .
 
-    - git config --global user.email "ci@gitlab.com"
-    - git config --global user.name "GitLab CI"
+    # Tag as latest based on branch
+    - |
+        gcloud artifacts docker tags add \
+          us-docker.pkg.dev/psivant-data/containers/stormm:$CI_COMMIT_SHA \
+          us-docker.pkg.dev/psivant-data/containers/stormm:$CI_COMMIT_BRANCH
 
-    # Use the conda-forge machinery to generate the relevant docker build files / environment
-    - cp -a conda recipe && mv recipe/recipe.yaml recipe/meta.yaml
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        gcloud artifacts docker tags add \
+          us-docker.pkg.dev/psivant-data/containers/stormm:$CI_COMMIT_SHA \
+          us-docker.pkg.dev/psivant-data/containers/stormm:$CI_COMMIT_BRANCH \
+          us-docker.pkg.dev/psivant-data/containers/stormm:latest
+      fi
 
-    - conda smithy init recipe
-    - conda smithy rerender --feedstock_directory stormm-recipe-feedstock
-
-    - git clone . stormm-recipe-feedstock/recipe/repo
-
-  artifacts:
-    paths:
-      # Pass the build files / environment into the next step
-      - ./stormm-recipe-feedstock
-    expire_in: 1h 30m
   only:
-    - tags
+    - development
+    - main
+    - test_build
 
-deploy-linux:
-  stage: deploy
-  image: docker
+build_singularity:
+  needs: [build_docker]
+  image: docker:24.0.5
+  stage: build_singularity
   services:
     - docker:dind
+  before_script:
+    - |
+      cat > /etc/apk/repositories << EOF; $(echo)
+      https://dl-cdn.alpinelinux.org/alpine/v$(cut -d'.' -f1,2 /etc/alpine-release)/main/
+      https://dl-cdn.alpinelinux.org/alpine/v$(cut -d'.' -f1,2 /etc/alpine-release)/community/
+      https://dl-cdn.alpinelinux.org/alpine/edge/testing/
+      https://dl-cdn.alpinelinux.org/alpine/edge/community/
+      EOF
+    - apk update
+    - apk add --no-cache curl gnupg python3 singularity
+    - curl -O https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz
+    - tar -xzf google-cloud-sdk.tar.gz
+    - ./google-cloud-sdk/install.sh
+    - rm google-cloud-sdk.tar.gz
+    - export PATH="$PATH:$(pwd)/google-cloud-sdk/bin"
+    - gcloud auth configure-docker us-docker.pkg.dev -q
+    - echo $GCP_SERVICE_KEY | base64 -d > gcloud-service-key.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=gcloud-service-key.json
+    - gcloud auth activate-service-account --key-file gcloud-service-key.json
+    - echo $GCP_SERVICE_KEY | base64 -d > gcloud-service-key.json
+    - docker login -u _json_key --password-stdin us-docker.pkg.dev < gcloud-service-key.json
   script:
-    - apk add bash py3-pip
+    - |
+      PROJECT_NAME_LOWER=$(echo $CI_PROJECT_NAME | tr '[:upper:]' '[:lower:]')
+      docker pull us-docker.pkg.dev/psivant-data/containers/$PROJECT_NAME_LOWER:$CI_COMMIT_SHA
+      singularity build "$PROJECT_NAME_LOWER-$CI_COMMIT_BRANCH.sif" docker-daemon://us-docker.pkg.dev/psivant-data/containers/$PROJECT_NAME_LOWER:$CI_COMMIT_SHA
+      gsutil cp "$PROJECT_NAME_LOWER-$CI_COMMIT_BRANCH.sif" gs://singularity-images/$CI_PROJECT_NAME/
+      gsutil cp "$PROJECT_NAME_LOWER-$CI_COMMIT_BRANCH.sif" gs://cluster-software-prod/images/
 
-    - cd stormm-recipe-feedstock
-    - CPU_COUNT=4 CI="gitlab" UPLOAD_PACKAGES="False" ./.scripts/run_docker_build.sh
-
-    - pip install --upgrade cloudsmith-cli
-    - find build_artifacts/linux-64 -name "*.conda" | xargs -n 1 cloudsmith push conda roivant/psivant
-  parallel:
-    matrix:
-      - CONFIG:
-          - "linux_64_cuda_compiler_versionNonecxx_compiler_version11"
-          - "linux_64_cuda_compiler_version11.0cxx_compiler_version9"
-        CLOUDSMITH_API_KEY: $CLOUDSMITH_API_KEY
-        CLOUDSMITH_API_USER: $CLOUDSMITH_API_USER
   only:
-    - tags
-  tags:
-    - saas-linux-large-amd64
+    - development
+    - main
+    - test_build

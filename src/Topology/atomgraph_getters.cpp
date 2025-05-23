@@ -495,6 +495,15 @@ char4 AtomGraph::getAtomType(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string AtomGraph::getFullAtomName(int index) const {
+  const int res_idx = this->getResidueIndex(index);
+  std::string result = char4ToString(residue_names.readHost(res_idx));
+  result += " " + std::to_string(residue_numbers.readHost(index));
+  result += " " + char4ToString(atom_names.readHost(res_idx));
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::vector<std::vector<char4>> AtomGraph::getAtomTypeNameTable() const {
   std::vector<std::vector<char4>> result(lj_type_count);
   std::vector<bool> coverage(lj_type_count, false);

@@ -1166,7 +1166,25 @@ int main(const int argc, const char* argv[]) {
   check(trj_outside_list == false, "One of the SystemCache's trajectory file names was outside "
         "the expected list.  The name extension feature, for differentiating names of multiple "
         "systems under the same label, may be malfunctioning.", test_sysc);
-
+  std::vector<bool> cache_coverage(sysc.getSystemCount(), false);
+  for (int i = 0; i < sysc.getLabelCount(); i++) {
+    for (int j = 0; j < sysc.getSystemCountWithinLabel(i); j++) {
+      const int chc_idx = sysc.getCacheIndex(sysc.getLabel(i), j);
+      cache_coverage[chc_idx] = true;
+    }
+  }
+  std::vector<int> blind_to_label_index_lookup;
+  for (int i = 0; i < sysc.getSystemCount(); i++) {
+    if (cache_coverage[i] == false) {
+      blind_to_label_index_lookup.push_back(i);
+    }
+  }
+  check(blind_to_label_index_lookup.size() == 0, "A total of " +
+        std::to_string(blind_to_label_index_lookup.size()) + " systems were not accessed when "
+        "looping over all label groups and the sub-indices of systems in each label group of a "
+        "SystemCache object.  Examples of system indices lacking coverage: " +
+        listItemsAsString(blind_to_label_index_lookup, 8, true));
+  
   // Make a new systems cache and verify that multiple frames under the same label are properly
   // handled.
   std::string multi_label_deck("&files\n");
@@ -1181,10 +1199,10 @@ int main(const int argc, const char* argv[]) {
   const FilesControls multi_label_fcon(multi_label_tf, &start_line);
   SystemCache multi_label_sysc(multi_label_fcon, ExceptionResponse::SILENT);
   check(multi_label_sysc.getCheckpointName(10), RelationalOperator::EQUAL, "md_0_10.rst",
-        "The SystemCache object does not produced the expected non-colliding name for a frame of "
+        "The SystemCache object does not produce the expected non-colliding name for a frame of "
         "an SD file.", test_sysc);
   check(multi_label_sysc.getCheckpointName(38), RelationalOperator::EQUAL, "md_1_2.rst",
-        "The SystemCache object does not produced the expected non-colliding name for a replica "
+        "The SystemCache object does not produce the expected non-colliding name for a replica "
         "of an coordinate system first read from an Amber ASCII restart file.", test_sysc);
 
   std::string cat_output_deck("&files\n");

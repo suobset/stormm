@@ -21,7 +21,6 @@ using constants::ExceptionResponse;
 using parse::TextFile;
 using parse::WrapTextSearch;
 using structure::ApplyConstraints;
-using namelist::NamelistEmulator;
 
 constexpr int default_total_swaps = 0;
 constexpr char default_remd_type[] = "Temperature";
@@ -93,10 +92,10 @@ public:
   
   /// \brief Get the vector of initial temperature targets for all groups of atoms and systems.
   // TODO: Change this to just a double
-  const double getLowTemperature() const;
+  double getLowTemperature() const;
 
   /// \brief Get the vector of final temperature targets for all groups of atoms and systems.
-  const double getHighTemperature() const;
+  double getHighTemperature() const;
   
   /// \brief Get the original namelist emulator object as a transcript of the user input.
   const NamelistEmulator& getTranscript() const;

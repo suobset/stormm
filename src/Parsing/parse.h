@@ -50,12 +50,30 @@ std::string char3ToString(const char3 value);
 std::string char4ToString(const char4 value);
 /// \}
 
+/// \brief Convert the first two characters of a string to char2, ignoring subsequent characters
+///        and padding with whitespace if the string is shorter than four characters.
+///
+/// \param value  The string to convert
+char2 stringToChar2(const std::string &value);
+
 /// \brief Convert the first four characters of a string to char4, ignoring subsequent characters
 ///        and padding with whitespace if the string is shorter than four characters.
 ///
 /// \param value  The string to convert
 char4 stringToChar4(const std::string &value);
-  
+
+/// \brief Convert an entire string to a vector of char4 values.  The final char4 element that
+///        terminates the string will contain a terminating character directly after the end of
+///        the original string and filling the final char4 element, e.g. "ttyl" will become
+///        { { 't', 't', 'y', 'l', }, { '\0', '\0', '\0', '\0' } } and "lever" will become
+///        { { 'l', 'e', 'v', 'e', }, { 'r', '\0', '\0', '\0' } }.
+///
+/// \param value  The string to convert
+/// \param blank  The character to insert if any elements of a tuple are unneeded to store the
+///               complete string.  By default, the function will fill in the null character, but
+///               white space may be suitable for some applications.
+std::vector<char4> stringToChar4Vector(const std::string &value, char blank = '\0');
+
 /// \brief Convert a positive integer to an alphabetic string, essentially a base-26 number.
 ///
 /// \param input  The integer to convert

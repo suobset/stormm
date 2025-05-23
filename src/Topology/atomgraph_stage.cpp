@@ -292,8 +292,8 @@ AtomGraphStage::AtomGraphStage(const AtomGraph *ag_in, const ExceptionResponse p
   nb_excl.nb12_excl_list = ag_in->nb12_exclusion_list.readHost();
   nb_excl.nb13_excl_list = ag_in->nb13_exclusion_list.readHost();
   nb_excl.nb14_excl_list = ag_in->nb14_exclusion_list.readHost();
-  mapMolecules(atom_count, &molecule_count, nb_excl, &molecule_membership, &molecule_limits,
-               &molecule_contents);
+  mapMolecules(atom_count, &molecule_count, &residue_count, nb_excl, &molecule_membership,
+               &molecule_limits, &molecule_contents, &residue_limits, &residue_names);
   
   // Load physical constants and sizing constants for non-bonded parameters.
   charge_type_count = ag_in->charge_type_count;
@@ -570,9 +570,9 @@ AtomGraphStage::exportTopology(const int minimum_solute_size,
                           dihe_periodicities, dihe_phase_angles, charge_parameters, lj_a_values,
                           lj_b_values, lj_c_values, lj_14_a_values, lj_14_b_values, lj_14_c_values,
                           all_atom_dzeros, all_atom_dzeros, all_atom_dzeros, all_atom_dzeros, {},
-                          {}, {}, atom_names, atom_types, residue_names, all_atom_unknown,
-                          tmp_cmap_tbl, tmp_cond_excl, tmp_bvt, tmp_cvt, tmp_attn_parm, tmp_vs_tbl,
-                          tmp_nb_excl, tmp_cnst_tbl);
+                          {}, {}, all_atom_dzeros, atom_names, atom_types, residue_names,
+                          all_atom_unknown, tmp_cmap_tbl, tmp_cond_excl, tmp_bvt, tmp_cvt,
+                          tmp_attn_parm, tmp_vs_tbl, tmp_nb_excl, tmp_cnst_tbl);
   return result;
 }
 
@@ -1627,8 +1627,8 @@ std::vector<int> AtomGraphStage::addConnections(const std::vector<int> &atom_i,
                                      bond_i_atoms, bond_j_atoms);
 
   // Map the molecular structure with the exclusions at hand.
-  mapMolecules(atom_count, &molecule_count, excl, &molecule_membership, &molecule_limits,
-               &molecule_contents);
+  mapMolecules(atom_count, &molecule_count, &residue_count, excl, &molecule_membership,
+               &molecule_limits, &molecule_contents, &residue_limits, &residue_names);
   
   // Return the arrays of exclusions to the object.
   nb11_exclusion_bounds = std::move(excl.nb11_excl_bounds);

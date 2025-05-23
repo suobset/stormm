@@ -13,7 +13,9 @@
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "FileManagement/file_enumerators.h"
 #include "Parsing/citation.h"
+#include "Parsing/parsing_enumerators.h"
 #include "Structure/structure_enumerators.h"
 #include "atomgraph_abstracts.h"
 #include "atomgraph_constants.h"
@@ -28,7 +30,10 @@ using constants::ExceptionResponse;
 using constants::PrecisionModel;
 using card::Hybrid;
 using card::HybridTargetLevel;
+using diskutil::PrintSituation;
 using parse::Citation;
+using parse::NumberFormat;
+using parse::PolyNumeric;
 using structure::ApplyConstraints;
 using symbols::amber_ancient_bioq;
 
@@ -83,22 +88,37 @@ public:
             double default_vdw14_screening, double charge_rounding_tol,
             double charge_discretization,
             ApplyConstraints use_bond_constraints_in = ApplyConstraints::NO,
-            ApplyConstraints use_settle = ApplyConstraints::NO);
-
-  AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
-            ExceptionResponse policy = ExceptionResponse::DIE);
+            ApplyConstraints use_settle_in = ApplyConstraints::NO);
 
   AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> &counts,
+            MoleculeOrdering arrangement = MoleculeOrdering::REORDER_ALL,
             ExceptionResponse policy = ExceptionResponse::DIE);
 
   AtomGraph(const AtomGraph &ag_a, int n_a, const AtomGraph &ag_b, int n_b,
+            MoleculeOrdering arrangement = MoleculeOrdering::REORDER_ALL,
             ExceptionResponse policy = ExceptionResponse::DIE);
 
   AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b, int n_b,
+            MoleculeOrdering arrangement = MoleculeOrdering::REORDER_ALL,
             ExceptionResponse policy = ExceptionResponse::DIE);
 
   AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b,
+            MoleculeOrdering arrangement = MoleculeOrdering::REORDER_ALL,
             ExceptionResponse policy = ExceptionResponse::DIE);
+
+  AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
+            ExceptionResponse policy = ExceptionResponse::DIE,
+            double charge_rounding_tol = default_charge_rounding_tol,
+            double charge_discretization = default_charge_precision_inc,
+            ApplyConstraints use_bond_constraints_in = ApplyConstraints::NO,
+            ApplyConstraints use_settle_in = ApplyConstraints::NO);
+
+  AtomGraph(const AtomGraph &original, const std::vector<bool> &mask,
+            ExceptionResponse policy = ExceptionResponse::DIE,
+            double charge_rounding_tol = default_charge_rounding_tol,
+            double charge_discretization = default_charge_precision_inc,
+            ApplyConstraints use_bond_constraints_in = ApplyConstraints::NO,
+            ApplyConstraints use_settle_in = ApplyConstraints::NO);
   /// \}
 
   /// \brief The default destructor is adequate
@@ -475,6 +495,12 @@ public:
   char4 getAtomType(int index) const;
   /// \}
 
+  /// \brief Get the full name (including the residue and structural residue number) of an atom,
+  ///        as a string.
+  ///
+  /// \param index  The topological index of the atom of interest
+  std::string getFullAtomName(int index) const;
+  
   /// \brief Get a table with the names of all unique atom types, arranged according to their
   ///        Lennard-Jones indices as they appear in the topology (in ascending order).
   std::vector<std::vector<char4>> getAtomTypeNameTable() const;
@@ -1184,6 +1210,27 @@ public:
   void setWaterResidueName(const char4 new_name);
   void setWaterResidueName(const std::string &new_name);
   /// \}
+
+  /// \brief Print out a topology in the specified format.
+  ///
+  /// \param output_file   The name of the file to print.  If an empty string is given, the source
+  ///                      file will be scheduled for overwriting, pending a user-specifiable
+  ///                      directive as to whether overwriting is enabled.
+  /// \param output_style  The format of topology to write, each format being readable by specific
+  ///                      third-party molecular mechancis packages
+  /// \param expectation   Indicates what state the output file is expected to be found in, if such
+  ///                      a file may be found to already exist at all
+  /// \param pr_policy     Specifies the course of action to take if errors are encountered
+  void printToFile(const std::string &output_file = {},
+                   TopologyKind output_style = TopologyKind::AMBER,
+                   PrintSituation expectation = PrintSituation::OPEN_NEW,
+                   ExceptionResponse pr_policy = ExceptionResponse::DIE) const;
+
+  /// \brief Print the contents of the topology in the AMBER file format.  Descriptions of input
+  ///        parameters follow from printToFile(), above.
+  void printAmberFormat(const std::string &output_file = {},
+                        PrintSituation expectation = PrintSituation::OPEN_NEW,
+                        ExceptionResponse pr_policy = ExceptionResponse::DIE) const;
   
 private:
   
@@ -1503,6 +1550,9 @@ private:
   // Relevant information for the non-bonded calculation
   int charge_type_count;                 ///< Number of distinct atomic partial charges
   int lj_type_count;                     ///< Number of distinct Lennard-Jones types
+  bool has_14_lennard_jones_data;        ///< Flag to indicate that the topology file contained
+                                         ///<   (or should contain) special 1:4 non-bonded
+                                         ///<   Lennard-Jones information
   int total_exclusions;                  ///< Total number of non-bonded exclusions, including 1:4
   int attenuated_14_type_count;          ///< The number of distinct 1:4 scaling factor pairs 
   int inferred_14_attenuations;          ///< Most 1:4 exclusions are actually attenuations
@@ -1704,21 +1754,31 @@ private:
   Hybrid<char4> residue_overflow_names; ///< Codified names of residues which were too long
 
   // Information currently unused
-  int unused_nhparm;                ///< Number of unique hydrogen bonding parameters
-  int unused_nparm;                 ///< If this is an Amber prmtop, indicates whether addles
-                                    ///<   created the file
-  int unused_natyp;                 ///< Atom types pertaining to hydrogen bonding interactions
-  int hbond_10_12_parameter_count;  ///< Number of 10-12 hybrodgen bonding parameters
-  int heavy_bonds_plus_constraints; ///< Bonds without hydrogen, plus constrained bonds
-  int heavy_angls_plus_constraints; ///< Angles without hydrogen, plus constrained angles
-  int heavy_dihes_plus_constraints; ///< Dihedrals without hydrogen, plus constrained dihedrals
-  Hybrid<int> tree_joining_info;    ///< Tree joining info, more relevant to Amber tleap than here
-  Hybrid<int> last_rotator_info;    ///< Last rotatable atom depending on any given atom in a chain
-  Hybrid<double> solty_info;        ///< Long ago reserved for future use in Amber
-  Hybrid<double> hbond_a_values;    ///< Hydrogen bond A coefficients, similar to L-J A coeffients
-  Hybrid<double> hbond_b_values;    ///< Hydrogen bond B coefficients, similar to L-J B coeffients
-  Hybrid<double> hbond_cutoffs;     ///< Cutoff values for hydrogen bonding of any given type
-  Hybrid<char4> tree_symbols;       ///< Tree symbols, i.e. BLA, more relevant to tleap than here
+  int unused_nhparm;                       ///< Number of unique hydrogen bonding parameters
+  int unused_nparm;                        ///< If this is an Amber prmtop, indicates whether
+                                           ///<   addles created the file
+  int unused_natyp;                        ///< Atom types pertaining to hydrogen bonding
+                                           ///<   interactions
+  int hbond_10_12_parameter_count;         ///< Number of 10-12 hybrodgen bonding parameters
+  int heavy_bonds_plus_constraints;        ///< Bonds without hydrogen, plus constrained bonds
+  int heavy_angls_plus_constraints;        ///< Angles without hydrogen, plus constrained angles
+  int heavy_dihes_plus_constraints;        ///< Dihedrals without hydrogen, plus constrained
+                                           ///<   dihedrals
+  Hybrid<int> tree_joining_info;           ///< Tree joining info, more relevant to Amber tleap
+                                           ///<   than here
+  Hybrid<int> last_rotator_info;           ///< Last rotatable atom depending on any given atom in
+                                           ///<   a chain
+  Hybrid<double> solty_info;               ///< Long ago reserved for future use in Amber
+  Hybrid<double> hbond_a_values;           ///< Hydrogen bond A coefficients, similar to L-J A
+                                           ///<   coeffients
+  Hybrid<double> hbond_b_values;           ///< Hydrogen bond B coefficients, similar to L-J B
+                                           ///<   coeffients
+  Hybrid<double> hbond_cutoffs;            ///< Cutoff values for hydrogen bonding of any given
+                                           ///<    type
+  Hybrid<double> atomic_polarizabilities;  ///< The polarizability coefficient of each atom, in
+                                           ///<   units of Angstrom^3
+  Hybrid<char4> tree_symbols;              ///< Tree symbols, i.e. BLA, more relevant to tleap
+                                           ///<   than here
 
   /// Hybrid data structures store data arrays that will be accessible to accelerators.  These are
   /// contiguous arrays for each type of data: integers and doubles.  There are no unsigned
@@ -1782,6 +1842,7 @@ private:
                         const std::vector<double> &tmp_hbond_a_values,
                         const std::vector<double> &tmp_hbond_b_values,
                         const std::vector<double> &tmp_hbond_cutoffs,
+                        const std::vector<double> &tmp_atpol,
                         const std::vector<char4> &tmp_atom_names,
                         const std::vector<char4> &tmp_atom_types,
                         const std::vector<char4> &tmp_residue_names,
@@ -1804,6 +1865,14 @@ private:
   ///        residue name is edited.
   void characterizeWaterResidue();
 
+  /// \brief Encapsulate the task of printing one section of an Amber topology.  The section will
+  ///        begin with "FLAG <section name>" and follow with a new line "%FORMAT xxxx" to indicate
+  ///        the numeric format of the data.  
+  void printAmberSection(std::ofstream *foutp, const std::string &section_name,
+                         const std::vector<PolyNumeric> &values, int values_per_line,
+                         int value_width,  int decimal_places, NumberFormat fmt,
+                         const std::string &task) const;
+
   /// Allow the AtomGraphStage to access private members directly to modify and guide construction
   /// of topologies used in STORMM's production calculations.
   friend class AtomGraphStage;
@@ -1819,7 +1888,29 @@ private:
 ///                 not nullptr, this array will be sized as appropriate and filled)
 std::vector<int2> findMoleculeOrder(const std::vector<AtomGraph*> &agv,
                                     const std::vector<int> &counts,
-                                    std::vector<int2> *origins = nullptr);
+                                    std::vector<int2> *origins = nullptr,
+                                    MoleculeOrdering arrangement = MoleculeOrdering::REORDER_ALL);
+
+/// \brief Scan for the existence of an atom's excluded partner.  The atom's index is not present
+///        in the input arguments.  Rather, it is implicit in the limits of the scan.
+///
+/// \param list     A list of excluded atoms due to 1:1, 1:2, 1:3, or 1:4 interactions
+/// \param llim     The lower limit of the scan (the "home" atom's lower exclusion bounds)
+/// \param hlim     The upper limit of the scan (the "home" atom's upper exclusion bounds)
+/// \param partner  Index of the partner atom, the presence of which indicates that the exclusion
+///                 is already in the topology
+bool scanForExclusion(const std::vector<int> &list, int llim, int hlim, int partner);
+  
+/// \brief Check for prior exclusion detections.  This is important for topology extraction, when
+///        there might be lower-order exclusions from prior detection cycles that should not be
+///        double-counted.  The function returns TRUE if the specified pair has already been
+///        detected.
+///
+/// \param proposals  A list of proposed exclusions.  Modified and returned.
+/// \param priors     A list of prior exclusion detections, with each of the two excluded atoms in
+///                   the "x" and "y" members.  Pairs will be compared with both x => first /
+///                   y =>second and x => second / y => first.
+void cullPriorExclusions(std::vector<int3> *proposals, const std::vector<int3> &priors);
 
 } // namespace topology
 } // namespace stormm

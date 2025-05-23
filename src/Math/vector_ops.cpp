@@ -5,6 +5,49 @@ namespace stormm {
 namespace stmath {
 
 //-------------------------------------------------------------------------------------------------
+bool foundIn(const std::vector<bool> &va, const std::vector<bool> &vb, const DataOrder format) {
+  const size_t n_a = va.size();
+  const size_t n_b = vb.size();
+  bool a_has_true  = false;
+  bool a_has_false = false;
+  for (size_t i = 0; i < n_a; i++) {
+    a_has_true  = (a_has_true || va[i]);
+    a_has_false = (a_has_false || (! va[i]));
+  }
+  bool b_has_true  = false;
+  bool b_has_false = false;
+  for (size_t i = 0; i < n_b; i++) {
+    b_has_true  = (b_has_true || vb[i]);
+    b_has_false = (b_has_false || (! vb[i]));
+  }
+  bool result = true;
+  if (a_has_true && (! b_has_true)) {
+    result = false;
+  }
+  if (a_has_false && (! b_has_false)) {
+    result = false;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<bool> reduceUniqueValues(const std::vector<bool> &va, const std::vector<bool> &vb) {
+  const size_t n_b = vb.size();
+  std::vector<bool> result = va;
+  for (size_t i = 0; i < n_b; i++) {
+    bool found = false;
+    const size_t n_r = result.size();
+    for (size_t j = 0; j < n_r; j++) {
+      found = (found || result[j] == vb[i]);
+    }
+    if (! found) {
+      result.push_back(vb[i]);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 void accumulateBitmask(uint* va, const size_t pos) {
   const size_t acc_elem = pos / uint_bit_count_zu;
   const int acc_bit  = pos - (acc_elem * uint_bit_count_zu);

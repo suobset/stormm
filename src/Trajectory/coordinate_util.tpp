@@ -39,5 +39,43 @@ void checkCopyValidity(const Tdest *destination, const Torig &origin,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> UnitCellType determineUnitCellType(const T* dims) {
+  if (fabs(dims[3]) < 1.0e-6 || fabs(dims[4]) < 1.0e-6 || fabs(dims[5]) < 1.0e-6) {
+    return UnitCellType::NONE;
+  }
+  else if (fabs(dims[3] - (0.5 * symbols::pi)) < 1.0e-6 ||
+           fabs(dims[4] - (0.5 * symbols::pi)) < 1.0e-6 ||
+           fabs(dims[5] - (0.5 * symbols::pi)) < 1.0e-6) {
+    return UnitCellType::ORTHORHOMBIC;
+  }
+  else {
+   return UnitCellType::TRICLINIC;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+UnitCellType determineUnitCellType(const std::vector<T> &dims, const int offset) {
+  if (offset + 6 > dims.size()) {
+    rtErr("An offset of " + std::to_string(offset) + " is invalid for obtaining box dimensions "
+          "from a Standard Template Library vector of size " + std::to_string(dims.size()) + ".",
+          "determineUnitCellType");
+  }
+  return determineUnitCellType(&dims.data()[offset]);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+UnitCellType determineUnitCellType(const Hybrid<T> &dims, const int offset) {
+  if (offset + 6 > dims.size()) {
+    rtErr("An offset of " + std::to_string(offset) + " is invalid for obtaining box dimensions "
+          "from a Hybrid object of size " + std::to_string(dims.size()) + ".",
+          "determineUnitCellType");
+  }
+  return determineUnitCellType(&dims.data()[offset]);
+}
+
 } // namespace trajectory
 } // namespace stormm

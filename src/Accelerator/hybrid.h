@@ -377,6 +377,8 @@ public:
   ///
   /// Overloaded:
   ///   - Post data to a specific index
+  ///   - Post data from a C-style array of trusted length to a specific index and over a
+  ///     contiguous segment of the Hybrid's GPU device memory
   ///   - Post part of a std::vector of data, starting at a specific offset of the Hybrid object's
   ///     device data with a specific length
   ///   - Post an entire std::vector of data to the start of the Hybrid object's device data
@@ -388,6 +390,7 @@ public:
   /// \param count   The number of elements to read
   /// \{
   void putDevice(const T value, size_t index);
+  void putDevice(const T* values, size_t offset, size_t count);
   void putDevice(const std::vector<T> &values, size_t offset, size_t count);
   void putDevice(const std::vector<T> &values);
   /// \}

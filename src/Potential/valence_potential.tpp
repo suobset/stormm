@@ -37,19 +37,6 @@ Tcalc evalHarmonicStretch(const int i_atom, const int j_atom, const Tcalc stiffn
   const Tcalc dr = (tcalc_ct == double_type_index) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                                      sqrtf((dx * dx) + (dy * dy) + (dz * dz));
   const Tcalc dl = dr - equilibrium;
-
-  // CHECK
-#if 0
-  if (i_atom == 0 || j_atom == 0) {
-    printf("[ %9.4lf %9.4lf %9.4lf -> %9.4lf %9.4lf %9.4lf ] ==> [ %9.4lf ... %9.4lf ]\n",
-           static_cast<double>(xcrd[i_atom]), static_cast<double>(ycrd[i_atom]),
-           static_cast<double>(zcrd[i_atom]), static_cast<double>(xcrd[j_atom]),
-           static_cast<double>(ycrd[j_atom]), static_cast<double>(zcrd[j_atom]),
-           static_cast<double>(dl), static_cast<double>(stiffness * dl * dl));
-           
-  }
-#endif
-  // END CHECK
   
   // Compute forces
   if (eval_force == EvaluateForce::YES) {

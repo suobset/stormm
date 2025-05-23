@@ -130,11 +130,9 @@ void ProgressBar::allocateBarContents() {
 
     // Add percentage placeholder (spaces initially)
     bar_contents[pos++] = ' ';
-    for (int i = 0; i < 4; ++i) {  // Reserve 3 characters for "XXX%" and a space
+    for (int i = 0; i < 4; ++i) {  // Reserve 4 characters for percentage display
         bar_contents[pos++] = ' ';
     }
-
-    // This preps the entire progress bar with brackets and placeholders
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -165,21 +163,25 @@ void ProgressBar::update() {
                 bar_contents[prgb_open_bracket.length() + i] = todo_mark[0];
             }
 
-            // Update the percentage display
+            // Update the percentage display with right justification
             std::string percentString = std::to_string(percent) + "%";
-            size_t percentPos = bar_contents.size() - 4;
+            size_t percentPos = bar_contents.size() - percentString.length();
+            // First clear the percentage area
+            for (size_t i = bar_contents.size() - 4; i < bar_contents.size(); ++i) {
+                bar_contents[i] = ' ';
+            }
+            // Then write the new percentage right-justified
             for (char c : percentString) {
                 bar_contents[percentPos++] = c;
             }
 
-            // Dump the fully updated bar_contents to the output
             *output << "\r" << bar_contents << std::flush;
         } else {
             // If bar is hidden, only show the percentage
             *output << "\r" << std::to_string(percent) + "%" << std::flush;
         }
 
-        last_percent = percent;  // Update the last_percent to the current one
+        last_percent = percent;
     }
 
     // Increment progress
@@ -212,9 +214,14 @@ void ProgressBar::updateTerminalWidth() {
         bar_contents[prgb_open_bracket.length() + i] = finished_mark[0];
     }
 
-    // Update the percentage text
+    // Update the percentage text with right justification
     std::string percentString = std::to_string(last_percent) + "%";
-    size_t percentPos = bar_contents.size() - 4; // Assuming the last 4 chars are reserved for "XXX%"
+    // First clear the percentage area
+    for (size_t i = bar_contents.size() - 4; i < bar_contents.size(); ++i) {
+        bar_contents[i] = ' ';
+    }
+    // Then write the new percentage right-justified
+    size_t percentPos = bar_contents.size() - percentString.length();
     for (char c : percentString) {
         bar_contents[percentPos++] = c;
     }

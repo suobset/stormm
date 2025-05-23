@@ -316,7 +316,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
         const int hlim = std::min(llim + values_per_line, nval);
         const int n_this_line = hlim - llim;
         for (int j = 0; j < n_this_line; j++) {
-          snprintf(&line[j * 5], nl_char - (j * 5), "%c%c%c%c ", values[llim + j].c4.x,
+          snprintf(&line[j * 4], nl_char - (j * 4), "%c%c%c%c", values[llim + j].c4.x,
                    values[llim + j].c4.y, values[llim + j].c4.z, values[llim + j].c4.w);
         }
         line[n_this_line * width] = '\n';

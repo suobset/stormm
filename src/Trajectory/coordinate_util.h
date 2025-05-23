@@ -12,6 +12,7 @@
 #include "phasespace.h"
 #include "Synthesis/condensate.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace stormm {
 namespace trajectory {
@@ -49,7 +50,43 @@ std::string nameCoordinateType(size_t ct_coords);
 template <typename Tdest, typename Torig>
 void checkCopyValidity(const Tdest *destination, const Torig &origin,
                        HybridTargetLevel destination_tier, HybridTargetLevel origin_tier);
-  
+
+/// \brief Determine whether overflow bits must be transferred based on scaling factors and
+///        conventions as to the reasonable limits of positions, velocities, or forces.
+///
+/// \param kind          The type of coordinates to assess
+/// \param scaling_bits  Number of bits after the point in the fixed-precision representation
+/// \param x_ovrf        Array of overflow bits, presumably in the Cartesian X direction.  If this
+///                      or other array pointers are null, the scaling factor must not exceed the
+///                      threshold convention or an error will be raised.
+/// \param y_ovrf        Array of overflow bits, presumably in the Cartesian Y direction
+/// \param z_ovrf        Array of overflow bits, presumably in the Cartesian Z direction
+bool overflowRequired(TrajectoryKind kind, int scaling_bits, const int* x_ovrf, const int* y_ovrf,
+                      const int* z_ovrf);
+
+/// \brief Determine the unit cell type based on six box dimensions (the edge lengths plus alpha,
+///        beta, and gamma angles).
+///
+/// Overloaded:
+///   - Provide a C-style array of numbers
+///   - Provide a Standard Template Library vector
+///   - Provide a Hybrid object
+///
+/// \param dims    The box dimensions, a six-element array listing the A, B, and C edge lengths in
+///                its first three entries and the alpha, beta, and gamma angles in its last three
+///                entries (units are Angstroms and radians)
+/// \param offset  Optional offset, available only if the box dimension input is a Standard
+///                Template Library vector or Hybrid object
+/// \{
+template <typename T> UnitCellType determineUnitCellType(const T* dims);
+
+template <typename T>
+UnitCellType determineUnitCellType(const std::vector<T> &dims, int offset = 0);
+
+template <typename T>
+UnitCellType determineUnitCellType(const Hybrid<T> &dims, int offset = 0);
+/// \}
+
 } // namespace trajectory
 } // namespace stormm
 

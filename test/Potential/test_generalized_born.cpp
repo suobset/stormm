@@ -3,11 +3,13 @@
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/geodesic.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
+#include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
-#include "../../src/Potential/nonbonded_potential.h"
+#include "../../src/Potential/surface_area.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Reporting/summary_file.h"
@@ -20,6 +22,7 @@ using stormm::llint;
 using stormm::llint_type_index;
 #ifndef STORMM_USE_HPC
 using stormm::double2;
+using stormm::double3;
 using stormm::int2;
 using stormm::int3;
 #endif
@@ -30,12 +33,14 @@ using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::energy::StateVariable;
 using stormm::energy::StaticExclusionMask;
+using stormm::energy::surfaceArea;
 using stormm::errors::rtWarn;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::review::stormmSplash;
 using stormm::review::stormmWatermark;
+using stormm::stmath::surfaceDistribution;
 using stormm::symbols::amber_ancient_bioq;
 using stormm::topology::AtomGraph;
 using stormm::topology::AtomicRadiusSet;
@@ -619,6 +624,17 @@ int main(const int argc, const char* argv[]) {
                                              trpi_ref_gb_forces, 1.0e-5, do_tests);
   testNBPrecisionModel<llint, llint, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
                                             trpi_ref_gb_forces, 1.8e-5, do_tests);
+
+  // Test the surface area calculation
+  PhaseSpaceWriter trpi_psw = trpi_ps.data();
+  const std::vector<double3> sph_pts = surfaceDistribution<double, double3>(272);
+  const double typical_spr = 1.4;
+  const double sa_trpi = surfaceArea(&trpi_psw, std::vector<bool>(trpi_psw.natom, true),
+                                     trpi_isk_d, sph_pts, typical_spr, 1.0, EvaluateForce::NO);
+  check(sa_trpi, RelationalOperator::EQUAL, Approx(4603.4695).margin(1.0e-1), "The surface area "
+        "of Trp-cage miniprotein, calculated using a typical solvent probe radius of " +
+        realToString(typical_spr, 2, NumberFormat::STANDARD_REAL) + " Angstroms, does not meet "
+        "expectations.", do_tests);
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {

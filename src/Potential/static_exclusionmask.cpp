@@ -369,6 +369,11 @@ void StaticExclusionMask::download() {
 //-------------------------------------------------------------------------------------------------
 bool StaticExclusionMask::testExclusion(const int atom_i, const int atom_j) const {
 
+  // All comparisons with j > i will be marked as exclusions, often a spurious result.
+  if (atom_j > atom_i) {
+    return testExclusion(atom_j, atom_i);
+  }
+
   // Get the supertile map index
   const int sptl_i = atom_i / supertile_length;
   const int sptl_j = atom_j / supertile_length;

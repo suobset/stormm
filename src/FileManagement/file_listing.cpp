@@ -362,17 +362,20 @@ std::vector<std::string> extractCommonPaths(std::vector<std::string> *input_path
         matches[j] = last_ossep[i] + 1;
         continue;
       }
-      int nchar = 0;
+      size_t nchar = 0;
       while (nchar <= last_ossep[i] && nchar <= last_ossep[j] &&
              input_path_ptr[i][nchar] == input_path_ptr[j][nchar]) {
         nchar++;
+      }
+      if (input_path_ptr[i].size() > 0 && nchar >= input_path_ptr[i].size()) {
+        nchar = input_path_ptr[i].size() - 1;
       }
       while (nchar >= 0 && input_path_ptr[i][nchar] != osc) {
         nchar--;
       }
       matches[j] = nchar + 1;
     }
-
+    
     // With the number of matching characters to all other paths now known, sort the list of
     // matches to determine the most effective shortcut that could be generated based on a
     // substring of the ith path.  Weight shortcuts that reduce the length by greater amounts
@@ -385,9 +388,13 @@ std::vector<std::string> extractCommonPaths(std::vector<std::string> *input_path
       while (k < npath && matches[k] == matches[j]) {
         k++;
       }
+
+      // The number of 11 characters arises from the length of the "shortcut" which might be
+      // inserted: ${PATH_X}/ .  Anything that doesn't save at least 11 characters is not saving
+      // more than one.
       llint test_score = static_cast<llint>(k - j) * static_cast<llint>(matches[j] - 11);
 
-      // Assign negative scores to any shortcut path that mathces fewer than the number of
+      // Assign negative scores to any shortcut path that matches fewer than the number of
       // instances needed to qualify.
       if (test_score > 0 && (k - j < n_instance)) {
         test_score *= -1;

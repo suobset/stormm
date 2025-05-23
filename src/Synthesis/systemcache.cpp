@@ -4,14 +4,17 @@
 #include "FileManagement/file_listing.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
+#include "MoleculeFormat/pdb.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_enumerators.h"
 #include "Parsing/parse.h"
+#include "Parsing/textfile.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
 #include "Structure/structure_enumerators.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/amber_ascii.h"
 
 namespace stormm {
 namespace synthesis {
@@ -23,13 +26,15 @@ using diskutil::splitPath;
 using energy::evaluateBondTerms;
 using energy::evaluateAngleTerms;
 using energy::ScoreCard;
+using namelist::InputStatus;
+using namelist::MoleculeSystem;
+using parse::findStringInVector;
+using parse::TextFile;
 using stmath::incrementingSeries;
 using stmath::prefixSumInPlace;
 using stmath::PrefixSumType;
 using stmath::sum;
-using namelist::InputStatus;
-using namelist::MoleculeSystem;
-using parse::findStringInVector;
+using structure::Pdb;
 using structure::ApplyConstraints;
 using structure::readStructureDataFile;
 using symbols::amber_ancient_bioq;
@@ -43,8 +48,10 @@ using topology::default_charge_precision_inc;
 using topology::TopologyKind;
 using topology::UnitCellType;
 using topology::ValenceKit;
+using trajectory::countAmberCrdFormatFrames;
 using trajectory::detectCoordinateFileKind;
 using trajectory::getEnumerationName;
+using trajectory::readAmberCrdFormat;
   
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache(const ExceptionResponse policy_in,
@@ -168,6 +175,32 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
                 "topology.", "SystemCache");
         case ExceptionResponse::WARN:
           rtWarn("Frames from the SD file " + crd_name + " could not be added to the temporary "
+                 "coordinates cache in order to pair these orphan coordinate systems to a "
+                 "topology.  These frames will be skipped.", "SystemCache");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      break;
+    case CoordinateFileKind::PDB:
+      try {
+        const Pdb all_frames(crd_name);
+        const size_t n_entries = all_frames.getModelCount();
+        for (size_t i = 0; i < n_entries; i++) {
+          tmp_coordinates_cache.push_back(all_frames.exportPhaseSpace(i));
+          tmp_coordinates_frame_count.push_back(1);
+          tmp_coordinates_kind.push_back(kind);
+        }
+      }
+      catch (std::runtime_error) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("Models from the PDB file " + crd_name + " could not be added to the temporary "
+                "coordinates cache in order to pair these orphan coordinate systems to a "
+                "topology.", "SystemCache");
+        case ExceptionResponse::WARN:
+          rtWarn("Models from the PDB file " + crd_name + " could not be added to the temporary "
                  "coordinates cache in order to pair these orphan coordinate systems to a "
                  "topology.  These frames will be skipped.", "SystemCache");
           break;
@@ -359,7 +392,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       topology_in_use[best_topology] = true;
     }
   }
-
+  
   // Loop back over systems and make sure that each has a unique restart file (even if these files
   // are not to be written).  Systems with similar trajectory file names must all share the same
   // original topology.
@@ -545,6 +578,78 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
         detectCoordinateFileKind(sysvec[i].getInputCoordinateFileName(), "SystemCache");
       switch (icrd_kind) {
       case CoordinateFileKind::AMBER_CRD:
+        {
+          // Read all frames of the trajectory.
+          const TextFile tf(sysvec[i].getInputCoordinateFileName());
+          const int natom = topology_cache[top_idx].getAtomCount();
+          const UnitCellType sys_uc = topology_cache[top_idx].getUnitCellType();
+          int nframe;
+          try {
+            nframe = countAmberCrdFormatFrames(tf, natom, sys_uc);
+          }
+          catch (std::runtime_error) {
+            switch (policy) {
+            case ExceptionResponse::DIE:
+              rtErr("The trajectory-format file " + sysvec[i].getInputCoordinateFileName() +
+                    ", in " + getEnumerationName(icrd_kind) + " format, could not be read as a "
+                    "collection of frames with " + std::to_string(natom) + " atoms.",
+                    "SystemCache");
+            case ExceptionResponse::WARN:
+              rtWarn("The trajectory-format file " + sysvec[i].getInputCoordinateFileName() +
+                     ", in " + getEnumerationName(icrd_kind) + " format, could not be read as a "
+                     "collection of frames with " + std::to_string(natom) + " atoms.  This "
+                     "coordinate set will be skipped.", "SystemCache");
+              break;
+            case ExceptionResponse::SILENT:
+              break;
+            }
+          }
+          if (nframe > 0) {
+            for (int j = 0; j < nframe; j++) {
+              PhaseSpace next_ps(natom, sys_uc);
+              PhaseSpaceWriter next_psw = next_ps.data();
+              readAmberCrdFormat(tf, next_psw.xcrd, next_psw.ycrd, next_psw.zcrd, natom, sys_uc,
+                                 next_psw.umat, next_psw.invu, next_psw.boxdim, j);
+              for (int k = 0; k < natom; k++) {
+                next_psw.xalt[k] = next_psw.xcrd[k];
+                next_psw.yalt[k] = next_psw.ycrd[k];
+                next_psw.zalt[k] = next_psw.zcrd[k];
+              }
+              for (int k = 0; k < 9; k++) {
+                next_psw.umat_alt[k] = next_psw.umat[k];
+                next_psw.invu_alt[k] = next_psw.invu[k];
+              }
+              for (int k = 0; k < 6; k++) {
+                next_psw.boxdim_alt[k] = next_psw.boxdim[k];
+              }
+              coordinates_cache.push_back(next_ps);
+              topology_indices.push_back(top_idx);
+              system_input_coordinate_names.push_back(sysvec[i].getInputCoordinateFileName());
+              system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+              system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
+              system_labels.push_back(sysvec[i].getLabel());
+              system_input_coordinate_kinds.push_back(icrd_kind);
+              system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
+              system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
+              sdf_cache.emplace_back();
+              system_count += 1;
+            }
+          }
+          else {
+            switch (policy) {
+            case ExceptionResponse::DIE:
+              rtErr("No frames were detected in the trajectory file " +
+                    sysvec[i].getInputCoordinateFileName() + ".", "SystemCache");
+            case ExceptionResponse::WARN:
+              rtWarn("No frames were detected in the trajectory file " +
+                    sysvec[i].getInputCoordinateFileName() + ".  This coordinate set will be "
+                     "skipped.", "SystemCache");
+              break;
+            case ExceptionResponse::SILENT:
+              break;
+            }
+          }
+        }
         break;
       case CoordinateFileKind::AMBER_INPCRD:
       case CoordinateFileKind::AMBER_ASCII_RST:
@@ -660,14 +765,64 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
           }
         }
         break;
+      case CoordinateFileKind::PDB:
+        {
+          // If the user has specified the frame range [ 0, -1 ), take that as a special case
+          // indicating that "all frames" shall be read and produce no warning or error.
+          // Otherwise, check the specified range against the file's actual contents.
+          const int fr_init  = sysvec[i].getStartingFrame();
+          const int fr_final = sysvec[i].getFinalFrame();
+          Pdb frame_selection;
+          try {
+            frame_selection = (fr_init == 0 && fr_final == -1) ?
+              Pdb(sysvec[i].getInputCoordinateFileName()) :
+              Pdb(sysvec[i].getInputCoordinateFileName(), incrementingSeries(fr_init, fr_final));
+            coordinates_ok = true;
+          }
+          catch (std::runtime_error) {
+            switch (policy) {
+            case ExceptionResponse::DIE:
+              rtErr("The PDB file " + sysvec[i].getInputCoordinateFileName() + " was not properly "
+                    "read.", "SystemCache");
+            case ExceptionResponse::WARN:
+              rtWarn("The PDB file " + sysvec[i].getInputCoordinateFileName() + " was not "
+                     "properly read.  All frames will be skipped.", "SystemCache");
+              break;
+            case ExceptionResponse::SILENT:
+              break;
+            }
+          }
+          if (coordinates_ok) {
+            const int jlim = frame_selection.getModelCount();
+            for (int j = 0; j < jlim; j++) {
+
+              // Correct PDB files containing multiple structures will always have the same number
+              // of atoms in each model.
+              for (int k = 0; k < sysvec[i].getReplicaCount(); k++) {
+                coordinates_cache.push_back(frame_selection.exportPhaseSpace(j));
+                topology_indices.push_back(top_idx);
+                system_input_coordinate_names.push_back(sysvec[i].getInputCoordinateFileName());
+                system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+                system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
+                system_labels.push_back(sysvec[i].getLabel());
+                system_input_coordinate_kinds.push_back(icrd_kind);
+                system_trajectory_kinds.push_back(sysvec[i].getTrajectoryFileKind());
+                system_checkpoint_kinds.push_back(sysvec[i].getCheckpointFileKind());
+                sdf_cache.emplace_back();
+                system_count += 1;
+              }
+            }
+          }
+        }
+        break;
       case CoordinateFileKind::UNKNOWN:
         switch (policy) {
         case ExceptionResponse::DIE:
-          rtErr("The format of coordinate file " + sysvec[i].getTopologyFileName() +
+          rtErr("The format of coordinate file " + sysvec[i].getInputCoordinateFileName() +
                 " for system " + std::to_string(i) + " could not be understood.",
                 "SystemCache");
         case ExceptionResponse::WARN:
-          rtWarn("The format of coordinate file " + sysvec[i].getTopologyFileName() +
+          rtWarn("The format of coordinate file " + sysvec[i].getInputCoordinateFileName() +
                  " could not be understood.  System " + std::to_string(i + 1) +
                  " will be skipped.", "SystemCache");
           break;
@@ -689,7 +844,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const std::vector<RestraintC
       example_indices[top_idx] = i;
     }
   }
-  
+
   // Make a list of all the systems making use of each topology, plus a bounds list to navigate it
   topology_cases.resize(system_count);
   topology_case_bounds.resize(topology_count + 1, 0);
@@ -1113,6 +1268,20 @@ int SystemCache::getLabelCacheIndex(const std::string &query) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int SystemCache::getCacheIndex(const std::string &query, const int index) const {
+  const int lbl_idx = getLabelCacheIndex(query);
+  if (lbl_idx >= label_count) {
+    rtErr("Label " + query + " was not found in the cache.", "SystemCache", "getCacheIndex");
+  }
+  if (index < 0 || index >= label_case_bounds[lbl_idx + 1] - label_case_bounds[lbl_idx]) {
+    rtErr("Label index " + std::to_string(index) + " exceeds the count of " +
+          std::to_string(label_case_bounds[lbl_idx + 1] - label_case_bounds[lbl_idx]) +
+          " for label group " + query + ".", "SystemCache", "getCacheIndex");
+  }
+  return label_cases[lbl_idx + index];
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph* query_ag,
                                                        const std::string &query_label) const {
 
@@ -1187,45 +1356,99 @@ std::vector<int> SystemCache::getMatchingSystemIndices(const AtomGraph& query_ag
 //-------------------------------------------------------------------------------------------------
 std::vector<int> SystemCache::getMatchingSystemIndices(const std::string &query_label) const {
   const int label_idx = getLabelCacheIndex(query_label);
-  const int llim = label_case_bounds[label_idx];
-  const int hlim = label_case_bounds[label_idx + 1];
-  std::vector<int> result(hlim - llim);
-  for (int i = llim; i < hlim; i++) {
-    result[i - llim] = label_cases[i];
+  if (label_idx == label_count) {
+    return std::vector<int>();
   }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag) const {
-  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag);
-  if (sys_idx.size() == 0) {
-    rtErr("No system was found matching the topology originating in file " +
-          getBaseName(query_ag->getFileName()) + ".", "SystemCache", "getInputCoordinatesKind");
+  else {
+    const int llim = label_case_bounds[label_idx];
+    const int hlim = label_case_bounds[label_idx + 1];
+    std::vector<int> result(hlim - llim);
+    for (int i = llim; i < hlim; i++) {
+      result[i - llim] = label_cases[i];
+    }
+    return result;
   }
-  return sys_idx[0];
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag,
-                                             const std::string &query_label) const {
-  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag, query_label);
+                                             const ExceptionResponse xcpt) const {
+  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag);
   if (sys_idx.size() == 0) {
-    rtErr("No system was found matching the topology originating in file " +
-          getBaseName(query_ag->getFileName()) + " and label \"" + query_label + "\".",
-          "SystemCache", "getInputCoordinatesKind");
+    switch (xcpt) {
+    case ExceptionResponse::DIE:
+      rtErr("No system was found matching the topology originating in file " +
+            getBaseName(query_ag->getFileName()) + ".", "SystemCache",
+            "getFirstMatchingSystemIndex");
+    case ExceptionResponse::WARN:
+      rtWarn("No system was found matching the topology originating in file " +
+             getBaseName(query_ag->getFileName()) + ".  The total number of systems (" +
+             std::to_string(system_count) + ") will be returned instead.", "SystemCache",
+             "getFirstMatchingSystemIndex");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return system_count;
   }
-  return sys_idx[0];
+  else {
+    return sys_idx[0];
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-int SystemCache::getFirstMatchingSystemIndex(const std::string &query_label) const {
+int SystemCache::getFirstMatchingSystemIndex(const AtomGraph *query_ag,
+                                             const std::string &query_label,
+                                             const ExceptionResponse xcpt) const {
+  const std::vector<int> sys_idx = getMatchingSystemIndices(query_ag, query_label);
+  if (sys_idx.size() == 0) {
+    switch (xcpt) {
+    case ExceptionResponse::DIE:
+      rtErr("No system was found matching the topology originating in file " +
+            getBaseName(query_ag->getFileName()) + " and label \"" + query_label + "\".",
+            "SystemCache", "getFirstMatchingSystemIndex");
+    case ExceptionResponse::WARN:
+      rtWarn("No system was found matching the topology originating in file " +
+             getBaseName(query_ag->getFileName()) + " and label \"" + query_label + "\".  The "
+             "total number of systems (" + std::to_string(system_count) + ") will be returned "
+             "instead.", "SystemCache", "getFirstMatchingSystemIndex");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return system_count;
+  }
+  else {
+    return sys_idx[0];
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getFirstMatchingSystemIndex(const std::string &query_label,
+                                             const ExceptionResponse xcpt) const {
   const std::vector<int> sys_idx = getMatchingSystemIndices(query_label);
   if (sys_idx.size() == 0) {
-    rtErr("No system was found matching label \"" + query_label + "\".", "SystemCache",
-          "getInputCoordinatesKind");
+    switch (xcpt) {
+    case ExceptionResponse::DIE:
+      rtErr("No system was found matching label \"" + query_label + "\".", "SystemCache",
+            "getFirstMatchingSystemIndex");
+    case ExceptionResponse::WARN:
+      rtWarn("No system was found matching label \"" + query_label + "\".  The total number of "
+             "systems (" + std::to_string(system_count) + ") will be returned instead.",
+             "SystemCache", "getFirstMatchingSystemIndex");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return system_count;
   }
-  return sys_idx[0];
+  else {
+    return sys_idx[0];
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1504,6 +1727,25 @@ const ForwardExclusionMask& SystemCache::getSystemForwardMask(const int index) c
   checkSystemBounds(index, "getSystemForwardMask");
   const int top_idx = topology_indices[index];
   return forward_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getSystemCountWithinLabel(const int index) const {
+  if (index < 0 || index >= label_count) {
+    rtErr("Label index " + std::to_string(index) + " is invalid for a cache with " +
+          std::to_string(label_count) + " labels.", "SystemCache", "getSystemCountWithinLabel");
+  }
+  return label_degeneracy[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getSystemCountWithinLabel(const std::string& query) const {
+  const int lbl_idx = getLabelCacheIndex(query);
+  if (lbl_idx >= label_count) {
+    rtErr("Label " + query + " was not found in the cache.", "SystemCache",
+          "getSystemCountWithinLabel");
+  }
+  return getSystemCountWithinLabel(lbl_idx);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1795,6 +2037,7 @@ bool SystemCache::determineFileMerger(const CoordinateFileRole purpose,
       case CoordinateFileKind::AMBER_CRD:
       case CoordinateFileKind::AMBER_NETCDF:
       case CoordinateFileKind::SDF:
+      case CoordinateFileKind::PDB:
         return true;
       case CoordinateFileKind::AMBER_INPCRD:
       case CoordinateFileKind::AMBER_ASCII_RST:
@@ -1822,6 +2065,7 @@ bool SystemCache::determineFileMerger(const CoordinateFileRole purpose,
       case CoordinateFileKind::AMBER_CRD:
       case CoordinateFileKind::AMBER_NETCDF:
       case CoordinateFileKind::SDF:
+      case CoordinateFileKind::PDB:
         return true;
       case CoordinateFileKind::AMBER_INPCRD:
       case CoordinateFileKind::AMBER_ASCII_RST:

@@ -69,8 +69,11 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit 
 /// \param atom_j    The second atom of the rotatable bond.  This can be taken as the center of
 ///                  coordinates for rotating the local system, if convenient.
 /// \param filename  The name of the original topology file (for error tracing purposes)
+/// \param policy    Course of action to take in the event that a bond is not actually rotatable,
+///                  or the group is too small to qualify as rotating
 std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
-                                  const int atom_i, const int atom_j, const std::string &filename);
+                                  const int atom_i, const int atom_j, const std::string &filename,
+                                  ExceptionResponse policy = ExceptionResponse::WARN);
   
 /// \brief Select atoms for rotation, given a rotatable bond found in a molecule's chemical
 ///        features.
@@ -83,9 +86,14 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
 /// \param atom_i  The root atom of the rotatable bond
 /// \param atom_j  The second atom of the rotatable bond.  This can be taken as the center of
 ///                coordinates for rotating the local system, if convenient.
+/// \param policy  Course of action to take in the event that a bond is not actually rotatable, or
+///                the group is too small to qualify as rotating
 /// \{
-std::vector<int> selectRotatingAtoms(const AtomGraph &ag, int atom_i, int atom_j);
-std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j);
+std::vector<int> selectRotatingAtoms(const AtomGraph &ag, int atom_i, int atom_j,
+                                     ExceptionResponse policy = ExceptionResponse::WARN);
+
+std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j,
+                                     ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
 
 /// \brief Determine the Lennard-Jones combining rule in effect.  These overloads of the function's

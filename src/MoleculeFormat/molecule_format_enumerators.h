@@ -8,6 +8,13 @@
 namespace stormm {
 namespace structure {
 
+/// \brief The possible types of atoms in a .pdb file
+enum class PdbAtomKind {
+  ATOM,   ///< An atom kind found in proteins
+  HETATM  ///< An atom kind found in ligands, solvent, ions, cofactors, lipids, carbohydrates,
+          ///<   and nucleic acids
+};
+  
 /// \brief The possible version numbers of an MDL MOL entry
 enum class MdlMolVersion {
   V2000, V3000, UNKNOWN

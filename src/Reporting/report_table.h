@@ -144,6 +144,11 @@ public:
   ///
   /// \param variable_name_in  The variable name to assign
   void setVariableName(const std::string &variable_name_in);
+
+  /// \brief Convert a table of strings into a table of unprotected strings (unprotected by comment
+  ///        characters if the table is printed to a file intended to be parsed by third-party
+  ///        programs).
+  void unprotectContent();
   
 private:
   int column_count;                          ///< The number of columns defined for the table
@@ -222,6 +227,36 @@ private:
 
   std::vector<std::string> dataAsStrings(const std::vector<char4> &data_in, int ncol);
   /// \}
+
+  /// \brief Format the variable name and, if necessary, a pre-allocation for the third-party
+  ///        program that may interpret the report file.  This is encapsulated, with a number of
+  ///        pre-computed parameters, so that the variable name may be produced under a variety of
+  ///        circumstances and table types.
+  ///
+  /// \param style           The output syntax style, e.g. creating output for interpretation by
+  ///                        third-party matrix algebra packages
+  /// \param set_start       The first column of the table to print under the variable's current
+  ///                        regime in the output
+  /// \param set_end         The last column of the table to print under the variable's current
+  ///                        regime in the output
+  /// \param data_row_start  The row of the table at which to begin printing data.
+  /// \param actual_row_end  The row of the table on which to stop printing.  This might not
+  ///                        encompass the whole table, if the interpreting package is intended to
+  ///                        construct the variable wrapping the table data in multiple stages.
+  std::string formatVariableName(OutputSyntax style, int set_start, int set_end,
+                                 int data_row_start, int actual_row_end) const;
+
+  /// \brief Format the closure for a variable in the output file.  Descriptions of input
+  ///        parameters follow from formatVariableName(), above, in addition to:
+  ///
+  /// \param comment_block       Pre-formatted to add comments at the end of a line
+  /// \param carriage_return     Pre-formatted with the ASCII carriage return character
+  /// \param hstack_line         
+  /// \param hstack_declaration
+  
+  std::string formatClosure(OutputSyntax style, const std::string &comment_block,
+                            const std::string &carriage_return, std::string *hstack_line,
+                            std::string *hstack_declaration, int set_start, int set_end) const;
 };
 
 } // namespace review

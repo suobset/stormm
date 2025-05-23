@@ -195,7 +195,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[], CommandLine
       break;
     }
     const std::string known_program = std::string("test") + osSeparator() + "bin" + osSeparator() +
-      "test_hybrid";
+                                      "test_hybrid";
     stormm_home_path = findStormmPath(exe_path, known_program);
     if (stormm_home_path.size() == 0) {
       stormm_home_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path,
@@ -243,11 +243,12 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[], CommandLine
     }
   }
 
-  // Finally, find ${STORMM_TMPDIR}
+  // Finally, find ${STORMM_TMPDIR}. Determine whether to remove any temporary, created files.
   bool tmpdir_defined = (tmpdir_path.size() > 0);
   if (tmpdir_path.size() == 0) {
     tmpdir_path = stormm_source_path + osSeparator() + "tmp";
   }
+  remove_files = (t_nml->getBoolValue("-keep_files") == false);
 
   // Create the temporary directory for these tests
   DrivePathType tmpdir_exist = getDrivePathType(tmpdir_path);

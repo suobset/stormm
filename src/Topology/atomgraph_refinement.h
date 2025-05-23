@@ -43,7 +43,7 @@ public:
   /// \param comp_yb       The second (required) component of parameters in the second set
   /// \param comp_zb       The third (optional) component of parameters in the second set
   /// \param bparam_count  The number of parameters in the second set
-  /// \param match_tol     Tolernace by which to declare two parameters match
+  /// \param match_tol     Tolerance by which to declare two parameters match
   /// \{
   explicit ParameterUnion(const T* comp_xa, const T* comp_ya, const T* comp_za, const T* comp_wa,
                           const T* comp_va, int aparam_count, const T* comp_xb, const T* comp_yb,
@@ -649,7 +649,7 @@ struct VirtualSiteTable {
                                     ///<   the ith atom is a virtual site.
   std::vector<int> vs_atoms;        ///< Atoms identified as virtual sites (by having zero mass).
                                     ///<   This compact list includes the topological indices only
-                                    ///<   of atoms that hav ebeen identified as virtual sites,
+                                    ///<   of atoms that have been identified as virtual sites,
                                     ///<   i.e. 3, 7, 11, ..., 4N + 3 in a box of TIP4P-Ew water.
   std::vector<int> frame_types;     ///< Frame types for each virtual site
   std::vector<int> frame1_atoms;    ///< Parent atoms
@@ -665,10 +665,11 @@ struct VirtualSiteTable {
   std::vector<double> frame_dim3;   ///< Third frame dimension
 };
 
-/// \brief Unguarded struct to help in the construction of a AtomGraph's categorized non-bonded
-///        exclusion lists.
-struct Map1234 {
-
+/// \brief Another unguarded class to help in the construction of an AtomGraph's categorized
+///        non-bonded exclusion lists.
+class Map1234 {
+public:
+  
   /// \brief The constructor simply allocates memory, if dimensions are available.
   ///
   /// Overloaded:
@@ -685,7 +686,41 @@ struct Map1234 {
   Map1234(int natom_in, int nb11_count_in, int nb12_count_in, int nb13_count_in,
           int nb14_count_in);
   /// \}
+
+  /// \brief A means to add exclusions to the object post-hoc, after construction
+  ///
+  /// Overloaded:
+  ///   - Provide two-tuples of integers, indicating the topological atom indices in their "x" and
+  ///     "y" members.  The order of all exclusions will be set as 1:2 (separated by one "bond").
+  ///   - Provide three-tuples of integers, indicating the topological atom indices as in the
+  ///     first case and then the order of the exclusion (1, 2, 3, or 4) in the "z" member
+  ///
+  /// \param plus_excl  The list of exclusions to add
+  /// \param policy     The course of action to take in the event that exclusions to be added are
+  ///                   already present.  It is always an error to indicate an invalid order for
+  ///                   an exclusion.
+  ///
+  /// \{
+  void addExclusions(const std::vector<int3> &plus_excl,
+                     ExceptionResponse policy = ExceptionResponse::DIE);
+
+  void addExclusions(const std::vector<int2> &plus_excl,
+                     ExceptionResponse policy = ExceptionResponse::DIE);
+  /// \}
+
+  /// \brief A means to remove exclusions from the object post-hoc, after construction.
+  ///        Overloading and descriptions of input parameters follow from addExclusions(), above,
+  ///        in addition to:
+  ///
+  /// \param minus_excl  The list of exclusions to remove
+  /// \{
+  void removeExclusions(const std::vector<int3> &minus_excl,
+                        ExceptionResponse policy = ExceptionResponse::DIE);
   
+  void removeExclusions(const std::vector<int2> &minus_excl,
+                        ExceptionResponse policy = ExceptionResponse::DIE);
+  /// \}
+
   std::vector<int> nb11_excl_bounds;  ///< 1:1 exclusion bounds list for each atom (needed for
                                       ///<   virtual sites and atoms with virtual sites)
   std::vector<int> nb11_excl_list;    ///< 1:1 exclusions list (double-counts all exclusions)
@@ -1145,6 +1180,8 @@ std::vector<int> traceBondedPatterns(const Map1234 &all_nb_excl);
 ///
 /// \param atom_count           The number of atoms in the system
 /// \param molecule_count       Number of detected, individual molecules (returned)
+/// \param residue_count        The number of residues in the system.  This may be modified if
+///                             molecule boundaries split one of the pre-defined residues.
 /// \param all_nb_excl          Collection of all nonbonded exclusions (for molecule tracing)
 /// \param molecule_membership  Membership of each atom in its home molecule (reallocated and
 ///                             returned)
@@ -1153,9 +1190,15 @@ std::vector<int> traceBondedPatterns(const Map1234 &all_nb_excl);
 ///                             that could, in theory, hop around in the topology (in practice the
 ///                             contents of each molecule will be a continuous stream of numbers
 ///                             increasing monotonically)
-void mapMolecules(const int atom_count, int *molecule_count, const Map1234 &all_nb_excl,
-                  std::vector<int> *molecule_membership, std::vector<int> *molecule_limits,
-                  std::vector<int> *molecule_contents);
+/// \param residue_limits       The boundaries of each residue in the topological atom ordering,
+///                             pre-defined but perhaps modified by this function
+/// \param residue_names        The names of each residue.  This may be modified, as new residues
+///                             are defined if the boundaries of molecules split the existing
+///                             residue demarcations.
+void mapMolecules(const int atom_count, int *molecule_count, int *residue_count,
+                  const Map1234 &all_nb_excl, std::vector<int> *molecule_membership,
+                  std::vector<int> *molecule_limits, std::vector<int> *molecule_contents,
+                  std::vector<int> *residue_limits, std::vector<char4> *residue_names);
 
 /// \brief Compute a stencil for obtaining the first partial derivative of a cubic spline on a
 ///        regular grid.  The first derivatives at any given grid point are a function of all the

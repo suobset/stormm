@@ -226,6 +226,13 @@ public:
   ///
   /// \param query  The string label to match
   int getLabelCacheIndex(const std::string &query) const;
+
+  /// \brief Get the index of a system in the cache as a whole, based on its label and frame
+  ///        number / subindex within that label group.
+  ///
+  /// \param query  Name of the label of interest
+  /// \param index  Index of the system within the label group
+  int getCacheIndex(const std::string &query, int index = 0) const;
   
   /// \brief Return the indices of all systems from within the cache, matching a particular
   ///        topology and / or a label.
@@ -239,10 +246,14 @@ public:
   /// \{
   std::vector<int> getMatchingSystemIndices(const AtomGraph* query_ag,
                                             const std::string &query_label) const;
+
   std::vector<int> getMatchingSystemIndices(const AtomGraph &query_ag,
                                             const std::string &query_label) const;
+
   std::vector<int> getMatchingSystemIndices(const AtomGraph *query_ag) const;
+
   std::vector<int> getMatchingSystemIndices(const AtomGraph &query_ag) const;
+
   std::vector<int> getMatchingSystemIndices(const std::string &query_label) const;
   /// \}
  
@@ -255,10 +266,19 @@ public:
   ///
   /// \param query_ag     The topology to match
   /// \param query_label  The label to seek out
+  /// \param xcpt         The course of action to take if no matching system can be found.  If the
+  ///                     protocol is not DIE, this function will behave much like the Standard
+  ///                     Template Library's find() function and return the total number of
+  ///                     systems, which may be useful under some circumstances.
   /// \{
-  int getFirstMatchingSystemIndex(const AtomGraph *query_ag) const;
-  int getFirstMatchingSystemIndex(const std::string &query_label) const;
-  int getFirstMatchingSystemIndex(const AtomGraph *query_ag, const std::string &query_label) const;
+  int getFirstMatchingSystemIndex(const AtomGraph *query_ag,
+                                  ExceptionResponse xcpt = ExceptionResponse::DIE) const;
+
+  int getFirstMatchingSystemIndex(const std::string &query_label,
+                                  ExceptionResponse xcpt = ExceptionResponse::DIE) const;
+
+  int getFirstMatchingSystemIndex(const AtomGraph *query_ag, const std::string &query_label,
+                                  ExceptionResponse xcpt = ExceptionResponse::DIE) const;
   /// \}
  
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
@@ -452,6 +472,19 @@ public:
   ///
   /// \param index  Index of the system of interest
   const ForwardExclusionMask& getSystemForwardMask(int index) const;
+
+  /// \brief Get the number of systems matching a particular label group within the cache.
+  ///
+  /// Overloaded:
+  ///   - Provide the label group's index within the internal list
+  ///   - Provide the label group name
+  ///
+  /// \param index  Internal index of the label group of interest
+  /// \param query  Name of the label group of interest
+  /// \{
+  int getSystemCountWithinLabel(int index) const;
+  int getSystemCountWithinLabel(const std::string &query) const;
+  /// \}
 
   /// \brief Get the number of systems described by a topology of the given index in this cache.
   ///
@@ -747,7 +780,7 @@ private:
   std::vector<int> checkpoint_degeneracy;
 
   /// A series of concatenated lists of all the systems sharing a particular label (this is
-  /// complementary to te label_subindices array, above)
+  /// complementary to th label_subindices array, above)
   std::vector<int> label_cases;
 
   /// Bounds array for label_cases above

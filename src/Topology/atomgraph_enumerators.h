@@ -74,6 +74,18 @@ enum class MoleculeKind {
                     ///<   should remain last to be used as a guide for the total number of
                     ///<   distinctions among molecules in the enum class.
 };
+
+/// \brief Offer different options for re-ordering molecules when combining topologies.
+enum class MoleculeOrdering {
+  RETAIN_ORDER,  ///< Retain the order of all molecules in the original topologies, combining them
+                 ///<   as lists of atoms one after another in the order presented by the topology
+                 ///<   list vector.
+  WATER_LAST,    ///< Solvent molecules of all topologies will be placed last in the new, combined
+                 ///<   topology.  Other molecules will retain their original order in topologies
+                 ///<   of the list.
+  REORDER_ALL    ///< All molecules will be reordered based on their perceived types and the
+                 ///<   priority scheme presented in the MoleculeKind enumerator class, above.
+};
   
 /// \brief Enumerate the ways to modify an atom's mobility in the toplogy
 enum class MobilitySetting {
@@ -221,6 +233,7 @@ enum class VirtualSiteKind {
 /// \param input  The enumeration of interest
 /// \{
 std::string getEnumerationName(TopologyKind input); 
+std::string getEnumerationName(TopologyDescriptor input); 
 std::string getEnumerationName(UnitCellType input); 
 std::string getEnumerationName(MoleculeKind input); 
 std::string getEnumerationName(MobilitySetting input);

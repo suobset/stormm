@@ -731,6 +731,7 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &s
       case NamelistType::STRUCT:
         break;
       case NamelistType::BOOLEAN:
+        keywords[param_index].activateBool(sub_key);
         return 0;
       case NamelistType::INTEGER:
         if (verifyNumberFormat(value.c_str(), NumberFormat::INTEGER)) {
@@ -1069,7 +1070,7 @@ void NamelistEmulator::printKeywordDocumentation(const int p_idx, const int name
       case InputStatus::DEFAULT:
         switch (keywords[p_idx].sub_kinds[i]) {
         case NamelistType::BOOLEAN:
-          dflt_pres[i] = true;
+          dflt_pres[i] = std::string("false");
           break;
         case NamelistType::INTEGER:
           dflt_pres[i] = std::to_string(keywords[p_idx].template_ints[i]);

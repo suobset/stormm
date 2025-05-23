@@ -642,37 +642,61 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
                                   const int atom_i, const int atom_j,
-                                  const std::string &filename) {
+                                  const std::string &filename, const ExceptionResponse policy) {
   std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int, false);
   bool ring_completed;
   int nrot = colorConnectivity(nbk, cdk, atom_i, atom_j, &marked, &ring_completed);
   if (ring_completed) {
-    rtWarn("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
-           std::to_string(atom_j + 1) + ", " +
-           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
-           std::to_string(cdk.res_numbers[atom_i]) + " :: " +
-           char4ToString(cdk.atom_names[atom_i]) + " and " +
-           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
-           std::to_string(cdk.res_numbers[atom_j]) + " :: " +
-           char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring system.  This "
-           "should not have happened if the bond was selected from a ChemicalFeatures object, but "
-           "may have occurred if there is a very complex fused ring system that could not be "
-           "fully mapped.  No atoms will rotate about this bond.  Original topology: " +
-           filename + ".", "selectRotatingAtoms");
-    std::vector<int> tmp_result;
-    return tmp_result;
+    const int ibin = findBin(cdk.res_limits, atom_i, cdk.nres);
+    const int jbin = findBin(cdk.res_limits, atom_j, cdk.nres);
+    const std::string err_msg("The rotatable bond between atoms " + std::to_string(atom_i + 1) +
+                              " and " + std::to_string(atom_j + 1) + ", " +
+                              char4ToString(cdk.res_names[ibin]) + " " +
+                              std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+                              char4ToString(cdk.atom_names[atom_i]) + " and " +
+                              char4ToString(cdk.res_names[jbin]) + " " +
+                              std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+                              char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a "
+                              "ring system.  This should not have happened if the bond was "
+                              "selected from a ChemicalFeatures object, but may have occurred if "
+                              "there is a very complex fused ring system that could not be fully "
+                              "mapped.  No atoms will rotate about this bond.  Original "
+                              "topology: " + filename + ".");
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr(err_msg, "selectRotatingAtoms");
+    case ExceptionResponse::WARN:
+      rtWarn(err_msg, "selectRotatingAtoms");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return std::vector<int>();
   }
   if (nrot == 0 || nrot == nbk.natom - 2) {
-    rtWarn("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
-           std::to_string(atom_j + 1) + ", " +
-           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
-           std::to_string(cdk.res_numbers[atom_i]) + " :: " +
-           char4ToString(cdk.atom_names[atom_i]) + " and " +
-           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
-           std::to_string(cdk.res_numbers[atom_j]) + " :: " +
-           char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be worth rotating.  This "
-           "should not have happened if the bond was selected from a ChemicalFeatures object.  "
-           "Original topology: " + filename + ".", "selectRotatingAtoms");
+    const int ibin = findBin(cdk.res_limits, atom_i, cdk.nres);
+    const int jbin = findBin(cdk.res_limits, atom_j, cdk.nres);
+    const std::string err_msg("The rotatable bond between atoms " + std::to_string(atom_i + 1) +
+                              " and " + std::to_string(atom_j + 1) + ", " +
+                              char4ToString(cdk.res_names[ibin]) + " " +
+                              std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+                              char4ToString(cdk.atom_names[atom_i]) + " and " +
+                              char4ToString(cdk.res_names[jbin]) + " " +
+                              std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+                              char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be "
+                              "worth rotating.  This should not have happened if the bond was "
+                              "selected from a ChemicalFeatures object.  Original topology: " +
+                              filename + ".");
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr(err_msg, "selectRotatingAtoms");
+    case ExceptionResponse::WARN:
+      rtWarn(err_msg, "selectRotatingAtoms");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    return std::vector<int>();
   }
   std::vector<int> result(nrot);
   int counter = 0;
@@ -688,17 +712,19 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> selectRotatingAtoms(const AtomGraph &ag, const int atom_i, const int atom_j) {
+std::vector<int> selectRotatingAtoms(const AtomGraph &ag, const int atom_i, const int atom_j,
+                                     const ExceptionResponse policy) {
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
-  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag.getFileName());
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag.getFileName(), policy);
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, const int atom_j) {
+std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                     const ExceptionResponse policy) {
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
   const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
-  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag->getFileName());
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j, ag->getFileName(), policy);
 }
 
 //-------------------------------------------------------------------------------------------------

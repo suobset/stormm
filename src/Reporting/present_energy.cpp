@@ -86,6 +86,7 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
     bool has_qqnb = false;
     const bool has_ljnb = true;
     bool has_gb = false;
+    bool has_sasa = false;
     std::vector<StateVariable> result;
     for (int i = 0; i < scmapr.ntopol; i++) {
       if (cache_topol_in_use[i] == false) {
@@ -123,6 +124,8 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
       const bool has_charge = (variance(nbk.charge, nbk.natom,
                                         VarianceMethod::VARIANCE) > verytiny);
       has_gb = (has_gb || topologies[i]->getImplicitSolventModel() != ImplicitSolventModel::NONE);
+      has_sasa = (has_sasa ||
+                  topologies[i]->getImplicitSolventModel() != ImplicitSolventModel::NONE);
       has_qqnb = (has_qqnb || has_charge);
 
       // The presence of 1:4 terms and presence of nonzero charges will be taken to imply the
@@ -155,6 +158,7 @@ std::vector<StateVariable> assessEnergyDetails(const ScoreCard &nrg,
     if (has_qqnb) result.push_back(StateVariable::ELECTROSTATIC);
     if (has_ljnb) result.push_back(StateVariable::VDW);
     if (has_gb)   result.push_back(StateVariable::GENERALIZED_BORN);
+    if (has_sasa) result.push_back(StateVariable::SURFACE_AREA);
     if (has_rstr) result.push_back(StateVariable::RESTRAINT);
     if (has_prss) result.push_back(StateVariable::PRESSURE);
     if (has_volm) result.push_back(StateVariable::VOLUME);
@@ -732,6 +736,8 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
   case EnergySample::TIME_AVERAGE:
     for (int i = 0; i < nquant; i++) {
       switch (repcon.getOutputSyntax()) {
+      case OutputSyntax::JSON:
+        break;
       case OutputSyntax::MATPLOTLIB:
         post_script->append(varname + "_" + lowercase(getEnumerationName(used_quantities[i])) +
                             " = " + varname + "_aggregate[" + std::to_string(i) + "]");
@@ -746,6 +752,8 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
         break;
       }
       switch (repcon.getOutputSyntax()) {
+      case OutputSyntax::JSON:
+        break;
       case OutputSyntax::MATPLOTLIB:
       case OutputSyntax::STANDALONE:
         if (i < nquant - 1) {
@@ -757,6 +765,7 @@ std::vector<ReportTable> tabulateFullEnergy(const ScoreCard &nrg, const EnergySa
       }
     }
     switch (repcon.getOutputSyntax()) {
+    case OutputSyntax::JSON:
     case OutputSyntax::MATPLOTLIB:
       break;
     case OutputSyntax::MATRIX_PKG:

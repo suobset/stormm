@@ -131,6 +131,7 @@ llint ScoreCard::sumPotentialEnergyAsLlint(const llint* nrg_data) const {
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELEC_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::SURFACE_AREA)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
   return lacc;
 }
@@ -154,6 +155,7 @@ llint ScoreCard::sumTotalEnergyAsLlint(const llint* nrg_data) const {
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELEC_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::SURFACE_AREA)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
   return lacc;
@@ -161,7 +163,6 @@ llint ScoreCard::sumTotalEnergyAsLlint(const llint* nrg_data) const {
 
 //-------------------------------------------------------------------------------------------------
 double ScoreCard::sumTotalEnergy(const llint* nrg_data) const {
-  const llint lacc = nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
   return static_cast<double>(sumTotalEnergyAsLlint(nrg_data)) * inverse_nrg_scale_lf;
 }
 

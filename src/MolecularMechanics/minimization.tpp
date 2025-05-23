@@ -276,7 +276,8 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
     }
     transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                             UnitCellType::NONE, vsk);
-    if (step % mincon.getDiagnosticPrintFrequency() == 0) {
+    const int ntpr = mincon.getDiagnosticPrintFrequency();
+    if (step == 0 || (ntpr > 0 && step % ntpr == 0)) {
       sc.commit(StateVariable::ALL_STATES);
       sc.incrementSampleCount();
       sc.setLastTimeStep(step);

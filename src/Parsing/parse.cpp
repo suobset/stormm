@@ -4,12 +4,15 @@
 #include <vector>
 #include "copyright.h"
 #include "Reporting/error_format.h"
+#include "Math/rounding.h"
 #include "ascii_numbers.h"
 #include "parse.h"
 
 namespace stormm {
 namespace parse {
 
+using stmath::roundUp;
+  
 //-------------------------------------------------------------------------------------------------
 std::string operator+(const std::string &lhs, const char4 rhs) {
   std::string result = lhs;
@@ -61,6 +64,15 @@ std::string char4ToString(const char4 value) {
 }
 
 //-------------------------------------------------------------------------------------------------
+char2 stringToChar2(const std::string &value) {
+  char2 result;
+  const int vlen = value.size();
+  result.x = (vlen > 0) ? value[0] : ' ';
+  result.y = (vlen > 1) ? value[1] : ' ';
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 char4 stringToChar4(const std::string &value) {
   char4 result;
   const int vlen = value.size();
@@ -69,6 +81,22 @@ char4 stringToChar4(const std::string &value) {
   result.z = (vlen > 2) ? value[2] : ' ';
   result.w = (vlen > 3) ? value[3] : ' ';
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<char4> stringToChar4Vector(const std::string &value, const char blank) {
+  const int nvs = value.size();
+  std::vector<char4> result((nvs + 3) / 4);
+  const int nrs = 4 * result.size();
+  for (int i = 0; i < nrs; i += 4) {
+    char4 istride;
+    istride.x = (i     < nvs) ? value[i    ] : blank;
+    istride.y = (i + 1 < nvs) ? value[i + 1] : blank;
+    istride.z = (i + 2 < nvs) ? value[i + 2] : blank;
+    istride.w = (i + 3 < nvs) ? value[i + 3] : blank;
+    result[i >> 2] = istride;
+  }
+  return result;  
 }
 
 //-------------------------------------------------------------------------------------------------
