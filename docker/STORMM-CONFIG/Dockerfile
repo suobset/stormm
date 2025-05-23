@@ -1,60 +1,54 @@
-# Use the official Debian base image
-FROM debian:latest
+# Use NVIDIA CUDA base image
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 
 # Set non-interactive mode for apt-get to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
 
 # Install necessary packages
 RUN apt-get update && \
+    apt-get clean && \
     apt-get install -y \
-    cmake \
+    wget \
+    python3-pip \
+    tzdata \
+    gcovr \
+    git \
+    libeigen3-dev \
+    libboost-all-dev \
     gcc \
     g++ \
-    make \
-    git \
-    wget \
-    curl \
-    vim \
-    emacs \
-    neovim \
-    ca-certificates \
-    gnupg2 \
-    lsb-release \
-    software-properties-common \
+    cmake \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Download and install the CUDA local repository for Debian 12
-RUN wget https://developer.download.nvidia.com/compute/cuda/12.6.1/local_installers/cuda-repo-debian12-12-6-local_12.6.1-560.35.03-1_amd64.deb && \
-    dpkg -i cuda-repo-debian12-12-6-local_12.6.1-560.35.03-1_amd64.deb && \
-    cp /var/cuda-repo-debian12-12-6-local/cuda-*-keyring.gpg /usr/share/keyrings/
+# Install CUDA 12.x
+RUN echo "Checking and installing CUDA 12.x..." && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    apt-get update -y && \
+    apt-get -y install cuda-toolkit-12-8 && \
+    export PATH=/usr/local/cuda/bin:$PATH && \
+    export CUDADIR=/usr/local/cuda && \
+    export CXXFLAGS="-I/usr/local/cuda/include $CXXFLAGS" && \
+    export LDFLAGS="-L/usr/local/cuda/lib64 $LDFLAGS"
 
-# Add contrib repository and update package list
-RUN add-apt-repository contrib && \
-    apt-get update
-
-# Install CUDA Toolkit
-RUN apt-get -y install cuda-toolkit-12-6
-
-# Set up environment variables for CUDA
-ENV PATH=/usr/local/cuda-12.6/bin:${PATH}
-ENV LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:${LD_LIBRARY_PATH}
-
-# Verify CUDA installation
-RUN nvcc --version
-
-# Create a directory for the repository
+# Set the working directory
 WORKDIR /app
 
-# Clone the Git repository
+# Copy the code from the CI/CD pipeline context into the Docker image
 RUN git clone https://github.com/psivant/stormm.git
 
 # Build STORMM using CMake with CUDA enabled
-RUN cmake -S stormm -B stormmbuild -DSTORMM_ENABLE_CUDA=ON -DSTORMM_ENABLE_RDKIT=OFF
+RUN cmake -S stormm -B stormmbuild \
+    -DCMAKE_BUILD_TYPE=RELEASE \
+    -DSTORMM_ENABLE_CUDA=YES \
+    -DSTORMM_ENABLE_RDKIT=NO \
+    -DCUSTOM_NVCC_THREADS=8
+
 RUN export STORMM_HOME=/app/stormm
 WORKDIR /app/stormmbuild
-RUN make 
+RUN make -j
 
 # Set the default command to run bash
 CMD ["/bin/bash"]
-

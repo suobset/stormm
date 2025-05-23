@@ -17,10 +17,10 @@ using stmath::PrefixSumType;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> &counts,
-                     const ExceptionResponse policy) :
+                     const MoleculeOrdering arrangement, const ExceptionResponse policy) :
     AtomGraph()
 {
-  snprintf(version_stamp, 16, "STORMM 0.1");
+  snprintf(version_stamp, 16, "V8000.000");
   std::time_t raw_time = std::time(nullptr);
   std::tm* current_time = std::localtime(&raw_time);
   date = *current_time;
@@ -70,6 +70,12 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
     last_atom_before_cap += counts[i] * agv[i]->last_atom_before_cap;
     unconstrained_dof += counts[i] * agv[i]->unconstrained_dof;
     constrained_dof += counts[i] * agv[i]->constrained_dof;
+    bond_term_with_hydrogen += counts[i] * agv[i]->bond_term_with_hydrogen;
+    bond_term_without_hydrogen += counts[i] * agv[i]->bond_term_without_hydrogen;
+    angl_term_with_hydrogen += counts[i] * agv[i]->angl_term_with_hydrogen;
+    angl_term_without_hydrogen += counts[i] * agv[i]->angl_term_without_hydrogen;
+    dihe_term_with_hydrogen += counts[i] * agv[i]->dihe_term_with_hydrogen;
+    dihe_term_without_hydrogen += counts[i] * agv[i]->dihe_term_without_hydrogen;
   }
 
   // Form consensus tables of bond, angle, dihedral, Urey-Bradley, CHARMM improper, and CMAP terms.
@@ -96,13 +102,15 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
   // set of 1:4 attenuations then that can be worked out by cloning the dihedral parameter sets.
   std::vector<std::vector<double>> tmp_elec14_attns(nsys), tmp_vdw14_attns(nsys);  
   for (int i = 0; i < nsys; i++) {
-    tmp_elec14_attns[i].resize(vk_v[i].ndihe_param);
-    tmp_vdw14_attns[i].resize(vk_v[i].ndihe_param);
+    tmp_elec14_attns[i].resize(vk_v[i].ndihe_param, 0.0);
+    tmp_vdw14_attns[i].resize(vk_v[i].ndihe_param, 0.0);
     for (int j = 0; j < vk_v[i].ndihe; j++) {
       const int attn14_param_idx = vk_v[i].dihe14_param_idx[j];
       const int dihe_param_idx = vk_v[i].dihe_param_idx[j];
-      tmp_elec14_attns[i][dihe_param_idx] = vk_v[i].attn14_elec[attn14_param_idx];
-      tmp_vdw14_attns[i][dihe_param_idx] = vk_v[i].attn14_vdw[attn14_param_idx];
+      tmp_elec14_attns[i][dihe_param_idx] = std::max(tmp_elec14_attns[i][dihe_param_idx],
+                                                     vk_v[i].attn14_elec[attn14_param_idx]);
+      tmp_vdw14_attns[i][dihe_param_idx] = std::max(tmp_vdw14_attns[i][dihe_param_idx],
+                                                    vk_v[i].attn14_vdw[attn14_param_idx]);
     }
   }
   ParameterUnion<double> uni_chrgs(nbk_v[0].q_parameter, nbk_v[0].n_q_types);
@@ -151,81 +159,60 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       tmp_desc[i] = uni_ljtab.getLJTypeCount();      
       break;
     case TopologyDescriptor::BONDS_WITH_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->bond_term_with_hydrogen;
-      }
+      tmp_desc[i] = bond_term_with_hydrogen;
       break;
     case TopologyDescriptor::BONDS_WITHOUT_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->bond_term_without_hydrogen;
-      }
+      tmp_desc[i] = bond_term_without_hydrogen;
       break;
     case TopologyDescriptor::ANGLES_WITH_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->angl_term_with_hydrogen;
-      }
+      tmp_desc[i] = angl_term_with_hydrogen;
       break;
     case TopologyDescriptor::ANGLES_WITHOUT_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->angl_term_without_hydrogen;
-      }
+      tmp_desc[i] = angl_term_without_hydrogen;
       break;
     case TopologyDescriptor::DIHEDRALS_WITH_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->dihe_term_with_hydrogen;
-      }
+      tmp_desc[i] = dihe_term_with_hydrogen;
       break;
     case TopologyDescriptor::DIHEDRALS_WITHOUT_HYDROGEN:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->dihe_term_without_hydrogen;
-      }
+      tmp_desc[i] = dihe_term_without_hydrogen;
       break;
     case TopologyDescriptor::NHPARM_UNUSED:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->unused_nhparm;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->unused_nhparm;
       }
       break;
     case TopologyDescriptor::ADDLES_CREATED:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->unused_nparm;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->unused_nparm;
       }
       break;
     case TopologyDescriptor::TOTAL_EXCLUDED_ATOMS:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->total_exclusions;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->total_exclusions;
       }
       break;
     case TopologyDescriptor::RESIDUE_COUNT:
-      tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->residue_count;
-      }
+      tmp_desc[i] = residue_count;
       break;
     case TopologyDescriptor::NBONA_UNUSED:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->heavy_bonds_plus_constraints;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->heavy_bonds_plus_constraints;
       }
       break;
     case TopologyDescriptor::NTHETA_UNUSED:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->heavy_angls_plus_constraints;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->heavy_angls_plus_constraints;
       }
       break;
     case TopologyDescriptor::NPHIA_UNUSED:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->heavy_dihes_plus_constraints;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->heavy_dihes_plus_constraints;
       }
       break;
     case TopologyDescriptor::BOND_TYPE_COUNT:
@@ -248,8 +235,8 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       // This information is unused, and it is not clear where to find the atom types involved in
       // hydrogen bonding.  Assume that the types in each of the various systems are independent.
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->unused_natyp;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->unused_natyp;
       }
       break;
     case TopologyDescriptor::NPHB_UNUSED:
@@ -259,45 +246,45 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       break;
     case TopologyDescriptor::PERTURBATION:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        const int active = (agv[i]->use_perturbation_info == PerturbationSetting::ON);
+      for (int j = 0; j < nsys; j++) {
+        const int active = (agv[j]->use_perturbation_info == PerturbationSetting::ON);
         tmp_desc[i] = std::max(tmp_desc[i], active);
       }
       break;
     case TopologyDescriptor::BOND_PERTURBATIONS:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->bond_perturbation_term_count;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->bond_perturbation_term_count;
       }
       break;
     case TopologyDescriptor::ANGLE_PERTURBATIONS:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->angl_perturbation_term_count;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->angl_perturbation_term_count;
       }
       break;
     case TopologyDescriptor::DIHEDRAL_PERTURBATIONS:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->dihe_perturbation_term_count;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->dihe_perturbation_term_count;
       }
       break;
     case TopologyDescriptor::BONDS_IN_PERTURBED_GROUP:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->bonds_in_perturbed_group;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->bonds_in_perturbed_group;
       }
       break;
     case TopologyDescriptor::ANGLES_IN_PERTURBED_GROUP:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->angls_in_perturbed_group;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->angls_in_perturbed_group;
       }
       break;
     case TopologyDescriptor::DIHEDRALS_IN_PERTURBED_GROUP:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] += counts[i] * agv[i]->dihes_in_perturbed_group;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] += counts[j] * agv[j]->dihes_in_perturbed_group;
       }
       break;
     case TopologyDescriptor::BOX_TYPE_INDEX:
@@ -307,8 +294,8 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       // combined system.
       tmp_desc[i] = 0;
       int cls_idx;
-      for (int i = 0; i < nsys; i++) {
-        switch (agv[i]->periodic_box_class) {
+      for (int j = 0; j < nsys; j++) {
+        switch (agv[j]->periodic_box_class) {
         case UnitCellType::NONE:
           cls_idx = 0;
           break;
@@ -327,21 +314,21 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       break;
     case TopologyDescriptor::CAP:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        const int active = (agv[i]->use_solvent_cap_option == SolventCapSetting::ON);
+      for (int j = 0; j < nsys; j++) {
+        const int active = (agv[j]->use_solvent_cap_option == SolventCapSetting::ON);
         tmp_desc[i] = std::max(tmp_desc[i], active);
       }
       break;
     case TopologyDescriptor::EXTRA_POINT_COUNT:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] = counts[i] * agv[i]->virtual_site_count;
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] = counts[j] * agv[j]->virtual_site_count;
       }
       break;
     case TopologyDescriptor::PIMD_SLICE_COUNT:
       tmp_desc[i] = 0;
-      for (int i = 0; i < nsys; i++) {
-        tmp_desc[i] = std::max(tmp_desc[i], agv[i]->implicit_copy_count);
+      for (int j = 0; j < nsys; j++) {
+        tmp_desc[i] = std::max(tmp_desc[i], agv[j]->implicit_copy_count);
       }
       break;
     case TopologyDescriptor::N_VALUES:
@@ -359,7 +346,7 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
     periodic_box_class = UnitCellType::TRICLINIC;
     break;
   }
-
+  
   // The details above are sums over the entire topology that is to be created.  The ordering of
   // atoms and molecules is still up in the air, and to simply tack one topology onto the end of
   // another may deal unexpected twists to a lot of scripts.  Loop over each topology and find its
@@ -368,7 +355,8 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
   // the order in which their topologies appear in the list.
   std::vector<int2> molecule_system_instance_origins;
   const std::vector<int2> molecule_order = findMoleculeOrder(agv, counts,
-                                                             &molecule_system_instance_origins);
+                                                             &molecule_system_instance_origins,
+                                                             arrangement);
 
   // As in other applications, it will be important to have maps of where each atom of the new
   // topology came from, and reverse lookups to understand where in the new topology each atom from
@@ -403,7 +391,7 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
   std::vector<int> tmp_molecule_membership(atom_count), tmp_molecule_contents(atom_count);
   std::vector<int> tmp_atomic_numbers(atom_count);
   std::vector<double> tmp_atomic_charges(atom_count), tmp_atomic_masses(atom_count);
-  std::vector<double> tmp_inv_atomic_masses(atom_count);
+  std::vector<double> tmp_inv_atomic_masses(atom_count), tmp_atomic_polarizabilities(atom_count);
   std::vector<char4> tmp_atom_names(atom_count), tmp_atom_types(atom_count);
   std::vector<char4> tmp_residue_names(residue_count);
   int atmcon = 0;
@@ -418,6 +406,7 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
     base_atom_idx = atmcon;
     base_resi_idx = rsdcon;
     tmp_molecule_limits[i] = atmcon;
+    const double* polarizability_ptr = agv[sys_orig]->atomic_polarizabilities.data();
     for (int j = mol_llim; j < mol_hlim; j++) {
       const int sys_atom_idx = cdk_v[sys_orig].mol_contents[j];
 
@@ -427,11 +416,13 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
         current_topl_res = all_res_idx[sys_orig][sys_atom_idx];
         mol_base_res = current_topl_res;
         tmp_residue_limits[rsdcon] = atmcon;
+        tmp_residue_names[rsdcon] = agv[sys_orig]->residue_names.readHost(current_topl_res);
       }
       if (current_topl_res != all_res_idx[sys_orig][sys_atom_idx]) {
         rsdcon++;
         tmp_residue_limits[rsdcon] = atmcon;
         current_topl_res = all_res_idx[sys_orig][sys_atom_idx];
+        tmp_residue_names[rsdcon] = agv[sys_orig]->residue_names.readHost(current_topl_res);
       }
       tmp_atom_struc_numbers[atmcon] = cdk_v[sys_orig].atom_numbers[sys_atom_idx] + j - mol_llim +
                                        base_atom_idx;
@@ -445,6 +436,7 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
       tmp_atomic_numbers[atmcon] = cdk_v[sys_orig].z_numbers[sys_atom_idx];
       tmp_atom_names[atmcon] = cdk_v[sys_orig].atom_names[sys_atom_idx];
       tmp_atom_types[atmcon] = cdk_v[sys_orig].atom_types[sys_atom_idx];
+      tmp_atomic_polarizabilities[atmcon] = polarizability_ptr[sys_atom_idx];
 
       // Mark the origins and destinations of atoms in the combined and original topologies
       atom_origins[atmcon] = { sys_orig, sys_atom_idx };
@@ -811,7 +803,7 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
                                    all_nb_excl, uni_bonds.getUnion(1), uni_angls.getUnion(1));
 
   // Examine dihedral coverge: are all 1:4 interactions covered by some dihedral, with a scaling
-  // factor assoicated with those parameters?
+  // factor associated with those parameters?
   const std::vector<int3> outstanding_14_pairs =
     checkDihedral14Coverage(atom_count, tmp_atomic_numbers, bvt, all_nb_excl, vst, attn_parm,
                             policy);
@@ -819,10 +811,10 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
   std::vector<int> tmp_inferred_14_i_atoms(inferred_14_attenuations);
   std::vector<int> tmp_inferred_14_l_atoms(inferred_14_attenuations);
   std::vector<int> tmp_inferred_14_param_idx(inferred_14_attenuations);
-  for (int i = 0; i < inferred_14_attenuations; i++) {
-    tmp_inferred_14_i_atoms[i]   = outstanding_14_pairs[i].x;
-    tmp_inferred_14_l_atoms[i]   = outstanding_14_pairs[i].y;
-    tmp_inferred_14_param_idx[i] = outstanding_14_pairs[i].z;
+  for (int pos = 0; pos < inferred_14_attenuations; pos++) {
+    tmp_inferred_14_i_atoms[pos]   = outstanding_14_pairs[pos].x;
+    tmp_inferred_14_l_atoms[pos]   = outstanding_14_pairs[pos].y;
+    tmp_inferred_14_param_idx[pos] = outstanding_14_pairs[pos].z;
   }
 
   // Miscellaneous items: atom mobility must be inherited from the input topologies, implicit
@@ -950,35 +942,36 @@ AtomGraph::AtomGraph(const std::vector<AtomGraph*> &agv, const std::vector<int> 
                    uni_chrgs.getUnion(0), tmp_lja_values, tmp_ljb_values, tmp_ljc_values,
                    tmp_lja_14_values, tmp_ljb_14_values, tmp_ljc_14_values, tmp_atomic_pb_radii,
                    tmp_gb_screening_factors, tmp_gb_coef, tmp_solty_info, tmp_hbond_a_values,
-                   tmp_hbond_b_values, tmp_hbond_cutoffs, tmp_atom_names, tmp_atom_types,
-                   tmp_residue_names, tmp_tree_symbols, cma, cond_excl, bvt, cvt, attn_parm, vst,
-                   all_nb_excl, cnst_table);
+                   tmp_hbond_b_values, tmp_hbond_cutoffs, tmp_atomic_polarizabilities,
+                   tmp_atom_names, tmp_atom_types, tmp_residue_names, tmp_tree_symbols, cma,
+                   cond_excl, bvt, cvt, attn_parm, vst, all_nb_excl, cnst_table);
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const AtomGraph &ag_a, const int n_a, const AtomGraph &ag_b, const int n_b,
-                     const ExceptionResponse policy) :
+                     const MoleculeOrdering arrangement, const ExceptionResponse policy) :
     AtomGraph({ const_cast<AtomGraph*>(ag_a.getSelfPointer()),
-                const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { n_a, n_b }, policy)
+                const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { n_a, n_b }, arrangement, policy)
 {}
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b, const int n_b,
-                     const ExceptionResponse policy) :
+                     const MoleculeOrdering arrangement, const ExceptionResponse policy) :
   AtomGraph({ const_cast<AtomGraph*>(ag_a.getSelfPointer()),
-              const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { 1, n_b }, policy)
+              const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { 1, n_b }, arrangement, policy)
 {}
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const AtomGraph &ag_a, const AtomGraph &ag_b,
-                     const ExceptionResponse policy) :
+                     const MoleculeOrdering arrangement, const ExceptionResponse policy) :
   AtomGraph({ const_cast<AtomGraph*>(ag_a.getSelfPointer()),
-              const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { 1, 1 }, policy)
+              const_cast<AtomGraph*>(ag_b.getSelfPointer()) }, { 1, 1 }, arrangement, policy)
 {}
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int2> findMoleculeOrder(const std::vector<AtomGraph*> &agv,
-                                    const std::vector<int> &counts, std::vector<int2> *origins) {
+                                    const std::vector<int> &counts, std::vector<int2> *origins,
+                                    const MoleculeOrdering arrangement) {
   int molecule_count = 0;
   const	size_t nsys = agv.size();
   if (nsys != counts.size()) {
@@ -1007,23 +1000,73 @@ std::vector<int2> findMoleculeOrder(const std::vector<AtomGraph*> &agv,
   }
   const int n_mol_type = static_cast<int>(MoleculeKind::OTHER);
   int molcon = 0;
-  for (int i = 0; i <= n_mol_type; i++) {
-    const MoleculeKind iseek = static_cast<MoleculeKind>(i);
-    for (int j = 0; j < nsys; j++) {
-      for (int k = 0; k < agv[j]->getMoleculeCount(); k++) {
-        if (molecule_kinds[j][k] == iseek) {
-          for (int m = 0; m < counts[j]; m++) {
-            result[molcon] = { j, k };
+  switch (arrangement) {
+  case MoleculeOrdering::RETAIN_ORDER:
+    {
+      for (int i = 0; i < nsys; i++) {
+        for (int j = 0; j < counts[j]; j++) {
+          for (int k = 0; k < agv[i]->getMoleculeCount(); k++) {
+            result[molcon] = { i, k };
             if (origins != nullptr) {
-              origins->at(molcon) = { j, molecule_usage[j][k] };
-              molecule_usage[j][k] += 1;
+              origins->at(molcon) = { k, molecule_usage[i][k] };
+              molecule_usage[i][k] += 1;
             }
             molcon++;
           }
         }
       }
     }
+    break;
+  case MoleculeOrdering::WATER_LAST:
+    for (int i = 0; i < nsys; i++) {
+      for (int j = 0; j < agv[i]->getMoleculeCount(); j++) {
+        if (molecule_kinds[i][j] != MoleculeKind::WATER) {
+          for (int k = 0; k < counts[j]; k++) {
+            result[molcon] = { i, j };
+            if (origins != nullptr) {
+              origins->at(molcon) = { j, molecule_usage[i][j] };
+              molecule_usage[i][j] += 1;
+            }
+            molcon++;
+          }
+        }
+      }
+      for (int j = 0; j < agv[i]->getMoleculeCount(); j++) {
+        if (molecule_kinds[i][j] == MoleculeKind::WATER) {
+          for (int k = 0; k < counts[j]; k++) {
+            result[molcon] = { i, j };
+            if (origins != nullptr) {
+              origins->at(molcon) = { i, molecule_usage[i][j] };
+              molecule_usage[i][j] += 1;
+            }
+            molcon++;
+          }
+        }
+      }
+      
+    }
+    break;
+  case MoleculeOrdering::REORDER_ALL:
+    for (int i = 0; i <= n_mol_type; i++) {
+      const MoleculeKind iseek = static_cast<MoleculeKind>(i);
+      for (int j = 0; j < nsys; j++) {
+        for (int k = 0; k < agv[j]->getMoleculeCount(); k++) {
+          if (molecule_kinds[j][k] == iseek) {
+            for (int m = 0; m < counts[j]; m++) {
+              result[molcon] = { j, k };
+              if (origins != nullptr) {
+                origins->at(molcon) = { j, molecule_usage[j][k] };
+                molecule_usage[j][k] += 1;
+              }
+              molcon++;
+            }
+          }
+        }
+      }
+    }
+    break;
   }
+
   return result;
 }
 

@@ -46,6 +46,10 @@ enum class OutputScope {
   
 /// \brief Possible formats for organized numerical output
 enum class OutputSyntax {
+  JSON,        ///< Results will be written in .json format.  This option does not allow comments
+               ///<   for explanatory purposes: the ASCII files that emerge will be digestible to
+               ///<   a .json or JavaScript interpreter, but they are objects, not tabulated
+               ///<   outputs which can also be read as text by a typical user.
   MATPLOTLIB,  ///< Results will be written to a script which the Python interpreter can run to
                ///<   display graphical results.  The script contains functions to simplify
                ///<   interactive plotting and rendering.
@@ -116,10 +120,17 @@ enum class TextEnds {
 
 /// \brief Differtiate the types of ReportTable content with a specific enumeration.
 enum class TableContentKind {
-  INTEGER,  ///< The table contains data that can be read as integers (does not distinguish 32-bit
-            ///<   from 64-bit integers)
-  REAL,     ///< The table contains data that can be read as real numbers
-  STRING    ///< The table data can only be interpreted as strings, possibly char4
+  INTEGER,     ///< The table contains data that can be read as integers (does not distinguish
+               ///<   32-bit from 64-bit integers)
+  REAL,        ///< The table contains data that can be read as real numbers
+  STRING,      ///< The table data can only be interpreted as strings, possibly char4.  The content
+               ///<   will be protected by comment characters so as not to disrupt parsing by other
+               ///<   programs such as matrix algebra packages.
+  OPEN_STRING  ///< The table data is again interpreted as strings, but will not be protected by
+               ///<   comment characters unless the content itself contains comment characters.
+               ///<   This option is useful if the leading columns of a table should be open to
+               ///<   parsing by a third party program, but items further to the right should be
+               ///<   treated as annotation.
 };
 
 /// \brief List the ways in which a surface can be depicted.

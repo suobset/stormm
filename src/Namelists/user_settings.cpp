@@ -34,11 +34,11 @@ UserSettings::UserSettings(const CommandLineParser &clip,
     has_files_nml{false}, has_minimize_nml{false}, has_solvent_nml{false}, has_random_nml{false},
     has_precision_nml{false}, has_conformer_nml{false}, has_receptor_nml{false},
     has_pppm_nml{false}, has_dynamics_nml{false}, has_remd_nml{false}, has_ffmorph_nml{false},
-    has_report_nml{false}, restraint_nml_count{0},
+    has_emulator_nml{false}, has_report_nml{false}, restraint_nml_count{0},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{},
-    receptor_input{}, pppm_input{}, dyna_input{}, remd_input{}, ffmod_input{}, diagnostic_input{},
-    rstr_inputs{}
+    receptor_input{}, pppm_input{}, dyna_input{}, remd_input{}, ffmod_input{}, emul_input{},
+    diagnostic_input{}, rstr_inputs{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -141,6 +141,8 @@ UserSettings::UserSettings(const CommandLineParser &clip,
   start_line = 0;
   ffmod_input = FFMorphControls(inp_tf, &start_line, &has_ffmorph_nml, policy);
   start_line = 0;
+  emul_input = EmulatorControls(inp_tf, &start_line, &has_emulator_nml, policy);
+  start_line = 0;
   diagnostic_input = ReportControls(inp_tf, &start_line, &has_report_nml, policy);
   start_line = 0;
   while (start_line < inp_tf.getLineCount()) {
@@ -239,6 +241,11 @@ bool UserSettings::getFFMorphPresence() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool UserSettings::getEmulatorPresence() const {
+  return has_emulator_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool UserSettings::getReportPresence() const {
   return has_report_nml;
 }
@@ -297,7 +304,12 @@ const RemdControls& UserSettings::getRemdNamelistInfo() const {
 const FFMorphControls& UserSettings::getFFMorphNamelistInfo() const {
   return ffmod_input;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+const EmulatorControls& UserSettings::getEmulatorNamelistInfo() const {
+  return emul_input;
+}
+
 //-------------------------------------------------------------------------------------------------
 const ReportControls& UserSettings::getReportNamelistInfo() const {
   return diagnostic_input;

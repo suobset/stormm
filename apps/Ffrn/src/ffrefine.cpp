@@ -105,6 +105,13 @@ int main(int argc, const char* argv[]) {
                                  sysc.getPrintingProtocol(CoordinateFileRole::CHECKPOINT, i));
         sdf_recovery[i].writeDataItems(sysc.getCheckpointName(i), PrintSituation::APPEND);
         break;        
+      case CoordinateFileKind::PDB:
+
+        // CHECK
+        rtErr("This functionality is not yet implemented.", "main");
+        // END CHECK
+        
+        break;
       case CoordinateFileKind::UNKNOWN:
         break;
       }

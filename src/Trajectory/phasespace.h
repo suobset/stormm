@@ -18,6 +18,7 @@ namespace stormm {
 namespace trajectory {
 
 using card::default_hpc_format;
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridFormat;
 using card::HybridTargetLevel;
@@ -175,6 +176,12 @@ public:
 
   PhaseSpace(const PhaseSpace &ps_a, const AtomGraph &ag_a, const PhaseSpace &ps_b,
              const AtomGraph &ag_b);
+
+  PhaseSpace(const PhaseSpace &original, const std::vector<int> &atom_list,
+             HybridFormat format_in = default_hpc_format);
+
+  PhaseSpace(const PhaseSpace &original, const std::vector<uint> &mask,
+             HybridFormat format_in = default_hpc_format);
   /// \}
 
   /// \brief The copy constructor handles assignment of internal POINTER-kind Hybrid objects.
@@ -274,17 +281,34 @@ public:
   /// Overloaded:
   ///   - Get a const pointer for a const PhaseSpace object's data
   ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///   - Specify the cycle position, or assume that the object's current position in the time
+  ///     cycle is desired
   ///
   /// \param dim   Cartesian dimension of interest
   /// \param kind  Specify coordinates, velocities, or forces--anything that could be thought
   ///              of as a trajectory
   /// \param tier  Level at which to extract the data
   /// \{
+  const double* getCoordinatePointer(CartesianDimension dim, TrajectoryKind kind,
+                                     CoordinateCycle orientation,
+                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  double* getCoordinatePointer(CartesianDimension dim, TrajectoryKind kind,
+                               CoordinateCycle orientation,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST);
+
   const double* getCoordinatePointer(CartesianDimension dim,
                                      TrajectoryKind kind = TrajectoryKind::POSITIONS,
                                      HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   double* getCoordinatePointer(CartesianDimension dim,
                                TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  const double* getCoordinatePointer(CartesianDimension dim, CoordinateCycle orientation,
+                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  double* getCoordinatePointer(CartesianDimension dim, CoordinateCycle orientation,
                                HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   

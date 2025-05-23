@@ -27,6 +27,7 @@ using stmath::extractBoxDimensions;
 using stmath::roundUp;
 using parse::TextFileReader;
 using structure::extractSdfCoordinates;
+using structure::extractPdbCoordinates;
 
 //-------------------------------------------------------------------------------------------------
 CoordinateFrameWriter::CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in,
@@ -572,6 +573,7 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
     }
     break;
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -627,6 +629,14 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
   case CoordinateFileKind::SDF:
     {
       const std::vector<double3> mdl_crd = extractSdfCoordinates(tf, frame_number);
+      double* x_ptr = x_coordinates.data();
+      double* y_ptr = y_coordinates.data();
+      double* z_ptr = z_coordinates.data();
+      for (int i = 0; i < atom_count; i++) {
+        x_ptr[i] = mdl_crd[i].x;
+        y_ptr[i] = mdl_crd[i].y;
+        z_ptr[i] = mdl_crd[i].z;
+      }
 
       // The SDF format is assumed to encode no box information
       unit_cell = UnitCellType::NONE;
@@ -640,6 +650,22 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
         umat_ptr[i] = static_cast<double>((i & 0x3) == 0);
         invu_ptr[i] = static_cast<double>((i & 0x3) == 0);
       }
+    }
+    break;
+  case CoordinateFileKind::PDB:
+    {
+      const std::vector<double3> pdb_crd = extractPdbCoordinates(tf, frame_number);
+      double* x_ptr = x_coordinates.data();
+      double* y_ptr = y_coordinates.data();
+      double* z_ptr = z_coordinates.data();
+      for (int i = 0; i < atom_count; i++) {
+        x_ptr[i] = pdb_crd[i].x;
+        y_ptr[i] = pdb_crd[i].y;
+        z_ptr[i] = pdb_crd[i].z;
+      }
+
+      // The PDB format contains box information in the CRYST1 record
+      
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
@@ -843,6 +869,7 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     if (fi_exists == false ||
@@ -884,9 +911,11 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
     }
     break;
   case CoordinateFileKind::SDF:
-    rtErr("The object does not have sufficient information to create an annotated SD file.  The "
-          "program must use one of the writeFrame() overloads from the write_annotated_frame "
-          "library instead.", "CoordinateSeries", "exportToFile");
+  case CoordinateFileKind::PDB:
+    rtErr("The object does not have sufficient information to create an annotated " +
+          getEnumerationName(kind) + " file.  The program must use one of the writeFrame() "
+          "overloads from the write_annotated_frame library instead.", "CoordinateSeries",
+          "exportToFile");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;
@@ -1011,6 +1040,7 @@ std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const Coordin
     }
     break;
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
@@ -1102,6 +1132,7 @@ std::vector<CoordinateFrame> getAllFrames(const TextFile &tf, const int atom_cou
     frame_numbers.resize(1, 0);
     break;
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:

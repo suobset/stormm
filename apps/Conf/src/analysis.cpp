@@ -343,6 +343,7 @@ void printResults(const PhaseSpaceSynthesis &poly_ps, const std::vector<int> &be
         poly_ps.printTrajectory(std::vector<int>(1, like_confs[i][j]), fname, 0.0,
                                 sc.getTrajectoryKind(cache_idx), sc.getPrintingProtocol());
         break;
+      case CoordinateFileKind::PDB:
       case CoordinateFileKind::UNKNOWN:
         break;
       }

@@ -37,6 +37,8 @@ using numerics::hostDoubleToInt95;
 using numerics::hostInt95ToDouble;
 using parse::NumberFormat;
 using parse::realToString;
+using symbols::avogadro_number;
+using symbols::boltzmann_constant;
 using testing::Approx;
   
 /// \brief Check that two vectors of the same data type are compatible for various arithmetic
@@ -214,6 +216,15 @@ template <typename T> double4 quadrivariateMean(const std::vector<T> &va);
 template <typename T> double4 quadrivariateMean(const Hybrid<T> &va);
 /// \}
 
+/// \brief Compute the mean of a data sequence, after applying Boltzmann weights to each member of
+///        the series.  Overloading and descriptions of parameters follow from other mean value
+///        functions above.
+/// \{
+template <typename T> double boltzmannWeightedMean(const T* va, size_t length);
+template <typename T> double boltzmannWeightedMean(const std::vector<T> &va);
+template <typename T> double boltzmannWeightedMean(const Hybrid<T> &va);
+/// \}
+  
 /// \brief Obtain the maximum value of a vector of scalar numbers.
 ///
 /// Overloaded:
@@ -520,11 +531,11 @@ template <typename T> void reportBinLimitError(const std::string &desc, const T 
 /// \param policy  Indication of what to do if the value is outside the listed limits
 /// \{
 template <typename T> int findBin(const T* limits, const T value, const int length,
-                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+                                  ExceptionResponse policy = ExceptionResponse::DIE);
 template <typename T> int findBin(const std::vector<T> &limits, const T value,
-                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+                                  ExceptionResponse policy = ExceptionResponse::DIE);
 template <typename T> int findBin(const Hybrid<T> &limits, const T value,
-                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+                                  ExceptionResponse policy = ExceptionResponse::DIE);
 /// \}
 
 /// \brief Search a data set for a particular value.  The index of the element containing the
@@ -545,22 +556,40 @@ template <typename T> int findBin(const Hybrid<T> &limits, const T value,
 /// \param format  Statement about the form of the data to expect (will be trusted)
 /// \{
 template <typename T> size_t locateValue(const T* vdata, const T value, const size_t length,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
 
 template <typename T> size_t locateValue(const std::vector<T> &vdata, const T value,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
 
 template <typename T> size_t locateValue(const Hybrid<T> &vdata, const T value,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
 
 template <typename T> size_t locateValue(const Approx &value, const T* vdata, const size_t length,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
 
 template <typename T> size_t locateValue(const Approx &value, const std::vector<T> &vdata,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
 
 template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &vdata,
-                                         const DataOrder format = DataOrder::NONE);
+                                         DataOrder format = DataOrder::NONE);
+/// \}
+
+/// \brief Determine whether one vector comprises another, including all unique values of the
+///        other.
+///
+/// Overloaded:
+///   
+///
+/// \param va      The first vector, which will be tested to determine whether the values of all
+///                its elements are also present in the second vector
+/// \param vb      The second vector
+/// \param format  Indicate the organization of data in each vector
+/// \{
+bool foundIn(const std::vector<bool> &va, const std::vector<bool> &vb,
+             DataOrder format = DataOrder::NONE);
+
+template <typename T> bool foundIn(const std::vector<T> &va, const std::vector<T> &vb,
+                                   DataOrder format = DataOrder::NONE);
 /// \}
 
 /// \brief Find the unique entries in a vector.  The result will be returned in ascending order.
@@ -570,13 +599,26 @@ template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &v
 ///   - Perform an in-place operation on the vector, shrinking its size and changing its content
 ///     into the result
 ///   - Perform an out-of-place operation on the vector, leaving the original data unchanged.
+///   - Perform an out-of-place operation on two vectors of booleans
 ///
-/// \param va  The vector to sort
+/// \param va  The (first) vector to sort
+/// \param vb  The second vector to sort
 /// \{
 template <typename T> std::vector<T> reduceUniqueValues(const std::vector<T> &va);
 template <typename T> void reduceUniqueValues(std::vector<T> *va);
+std::vector<bool> reduceUniqueValues(const std::vector<bool> &va, const std::vector<bool> &vb);
 /// \}
 
+/// \brief Merge two vectors of boolean values to their unique components.  Because there are at
+///        most two unique values for a boolean variable, this will use no special sorting or
+///        insertion approach.  The original vectors are assumed to be already reduced to their
+///        unique values.
+///
+/// \param v_a  The first vector of booleans
+/// \param v_b  The second vector of booleans
+/// \{
+/// \}
+  
 /// \brief Find the unique elements of one vector that are not present in another.  Options are
 ///        provided to search for replaceable or separate copies of each value.  The function will
 ///        proceed by making Standard Template Library vectors of the unique values in each array

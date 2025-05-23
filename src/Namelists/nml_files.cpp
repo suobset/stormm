@@ -912,7 +912,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                 "others.");
   t_nml.addHelp("r_kind", "The type of checkpoint file to write, unless specific directives are "
                 "provided for a particular system.  Acceptable settings include 'AMBER_ASCII_RST' "
-                "and 'AMMBER_INPCRD', among others.");  
+                "and 'AMBER_INPCRD', among others.");  
   t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
   t_nml.addHelp("fusion", "Indicate whether multiple trajectories or checkpoint files produced "
                 "from systems classified under the same label should be fused into a single file "
@@ -932,8 +932,8 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, bool *found,
                 "modified.");
   t_nml.addHelp("sdf_alert", "By default, when modifying .sdf files to correct errors in data "
                 "item names on output, a warning will be emitted.  This behavior can also be "
-                "triggered by supplying one of \"warn\", \"alert\", or \"yes\".  To suppress "
-                "warnings, enter \"no\" or \"silent\".");
+                "triggered by supplying one of the keywords \"warn\", \"alert\", or \"yes.\"  To "
+                "suppress warnings, enter \"no\" or \"silent\".");
   
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.

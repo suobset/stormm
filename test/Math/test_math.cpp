@@ -1701,6 +1701,27 @@ int main(const int argc, const char* argv[]) {
         "processed correctly to reveal the locations of various values.");
   check(location_bounds, RelationalOperator::EQUAL, location_bounds_ans, "The bounds array for "
         "locations of a series of mixed integers was not formed correctly.");
+  const std::vector<bool> some_truths = { false, false, false, true };
+  const std::vector<bool> other_truths = { true, false, true };
+  check(foundIn(some_truths, other_truths), "A comparison of two boolean vectors does not yield "
+        "the correct result: both contain true and false values.");
+  const std::vector<bool> all_truths = { true, true, true, true };
+  const std::vector<bool> all_falsehoods = { false, false };
+  check(foundIn(all_truths, all_falsehoods) == false, "A comparison of two boolean vectors does "
+        "not yield the correct result: one contains only true values, the other is filled with "
+        "false.");
+  check(foundIn(some_truths, all_falsehoods) == false, "A comparison of two boolean vectors does "
+        "not yield the correct result: one contains both true and false values, the other is "
+        "filled with false.");
+  check(foundIn(all_falsehoods, some_truths), "A comparison of two boolean vectors does not yield "
+        "the correct result: one contains only false values, the other is has both true and false "
+        "entries.");
+  const std::vector<int> some_even_numbers = { 2, 6, 8, 12 };
+  check(foundIn(some_even_numbers, inc_fourteen_ans), "A comparison of two int vectors does not "
+        "yield the expected result.  All entries of the first vector are present in the second.");
+  check(foundIn(inc_fourteen_ans, some_even_numbers) == false, "A comparison of two int vectors "
+        "does not yield the expected result.  There are unique entries in the first vector not "
+        "present in the second.");
 
   // Verify that the internal random number generation is consistent with expectations.  Create
   // three generators, the first two initialized in the same way (which thus should track one
@@ -2222,6 +2243,13 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> corr_x2 = {  0.7, -0.8, -4.9,  9.2,  5.3,  4.0, -5.9, 7.9 };
   check(pearson(corr_x1, corr_x2), RelationalOperator::EQUAL, Approx(0.9651506029).margin(tiny),
         "The correlation coefficient computed for two vectors is incorrect.");
+  const std::vector<double> ubasin = { 1.0, 1.0, 2.4, 3.8 };
+  const double ufree = boltzmannWeightedMean(ubasin, 300.0);
+  check(ufree, RelationalOperator::EQUAL, 1.07568317, "The Boltzmann-weighted average of a series "
+        "of energy values does not meet expectations at a typical temperature.");
+  const double ufree_ht = boltzmannWeightedMean(ubasin, 3.0e9);
+  check(ufree_ht, RelationalOperator::EQUAL, 2.05, "The Boltzmann-weighted average of a series of "
+        "energy values does not meet expectations at an exceptionally high temperature.");
 
   // Check single-precision random number generation
   section(2);

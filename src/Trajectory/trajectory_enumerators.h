@@ -20,6 +20,7 @@ enum class CoordinateFileKind {
   AMBER_NETCDF,      ///< The binary Amber NetCDF trajectory format
   AMBER_NETCDF_RST,  ///< The binary Amber NetCDF restart format
   SDF,               ///< The trajectory is an MDL MOL file, or a collection of them
+  PDB,               ///< The trajectory is a PDB file, or a collection of them
   UNKNOWN            ///< The coordinate file kind is not (yet) understood
 };
 

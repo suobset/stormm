@@ -184,7 +184,7 @@ NamelistElement::NamelistElement(const std::string keyword_in,
 
   // Check that there is a member keyword for every member kind.
   if (sub_keys.size() != sub_kinds.size()) {
-    rtErr("The STRUCT keywords \"" + label + "\" has " + std::to_string(sub_keys.size()) +
+    rtErr("The STRUCT keyword \"" + label + "\" has " + std::to_string(sub_keys.size()) +
           " sub-keys associated with it and " + std::to_string(sub_kinds.size()) +
           " data types for them.", "NamelistElement");
   }
@@ -761,7 +761,7 @@ void NamelistElement::activateBool(const std::string &sub_key_query) {
   if (kind != NamelistType::STRUCT) {
     reportNamelistTypeProblem("activateBool", "bool");
   }
-  const int member_index = validateSubKey(sub_key_query, NamelistType::INTEGER, "setIntValue");
+  const int member_index = validateSubKey(sub_key_query, NamelistType::BOOLEAN, "activateBool");
   if ((next_entry_index > 0 && accept_multiple_values == false) || sub_key_found[member_index]) {
     const std::string errmsg = "An extra entry was found for keyword \"" + label +
                                "\", sub-key \"" + sub_key_query + "\".  The sub-key has already "
@@ -769,7 +769,7 @@ void NamelistElement::activateBool(const std::string &sub_key_query) {
     badInputResponse(errmsg, "activateBool");
   }
   else {
-    sub_bool_values.at((next_entry_index * template_size) +  member_index) = true;
+    sub_bool_values.at((next_entry_index * template_size) + member_index) = true;
     sub_key_found[member_index] = true;
   }
 }
@@ -951,6 +951,7 @@ NamelistElement::setEstablishment(const std::vector<std::string> &list_of_defaul
     switch (relevant_kind) {
     case NamelistType::BOOLEAN:
       result.push_back(InputStatus::DEFAULT);
+      break;
     case NamelistType::INTEGER:
       if (verifyNumberFormat(list_of_defaults[i].c_str(), NumberFormat::INTEGER)) {
         result.push_back(InputStatus::DEFAULT);

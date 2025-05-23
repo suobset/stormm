@@ -21,7 +21,7 @@ using parse::WrapTextSearch;
 constexpr int default_minimize_maxcyc         = 200;
 constexpr int default_minimize_ncyc           = 50;
 constexpr int default_minimize_cdcyc          = 25;
-constexpr int default_minimize_ntpr           = 50;
+constexpr int default_minimize_ntpr           = 0;
 constexpr char default_minimize_checkpoint[]  = "true";
 constexpr double default_minimize_cut         = 8.0;
 constexpr double default_minimize_dx0         = 0.01;

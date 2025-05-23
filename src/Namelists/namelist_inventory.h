@@ -11,6 +11,7 @@
 #include "namelist_emulator.h"
 #include "nml_conformer.h"
 #include "nml_dynamics.h"
+#include "nml_emulate.h"
 #include "nml_ffmorph.h"
 #include "nml_files.h"
 #include "nml_mesh.h"
@@ -63,6 +64,7 @@ private:
 const std::vector<NamelistToken> namelist_inventory = {
   NamelistToken(std::string("&conformer"), conformerInput),
   NamelistToken(std::string("&dynamics"), dynamicsInput),
+  NamelistToken(std::string("&emulator"), emulatorInput),
   NamelistToken(std::string("&ffmorph"), ffmorphInput),
   NamelistToken(std::string("&files"), filesInput),
   NamelistToken(std::string("&mesh"), meshInput),

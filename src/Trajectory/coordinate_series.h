@@ -250,14 +250,18 @@ public:
   ///   - Get coordinates for all atoms in a frame
   ///   - Get coordinates for a selected range of atoms in a frame
   ///
-  /// \param frame_index  Index of the frame to access
-  /// \param low_index    The lower atom index of a range
-  /// \param high_index   The upper atom index of a range
-  /// \param tier  The level at which to access coordinates
+  /// \param frame_index         Index of the frame to access
+  /// \param globalpos_bits_out  The number of bits after the point to apply if a fixed-precision
+  ///                            output is required.  Setting this to <= 0 indicates floating point
+  ///                            output.
+  /// \param low_index           The lower atom index of a range
+  /// \param high_index          The upper atom index of a range
+  /// \param tier                The level at which to access coordinates
   /// \{
   template <typename Treport> std::vector<Treport>
   getInterlacedCoordinates(int frame_index, int globalpos_bits_out = -1,
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
   template <typename Treport> std::vector<Treport>
   getInterlacedCoordinates(int frame_index, int low_index, int high_index,
                            int globalpos_bits_out = -1,

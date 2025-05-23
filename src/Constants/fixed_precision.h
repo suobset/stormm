@@ -136,7 +136,7 @@ constexpr float  default_inverse_charge_mesh_scale_f = (float)default_inverse_ch
 constexpr int    min_charge_mesh_scale_bits = 24;
 constexpr int    max_charge_mesh_scale_bits = 48;
 /// \}
-
+  
 } // namespace numerics
 } // namespace stormm
 

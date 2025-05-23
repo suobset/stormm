@@ -59,17 +59,21 @@ std::vector<uint> numberSeriesToBitMask(const Hybrid<int> &number_series, int ou
 ///        use of all indices, i.e. 0, 2, 3, 1, 1, 0, 5, 6, 9 with ten indices in all.  Create a
 ///        key for extracting from the original table the values which x_subset does index, which
 ///        can then guide the construction of a smaller table for which x_subset does use all of
-///        the values.
+///        the values.  Upon completion, the original indexing will have been replaced by the new
+///        indexing and a key indicating how the modified index values map to the original index
+///        values is returned.
 ///
 /// \param x_subset          A collection of indices, probably with incomplete usage of some
-///                          larger list of possible indices
+///                          larger list of possible indices.  Modified and returned.
+/// \param x_size            The true size of the original array.  The subset may not include the
+///                          maximum index, hence this size must be provided.
 /// \param n_subset_indices  Pointer for returning the number of unique indices found in the
 ///                          subset
-std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset,
+std::vector<int> getSubsetIndexPattern(std::vector<int> *x_subset, int x_size,
                                        int *n_subset_indices = nullptr);
 
 /// \brief Extract values from a table into a (smaller) table that fits with a reduced indexing
-///        scheme.  For example:
+///        scheme.  Indices of -1 are considered invalid and removed.  For example:
 ///
 ///        Original       = { 0.1, 0.5, 0.9, 0.2, 0.6, 0.8, 0.7, 0.4 }
 ///        indexed_values = {  -1,   0,  -1,  -1,   1,   2,   3,  -1 }
@@ -100,7 +104,7 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
                                                           const std::vector<int> reduced_indices,
                                                           const int reduced_length = 0);
 /// \}
-
+  
 /// \brief Given a series of integers in the range [ 0, ... N ), count the quantities of each
 ///        integer.  Produce a new series with the indices of all elements in the original series
 ///        whose value is 0, followed by the indices of all elements whose value is 1, ..., N-1.
@@ -135,6 +139,32 @@ void indexingArray(const Hybrid<Tdata> &raw_values, Hybrid<Tloc> *value_location
                    Hybrid<Tloc> *value_bounds, size_t value_limit = 0);
 /// \}
 
+/// \brief Translate a bitmask into a series of integers indicating which indices are checked 1 or
+///        'true'.  Theis reverses the operation of numberSeriesToBitMask, above, in a more general
+///        way.
+///
+/// Overloaded:
+///   - Provide a Standard Template Library bool vector
+///   - Provide a vector of unsigned integer bit masks, either as C-style array, a Standard
+///     Template Library bool vector, or as a Hybrid object
+///
+/// \param bitmask  The original bit mask
+/// \param length   The trusted length of the bit mask, if the bit mask is provided as a C-style
+///                 array (this option is only available for unsigned integer bit masks, not
+///                 bool* arrays).  The length should be the number of valid bits, each considered
+///                 an element of the array.  The length should not be submitted as the number of
+///                 unsigned integers in the array.
+/// \{
+std::vector<int> enumerateMask(const std::vector<bool> &bitmask);
+
+std::vector<int> enumerateMask(const uint* bitmask, const int length);
+
+std::vector<int> enumerateMask(const std::vector<uint> &bitmask);
+
+std::vector<int> enumerateMask(const Hybrid<uint> &bitmask);
+/// \}
+
+  
 } // namespace stmath
 } // namespace stormm
 

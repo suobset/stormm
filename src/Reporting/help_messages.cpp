@@ -94,7 +94,7 @@ bool detectHelpSignal(const int argc, const char* argv[], const HelpSignalKind k
 //-------------------------------------------------------------------------------------------------
 bool displayNamelistHelp(const int argc, const char* argv[],
                          const std::vector<std::string> &module_name,
-                         const bool (*aux_recognition)(const std::string)) {
+                         const std::vector<NamelistToken> &custom_namelists) {
   const int n_names = module_name.size();
   bool found = false;
   for (int i = 0; i < n_names; i++) {
@@ -103,7 +103,7 @@ bool displayNamelistHelp(const int argc, const char* argv[],
     for (int j = 0; j < argc; j++) {
       if (strcmp(argv[j], module_name[i].c_str()) == 0 ||
           strcmp(argv[j], module_less_amp.c_str()) == 0) {
-        found = (found || displayNamelistHelp(module_name[i], aux_recognition));
+        found = (found || displayNamelistHelp(module_name[i], custom_namelists));
       }
     }
   }
@@ -112,14 +112,14 @@ bool displayNamelistHelp(const int argc, const char* argv[],
 
 //-------------------------------------------------------------------------------------------------
 bool displayNamelistHelp(const int argc, const char* argv[], const std::string &module_name,
-                         const bool (*aux_recognition)(const std::string)) {
+                         const std::vector<NamelistToken> &custom_namelists) {
   return displayNamelistHelp(argc, argv, std::vector<std::string>(1, module_name),
-                             aux_recognition);
+                             custom_namelists);
 }
 
 //-------------------------------------------------------------------------------------------------
 bool displayNamelistHelp(const std::string &module_name,
-                         const bool (*aux_recognition)(const std::string)) {
+                         const std::vector<NamelistToken> &custom_namelists) {
   const TextFile tf(std::string(""), TextOrigin::RAM);
   const std::string search_name = (module_name[0] == '&') ? module_name : "&" + module_name;
   const size_t nmlcount = namelist_inventory.size();
@@ -132,13 +132,19 @@ bool displayNamelistHelp(const std::string &module_name,
       return true;
     }
   }
-  if (aux_recognition == nullptr) {
-    return false;
+  if (custom_namelists.size() > 0) {
+    const size_t custom_nmlcount = custom_namelists.size();
+    for (size_t i = 0; i < custom_nmlcount; i++) {
+      int start_line = 0;
+      bool found = false;
+      if (strcmpCased(search_name, custom_namelists[i].getTitle(), CaseSensitivity::YES)) {
+        const NamelistEmulator t_nml = custom_namelists[i].invoke(tf, &start_line, &found);
+        t_nml.printHelp();
+        return true;
+      }
+    }
   }
-  else {
-    return aux_recognition(search_name);
-  }
-  __builtin_unreachable();
+  return false;
 }
 
 } // namespace display

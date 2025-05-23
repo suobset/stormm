@@ -410,6 +410,20 @@ bool operator!=(const ullint3 lhs, const ullint3 rhs);
 bool operator==(const ullint4 lhs, const ullint4 rhs);
 bool operator!=(const ullint4 lhs, const ullint4 rhs);
 
+bool operator<(const char2 lhs, const char2 rhs);
+bool operator<=(const char2 lhs, const char2 rhs);
+bool operator>(const char2 lhs, const char2 rhs);
+bool operator>=(const char2 lhs, const char2 rhs);
+bool operator==(const char2 lhs, const char2 rhs);
+bool operator!=(const char2 lhs, const char2 rhs);
+
+bool operator<(const char3 lhs, const char3 rhs);
+bool operator<=(const char3 lhs, const char3 rhs);
+bool operator>(const char3 lhs, const char3 rhs);
+bool operator>=(const char3 lhs, const char3 rhs);
+bool operator==(const char3 lhs, const char3 rhs);
+bool operator!=(const char3 lhs, const char3 rhs);
+
 bool operator<(const char4 lhs, const char4 rhs);
 bool operator<=(const char4 lhs, const char4 rhs);
 bool operator>(const char4 lhs, const char4 rhs);

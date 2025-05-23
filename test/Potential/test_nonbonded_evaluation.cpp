@@ -886,6 +886,7 @@ int main(const int argc, const char* argv[]) {
   const std::string trpw_top_name = base_top_name + osc + "trpcage_in_water.top";
   const std::string trpw_crd_name = base_crd_name + osc + "trpcage_in_water.inpcrd";
   const std::string trpp_top_name = base_top_name + osc + "trpcage_no_z.top";
+  const std::string ster_top_name = base_top_name + osc + "stereo_L1.top";
   const bool systems_exist = (getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
                               getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
@@ -894,7 +895,8 @@ int main(const int argc, const char* argv[]) {
                               getDrivePathType(alad_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(trpw_top_name) == DrivePathType::FILE &&
                               getDrivePathType(trpw_crd_name) == DrivePathType::FILE &&
-                              getDrivePathType(trpw_top_name) == DrivePathType::FILE);
+                              getDrivePathType(trpw_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(ster_top_name) == DrivePathType::FILE);
   const TestPriority do_tests = (systems_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (systems_exist == false) {
     rtWarn("Files for the Trp-cage miniprotein (with and without water), the DHFR globular "
@@ -905,8 +907,8 @@ int main(const int argc, const char* argv[]) {
   }
 
   // Read topologies and coordinates
-  AtomGraph trpi_ag, dhfr_ag, alad_ag, trpw_ag, trpp_ag;
-  PhaseSpace trpi_ps, dhfr_ps, alad_ps, trpw_ps;
+  AtomGraph trpi_ag, dhfr_ag, alad_ag, trpw_ag, trpp_ag, ster_ag;
+  PhaseSpace trpi_ps, dhfr_ps, alad_ps, trpw_ps, ster_ps;
   if (systems_exist) {
     trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT);
     trpi_ps.buildFromFile(trpi_crd_name, CoordinateFileKind::AMBER_INPCRD);
@@ -917,6 +919,7 @@ int main(const int argc, const char* argv[]) {
     trpw_ag.buildFromPrmtop(trpw_top_name, ExceptionResponse::SILENT);
     trpw_ps.buildFromFile(trpw_crd_name, CoordinateFileKind::AMBER_INPCRD);
     trpp_ag.buildFromPrmtop(trpw_top_name, ExceptionResponse::SILENT);
+    ster_ag.buildFromPrmtop(ster_top_name, ExceptionResponse::SILENT);
   }
   timer.assignTime(input_timings);
   
@@ -926,14 +929,15 @@ int main(const int argc, const char* argv[]) {
   const StaticExclusionMask dhfr_semask(&dhfr_ag);
   const StaticExclusionMask alad_semask(&alad_ag);
   const StaticExclusionMask trpw_semask(&trpw_ag);
+  const StaticExclusionMask ster_semask(&ster_ag);
   timer.assignTime(sem_timings);
 
   // Check exclusions for three systems against the original topologies
   section(1);
   const std::vector<const StaticExclusionMask*> my_masks = { &trpi_semask, &alad_semask,
-                                                             &trpw_semask };
+                                                             &trpw_semask, &ster_semask };
   const std::vector<std::string> my_systems = { "Trp-cage (unsolvated)", "alanine dipeptide",
-                                                "Trp-cage (solvated)" };
+                                                "Trp-cage (solvated)", "chiral small molecule" };
   for (size_t i = 0; i < my_masks.size(); i++) {
     const int3 n_errors = checkMarkedExclusions(*(my_masks[i]));
     check(n_errors.x == 0, "The StaticExclusionMask object recorded " +

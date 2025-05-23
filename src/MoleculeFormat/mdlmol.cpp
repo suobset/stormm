@@ -1825,7 +1825,7 @@ std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const int low_fram
   std::vector<MdlMol> result;
   
   // Find the limits for different MDL MOL entries
-  const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
+  const std::vector<int2> mol_entry_limits = findEntryLimits(tf, std::string("$$$$"));
   const int nsection = mol_entry_limits.size();
   int actual_low_limit, actual_high_limit;
   if (low_frame_limit >= nsection) {
@@ -1868,7 +1868,7 @@ std::vector<MdlMol> readStructureDataFile(const TextFile &tf, const CaseSensitiv
   std::vector<MdlMol> result;
   
   // Find the limits for different MDL MOL entries
-  const std::vector<int2> mol_entry_limits = findSdfMolEntryLimits(tf);
+  const std::vector<int2> mol_entry_limits = findEntryLimits(tf, std::string("$$$$"));
 
   // Parse each MDL MOL entry
   const int nsection = mol_entry_limits.size();

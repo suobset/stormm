@@ -104,12 +104,12 @@ int RemdControls::getMaxReplicas() const{
 }
 
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getLowTemperature() const {
+double RemdControls::getLowTemperature() const {
   return low_temperature;
 }
 
 //-------------------------------------------------------------------------------------------------
-const double RemdControls::getHighTemperature() const {
+double RemdControls::getHighTemperature() const {
   return high_temperature;
 }
 

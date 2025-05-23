@@ -22,6 +22,7 @@ SolventControls::SolventControls(const ExceptionResponse policy_in, const WrapTe
     external_dielectric{default_solvent_extdiel},
     salt_concentration{default_solvent_saltcon},
     pb_radii{translateAtomicRadiusSet(std::string(default_solvent_pbradii))},
+    sa_scaling{default_surface_area_energy},
     nml_transcript{"solvent"}
 {}
 
@@ -103,6 +104,11 @@ AtomicRadiusSet SolventControls::getPBRadiiSet() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double SolventControls::getSurfaceAreaScalingFactor() const {
+  return sa_scaling;
+}
+
+//-------------------------------------------------------------------------------------------------
 const NamelistEmulator& SolventControls::getTranscript() const {
   return nml_transcript;
 }
@@ -149,6 +155,11 @@ void SolventControls::choosePBRadiiSet(const std::string &pbrad_in) {
 //-------------------------------------------------------------------------------------------------
 void SolventControls::choosePBRadiiSet(const AtomicRadiusSet pbrad_in) {
   pb_radii = pbrad_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setSurfaceAreaScalingFactor(const double sa_scaling_in) {
+  sa_scaling = sa_scaling_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -226,10 +237,10 @@ void SolventControls::validateSaltConcentration() {
       rtErr("A negative salt concentration of " + std::to_string(salt_concentration) +
             " is nonsensical.", "SolventControls", "validateSaltConcentration");
     case ExceptionResponse::WARN:
-      rtErr("A negative salt concentration of " + std::to_string(salt_concentration) +
-            " is nonsensical and will be replaced by the default value of " +
-            std::to_string(default_solvent_saltcon) + ".", "SolventControls",
-            "validateSaltConcentration");
+      rtWarn("A negative salt concentration of " + std::to_string(salt_concentration) +
+             " is nonsensical and will be replaced by the default value of " +
+             std::to_string(default_solvent_saltcon) + ".", "SolventControls",
+             "validateSaltConcentration");
       salt_concentration = default_solvent_saltcon;
       break;
     case ExceptionResponse::SILENT:

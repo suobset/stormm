@@ -159,6 +159,180 @@ int confirmDihedralMatch(const ChemicalDetailsKit &cdk, const ValenceKit<double>
 }
 
 //-------------------------------------------------------------------------------------------------
+// Get the list of attenuated 1:4 pairs along with scaling constants for electrostatic and van-der
+// Waals interactions.  An array of tuples is returned.  For each pair, the atom index of the first
+// atom is returned in the "x" member of the tuple, the atom index of the second in the "y" member,
+// the electrostatic scaling factor in the "z" member, and the van-der Waals scaling factor in the
+// "w" member.
+//
+// Arguments:
+//   vk:        Valence parameters for the system in question
+//   nbk:       Non-bonded parameters for the system in question
+//   desc:      Description of the system from which the list of interactions originated
+//   do_tests:  Indication of whether testing is possible
+//-------------------------------------------------------------------------------------------------
+std::vector<double4> getAttenuated14PairList(const ValenceKit<double> &vk,
+                                             const NonbondedKit<double> &nbk,
+                                             const std::string &desc,
+                                             const TestPriority do_tests) {
+  std::vector<double4> result;
+  for (int pos = 0; pos < vk.ndihe; pos++) {
+    const int attn_idx = vk.dihe14_param_idx[pos];
+    if (attn_idx == 0) {
+      continue;
+    }
+    
+    result.push_back({ static_cast<double>(vk.dihe_i_atoms[pos]),
+                       static_cast<double>(vk.dihe_l_atoms[pos]),
+                       vk.attn14_elec[attn_idx], vk.attn14_vdw[attn_idx] });
+  }
+
+  // Check the result for duplicates
+  std::vector<double4> lcopy = result;
+  std::sort(lcopy.begin(), lcopy.end(), [](double4 a, double4 b) { return (a.x < b.x); });
+  const int n = lcopy.size();
+  std::vector<int2> duplicates;
+  for (int i = 0; i < n; i++) {
+    int j = i + 1;
+    while (j < n && lcopy[i].x == lcopy[j].x) {
+      if (fabs(lcopy[i].y - lcopy[j].y) < 1.0e-4 && fabs(lcopy[i].z - lcopy[j].z) < 1.0e-4 &&
+          fabs(lcopy[i].w - lcopy[j].w) < 1.0e-4) {
+        duplicates.push_back({ i, j });
+      }
+      j++;
+    }
+  }
+  check(duplicates.size(), RelationalOperator::EQUAL, 0, "Duplicate entries were found in a list "
+        "of attenuated 1-4 interactions pertaining to the " + desc + " system.", do_tests);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Match the details of an attenuated 1:4 interaction to one member of a list.
+//
+// Arguments:
+//   item:
+//   list:
+//   offset:
+//   coverage:
+//-------------------------------------------------------------------------------------------------
+bool matchAttenuationToList(const double4 item, const std::vector<double4> &list,
+                            const double offset, std::vector<bool> *coverage) {
+  const int llen = list.size();
+  for (int i = 0; i < llen; i++) {
+    if (((fabs(item.x - (list[i].x - offset)) < 1.0e-4 &&
+          fabs(item.y - (list[i].y - offset)) < 1.0e-4) ||
+         (fabs(item.y - (list[i].x - offset)) < 1.0e-4 &&
+          fabs(item.x - (list[i].y - offset)) < 1.0e-4)) &&
+        fabs(item.z - list[i].z) < 1.0e-6 && fabs(item.w - list[i].w) < 1.0e-6) {
+      coverage->at(i) = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Construct a message to reveal the indices and names of some examples of missing pairs out of a
+// list of attenuations.
+//
+// Arguments:
+//   pairs:  The list of missing pairs, with the atom indices represented as real numbers in the
+//           "x" and "y" members of the tuple.  Electrostatic and van-der Waals scaling factors for
+//           the attenuated interaction are listed in the "z" and "w" members, respectively.
+//   cdk:    Contains atom names of the system
+//-------------------------------------------------------------------------------------------------
+std::string listMissingPairs(const std::vector<double4> &pairs, const ChemicalDetailsKit &cdk) {
+  std::string result;
+  if (pairs.size() > 0) {
+    const int nrep = std::min(static_cast<int>(pairs.size()), 8);
+    result += "Examples of missing pairs include:\n";
+    for (int i = 0; i < nrep; i++) {
+      const int i_atom = round(pairs[i].x);
+      const int j_atom = round(pairs[i].y);
+      result += "  - Indices { " + std::to_string(i_atom) + ", " + std::to_string(j_atom) +
+                " } " + char4ToString(cdk.atom_names[i_atom]) + " " +
+                char4ToString(cdk.atom_names[j_atom]) + "\n"; 
+    }
+    result += "\n";
+  }
+  return result;
+}
+
+std::string listMissingPairs(const std::vector<int2> &pairs, const ChemicalDetailsKit &cdk) {
+  std::string result;
+  if (pairs.size() > 0) {
+    const int nrep = std::min(static_cast<int>(pairs.size()), 8);
+    result += "Examples of missing pairs include:\n";
+    for (int i = 0; i < nrep; i++) {
+      result += "  - Indices { " + std::to_string(pairs[i].x) + ", " + std::to_string(pairs[i].y) +
+                " } " + char4ToString(cdk.atom_names[pairs[i].x]) + " " +
+                char4ToString(cdk.atom_names[pairs[i].y]) + "\n"; 
+    }
+    result += "\n";
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check that, for a simple combination of two topologies (each containing one molecule and adding
+// them one after the other), all pairs of attentuated 1:4 interactions are accounted for and that
+// the interaction parameters are consistent.
+//
+// Arguments:
+//   list_a:      The first topology's list of 1-4 interactions
+//   list_b:      The second topology's list of 1-4 interactions
+//   list_comp:   The combined list of 1-4 interactions
+//   sys_a_file:  Original file name of the first system (for error reporting)
+//   sys_b_file:  Original file name of the second system
+//   cdk_a:       Details of the first topology, including atom and residue names
+//   cdk_b:       Details of the second topology, including atom and residue names
+//   cdk_comp:    Details of the combined topology
+//   do_tests:    Indication of whether testing is possible
+//-------------------------------------------------------------------------------------------------
+void checkAttenuated14PairLists(const std::vector<double4> &list_a,
+                                const std::vector<double4> &list_b,
+                                const std::vector<double4> &list_comp,
+                                const std::string &sys_a_file, const std::string &sys_b_file,
+                                const ChemicalDetailsKit &cdk_a, const ChemicalDetailsKit &cdk_b,
+                                const ChemicalDetailsKit &cdk_comp, const TestPriority do_tests) {
+  const int na = list_a.size();
+  const int nb = list_b.size();
+  const int nc = list_comp.size();
+  std::vector<bool> sysa_in_complex(na);
+  std::vector<bool> sysb_in_complex(nb);
+  std::vector<bool> complex_coverage(nc, false);
+  int na_not_represented = 0;
+  std::vector<double4> unrepresented_a_pairs, unrepresented_b_pairs;
+  for (int pos = 0; pos < na; pos++) {
+    sysa_in_complex[pos] = matchAttenuationToList(list_a[pos], list_comp, 0, &complex_coverage);
+    if (sysa_in_complex[pos] == false) {
+      unrepresented_a_pairs.push_back(list_a[pos]);
+      na_not_represented++;
+    }
+  }
+  int nb_not_represented = 0;
+  for (int pos = 0; pos < nb; pos++) {
+    sysb_in_complex[pos] = matchAttenuationToList(list_b[pos], list_comp, cdk_a.natom,
+                                                  &complex_coverage);
+    if (sysb_in_complex[pos] == false) {
+      unrepresented_b_pairs.push_back(list_b[pos]);
+      nb_not_represented++;
+    }
+  }
+  const std::string err_a_msg = listMissingPairs(unrepresented_a_pairs, cdk_a);
+  check(na_not_represented, RelationalOperator::EQUAL, 0, "Some attenuated non-bonded pair "
+        "interactions found in the first topology (" + sys_a_file + ", " +
+        std::to_string(cdk_a.natom) + " atoms) were not represented in the complex (" +
+        std::to_string(cdk_comp.natom) + " atoms).  " + err_a_msg, do_tests);
+  const std::string err_b_msg = listMissingPairs(unrepresented_b_pairs, cdk_b);
+  check(nb_not_represented, RelationalOperator::EQUAL, 0, "Some attenuated non-bonded pair "
+        "interactions found in the second topology (" + sys_b_file + ", " +
+        std::to_string(cdk_b.natom) + " atoms) were not represented in the complex (" +
+        std::to_string(cdk_comp.natom) + " atoms).  " + err_b_msg, do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // Test the combination of two topologies.  This testing apparatus contains implicit assumptions
 // that the topologies contain only one molecule each, and that the first topology, larger than the
 // first, will have all of its instances come first in the product.
@@ -299,7 +473,7 @@ void testTopologyFusion(const AtomGraph &ag_a, const AtomGraph &ag_b, const Phas
         " angles in a fused topology of " + getBaseName(ag_a.getFileName()) + " and " +
         getBaseName(ag_b.getFileName()) + " could not be traced to their origins in the input "
         "topologies.", do_tests);
-  
+
   // Create a combined PhaseSpace object and test energies.  Test the PhaseSpace combination
   // procedure.
   PhaseSpace comp_ps({ const_cast<PhaseSpace*>(ps_a.getSelfPointer()),
@@ -381,6 +555,67 @@ void testTopologyFusion(const AtomGraph &ag_a, const AtomGraph &ag_b, const Phas
         " miniproteins and " + std::to_string(n_b) + " small molecules does not match the sum of "
         "energies in the individual systems.", do_tests);
   
+  // Check 1-4 non-bonded interactions within the two molecules and their combined structure
+  const double2 attn_nrg_a  = evaluateAttenuated14Terms(aga_vk, aga_nbk, aga_psw, &sc,
+                                                        EvaluateForce::YES, EvaluateForce::YES, 0);
+  const double2 attn_nrg_b  = evaluateAttenuated14Terms(agb_vk, agb_nbk, agb_psw, &sc,
+                                                        EvaluateForce::YES, EvaluateForce::YES, 1);
+  const double2 attn_nrg_ab = evaluateAttenuated14Terms(comp_vk, comp_nbk, comp_psw, &sc,
+                                                        EvaluateForce::YES, EvaluateForce::YES, 2);
+  check((dn_a * attn_nrg_a.x) + (dn_b * attn_nrg_b.x), RelationalOperator::EQUAL, attn_nrg_ab.x,
+        "The total electrostatic energy of attenuated 1:4 non-bonded interactions in a complex "
+        "of " + std::to_string(n_a) + " " + std::to_string(ag_a.getAtomCount()) + "-atom and " +
+        std::to_string(n_b) + " " + std::to_string(ag_b.getAtomCount()) + "-atom molecules does "
+        "not match the sum of energies in the individual systems.");
+  check((dn_a * attn_nrg_a.y) + (dn_b * attn_nrg_b.y), RelationalOperator::EQUAL, attn_nrg_ab.y,
+        "The total van-der Waals energy of attenuated 1:4 non-bonded interactions in a complex "
+        "of " + std::to_string(n_a) + " " + std::to_string(ag_a.getAtomCount()) + "-atom and " +
+        std::to_string(n_b) + " " + std::to_string(ag_b.getAtomCount()) + "-atom molecules "
+        "does not match the sum of energies in the individual systems.");
+  if (n_a == 1 && n_b == 1) {
+    const std::vector<double4> attn_pairs_a = getAttenuated14PairList(aga_vk, aga_nbk, "first",
+                                                                      do_tests);
+    const std::vector<double4> attn_pairs_b = getAttenuated14PairList(agb_vk, agb_nbk, "second",
+                                                                      do_tests);
+    const std::vector<double4> attn_pairs_ab = getAttenuated14PairList(comp_vk, comp_nbk,
+                                                                       "combined", do_tests);
+    checkAttenuated14PairLists(attn_pairs_a, attn_pairs_b, attn_pairs_ab,
+                               getBaseName(ag_a.getFileName()), getBaseName(ag_b.getFileName()),
+                               aga_cdk, agb_cdk, comp_cdk, do_tests);
+  }
+
+  // Check the dihedral-related and inferred 1:4 attenuations.
+  int indiv_dihe_attn = 0;
+  int indiv_infr_attn = 0;
+  for (int i = 0; i < aga_vk.ndihe; i++) {
+    indiv_dihe_attn += n_a * (aga_vk.dihe14_param_idx[i] == 0);
+  }
+  for (int i = 0; i < agb_vk.ndihe; i++) {
+    indiv_dihe_attn += n_b * (agb_vk.dihe14_param_idx[i] == 0);
+  }
+  for (int i = 0; i < aga_vk.ninfr14; i++) {
+    indiv_infr_attn += n_a * (aga_vk.infr14_param_idx[i] == 0);
+  }
+  for (int i = 0; i < agb_vk.ninfr14; i++) {
+    indiv_infr_attn += n_b * (agb_vk.infr14_param_idx[i] == 0);
+  }
+  int comp_dihe_attn = 0;
+  int comp_infr_attn = 0;
+  for (int i = 0; i < comp_vk.ndihe; i++) {
+    comp_dihe_attn += (comp_vk.dihe14_param_idx[i] == 0);
+  }
+  for (int i = 0; i < comp_vk.ninfr14; i++) {
+    comp_infr_attn += (comp_vk.infr14_param_idx[i] == 0);
+  }
+  check(indiv_dihe_attn, RelationalOperator::EQUAL, comp_dihe_attn, "The number of dihedral 1:4 "
+        "interactions calculated in a fused topology does not match the sum of 1:4 interaction "
+        "counts in the underlying topologies, " + getBaseName(ag_a.getFileName()) + " and " +
+        getBaseName(ag_b.getFileName()) + ".", do_tests);
+  check(indiv_infr_attn, RelationalOperator::EQUAL, comp_infr_attn, "The number of inferred 1:4 "
+        "interactions calculated in a fused topology does not match the sum of 1:4 interaction "
+        "counts in the underlying topologies, " + getBaseName(ag_a.getFileName()) + " and " +
+        getBaseName(ag_b.getFileName()) + ".", do_tests);
+
   // Check non-bonded interactions within the two molecules and their combined structure
   const StaticExclusionMask aga_se(ag_a), agb_se(ag_b), comp_se(ag_ab);
   const double2 nonb_nrg_a = evaluateNonbondedEnergy(ag_a, aga_se, &ps_a_copy, &sc,
@@ -404,8 +639,12 @@ void testTopologyFusion(const AtomGraph &ag_a, const AtomGraph &ag_b, const Phas
   std::vector<int2> agb_omitted_exclusions, agb_excess_exclusions;
   std::vector<int2> aga_omitted_local_excl, aga_excess_local_excl;
   std::vector<int2> agb_omitted_local_excl, agb_excess_local_excl;
+  int static_a_nexcl  = 0;
+  int static_ab_nexcl = 0;
+  int local_a_nexcl  = 0;
+  int local_ab_nexcl = 0;
   for (int i = 0; i < aga_nbk.natom; i++) {
-    for (int j = 0; j < aga_nbk.natom; j++) {
+    for (int j = 0; j <= i; j++) {
       const bool aga_excl = aga_se.testExclusion(i, j);
       const bool comp_excl = comp_se.testExclusion(i, j);
       if (aga_excl == false && comp_excl == true) {
@@ -422,22 +661,44 @@ void testTopologyFusion(const AtomGraph &ag_a, const AtomGraph &ag_b, const Phas
       if (aga_lcl_excl == true && comp_lcl_excl == false) {
         aga_omitted_local_excl.push_back({ i, j });
       }
+      static_a_nexcl += static_cast<int>(aga_excl);
+      local_a_nexcl += static_cast<int>(aga_lcl_excl);
+      static_ab_nexcl += static_cast<int>(comp_excl);
+      local_ab_nexcl += static_cast<int>(comp_lcl_excl);
     }
   }
+  const std::string omit_a_msg = listMissingPairs(aga_omitted_exclusions, aga_cdk);
+  const std::string omit_local_a_msg = listMissingPairs(aga_omitted_local_excl, agb_cdk);
+  const std::string xs_a_msg = listMissingPairs(aga_excess_exclusions, aga_cdk);
+  const std::string xs_local_a_msg = listMissingPairs(aga_excess_local_excl, agb_cdk);
   check(aga_omitted_exclusions.size() == 0, "Some exclusions (total " +
-        std::to_string(aga_omitted_exclusions.size()) + ") in the Trp-cage miniprotein were "
-        "excluded from the complex topology.", do_tests);
+        std::to_string(aga_omitted_exclusions.size()) + " of " + std::to_string(static_a_nexcl) +
+        ") in the first molecule (" + std::to_string(ag_a.getAtomCount()) + " atoms in all) were "
+        "excluded from the complex topology (" + std::to_string(ag_ab.getAtomCount()) +
+        " atoms).  This happened when comparing to a STATIC exclusion mask.  " + omit_a_msg,
+        do_tests);
   check(aga_excess_exclusions.size() == 0, "Some pairs (total " +
-        std::to_string(aga_excess_exclusions.size()) + ") in the Trp-cage miniprotein were "
-        "excluded in the complex topology by mistake.", do_tests);
+        std::to_string(aga_excess_exclusions.size()) + " of " + std::to_string(static_a_nexcl) +
+        ") in the first molecule (" + std::to_string(ag_a.getAtomCount()) + " atoms in all) "
+        "were excluded in the complex topology (" + std::to_string(ag_ab.getAtomCount()) +
+        " atoms) by mistake.  This happened when comparing to a STATIC exclusion mask.  " +
+        xs_a_msg, do_tests);
   check(aga_omitted_local_excl.size() == 0, "Some exclusions (total " +
-        std::to_string(aga_omitted_local_excl.size()) + ") in the Trp-cage miniprotein were "
-        "excluded from the complex topology.", do_tests);
+        std::to_string(aga_omitted_local_excl.size()) + " of " +
+        std::to_string(local_a_nexcl) + ") in the first molecule (" +
+        std::to_string(ag_a.getAtomCount()) + " in all) were excluded from the complex "
+        "topology (" + std::to_string(ag_ab.getAtomCount()) + " atoms).  This happened when "
+        "comparing to a LOCAL exclusion mask.  " + omit_local_a_msg, do_tests);
   check(aga_excess_local_excl.size() == 0, "Some pairs (total " +
-        std::to_string(aga_excess_local_excl.size()) + ") in the Trp-cage miniprotein were "
-        "excluded in the complex topology by mistake.", do_tests);
+        std::to_string(aga_excess_local_excl.size()) + " of " + std::to_string(local_a_nexcl) +
+        ") in the first molecule (" + std::to_string(ag_a.getAtomCount()) + " atoms in all) were "
+        "excluded in the complex topology (" + std::to_string(ag_ab.getAtomCount()) + " atoms) "
+        "by mistake.  This happened when comparing to a LOCAL exclusion mask.  " +
+        xs_local_a_msg, do_tests);
+  int static_b_nexcl  = 0;
+  int local_b_nexcl  = 0;
   for (int i = 0; i < agb_nbk.natom; i++) {
-    for (int j = 0; j < agb_nbk.natom; j++) {
+    for (int j = 0; j <= i; j++) {
       const bool agb_excl = agb_se.testExclusion(i, j);
       const bool comp_excl = comp_se.testExclusion(i + (n_a * aga_nbk.natom),
                                                    j + (n_a * aga_nbk.natom));
@@ -456,20 +717,38 @@ void testTopologyFusion(const AtomGraph &ag_a, const AtomGraph &ag_b, const Phas
       if (agb_lcl_excl == true && comp_lcl_excl == false) {
         agb_omitted_local_excl.push_back({ i, j });
       }
+      static_b_nexcl += static_cast<int>(agb_excl);
+      local_b_nexcl += static_cast<int>(agb_lcl_excl);
     }
   }
-  check(agb_omitted_exclusions.size() == 0, "Some exclusions (total " +
-        std::to_string(agb_omitted_exclusions.size()) + ") in the small molecule were excluded "
-        "from the complex topology.", do_tests);
+  const std::string omit_b_msg = listMissingPairs(agb_omitted_exclusions, aga_cdk);
+  const std::string omit_local_b_msg = listMissingPairs(agb_omitted_local_excl, agb_cdk);
+  const std::string xs_b_msg = listMissingPairs(agb_excess_exclusions, aga_cdk);
+  const std::string xs_local_b_msg = listMissingPairs(agb_excess_local_excl, agb_cdk);
+  check(aga_omitted_exclusions.size() == 0, "Some exclusions (total " +
+        std::to_string(agb_omitted_exclusions.size()) + " of " + std::to_string(static_b_nexcl) +
+        ") in the second molecule (" + std::to_string(ag_b.getAtomCount()) + " atoms in all) were "
+        "excluded from the complex topology (" + std::to_string(ag_ab.getAtomCount()) +
+        " atoms).  This happened when comparing to a STATIC exclusion mask.  " + omit_b_msg,
+        do_tests);
   check(agb_excess_exclusions.size() == 0, "Some pairs (total " +
-        std::to_string(agb_excess_exclusions.size()) + ") in the small molecule were excluded "
-        "in the complex topology by mistake.", do_tests);
+        std::to_string(agb_excess_exclusions.size()) + " of " + std::to_string(static_b_nexcl) +
+        ") in the second molecule (" + std::to_string(ag_b.getAtomCount()) + " atoms in all) "
+        "were excluded in the complex topology (" + std::to_string(ag_ab.getAtomCount()) +
+        " atoms) by mistake.  This happened when comparing to a STATIC exclusion mask.  " +
+        xs_b_msg, do_tests);
   check(agb_omitted_local_excl.size() == 0, "Some exclusions (total " +
-        std::to_string(agb_omitted_local_excl.size()) + ") in the small molecule were excluded "
-        "from the complex topology's local exclusion masking.", do_tests);
+        std::to_string(agb_omitted_local_excl.size()) + " of " +
+        std::to_string(local_b_nexcl) + ") in the second molecule (" +
+        std::to_string(ag_b.getAtomCount()) + " in all) were excluded from the complex "
+        "topology (" + std::to_string(ag_ab.getAtomCount()) + " atoms).  This happened when "
+        "comparing to a LOCAL exclusion mask.  " + omit_local_b_msg, do_tests);
   check(agb_excess_local_excl.size() == 0, "Some pairs (total " +
-        std::to_string(agb_excess_local_excl.size()) + ") in the small molecule were excluded "
-        "in the complex topology's local exclusion masking by mistake.", do_tests);
+        std::to_string(agb_excess_local_excl.size()) + " of " + std::to_string(local_b_nexcl) +
+        ") in the second molecule (" + std::to_string(ag_b.getAtomCount()) + " atoms in all) were "
+        "excluded in the complex topology (" + std::to_string(ag_ab.getAtomCount()) + " atoms) "
+        "by mistake.  This happened when comparing to a LOCAL exclusion mask.  " +
+        xs_local_b_msg, do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -688,18 +967,33 @@ int main(const int argc, const char* argv[]) {
   const AtomGraph& ster_ag = combi.getTopologyReference(2);
   const PhaseSpace trpi_ps = combi.exportPhaseSpace(0);
   const PhaseSpace ster_ps = combi.exportPhaseSpace(2);
+  testTopologyFusion(ster_ag, ster_ag, ster_ps, ster_ps, 1, 1, { 1000.0, 1000.0, 1000.0 },
+                     { 1000.0, 1000.0, 1000.0 }, combi.getTestingStatus());
   testTopologyFusion(trpi_ag, ster_ag, trpi_ps, ster_ps, 1, 1, { 1000.0, 1000.0, 1000.0 },
                      { 1000.0, 1000.0, 1000.0 }, combi.getTestingStatus());
   testTopologyFusion(trpi_ag, ster_ag, trpi_ps, ster_ps, 1, 2, { 1000.0, 1000.0, 1000.0 },
                      { 5000.0, 5000.0, -5000.0 }, combi.getTestingStatus());
   const AtomGraph& stvs_ag = combi.getTopologyReference(3);
   const PhaseSpace& stvs_ps = combi.exportPhaseSpace(3);
+  testTopologyFusion(stvs_ag, stvs_ag, stvs_ps, stvs_ps, 1, 1, { 1000.0, -1000.0, 1000.0 },
+                     { 5000.0, 5000.0, -5000.0 }, combi.getTestingStatus());
   testTopologyFusion(trpi_ag, stvs_ag, trpi_ps, stvs_ps, 1, 1, { 1000.0, 1000.0, 1000.0 },
                      { 1000.0, 1000.0, 1000.0 }, combi.getTestingStatus());
   testTopologyFusion(trpi_ag, stvs_ag, trpi_ps, stvs_ps, 2, 2, { 1000.0, -1000.0, 1000.0 },
                      { 5000.0, 5000.0, -5000.0 }, combi.getTestingStatus());
 
-  
+  // Test topology extraction
+  std::vector<bool> trpi_part_mask(trpi_ag.getAtomCount(), false);
+  for (int i = 0; i < 100; i++) {
+    trpi_part_mask[i] = true;
+  }
+  AtomGraph trpi_part_ag(trpi_ag, trpi_part_mask);
+
+  // Test topology printing
+  const std::string pruned_top_name = oe.getTemporaryDirectoryPath() + osc + "trpi_part_ag.top";
+  trpi_part_ag.printToFile(pruned_top_name);
+  oe.logFileCreated(pruned_top_name);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
   if (oe.getVerbosity() == TestVerbosity::FULL) {

@@ -417,6 +417,46 @@ template <typename T> double4 quadrivariateMean(const Hybrid<T> &va) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> double boltzmannWeightedMean(const T* va, size_t length,
+                                                   const T temperature) {
+  const T best_value = minValue(va, length);
+  double total_weight = 0.0;
+  const T bfac = 1.0 / (boltzmann_constant * temperature);
+  double weighted_sum = 0.0;
+  if (std::type_index(typeid(T)).hash_code() == double_type_index) {
+    for (size_t i = 0; i < length; i++) {
+      const T wi = exp((best_value - va[i]) * bfac);
+      total_weight += wi;
+    }
+    const T inv_total_weight = 1.0 / total_weight;
+    for (size_t i = 0; i < length; i++) {
+      weighted_sum += exp((best_value - va[i]) * bfac) * inv_total_weight * va[i];
+    }
+  }
+  else {
+    for (size_t i = 0; i < length; i++) {
+      const T wi = expf((best_value - va[i]) * bfac);
+      total_weight += wi;
+    }
+    const T inv_total_weight = 1.0 / total_weight;
+    for (size_t i = 0; i < length; i++) {
+      weighted_sum += expf((best_value - va[i]) * bfac) * inv_total_weight * va[i];
+    }
+  }
+  return weighted_sum;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double boltzmannWeightedMean(const std::vector<T> &va, const T temperature) {
+  return boltzmannWeightedMean(va.data(), va.size(), temperature);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double boltzmannWeightedMean(const Hybrid<T> &va, const T temperature) {
+  return boltzmannWeightedMean(va.data(), va.size(), temperature);
+}
+  
+//-------------------------------------------------------------------------------------------------
 template <typename T> T maxValue(const T* va, const size_t length) {
   if (isScalarType<T>() == false) {
     rtErr("Data type " + std::string(typeid(T).name()) + " is not suitable for computing a "
@@ -1091,6 +1131,42 @@ template <typename T> size_t locateValue(const Approx &value, const std::vector<
 template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &vdata,
                                          const DataOrder format) {
   return locateValue(value, vdata.data(), vdata.size(), format);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> bool foundIn(const std::vector<T> &va, const std::vector<T> &vb,
+                                   const DataOrder format) {
+  const size_t n_a = va.size();
+  const size_t n_b = vb.size();
+  bool all_found = true;
+  size_t i = 0;
+  switch (format) {
+  case DataOrder::ASCENDING:
+  case DataOrder::DESCENDING:
+    while (i < n_a && all_found) {
+      all_found = locateValue<T>(vb, va[i], format);
+      while (i + 1 < n_a && va[i] == va[i + 1]) {
+        i++;
+      }
+      i++;
+    }
+    break;
+  case DataOrder::NONE:
+    while (i < n_a && all_found) {
+      bool not_found = true;
+      size_t j = 0;
+      while (not_found && j < n_b) {
+        not_found = (not_found && va[i] != vb[j]);
+        j++;
+      }
+      if (not_found) {
+        all_found = false;
+      }
+      i++;
+    }
+    break;
+  }
+  return all_found;
 }
 
 //-------------------------------------------------------------------------------------------------

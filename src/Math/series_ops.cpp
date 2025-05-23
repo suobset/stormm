@@ -37,18 +37,26 @@ std::vector<uint> numberSeriesToBitMask(const Hybrid<int> &number_series, const 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset, int *n_subset_indices) {
+std::vector<int> getSubsetIndexPattern(std::vector<int> *x_subset, const int x_size,
+                                       int *n_subset_indices) {
 
+  // Protect against empty data
+  const size_t nidx = x_subset->size();
+  if (nidx == 0) {
+    *n_subset_indices = 0;
+    return std::vector<int>();
+  }
+  
   // Obtain the maximum index
-  const size_t nidx = x_subset.size();
-  const int max_index = maxValue(x_subset);
-  std::vector<bool> index_found(max_index + 1, false);
+  int* xsbs_ptr = x_subset->data();
+  const size_t subset_size = x_subset->size();
+  std::vector<bool> index_found(x_size, false);
   for (size_t i = 0; i < nidx; i++) {
-    index_found[x_subset[i]] = true;
+    index_found[xsbs_ptr[i]] = true;
   }
   int new_index_counter = 0;
-  std::vector<int> result(max_index + 1, -1);
-  for (size_t i = 0; i <= max_index; i++) {
+  std::vector<int> result(x_size, -1);
+  for (size_t i = 0; i < x_size; i++) {
     if (index_found[i]) {
       result[i] = new_index_counter;     
       new_index_counter++;
@@ -57,8 +65,62 @@ std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset, int *n_
   if (n_subset_indices != nullptr) {
     *n_subset_indices = new_index_counter;
   }
+  for (size_t i = 0; i < nidx; i++) {
+    xsbs_ptr[i] = result[xsbs_ptr[i]];
+  }
   return result;
 }
   
+//-------------------------------------------------------------------------------------------------
+std::vector<int> enumerateMask(const std::vector<bool> &bitmask) {
+  std::vector<int> result;
+  int nchk = 0;
+  const size_t nval = bitmask.size();
+  for (size_t i = 0; i < nval; i++) {
+    nchk += static_cast<int>(bitmask[i]);
+  }
+  result.resize(nchk);
+  nchk = 0;
+  for (size_t i = 0; i < nval; i++) {
+    if (bitmask[i]) {
+      result[nchk] = i;
+      nchk++;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> enumerateMask(const uint* bitmask, const int length) {
+  std::vector<int> result;
+  int nchk = 0;
+  for (int i = 0; i < length; i++) {
+    const int seg = (i >> 5);
+    const int pos = i - (seg << 5);
+    nchk += ((bitmask[seg] >> pos) & 0x1);
+  }
+  result.resize(nchk);
+  nchk = 0;
+  for (int i = 0; i < length; i++) {
+    const int seg = (i >> 5);
+    const int pos = i - (seg << 5);
+    if ((bitmask[seg] >> pos) & 0x1) {
+      result[nchk] = i;
+      nchk++;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> enumerateMask(const std::vector<uint> &bitmask) {
+  return enumerateMask(bitmask.data(), bitmask.size() * 32);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> enumerateMask(const Hybrid<uint> &bitmask) {
+  return enumerateMask(bitmask.data(), bitmask.size() * 32);
+}
+
 } // namespace stmath
 } // namespace stormm

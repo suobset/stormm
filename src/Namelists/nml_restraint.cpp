@@ -563,7 +563,9 @@ const NamelistEmulator& RestraintControls::getTranscript() const {
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy, WrapTextSearch wrap) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, policy,
-                         "Replicates the Amber NMR restraint namelist within STORMM.");
+                         "Replicates the Amber NMR restraint namelist within STORMM, with notable "
+                         "improvements for applying groups of restraints to molecules through "
+                         "intuitive atom masks or keywords.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "MISSING"));
   t_nml.addKeyword(NamelistElement("iat2", NamelistType::INTEGER, "MISSING"));
   t_nml.addKeyword(NamelistElement("iat3", NamelistType::INTEGER, "MISSING"));

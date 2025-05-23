@@ -209,7 +209,7 @@ CheckResult check(const double lhs, const RelationalOperator relationship, const
   idec = (idec > 9 && both_are_integers) ? 0 : idec;
 
   // Report the error.  Add an alert if the test is considered non-critical.
-  std::string error_edit("  ");
+  std::string error_edit = (error_message.back() != '\n') ? "  " : "";
   switch (rhs.getStyle()) {
   case ComparisonType::ABSOLUTE:
   case ComparisonType::MEAN_UNSIGNED_ERROR:

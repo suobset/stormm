@@ -800,24 +800,32 @@ template <typename T> void Hybrid<T>::putDevice(const T value, const size_t inde
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void Hybrid<T>::putDevice(const std::vector<T> &values, const size_t offset, const size_t count) {
+void Hybrid<T>::putDevice(const T* values, const size_t offset, const size_t count) {
 
   // Check that there is data on the device
   if (devc_data == nullptr) {
     rtErr("No device data exists in Hybrid object " + std::string(label.name), "Hybrid",
           "putDevice");
   }
-  if (count > values.size()) {
-    rtErr("There is only enough data provided to import " + std::to_string(values.size()) +
-          " data elements out of " + std::to_string(count) + " requested into Hybrid object " +
-          std::string(label.name), "Hybrid", "putDevice");
-  }
   if (offset + count > length) {
     rtErr("There is only enough space available to import " + std::to_string(length - offset) +
           " data elements out of " + std::to_string(count) + " requested into Hybrid object " +
           std::string(label.name), "Hybrid", "putDevice");
   }
-  cudaMemcpy(&devc_data[offset], values.data(), count * sizeof(T), cudaMemcpyHostToDevice);
+  cudaMemcpy(&devc_data[offset], values, count * sizeof(T), cudaMemcpyHostToDevice);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void Hybrid<T>::putDevice(const std::vector<T> &values, const size_t offset, const size_t count) {
+
+  // Check that the host-side vector is large enough
+  if (count > values.size()) {
+    rtErr("There is only enough data provided to import " + std::to_string(values.size()) +
+          " data elements out of " + std::to_string(count) + " requested into Hybrid object " +
+          std::string(label.name), "Hybrid", "putDevice");
+  }
+  putDevice(values.data(), offset, count);
 }
 
 //-------------------------------------------------------------------------------------------------

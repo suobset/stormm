@@ -60,12 +60,16 @@ MdlMolVersion findMolObjVersion(const char* text, const int nchar);
 MdlMolVersion findMolObjVersion(const TextFile &tf, const int line_number);
 /// \}
 
-/// \brief Find the limits for different MDL MOL entries within an SD file.
+/// \brief Find the limits for different entries in a text file, e.g. MDL MOL entries within an SD
+///        file or MODEL entries in a PDB file.
 ///
-/// \param tf  The SD file, read into RAM
-std::vector<int2> findSdfMolEntryLimits(const TextFile &tf);
+/// \param tf      The SD file, read into RAM
+/// \param marker  Character sequence indicating the beginning of a new entry
+std::vector<int2> findEntryLimits(const TextFile &tf, const std::string &marker);
 
-/// \brief Extract the vector of molecular coordiantes from an SDF file.
+/// \brief Extract the vector of molecular coordinates from an SDF file.  This can operate in a
+///        topology-agnostic sense in that it only looks for the coordinate section of a specific
+///        entry and produces the particle positions: it does not investigate what the atoms are.
 ///
 /// Overloaded:
 ///   - Accept the line numbers defining the limits of the frame
@@ -84,6 +88,19 @@ std::vector<double3> extractSdfCoordinates(const TextFile &tf, int frame_number 
                                            ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
 
+/// \brief Extract the vector of molecular coordinates from a PDB file.  Like the function
+///        extractSdfCoordinates() above, this function does not require a topology or definitions
+///        of what the atoms are in order to get their positions.  It seeks the specified model
+///        number within the file, then pulls coordinates.  Overloading and descriptions of input
+///        variables follow from extractSdfCoordinates().
+/// \{
+std::vector<double3> extractPdbCoordinates(const TextFile &tf, int line_start, int line_end_in,
+                                           ExceptionResponse policy = ExceptionResponse::WARN);
+
+std::vector<double3> extractPdbCoordinates(const TextFile &tf, int frame_number = 0,
+                                           ExceptionResponse policy = ExceptionResponse::WARN);
+/// \}
+  
 } // namespace structure
 } // namespace stormm
 

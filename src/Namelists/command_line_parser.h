@@ -7,6 +7,7 @@
 #include <vector>
 #include "copyright.h"
 #include "namelist_emulator.h"
+#include "namelist_inventory.h"
 
 namespace stormm {
 namespace namelist {
@@ -152,6 +153,15 @@ public:
   ///
   /// \param list  The collection of relevant namelists
   void addControlBlocks(const std::vector<std::string> &list);
+
+  /// \brief Add a series of custom namelists to the object's repertoire of control blocks, about
+  ///        which it is prepared to dispense user information.
+  ///
+  /// \param custom_namelists_in  The collection of custom namelist classes.  These are equivalent
+  ///                             to, but not included in, the collection of namelists held in the
+  ///                             main libraries.  Each CommandLineParser object has an innate
+  ///                             ability to search the main libraries' namelists for annotation.
+  void addCustomNamelists(const std::vector<NamelistToken> &custom_namelists_in);
   
 private:
 
@@ -185,6 +195,11 @@ private:
 
   /// List of all notable keywords from coordinating CommandLineParser objects
   std::vector<std::string> noted_imports;
+
+  /// List of custom control blocks (namelists) that the parser should be aware of in order to
+  /// present a user with information consistent with the command-line manual display system for
+  /// namelists in STORMM's main libraries.
+  std::vector<NamelistToken> custom_namelists;
 };
   
 } // namespace namelist

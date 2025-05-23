@@ -638,6 +638,7 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     if (fi_exists == false ||
@@ -669,9 +670,13 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
     }
     break;
   case CoordinateFileKind::SDF:
-    rtErr("The object does not have sufficient information to create an annotated SD file.  The "
-          "program must use one of the writeFrame() overloads from the write_annotated_frame "
-          "library instead.", "CoordinateSeries", "exportToFile");
+  case CoordinateFileKind::PDB:
+    {
+      const std::string file_kind_name = (kind == CoordinateFileKind::PDB) ? "PDB" : "SD";
+      rtErr("The object does not have sufficient information to create an annotated " +
+            file_kind_name + " file.  The program must use one of the writeFrame() overloads from "
+            "the write_annotated_frame library instead.", "CoordinateSeries", "exportToFile");
+    }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
     break;
@@ -1209,6 +1214,7 @@ void CoordinateSeries<T>::importFromFile(const std::string &file_name,
     }
     break;
   case CoordinateFileKind::SDF:
+  case CoordinateFileKind::PDB:
     break;
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
