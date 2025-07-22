@@ -140,28 +140,6 @@ if (STORMM_INCLUDE_NETCDF)
         INSTALL_COMMAND ${CMAKE_COMMAND} --install .
     )
 
-    # --- Install NetCDF-CXX4 (Requires NetCDF-C) ---
-    ExternalProject_Add(
-        NetCDFCXX
-        GIT_REPOSITORY https://github.com/Unidata/netcdf-cxx4.git
-        GIT_TAG v4.3.1  # Use a stable release
-        GIT_PROGRESS 1
-        DEPENDS NetCDFC
-        CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX=${NETCDF_CXX_INSTALL_DIR}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-            -DBUILD_SHARED_LIBS=ON
-            -DNCXX_ENABLE_TESTS=OFF
-            -DENABLE_DOXYGEN=OFF
-            -DnetCDF_LIBRARIES=${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX}
-            -DnetCDF_INCLUDE_DIR=${NETCDF_C_INSTALL_DIR}/include
-            -DCMAKE_PREFIX_PATH="${NETCDF_C_INSTALL_DIR};${HDF5_INSTALL_DIR}"
-            -DNETCDF_C_LIBRARY=${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX}
-            -DNETCDF_C_INCLUDE_DIR=${NETCDF_C_INSTALL_DIR}/include
-        BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
-        INSTALL_COMMAND ${CMAKE_COMMAND} --install .
-    )
-
     # Create imported targets for easier linking
     add_library(HDF5::HDF5 SHARED IMPORTED)
     set_target_properties(HDF5::HDF5 PROPERTIES
@@ -176,25 +154,15 @@ if (STORMM_INCLUDE_NETCDF)
         INTERFACE_LINK_LIBRARIES HDF5::HDF5
     )
 
-    add_library(NetCDF::NetCDFCXX SHARED IMPORTED)
-    set_target_properties(NetCDF::NetCDFCXX PROPERTIES
-        IMPORTED_LOCATION ${NETCDF_CXX_INSTALL_DIR}/lib/libnetcdf-cxx4${CMAKE_SHARED_LIBRARY_SUFFIX}
-        INTERFACE_INCLUDE_DIRECTORIES ${NETCDF_CXX_INSTALL_DIR}/include
-        INTERFACE_LINK_LIBRARIES NetCDF::NetCDF
-    )
-
     # Add dependencies to ensure external projects are built before imported targets are used
     add_dependencies(HDF5::HDF5 HDF5)
     add_dependencies(NetCDF::NetCDF NetCDFC)
-    add_dependencies(NetCDF::NetCDFCXX NetCDFCXX)
 
     # Set variables for compatibility (if your code expects these)
     set(HDF5_INCLUDE_DIR ${HDF5_INSTALL_DIR}/include)
     set(HDF5_LIBRARY ${HDF5_INSTALL_DIR}/lib/libhdf5${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(NETCDF_C_INCLUDE_DIR ${NETCDF_C_INSTALL_DIR}/include)
     set(NETCDF_C_LIBRARY ${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX})
-    set(NETCDF_CXX_INCLUDE_DIR ${NETCDF_CXX_INSTALL_DIR}/include)
-    set(NETCDF_CXX_LIBRARY ${NETCDF_CXX_INSTALL_DIR}/lib/libnetcdf-cxx4${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     # Add compile definitions
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_NETCDF")
