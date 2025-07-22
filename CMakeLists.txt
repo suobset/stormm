@@ -120,20 +120,22 @@ if (STORMM_INCLUDE_NETCDF)
     ExternalProject_Add(
         NetCDFC
         GIT_REPOSITORY https://github.com/Unidata/netcdf-c.git
-        GIT_TAG v4.9.2  # Use a stable release instead of main
+        GIT_TAG v4.9.2
         GIT_PROGRESS 1
         DEPENDS HDF5
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=${NETCDF_C_INSTALL_DIR}
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
             -DBUILD_SHARED_LIBS=ON
-            -DNETCDF_ENABLE_HDF5=ON
-            -DNETCDF_ENABLE_DAP=OFF
-            -DNETCDF_ENABLE_TESTS=OFF
-            -DNETCDF_BUILD_UTILITIES=OFF
+            -DENABLE_NETCDF_4=ON
+            -DENABLE_DAP=ON
+            -DENABLE_TESTS=OFF
+            -DBUILD_UTILITIES=OFF
             -DHDF5_ROOT=${HDF5_INSTALL_DIR}
             -DHDF5_DIR=${HDF5_INSTALL_DIR}/lib/cmake/hdf5
             -DCMAKE_PREFIX_PATH=${HDF5_INSTALL_DIR}
+            # Suppress compiler warnings (optional)
+            -DCMAKE_C_FLAGS=-w
         BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
         INSTALL_COMMAND ${CMAKE_COMMAND} --install .
     )
