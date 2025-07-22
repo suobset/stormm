@@ -87,59 +87,119 @@ if (STORMM_INCLUDE_NETCDF)
     set(NETCDF_CXX_INSTALL_DIR ${NETCDF_INSTALL_DIR}/install-cxx)
 
     # --- Install HDF5 ---
+    # --- Install HDF5 ---
     ExternalProject_Add(
-        HDF5
-        GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
-        GIT_TAG hdf5-1_14_3
-        GIT_PROGRESS 1
-        GIT_SHALLOW 1
-        CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX=${HDF5_INSTALL_DIR}
-            -DBUILD_SHARED_LIBS=ON
-            -DHDF5_BUILD_HL_LIB=ON
-            -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
-            -DHDF5_BUILD_CPP_LIB=ON
-            -DHDF5_BUILD_TOOLS=OFF
-            -DHDF5_BUILD_EXAMPLES=OFF
-            -DHDF5_BUILD_JAVA=OFF
-            -DHDF5_BUILD_FORTRAN=OFF
-            -DHDF5_BUILD_UTILS=OFF
-            -DHDF5_ENABLE_PARALLEL=OFF
-            -DHDF5_ENABLE_THREADSAFE=OFF
-            -DHDF5_ENABLE_DIRECT_VFD=ON
-            -DHDF5_ENABLE_EMBEDDED_LIBINFO=ON
-        BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
-        INSTALL_COMMAND ${CMAKE_COMMAND} --install .
+      HDF5
+      GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
+      GIT_TAG hdf5-1_14_3
+      GIT_PROGRESS 1
+      GIT_SHALLOW 1
+      CMAKE_ARGS
+          -DCMAKE_INSTALL_PREFIX=${HDF5_INSTALL_DIR}
+          -DBUILD_SHARED_LIBS=ON
+          -DHDF5_BUILD_HL_LIB=ON
+          -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
+          -DHDF5_BUILD_CPP_LIB=ON
+          -DHDF5_BUILD_TOOLS=OFF
+          -DHDF5_BUILD_EXAMPLES=OFF
+          -DHDF5_BUILD_JAVA=OFF
+          -DHDF5_BUILD_FORTRAN=OFF
+          -DHDF5_BUILD_UTILS=OFF
+          -DHDF5_ENABLE_PARALLEL=OFF
+          -DHDF5_ENABLE_THREADSAFE=OFF
+          -DHDF5_ENABLE_DIRECT_VFD=ON
+          -DHDF5_ENABLE_EMBEDDED_LIBINFO=ON
+          # Add these lines to disable network features that require CURL
+          -DHDF5_ENABLE_ROS3_VFD=OFF
+          -DHDF5_ENABLE_DAP=OFF
+      BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
+      INSTALL_COMMAND ${CMAKE_COMMAND} --install .
     )
-
-    # Set include and library paths
-    set(HDF5_INCLUDE_DIR ${HDF5_INSTALL_DIR}/include)
-    set(HDF5_LIBRARY ${HDF5_INSTALL_DIR}/lib/libhdf5${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     # --- Install NetCDF-C (Requires HDF5) ---
     ExternalProject_Add(
         NetCDFC
         GIT_REPOSITORY https://github.com/Unidata/netcdf-c.git
-        GIT_TAG main
+        GIT_TAG v4.9.2  # Use a stable release instead of main
         GIT_PROGRESS 1
         DEPENDS HDF5
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=${NETCDF_C_INSTALL_DIR}
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
             -DBUILD_SHARED_LIBS=ON
             -DNETCDF_ENABLE_HDF5=ON
             -DNETCDF_ENABLE_DAP=OFF
             -DNETCDF_ENABLE_TESTS=OFF
+            -DNETCDF_BUILD_UTILITIES=OFF
             -DHDF5_ROOT=${HDF5_INSTALL_DIR}
+            -DHDF5_DIR=${HDF5_INSTALL_DIR}/lib/cmake/hdf5
+            -DCMAKE_PREFIX_PATH=${HDF5_INSTALL_DIR}
         BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
         INSTALL_COMMAND ${CMAKE_COMMAND} --install .
     )
 
-    # Set include and library paths
+    # --- Install NetCDF-CXX4 (Requires NetCDF-C) ---
+    ExternalProject_Add(
+        NetCDFCXX
+        GIT_REPOSITORY https://github.com/Unidata/netcdf-cxx4.git
+        GIT_TAG v4.3.1  # Use a stable release
+        GIT_PROGRESS 1
+        DEPENDS NetCDFC
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=${NETCDF_CXX_INSTALL_DIR}
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -DBUILD_SHARED_LIBS=ON
+            -DNCXX_ENABLE_TESTS=OFF
+            -DENABLE_DOXYGEN=OFF
+            -DnetCDF_LIBRARIES=${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX}
+            -DnetCDF_INCLUDE_DIR=${NETCDF_C_INSTALL_DIR}/include
+            -DCMAKE_PREFIX_PATH="${NETCDF_C_INSTALL_DIR};${HDF5_INSTALL_DIR}"
+            -DNETCDF_C_LIBRARY=${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX}
+            -DNETCDF_C_INCLUDE_DIR=${NETCDF_C_INSTALL_DIR}/include
+        BUILD_COMMAND ${CMAKE_COMMAND} --build . --parallel
+        INSTALL_COMMAND ${CMAKE_COMMAND} --install .
+    )
+
+    # Create imported targets for easier linking
+    add_library(HDF5::HDF5 SHARED IMPORTED)
+    set_target_properties(HDF5::HDF5 PROPERTIES
+        IMPORTED_LOCATION ${HDF5_INSTALL_DIR}/lib/libhdf5${CMAKE_SHARED_LIBRARY_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${HDF5_INSTALL_DIR}/include
+    )
+
+    add_library(NetCDF::NetCDF SHARED IMPORTED)
+    set_target_properties(NetCDF::NetCDF PROPERTIES
+        IMPORTED_LOCATION ${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${NETCDF_C_INSTALL_DIR}/include
+        INTERFACE_LINK_LIBRARIES HDF5::HDF5
+    )
+
+    add_library(NetCDF::NetCDFCXX SHARED IMPORTED)
+    set_target_properties(NetCDF::NetCDFCXX PROPERTIES
+        IMPORTED_LOCATION ${NETCDF_CXX_INSTALL_DIR}/lib/libnetcdf-cxx4${CMAKE_SHARED_LIBRARY_SUFFIX}
+        INTERFACE_INCLUDE_DIRECTORIES ${NETCDF_CXX_INSTALL_DIR}/include
+        INTERFACE_LINK_LIBRARIES NetCDF::NetCDF
+    )
+
+    # Add dependencies to ensure external projects are built before imported targets are used
+    add_dependencies(HDF5::HDF5 HDF5)
+    add_dependencies(NetCDF::NetCDF NetCDFC)
+    add_dependencies(NetCDF::NetCDFCXX NetCDFCXX)
+
+    # Set variables for compatibility (if your code expects these)
+    set(HDF5_INCLUDE_DIR ${HDF5_INSTALL_DIR}/include)
+    set(HDF5_LIBRARY ${HDF5_INSTALL_DIR}/lib/libhdf5${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(NETCDF_C_INCLUDE_DIR ${NETCDF_C_INSTALL_DIR}/include)
     set(NETCDF_C_LIBRARY ${NETCDF_C_INSTALL_DIR}/lib/libnetcdf${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set(NETCDF_CXX_INCLUDE_DIR ${NETCDF_CXX_INSTALL_DIR}/include)
+    set(NETCDF_CXX_LIBRARY ${NETCDF_CXX_INSTALL_DIR}/lib/libnetcdf-cxx4${CMAKE_SHARED_LIBRARY_SUFFIX})
 
+    # Add compile definitions
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSTORMM_USE_NETCDF")
+    if(STORMM_ENABLE_CUDA)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DSTORMM_USE_NETCDF")
+    endif()
 endif()
-
 
 # --- RDKit Integration ---
 if (STORMM_ENABLE_RDKIT)
@@ -192,12 +252,12 @@ file(WRITE ${CMAKE_BINARY_DIR}/check_memory.cmake
         OUTPUT_VARIABLE AVAILABLE_MEM_KB
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-    
+
     string(REGEX REPLACE \"[^0-9]\" \"\" TOTAL_MEM_KB \"\${TOTAL_MEM_KB}\")
     string(REGEX REPLACE \"[^0-9]\" \"\" AVAILABLE_MEM_KB \"\${AVAILABLE_MEM_KB}\")
-    
+
     math(EXPR USED_PERCENT \"100 - (\${AVAILABLE_MEM_KB} * 100 / \${TOTAL_MEM_KB})\")
-    
+
     if(USED_PERCENT GREATER 70)
         message(WARNING \"System memory usage is at \${USED_PERCENT}% (above 70% threshold)\")
         message(STATUS \"Available memory: \${AVAILABLE_MEM_KB}KB of \${TOTAL_MEM_KB}KB total\")
@@ -221,13 +281,13 @@ elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\")
         OUTPUT_VARIABLE TOTAL_MEM_B
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-    
+
     string(REGEX REPLACE \"[^0-9]\" \"\" FREE_PAGES \"\${FREE_PAGES}\")
     string(REGEX REPLACE \"[^0-9]\" \"\" INACTIVE_PAGES \"\${INACTIVE_PAGES}\")
-    
+
     math(EXPR AVAILABLE_MEM_B \"(\${FREE_PAGES} + \${INACTIVE_PAGES}) * 4096\")
     math(EXPR AVAILABLE_PERCENT \"(\${AVAILABLE_MEM_B} * 100 / \${TOTAL_MEM_B})\")
-    
+
     if(AVAILABLE_PERCENT GREATER 70)
         message(WARNING \"System memory availability is at \${AVAILABLE_PERCENT}% (above 70% threshold)\")
         message(STATUS \"Available memory: \${AVAILABLE_MEM_B} bytes of \${TOTAL_MEM_B} bytes total\")
