@@ -24,6 +24,7 @@ string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 option(STORMM_BUILD_APPS "Build the apps" ON)
 option(STORMM_BUILD_TESTS "Build the tests" ON)
 option(STORMM_BUILD_BENCHMARKS "Build the benchmarks" ON)
+option(STORMM_BUILD_PYTHON "Build the Python bridge library" ON)
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
@@ -523,4 +524,21 @@ endif()
 #--- Build the benchmarks ---
 if (STORMM_BUILD_BENCHMARKS)
     add_subdirectory(benchmark)
+endif()
+
+#--- Build the Python bridge ---
+if (STORMM_BUILD_PYTHON)
+    add_library(stormm_pybridge SHARED python/cpp/stormm_pybridge.cpp)
+    target_include_directories(stormm_pybridge
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    target_link_libraries(stormm_pybridge
+        PRIVATE
+        ${PROJECT_NAME}
+    )
+    set_target_properties(stormm_pybridge PROPERTIES
+        OUTPUT_NAME "stormm_pybridge"
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
 endif()
