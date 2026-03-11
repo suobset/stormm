@@ -16,7 +16,7 @@ STORMM.
 From the repository root:
 
 ```bash
-cmake -S . -B build -DSTORMM_ENABLE_CUDA=OFF
+cmake -S . -B build -DSTORMM_ENABLE_CUDA=OFF -DSTORMM_ENABLE_PYTHON=ON
 cmake --build build --target stormm_pybridge -j4
 ```
 
