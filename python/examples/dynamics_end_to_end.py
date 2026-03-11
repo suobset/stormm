@@ -21,8 +21,8 @@ def center_of_mass(coords, masses):
 def main():
   top_a = REPO_ROOT / "test" / "Topology" / "ala_dipeptide.top"
   crd_a = REPO_ROOT / "test" / "Trajectory" / "ala_dipeptide.inpcrd"
-  top_b = REPO_ROOT / "test" / "Topology" / "ala_dipeptide.top"
-  crd_b = REPO_ROOT / "test" / "Trajectory" / "ala_dipeptide.inpcrd"
+  top_b = REPO_ROOT / "test" / "Topology" / "trpcage.top"
+  crd_b = REPO_ROOT / "test" / "Trajectory" / "trpcage.inpcrd"
 
   ag_a = dynamics.AtomGraph(top_a)
   ps_a = dynamics.PhaseSpace(crd_a, ag_a)
