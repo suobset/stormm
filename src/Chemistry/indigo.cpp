@@ -515,14 +515,14 @@ IndigoAtomCenter::IndigoAtomCenter(const int table_index_in, const int z_number_
     case 11:
     case 19:
 
-      // Alkali metals will have a formal charge of +1 outside of extreme circumstances
+      // Alkali metals will have a formal charge of +1 except in extreme circumstances
       fc_value = 1;
       break;
     case 2:
     case 10:
     case 18:
 
-      // Noble gases will have a formal charge of 0 outside extremem circumstances
+      // Noble gases will have a formal charge of 0, barring some extreme circumstance
       fc_value = 0;
       break;
     default:
@@ -980,7 +980,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     }
     viable = (viable && negative_carbons <= maximum_negative_carbons);
     if (viable) {
-
+        
       // If not all atom centers are participating, increment the number of centers that are
       // included in the fragment and start the search for the state of the next atom at its
       // first position.  Otherwise, compute the score and net charge of this state, then push
