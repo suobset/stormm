@@ -3,6 +3,14 @@
 This directory provides a Python interface to existing STORMM C++ code. It does not reimplement
 STORMM.
 
+## Layout
+
+- `cpp/stormm_pybridge.h`: documented C ABI declarations consumed by Python `ctypes`
+- `cpp/stormm_pybridge.cpp`: C++ implementations that marshal Python-compatible arguments into
+  native STORMM objects
+- `stormm/dynamics.py`: thin Python wrappers and convenience classes
+- `examples/dynamics_end_to_end.py`: runnable example that exercises all wrapped object types
+
 ## Build
 
 From the repository root:

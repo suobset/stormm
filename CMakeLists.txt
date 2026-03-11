@@ -528,6 +528,8 @@ endif()
 
 #--- Build the Python bridge ---
 if (STORMM_BUILD_PYTHON)
+    # Build a small C ABI layer for Python ctypes clients.  This target links against the main
+    # STORMM shared library and exports stable, pointer-based entry points.
     add_library(stormm_pybridge SHARED python/cpp/stormm_pybridge.cpp)
     target_include_directories(stormm_pybridge
         PRIVATE

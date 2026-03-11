@@ -1,3 +1,11 @@
+"""ctypes-based Python API for selected STORMM dynamics workflows.
+
+Design notes for contributors:
+- This module is intentionally thin.  It forwards work to compiled STORMM C++ code.
+- All raw handles are opaque pointers created/destroyed by the bridge C API.
+- We keep explicit argtypes/restype declarations to make failures deterministic.
+"""
+
 from __future__ import annotations
 
 import ctypes
@@ -9,10 +17,14 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 
 class StormmError(RuntimeError):
+  """Raised when the bridge reports an execution or validation error."""
+
   pass
 
 
 def _shared_lib_extension() -> str:
+  """Map platform name to shared-library suffix."""
+
   if sys.platform == "darwin":
     return ".dylib"
   if sys.platform.startswith("win"):
@@ -21,6 +33,12 @@ def _shared_lib_extension() -> str:
 
 
 def _candidate_bridge_paths() -> List[Path]:
+  """Search order for the C bridge shared library.
+
+  STORMM_PYBRIDGE can override the location, otherwise we check the common build path and
+  package-local fallbacks.
+  """
+
   ext = _shared_lib_extension()
   repo_root = Path(__file__).resolve().parents[2]
   env_override = os.environ.get("STORMM_PYBRIDGE")
@@ -36,6 +54,8 @@ def _candidate_bridge_paths() -> List[Path]:
 
 
 def _load_library() -> ctypes.CDLL:
+  """Load the compiled bridge library or fail with actionable diagnostics."""
+
   checked_paths: List[str] = []
   for candidate in _candidate_bridge_paths():
     checked_paths.append(str(candidate))
@@ -51,6 +71,10 @@ def _load_library() -> ctypes.CDLL:
 
 _lib = _load_library()
 
+# ------------------------------------------------------------------------------
+# C ABI signatures
+# ------------------------------------------------------------------------------
+# Explicit signatures keep ctypes from making unsafe type assumptions.
 _lib.stormm_get_last_error.restype = ctypes.c_char_p
 
 _lib.stormm_state_variable_count.argtypes = []
@@ -58,6 +82,7 @@ _lib.stormm_state_variable_count.restype = ctypes.c_int
 _lib.stormm_state_variable_name.argtypes = [ctypes.c_int]
 _lib.stormm_state_variable_name.restype = ctypes.c_char_p
 
+# AtomGraph constructor / query signatures.
 _lib.stormm_atomgraph_create.argtypes = [ctypes.c_char_p]
 _lib.stormm_atomgraph_create.restype = ctypes.c_void_p
 _lib.stormm_atomgraph_destroy.argtypes = [ctypes.c_void_p]
@@ -72,6 +97,7 @@ _lib.stormm_atomgraph_get_atomic_masses.argtypes = [ctypes.c_void_p,
                                                      ctypes.POINTER(ctypes.c_double), ctypes.c_int]
 _lib.stormm_atomgraph_get_atomic_masses.restype = ctypes.c_int
 
+# PhaseSpace constructor / query signatures.
 _lib.stormm_phasespace_create.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
 _lib.stormm_phasespace_create.restype = ctypes.c_void_p
 _lib.stormm_phasespace_destroy.argtypes = [ctypes.c_void_p]
@@ -85,6 +111,7 @@ _lib.stormm_phasespace_get_interlaced_coordinates.restype = ctypes.c_int
 _lib.stormm_phasespace_export.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_double]
 _lib.stormm_phasespace_export.restype = ctypes.c_int
 
+# DynamicsControls mutator signatures.
 _lib.stormm_dynamics_controls_create.argtypes = []
 _lib.stormm_dynamics_controls_create.restype = ctypes.c_void_p
 _lib.stormm_dynamics_controls_destroy.argtypes = [ctypes.c_void_p]
@@ -113,6 +140,7 @@ _lib.stormm_dynamics_controls_set_andersen_frequency.restype = ctypes.c_int
 _lib.stormm_dynamics_controls_set_seed.argtypes = [ctypes.c_void_p, ctypes.c_int]
 _lib.stormm_dynamics_controls_set_seed.restype = ctypes.c_int
 
+# One-system dynamics execution signature.
 _lib.stormm_dynamics_run.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int,
                                      ctypes.c_double, ctypes.c_char_p, ctypes.c_char_p,
                                      ctypes.POINTER(ctypes.c_double),
@@ -121,6 +149,7 @@ _lib.stormm_dynamics_run.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_
                                      ctypes.POINTER(ctypes.c_double), ctypes.c_int]
 _lib.stormm_dynamics_run.restype = ctypes.c_int
 
+# AtomGraphSynthesis signatures.
 _lib.stormm_atomgraph_synthesis_create.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_int]
 _lib.stormm_atomgraph_synthesis_create.restype = ctypes.c_void_p
 _lib.stormm_atomgraph_synthesis_destroy.argtypes = [ctypes.c_void_p]
@@ -134,6 +163,7 @@ _lib.stormm_atomgraph_synthesis_get_atom_count.restype = ctypes.c_int
 _lib.stormm_atomgraph_synthesis_get_atom_count_system.argtypes = [ctypes.c_void_p, ctypes.c_int]
 _lib.stormm_atomgraph_synthesis_get_atom_count_system.restype = ctypes.c_int
 
+# PhaseSpaceSynthesis signatures.
 _lib.stormm_phasespace_synthesis_create.argtypes = [ctypes.POINTER(ctypes.c_void_p),
                                                     ctypes.POINTER(ctypes.c_void_p), ctypes.c_int]
 _lib.stormm_phasespace_synthesis_create.restype = ctypes.c_void_p
@@ -155,6 +185,8 @@ _lib.stormm_phasespace_synthesis_get_interlaced_coordinates.restype = ctypes.c_i
 
 
 def _last_error_message() -> str:
+  """Fetch the bridge's thread-local error string."""
+
   raw = _lib.stormm_get_last_error()
   if raw is None:
     return "Unknown STORMM error."
@@ -162,18 +194,24 @@ def _last_error_message() -> str:
 
 
 def _check_ptr(value: ctypes.c_void_p, context: str) -> ctypes.c_void_p:
+  """Raise a Python exception when a creation call returns null."""
+
   if not value:
     raise StormmError(f"{context} failed: {_last_error_message()}")
   return ctypes.c_void_p(value)
 
 
 def _check_rc(rc: int, context: str) -> int:
+  """Raise a Python exception when a bridge call returns a negative code."""
+
   if rc < 0:
     raise StormmError(f"{context} failed: {_last_error_message()}")
   return rc
 
 
 def _encode_optional_path(path: Optional[Union[str, Path]]) -> Optional[bytes]:
+  """Normalize Python paths to absolute UTF-8 bytes for C calls."""
+
   if path is None:
     return None
   return str(Path(path).expanduser().resolve()).encode("utf-8")
@@ -184,6 +222,8 @@ _THERMOSTAT_KIND = {"none": 0, "andersen": 1, "langevin": 2, "berendsen": 3}
 
 
 def _normalize_trajectory_kind(kind: str) -> int:
+  """Validate and translate user-facing trajectory kind strings."""
+
   key = kind.lower().strip()
   if key not in _TRAJECTORY_KIND:
     raise ValueError(f"Unsupported trajectory kind '{kind}'.")
@@ -191,6 +231,8 @@ def _normalize_trajectory_kind(kind: str) -> int:
 
 
 def _normalize_thermostat_kind(kind: Union[str, int, None]) -> int:
+  """Validate and translate thermostat selectors."""
+
   if kind is None:
     return -1
   if isinstance(kind, int):
@@ -204,6 +246,8 @@ def _normalize_thermostat_kind(kind: Union[str, int, None]) -> int:
 
 
 def state_variable_names() -> List[str]:
+  """Return canonical STORMM state variable names in enum order."""
+
   count = _check_rc(_lib.stormm_state_variable_count(), "state variable count query")
   names: List[str] = []
   for i in range(count):
@@ -215,6 +259,8 @@ def state_variable_names() -> List[str]:
 
 
 class AtomGraph:
+  """Python owner for a STORMM AtomGraph handle."""
+
   def __init__(self, topology_path: Union[str, Path]) -> None:
     path = str(Path(topology_path).expanduser().resolve()).encode("utf-8")
     self._handle = _check_ptr(_lib.stormm_atomgraph_create(path), "AtomGraph creation")
@@ -256,7 +302,10 @@ class AtomGraph:
 
 
 class PhaseSpace:
+  """Python owner for a STORMM PhaseSpace handle."""
+
   def __init__(self, coordinate_path: Union[str, Path], atomgraph: AtomGraph) -> None:
+    # Hold a topology reference so callers cannot accidentally destroy it first.
     self._atomgraph_ref = atomgraph
     path = str(Path(coordinate_path).expanduser().resolve()).encode("utf-8")
     self._handle = _check_ptr(_lib.stormm_phasespace_create(path, atomgraph._handle),
@@ -299,6 +348,8 @@ class PhaseSpace:
 
 
 class DynamicsControls:
+  """Python owner for STORMM DynamicsControls."""
+
   def __init__(self) -> None:
     self._handle = _check_ptr(_lib.stormm_dynamics_controls_create(), "DynamicsControls creation")
 
@@ -380,6 +431,8 @@ class DynamicsControls:
 
 
 class AtomGraphSynthesis:
+  """Python owner for STORMM AtomGraphSynthesis."""
+
   def __init__(self, atomgraphs: Sequence[AtomGraph]) -> None:
     if not atomgraphs:
       raise ValueError("AtomGraphSynthesis needs at least one AtomGraph.")
@@ -422,6 +475,8 @@ class AtomGraphSynthesis:
 
 
 class PhaseSpaceSynthesis:
+  """Python owner for STORMM PhaseSpaceSynthesis."""
+
   def __init__(self, phasespaces: Sequence[PhaseSpace], atomgraphs: Sequence[AtomGraph]) -> None:
     if not phasespaces:
       raise ValueError("PhaseSpaceSynthesis needs at least one system.")
@@ -484,6 +539,8 @@ class PhaseSpaceSynthesis:
 
 @dataclass(frozen=True)
 class DynamicsResult:
+  """Structured return values from `run_dynamics`."""
+
   potential_energy: float
   total_energy: float
   sample_count: int
@@ -494,6 +551,8 @@ def run_dynamics(phasespace: PhaseSpace, atomgraph: AtomGraph, controls: Optiona
                  thermostat: Union[str, int, None] = None, temperature_kelvin: float = 298.15,
                  trajectory_file: Optional[Union[str, Path]] = None,
                  restart_file: Optional[Union[str, Path]] = None) -> DynamicsResult:
+  """Run STORMM dynamics and return energies/states in Python-native types."""
+
   state_count = _check_rc(_lib.stormm_state_variable_count(), "state variable count query")
   state_values = (ctypes.c_double * state_count)()
   potential = ctypes.c_double(0.0)
