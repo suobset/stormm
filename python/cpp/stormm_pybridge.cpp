@@ -1,5 +1,7 @@
+// -*-c++-*-
+#include "stormm_pybridge.h"
+
 #include <algorithm>
-#include <cstring>
 #include <exception>
 #include <stdexcept>
 #include <string>
@@ -20,6 +22,8 @@
 
 namespace {
 
+// Import the STORMM types wrapped by this C ABI layer.  Keeping aliases local avoids leaking
+// STORMM namespaces into extern "C" declarations while reducing verbosity in wrapper code.
 using stormm::energy::ScoreCard;
 using stormm::energy::StateVariable;
 using stormm::energy::StaticExclusionMask;
@@ -35,6 +39,7 @@ using stormm::trajectory::Thermostat;
 using stormm::trajectory::ThermostatKind;
 using stormm::trajectory::TrajectoryKind;
 
+// Bridge errors are stored per-thread so concurrent Python use can report diagnostics correctly.
 thread_local std::string stormm_last_error;
 
 void setError(const std::string &msg) {
@@ -45,6 +50,7 @@ void clearError() {
   stormm_last_error.clear();
 }
 
+// Validate opaque pointers originating from Python before reinterpreting as C++ handles.
 template <typename T>
 T* requireHandle(void* handle, const char* name) {
   if (handle == nullptr) {
@@ -61,6 +67,7 @@ const T* requireHandle(const void* handle, const char* name) {
   return reinterpret_cast<const T*>(handle);
 }
 
+// Convert C++ exceptions to integer return codes and record a string message for Python.
 template <typename Fn>
 int wrapVoid(Fn &&fn) {
   try {
@@ -93,6 +100,7 @@ RetType wrapValue(Fn &&fn, RetType error_value) {
   return error_value;
 }
 
+// Translate compact Python thermostat codes into STORMM enum values.
 ThermostatKind toThermostatKind(const int kind_code) {
   switch (kind_code) {
   case 0:
@@ -110,6 +118,7 @@ ThermostatKind toThermostatKind(const int kind_code) {
   }
 }
 
+// Translate compact Python trajectory codes into STORMM enum values.
 TrajectoryKind toTrajectoryKind(const int kind_code) {
   switch (kind_code) {
   case 0:
@@ -124,10 +133,12 @@ TrajectoryKind toTrajectoryKind(const int kind_code) {
   }
 }
 
+// Convert nullable C strings from Python into C++ strings with safe defaults.
 std::string toString(const char* text) {
   return (text == nullptr) ? std::string() : std::string(text);
 }
 
+// Standard two-call vector export helper: first call with out = null to get required length.
 int copyVectorToBuffer(const std::vector<double> &data, double* out, const int out_len) {
   const int need = static_cast<int>(data.size());
   if (out == nullptr) {
@@ -145,6 +156,9 @@ int copyVectorToBuffer(const std::vector<double> &data, double* out, const int o
 
 extern "C" {
 
+// -----------------------------------------------------------------------------
+// Global diagnostics
+// -----------------------------------------------------------------------------
 const char* stormm_get_last_error() {
   return stormm_last_error.c_str();
 }
@@ -166,6 +180,9 @@ const char* stormm_state_variable_name(const int state_index) {
   }, static_cast<const char*>(nullptr));
 }
 
+// -----------------------------------------------------------------------------
+// AtomGraph wrappers
+// -----------------------------------------------------------------------------
 void* stormm_atomgraph_create(const char* topology_file) {
   return wrapValue([&]() -> void* {
     if (topology_file == nullptr) {
@@ -213,6 +230,9 @@ int stormm_atomgraph_get_atomic_masses(const void* atomgraph_handle, double* out
   }, -1);
 }
 
+// -----------------------------------------------------------------------------
+// PhaseSpace wrappers
+// -----------------------------------------------------------------------------
 void* stormm_phasespace_create(const char* coordinate_file, const void* atomgraph_handle) {
   return wrapValue([&]() -> void* {
     if (coordinate_file == nullptr) {
@@ -259,6 +279,9 @@ int stormm_phasespace_export(const void* phasespace_handle, const char* output_f
   });
 }
 
+// -----------------------------------------------------------------------------
+// DynamicsControls wrappers
+// -----------------------------------------------------------------------------
 void* stormm_dynamics_controls_create() {
   return wrapValue([&]() -> void* {
     DynamicsControls* dyncon = new DynamicsControls();
@@ -358,6 +381,9 @@ int stormm_dynamics_controls_set_seed(void* controls_handle, const int random_se
   });
 }
 
+// -----------------------------------------------------------------------------
+// One-system dynamics execution wrapper
+// -----------------------------------------------------------------------------
 int stormm_dynamics_run(void* phasespace_handle, const void* atomgraph_handle,
                         const void* controls_handle, const int thermostat_kind_code,
                         const double thermostat_temperature, const char* trajectory_file,
@@ -412,6 +438,9 @@ int stormm_dynamics_run(void* phasespace_handle, const void* atomgraph_handle,
   }, -1);
 }
 
+// -----------------------------------------------------------------------------
+// AtomGraphSynthesis wrappers
+// -----------------------------------------------------------------------------
 void* stormm_atomgraph_synthesis_create(void* const* atomgraph_handles, const int count) {
   return wrapValue([&]() -> void* {
     if (count <= 0) {
@@ -468,6 +497,9 @@ int stormm_atomgraph_synthesis_get_atom_count_system(const void* ags_handle, con
   }, -1);
 }
 
+// -----------------------------------------------------------------------------
+// PhaseSpaceSynthesis wrappers
+// -----------------------------------------------------------------------------
 void* stormm_phasespace_synthesis_create(void* const* phasespace_handles,
                                          void* const* atomgraph_handles, const int count) {
   return wrapValue([&]() -> void* {
