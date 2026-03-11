@@ -24,7 +24,13 @@ string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 option(STORMM_BUILD_APPS "Build the apps" ON)
 option(STORMM_BUILD_TESTS "Build the tests" ON)
 option(STORMM_BUILD_BENCHMARKS "Build the benchmarks" ON)
-option(STORMM_BUILD_PYTHON "Build the Python bridge library" ON)
+
+# Preserve compatibility with older build scripts while migrating to STORMM_ENABLE_PYTHON.
+if (DEFINED STORMM_BUILD_PYTHON AND NOT DEFINED STORMM_ENABLE_PYTHON)
+    set(STORMM_ENABLE_PYTHON ${STORMM_BUILD_PYTHON})
+    message(WARNING "STORMM_BUILD_PYTHON is deprecated; use STORMM_ENABLE_PYTHON instead.")
+endif()
+option(STORMM_ENABLE_PYTHON "Enable the Python bridge library" ON)
 option(STORMM_ENABLE_CUDA "Enable CUDA support" ON)
 option(STORMM_ENABLE_RDKIT "Enable RDKIT support" ON)
 option(STORMM_ENABLE_TEST_COVERAGE "Enable test coverage" OFF)
@@ -527,7 +533,7 @@ if (STORMM_BUILD_BENCHMARKS)
 endif()
 
 #--- Build the Python bridge ---
-if (STORMM_BUILD_PYTHON)
+if (STORMM_ENABLE_PYTHON)
     # Build a small C ABI layer for Python ctypes clients.  This target links against the main
     # STORMM shared library and exports stable, pointer-based entry points.
     add_library(stormm_pybridge SHARED python/cpp/stormm_pybridge.cpp)
